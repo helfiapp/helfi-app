@@ -1,5 +1,4 @@
-"use client";
-import { useState } from 'react';
+import React, { useState } from 'react';
 
 const steps = [
   'gender',
@@ -13,6 +12,7 @@ const steps = [
 
 function GenderStep({ onNext, initial }: { onNext: (data: any) => void, initial?: string }) {
   const [gender, setGender] = useState(initial || '');
+  const [agreed, setAgreed] = useState(false);
   return (
     <div className="max-w-md mx-auto mt-12 p-6 bg-white rounded shadow">
       <h2 className="text-2xl font-bold mb-4">Let's get started. What's your gender?</h2>
@@ -31,10 +31,22 @@ function GenderStep({ onNext, initial }: { onNext: (data: any) => void, initial?
           Female
         </button>
       </div>
+      <div className="flex items-center mb-4">
+        <input
+          type="checkbox"
+          id="agree-terms"
+          checked={agreed}
+          onChange={e => setAgreed(e.target.checked)}
+          className="mr-2"
+        />
+        <label htmlFor="agree-terms" className="text-sm text-gray-700">
+          I agree to the <a href="/terms" target="_blank" className="text-helfi-green underline">Terms and Conditions</a> and <a href="/privacy" target="_blank" className="text-helfi-green underline">Privacy Policy</a>
+        </label>
+      </div>
       <button
         className="btn-primary w-full"
-        disabled={!gender}
-        onClick={() => gender && onNext({ gender })}
+        disabled={!gender || !agreed}
+        onClick={() => gender && agreed && onNext({ gender })}
       >
         Continue
       </button>
