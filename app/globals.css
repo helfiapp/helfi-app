@@ -1,0 +1,32 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 3.9%;
+  }
+
+  body {
+    @apply bg-white text-helfi-black antialiased;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green-dark transition-colors;
+  }
+
+  .btn-secondary {
+    @apply border border-helfi-green text-helfi-green px-4 py-2 rounded-lg hover:bg-helfi-green hover:text-white transition-colors;
+  }
+
+  .input-primary {
+    @apply block w-full rounded-lg border-gray-300 shadow-sm focus:border-helfi-green focus:ring-helfi-green;
+  }
+
+  .card {
+    @apply bg-white rounded-xl shadow-md p-6;
+  }
+} 
