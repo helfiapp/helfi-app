@@ -2060,36 +2060,16 @@ export default function Onboarding() {
 
         {/* Content */}
         <div className="flex-1 px-4 py-6">
-          <div style={{ display: step === 0 ? 'block' : 'none' }}>
-            <GenderStep key="gender" onNext={handleNext} initial={form.gender} />
-          </div>
-          <div style={{ display: step === 1 ? 'block' : 'none' }}>
-            <PhysicalStep key="physical" onNext={handleNext} onBack={handleBack} initial={form} />
-          </div>
-          <div style={{ display: step === 2 ? 'block' : 'none' }}>
-            <ExerciseStep key="exercise" onNext={handleNext} onBack={handleBack} initial={form} />
-          </div>
-          <div style={{ display: step === 3 ? 'block' : 'none' }}>
-            <HealthGoalsStep key="health" onNext={handleNext} onBack={handleBack} initial={form} />
-          </div>
-          <div style={{ display: step === 4 ? 'block' : 'none' }}>
-            <HealthSituationsStep key="healthSituations" onNext={handleNext} onBack={handleBack} initial={form} />
-          </div>
-          <div style={{ display: step === 5 ? 'block' : 'none' }}>
-            <SupplementsStep key="supplements" onNext={handleNext} onBack={handleBack} initial={form} />
-          </div>
-          <div style={{ display: step === 6 ? 'block' : 'none' }}>
-            <MedicationsStep key="medications" onNext={handleNext} onBack={handleBack} initial={form} />
-          </div>
-          <div style={{ display: step === 7 ? 'block' : 'none' }}>
-            <BloodResultsStep key="bloodResults" onNext={handleNext} onBack={handleBack} initial={form} />
-          </div>
-          <div style={{ display: step === 8 ? 'block' : 'none' }}>
-            <AIInsightsStep key="aiInsights" onNext={handleNext} onBack={handleBack} initial={form} />
-          </div>
-          <div style={{ display: step === 9 ? 'block' : 'none' }}>
-            <ReviewStep key="review" onBack={handleBack} data={form} />
-          </div>
+          {step === 0 && <GenderStep onNext={handleNext} initial={form.gender} />}
+          {step === 1 && <PhysicalStep onNext={handleNext} onBack={handleBack} initial={form} />}
+          {step === 2 && <ExerciseStep onNext={handleNext} onBack={handleBack} initial={form} />}
+          {step === 3 && <HealthGoalsStep onNext={handleNext} onBack={handleBack} initial={form} />}
+          {step === 4 && <HealthSituationsStep onNext={handleNext} onBack={handleBack} initial={form} />}
+          {step === 5 && <SupplementsStep onNext={handleNext} onBack={handleBack} initial={form} />}
+          {step === 6 && <MedicationsStep onNext={handleNext} onBack={handleBack} initial={form} />}
+          {step === 7 && <BloodResultsStep onNext={handleNext} onBack={handleBack} initial={form} />}
+          {step === 8 && <AIInsightsStep onNext={handleNext} onBack={handleBack} initial={form} />}
+          {step === 9 && <ReviewStep onBack={handleBack} data={form} />}
         </div>
       </div>
     </div>
