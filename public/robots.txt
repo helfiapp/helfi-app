@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /healthapp/
+Disallow: /admin/
+Disallow: /admin-panel/
+Disallow: /api/
+
+Sitemap: https://helfi.ai/sitemap.xml 
