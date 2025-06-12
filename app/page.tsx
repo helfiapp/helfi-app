@@ -182,6 +182,249 @@ export default function SplashPage() {
         </div>
       </section>
 
+      {/* Why Health Tracking Matters Section */}
+      <section className="px-4 py-20 bg-gradient-to-br from-green-50 to-blue-50">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-bold text-helfi-black mb-6">
+              Why Personal Health Intelligence Matters
+            </h2>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
+              In today's fast-paced world, maintaining optimal health requires more than just good intentions. 
+              Our AI-powered health intelligence platform transforms how you understand and optimize your wellbeing.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+            <div>
+              <h3 className="text-3xl font-bold text-helfi-black mb-6">The Modern Health Challenge</h3>
+              <div className="space-y-6">
+                <div className="flex items-start space-x-4">
+                  <div className="bg-red-100 rounded-full p-2 mt-1">
+                    <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-gray-900 mb-2">Overwhelming Information</h4>
+                    <p className="text-gray-600">Millions of health articles, supplements, and conflicting advice make it impossible to know what's right for your unique body.</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start space-x-4">
+                  <div className="bg-orange-100 rounded-full p-2 mt-1">
+                    <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-gray-900 mb-2">Supplement Interactions</h4>
+                    <p className="text-gray-600">Dangerous drug interactions happen daily because people don't track their supplements, medications, and nutrients properly.</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start space-x-4">
+                  <div className="bg-yellow-100 rounded-full p-2 mt-1">
+                    <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-1.996-.833-2.764 0L3.052 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-gray-900 mb-2">Missed Health Patterns</h4>
+                    <p className="text-gray-600">Without proper tracking, you miss crucial patterns between your diet, supplements, sleep, and how you feel.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h3 className="text-3xl font-bold text-helfi-black mb-6">The Helfi Solution</h3>
+              <div className="space-y-6">
+                <div className="flex items-start space-x-4">
+                  <div className="bg-helfi-green/20 rounded-full p-2 mt-1">
+                    <svg className="w-6 h-6 text-helfi-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-gray-900 mb-2">AI-Powered Personalization</h4>
+                    <p className="text-gray-600">Our advanced AI analyzes your unique health profile to provide personalized recommendations that actually work for your body.</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start space-x-4">
+                  <div className="bg-blue-100 rounded-full p-2 mt-1">
+                    <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-gray-900 mb-2">Safety First Approach</h4>
+                    <p className="text-gray-600">Automatically detect dangerous supplement-medication interactions and get instant alerts to keep you safe.</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start space-x-4">
+                  <div className="bg-purple-100 rounded-full p-2 mt-1">
+                    <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-gray-900 mb-2">Effortless Tracking</h4>
+                    <p className="text-gray-600">Simply take photos of your food or say "Hey Helfi, I just took my vitamins" - our AI handles the rest automatically.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Health Intelligence Benefits Section */}
+      <section className="px-4 py-20 bg-white">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-bold text-helfi-black mb-6">
+              Transform Your Health with AI Intelligence
+            </h2>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              Discover how artificial intelligence can revolutionize your approach to wellness, nutrition, and longevity.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+            <div className="text-center p-6 bg-gradient-to-br from-green-50 to-blue-50 rounded-2xl">
+              <div className="w-16 h-16 bg-helfi-green/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-helfi-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold text-helfi-black mb-3">Smart Supplement Optimization</h3>
+              <p className="text-gray-600 text-sm">
+                Optimize your supplement timing, dosages, and combinations based on your unique metabolism and health goals.
+              </p>
+            </div>
+
+            <div className="text-center p-6 bg-gradient-to-br from-blue-50 to-purple-50 rounded-2xl">
+              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold text-helfi-black mb-3">Instant Health Insights</h3>
+              <p className="text-gray-600 text-sm">
+                Get real-time analysis of how your lifestyle choices affect your energy, mood, sleep quality, and overall wellbeing.
+              </p>
+            </div>
+
+            <div className="text-center p-6 bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl">
+              <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold text-helfi-black mb-3">Predictive Health Analytics</h3>
+              <p className="text-gray-600 text-sm">
+                Identify health trends before they become problems with advanced pattern recognition and predictive modeling.
+              </p>
+            </div>
+
+            <div className="text-center p-6 bg-gradient-to-br from-orange-50 to-red-50 rounded-2xl">
+              <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-1.996-.833-2.764 0L3.052 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold text-helfi-black mb-3">Safety & Interaction Alerts</h3>
+              <p className="text-gray-600 text-sm">
+                Stay safe with automatic detection of dangerous drug interactions, supplement conflicts, and personalized warnings.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Voice AI Section */}
+      <section className="px-4 py-20 bg-gradient-to-r from-purple-50 to-blue-50">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+            <div>
+              <h2 className="text-4xl font-bold text-helfi-black mb-6">
+                Meet Your AI Health Assistant
+              </h2>
+              <p className="text-xl text-gray-600 mb-8">
+                Experience the future of health tracking with our revolutionary voice AI technology. 
+                Simply speak naturally and let Helfi handle the complex analysis.
+              </p>
+              
+              <div className="space-y-6">
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-purple-100">
+                  <div className="flex items-start space-x-4">
+                    <div className="bg-purple-100 rounded-full p-2 mt-1">
+                      <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-gray-900 mb-2">Natural Voice Commands</h4>
+                      <p className="text-gray-600 text-sm">"Hey Helfi, I just went for a 5km run and feeling great!"</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-blue-100">
+                  <div className="flex items-start space-x-4">
+                    <div className="bg-blue-100 rounded-full p-2 mt-1">
+                      <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-gray-900 mb-2">Instant Analysis</h4>
+                      <p className="text-gray-600 text-sm">"I'm feeling tired after lunch, what might be causing this?"</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-green-100">
+                  <div className="flex items-start space-x-4">
+                    <div className="bg-helfi-green/20 rounded-full p-2 mt-1">
+                      <svg className="w-6 h-6 text-helfi-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-gray-900 mb-2">Smart Recommendations</h4>
+                      <p className="text-gray-600 text-sm">"Based on your pattern, try taking magnesium 2 hours before your usual sleep time."</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="text-center">
+              <div className="bg-gradient-to-br from-purple-100 to-blue-100 rounded-3xl p-12 relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-purple-400/20 to-blue-400/20"></div>
+                <div className="relative z-10">
+                  <div className="text-6xl mb-6">🎤</div>
+                  <h3 className="text-2xl font-bold text-gray-900 mb-4">Talk to Helfi</h3>
+                  <p className="text-gray-700 mb-6">
+                    The most natural way to track your health. Just speak, and let AI do the work.
+                  </p>
+                  <button
+                    onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}
+                    className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-8 py-4 rounded-xl font-semibold hover:from-purple-700 hover:to-blue-700 transition-all duration-200"
+                  >
+                    Try Voice AI Free
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Pricing Section */}
       <section id="pricing" className="px-4 py-20 bg-gray-50">
         <div className="max-w-7xl mx-auto">
@@ -355,16 +598,214 @@ export default function SplashPage() {
             </div>
           </div>
 
-          {/* Additional pricing info */}
-          <div className="text-center mt-12">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 max-w-4xl mx-auto">
-              <h4 className="font-semibold text-blue-900 mb-3">🎯 14-Day Free Trial includes everything!</h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-blue-700">
-                <div>✨ Experience voice AI commands</div>
-                <div>📱 Connect all your devices</div>
-                <div>🧠 Get unlimited AI insights</div>
+          {/* Enhanced Trial Benefits Section */}
+          <div className="text-center mt-16">
+            <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 border border-blue-200 rounded-2xl p-8 max-w-5xl mx-auto shadow-lg">
+              <div className="mb-6">
+                <div className="inline-flex items-center bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-2 rounded-full text-sm font-semibold shadow-md">
+                  🎯 14-Day Free Trial includes everything!
+                </div>
               </div>
-              <p className="text-sm text-blue-600 mt-3">No credit card required • Cancel anytime • Keep your data</p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                <div className="bg-white rounded-xl p-6 shadow-sm border border-blue-100 hover:shadow-md transition-shadow">
+                  <div className="text-3xl mb-3">🎤</div>
+                  <h5 className="font-semibold text-gray-900 mb-2">Voice AI Commands</h5>
+                  <p className="text-sm text-gray-600">Say "Hey Helfi, I just ate lunch" and watch the magic happen</p>
+                </div>
+                
+                <div className="bg-white rounded-xl p-6 shadow-sm border border-blue-100 hover:shadow-md transition-shadow">
+                  <div className="text-3xl mb-3">📱</div>
+                  <h5 className="font-semibold text-gray-900 mb-2">Device Integration</h5>
+                  <p className="text-sm text-gray-600">Connect Fitbit, Apple Watch, Oura Ring and more instantly</p>
+                </div>
+                
+                <div className="bg-white rounded-xl p-6 shadow-sm border border-blue-100 hover:shadow-md transition-shadow">
+                  <div className="text-3xl mb-3">🧠</div>
+                  <h5 className="font-semibold text-gray-900 mb-2">Unlimited AI Insights</h5>
+                  <p className="text-sm text-gray-600">Get personalized health recommendations 24/7</p>
+                </div>
+              </div>
+              
+              <div className="flex flex-wrap justify-center items-center gap-6 text-sm text-blue-700 font-medium">
+                <div className="flex items-center">
+                  <svg className="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  No credit card required
+                </div>
+                <div className="flex items-center">
+                  <svg className="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Cancel anytime
+                </div>
+                <div className="flex items-center">
+                  <svg className="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Keep your data forever
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ Section */}
+      <section className="px-4 py-20 bg-white">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-bold text-helfi-black mb-6">
+              Frequently Asked Questions
+            </h2>
+            <p className="text-xl text-gray-600">
+              Everything you need to know about Helfi's AI-powered health intelligence platform
+            </p>
+          </div>
+
+          <div className="space-y-8">
+            <div className="bg-gray-50 rounded-2xl p-8">
+              <h3 className="text-xl font-bold text-helfi-black mb-4">
+                How does Helfi's AI analyze my health data?
+              </h3>
+              <p className="text-gray-600 leading-relaxed">
+                Our advanced AI engine uses machine learning algorithms to analyze patterns in your nutrition, supplement intake, 
+                sleep, exercise, and mood data. It identifies correlations that humans might miss, providing personalized insights 
+                about what works best for your unique body and lifestyle. The more data you provide, the more accurate and 
+                personalized your recommendations become.
+              </p>
+            </div>
+
+            <div className="bg-gray-50 rounded-2xl p-8">
+              <h3 className="text-xl font-bold text-helfi-black mb-4">
+                Is my health data secure and private?
+              </h3>
+              <p className="text-gray-600 leading-relaxed">
+                Absolutely. Your health data is encrypted using bank-level security (AES-256 encryption) and stored in 
+                HIPAA-compliant servers. We never sell your personal information to third parties, and you maintain complete 
+                control over your data. You can export or delete your information at any time. Our AI processing happens 
+                securely on our servers, ensuring your sensitive health information never leaves our protected environment.
+              </p>
+            </div>
+
+            <div className="bg-gray-50 rounded-2xl p-8">
+              <h3 className="text-xl font-bold text-helfi-black mb-4">
+                Can Helfi detect dangerous supplement and medication interactions?
+              </h3>
+              <p className="text-gray-600 leading-relaxed">
+                Yes! One of Helfi's most important features is our comprehensive interaction checker. Our database contains 
+                thousands of known interactions between supplements, medications, and nutrients. When you log new supplements 
+                or medications, Helfi automatically checks for potential conflicts and alerts you immediately. This includes 
+                interactions that affect absorption, effectiveness, or could cause adverse effects.
+              </p>
+            </div>
+
+            <div className="bg-gray-50 rounded-2xl p-8">
+              <h3 className="text-xl font-bold text-helfi-black mb-4">
+                How accurate is the food photo recognition?
+              </h3>
+              <p className="text-gray-600 leading-relaxed">
+                Our AI food recognition system has been trained on millions of food images and achieves over 85% accuracy for 
+                common foods. It can identify ingredients, estimate portion sizes, and calculate nutritional content including 
+                calories, macronutrients, vitamins, and minerals. For best results, take photos in good lighting and include 
+                reference objects for size. You can always edit the AI's suggestions to ensure accuracy.
+              </p>
+            </div>
+
+            <div className="bg-gray-50 rounded-2xl p-8">
+              <h3 className="text-xl font-bold text-helfi-black mb-4">
+                What devices can I connect to Helfi?
+              </h3>
+              <p className="text-gray-600 leading-relaxed">
+                Helfi integrates with popular fitness and health devices including Fitbit, Apple Watch, Oura Ring, Garmin watches, 
+                Google Fit, Samsung Health, Withings smart scales, and Polar heart rate monitors. These integrations provide 
+                automatic tracking of steps, heart rate, sleep patterns, weight, and exercise data, giving our AI more comprehensive 
+                information to provide better health insights and recommendations.
+              </p>
+            </div>
+
+            <div className="bg-gray-50 rounded-2xl p-8">
+              <h3 className="text-xl font-bold text-helfi-black mb-4">
+                How does the voice AI feature work?
+              </h3>
+              <p className="text-gray-600 leading-relaxed">
+                Our voice AI assistant allows you to interact with Helfi using natural speech. Simply say commands like 
+                "Hey Helfi, I just took my morning vitamins" or "I'm feeling tired, what might be causing this?" The AI 
+                processes your speech, logs relevant information automatically, and provides instant analysis and recommendations. 
+                It's designed to understand context and natural language, making health tracking as simple as having a conversation.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Benefits for Health Optimization Section */}
+      <section className="px-4 py-20 bg-gradient-to-br from-helfi-green/5 to-blue-50">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-bold text-helfi-black mb-6">
+              Why Health Optimization Matters More Than Ever
+            </h2>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
+              In 2024, chronic diseases affect 6 in 10 adults in the US. Many of these conditions are preventable 
+              through proper nutrition, supplement optimization, and lifestyle tracking.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+              <div className="text-4xl mb-4">📈</div>
+              <h3 className="text-xl font-bold text-helfi-black mb-4">Prevent Chronic Disease</h3>
+              <p className="text-gray-600">
+                Studies show that proper nutrition tracking and supplement optimization can reduce the risk of heart disease, 
+                diabetes, and other chronic conditions by up to 40%. Early intervention through data-driven insights is key.
+              </p>
+            </div>
+
+            <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+              <div className="text-4xl mb-4">💊</div>
+              <h3 className="text-xl font-bold text-helfi-black mb-4">Optimize Supplement Efficacy</h3>
+              <p className="text-gray-600">
+                Most people take supplements incorrectly, reducing their effectiveness by 50-70%. Proper timing, dosages, 
+                and interaction awareness can dramatically improve health outcomes and save money on ineffective supplementation.
+              </p>
+            </div>
+
+            <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+              <div className="text-4xl mb-4">🧠</div>
+              <h3 className="text-xl font-bold text-helfi-black mb-4">Enhance Mental Performance</h3>
+              <p className="text-gray-600">
+                Tracking correlations between nutrition, supplements, and cognitive performance helps identify what boosts 
+                your mental clarity, focus, and mood. Personalized insights lead to sustained cognitive enhancement.
+              </p>
+            </div>
+
+            <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+              <div className="text-4xl mb-4">⚡</div>
+              <h3 className="text-xl font-bold text-helfi-black mb-4">Increase Energy Levels</h3>
+              <p className="text-gray-600">
+                By analyzing patterns in your sleep, nutrition, and supplement intake, Helfi identifies what factors 
+                contribute to energy crashes and sustained vitality, helping you maintain consistent energy throughout the day.
+              </p>
+            </div>
+
+            <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+              <div className="text-4xl mb-4">🏃</div>
+              <h3 className="text-xl font-bold text-helfi-black mb-4">Improve Athletic Performance</h3>
+              <p className="text-gray-600">
+                Athletes who track nutrition and supplementation with AI guidance show 20-30% improvements in recovery time 
+                and performance metrics compared to those using generic approaches.
+              </p>
+            </div>
+
+            <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
+              <div className="text-4xl mb-4">💰</div>
+              <h3 className="text-xl font-bold text-helfi-black mb-4">Save Money on Healthcare</h3>
+              <p className="text-gray-600">
+                Preventive health optimization through proper tracking and AI insights can reduce healthcare costs by 
+                thousands of dollars annually by preventing costly chronic diseases and optimizing supplement spending.
+              </p>
             </div>
           </div>
         </div>
