@@ -15,6 +15,9 @@ export default function AdminPanel() {
   const [waitlistData, setWaitlistData] = useState([])
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  const [testEmail, setTestEmail] = useState('')
+  const [testEmailLoading, setTestEmailLoading] = useState(false)
+  const [testEmailResult, setTestEmailResult] = useState('')
 
   useEffect(() => {
     // Check if already authenticated in this session
@@ -56,6 +59,30 @@ export default function AdminPanel() {
     sessionStorage.removeItem('adminAuthenticated')
     setIsAuthenticated(false)
     setPassword('')
+  }
+
+  const handleTestEmail = async () => {
+    if (!testEmail) return
+    
+    setTestEmailLoading(true)
+    setTestEmailResult('')
+    
+    try {
+      const response = await fetch('/api/test-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: testEmail }),
+      })
+      
+      const data = await response.json()
+      setTestEmailResult(JSON.stringify(data, null, 2))
+    } catch (error) {
+      setTestEmailResult(`Error: ${error}`)
+    } finally {
+      setTestEmailLoading(false)
+    }
   }
 
   if (!isAuthenticated) {
@@ -240,14 +267,33 @@ export default function AdminPanel() {
           </div>
 
           <div className="bg-white rounded-lg shadow-sm p-6 border">
-            <h3 className="text-lg font-semibold text-helfi-black mb-4">Email Testing</h3>
+            <h3 className="text-lg font-semibold text-helfi-black mb-4">🧪 Email Testing</h3>
             <div className="space-y-3">
-              <button 
-                onClick={() => window.open('/api/send-email', '_blank')}
-                className="block w-full btn-secondary text-center"
-              >
-                Test Email Service
-              </button>
+              <div className="flex gap-2">
+                <input
+                  type="email"
+                  placeholder="Enter email to test"
+                  value={testEmail}
+                  onChange={(e) => setTestEmail(e.target.value)}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-helfi-green focus:border-helfi-green text-sm"
+                />
+                <button
+                  onClick={handleTestEmail}
+                  disabled={testEmailLoading || !testEmail}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 text-sm"
+                >
+                  {testEmailLoading ? 'Sending...' : 'Test'}
+                </button>
+              </div>
+              
+              {testEmailResult && (
+                <div className="mt-3">
+                  <h4 className="font-medium mb-1 text-sm">Result:</h4>
+                  <pre className="bg-gray-100 p-3 rounded-md text-xs overflow-auto max-h-32">
+                    {testEmailResult}
+                  </pre>
+                </div>
+              )}
             </div>
           </div>
 
