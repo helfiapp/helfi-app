@@ -78,6 +78,107 @@ export default function Dashboard() {
             </div>
           </div>
 
+          {/* Device Integration Section */}
+          {onboardingData && (
+            <div className="mb-8 bg-gradient-to-r from-blue-50 to-green-50 rounded-lg p-6 border border-blue-200">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-helfi-black mb-2">📱 Connect Your Devices</h3>
+                  <p className="text-sm text-gray-600">Sync your smartwatch and fitness devices for better health insights</p>
+                </div>
+                <div className="text-green-600 text-sm font-medium">
+                  Enhanced Analytics
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                <div className="bg-white p-3 rounded-lg border border-gray-200 hover:border-blue-300 transition-colors cursor-pointer group">
+                  <div className="text-center">
+                    <div className="text-2xl mb-1">⌚</div>
+                    <div className="text-xs font-medium text-gray-700">Apple Watch</div>
+                    <div className="text-xs text-gray-500 mt-1 group-hover:text-blue-600">Connect</div>
+                  </div>
+                </div>
+                
+                <div className="bg-white p-3 rounded-lg border border-gray-200 hover:border-blue-300 transition-colors cursor-pointer group">
+                  <div className="text-center">
+                    <div className="text-2xl mb-1">🏃</div>
+                    <div className="text-xs font-medium text-gray-700">Fitbit</div>
+                    <div className="text-xs text-gray-500 mt-1 group-hover:text-blue-600">Connect</div>
+                  </div>
+                </div>
+                
+                <div className="bg-white p-3 rounded-lg border border-gray-200 hover:border-blue-300 transition-colors cursor-pointer group">
+                  <div className="text-center">
+                    <div className="text-2xl mb-1">🔵</div>
+                    <div className="text-xs font-medium text-gray-700">Oura Ring</div>
+                    <div className="text-xs text-gray-500 mt-1 group-hover:text-blue-600">Connect</div>
+                  </div>
+                </div>
+                
+                <div className="bg-white p-3 rounded-lg border border-gray-200 hover:border-blue-300 transition-colors cursor-pointer group">
+                  <div className="text-center">
+                    <div className="text-2xl mb-1">🏔️</div>
+                    <div className="text-xs font-medium text-gray-700">Garmin</div>
+                    <div className="text-xs text-gray-500 mt-1 group-hover:text-blue-600">Connect</div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                <div className="bg-white p-3 rounded-lg border border-gray-200 hover:border-blue-300 transition-colors cursor-pointer group">
+                  <div className="text-center">
+                    <div className="text-2xl mb-1">🤖</div>
+                    <div className="text-xs font-medium text-gray-700">Google Fit</div>
+                    <div className="text-xs text-gray-500 mt-1 group-hover:text-blue-600">Connect</div>
+                  </div>
+                </div>
+                
+                <div className="bg-white p-3 rounded-lg border border-gray-200 hover:border-blue-300 transition-colors cursor-pointer group">
+                  <div className="text-center">
+                    <div className="text-2xl mb-1">⚖️</div>
+                    <div className="text-xs font-medium text-gray-700">Withings</div>
+                    <div className="text-xs text-gray-500 mt-1 group-hover:text-blue-600">Connect</div>
+                  </div>
+                </div>
+                
+                <div className="bg-white p-3 rounded-lg border border-gray-200 hover:border-blue-300 transition-colors cursor-pointer group">
+                  <div className="text-center">
+                    <div className="text-2xl mb-1">❄️</div>
+                    <div className="text-xs font-medium text-gray-700">Polar</div>
+                    <div className="text-xs text-gray-500 mt-1 group-hover:text-blue-600">Connect</div>
+                  </div>
+                </div>
+                
+                <div className="bg-white p-3 rounded-lg border border-gray-200 hover:border-blue-300 transition-colors cursor-pointer group">
+                  <div className="text-center">
+                    <div className="text-2xl mb-1">📱</div>
+                    <div className="text-xs font-medium text-gray-700">Samsung</div>
+                    <div className="text-xs text-gray-500 mt-1 group-hover:text-blue-600">Connect</div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                <div className="flex items-start space-x-3">
+                  <div className="text-blue-600 text-lg">💡</div>
+                  <div>
+                    <h4 className="font-medium text-blue-900 mb-1">What data can we access?</h4>
+                    <ul className="text-sm text-blue-700 space-y-1">
+                      <li>• Heart rate, steps, and activity levels</li>
+                      <li>• Sleep quality and recovery metrics</li>
+                      <li>• Workout intensity and calories burned</li>
+                      <li>• Blood oxygen and stress indicators</li>
+                    </ul>
+                    <p className="text-xs text-blue-600 mt-2 font-medium">
+                      🔒 Your data is encrypted and never shared with third parties
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Onboarding Data Section */}
           {onboardingData && (
             <div className="mt-8 bg-gray-50 rounded-lg p-6">
