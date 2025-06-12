@@ -7,6 +7,11 @@ const inter = Inter({ subsets: ['latin'] })
 export const metadata = {
   title: 'Helfi - Personal Health Intelligence Platform',
   description: 'Track, analyze, and optimize your health with AI-powered insights.',
+  icons: {
+    icon: 'https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/FAVICON_ntiqz6.png',
+    shortcut: 'https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/FAVICON_ntiqz6.png',
+    apple: 'https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/FAVICON_ntiqz6.png',
+  },
 }
 
 export default function RootLayout({

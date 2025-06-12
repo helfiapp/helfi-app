@@ -9,12 +9,35 @@ export default function SignIn() {
   const [email, setEmail] = useState('')
   const [emailSent, setEmailSent] = useState(false)
   const [agreed, setAgreed] = useState(false)
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
-  const handleEmailSignIn = async (e) => {
+  const handleEmailSignIn = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     if (!email || !agreed) return
-    await signIn('email', { email, callbackUrl: '/onboarding' })
-    setEmailSent(true)
+    
+    setLoading(true)
+    setError('')
+    
+    try {
+      const result = await signIn('email', { 
+        email, 
+        callbackUrl: '/onboarding',
+        redirect: false 
+      })
+      
+      if (result?.error) {
+        setError('Failed to send sign-in email. Please try again.')
+        console.error('SignIn error:', result.error)
+      } else {
+        setEmailSent(true)
+      }
+    } catch (error) {
+      console.error('Email sign in error:', error)
+      setError('An unexpected error occurred. Please try again.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -45,6 +68,7 @@ export default function SignIn() {
             onChange={e => setEmail(e.target.value)}
             className="input-primary w-full mb-2"
             required
+            disabled={loading}
           />
           <div className="flex items-center mb-2">
             <input
@@ -54,23 +78,34 @@ export default function SignIn() {
               onChange={e => setAgreed(e.target.checked)}
               className="mr-2"
               required
+              disabled={loading}
             />
             <label htmlFor="agree-terms" className="text-sm text-gray-700">
               I agree to the <Link href="/terms" target="_blank" className="text-helfi-green underline">Terms and Conditions</Link> and <Link href="/privacy" target="_blank" className="text-helfi-green underline">Privacy Policy</Link>
             </label>
           </div>
+          {error && (
+            <div className="mb-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+              {error}
+            </div>
+          )}
+          {emailSent && (
+            <div className="mb-2 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
+              ✅ Check your email for a magic link to sign in!
+            </div>
+          )}
           <button
             type="submit"
-            className="w-full btn-secondary mb-2"
-            disabled={!email || !agreed}
+            className="w-full btn-secondary mb-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={!email || !agreed || loading}
           >
-            {emailSent ? 'Check your email for a magic link' : 'Continue with Email'}
+            {loading ? 'Sending...' : emailSent ? 'Email Sent!' : 'Continue with Email'}
           </button>
         </form>
         <button
           onClick={() => agreed && signIn('google', { callbackUrl: '/onboarding' })}
-          className="w-full flex items-center justify-center gap-3 btn-primary"
-          disabled={!agreed}
+          className="w-full flex items-center justify-center gap-3 btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={!agreed || loading}
         >
           <svg className="w-5 h-5" viewBox="0 0 24 24">
             <path
