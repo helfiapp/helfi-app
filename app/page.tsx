@@ -50,7 +50,10 @@ export default function SplashPage() {
       <nav className="relative z-10 px-4 py-6">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="flex items-center">
-            <div className="w-24 h-24 md:w-32 md:h-32">
+            <button 
+              onClick={() => window.location.reload()}
+              className="w-24 h-24 md:w-32 md:h-32 cursor-pointer hover:opacity-80 transition-opacity"
+            >
               <Image
                 src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/HELFI_TRANSPARENT_rmssry.png"
                 alt="Helfi Logo"
@@ -59,7 +62,7 @@ export default function SplashPage() {
                 className="w-full h-full object-contain"
                 priority
               />
-            </div>
+            </button>
           </div>
           
           {/* Desktop Menu */}
@@ -76,9 +79,18 @@ export default function SplashPage() {
             >
               Pricing
             </button>
-            <Link href="/healthapp" className="text-gray-700 hover:text-helfi-green transition-colors font-medium">
-              Health App
-            </Link>
+            <button 
+              onClick={() => document.getElementById('why-helfi')?.scrollIntoView({ behavior: 'smooth' })}
+              className="text-gray-700 hover:text-helfi-green transition-colors font-medium"
+            >
+              Why Helfi
+            </button>
+            <button 
+              onClick={() => document.getElementById('faq')?.scrollIntoView({ behavior: 'smooth' })}
+              className="text-gray-700 hover:text-helfi-green transition-colors font-medium"
+            >
+              FAQ
+            </button>
             <button 
               onClick={() => document.getElementById('waitlist-signup')?.scrollIntoView({ behavior: 'smooth' })}
               className="btn-secondary hover:bg-gray-100 transition-colors"
@@ -183,7 +195,7 @@ export default function SplashPage() {
       </section>
 
       {/* Why Health Tracking Matters Section */}
-      <section className="px-4 py-20 bg-gradient-to-br from-green-50 to-blue-50">
+      <section id="why-helfi" className="px-4 py-20 bg-gradient-to-br from-green-50 to-blue-50">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-helfi-black mb-6">
@@ -407,7 +419,13 @@ export default function SplashPage() {
               <div className="bg-gradient-to-br from-purple-100 to-blue-100 rounded-3xl p-12 relative overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-br from-purple-400/20 to-blue-400/20"></div>
                 <div className="relative z-10">
-                  <div className="text-6xl mb-6">🎤</div>
+                  <div className="mb-6 flex justify-center">
+                    <img 
+                      src="https://images.unsplash.com/photo-1551601651-2a8555f1a136?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80"
+                      alt="Woman talking on phone with voice AI"
+                      className="w-24 h-24 rounded-full object-cover shadow-lg"
+                    />
+                  </div>
                   <h3 className="text-2xl font-bold text-gray-900 mb-4">Talk to Helfi</h3>
                   <p className="text-gray-700 mb-6">
                     The most natural way to track your health. Just speak, and let AI do the work.
@@ -653,7 +671,7 @@ export default function SplashPage() {
       </section>
 
       {/* FAQ Section */}
-      <section className="px-4 py-20 bg-white">
+      <section id="faq" className="px-4 py-20 bg-white">
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-helfi-black mb-6">
@@ -889,12 +907,40 @@ export default function SplashPage() {
             
             <div>
               <h4 className="font-semibold mb-4">Platform</h4>
-                             <ul className="space-y-2 text-gray-400">
-                 <li><a href="#" className="hover:text-white">Features</a></li>
-                 <li><a href="#" className="hover:text-white">Pricing</a></li>
-                 <li><a href="#" className="hover:text-white">About</a></li>
-                 <li><a href="#" className="hover:text-white">Contact</a></li>
-               </ul>
+              <ul className="space-y-2 text-gray-400">
+                <li>
+                  <button 
+                    onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}
+                    className="hover:text-white text-left"
+                  >
+                    Features
+                  </button>
+                </li>
+                <li>
+                  <button 
+                    onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}
+                    className="hover:text-white text-left"
+                  >
+                    Pricing
+                  </button>
+                </li>
+                <li>
+                  <button 
+                    onClick={() => document.getElementById('why-helfi')?.scrollIntoView({ behavior: 'smooth' })}
+                    className="hover:text-white text-left"
+                  >
+                    Why Helfi
+                  </button>
+                </li>
+                <li>
+                  <button 
+                    onClick={() => document.getElementById('faq')?.scrollIntoView({ behavior: 'smooth' })}
+                    className="hover:text-white text-left"
+                  >
+                    FAQ
+                  </button>
+                </li>
+              </ul>
             </div>
             
             <div>

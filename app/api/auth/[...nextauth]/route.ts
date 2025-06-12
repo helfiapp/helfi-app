@@ -23,6 +23,10 @@ const handler = NextAuth({
         
         const resend = new Resend(process.env.RESEND_API_KEY || "re_Q2Ty3J2n_6TrpJB9dKxky37hbm8i7c4d3");
         
+        // Generate unsubscribe link for authentication emails (in case user wants to stop receiving them)
+        const unsubscribeToken = Buffer.from(`unsubscribe_${email}_helfi`).toString('base64url');
+        const unsubscribeUrl = `${process.env.NEXTAUTH_URL || 'https://helfi.ai'}/api/unsubscribe?email=${encodeURIComponent(email)}&token=${unsubscribeToken}`;
+        
         try {
           const result = await resend.emails.send({
             from: "Helfi Health <noreply@helfi.ai>",
@@ -41,11 +45,21 @@ const handler = NextAuth({
                   </a>
                 </div>
                 
+                <div style="background: #f8fafc; padding: 15px; border-radius: 8px; margin: 20px 0; text-align: center;">
+                  <p style="color: #6b7280; font-size: 14px; margin: 0;">
+                    🔒 This is a secure sign-in link that expires in 24 hours.<br>
+                    If you didn't request this, you can safely ignore this email.
+                  </p>
+                </div>
+                
                 <div style="border-top: 1px solid #e5e7eb; padding-top: 20px; text-align: center;">
                   <p style="color: #9ca3af; font-size: 14px; margin: 0;">
                     This email was sent to ${email}<br>
-                    If you didn't request this, you can safely ignore this email.<br>
                     <a href="https://www.helfi.ai" style="color: #10b981;">www.helfi.ai</a>
+                  </p>
+                  <p style="color: #9ca3af; font-size: 12px; margin: 10px 0 0 0;">
+                    Don't want to receive sign-in emails? 
+                    <a href="${unsubscribeUrl}" style="color: #6b7280; text-decoration: underline;">Unsubscribe</a>
                   </p>
                 </div>
               </div>

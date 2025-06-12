@@ -76,6 +76,10 @@ export async function POST(request: NextRequest) {
       dbSuccess = false;
     }
 
+    // Generate unsubscribe link
+    const unsubscribeToken = Buffer.from(`unsubscribe_${email}_helfi`).toString('base64url');
+    const unsubscribeUrl = `${process.env.NEXTAUTH_URL || 'https://helfi.ai'}/api/unsubscribe?email=${encodeURIComponent(email)}&token=${unsubscribeToken}`;
+
     // Send welcome email to the user
     let userEmailSuccess = false;
     try {
@@ -121,6 +125,10 @@ export async function POST(request: NextRequest) {
               This email was sent to ${email}<br>
               Helfi Health Intelligence Platform<br>
               <a href="https://www.helfi.ai" style="color: #10b981;">www.helfi.ai</a>
+            </p>
+            <p style="color: #9ca3af; font-size: 12px; margin: 10px 0 0 0;">
+              Don't want to receive these emails? 
+              <a href="${unsubscribeUrl}" style="color: #6b7280; text-decoration: underline;">Unsubscribe</a>
             </p>
           </div>
         </div>

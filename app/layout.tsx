@@ -61,7 +61,7 @@ export const metadata = {
     images: ['https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/HELFI_TRANSPARENT_rmssry.png'],
   },
   verification: {
-    google: 'your-google-verification-code', // Add your actual verification code
+    google: 'REPLACE_WITH_YOUR_VERIFICATION_CODE', // Replace this with your actual Google Search Console verification code
   },
   alternates: {
     canonical: 'https://helfi.ai',

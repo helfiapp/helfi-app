@@ -1526,107 +1526,199 @@ function ReviewStep({ onBack, data }: { onBack: () => void, data: any }) {
   );
 }
 
-export default function HealthApp() {
-  const { data: session, status } = useSession();
-  const stepNames = ['Gender', 'Physical', 'Exercise', 'Health Goals', 'Supplements', 'Medications', 'Review'];
-  const [step, setStep] = useState(0);
-  const [form, setForm] = useState<any>({});
+// Password Protection Component
+function PasswordProtection({ children }: { children: React.ReactNode }) {
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
 
-  // Show sign-in page if not authenticated
-  if (status === 'loading') {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-helfi-green"></div>
-      </div>
-    );
+  // Check if already authenticated in session storage
+  useEffect(() => {
+    const authenticated = sessionStorage.getItem('healthapp_authenticated')
+    if (authenticated === 'true') {
+      setIsAuthenticated(true)
+    }
+  }, [])
+
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsLoading(true)
+    setError('')
+
+    // Secure password: HelfiBeta2024!
+    const correctPassword = 'HelfiBeta2024!'
+    
+    if (password === correctPassword) {
+      setIsAuthenticated(true)
+      sessionStorage.setItem('healthapp_authenticated', 'true')
+    } else {
+      setError('Invalid password. Please contact support for access.')
+      setPassword('')
+    }
+    setIsLoading(false)
   }
 
-  if (!session) {
+  if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <nav className="bg-white shadow-sm border-b">
-          <div className="max-w-7xl mx-auto px-4 py-4">
-            <div className="flex justify-between items-center">
-              <Link href="/" className="text-2xl font-bold text-helfi-green">
-                Helfi
-              </Link>
-              <div className="text-sm text-gray-600">
-                Health Intelligence Platform
+      <div className="min-h-screen bg-gradient-to-br from-helfi-green/5 via-white to-blue-50 flex items-center justify-center px-4">
+        <div className="max-w-md w-full">
+          <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-200">
+            <div className="text-center mb-8">
+              <div className="w-16 h-16 bg-helfi-green/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-helfi-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+              </div>
+              <h1 className="text-2xl font-bold text-helfi-black mb-2">
+                Access Required
+              </h1>
+              <p className="text-gray-600">
+                This is a private beta. Please enter the access password to continue.
+              </p>
+            </div>
+
+            <form onSubmit={handlePasswordSubmit} className="space-y-6">
+              <div>
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+                  Beta Access Password
+                </label>
+                <input
+                  type="password"
+                  id="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:border-helfi-green focus:ring-2 focus:ring-helfi-green/20 outline-none transition-colors"
+                  placeholder="Enter password"
+                  required
+                />
+              </div>
+
+              {error && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+                  {error}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full bg-helfi-green text-white px-6 py-3 rounded-lg font-semibold hover:bg-helfi-green/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isLoading ? 'Verifying...' : 'Access Beta'}
+              </button>
+            </form>
+
+            <div className="mt-6 text-center">
+              <p className="text-sm text-gray-500">
+                Need access? Contact{' '}
+                <a href="mailto:support@helfi.ai" className="text-helfi-green hover:underline">
+                  support@helfi.ai
+                </a>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return <>{children}</>
+}
+
+export default function HealthApp() {
+  const { data: session, status } = useSession();
+
+  return (
+    <PasswordProtection>
+      {status === 'loading' ? (
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-helfi-green"></div>
+        </div>
+      ) : !session ? (
+        <div className="min-h-screen bg-gray-50">
+          <nav className="bg-white shadow-sm border-b">
+            <div className="max-w-7xl mx-auto px-4 py-4">
+              <div className="flex justify-between items-center">
+                <Link href="/" className="text-2xl font-bold text-helfi-green">
+                  Helfi
+                </Link>
+                <div className="text-sm text-gray-600">
+                  Health Intelligence Platform
+                </div>
+              </div>
+            </div>
+          </nav>
+          
+          <div className="max-w-md mx-auto px-4 py-20">
+            <div className="bg-white rounded-lg shadow-lg p-8">
+              <div className="text-center mb-8">
+                <h1 className="text-2xl font-bold text-helfi-black mb-2">
+                  Access Health Platform
+                </h1>
+                <p className="text-gray-600">
+                  Sign in to continue to your health dashboard
+                </p>
+              </div>
+              
+              <div className="space-y-4">
+                <Link
+                  href="/auth/signin"
+                  className="w-full bg-helfi-green text-white py-3 px-4 rounded-lg hover:bg-green-700 transition-colors text-center block"
+                >
+                  Sign In / Sign Up
+                </Link>
+                
+                <div className="text-center">
+                  <Link href="/" className="text-sm text-gray-600 hover:text-helfi-green">
+                    ← Back to main site
+                  </Link>
+                </div>
+              </div>
+              
+              <div className="mt-8 p-4 bg-blue-50 rounded-lg">
+                <p className="text-sm text-blue-800">
+                  <strong>Beta Access:</strong> This is the private beta of the Helfi health platform. 
+                  Sign in with Google or email to test the onboarding flow.
+                </p>
               </div>
             </div>
           </div>
-        </nav>
-        
-        <div className="max-w-md mx-auto px-4 py-20">
-          <div className="bg-white rounded-lg shadow-lg p-8">
-            <div className="text-center mb-8">
-              <h1 className="text-2xl font-bold text-helfi-black mb-2">
-                Access Health Platform
+        </div>
+      ) : (
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="max-w-md mx-auto px-4 py-20">
+            <div className="bg-white rounded-lg shadow-lg p-8 text-center">
+              <h1 className="text-2xl font-bold text-helfi-black mb-4">
+                Health App Coming Soon
               </h1>
-              <p className="text-gray-600">
-                Sign in to continue to your health dashboard
+              <p className="text-gray-600 mb-6">
+                Our comprehensive health tracking platform is under development.
               </p>
-            </div>
-            
-            <div className="space-y-4">
-              <Link
-                href="/auth/signin"
-                className="w-full bg-helfi-green text-white py-3 px-4 rounded-lg hover:bg-green-700 transition-colors text-center block"
-              >
-                Sign In / Sign Up
-              </Link>
-              
-              <div className="text-center">
-                <Link href="/" className="text-sm text-gray-600 hover:text-helfi-green">
+              <div className="space-y-4">
+                <Link
+                  href="/onboarding"
+                  className="w-full bg-helfi-green text-white py-3 px-4 rounded-lg hover:bg-green-700 transition-colors text-center block"
+                >
+                  Try Onboarding Demo
+                </Link>
+                <Link
+                  href="/dashboard"
+                  className="w-full border border-helfi-green text-helfi-green py-3 px-4 rounded-lg hover:bg-helfi-green hover:text-white transition-colors text-center block"
+                >
+                  View Dashboard
+                </Link>
+                <Link
+                  href="/"
+                  className="text-sm text-gray-600 hover:text-helfi-green block"
+                >
                   ← Back to main site
                 </Link>
               </div>
             </div>
-            
-            <div className="mt-8 p-4 bg-blue-50 rounded-lg">
-              <p className="text-sm text-blue-800">
-                <strong>Development Access:</strong> This is the beta version of the Helfi health platform. 
-                Sign in with Google or email to test the onboarding flow.
-              </p>
-            </div>
           </div>
         </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <div className="max-w-md mx-auto px-4 py-20">
-        <div className="bg-white rounded-lg shadow-lg p-8 text-center">
-          <h1 className="text-2xl font-bold text-helfi-black mb-4">
-            Health App Coming Soon
-          </h1>
-          <p className="text-gray-600 mb-6">
-            Our comprehensive health tracking platform is under development.
-          </p>
-          <div className="space-y-4">
-            <Link
-              href="/onboarding"
-              className="w-full bg-helfi-green text-white py-3 px-4 rounded-lg hover:bg-green-700 transition-colors text-center block"
-            >
-              Try Onboarding Demo
-            </Link>
-            <Link
-              href="/dashboard"
-              className="w-full border border-helfi-green text-helfi-green py-3 px-4 rounded-lg hover:bg-helfi-green hover:text-white transition-colors text-center block"
-            >
-              View Dashboard
-            </Link>
-            <Link
-              href="/"
-              className="text-sm text-gray-600 hover:text-helfi-green block"
-            >
-              ← Back to main site
-            </Link>
-          </div>
-        </div>
-      </div>
-    </div>
+      )}
+    </PasswordProtection>
   );
 }
