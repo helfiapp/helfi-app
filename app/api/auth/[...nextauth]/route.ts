@@ -27,10 +27,13 @@ const handler = NextAuth({
       },
       from: "Helfi Health <noreply@helfi.ai>",
       sendVerificationRequest: async ({ identifier: email, url, provider, theme }) => {
+        console.log('NextAuth: Attempting to send verification email to:', email);
+        console.log('NextAuth: Magic link URL:', url);
+        
         const resend = new Resend(process.env.RESEND_API_KEY || "re_Q2Ty3J2n_6TrpJB9dKxky37hbm8i7c4d3");
         
         try {
-          await resend.emails.send({
+          const result = await resend.emails.send({
             from: "Helfi Health <noreply@helfi.ai>",
             to: email,
             subject: "Sign in to Helfi",
@@ -57,9 +60,11 @@ const handler = NextAuth({
               </div>
             `,
           });
+          
+          console.log('NextAuth: Email sent successfully:', result);
         } catch (error) {
-          console.error("Failed to send verification email:", error);
-          throw new Error("Failed to send verification email");
+          console.error("NextAuth: Failed to send verification email:", error);
+          throw new Error(`Failed to send verification email: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
       },
     }),
@@ -68,6 +73,13 @@ const handler = NextAuth({
     signIn: '/auth/signin',
   },
   secret: process.env.NEXTAUTH_SECRET,
+  debug: true,
+  callbacks: {
+    async signIn({ user, account, profile, email, credentials }) {
+      console.log('NextAuth signIn callback:', { user, account, profile, email, credentials });
+      return true;
+    },
+  },
 })
 
 export { handler as GET, handler as POST } 
