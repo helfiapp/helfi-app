@@ -7,6 +7,9 @@ import { Resend } from 'resend'
 
 const handler = NextAuth({
   adapter: PrismaAdapter(prisma),
+  session: {
+    strategy: "jwt",
+  },
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -59,6 +62,7 @@ const handler = NextAuth({
   ],
   pages: {
     signIn: '/auth/signin',
+    verifyRequest: '/auth/verify-request',
   },
   secret: process.env.NEXTAUTH_SECRET,
   debug: true,

@@ -30,7 +30,8 @@ export default function SignIn() {
         setError('Failed to send sign-in email. Please try again.')
         console.error('SignIn error:', result.error)
       } else {
-        setEmailSent(true)
+        // Redirect to verify request page
+        window.location.href = '/auth/verify-request'
       }
     } catch (error) {
       console.error('Email sign in error:', error)
