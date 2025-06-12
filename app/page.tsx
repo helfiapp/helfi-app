@@ -61,10 +61,37 @@ export default function SplashPage() {
               />
             </div>
           </div>
-          <div className="space-x-4">
+          
+          {/* Desktop Menu */}
+          <div className="hidden md:flex items-center space-x-8">
+            <button 
+              onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}
+              className="text-gray-700 hover:text-helfi-green transition-colors font-medium"
+            >
+              Features
+            </button>
+            <button 
+              onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}
+              className="text-gray-700 hover:text-helfi-green transition-colors font-medium"
+            >
+              Pricing
+            </button>
+            <Link href="/healthapp" className="text-gray-700 hover:text-helfi-green transition-colors font-medium">
+              Health App
+            </Link>
             <button 
               onClick={() => document.getElementById('waitlist-signup')?.scrollIntoView({ behavior: 'smooth' })}
               className="btn-secondary hover:bg-gray-100 transition-colors"
+            >
+              Join Waitlist
+            </button>
+          </div>
+
+          {/* Mobile Menu Button */}
+          <div className="md:hidden">
+            <button 
+              onClick={() => document.getElementById('waitlist-signup')?.scrollIntoView({ behavior: 'smooth' })}
+              className="btn-secondary hover:bg-gray-100 transition-colors text-sm px-4 py-2"
             >
               Join Waitlist
             </button>
@@ -104,7 +131,7 @@ export default function SplashPage() {
       </section>
 
       {/* Features Section */}
-      <section className="px-4 py-20 bg-white">
+      <section id="features" className="px-4 py-20 bg-white">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-helfi-black mb-4">
@@ -156,7 +183,7 @@ export default function SplashPage() {
       </section>
 
       {/* Pricing Section */}
-      <section className="px-4 py-20 bg-gray-50">
+      <section id="pricing" className="px-4 py-20 bg-gray-50">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-helfi-black mb-4">
@@ -167,44 +194,57 @@ export default function SplashPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
             {/* Free Plan */}
             <div className="bg-white rounded-2xl p-8 border-2 border-gray-200">
               <div className="text-center">
-                <h3 className="text-2xl font-bold text-helfi-black mb-2">Basic</h3>
+                <h3 className="text-2xl font-bold text-helfi-black mb-2">Health Basics</h3>
                 <div className="mb-6">
                   <span className="text-4xl font-bold text-helfi-black">Free</span>
+                  <div className="text-sm text-gray-500 mt-1">Forever</div>
                 </div>
                 <ul className="space-y-3 text-left mb-8">
                   <li className="flex items-center">
                     <svg className="w-5 h-5 text-helfi-green mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
-                    Basic health tracking
+                    Complete onboarding & profile setup
                   </li>
                   <li className="flex items-center">
                     <svg className="w-5 h-5 text-helfi-green mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
-                    Manual data entry
+                    Initial supplement interaction check
                   </li>
                   <li className="flex items-center">
                     <svg className="w-5 h-5 text-helfi-green mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
-                    Basic progress charts
+                    3 AI food photo analyses per day
+                  </li>
+                  <li className="flex items-center">
+                    <svg className="w-5 h-5 text-helfi-green mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    Basic health goal tracking
+                  </li>
+                  <li className="flex items-center">
+                    <svg className="w-5 h-5 text-helfi-green mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    Weekly health summary emails
                   </li>
                 </ul>
-                                 <button 
-                   onClick={() => document.getElementById('waitlist-signup')?.scrollIntoView({ behavior: 'smooth' })}
-                   className="btn-secondary w-full"
-                 >
-                   Join Waitlist
-                 </button>
+                <button 
+                  onClick={() => document.getElementById('waitlist-signup')?.scrollIntoView({ behavior: 'smooth' })}
+                  className="btn-secondary w-full"
+                >
+                  Get Started Free
+                </button>
               </div>
             </div>
 
-            {/* Premium Plan */}
+            {/* Pro Plan */}
             <div className="bg-white rounded-2xl p-8 border-2 border-helfi-green relative">
               <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
                 <span className="bg-helfi-green text-white px-4 py-1 rounded-full text-sm font-medium">
@@ -212,99 +252,119 @@ export default function SplashPage() {
                 </span>
               </div>
               <div className="text-center">
-                <h3 className="text-2xl font-bold text-helfi-black mb-2">Premium</h3>
+                <h3 className="text-2xl font-bold text-helfi-black mb-2">AI Health Coach</h3>
                 <div className="mb-6">
-                  <span className="text-4xl font-bold text-helfi-black">$9.99</span>
+                  <span className="text-4xl font-bold text-helfi-black">$12</span>
                   <span className="text-gray-600">/month</span>
+                  <div className="text-sm text-gray-500 mt-1">$99/year (save 31%)</div>
                 </div>
                 <ul className="space-y-3 text-left mb-8">
                   <li className="flex items-center">
                     <svg className="w-5 h-5 text-helfi-green mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
-                    Everything in Basic
+                    Everything in Health Basics
                   </li>
                   <li className="flex items-center">
                     <svg className="w-5 h-5 text-helfi-green mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
-                    AI-powered insights & recommendations
+                    Unlimited supplement interaction updates
                   </li>
                   <li className="flex items-center">
                     <svg className="w-5 h-5 text-helfi-green mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
-                    Photo supplement recognition
+                    20 AI food photo analyses per day
                   </li>
                   <li className="flex items-center">
                     <svg className="w-5 h-5 text-helfi-green mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
-                    Weekly AI health reports
+                    Personalized health insights
                   </li>
                   <li className="flex items-center">
                     <svg className="w-5 h-5 text-helfi-green mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
-                    Advanced analytics & trends
+                    Smart symptom tracking & correlation
                   </li>
                 </ul>
-                                 <button 
-                   onClick={() => document.getElementById('waitlist-signup')?.scrollIntoView({ behavior: 'smooth' })}
-                   className="btn-primary w-full"
-                 >
-                   Join Waitlist
-                 </button>
+                <button 
+                  onClick={() => document.getElementById('waitlist-signup')?.scrollIntoView({ behavior: 'smooth' })}
+                  className="btn-primary w-full"
+                >
+                  Start 14-Day Free Trial
+                </button>
               </div>
             </div>
 
-            {/* Pro Plan */}
-            <div className="bg-white rounded-2xl p-8 border-2 border-gray-200">
+            {/* Ultimate Plan */}
+            <div className="bg-white rounded-2xl p-8 border-2 border-purple-200 relative">
+              <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
+                <span className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-4 py-1 rounded-full text-sm font-medium">
+                  Premium AI
+                </span>
+              </div>
               <div className="text-center">
-                <h3 className="text-2xl font-bold text-helfi-black mb-2">Pro</h3>
+                <h3 className="text-2xl font-bold text-helfi-black mb-2">Personal Health Assistant</h3>
                 <div className="mb-6">
-                  <span className="text-4xl font-bold text-helfi-black">$19.99</span>
+                  <span className="text-4xl font-bold text-helfi-black">$20</span>
                   <span className="text-gray-600">/month</span>
+                  <div className="text-sm text-gray-500 mt-1">$179/year (save 25%)</div>
                 </div>
                 <ul className="space-y-3 text-left mb-8">
                   <li className="flex items-center">
-                    <svg className="w-5 h-5 text-helfi-green mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5 text-purple-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
-                    Everything in Premium
+                    Everything in AI Health Coach
                   </li>
                   <li className="flex items-center">
-                    <svg className="w-5 h-5 text-helfi-green mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5 text-purple-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
-                    Healthcare provider integration
+                    <strong>"Talk to Helfi" voice AI assistant</strong>
                   </li>
                   <li className="flex items-center">
-                    <svg className="w-5 h-5 text-helfi-green mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5 text-purple-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
-                    Custom health goal creation
+                    Unlimited AI food photo analyses
                   </li>
                   <li className="flex items-center">
-                    <svg className="w-5 h-5 text-helfi-green mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5 text-purple-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
-                    Priority support
+                    All device integrations (Fitbit, Apple, etc.)
                   </li>
                   <li className="flex items-center">
-                    <svg className="w-5 h-5 text-helfi-green mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5 text-purple-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
-                    Data export & API access
+                    Real-time health monitoring & alerts
                   </li>
                 </ul>
-                                 <button 
-                   onClick={() => document.getElementById('waitlist-signup')?.scrollIntoView({ behavior: 'smooth' })}
-                   className="btn-secondary w-full"
-                 >
-                   Join Waitlist
-                 </button>
+                <button 
+                  onClick={() => document.getElementById('waitlist-signup')?.scrollIntoView({ behavior: 'smooth' })}
+                  className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-blue-700 transition-all duration-200 w-full"
+                >
+                  Start 14-Day Free Trial
+                </button>
               </div>
+            </div>
+          </div>
+
+          {/* Additional pricing info */}
+          <div className="text-center mt-12">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 max-w-4xl mx-auto">
+              <h4 className="font-semibold text-blue-900 mb-3">🎯 14-Day Free Trial includes everything!</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-blue-700">
+                <div>✨ Experience voice AI commands</div>
+                <div>📱 Connect all your devices</div>
+                <div>🧠 Get unlimited AI insights</div>
+              </div>
+              <p className="text-sm text-blue-600 mt-3">No credit card required • Cancel anytime • Keep your data</p>
             </div>
           </div>
         </div>
