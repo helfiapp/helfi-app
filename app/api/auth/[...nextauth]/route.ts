@@ -13,18 +13,6 @@ const handler = NextAuth({
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     }),
     EmailProvider({
-      server: {
-        host: "smtp.resend.com",
-        port: 587,
-        auth: {
-          user: "resend",
-          pass: process.env.RESEND_API_KEY || "re_Q2Ty3J2n_6TrpJB9dKxky37hbm8i7c4d3",
-        },
-        secure: false,
-        tls: {
-          rejectUnauthorized: false
-        }
-      },
       from: "Helfi Health <noreply@helfi.ai>",
       sendVerificationRequest: async ({ identifier: email, url, provider, theme }) => {
         console.log('NextAuth: Attempting to send verification email to:', email);
