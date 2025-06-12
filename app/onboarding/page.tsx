@@ -1472,18 +1472,39 @@ function MedicationsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 When do you take this medication? *
               </label>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {timingOptions.map(time => (
-                  <label key={time} className="flex items-center space-x-3 cursor-pointer">
+                  <div key={time} className="flex items-center space-x-3">
                     <input
                       type="checkbox"
                       checked={photoTiming.includes(time)}
                       onChange={() => toggleTiming(time, true)}
                       className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
+                      id={`photo-timing-${time}`}
                     />
-                    <span className="text-gray-700">{time}</span>
-                  </label>
+                    <label htmlFor={`photo-timing-${time}`} className="flex-1 cursor-pointer">
+                      <span className="text-gray-700">{time}</span>
+                    </label>
+                    {photoTiming.includes(time) && (
+                      <input
+                        type="text"
+                        placeholder="Dosage (e.g., 2.5mg)"
+                        className="w-32 px-2 py-1 border border-gray-300 rounded text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                        onChange={(e) => {
+                          // Store dosage per time slot for photos
+                          const timingWithDosage = photoTiming.map(t => 
+                            t === time ? `${time}:${e.target.value || photoDosage}` : t
+                          );
+                          setPhotoTiming(timingWithDosage);
+                        }}
+                      />
+                    )}
+                  </div>
                 ))}
+              </div>
+              <div className="mt-2 text-xs text-gray-500">
+                💡 Tip: If you split your medication throughout the day, 
+                check multiple times and enter the specific dosage for each time.
               </div>
             </div>
 
@@ -1518,18 +1539,39 @@ function MedicationsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 When do you take this medication? *
               </label>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {timingOptions.map(time => (
-                  <label key={time} className="flex items-center space-x-3 cursor-pointer">
+                  <div key={time} className="flex items-center space-x-3">
                     <input
                       type="checkbox"
                       checked={timing.includes(time)}
                       onChange={() => toggleTiming(time, false)}
                       className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
+                      id={`timing-${time}`}
                     />
-                    <span className="text-gray-700">{time}</span>
-                  </label>
+                    <label htmlFor={`timing-${time}`} className="flex-1 cursor-pointer">
+                      <span className="text-gray-700">{time}</span>
+                    </label>
+                    {timing.includes(time) && (
+                      <input
+                        type="text"
+                        placeholder="Dosage (e.g., 2.5mg)"
+                        className="w-32 px-2 py-1 border border-gray-300 rounded text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                        onChange={(e) => {
+                          // Store dosage per time slot
+                          const timingWithDosage = timing.map(t => 
+                            t === time ? `${time}:${e.target.value || dosage}` : t
+                          );
+                          setTiming(timingWithDosage);
+                        }}
+                      />
+                    )}
+                  </div>
                 ))}
+              </div>
+              <div className="mt-2 text-xs text-gray-500">
+                💡 Tip: If you split your medication (e.g., 5mg Tadalafil as 2.5mg twice daily), 
+                check multiple times and enter the dosage for each time.
               </div>
             </div>
             <button 

@@ -18,6 +18,7 @@ export default function AdminPanel() {
   const [testEmail, setTestEmail] = useState('')
   const [testEmailLoading, setTestEmailLoading] = useState(false)
   const [testEmailResult, setTestEmailResult] = useState('')
+  const [showMailingList, setShowMailingList] = useState(false)
 
   useEffect(() => {
     // Check if already authenticated in this session
@@ -192,62 +193,83 @@ export default function AdminPanel() {
           </p>
         </div>
 
-        {/* Waitlist Section */}
+        {/* Mailing List Toggle */}
         <div className="bg-white rounded-lg shadow-sm p-6 border mb-8">
-          <div className="flex justify-between items-center mb-6">
+          <div className="flex justify-between items-center">
             <h2 className="text-xl font-semibold text-helfi-black">
-              Waitlist Signups ({waitlistData.length})
+              📧 Mailing List Management
             </h2>
             <button
-              onClick={loadWaitlistData}
+              onClick={() => {
+                setShowMailingList(!showMailingList);
+                if (!showMailingList) {
+                  loadWaitlistData();
+                }
+              }}
               className="btn-secondary text-sm"
-              disabled={loading}
             >
-              {loading ? 'Refreshing...' : 'Refresh'}
+              {showMailingList ? 'Hide Mailing List' : `View Mailing List (${waitlistData.length})`}
             </button>
           </div>
           
-          {loading ? (
-            <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-helfi-green mx-auto"></div>
-              <p className="mt-2 text-gray-600">Loading waitlist...</p>
-            </div>
-          ) : waitlistData.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Name
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Email
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Signed Up
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {waitlistData.map((signup: any, index) => (
-                    <tr key={index}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {signup.name}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {signup.email}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(signup.createdAt).toLocaleDateString()}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <p className="text-gray-600">No waitlist signups yet</p>
+          {showMailingList && (
+            <div className="mt-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-medium text-gray-700">
+                  Waitlist Signups ({waitlistData.length})
+                </h3>
+                <button
+                  onClick={loadWaitlistData}
+                  className="text-sm text-helfi-green hover:text-helfi-green-dark"
+                  disabled={loading}
+                >
+                  {loading ? 'Refreshing...' : '🔄 Refresh'}
+                </button>
+              </div>
+              
+              {loading ? (
+                <div className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-helfi-green mx-auto"></div>
+                  <p className="mt-2 text-gray-600">Loading mailing list...</p>
+                </div>
+              ) : waitlistData.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Name
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Email
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Signed Up
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {waitlistData.map((signup: any, index) => (
+                        <tr key={index}>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {signup.name}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {signup.email}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {new Date(signup.createdAt).toLocaleDateString()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-gray-600">No mailing list subscribers yet</p>
+                </div>
+              )}
             </div>
           )}
         </div>
