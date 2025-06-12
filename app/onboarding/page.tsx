@@ -1314,6 +1314,7 @@ function MedicationsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
   const [name, setName] = useState('');
   const [dosage, setDosage] = useState('');
   const [timing, setTiming] = useState<string[]>([]);
+  const [timingDosages, setTimingDosages] = useState<{[key: string]: string}>({});
   const [frontImage, setFrontImage] = useState<File | null>(null);
   const [backImage, setBackImage] = useState<File | null>(null);
   const [uploadMethod, setUploadMethod] = useState<'manual' | 'photo'>('photo');
@@ -1321,6 +1322,7 @@ function MedicationsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
   // For photo upload method
   const [photoDosage, setPhotoDosage] = useState('');
   const [photoTiming, setPhotoTiming] = useState<string[]>([]);
+  const [photoTimingDosages, setPhotoTimingDosages] = useState<{[key: string]: string}>({});
 
   const timingOptions = ['Morning', 'Afternoon', 'Evening', 'Before Bed'];
 
@@ -1337,18 +1339,31 @@ function MedicationsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
 
   const addMedication = () => {
     if (uploadMethod === 'manual' && name && dosage && timing.length > 0) {
-      setMedications((prev: any[]) => [...prev, { name, dosage, timing, method: 'manual' }]);
-      setName(''); setDosage(''); setTiming([]);
+      // Combine timing and individual dosages
+      const timingWithDosages = timing.map(time => 
+        timingDosages[time] ? `${time}: ${timingDosages[time]}` : `${time}: ${dosage}`
+      );
+      setMedications((prev: any[]) => [...prev, { 
+        name, 
+        dosage, 
+        timing: timingWithDosages, 
+        method: 'manual' 
+      }]);
+      setName(''); setDosage(''); setTiming([]); setTimingDosages({});
     } else if (uploadMethod === 'photo' && frontImage && photoDosage && photoTiming.length > 0) {
+      // Combine timing and individual dosages for photos
+      const timingWithDosages = photoTiming.map(time => 
+        photoTimingDosages[time] ? `${time}: ${photoTimingDosages[time]}` : `${time}: ${photoDosage}`
+      );
       setMedications((prev: any[]) => [...prev, { 
         frontImage: frontImage.name, 
         backImage: backImage?.name, 
         method: 'photo',
         name: frontImage.name.split('.')[0], // Use filename as temporary name
         dosage: photoDosage,
-        timing: photoTiming
+        timing: timingWithDosages
       }]);
-      setFrontImage(null); setBackImage(null); setPhotoDosage(''); setPhotoTiming([]);
+      setFrontImage(null); setBackImage(null); setPhotoDosage(''); setPhotoTiming([]); setPhotoTimingDosages({});
     }
   };
 
@@ -1489,13 +1504,13 @@ function MedicationsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
                       <input
                         type="text"
                         placeholder="Dosage (e.g., 2.5mg)"
+                        value={photoTimingDosages[time] || ''}
                         className="w-32 px-2 py-1 border border-gray-300 rounded text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
                         onChange={(e) => {
-                          // Store dosage per time slot for photos
-                          const timingWithDosage = photoTiming.map(t => 
-                            t === time ? `${time}:${e.target.value || photoDosage}` : t
-                          );
-                          setPhotoTiming(timingWithDosage);
+                          setPhotoTimingDosages(prev => ({
+                            ...prev,
+                            [time]: e.target.value
+                          }));
                         }}
                       />
                     )}
@@ -1556,13 +1571,13 @@ function MedicationsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
                       <input
                         type="text"
                         placeholder="Dosage (e.g., 2.5mg)"
+                        value={timingDosages[time] || ''}
                         className="w-32 px-2 py-1 border border-gray-300 rounded text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
                         onChange={(e) => {
-                          // Store dosage per time slot
-                          const timingWithDosage = timing.map(t => 
-                            t === time ? `${time}:${e.target.value || dosage}` : t
-                          );
-                          setTiming(timingWithDosage);
+                          setTimingDosages(prev => ({
+                            ...prev,
+                            [time]: e.target.value
+                          }));
                         }}
                       />
                     )}
@@ -1948,14 +1963,24 @@ export default function Onboarding() {
         // If we're editing and have data, show a message
         if (isEditing === 'true') {
           console.log('Edit mode detected - data loaded successfully');
+          console.log('Form state after loading:', parsedData);
           // Clear the editing flag
           localStorage.removeItem('isEditing');
         }
       } catch (error) {
         console.error('Error loading existing data:', error);
       }
+    } else {
+      console.log('No existing data found in localStorage');
     }
   }, []);
+
+  // Debug form state changes
+  useEffect(() => {
+    console.log('Form state updated:', form);
+    console.log('Current step:', step);
+    console.log('Gender value for step 0:', form.gender);
+  }, [form, step]);
 
   // Scroll to top when step changes
   useEffect(() => {
