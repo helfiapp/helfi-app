@@ -11,8 +11,8 @@ export default function Dashboard() {
   const [showResetConfirm, setShowResetConfirm] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
 
-  // Profile data with better fallback
-  const userImage = session?.user?.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(session?.user?.name || 'User')}&background=22c55e&color=ffffff&rounded=true&size=128`;
+  // Profile data with better fallback - use SVG icon if no image
+  const userImage = session?.user?.image;
   const userName = session?.user?.name || 'User';
 
   // Close dropdown on outside click
@@ -105,24 +105,40 @@ export default function Dashboard() {
                 className="focus:outline-none"
                 aria-label="Open profile menu"
               >
-                <Image
-                  src={userImage}
-                  alt="Profile"
-                  width={48}
-                  height={48}
-                  className="rounded-full border-2 border-helfi-green shadow-sm object-cover w-12 h-12"
-                />
+                {userImage ? (
+                  <Image
+                    src={userImage}
+                    alt="Profile"
+                    width={48}
+                    height={48}
+                    className="rounded-full border-2 border-helfi-green shadow-sm object-cover w-12 h-12"
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded-full border-2 border-helfi-green shadow-sm bg-helfi-green flex items-center justify-center">
+                    <svg className="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                    </svg>
+                  </div>
+                )}
               </button>
               {dropdownOpen && (
                 <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-100 animate-fade-in">
                   <div className="flex items-center px-4 py-3 border-b border-gray-100">
-                    <Image
-                      src={userImage}
-                      alt="Profile"
-                      width={40}
-                      height={40}
-                      className="rounded-full object-cover mr-3"
-                    />
+                    {userImage ? (
+                      <Image
+                        src={userImage}
+                        alt="Profile"
+                        width={40}
+                        height={40}
+                        className="rounded-full object-cover mr-3"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-helfi-green flex items-center justify-center mr-3">
+                        <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                        </svg>
+                      </div>
+                    )}
                     <div>
                       <div className="font-semibold text-gray-900">{userName}</div>
                       <div className="text-xs text-gray-500">{session?.user?.email || 'user@email.com'}</div>
@@ -155,24 +171,40 @@ export default function Dashboard() {
                 className="focus:outline-none"
                 aria-label="Open profile menu"
               >
-                <Image
-                  src={userImage}
-                  alt="Profile"
-                  width={40}
-                  height={40}
-                  className="rounded-full border-2 border-helfi-green shadow-sm object-cover w-10 h-10"
-                />
+                {userImage ? (
+                  <Image
+                    src={userImage}
+                    alt="Profile"
+                    width={40}
+                    height={40}
+                    className="rounded-full border-2 border-helfi-green shadow-sm object-cover w-10 h-10"
+                  />
+                ) : (
+                  <div className="w-10 h-10 rounded-full border-2 border-helfi-green shadow-sm bg-helfi-green flex items-center justify-center">
+                    <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                    </svg>
+                  </div>
+                )}
               </button>
               {dropdownOpen && (
                 <div className="absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-xl py-2 z-50 border border-gray-100 animate-fade-in">
                   <div className="flex items-center px-4 py-3 border-b border-gray-100">
-                    <Image
-                      src={userImage}
-                      alt="Profile"
-                      width={36}
-                      height={36}
-                      className="rounded-full object-cover mr-3"
-                    />
+                    {userImage ? (
+                      <Image
+                        src={userImage}
+                        alt="Profile"
+                        width={36}
+                        height={36}
+                        className="rounded-full object-cover mr-3"
+                      />
+                    ) : (
+                      <div className="w-9 h-9 rounded-full bg-helfi-green flex items-center justify-center mr-3">
+                        <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                        </svg>
+                      </div>
+                    )}
                     <div className="flex-1 min-w-0">
                       <div className="font-semibold text-gray-900 truncate">{userName}</div>
                       <div className="text-xs text-gray-500 truncate">{session?.user?.email || 'user@email.com'}</div>

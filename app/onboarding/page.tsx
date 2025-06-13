@@ -66,8 +66,8 @@ function OnboardingNav() {
   const { data: session } = useSession();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   
-  // Profile data with better fallback
-  const userImage = session?.user?.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(session?.user?.name || 'User')}&background=22c55e&color=ffffff&rounded=true&size=128`;
+  // Profile data with better fallback - use SVG icon if no image
+  const userImage = session?.user?.image;
   const userName = session?.user?.name || 'User';
 
   // Close dropdown on outside click
@@ -86,7 +86,7 @@ function OnboardingNav() {
   }, [dropdownOpen]);
 
   return (
-    <div className="fixed top-4 right-4 z-50 flex items-center space-x-2">
+    <div className="fixed top-20 sm:top-4 right-4 z-50 flex items-center space-x-2">
       {/* Profile Avatar & Dropdown */}
       <div className="relative" id="onboarding-profile-dropdown">
         <button
@@ -94,24 +94,40 @@ function OnboardingNav() {
           className="focus:outline-none bg-white border border-gray-300 rounded-full p-1 shadow-lg hover:shadow-xl transition-all"
           aria-label="Open profile menu"
         >
-          <Image
-            src={userImage}
-            alt="Profile"
-            width={32}
-            height={32}
-            className="rounded-full object-cover w-8 h-8"
-          />
+          {userImage ? (
+            <Image
+              src={userImage}
+              alt="Profile"
+              width={32}
+              height={32}
+              className="rounded-full object-cover w-8 h-8"
+            />
+          ) : (
+            <div className="w-8 h-8 rounded-full bg-helfi-green flex items-center justify-center">
+              <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+              </svg>
+            </div>
+          )}
         </button>
         {dropdownOpen && (
           <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl py-2 z-50 border border-gray-100 animate-fade-in">
             <div className="flex items-center px-4 py-3 border-b border-gray-100">
-              <Image
-                src={userImage}
-                alt="Profile"
-                width={32}
-                height={32}
-                className="rounded-full object-cover mr-3"
-              />
+              {userImage ? (
+                <Image
+                  src={userImage}
+                  alt="Profile"
+                  width={32}
+                  height={32}
+                  className="rounded-full object-cover mr-3"
+                />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-helfi-green flex items-center justify-center mr-3">
+                  <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                  </svg>
+                </div>
+              )}
               <div className="flex-1 min-w-0">
                 <div className="font-semibold text-gray-900 truncate text-sm">{userName}</div>
                 <div className="text-xs text-gray-500 truncate">{session?.user?.email || 'user@email.com'}</div>
@@ -134,6 +150,20 @@ function OnboardingNav() {
                   Profile
                 </div>
               </Link>
+              <button 
+                onClick={() => {
+                  localStorage.setItem('isEditing', 'true');
+                  window.location.href = '/onboarding';
+                }}
+                className="block w-full text-left px-4 py-2 text-gray-700 hover:bg-gray-50 text-sm"
+              >
+                <div className="flex items-center">
+                  <svg className="w-4 h-4 mr-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                  Edit Health Profile
+                </div>
+              </button>
               <Link href="/account" className="block px-4 py-2 text-gray-700 hover:bg-gray-50 text-sm">
                 <div className="flex items-center">
                   <svg className="w-4 h-4 mr-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -346,10 +376,10 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
           </button>
         </div>
       </div>
-      <div className="flex justify-between">
-        <button className="border border-green-600 text-green-600 px-6 py-3 rounded-lg hover:bg-green-600 hover:text-white transition-colors" onClick={onBack}>Back</button>
+      <div className="flex gap-3">
+        <button className="flex-1 border border-green-600 text-green-600 px-6 py-3 rounded-lg hover:bg-green-600 hover:text-white transition-colors" onClick={onBack}>Back</button>
         <button 
-          className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-300" 
+          className="flex-1 bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-300" 
           disabled={!weight || (unit === 'metric' ? !height : (!feet || !inches))} 
           onClick={handleNext}
         >
@@ -638,15 +668,15 @@ function ExerciseStep({ onNext, onBack, initial }: { onNext: (data: any) => void
           </div>
         )}
 
-        <div className="flex justify-between pt-4">
+        <div className="flex gap-3 pt-4">
           <button 
-            className="border border-green-600 text-green-600 px-6 py-3 rounded-lg hover:bg-green-600 hover:text-white transition-colors" 
+            className="flex-1 border border-green-600 text-green-600 px-6 py-3 rounded-lg hover:bg-green-600 hover:text-white transition-colors" 
             onClick={onBack}
           >
             Back
           </button>
           <button 
-            className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-300" 
+            className="flex-1 bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-300" 
             disabled={!exerciseFrequency}
             onClick={() => onNext({ exerciseFrequency, exerciseTypes })}
           >
@@ -959,15 +989,15 @@ function HealthGoalsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
         )}
 
         {/* Navigation Buttons */}
-        <div className="flex justify-between pt-4">
+        <div className="flex gap-3 pt-4">
           <button 
-            className="border border-green-600 text-green-600 px-6 py-3 rounded-lg hover:bg-green-600 hover:text-white transition-colors" 
+            className="flex-1 border border-green-600 text-green-600 px-6 py-3 rounded-lg hover:bg-green-600 hover:text-white transition-colors" 
             onClick={onBack}
           >
             Back
           </button>
           <button 
-            className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-300" 
+            className="flex-1 bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-300" 
             disabled={goals.length === 0} 
             onClick={handleNext}
           >
@@ -1074,16 +1104,16 @@ function HealthSituationsStep({ onNext, onBack, initial }: { onNext: (data: any)
           </div>
         </div>
 
-        <div className="flex justify-between mt-8">
+        <div className="flex gap-3 mt-8">
           <button
             onClick={handleSkip}
-            className="text-gray-600 hover:text-gray-900 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+            className="flex-1 text-gray-600 hover:text-gray-900 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors border border-gray-300"
           >
             Skip for now
           </button>
           <button
             onClick={handleNext}
-            className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors"
+            className="flex-1 bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors"
           >
             Continue
           </button>
@@ -1394,15 +1424,15 @@ function SupplementsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
         )}
 
         {/* Navigation Buttons */}
-        <div className="flex justify-between pt-4">
+        <div className="flex gap-3 pt-4">
           <button 
-            className="border border-green-600 text-green-600 px-6 py-3 rounded-lg hover:bg-green-600 hover:text-white transition-colors" 
+            className="flex-1 border border-green-600 text-green-600 px-6 py-3 rounded-lg hover:bg-green-600 hover:text-white transition-colors" 
             onClick={onBack}
           >
             Back
           </button>
           <button 
-            className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors" 
+            className="flex-1 bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors" 
             onClick={() => onNext({ supplements })}
           >
             Next
@@ -1992,16 +2022,16 @@ function BloodResultsStep({ onNext, onBack, initial }: { onNext: (data: any) => 
           />
         </div>
 
-        <div className="flex justify-between">
+        <div className="flex gap-3">
           <button
             onClick={handleSkip}
-            className="text-gray-600 hover:text-gray-900 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+            className="flex-1 text-gray-600 hover:text-gray-900 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors border border-gray-300"
           >
             Skip for now
           </button>
           <button
             onClick={handleNext}
-            className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors"
+            className="flex-1 bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors"
           >
             Continue
           </button>
@@ -2021,9 +2051,9 @@ function AIInsightsStep({ onNext, onBack, initial }: { onNext: (data: any) => vo
         <button className={`flex-1 p-4 rounded border ${wantInsights === 'yes' ? 'bg-helfi-green text-white' : 'border-helfi-green'}`} onClick={() => setWantInsights('yes')}>Yes</button>
         <button className={`flex-1 p-4 rounded border ${wantInsights === 'no' ? 'bg-helfi-green text-white' : 'border-helfi-green'}`} onClick={() => setWantInsights('no')}>No Thanks</button>
       </div>
-      <div className="flex justify-between">
-        <button className="btn-secondary" onClick={onBack}>Back</button>
-        <button className="btn-primary" disabled={!wantInsights} onClick={() => onNext({ wantInsights })}>Next</button>
+      <div className="flex gap-3">
+        <button className="flex-1 border border-green-600 text-green-600 px-6 py-3 rounded-lg hover:bg-green-600 hover:text-white transition-colors" onClick={onBack}>Back</button>
+        <button className="flex-1 bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-300" disabled={!wantInsights} onClick={() => onNext({ wantInsights })}>Next</button>
       </div>
     </div>
   );
@@ -2092,10 +2122,10 @@ function ReviewStep({ onBack, data }: { onBack: () => void, data: any }) {
         <div><b>Medications:</b> {formatMedications()}</div>
         <div><b>AI Insights:</b> {safeData.wantInsights === 'yes' ? 'Yes' : 'No'}</div>
       </div>
-      <div className="flex justify-between">
-        <button className="btn-secondary" onClick={onBack}>Back</button>
+      <div className="flex gap-3">
+        <button className="flex-1 border border-green-600 text-green-600 px-6 py-3 rounded-lg hover:bg-green-600 hover:text-white transition-colors" onClick={onBack}>Back</button>
         <button 
-          className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors" 
+          className="flex-1 bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors" 
           onClick={handleConfirm}
         >
           Confirm &amp; Begin
@@ -2257,7 +2287,7 @@ export default function Onboarding() {
   return (
     <div className="fixed inset-0 bg-gray-50 overflow-y-auto" id="onboarding-container">
       <OnboardingNav />
-      <div className="min-h-full flex flex-col">
+      <div className="min-h-full flex flex-col pb-20 sm:pb-0">
         {/* Progress bar */}
         <div className="sticky top-0 bg-white border-b border-gray-200 px-3 sm:px-4 py-3 safe-area-inset-top">
           {/* Header */}
@@ -2304,28 +2334,41 @@ export default function Onboarding() {
             </div>
           </div>
           
-          {/* Desktop: Full step buttons */}
-          <div className="hidden sm:block mb-3">
-            <div className="grid grid-cols-5 gap-1 lg:gap-2">
+          {/* Desktop: Modern step indicators */}
+          <div className="hidden sm:block mb-4">
+            <div className="flex items-center justify-between">
               {stepNames.map((stepName, index) => (
-                <button
-                  key={index}
-                  onClick={() => jumpToStep(index)}
-                  className={`text-xs px-1 lg:px-2 py-1 rounded transition-colors text-center ${
-                    index === step 
-                      ? 'bg-green-600 text-white font-medium' 
-                      : index < step 
-                        ? 'bg-green-100 text-green-700 hover:bg-green-200' 
-                        : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                  }`}
-                  title={`Jump to ${stepName}`}
-                >
-                  <div className="truncate">
-                    <span className="font-semibold">{index + 1}.</span>
-                    <span className="hidden lg:inline ml-1">{stepName}</span>
-                  </div>
-                </button>
+                <div key={index} className="flex items-center flex-1">
+                  <button
+                    onClick={() => jumpToStep(index)}
+                    className={`relative flex items-center justify-center w-8 h-8 rounded-full border-2 transition-all duration-200 ${
+                      index === step 
+                        ? 'bg-green-600 border-green-600 text-white shadow-lg scale-110' 
+                        : index < step 
+                          ? 'bg-green-600 border-green-600 text-white hover:scale-105' 
+                          : 'bg-white border-gray-300 text-gray-400 hover:border-gray-400'
+                    }`}
+                    title={`${index < step ? 'Completed: ' : index === step ? 'Current: ' : 'Upcoming: '}${stepName}`}
+                  >
+                    {index < step ? (
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    ) : (
+                      <span className="text-sm font-semibold">{index + 1}</span>
+                    )}
+                  </button>
+                  {index < stepNames.length - 1 && (
+                    <div className={`flex-1 h-0.5 mx-2 transition-colors duration-200 ${
+                      index < step ? 'bg-green-600' : 'bg-gray-300'
+                    }`} />
+                  )}
+                </div>
               ))}
+            </div>
+            <div className="text-center mt-3">
+              <span className="text-sm font-medium text-gray-700">{stepNames[step]}</span>
+              <div className="text-xs text-gray-500 mt-1">Step {step + 1} of {stepNames.length}</div>
             </div>
           </div>
           
@@ -2356,6 +2399,49 @@ export default function Onboarding() {
           {step === 7 && <BloodResultsStep onNext={handleNext} onBack={handleBack} initial={form} />}
           {step === 8 && <AIInsightsStep onNext={handleNext} onBack={handleBack} initial={form} />}
           {step === 9 && <ReviewStep onBack={handleBack} data={form} />}
+        </div>
+
+        {/* Mobile Bottom Navigation */}
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-3 sm:hidden safe-area-inset-bottom">
+          <div className="flex items-center justify-between">
+            <button
+              onClick={handleBack}
+              disabled={step === 0}
+              className={`flex items-center px-4 py-2 rounded-lg transition-colors ${
+                step === 0 
+                  ? 'text-gray-400 cursor-not-allowed' 
+                  : 'text-gray-700 hover:bg-gray-100'
+              }`}
+            >
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              Back
+            </button>
+            
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-gray-500">{step + 1} of {stepNames.length}</span>
+              <div className="w-16 bg-gray-200 rounded-full h-2">
+                <div 
+                  className="bg-green-600 h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${((step + 1) / stepNames.length) * 100}%` }}
+                />
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                localStorage.setItem('onboardingData', JSON.stringify(form));
+                window.location.href = '/dashboard';
+              }}
+              className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            >
+              Dashboard
+              <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
     </div>
