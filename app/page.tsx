@@ -88,18 +88,18 @@ export default function SplashPage() {
       </div>
 
       {/* Navigation */}
-      <nav className="relative z-10 px-4 py-4 md:py-6">
+      <nav className="relative z-10 px-4 py-6">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="flex items-center">
             <button 
               onClick={() => window.location.reload()}
-              className="w-20 h-20 md:w-24 md:h-24 lg:w-28 lg:h-28 cursor-pointer hover:opacity-80 transition-opacity"
+              className="w-24 h-24 md:w-32 md:h-32 cursor-pointer hover:opacity-80 transition-opacity"
             >
               <Image
                 src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/HELFI_TRANSPARENT_rmssry.png"
                 alt="Helfi Logo"
-                width={112}
-                height={112}
+                width={128}
+                height={128}
                 className="w-full h-full object-contain"
                 priority
               />
@@ -304,15 +304,15 @@ export default function SplashPage() {
       </nav>
 
       {/* Hero Section */}
-      <section className="px-4 py-16 md:py-20">
+      <section className="px-4 py-20">
         <div className="max-w-7xl mx-auto text-center">
           <div className="max-w-4xl mx-auto">
-            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-helfi-black mb-6 leading-tight">
+            <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold text-helfi-black mb-6 leading-tight">
               <span className="block">Your Personal</span>
               <span className="text-helfi-green block">Health Intelligence</span>
               <span className="block">Platform</span>
             </h1>
-            <p className="text-lg md:text-xl lg:text-2xl text-gray-600 mb-8 leading-relaxed max-w-3xl mx-auto">
+            <p className="text-xl md:text-2xl text-gray-600 mb-8 leading-relaxed">
               Track your health metrics, supplements, and medications. Get AI-powered insights 
               and personalized recommendations to optimize your wellbeing.
             </p>
@@ -335,50 +335,50 @@ export default function SplashPage() {
       </section>
 
       {/* Features Section */}
-      <section id="features" className="px-4 py-16 md:py-20 bg-white">
+      <section id="features" className="px-4 py-20 bg-white">
         <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-12 md:mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-helfi-black mb-4">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-bold text-helfi-black mb-4">
               Everything you need for optimal health
             </h2>
-            <p className="text-lg md:text-xl text-gray-600 max-w-2xl mx-auto">
+            <p className="text-xl text-gray-600">
               Comprehensive health tracking meets artificial intelligence
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
-            <div className="text-center p-6 md:p-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="text-center p-8">
               <div className="w-16 h-16 bg-helfi-green/10 rounded-full flex items-center justify-center mx-auto mb-6">
                 <svg className="w-8 h-8 text-helfi-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
               </div>
-              <h3 className="text-xl md:text-2xl font-bold text-helfi-black mb-4">Smart Health Tracking</h3>
-              <p className="text-gray-600 leading-relaxed">
+              <h3 className="text-2xl font-bold text-helfi-black mb-4">Smart Health Tracking</h3>
+              <p className="text-gray-600">
                 Track weight, sleep, mood, energy levels, and custom health metrics with intelligent pattern recognition.
               </p>
             </div>
 
-            <div className="text-center p-6 md:p-8">
+            <div className="text-center p-8">
               <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
                 <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                 </svg>
               </div>
-              <h3 className="text-xl md:text-2xl font-bold text-helfi-black mb-4">AI-Powered Insights</h3>
-              <p className="text-gray-600 leading-relaxed">
+              <h3 className="text-2xl font-bold text-helfi-black mb-4">AI-Powered Insights</h3>
+              <p className="text-gray-600">
                 Get personalized recommendations based on your unique health patterns and goals using advanced AI analysis.
               </p>
             </div>
 
-            <div className="text-center p-6 md:p-8">
+            <div className="text-center p-8">
               <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
                 <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
                 </svg>
               </div>
-              <h3 className="text-xl md:text-2xl font-bold text-helfi-black mb-4">Supplement Management</h3>
-              <p className="text-gray-600 leading-relaxed">
+              <h3 className="text-2xl font-bold text-helfi-black mb-4">Supplement Management</h3>
+              <p className="text-gray-600">
                 Track supplements and medications with photo recognition, interaction checking, and optimal timing recommendations.
               </p>
             </div>
@@ -387,13 +387,13 @@ export default function SplashPage() {
       </section>
 
       {/* Why Health Tracking Matters Section */}
-      <section id="why-helfi" className="px-4 py-16 md:py-20 bg-gradient-to-br from-green-50 to-blue-50">
+      <section id="why-helfi" className="px-4 py-20 bg-gradient-to-br from-green-50 to-blue-50">
         <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-12 md:mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-helfi-black mb-6">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-bold text-helfi-black mb-6">
               Why Personal Health Intelligence Matters
             </h2>
-            <p className="text-lg md:text-xl text-gray-600 max-w-4xl mx-auto leading-relaxed">
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
               In today's fast-paced world, maintaining optimal health requires more than just good intentions. 
               Our AI-powered health intelligence platform transforms how you understand and optimize your wellbeing.
             </p>
