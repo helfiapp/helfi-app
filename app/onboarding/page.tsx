@@ -63,7 +63,7 @@ function LogoutButton() {
   );
 }
 
-function OnboardingNav() {
+function HeaderProfileSection() {
   const { data: session } = useSession();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [userImage, setUserImage] = useState<string | null>(null);
@@ -83,7 +83,7 @@ function OnboardingNav() {
   // Close dropdown on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent) {
-      if (!(e.target as HTMLElement).closest('#onboarding-profile-dropdown')) {
+      if (!(e.target as HTMLElement).closest('#header-profile-dropdown')) {
         setDropdownOpen(false);
       }
     }
@@ -96,9 +96,9 @@ function OnboardingNav() {
   }, [dropdownOpen]);
 
   return (
-    <div className="fixed top-24 md:top-20 right-4 z-50 flex items-center space-x-2">
+    <div className="flex items-center space-x-3 flex-shrink-0">
       {/* Profile Avatar & Dropdown */}
-      <div className="relative" id="onboarding-profile-dropdown">
+      <div className="relative" id="header-profile-dropdown">
         <button
           onClick={() => setDropdownOpen((v) => !v)}
           className="focus:outline-none bg-white border border-gray-300 rounded-full p-1 shadow-lg hover:shadow-xl transition-all"
@@ -108,12 +108,12 @@ function OnboardingNav() {
             <Image
               src={userImage}
               alt="Profile"
-              width={32}
-              height={32}
-              className="rounded-full object-cover w-8 h-8"
+              width={36}
+              height={36}
+              className="rounded-full object-cover w-9 h-9"
             />
           ) : (
-            <div className="w-8 h-8 rounded-full bg-helfi-green flex items-center justify-center">
+            <div className="w-9 h-9 rounded-full bg-helfi-green flex items-center justify-center">
               <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
               </svg>
@@ -209,6 +209,24 @@ function OnboardingNav() {
         )}
       </div>
       <RefreshButton />
+    </div>
+  );
+}
+
+function FloatingSkipSection({ step, stepNames, form }: { step: number, stepNames: string[], form: any }) {
+  return (
+    <div className="fixed top-24 md:top-20 right-4 z-50 flex items-center space-x-3">
+      <button
+        onClick={() => {
+          localStorage.setItem('onboardingData', JSON.stringify(form));
+          window.location.href = '/dashboard';
+        }}
+        className="text-sm bg-blue-100 text-blue-700 px-4 py-2 rounded-lg hover:bg-blue-200 transition-colors whitespace-nowrap font-medium shadow-lg"
+        title="Skip to Dashboard"
+      >
+        Skip
+      </button>
+      <span className="text-sm sm:text-base text-gray-700 font-medium whitespace-nowrap bg-white px-3 py-2 rounded-lg shadow-lg border border-gray-200">{step + 1}/{stepNames.length}</span>
     </div>
   );
 }
@@ -2335,7 +2353,7 @@ export default function Onboarding() {
 
   return (
     <div className="fixed inset-0 bg-gray-50 overflow-y-auto" id="onboarding-container">
-      <OnboardingNav />
+      <FloatingSkipSection step={step} stepNames={stepNames} form={form} />
       <div className="min-h-full flex flex-col pb-20 sm:pb-0">
         {/* Progress bar */}
         <div className="fixed-header safe-area-top px-3 sm:px-4 py-4">
@@ -2344,19 +2362,7 @@ export default function Onboarding() {
             <h1 className="text-lg sm:text-xl font-semibold text-gray-900 truncate">
               {Object.keys(form).length > 0 ? 'Edit Profile' : 'Setup Profile'}
             </h1>
-            <div className="flex items-center space-x-3 flex-shrink-0">
-              <button
-                onClick={() => {
-                  localStorage.setItem('onboardingData', JSON.stringify(form));
-                  window.location.href = '/dashboard';
-                }}
-                className="text-sm bg-blue-100 text-blue-700 px-4 py-2 rounded-lg hover:bg-blue-200 transition-colors whitespace-nowrap font-medium"
-                title="Skip to Dashboard"
-              >
-                Skip
-              </button>
-              <span className="text-sm sm:text-base text-gray-700 font-medium whitespace-nowrap">{step + 1}/{stepNames.length}</span>
-            </div>
+            <HeaderProfileSection />
           </div>
           
           {/* Mobile: Compact step dots with navigation arrows */}
