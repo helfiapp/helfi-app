@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { useSession, signOut } from 'next-auth/react'
 
 // Back to Top Button Component
 function BackToTopButton() {
@@ -45,49 +44,8 @@ function BackToTopButton() {
 }
 
 export default function SplashPage() {
-  // Temporarily disable session for public access
-  const session = null; // const { data: session } = useSession();
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-
-  // Placeholder for user image (replace with real user image from session/profile)
-  const userImage = 'https://ui-avatars.com/api/?name=User&background=E5E7EB&color=374151&rounded=true&size=128';
-  const userName = 'User';
-
-  // Close dropdown on outside click
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (!(e.target as HTMLElement).closest('#profile-dropdown')) {
-        setDropdownOpen(false);
-      }
-    }
-    if (dropdownOpen) {
-      document.addEventListener('mousedown', handleClick);
-    } else {
-      document.removeEventListener('mousedown', handleClick);
-    }
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [dropdownOpen]);
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-helfi-green/5 via-white to-blue-50">
-      {/* Medical Disclaimer Banner */}
-      <div className="bg-blue-50 border-l-4 border-blue-400 p-4">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex items-start">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <p className="text-sm text-blue-700">
-                <strong>Medical Disclaimer:</strong> Helfi is not a medical device and does not provide medical advice, diagnosis, or treatment. Always consult with a qualified healthcare provider before making health-related decisions. <Link href="/terms" className="underline hover:text-blue-900">View full disclaimer</Link>
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Navigation */}
       <nav className="relative z-10 px-4 py-6">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
@@ -139,167 +97,16 @@ export default function SplashPage() {
             >
               Join Waitlist
             </button>
-            {/* Profile Avatar & Dropdown */}
-            <div className="relative ml-6" id="profile-dropdown">
-              <button
-                onClick={() => setDropdownOpen((v) => !v)}
-                className="focus:outline-none"
-                aria-label="Open profile menu"
-              >
-                <Image
-                  src={userImage}
-                  alt="Profile"
-                  width={48}
-                  height={48}
-                  className="rounded-full border-2 border-helfi-green shadow-sm object-cover w-12 h-12"
-                />
-              </button>
-              {dropdownOpen && (
-                <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-100 animate-fade-in">
-                  <div className="flex items-center px-4 py-3 border-b border-gray-100">
-                    <Image
-                      src={userImage}
-                      alt="Profile"
-                      width={40}
-                      height={40}
-                      className="rounded-full object-cover mr-3"
-                    />
-                    <div>
-                      <div className="font-semibold text-gray-900">{userName}</div>
-                      <div className="text-xs text-gray-500">{'user@email.com'}</div>
-                    </div>
-                  </div>
-                  <Link href="/profile" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Profile</Link>
-                  <Link href="/account" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Account Settings</Link>
-                  <Link href="/profile/image" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Upload/Change Profile Image</Link>
-                  <Link href="/billing" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Subscription & Billing</Link>
-                  <Link href="/notifications" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Notifications</Link>
-                  <Link href="/privacy" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Privacy Settings</Link>
-                  <Link href="/help" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
-                  <button
-                    onClick={() => signOut()}
-                    className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50 font-semibold"
-                  >
-                    Logout
-                  </button>
-                </div>
-              )}
-            </div>
           </div>
 
-          {/* Mobile Menu */}
-          <div className="md:hidden flex items-center space-x-3">
+          {/* Mobile Menu Button */}
+          <div className="md:hidden">
             <button 
               onClick={() => document.getElementById('waitlist-signup')?.scrollIntoView({ behavior: 'smooth' })}
-              className="btn-secondary hover:bg-gray-100 transition-colors text-sm px-3 py-2"
+              className="btn-secondary hover:bg-gray-100 transition-colors text-sm px-4 py-2"
             >
               Join Waitlist
             </button>
-            {/* Mobile Profile Avatar & Dropdown */}
-            <div className="relative" id="mobile-profile-dropdown">
-              <button
-                onClick={() => setDropdownOpen((v) => !v)}
-                className="focus:outline-none"
-                aria-label="Open profile menu"
-              >
-                <Image
-                  src={userImage}
-                  alt="Profile"
-                  width={40}
-                  height={40}
-                  className="rounded-full border-2 border-helfi-green shadow-sm object-cover w-10 h-10"
-                />
-              </button>
-              {dropdownOpen && (
-                <div className="absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-xl py-2 z-50 border border-gray-100 animate-fade-in">
-                  <div className="flex items-center px-4 py-3 border-b border-gray-100">
-                    <Image
-                      src={userImage}
-                      alt="Profile"
-                      width={36}
-                      height={36}
-                      className="rounded-full object-cover mr-3"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="font-semibold text-gray-900 truncate">{userName}</div>
-                      <div className="text-xs text-gray-500 truncate">{'user@email.com'}</div>
-                    </div>
-                  </div>
-                  <div className="py-1">
-                    <Link href="/profile" className="block px-4 py-3 text-gray-700 hover:bg-gray-50 text-sm">
-                      <div className="flex items-center">
-                        <svg className="w-4 h-4 mr-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
-                        Profile
-                      </div>
-                    </Link>
-                    <Link href="/account" className="block px-4 py-3 text-gray-700 hover:bg-gray-50 text-sm">
-                      <div className="flex items-center">
-                        <svg className="w-4 h-4 mr-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                        Account Settings
-                      </div>
-                    </Link>
-                    <Link href="/profile/image" className="block px-4 py-3 text-gray-700 hover:bg-gray-50 text-sm">
-                      <div className="flex items-center">
-                        <svg className="w-4 h-4 mr-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                        Change Profile Image
-                      </div>
-                    </Link>
-                    <Link href="/billing" className="block px-4 py-3 text-gray-700 hover:bg-gray-50 text-sm">
-                      <div className="flex items-center">
-                        <svg className="w-4 h-4 mr-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                        </svg>
-                        Subscription & Billing
-                      </div>
-                    </Link>
-                    <Link href="/notifications" className="block px-4 py-3 text-gray-700 hover:bg-gray-50 text-sm">
-                      <div className="flex items-center">
-                        <svg className="w-4 h-4 mr-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-5 5v-5zM4.868 19.462A17.173 17.173 0 003 12C3 5.373 8.373 0 15 0s12 5.373 12 12-5.373 12-12 12a11.99 11.99 0 01-8.132-3.538z" />
-                        </svg>
-                        Notifications
-                      </div>
-                    </Link>
-                    <Link href="/privacy" className="block px-4 py-3 text-gray-700 hover:bg-gray-50 text-sm">
-                      <div className="flex items-center">
-                        <svg className="w-4 h-4 mr-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                        </svg>
-                        Privacy Settings
-                      </div>
-                    </Link>
-                    <Link href="/help" className="block px-4 py-3 text-gray-700 hover:bg-gray-50 text-sm">
-                      <div className="flex items-center">
-                        <svg className="w-4 h-4 mr-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        Help & Support
-                      </div>
-                    </Link>
-                  </div>
-                  <div className="border-t border-gray-100 pt-1">
-                    <button
-                      onClick={() => signOut()}
-                      className="block w-full text-left px-4 py-3 text-red-600 hover:bg-red-50 font-semibold text-sm"
-                    >
-                      <div className="flex items-center">
-                        <svg className="w-4 h-4 mr-3 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                        </svg>
-                        Logout
-                      </div>
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
           </div>
         </div>
       </nav>
