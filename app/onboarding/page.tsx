@@ -2354,18 +2354,74 @@ export default function Onboarding() {
   return (
     <div className="fixed inset-0 bg-gray-50 overflow-y-auto" id="onboarding-container">
       <FloatingSkipSection step={step} stepNames={stepNames} form={form} />
-      <div className="min-h-full flex flex-col pb-24 sm:pb-4">
-        {/* Header */}
+      <div className="min-h-full flex flex-col pb-20 sm:pb-0">
+        {/* Progress bar back at top */}
         <div className="fixed-header safe-area-top px-3 sm:px-4 py-4">
+          {/* Header */}
           <div className="flex items-center justify-center mb-4">
             <h1 className="text-lg sm:text-xl font-semibold text-gray-900 truncate">
               {Object.keys(form).length > 0 ? 'Edit Profile' : 'Setup Profile'}
             </h1>
           </div>
           
-          {/* Mobile: Step indicator without arrows */}
+          {/* Mobile: Compact step dots with navigation arrows */}
           <div className="block sm:hidden mb-4">
-            <div className="text-center">
+            <div className="flex items-center justify-center space-x-3">
+              {/* Left Arrow */}
+              <button
+                onClick={() => handleBack()}
+                disabled={step === 0}
+                className={`p-2 rounded-full transition-colors ${
+                  step === 0 
+                    ? 'text-gray-300 cursor-not-allowed' 
+                    : 'text-gray-600 hover:bg-gray-100 active:bg-gray-200'
+                }`}
+                title="Previous step"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              
+              {/* Step Dots */}
+              <div className="flex items-center space-x-2">
+                {stepNames.map((_, index) => (
+                  <button
+                    key={index}
+                    onClick={() => jumpToStep(index)}
+                    className={`w-3 h-3 rounded-full transition-all ${
+                      index === step 
+                        ? 'bg-green-600 scale-125' 
+                        : index < step 
+                          ? 'bg-green-300' 
+                          : 'bg-gray-300'
+                    }`}
+                    title={`Step ${index + 1}: ${stepNames[index]}`}
+                  />
+                ))}
+              </div>
+              
+              {/* Right Arrow */}
+              <button
+                onClick={() => {
+                  if (step < stepNames.length - 1) {
+                    jumpToStep(step + 1);
+                  }
+                }}
+                disabled={step === stepNames.length - 1}
+                className={`p-2 rounded-full transition-colors ${
+                  step === stepNames.length - 1 
+                    ? 'text-gray-300 cursor-not-allowed' 
+                    : 'text-gray-600 hover:bg-gray-100 active:bg-gray-200'
+                }`}
+                title="Next step"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+            <div className="text-center mt-4">
               <span className="text-base text-gray-700 font-semibold">{stepNames[step]}</span>
               <div className="text-sm text-gray-500 mt-1">Step {step + 1} of {stepNames.length}</div>
             </div>
@@ -2408,80 +2464,6 @@ export default function Onboarding() {
               <div className="text-xs text-gray-500 mt-1">Step {step + 1} of {stepNames.length}</div>
             </div>
           </div>
-        </div>
-
-        {/* Content */}
-        <div className="flex-1 px-4 py-6 pt-20 sm:pt-8">
-          {step === 0 && <GenderStep onNext={handleNext} initial={form.gender} />}
-          {step === 1 && <PhysicalStep onNext={handleNext} onBack={handleBack} initial={form} />}
-          {step === 2 && <ExerciseStep onNext={handleNext} onBack={handleBack} initial={form} />}
-          {step === 3 && <HealthGoalsStep onNext={handleNext} onBack={handleBack} initial={form} />}
-          {step === 4 && <HealthSituationsStep onNext={handleNext} onBack={handleBack} initial={form} />}
-          {step === 5 && <SupplementsStep onNext={handleNext} onBack={handleBack} initial={form} />}
-          {step === 6 && <MedicationsStep onNext={handleNext} onBack={handleBack} initial={form} />}
-          {step === 7 && <BloodResultsStep onNext={handleNext} onBack={handleBack} initial={form} />}
-          {step === 8 && <AIInsightsStep onNext={handleNext} onBack={handleBack} initial={form} />}
-          {step === 9 && <ReviewStep onBack={handleBack} data={form} />}
-        </div>
-
-        {/* Progress bar at bottom */}
-        <div className="fixed bottom-20 left-0 right-0 bg-white border-t border-gray-200 px-4 py-3 z-50">
-          {/* Mobile: Compact step dots with navigation arrows */}
-          <div className="flex items-center justify-center space-x-3 mb-3">
-            {/* Left Arrow */}
-            <button
-              onClick={() => handleBack()}
-              disabled={step === 0}
-              className={`p-2 rounded-full transition-colors ${
-                step === 0 
-                  ? 'text-gray-300 cursor-not-allowed' 
-                  : 'text-gray-600 hover:bg-gray-100 active:bg-gray-200'
-              }`}
-              title="Previous step"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
-            
-            {/* Step Dots */}
-            <div className="flex items-center space-x-2">
-              {stepNames.map((_, index) => (
-                <button
-                  key={index}
-                  onClick={() => jumpToStep(index)}
-                  className={`w-3 h-3 rounded-full transition-all ${
-                    index === step 
-                      ? 'bg-green-600 scale-125' 
-                      : index < step 
-                        ? 'bg-green-300' 
-                        : 'bg-gray-300'
-                  }`}
-                  title={`Step ${index + 1}: ${stepNames[index]}`}
-                />
-              ))}
-            </div>
-            
-            {/* Right Arrow */}
-            <button
-              onClick={() => {
-                if (step < stepNames.length - 1) {
-                  jumpToStep(step + 1);
-                }
-              }}
-              disabled={step === stepNames.length - 1}
-              className={`p-2 rounded-full transition-colors ${
-                step === stepNames.length - 1 
-                  ? 'text-gray-300 cursor-not-allowed' 
-                  : 'text-gray-600 hover:bg-gray-100 active:bg-gray-200'
-              }`}
-              title="Next step"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
-          </div>
           
           {/* Progress bar */}
           <div className="w-full bg-gray-200 rounded-full h-2 cursor-pointer shadow-inner" onClick={(e) => {
@@ -2496,6 +2478,20 @@ export default function Onboarding() {
               style={{ width: `${((step + 1) / stepNames.length) * 100}%` }}
             />
           </div>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 px-4 py-6 pt-12 sm:pt-8">
+          {step === 0 && <GenderStep onNext={handleNext} initial={form.gender} />}
+          {step === 1 && <PhysicalStep onNext={handleNext} onBack={handleBack} initial={form} />}
+          {step === 2 && <ExerciseStep onNext={handleNext} onBack={handleBack} initial={form} />}
+          {step === 3 && <HealthGoalsStep onNext={handleNext} onBack={handleBack} initial={form} />}
+          {step === 4 && <HealthSituationsStep onNext={handleNext} onBack={handleBack} initial={form} />}
+          {step === 5 && <SupplementsStep onNext={handleNext} onBack={handleBack} initial={form} />}
+          {step === 6 && <MedicationsStep onNext={handleNext} onBack={handleBack} initial={form} />}
+          {step === 7 && <BloodResultsStep onNext={handleNext} onBack={handleBack} initial={form} />}
+          {step === 8 && <AIInsightsStep onNext={handleNext} onBack={handleBack} initial={form} />}
+          {step === 9 && <ReviewStep onBack={handleBack} data={form} />}
         </div>
 
         {/* Bottom Navigation */}
