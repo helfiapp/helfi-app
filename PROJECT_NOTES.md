@@ -4,16 +4,17 @@
 
 ### Current Live Status (Updated: January 25, 2025)
 - **Live Domain**: https://helfi.ai and https://www.helfi.ai
-- **Current Deployment**: helfi-mk5nt946f-louie-veleskis-projects.vercel.app
-- **Status**: ✅ WORKING - Desktop layout fixed, support page live
+- **Current Deployment**: helfi-jokds0zjf-louie-veleskis-projects.vercel.app
+- **Status**: ✅ WORKING - Desktop layout fixed, support page live, mobile menu working
 - **Support Email**: support@helfi.ai (implemented and working)
+- **Last Emergency Fix**: January 25, 2025 - Forced fresh deployment to resolve caching issues
 
 ### Vercel Configuration
 - **Project**: louie-veleskis-projects/helfi-app
 - **GitHub Repo**: https://github.com/helfiapp/helfi-app
 - **Domain Aliases**: 
-  - helfi.ai → helfi-mk5nt946f-louie-veleskis-projects.vercel.app
-  - www.helfi.ai → helfi-mk5nt946f-louie-veleskis-projects.vercel.app
+  - helfi.ai → helfi-jokds0zjf-louie-veleskis-projects.vercel.app
+  - www.helfi.ai → helfi-jokds0zjf-louie-veleskis-projects.vercel.app
 
 ## 📋 TODOIST AUTOMATION
 
