@@ -45,12 +45,13 @@ function BackToTopButton() {
 }
 
 export default function SplashPage() {
-  const { data: session } = useSession();
+  // Temporarily disable session for public access
+  const session = null; // const { data: session } = useSession();
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
   // Placeholder for user image (replace with real user image from session/profile)
-  const userImage = session?.user?.image || 'https://ui-avatars.com/api/?name=User&background=E5E7EB&color=374151&rounded=true&size=128';
-  const userName = session?.user?.name || 'User';
+  const userImage = 'https://ui-avatars.com/api/?name=User&background=E5E7EB&color=374151&rounded=true&size=128';
+  const userName = 'User';
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -165,7 +166,7 @@ export default function SplashPage() {
                     />
                     <div>
                       <div className="font-semibold text-gray-900">{userName}</div>
-                      <div className="text-xs text-gray-500">{session?.user?.email || 'user@email.com'}</div>
+                      <div className="text-xs text-gray-500">{'user@email.com'}</div>
                     </div>
                   </div>
                   <Link href="/profile" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Profile</Link>
@@ -221,7 +222,7 @@ export default function SplashPage() {
                     />
                     <div className="flex-1 min-w-0">
                       <div className="font-semibold text-gray-900 truncate">{userName}</div>
-                      <div className="text-xs text-gray-500 truncate">{session?.user?.email || 'user@email.com'}</div>
+                      <div className="text-xs text-gray-500 truncate">{'user@email.com'}</div>
                     </div>
                   </div>
                   <div className="py-1">
