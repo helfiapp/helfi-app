@@ -10,8 +10,8 @@ export default function ProfilePage() {
   const [onboardingData, setOnboardingData] = useState<any>(null)
   const [dropdownOpen, setDropdownOpen] = useState(false)
 
-  // Profile data
-  const userImage = session?.user?.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(session?.user?.name || 'User')}&background=22c55e&color=ffffff&rounded=true&size=128`;
+  // Profile data with better fallback - use SVG icon if no image
+  const userImage = session?.user?.image;
   const userName = session?.user?.name || 'User';
 
   // Close dropdown on outside click
@@ -87,24 +87,40 @@ export default function ProfilePage() {
                 className="focus:outline-none"
                 aria-label="Open profile menu"
               >
-                <Image
-                  src={userImage}
-                  alt="Profile"
-                  width={48}
-                  height={48}
-                  className="rounded-full border-2 border-helfi-green shadow-sm object-cover w-12 h-12"
-                />
+                {userImage ? (
+                  <Image
+                    src={userImage}
+                    alt="Profile"
+                    width={48}
+                    height={48}
+                    className="rounded-full border-2 border-helfi-green shadow-sm object-cover w-12 h-12"
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded-full border-2 border-helfi-green shadow-sm bg-helfi-green flex items-center justify-center">
+                    <svg className="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                    </svg>
+                  </div>
+                )}
               </button>
               {dropdownOpen && (
                 <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-100 animate-fade-in">
                   <div className="flex items-center px-4 py-3 border-b border-gray-100">
-                    <Image
-                      src={userImage}
-                      alt="Profile"
-                      width={40}
-                      height={40}
-                      className="rounded-full object-cover mr-3"
-                    />
+                    {userImage ? (
+                      <Image
+                        src={userImage}
+                        alt="Profile"
+                        width={40}
+                        height={40}
+                        className="rounded-full object-cover mr-3"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-helfi-green flex items-center justify-center mr-3">
+                        <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                        </svg>
+                      </div>
+                    )}
                     <div>
                       <div className="font-semibold text-gray-900">{userName}</div>
                       <div className="text-xs text-gray-500">{session?.user?.email || 'user@email.com'}</div>
@@ -136,24 +152,40 @@ export default function ProfilePage() {
                 className="focus:outline-none"
                 aria-label="Open profile menu"
               >
-                <Image
-                  src={userImage}
-                  alt="Profile"
-                  width={40}
-                  height={40}
-                  className="rounded-full border-2 border-helfi-green shadow-sm object-cover w-10 h-10"
-                />
+                {userImage ? (
+                  <Image
+                    src={userImage}
+                    alt="Profile"
+                    width={40}
+                    height={40}
+                    className="rounded-full border-2 border-helfi-green shadow-sm object-cover w-10 h-10"
+                  />
+                ) : (
+                  <div className="w-10 h-10 rounded-full border-2 border-helfi-green shadow-sm bg-helfi-green flex items-center justify-center">
+                    <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                    </svg>
+                  </div>
+                )}
               </button>
               {dropdownOpen && (
                 <div className="absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-xl py-2 z-50 border border-gray-100 animate-fade-in">
                   <div className="flex items-center px-4 py-3 border-b border-gray-100">
-                    <Image
-                      src={userImage}
-                      alt="Profile"
-                      width={36}
-                      height={36}
-                      className="rounded-full object-cover mr-3"
-                    />
+                    {userImage ? (
+                      <Image
+                        src={userImage}
+                        alt="Profile"
+                        width={36}
+                        height={36}
+                        className="rounded-full object-cover mr-3"
+                      />
+                    ) : (
+                      <div className="w-9 h-9 rounded-full bg-helfi-green flex items-center justify-center mr-3">
+                        <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                        </svg>
+                      </div>
+                    )}
                     <div className="flex-1 min-w-0">
                       <div className="font-semibold text-gray-900 truncate">{userName}</div>
                       <div className="text-xs text-gray-500 truncate">{session?.user?.email || 'user@email.com'}</div>
@@ -220,13 +252,21 @@ export default function ProfilePage() {
           {/* Profile Header */}
           <div className="flex items-center space-x-6 mb-8">
             <div className="relative">
-              <Image
-                src={userImage}
-                alt="Profile"
-                width={120}
-                height={120}
-                className="rounded-full border-4 border-helfi-green shadow-lg object-cover w-30 h-30"
-              />
+              {userImage ? (
+                <Image
+                  src={userImage}
+                  alt="Profile"
+                  width={120}
+                  height={120}
+                  className="rounded-full border-4 border-helfi-green shadow-lg object-cover w-30 h-30"
+                />
+              ) : (
+                <div className="w-30 h-30 rounded-full border-4 border-helfi-green shadow-lg bg-helfi-green flex items-center justify-center">
+                  <svg className="w-16 h-16 text-white" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                  </svg>
+                </div>
+              )}
               <Link 
                 href="/profile/image"
                 className="absolute bottom-0 right-0 bg-helfi-green text-white rounded-full p-2 shadow-lg hover:bg-helfi-green/90 transition-colors"
@@ -239,19 +279,25 @@ export default function ProfilePage() {
             <div>
               <h1 className="text-3xl font-bold text-gray-900 mb-2">{userName}</h1>
               <p className="text-gray-600 mb-4">{session?.user?.email}</p>
-              <div className="flex space-x-3">
+              <div className="flex flex-col sm:flex-row gap-3">
                 <button
                   onClick={handleEditOnboarding}
                   className="bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors"
                 >
-                  Edit Health Profile
+                  ✏️ Edit Health Profile
                 </button>
-                <Link
-                  href="/account"
-                  className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors"
+                <button
+                  onClick={() => {
+                    if (confirm('Are you sure you want to reset all your health data? This action cannot be undone.')) {
+                      localStorage.removeItem('onboardingData');
+                      setOnboardingData(null);
+                      window.location.reload();
+                    }
+                  }}
+                  className="bg-red-100 text-red-700 px-4 py-2 rounded-lg hover:bg-red-200 transition-colors"
                 >
-                  Account Settings
-                </Link>
+                  🔄 Reset All Data
+                </button>
               </div>
             </div>
           </div>

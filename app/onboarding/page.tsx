@@ -86,7 +86,7 @@ function OnboardingNav() {
   }, [dropdownOpen]);
 
   return (
-    <div className="fixed top-20 sm:top-4 right-4 z-50 flex items-center space-x-2">
+    <div className="fixed top-20 md:top-4 right-4 z-50 flex items-center space-x-2">
       {/* Profile Avatar & Dropdown */}
       <div className="relative" id="onboarding-profile-dropdown">
         <button
