@@ -87,7 +87,7 @@ function OnboardingNav() {
   }, [dropdownOpen]);
 
   return (
-    <div className="fixed top-20 md:top-4 right-4 z-50 flex items-center space-x-2">
+    <div className="fixed top-32 md:top-24 right-4 z-50 flex items-center space-x-2">
       {/* Profile Avatar & Dropdown */}
       <div className="relative" id="onboarding-profile-dropdown">
         <button
@@ -2467,7 +2467,7 @@ export default function Onboarding() {
         </div>
 
         {/* Content */}
-        <div className="flex-1 px-4 py-6 pt-48 sm:pt-40">
+        <div className="flex-1 px-4 py-6 pt-28 sm:pt-24">
           {step === 0 && <GenderStep onNext={handleNext} initial={form.gender} />}
           {step === 1 && <PhysicalStep onNext={handleNext} onBack={handleBack} initial={form} />}
           {step === 2 && <ExerciseStep onNext={handleNext} onBack={handleBack} initial={form} />}
