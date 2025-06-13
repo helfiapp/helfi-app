@@ -11,9 +11,22 @@ export default function HelpPage() {
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [openFaq, setOpenFaq] = useState<number | null>(null)
 
-  // Profile data with better fallback
-  const userImage = session?.user?.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(session?.user?.name || 'User')}&background=22c55e&color=ffffff&rounded=true&size=128`;
+  // Profile data with localStorage integration
+  const [userImage, setUserImage] = useState<string | null>(null);
   const userName = session?.user?.name || 'User';
+
+  // Load profile image from localStorage or session
+  useEffect(() => {
+    const savedImage = localStorage.getItem('userProfileImage');
+    if (savedImage) {
+      setUserImage(savedImage);
+    } else if (session?.user?.image) {
+      setUserImage(session.user.image);
+    } else {
+      // Fallback to generated avatar
+      setUserImage(`https://ui-avatars.com/api/?name=${encodeURIComponent(session?.user?.name || 'User')}&background=22c55e&color=ffffff&rounded=true&size=128`);
+    }
+  }, [session]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -98,24 +111,40 @@ export default function HelpPage() {
                 className="focus:outline-none"
                 aria-label="Open profile menu"
               >
-                <Image
-                  src={userImage}
-                  alt="Profile"
-                  width={48}
-                  height={48}
-                  className="rounded-full border-2 border-helfi-green shadow-sm object-cover w-12 h-12"
-                />
+                {userImage ? (
+                  <Image
+                    src={userImage}
+                    alt="Profile"
+                    width={48}
+                    height={48}
+                    className="rounded-full border-2 border-helfi-green shadow-sm object-cover w-12 h-12"
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded-full border-2 border-helfi-green shadow-sm bg-helfi-green flex items-center justify-center">
+                    <svg className="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                    </svg>
+                  </div>
+                )}
               </button>
               {dropdownOpen && (
                 <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-100 animate-fade-in">
                   <div className="flex items-center px-4 py-3 border-b border-gray-100">
-                    <Image
-                      src={userImage}
-                      alt="Profile"
-                      width={40}
-                      height={40}
-                      className="rounded-full object-cover mr-3"
-                    />
+                    {userImage ? (
+                      <Image
+                        src={userImage}
+                        alt="Profile"
+                        width={40}
+                        height={40}
+                        className="rounded-full object-cover mr-3"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-helfi-green flex items-center justify-center mr-3">
+                        <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                        </svg>
+                      </div>
+                    )}
                     <div>
                       <div className="font-semibold text-gray-900">{userName}</div>
                       <div className="text-xs text-gray-500">{session?.user?.email || 'user@email.com'}</div>

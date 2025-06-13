@@ -11,9 +11,18 @@ export default function Dashboard() {
   const [onboardingData, setOnboardingData] = useState<any>(null)
   const [showResetConfirm, setShowResetConfirm] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [userImage, setUserImage] = useState<string | null>(null)
 
-  // Profile data with better fallback - use SVG icon if no image
-  const userImage = session?.user?.image;
+  // Load profile image from localStorage or session
+  useEffect(() => {
+    const savedImage = localStorage.getItem('userProfileImage');
+    if (savedImage) {
+      setUserImage(savedImage);
+    } else if (session?.user?.image) {
+      setUserImage(session.user.image);
+    }
+  }, [session]);
+
   const userName = session?.user?.name || 'User';
 
   // Close dropdown on outside click

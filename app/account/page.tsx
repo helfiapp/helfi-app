@@ -16,9 +16,19 @@ export default function AccountPage() {
     email: ''
   })
 
-  // Profile data with better fallback - use SVG icon if no image
-  const userImage = session?.user?.image;
+  // Profile data with localStorage integration
+  const [userImage, setUserImage] = useState<string | null>(null);
   const userName = session?.user?.name || 'User';
+
+  // Load profile image from localStorage or session
+  useEffect(() => {
+    const savedImage = localStorage.getItem('userProfileImage');
+    if (savedImage) {
+      setUserImage(savedImage);
+    } else if (session?.user?.image) {
+      setUserImage(session.user.image);
+    }
+  }, [session]);
 
   // Load saved data on mount
   useEffect(() => {
