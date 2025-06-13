@@ -441,23 +441,24 @@ export default function Dashboard() {
           {/* Onboarding Data Section */}
           {onboardingData && (
             <div className="mt-8 bg-gray-50 rounded-lg p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">Your Profile Information</h3>
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <button
-                    onClick={handleEditOnboarding}
-                    className="btn-mobile-primary"
-                  >
-                    ✏️ Edit Profile
-                  </button>
-                  <button
-                    onClick={() => setShowResetConfirm(true)}
-                    className="bg-red-500 text-white px-4 py-3 rounded-lg hover:bg-red-600 transition-colors font-medium"
-                  >
-                    🔄 Reset All Data
-                  </button>
-                </div>
+              {/* Action Buttons - Above the heading */}
+              <div className="mb-6 space-y-3">
+                <button
+                  onClick={handleEditOnboarding}
+                  className="btn-mobile-primary w-full block"
+                >
+                  ✏️ Edit Profile
+                </button>
+                <button
+                  onClick={() => setShowResetConfirm(true)}
+                  className="bg-red-500 text-white px-4 py-3 rounded-lg hover:bg-red-600 transition-colors font-medium w-full block"
+                >
+                  🔄 Reset All Data
+                </button>
               </div>
+              
+              {/* Profile Information Heading */}
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Your Profile Information</h3>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                 <div>
