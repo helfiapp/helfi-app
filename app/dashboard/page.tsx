@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import Image from 'next/image'
 import Link from 'next/link'
+import BottomNav from '../../components/BottomNav'
 
 export default function Dashboard() {
   const { data: session } = useSession()
@@ -18,7 +19,8 @@ export default function Dashboard() {
   // Close dropdown on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent) {
-      if (!(e.target as HTMLElement).closest('#profile-dropdown')) {
+      if (!(e.target as HTMLElement).closest('#profile-dropdown') && 
+          !(e.target as HTMLElement).closest('#mobile-profile-dropdown')) {
         setDropdownOpen(false);
       }
     }
@@ -62,24 +64,24 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 pb-20 md:pb-0">
       {/* Navigation Header */}
-      <nav className="bg-white border-b border-gray-200 px-4 py-3">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <div className="flex items-center">
-            <Link href="/" className="w-16 h-16 md:w-20 md:h-20 cursor-pointer hover:opacity-80 transition-opacity">
+      <nav className="fixed-header safe-area-top px-4 py-3">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center min-w-0">
+            <Link href="/" className="w-12 h-12 flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity">
               <Image
                 src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/HELFI_TRANSPARENT_rmssry.png"
                 alt="Helfi Logo"
-                width={80}
-                height={80}
+                width={48}
+                height={48}
                 className="w-full h-full object-contain"
                 priority
               />
             </Link>
-            <div className="ml-4">
-              <h1 className="text-lg md:text-xl font-semibold text-gray-900">Health Dashboard</h1>
-              <p className="text-sm text-gray-500 hidden sm:block">Welcome back, {userName}</p>
+            <div className="ml-3 min-w-0">
+              <h1 className="text-lg font-semibold text-gray-900 truncate">Dashboard</h1>
+              <p className="text-sm text-gray-500 hidden sm:block">Your health overview</p>
             </div>
           </div>
           
@@ -282,15 +284,22 @@ export default function Dashboard() {
       </nav>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="bg-white rounded-lg shadow-sm p-8">
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-helfi-black mb-4">
-              Welcome to Your Health Dashboard
-            </h1>
-            <p className="text-gray-600">
-              Your personalized health intelligence platform is being built!
-            </p>
+      <div className="pt-20 px-4 pb-8">
+        <div className="max-w-6xl mx-auto">
+          {/* Welcome Section */}
+          <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">Welcome back, {userName}!</h2>
+                <p className="text-gray-600 mt-1">Here's your health overview for today</p>
+              </div>
+              <div className="hidden md:block">
+                <div className="text-right">
+                  <div className="text-sm text-gray-500">Last updated</div>
+                  <div className="text-sm font-medium text-gray-900">{new Date().toLocaleDateString()}</div>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -425,16 +434,16 @@ export default function Dashboard() {
             <div className="mt-8 bg-gray-50 rounded-lg p-6">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-semibold text-gray-900">Your Profile Information</h3>
-                <div className="space-x-3">
+                <div className="flex flex-col sm:flex-row gap-3">
                   <button
                     onClick={handleEditOnboarding}
-                    className="bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors text-sm"
+                    className="btn-mobile-primary"
                   >
                     ✏️ Edit Profile
                   </button>
                   <button
                     onClick={() => setShowResetConfirm(true)}
-                    className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors text-sm"
+                    className="bg-red-500 text-white px-4 py-3 rounded-lg hover:bg-red-600 transition-colors font-medium"
                   >
                     🔄 Reset All Data
                   </button>
@@ -555,6 +564,9 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+
+      {/* Bottom Navigation */}
+      <BottomNav />
     </div>
   )
 } 

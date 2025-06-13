@@ -4,11 +4,13 @@ import React, { useState, useEffect } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import Image from 'next/image'
 import Link from 'next/link'
+import BottomNav from '../../components/BottomNav'
 
 export default function ProfilePage() {
   const { data: session } = useSession()
   const [onboardingData, setOnboardingData] = useState<any>(null)
   const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [showResetDialog, setShowResetDialog] = useState(false)
 
   // Profile data with better fallback - use SVG icon if no image
   const userImage = session?.user?.image;
@@ -49,8 +51,15 @@ export default function ProfilePage() {
     window.location.href = '/onboarding'
   }
 
+  const handleResetData = () => {
+    localStorage.removeItem('onboardingData')
+    setOnboardingData(null)
+    setShowResetDialog(false)
+    window.location.reload()
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 pb-20 md:pb-0">
       {/* Navigation Header */}
       <nav className="bg-white border-b border-gray-200 px-4 py-3">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
@@ -250,8 +259,8 @@ export default function ProfilePage() {
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="bg-white rounded-lg shadow-sm p-8">
           {/* Profile Header */}
-          <div className="flex items-center space-x-6 mb-8">
-            <div className="relative">
+          <div className="flex flex-col md:flex-row md:items-center md:space-x-6 mb-8">
+            <div className="relative mx-auto md:mx-0 mb-6 md:mb-0">
               {userImage ? (
                 <Image
                   src={userImage}
@@ -276,25 +285,22 @@ export default function ProfilePage() {
                 </svg>
               </Link>
             </div>
-            <div>
+            <div className="text-center md:text-left flex-1">
               <h1 className="text-3xl font-bold text-gray-900 mb-2">{userName}</h1>
-              <p className="text-gray-600 mb-4">{session?.user?.email}</p>
-              <div className="flex flex-col sm:flex-row gap-3">
+              <p className="text-gray-600 mb-6">{session?.user?.email}</p>
+              
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">Your Profile Information</h2>
+              
+              <div className="flex flex-col space-y-3">
                 <button
                   onClick={handleEditOnboarding}
-                  className="bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors"
+                  className="btn-mobile-primary w-full"
                 >
-                  ✏️ Edit Health Profile
+                  ✏️ Edit Profile
                 </button>
                 <button
-                  onClick={() => {
-                    if (confirm('Are you sure you want to reset all your health data? This action cannot be undone.')) {
-                      localStorage.removeItem('onboardingData');
-                      setOnboardingData(null);
-                      window.location.reload();
-                    }
-                  }}
-                  className="bg-red-100 text-red-700 px-4 py-2 rounded-lg hover:bg-red-200 transition-colors"
+                  onClick={() => setShowResetDialog(true)}
+                  className="bg-red-100 text-red-700 px-4 py-3 rounded-lg hover:bg-red-200 transition-colors font-medium w-full"
                 >
                   🔄 Reset All Data
                 </button>
@@ -399,6 +405,59 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
+
+      {/* Reset Confirmation Dialog */}
+      {showResetDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+            <div className="flex items-center mb-4">
+              <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mr-4">
+                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Reset All Health Data</h3>
+                <p className="text-sm text-gray-500">This action cannot be undone</p>
+              </div>
+            </div>
+            
+            <div className="mb-6">
+              <p className="text-gray-700 mb-4">
+                Are you sure you want to reset all your health data? This will permanently delete:
+              </p>
+              <ul className="text-sm text-gray-600 space-y-1 ml-4">
+                <li>• Personal information (weight, height, body type)</li>
+                <li>• Exercise preferences and frequency</li>
+                <li>• Health goals and situations</li>
+                <li>• Supplement and medication data</li>
+                <li>• All progress and insights</li>
+              </ul>
+              <p className="text-red-600 font-medium text-sm mt-4">
+                This action cannot be undone. You will need to complete the onboarding process again.
+              </p>
+            </div>
+            
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={handleResetData}
+                className="btn-mobile-danger"
+              >
+                Yes, Reset All Data
+              </button>
+              <button
+                onClick={() => setShowResetDialog(false)}
+                className="btn-mobile-secondary"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bottom Navigation */}
+      <BottomNav />
     </div>
   )
 } 

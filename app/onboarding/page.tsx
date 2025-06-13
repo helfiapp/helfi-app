@@ -5,6 +5,7 @@ import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import Image from 'next/image';
 import Link from 'next/link';
+import BottomNav from '../../components/BottomNav';
 
 // Auth-enabled onboarding flow
 
@@ -2107,28 +2108,67 @@ function ReviewStep({ onBack, data }: { onBack: () => void, data: any }) {
   };
 
   return (
-    <div className="max-w-md mx-auto mt-12 p-6 bg-white rounded shadow">
-      <h2 className="text-2xl font-bold mb-4">Here's what we have so far</h2>
-      <p className="mb-4 text-gray-600">Double-check your inputs before we take you to your dashboard.</p>
-      <div className="mb-4 text-left">
-        <div><b>Gender:</b> {safeData.gender || 'Not specified'}</div>
-        <div><b>Weight:</b> {safeData.weight || 'Not specified'}</div>
-        <div><b>Height:</b> {safeData.height || 'Not specified'}</div>
-        <div><b>Body Type:</b> {safeData.bodyType || 'Not specified'}</div>
-        <div><b>Exercise Frequency:</b> {safeData.exerciseFrequency || 'Not specified'}</div>
-        <div><b>Exercise Types:</b> {(safeData.exerciseTypes || []).join(', ') || 'None'}</div>
-        <div><b>Health Goals:</b> {(safeData.goals || []).join(', ') || 'None'}</div>
-        <div><b>Supplements:</b> {formatSupplements()}</div>
-        <div><b>Medications:</b> {formatMedications()}</div>
-        <div><b>AI Insights:</b> {safeData.wantInsights === 'yes' ? 'Yes' : 'No'}</div>
+    <div className="w-full max-w-2xl mx-auto p-6 bg-white rounded-xl shadow-sm">
+      <h2 className="text-2xl font-bold mb-4 text-center">Here's what we have so far</h2>
+      <p className="mb-6 text-gray-600 text-center">Double-check your inputs before we take you to your dashboard.</p>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div className="space-y-3">
+          <div className="flex justify-between">
+            <span className="font-medium text-gray-700">Gender:</span>
+            <span className="text-gray-900">{safeData.gender || 'Not specified'}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="font-medium text-gray-700">Weight:</span>
+            <span className="text-gray-900">{safeData.weight || 'Not specified'}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="font-medium text-gray-700">Height:</span>
+            <span className="text-gray-900">{safeData.height || 'Not specified'}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="font-medium text-gray-700">Body Type:</span>
+            <span className="text-gray-900">{safeData.bodyType || 'Not specified'}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="font-medium text-gray-700">Exercise Frequency:</span>
+            <span className="text-gray-900">{safeData.exerciseFrequency || 'Not specified'}</span>
+          </div>
+        </div>
+        
+        <div className="space-y-3">
+          <div>
+            <span className="font-medium text-gray-700">Exercise Types:</span>
+            <div className="text-gray-900 text-sm mt-1">{(safeData.exerciseTypes || []).join(', ') || 'None'}</div>
+          </div>
+          <div>
+            <span className="font-medium text-gray-700">Health Goals:</span>
+            <div className="text-gray-900 text-sm mt-1">{(safeData.goals || []).join(', ') || 'None'}</div>
+          </div>
+          <div>
+            <span className="font-medium text-gray-700">Supplements:</span>
+            <div className="text-gray-900 text-sm mt-1">{formatSupplements()}</div>
+          </div>
+          <div>
+            <span className="font-medium text-gray-700">Medications:</span>
+            <div className="text-gray-900 text-sm mt-1">{formatMedications()}</div>
+          </div>
+          <div className="flex justify-between">
+            <span className="font-medium text-gray-700">AI Insights:</span>
+            <span className="text-gray-900">{safeData.wantInsights === 'yes' ? 'Yes' : 'No'}</span>
+          </div>
+        </div>
       </div>
-      <div className="flex gap-3">
-        <button className="flex-1 border border-green-600 text-green-600 px-6 py-3 rounded-lg hover:bg-green-600 hover:text-white transition-colors" onClick={onBack}>Back</button>
+      
+      <div className="flex flex-col gap-3">
         <button 
-          className="flex-1 bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors" 
+          className="w-full bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors font-medium" 
           onClick={handleConfirm}
         >
           Confirm &amp; Begin
+        </button>
+        <button className="w-full border border-green-600 text-green-600 px-6 py-3 rounded-lg hover:bg-green-600 hover:text-white transition-colors font-medium" onClick={onBack}>
+          Back
         </button>
       </div>
     </div>
@@ -2289,48 +2329,87 @@ export default function Onboarding() {
       <OnboardingNav />
       <div className="min-h-full flex flex-col pb-20 sm:pb-0">
         {/* Progress bar */}
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-3 sm:px-4 py-3 safe-area-inset-top">
+        <div className="fixed-header safe-area-top px-3 sm:px-4 py-4">
           {/* Header */}
-          <div className="flex items-center justify-between mb-3">
-            <h1 className="text-base sm:text-lg font-semibold text-gray-900 truncate">
+          <div className="flex items-center justify-between mb-4">
+            <h1 className="text-lg sm:text-xl font-semibold text-gray-900 truncate">
               {Object.keys(form).length > 0 ? 'Edit Profile' : 'Setup Profile'}
             </h1>
-            <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0">
+            <div className="flex items-center space-x-3 flex-shrink-0">
               <button
                 onClick={() => {
                   localStorage.setItem('onboardingData', JSON.stringify(form));
                   window.location.href = '/dashboard';
                 }}
-                className="text-xs bg-blue-100 text-blue-700 px-2 sm:px-3 py-1 rounded hover:bg-blue-200 transition-colors whitespace-nowrap"
+                className="text-sm bg-blue-100 text-blue-700 px-4 py-2 rounded-lg hover:bg-blue-200 transition-colors whitespace-nowrap font-medium"
                 title="Skip to Dashboard"
               >
                 Skip
               </button>
-              <span className="text-xs sm:text-sm text-gray-500 whitespace-nowrap">{step + 1}/{stepNames.length}</span>
+              <span className="text-sm sm:text-base text-gray-700 font-medium whitespace-nowrap">{step + 1}/{stepNames.length}</span>
             </div>
           </div>
           
-          {/* Mobile: Compact step dots */}
-          <div className="block sm:hidden mb-3">
-            <div className="flex items-center justify-center space-x-2">
-              {stepNames.map((_, index) => (
-                <button
-                  key={index}
-                  onClick={() => jumpToStep(index)}
-                  className={`w-3 h-3 rounded-full transition-all ${
-                    index === step 
-                      ? 'bg-green-600 scale-125' 
-                      : index < step 
-                        ? 'bg-green-300' 
-                        : 'bg-gray-300'
-                  }`}
-                  title={`Step ${index + 1}: ${stepNames[index]}`}
-                />
-              ))}
+          {/* Mobile: Compact step dots with navigation arrows */}
+          <div className="block sm:hidden mb-4">
+            <div className="flex items-center justify-center space-x-3">
+              {/* Left Arrow */}
+              <button
+                onClick={() => handleBack()}
+                disabled={step === 0}
+                className={`p-2 rounded-full transition-colors ${
+                  step === 0 
+                    ? 'text-gray-300 cursor-not-allowed' 
+                    : 'text-gray-600 hover:bg-gray-100 active:bg-gray-200'
+                }`}
+                title="Previous step"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              
+              {/* Step Dots */}
+              <div className="flex items-center space-x-2">
+                {stepNames.map((_, index) => (
+                  <button
+                    key={index}
+                    onClick={() => jumpToStep(index)}
+                    className={`w-3 h-3 rounded-full transition-all ${
+                      index === step 
+                        ? 'bg-green-600 scale-125' 
+                        : index < step 
+                          ? 'bg-green-300' 
+                          : 'bg-gray-300'
+                    }`}
+                    title={`Step ${index + 1}: ${stepNames[index]}`}
+                  />
+                ))}
+              </div>
+              
+              {/* Right Arrow */}
+              <button
+                onClick={() => {
+                  if (step < stepNames.length - 1) {
+                    jumpToStep(step + 1);
+                  }
+                }}
+                disabled={step === stepNames.length - 1}
+                className={`p-2 rounded-full transition-colors ${
+                  step === stepNames.length - 1 
+                    ? 'text-gray-300 cursor-not-allowed' 
+                    : 'text-gray-600 hover:bg-gray-100 active:bg-gray-200'
+                }`}
+                title="Next step"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
             </div>
-            <div className="text-center mt-3">
-              <span className="text-sm text-gray-700 font-semibold">{stepNames[step]}</span>
-              <div className="text-xs text-gray-500 mt-1">Step {step + 1} of {stepNames.length}</div>
+            <div className="text-center mt-4">
+              <span className="text-base text-gray-700 font-semibold">{stepNames[step]}</span>
+              <div className="text-sm text-gray-500 mt-1">Step {step + 1} of {stepNames.length}</div>
             </div>
           </div>
           
@@ -2388,7 +2467,7 @@ export default function Onboarding() {
         </div>
 
         {/* Content */}
-        <div className="flex-1 px-4 py-6">
+        <div className="flex-1 px-4 py-6 pt-48 sm:pt-40">
           {step === 0 && <GenderStep onNext={handleNext} initial={form.gender} />}
           {step === 1 && <PhysicalStep onNext={handleNext} onBack={handleBack} initial={form} />}
           {step === 2 && <ExerciseStep onNext={handleNext} onBack={handleBack} initial={form} />}
@@ -2401,48 +2480,8 @@ export default function Onboarding() {
           {step === 9 && <ReviewStep onBack={handleBack} data={form} />}
         </div>
 
-        {/* Mobile Bottom Navigation */}
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-3 sm:hidden safe-area-inset-bottom">
-          <div className="flex items-center justify-between">
-            <button
-              onClick={handleBack}
-              disabled={step === 0}
-              className={`flex items-center px-4 py-2 rounded-lg transition-colors ${
-                step === 0 
-                  ? 'text-gray-400 cursor-not-allowed' 
-                  : 'text-gray-700 hover:bg-gray-100'
-              }`}
-            >
-              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-              Back
-            </button>
-            
-            <div className="flex items-center space-x-2">
-              <span className="text-sm text-gray-500">{step + 1} of {stepNames.length}</span>
-              <div className="w-16 bg-gray-200 rounded-full h-2">
-                <div 
-                  className="bg-green-600 h-2 rounded-full transition-all duration-300"
-                  style={{ width: `${((step + 1) / stepNames.length) * 100}%` }}
-                />
-              </div>
-            </div>
-
-            <button
-              onClick={() => {
-                localStorage.setItem('onboardingData', JSON.stringify(form));
-                window.location.href = '/dashboard';
-              }}
-              className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-            >
-              Dashboard
-              <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
-          </div>
-        </div>
+        {/* Bottom Navigation */}
+        <BottomNav />
       </div>
     </div>
   );

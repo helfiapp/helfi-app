@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import Image from 'next/image'
 import Link from 'next/link'
+import BottomNav from '../../components/BottomNav'
 
 export default function PrivacyPage() {
   const { data: session } = useSession()
@@ -14,7 +15,7 @@ export default function PrivacyPage() {
   const userName = session?.user?.name || 'User';
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 pb-20 md:pb-0">
       {/* Navigation Header */}
       <nav className="bg-white border-b border-gray-200 px-4 py-3">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
@@ -189,6 +190,9 @@ export default function PrivacyPage() {
           </div>
         </div>
       </div>
+
+      {/* Bottom Navigation */}
+      <BottomNav />
     </div>
   )
 } 
