@@ -66,9 +66,18 @@ function LogoutButton() {
 function OnboardingNav() {
   const { data: session } = useSession();
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [userImage, setUserImage] = useState<string | null>(null);
   
-  // Profile data with better fallback - use SVG icon if no image
-  const userImage = session?.user?.image;
+  // Load profile image from localStorage or session
+  useEffect(() => {
+    const savedImage = localStorage.getItem('userProfileImage');
+    if (savedImage) {
+      setUserImage(savedImage);
+    } else if (session?.user?.image) {
+      setUserImage(session.user.image);
+    }
+  }, [session]);
+  
   const userName = session?.user?.name || 'User';
 
   // Close dropdown on outside click
@@ -87,7 +96,7 @@ function OnboardingNav() {
   }, [dropdownOpen]);
 
   return (
-    <div className="fixed top-32 md:top-24 right-4 z-50 flex items-center space-x-2">
+    <div className="fixed top-24 md:top-20 right-4 z-50 flex items-center space-x-2">
       {/* Profile Avatar & Dropdown */}
       <div className="relative" id="onboarding-profile-dropdown">
         <button
@@ -2467,7 +2476,7 @@ export default function Onboarding() {
         </div>
 
         {/* Content */}
-        <div className="flex-1 px-4 py-6 pt-28 sm:pt-24">
+        <div className="flex-1 px-4 py-6 pt-12 sm:pt-8">
           {step === 0 && <GenderStep onNext={handleNext} initial={form.gender} />}
           {step === 1 && <PhysicalStep onNext={handleNext} onBack={handleBack} initial={form} />}
           {step === 2 && <ExerciseStep onNext={handleNext} onBack={handleBack} initial={form} />}
