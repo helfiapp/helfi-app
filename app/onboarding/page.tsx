@@ -1655,7 +1655,17 @@ function MedicationsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
         <div className="space-y-3">
           <button 
             className="w-full bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-300" 
-            onClick={() => onNext({ medications })}
+            onClick={() => {
+              try {
+                console.log('Medications step - analyzing medications:', medications);
+                const safeData = { medications: medications || [] };
+                console.log('Sending safe data:', safeData);
+                onNext(safeData);
+              } catch (error) {
+                console.error('Error in medications step:', error);
+                alert('There was an issue processing your medications. Please try again.');
+              }
+            }}
             disabled={medications.length === 0}
           >
             Analyze for Interactions & Contradictions
@@ -1916,29 +1926,76 @@ function AIInsightsStep({ onNext, onBack, initial }: { onNext: (data: any) => vo
 }
 
 function ReviewStep({ onBack, data }: { onBack: () => void, data: any }) {
+  // Safe data access with fallbacks
+  const safeData = data || {};
+  
+  const formatSupplements = () => {
+    try {
+      const supplements = safeData.supplements || [];
+      return supplements.map((s: any) => {
+        if (!s) return 'Invalid supplement data';
+        const name = s.name || 'Unknown supplement';
+        const dosage = s.dosage || 'Unknown dosage';
+        const timing = Array.isArray(s.timing) ? s.timing.join(', ') : (s.timing || 'Unknown timing');
+        return `${name} (${dosage}, ${timing})`;
+      }).join('; ') || 'None';
+    } catch (error) {
+      console.error('Error formatting supplements:', error);
+      return 'Error displaying supplements';
+    }
+  };
+
+  const formatMedications = () => {
+    try {
+      const medications = safeData.medications || [];
+      return medications.map((m: any) => {
+        if (!m) return 'Invalid medication data';
+        const name = m.name || 'Unknown medication';
+        const dosage = m.dosage || 'Unknown dosage';
+        const timing = Array.isArray(m.timing) ? m.timing.join(', ') : (m.timing || 'Unknown timing');
+        return `${name} (${dosage}, ${timing})`;
+      }).join('; ') || 'None';
+    } catch (error) {
+      console.error('Error formatting medications:', error);
+      return 'Error displaying medications';
+    }
+  };
+
+  const handleConfirm = () => {
+    try {
+      console.log('Saving onboarding data:', safeData);
+      localStorage.setItem('onboardingData', JSON.stringify(safeData));
+      window.location.href = '/dashboard';
+    } catch (error) {
+      console.error('Error saving data:', error);
+      alert('There was an issue saving your data. Please try again.');
+    }
+  };
+
   return (
     <div className="max-w-md mx-auto mt-12 p-6 bg-white rounded shadow">
       <h2 className="text-2xl font-bold mb-4">Here's what we have so far</h2>
       <p className="mb-4 text-gray-600">Double-check your inputs before we take you to your dashboard.</p>
       <div className="mb-4 text-left">
-        <div><b>Gender:</b> {data.gender}</div>
-        <div><b>Weight:</b> {data.weight}</div>
-        <div><b>Height:</b> {data.height}</div>
-        <div><b>Body Type:</b> {data.bodyType}</div>
-        <div><b>Exercise Frequency:</b> {data.exerciseFrequency}</div>
-        <div><b>Exercise Types:</b> {(data.exerciseTypes || []).join(', ')}</div>
-        <div><b>Health Goals:</b> {(data.goals || []).join(', ')}</div>
-        <div><b>Supplements:</b> {(data.supplements || []).map((s: any) => `${s.name} (${s.dosage}, ${Array.isArray(s.timing) ? s.timing.join(', ') : s.timing})`).join('; ')}</div>
-        <div><b>Medications:</b> {(data.medications || []).map((m: any) => `${m.name} (${m.dosage}, ${Array.isArray(m.timing) ? m.timing.join(', ') : m.timing})`).join('; ')}</div>
-        <div><b>AI Insights:</b> {data.wantInsights === 'yes' ? 'Yes' : 'No'}</div>
+        <div><b>Gender:</b> {safeData.gender || 'Not specified'}</div>
+        <div><b>Weight:</b> {safeData.weight || 'Not specified'}</div>
+        <div><b>Height:</b> {safeData.height || 'Not specified'}</div>
+        <div><b>Body Type:</b> {safeData.bodyType || 'Not specified'}</div>
+        <div><b>Exercise Frequency:</b> {safeData.exerciseFrequency || 'Not specified'}</div>
+        <div><b>Exercise Types:</b> {(safeData.exerciseTypes || []).join(', ') || 'None'}</div>
+        <div><b>Health Goals:</b> {(safeData.goals || []).join(', ') || 'None'}</div>
+        <div><b>Supplements:</b> {formatSupplements()}</div>
+        <div><b>Medications:</b> {formatMedications()}</div>
+        <div><b>AI Insights:</b> {safeData.wantInsights === 'yes' ? 'Yes' : 'No'}</div>
       </div>
       <div className="flex justify-between">
         <button className="btn-secondary" onClick={onBack}>Back</button>
-        <button className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors" onClick={() => {
-          // Save complete data to localStorage for now
-          localStorage.setItem('onboardingData', JSON.stringify(data));
-          window.location.href = '/dashboard';
-        }}>Confirm &amp; Begin</button>
+        <button 
+          className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors" 
+          onClick={handleConfirm}
+        >
+          Confirm &amp; Begin
+        </button>
       </div>
     </div>
   );
@@ -2012,17 +2069,41 @@ export default function Onboarding() {
   }, [step]);
 
   const handleNext = (data: any) => {
-    setForm((prev: any) => ({ ...prev, ...data }));
-    setStep((prev) => {
-      const newStep = Math.min(stepNames.length - 1, prev + 1);
-      // Force immediate scroll
-      requestAnimationFrame(() => {
-        window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-        const container = document.getElementById('onboarding-container');
-        if (container) container.scrollTop = 0;
+    try {
+      console.log('handleNext called with data:', data);
+      console.log('Current step:', step);
+      console.log('Current form:', form);
+      
+      // Ensure data is valid
+      const safeData = data || {};
+      
+      setForm((prev: any) => {
+        const newForm = { ...prev, ...safeData };
+        console.log('Updated form:', newForm);
+        return newForm;
       });
-      return newStep;
-    });
+      
+      setStep((prev) => {
+        const newStep = Math.min(stepNames.length - 1, prev + 1);
+        console.log('Moving to step:', newStep);
+        
+        // Force immediate scroll
+        requestAnimationFrame(() => {
+          try {
+            window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+            const container = document.getElementById('onboarding-container');
+            if (container) container.scrollTop = 0;
+          } catch (scrollError) {
+            console.error('Scroll error:', scrollError);
+          }
+        });
+        return newStep;
+      });
+    } catch (error) {
+      console.error('Error in handleNext:', error);
+      // Show user-friendly error message
+      alert('There was an issue processing your data. Please try again or contact support if the problem persists.');
+    }
   };
 
   const handleBack = () => {
