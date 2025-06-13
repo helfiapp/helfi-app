@@ -66,8 +66,8 @@ function OnboardingNav() {
   const { data: session } = useSession();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   
-  // Profile data
-  const userImage = session?.user?.image || 'https://ui-avatars.com/api/?name=User&background=E5E7EB&color=374151&rounded=true&size=128';
+  // Profile data with better fallback
+  const userImage = session?.user?.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(session?.user?.name || 'User')}&background=22c55e&color=ffffff&rounded=true&size=128`;
   const userName = session?.user?.name || 'User';
 
   // Close dropdown on outside click
