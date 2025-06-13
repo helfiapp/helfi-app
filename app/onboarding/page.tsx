@@ -2010,12 +2010,22 @@ export default function Onboarding() {
   useEffect(() => {
     const existingData = localStorage.getItem('onboardingData');
     const isEditing = localStorage.getItem('isEditing');
+    const savedStep = localStorage.getItem('onboardingCurrentStep');
     
     if (existingData) {
       try {
         const parsedData = JSON.parse(existingData);
         console.log('Loading existing onboarding data:', parsedData);
         setForm(parsedData);
+        
+        // Restore the current step if available
+        if (savedStep) {
+          const stepNumber = parseInt(savedStep, 10);
+          if (stepNumber >= 0 && stepNumber < stepNames.length) {
+            setStep(stepNumber);
+            console.log('Restored step:', stepNumber);
+          }
+        }
         
         // If we're editing and have data, show a message
         if (isEditing === 'true') {
@@ -2087,6 +2097,9 @@ export default function Onboarding() {
         const newStep = Math.min(stepNames.length - 1, prev + 1);
         console.log('Moving to step:', newStep);
         
+        // Save current step to localStorage
+        localStorage.setItem('onboardingCurrentStep', newStep.toString());
+        
         // Force immediate scroll
         requestAnimationFrame(() => {
           try {
@@ -2109,6 +2122,10 @@ export default function Onboarding() {
   const handleBack = () => {
     setStep((prev) => {
       const newStep = Math.max(0, prev - 1);
+      
+      // Save current step to localStorage
+      localStorage.setItem('onboardingCurrentStep', newStep.toString());
+      
       // Force immediate scroll
       requestAnimationFrame(() => {
         window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
@@ -2117,6 +2134,20 @@ export default function Onboarding() {
       });
       return newStep;
     });
+  };
+
+  const jumpToStep = (targetStep: number) => {
+    if (targetStep >= 0 && targetStep < stepNames.length) {
+      setStep(targetStep);
+      localStorage.setItem('onboardingCurrentStep', targetStep.toString());
+      
+      // Force immediate scroll
+      requestAnimationFrame(() => {
+        window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+        const container = document.getElementById('onboarding-container');
+        if (container) container.scrollTop = 0;
+      });
+    }
   };
 
   return (
@@ -2129,9 +2160,49 @@ export default function Onboarding() {
             <h1 className="text-lg font-semibold text-gray-900">
               {Object.keys(form).length > 0 ? 'Edit Profile' : 'Setup Profile'}
             </h1>
-            <span className="text-sm text-gray-500">{step + 1} of {stepNames.length}</span>
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={() => {
+                  localStorage.setItem('onboardingData', JSON.stringify(form));
+                  window.location.href = '/dashboard';
+                }}
+                className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded hover:bg-blue-200 transition-colors"
+                title="Skip to Dashboard"
+              >
+                Skip to Dashboard
+              </button>
+              <span className="text-sm text-gray-500">{step + 1} of {stepNames.length}</span>
+            </div>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
+          
+          {/* Clickable step indicators */}
+          <div className="flex items-center justify-between mb-2">
+            {stepNames.map((stepName, index) => (
+              <button
+                key={index}
+                onClick={() => jumpToStep(index)}
+                className={`text-xs px-2 py-1 rounded transition-colors ${
+                  index === step 
+                    ? 'bg-green-600 text-white' 
+                    : index < step 
+                      ? 'bg-green-100 text-green-700 hover:bg-green-200' 
+                      : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                }`}
+                title={`Jump to ${stepName}`}
+              >
+                {index + 1}. {stepName}
+              </button>
+            ))}
+          </div>
+          
+          {/* Progress bar */}
+          <div className="w-full bg-gray-200 rounded-full h-2 cursor-pointer" onClick={(e) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const percentage = clickX / rect.width;
+            const targetStep = Math.floor(percentage * stepNames.length);
+            jumpToStep(targetStep);
+          }}>
             <div 
               className="bg-green-600 h-2 rounded-full transition-all duration-300 ease-out"
               style={{ width: `${((step + 1) / stepNames.length) * 100}%` }}
