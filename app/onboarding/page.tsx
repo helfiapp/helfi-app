@@ -2155,48 +2155,77 @@ export default function Onboarding() {
       <OnboardingNav />
       <div className="min-h-full flex flex-col">
         {/* Progress bar */}
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 safe-area-inset-top">
-          <div className="flex items-center justify-between mb-2">
-            <h1 className="text-lg font-semibold text-gray-900">
+        <div className="sticky top-0 bg-white border-b border-gray-200 px-3 sm:px-4 py-3 safe-area-inset-top">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-3">
+            <h1 className="text-base sm:text-lg font-semibold text-gray-900 truncate">
               {Object.keys(form).length > 0 ? 'Edit Profile' : 'Setup Profile'}
             </h1>
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0">
               <button
                 onClick={() => {
                   localStorage.setItem('onboardingData', JSON.stringify(form));
                   window.location.href = '/dashboard';
                 }}
-                className="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded hover:bg-blue-200 transition-colors"
+                className="text-xs bg-blue-100 text-blue-700 px-2 sm:px-3 py-1 rounded hover:bg-blue-200 transition-colors whitespace-nowrap"
                 title="Skip to Dashboard"
               >
-                Skip to Dashboard
+                Skip
               </button>
-              <span className="text-sm text-gray-500">{step + 1} of {stepNames.length}</span>
+              <span className="text-xs sm:text-sm text-gray-500 whitespace-nowrap">{step + 1}/{stepNames.length}</span>
             </div>
           </div>
           
-          {/* Clickable step indicators */}
-          <div className="flex items-center justify-between mb-2">
-            {stepNames.map((stepName, index) => (
-              <button
-                key={index}
-                onClick={() => jumpToStep(index)}
-                className={`text-xs px-2 py-1 rounded transition-colors ${
-                  index === step 
-                    ? 'bg-green-600 text-white' 
-                    : index < step 
-                      ? 'bg-green-100 text-green-700 hover:bg-green-200' 
-                      : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                }`}
-                title={`Jump to ${stepName}`}
-              >
-                {index + 1}. {stepName}
-              </button>
-            ))}
+          {/* Mobile: Compact step dots */}
+          <div className="block sm:hidden mb-3">
+            <div className="flex items-center justify-center space-x-1">
+              {stepNames.map((_, index) => (
+                <button
+                  key={index}
+                  onClick={() => jumpToStep(index)}
+                  className={`w-3 h-3 rounded-full transition-all ${
+                    index === step 
+                      ? 'bg-green-600 scale-125' 
+                      : index < step 
+                        ? 'bg-green-300' 
+                        : 'bg-gray-300'
+                  }`}
+                  title={`Step ${index + 1}: ${stepNames[index]}`}
+                />
+              ))}
+            </div>
+            <div className="text-center mt-2">
+              <span className="text-xs text-gray-600 font-medium">{stepNames[step]}</span>
+            </div>
+          </div>
+          
+          {/* Desktop: Full step buttons */}
+          <div className="hidden sm:block mb-3">
+            <div className="grid grid-cols-5 gap-1 lg:gap-2">
+              {stepNames.map((stepName, index) => (
+                <button
+                  key={index}
+                  onClick={() => jumpToStep(index)}
+                  className={`text-xs px-1 lg:px-2 py-1 rounded transition-colors text-center ${
+                    index === step 
+                      ? 'bg-green-600 text-white font-medium' 
+                      : index < step 
+                        ? 'bg-green-100 text-green-700 hover:bg-green-200' 
+                        : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                  }`}
+                  title={`Jump to ${stepName}`}
+                >
+                  <div className="truncate">
+                    <span className="font-semibold">{index + 1}.</span>
+                    <span className="hidden lg:inline ml-1">{stepName}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
           
           {/* Progress bar */}
-          <div className="w-full bg-gray-200 rounded-full h-2 cursor-pointer" onClick={(e) => {
+          <div className="w-full bg-gray-200 rounded-full h-2 cursor-pointer shadow-inner" onClick={(e) => {
             const rect = e.currentTarget.getBoundingClientRect();
             const clickX = e.clientX - rect.left;
             const percentage = clickX / rect.width;
@@ -2204,7 +2233,7 @@ export default function Onboarding() {
             jumpToStep(targetStep);
           }}>
             <div 
-              className="bg-green-600 h-2 rounded-full transition-all duration-300 ease-out"
+              className="bg-gradient-to-r from-green-500 to-green-600 h-2 rounded-full transition-all duration-500 ease-out shadow-sm"
               style={{ width: `${((step + 1) / stepNames.length) * 100}%` }}
             />
           </div>

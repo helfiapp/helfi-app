@@ -1,16 +1,19 @@
 {
   "/_not-found": "app/_not-found.js",
-  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
   "/admin-panel/page": "app/admin-panel/page.js",
   "/api/admin/waitlist/route": "app/api/admin/waitlist/route.js",
   "/admin/page": "app/admin/page.js",
-  "/auth/signin/page": "app/auth/signin/page.js",
   "/api/send-email/route": "app/api/send-email/route.js",
+  "/api/test-email/route": "app/api/test-email/route.js",
+  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
   "/api/waitlist/route": "app/api/waitlist/route.js",
+  "/auth/verify-request/page": "app/auth/verify-request/page.js",
   "/dashboard/page": "app/dashboard/page.js",
-  "/page": "app/page.js",
-  "/healthapp/page": "app/healthapp/page.js",
-  "/terms/page": "app/terms/page.js",
   "/onboarding/page": "app/onboarding/page.js",
-  "/privacy/page": "app/privacy/page.js"
+  "/healthapp/page": "app/healthapp/page.js",
+  "/page": "app/page.js",
+  "/terms/page": "app/terms/page.js",
+  "/privacy/page": "app/privacy/page.js",
+  "/api/unsubscribe/route": "app/api/unsubscribe/route.js",
+  "/auth/signin/page": "app/auth/signin/page.js"
 }
