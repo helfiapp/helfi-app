@@ -1,10 +1,21 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 
 export default function BottomNav() {
   const pathname = usePathname()
+  const router = useRouter()
+
+  const handleNavClick = (href: string, e: React.MouseEvent) => {
+    e.preventDefault()
+    
+    // Scroll to top immediately
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' })
+    
+    // Navigate to the new page
+    router.push(href)
+  }
 
   const navItems = [
     {
@@ -73,6 +84,7 @@ export default function BottomNav() {
             <Link
               key={item.href}
               href={item.href}
+              onClick={(e) => handleNavClick(item.href, e)}
               className={`flex flex-col items-center py-2 px-3 rounded-lg transition-colors ${
                 active ? 'bg-helfi-green/10' : 'hover:bg-gray-50'
               }`}
