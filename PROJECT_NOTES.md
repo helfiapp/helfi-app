@@ -4,10 +4,11 @@
 
 ### Current Live Status (Updated: January 25, 2025)
 - **Live Domain**: https://helfi.ai and https://www.helfi.ai
-- **Current Deployment**: helfi-amip9cblh-louie-veleskis-projects.vercel.app
-- **Status**: ✅ WORKING PERFECTLY - Desktop layout fixed, mobile menu working, all features live
-- **Support Email**: support@helfi.ai (temporarily disabled due to auth issues)
-- **Last Emergency Fix**: January 25, 2025 - Resolved NextAuth authentication blocking entire site
+- **Current Deployment**: helfi-onkjnslau-louie-veleskis-projects.vercel.app
+- **Status**: ✅ FULLY RESTORED AND WORKING - All pages restored, healthapp live, desktop layout perfect
+- **Support Email**: support@helfi.ai (working)
+- **Healthapp**: https://helfi.ai/healthapp (RESTORED AND WORKING)
+- **Last Emergency Fix**: January 25, 2025 - Successfully restored all missing pages from working commit 3f6c505
 
 ### Vercel Configuration
 - **Project**: louie-veleskis-projects/helfi-app
