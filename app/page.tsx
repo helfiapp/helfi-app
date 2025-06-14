@@ -43,36 +43,12 @@ function BackToTopButton() {
 }
 
 export default function SplashPage() {
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [mobileDropdownOpen, setMobileDropdownOpen] = useState(false);
-
-  // Placeholder for user image and name
-  const userImage = 'https://ui-avatars.com/api/?name=User&background=E5E7EB&color=374151&rounded=true&size=128';
-  const userName = 'User';
-
-  // Close dropdown on outside click
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (!(e.target as HTMLElement).closest('#profile-dropdown')) {
-        setDropdownOpen(false);
-      }
-      if (!(e.target as HTMLElement).closest('#mobile-profile-dropdown')) {
-        setMobileDropdownOpen(false);
-      }
-    }
-    if (dropdownOpen || mobileDropdownOpen) {
-      document.addEventListener('mousedown', handleClick);
-    } else {
-      document.removeEventListener('mousedown', handleClick);
-    }
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [dropdownOpen, mobileDropdownOpen]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-helfi-green/5 via-white to-blue-50">
       {/* Medical Disclaimer Banner */}
       <div className="bg-blue-50 border-l-4 border-blue-400 p-4">
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-6xl mx-auto">
           <div className="flex items-start">
             <div className="flex-shrink-0">
               <svg className="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
@@ -89,8 +65,8 @@ export default function SplashPage() {
       </div>
 
       {/* Navigation */}
-      <nav className="relative z-10 px-4 py-6">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
+      <nav className="relative z-10 px-6 py-6">
+        <div className="max-w-6xl mx-auto flex justify-between items-center">
           <div className="flex items-center">
             <button 
               onClick={() => window.location.reload()}
@@ -139,52 +115,6 @@ export default function SplashPage() {
             >
               Join Waitlist
             </button>
-            {/* Profile Avatar & Dropdown */}
-            <div className="relative ml-6" id="profile-dropdown">
-              <button
-                onClick={() => setDropdownOpen((v) => !v)}
-                className="focus:outline-none"
-                aria-label="Open profile menu"
-              >
-                <Image
-                  src={userImage}
-                  alt="Profile"
-                  width={48}
-                  height={48}
-                  className="rounded-full border-2 border-helfi-green shadow-sm object-cover w-12 h-12"
-                />
-              </button>
-              {dropdownOpen && (
-                <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-100 animate-fade-in">
-                  <div className="flex items-center px-4 py-3 border-b border-gray-100">
-                    <Image
-                      src={userImage}
-                      alt="Profile"
-                      width={40}
-                      height={40}
-                      className="rounded-full object-cover mr-3"
-                    />
-                    <div>
-                      <div className="font-semibold text-gray-900">{userName}</div>
-                      <div className="text-xs text-gray-500">user@email.com</div>
-                    </div>
-                  </div>
-                  <Link href="/profile" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Profile</Link>
-                  <Link href="/account" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Account Settings</Link>
-                  <Link href="/profile/image" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Upload/Change Profile Image</Link>
-                  <Link href="/billing" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Subscription & Billing</Link>
-                  <Link href="/notifications" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Notifications</Link>
-                  <Link href="/privacy" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Privacy Settings</Link>
-                  <Link href="/help" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
-                  <button
-                    onClick={() => window.location.href = '/'}
-                    className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50 font-semibold"
-                  >
-                    Logout
-                  </button>
-                </div>
-              )}
-            </div>
           </div>
 
           {/* Mobile Menu */}
@@ -195,118 +125,13 @@ export default function SplashPage() {
             >
               Join Waitlist
             </button>
-            {/* Mobile Profile Avatar & Dropdown */}
-            <div className="relative" id="mobile-profile-dropdown">
-              <button
-                onClick={() => setMobileDropdownOpen((v) => !v)}
-                className="focus:outline-none"
-                aria-label="Open profile menu"
-              >
-                <Image
-                  src={userImage}
-                  alt="Profile"
-                  width={40}
-                  height={40}
-                  className="rounded-full border-2 border-helfi-green shadow-sm object-cover w-10 h-10"
-                />
-              </button>
-              {mobileDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-xl py-2 z-50 border border-gray-100 animate-fade-in">
-                  <div className="flex items-center px-4 py-3 border-b border-gray-100">
-                    <Image
-                      src={userImage}
-                      alt="Profile"
-                      width={36}
-                      height={36}
-                      className="rounded-full object-cover mr-3"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="font-semibold text-gray-900 truncate">{userName}</div>
-                      <div className="text-xs text-gray-500 truncate">user@email.com</div>
-                    </div>
-                  </div>
-                  <div className="py-1">
-                    <Link href="/profile" className="block px-4 py-3 text-gray-700 hover:bg-gray-50 text-sm">
-                      <div className="flex items-center">
-                        <svg className="w-4 h-4 mr-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
-                        Profile
-                      </div>
-                    </Link>
-                    <Link href="/account" className="block px-4 py-3 text-gray-700 hover:bg-gray-50 text-sm">
-                      <div className="flex items-center">
-                        <svg className="w-4 h-4 mr-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                        Account Settings
-                      </div>
-                    </Link>
-                    <Link href="/profile/image" className="block px-4 py-3 text-gray-700 hover:bg-gray-50 text-sm">
-                      <div className="flex items-center">
-                        <svg className="w-4 h-4 mr-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                        Change Profile Image
-                      </div>
-                    </Link>
-                    <Link href="/billing" className="block px-4 py-3 text-gray-700 hover:bg-gray-50 text-sm">
-                      <div className="flex items-center">
-                        <svg className="w-4 h-4 mr-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                        </svg>
-                        Subscription & Billing
-                      </div>
-                    </Link>
-                    <Link href="/notifications" className="block px-4 py-3 text-gray-700 hover:bg-gray-50 text-sm">
-                      <div className="flex items-center">
-                        <svg className="w-4 h-4 mr-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-5 5v-5zM4.868 19.462A17.173 17.173 0 003 12C3 5.373 8.373 0 15 0s12 5.373 12 12-5.373 12-12 12a11.99 11.99 0 01-8.132-3.538z" />
-                        </svg>
-                        Notifications
-                      </div>
-                    </Link>
-                    <Link href="/privacy" className="block px-4 py-3 text-gray-700 hover:bg-gray-50 text-sm">
-                      <div className="flex items-center">
-                        <svg className="w-4 h-4 mr-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                        </svg>
-                        Privacy Settings
-                      </div>
-                    </Link>
-                    <Link href="/help" className="block px-4 py-3 text-gray-700 hover:bg-gray-50 text-sm">
-                      <div className="flex items-center">
-                        <svg className="w-4 h-4 mr-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        Help & Support
-                      </div>
-                    </Link>
-                  </div>
-                  <div className="border-t border-gray-100 pt-1">
-                    <button
-                      onClick={() => window.location.href = '/'}
-                      className="block w-full text-left px-4 py-3 text-red-600 hover:bg-red-50 font-semibold text-sm"
-                    >
-                      <div className="flex items-center">
-                        <svg className="w-4 h-4 mr-3 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                        </svg>
-                        Logout
-                      </div>
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
           </div>
         </div>
       </nav>
 
       {/* Hero Section */}
-      <section className="px-4 py-20">
-        <div className="max-w-7xl mx-auto text-center">
+      <section className="px-6 py-20">
+        <div className="max-w-6xl mx-auto text-center">
           <div className="max-w-4xl mx-auto">
             <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold text-helfi-black mb-6 leading-tight">
               <span className="block">Your Personal</span>
@@ -336,8 +161,8 @@ export default function SplashPage() {
       </section>
 
       {/* Features Section */}
-      <section id="features" className="px-4 py-20 bg-white">
-        <div className="max-w-7xl mx-auto">
+      <section id="features" className="px-6 py-20 bg-white">
+        <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-helfi-black mb-4">
               Everything you need for optimal health
@@ -388,8 +213,8 @@ export default function SplashPage() {
       </section>
 
       {/* Why Health Tracking Matters Section */}
-      <section id="why-helfi" className="px-4 py-20 bg-gradient-to-br from-green-50 to-blue-50">
-        <div className="max-w-7xl mx-auto">
+      <section id="why-helfi" className="px-6 py-20 bg-gradient-to-br from-green-50 to-blue-50">
+        <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-helfi-black mb-6">
               Why Personal Health Intelligence Matters
@@ -400,85 +225,96 @@ export default function SplashPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            <div>
-              <h3 className="text-3xl font-bold text-helfi-black mb-6">The Modern Health Challenge</h3>
-              <div className="space-y-6">
-                <div className="flex items-start space-x-4">
-                  <div className="bg-red-100 rounded-full p-2 mt-1">
-                    <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-2">Overwhelming Information</h4>
-                    <p className="text-gray-600">Millions of health articles, supplements, and conflicting advice make it impossible to know what's right for your unique body.</p>
-                  </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-start mt-16">
+            <div className="space-y-8">
+              <div className="flex items-start space-x-4">
+                <div className="bg-red-100 rounded-full p-3 mt-1 flex-shrink-0">
+                  <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
                 </div>
-                
-                <div className="flex items-start space-x-4">
-                  <div className="bg-orange-100 rounded-full p-2 mt-1">
-                    <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-2">Supplement Interactions</h4>
-                    <p className="text-gray-600">Dangerous drug interactions happen daily because people don't track their supplements, medications, and nutrients properly.</p>
-                  </div>
+                <div>
+                  <h3 className="text-xl font-bold text-helfi-black mb-3">Hidden Health Patterns</h3>
+                  <p className="text-gray-600">
+                    Many health issues develop silently over time. Without consistent tracking, patterns that could 
+                    indicate emerging problems often go unnoticed until they become serious.
+                  </p>
                 </div>
-                
-                <div className="flex items-start space-x-4">
-                  <div className="bg-yellow-100 rounded-full p-2 mt-1">
-                    <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-1.996-.833-2.764 0L3.052 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-2">Missed Health Patterns</h4>
-                    <p className="text-gray-600">Without proper tracking, you miss crucial patterns between your diet, supplements, sleep, and how you feel.</p>
-                  </div>
+              </div>
+
+              <div className="flex items-start space-x-4">
+                <div className="bg-yellow-100 rounded-full p-3 mt-1 flex-shrink-0">
+                  <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-helfi-black mb-3">Supplement Confusion</h3>
+                  <p className="text-gray-600">
+                    With thousands of supplements available, knowing what works, what's safe, and what interacts 
+                    with your medications is overwhelming without expert guidance.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start space-x-4">
+                <div className="bg-orange-100 rounded-full p-3 mt-1 flex-shrink-0">
+                  <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-1.996-.833-2.764 0L3.052 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-helfi-black mb-3">Safety &amp; Interaction Alerts</h3>
+                  <p className="text-gray-600">
+                    Stay safe with automatic detection of dangerous drug interactions, supplement conflicts, and personalized warnings.
+                  </p>
                 </div>
               </div>
             </div>
 
-            <div>
-              <h3 className="text-3xl font-bold text-helfi-black mb-6">The Helfi Solution</h3>
-              <div className="space-y-6">
-                <div className="flex items-start space-x-4">
-                  <div className="bg-helfi-green/20 rounded-full p-2 mt-1">
-                    <svg className="w-6 h-6 text-helfi-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-2">AI-Powered Personalization</h4>
-                    <p className="text-gray-600">Our advanced AI analyzes your unique health profile to provide personalized recommendations that actually work for your body.</p>
-                  </div>
+            <div className="space-y-8">
+              <div className="flex items-start space-x-4">
+                <div className="bg-helfi-green/20 rounded-full p-3 mt-1 flex-shrink-0">
+                  <svg className="w-6 h-6 text-helfi-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
                 </div>
-                
-                <div className="flex items-start space-x-4">
-                  <div className="bg-blue-100 rounded-full p-2 mt-1">
-                    <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-2">Safety First Approach</h4>
-                    <p className="text-gray-600">Automatically detect dangerous supplement-medication interactions and get instant alerts to keep you safe.</p>
-                  </div>
+                <div>
+                  <h3 className="text-xl font-bold text-helfi-black mb-3">Personalized Insights</h3>
+                  <p className="text-gray-600">
+                    Our AI learns your unique patterns and provides recommendations tailored specifically to your 
+                    body, lifestyle, and health goals.
+                  </p>
                 </div>
-                
-                <div className="flex items-start space-x-4">
-                  <div className="bg-purple-100 rounded-full p-2 mt-1">
-                    <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-2">Effortless Tracking</h4>
-                    <p className="text-gray-600">Simply take photos of your food or say "Hey Helfi, I just took my vitamins" - our AI handles the rest automatically.</p>
-                  </div>
+              </div>
+
+              <div className="flex items-start space-x-4">
+                <div className="bg-blue-100 rounded-full p-3 mt-1 flex-shrink-0">
+                  <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-helfi-black mb-3">Proactive Prevention</h3>
+                  <p className="text-gray-600">
+                    Identify potential health issues before they become problems, allowing you to take preventive 
+                    action and maintain optimal wellness.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start space-x-4">
+                <div className="bg-purple-100 rounded-full p-3 mt-1 flex-shrink-0">
+                  <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-helfi-black mb-3">Optimization Guidance</h3>
+                  <p className="text-gray-600">
+                    Get science-backed recommendations for supplements, timing, dosages, and lifestyle changes 
+                    to maximize your health outcomes.
+                  </p>
                 </div>
               </div>
             </div>
@@ -551,8 +387,8 @@ export default function SplashPage() {
       </section>
 
       {/* Voice AI Section */}
-      <section className="px-4 py-20 bg-gradient-to-r from-purple-50 to-blue-50">
-        <div className="max-w-7xl mx-auto">
+      <section className="px-6 py-20 bg-gradient-to-r from-purple-50 to-blue-50">
+        <div className="max-w-6xl mx-auto">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div>
               <h2 className="text-4xl font-bold text-helfi-black mb-6">
@@ -614,8 +450,8 @@ export default function SplashPage() {
                 <div className="relative z-10">
                   <div className="mb-6 flex justify-center">
                     <img 
-                      src="https://images.unsplash.com/photo-1551601651-2a8555f1a136?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80"
-                      alt="Woman talking on phone with voice AI"
+                      src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80"
+                      alt="Woman speaking into phone using voice AI"
                       className="w-24 h-24 rounded-full object-cover shadow-lg"
                     />
                   </div>
@@ -637,8 +473,8 @@ export default function SplashPage() {
       </section>
 
       {/* Pricing Section */}
-      <section id="pricing" className="px-4 py-20 bg-gray-50">
-        <div className="max-w-7xl mx-auto">
+      <section id="pricing" className="px-6 py-20 bg-gray-50">
+        <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-helfi-black mb-4">
               Simple, Transparent Pricing
@@ -864,8 +700,8 @@ export default function SplashPage() {
       </section>
 
       {/* FAQ Section */}
-      <section id="faq" className="px-4 py-20 bg-white">
-        <div className="max-w-4xl mx-auto">
+      <section id="faq" className="px-6 py-20 bg-white">
+        <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-helfi-black mb-6">
               Frequently Asked Questions
@@ -953,7 +789,7 @@ export default function SplashPage() {
 
       {/* Benefits for Health Optimization Section */}
       <section className="px-4 py-20 bg-gradient-to-br from-helfi-green/5 to-blue-50">
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-helfi-black mb-6">
               Why Health Optimization Matters More Than Ever
@@ -1023,8 +859,8 @@ export default function SplashPage() {
       </section>
 
       {/* Waitlist Signup Section */}
-      <section id="waitlist-signup" className="px-4 py-20 bg-helfi-green">
-        <div className="max-w-2xl mx-auto text-center">
+      <section id="waitlist-signup" className="px-6 py-20 bg-gradient-to-br from-helfi-green/10 to-blue-50">
+        <div className="max-w-6xl mx-auto">
           <h2 className="text-4xl font-bold text-white mb-4">
             Be the first to know when we launch!
           </h2>
@@ -1087,7 +923,7 @@ export default function SplashPage() {
 
       {/* Footer */}
       <footer className="bg-helfi-black text-white px-4 py-12">
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-6xl mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div className="md:col-span-2">
               <div className="text-2xl font-bold mb-4">

@@ -8,7 +8,7 @@ import { Resend } from 'resend'
 const handler = NextAuth({
   adapter: PrismaAdapter(prisma),
   session: {
-    strategy: "jwt",
+    strategy: "database",
   },
   providers: [
     GoogleProvider({
