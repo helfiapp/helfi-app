@@ -44,6 +44,7 @@ function BackToTopButton() {
 
 export default function SplashPage() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [mobileDropdownOpen, setMobileDropdownOpen] = useState(false);
 
   // Placeholder for user image and name
   const userImage = 'https://ui-avatars.com/api/?name=User&background=E5E7EB&color=374151&rounded=true&size=128';
@@ -55,14 +56,17 @@ export default function SplashPage() {
       if (!(e.target as HTMLElement).closest('#profile-dropdown')) {
         setDropdownOpen(false);
       }
+      if (!(e.target as HTMLElement).closest('#mobile-profile-dropdown')) {
+        setMobileDropdownOpen(false);
+      }
     }
-    if (dropdownOpen) {
+    if (dropdownOpen || mobileDropdownOpen) {
       document.addEventListener('mousedown', handleClick);
     } else {
       document.removeEventListener('mousedown', handleClick);
     }
     return () => document.removeEventListener('mousedown', handleClick);
-  }, [dropdownOpen]);
+  }, [dropdownOpen, mobileDropdownOpen]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-helfi-green/5 via-white to-blue-50">
@@ -194,7 +198,7 @@ export default function SplashPage() {
             {/* Mobile Profile Avatar & Dropdown */}
             <div className="relative" id="mobile-profile-dropdown">
               <button
-                onClick={() => setDropdownOpen((v) => !v)}
+                onClick={() => setMobileDropdownOpen((v) => !v)}
                 className="focus:outline-none"
                 aria-label="Open profile menu"
               >
@@ -206,7 +210,7 @@ export default function SplashPage() {
                   className="rounded-full border-2 border-helfi-green shadow-sm object-cover w-10 h-10"
                 />
               </button>
-              {dropdownOpen && (
+              {mobileDropdownOpen && (
                 <div className="absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-xl py-2 z-50 border border-gray-100 animate-fade-in">
                   <div className="flex items-center px-4 py-3 border-b border-gray-100">
                     <Image
