@@ -450,7 +450,7 @@ export default function SplashPage() {
                 <div className="relative z-10">
                   <div className="mb-6 flex justify-center">
                     <img 
-                      src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80"
+                      src="https://images.unsplash.com/photo-1576091160399-112ba8d25d1f?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80"
                       alt="Woman speaking into phone using voice AI"
                       className="w-24 h-24 rounded-full object-cover shadow-lg"
                     />
@@ -859,8 +859,8 @@ export default function SplashPage() {
       </section>
 
       {/* Waitlist Signup Section */}
-      <section id="waitlist-signup" className="px-6 py-20 bg-gradient-to-br from-helfi-green/10 to-blue-50">
-        <div className="max-w-6xl mx-auto">
+      <section id="waitlist-signup" className="px-6 py-20 bg-helfi-green">
+        <div className="max-w-2xl mx-auto text-center">
           <h2 className="text-4xl font-bold text-white mb-4">
             Be the first to know when we launch!
           </h2>
