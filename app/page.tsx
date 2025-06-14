@@ -450,7 +450,7 @@ export default function SplashPage() {
                 <div className="relative z-10">
                   <div className="mb-6 flex justify-center">
                     <img 
-                      src="https://images.unsplash.com/photo-1576091160399-112ba8d25d1f?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80"
+                      src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749922074/WOMAN_TALKING_INTO_HER_PHONE_zi9fh8.jpg"
                       alt="Woman speaking into phone using voice AI"
                       className="w-24 h-24 rounded-full object-cover shadow-lg"
                     />
