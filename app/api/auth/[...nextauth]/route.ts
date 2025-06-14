@@ -9,6 +9,7 @@ const handler = NextAuth({
   adapter: PrismaAdapter(prisma),
   session: {
     strategy: "database",
+    maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   providers: [
     GoogleProvider({
@@ -82,23 +83,38 @@ const handler = NextAuth({
   debug: true,
   callbacks: {
     async signIn({ user, account, profile, email, credentials }) {
-      console.log('NextAuth signIn callback:', { user, account, profile, email, credentials });
+      console.log('🔥 NextAuth signIn callback:', { 
+        user: user?.email, 
+        account: account?.provider, 
+        profile: profile?.email 
+      });
+      
+      // Always allow sign in
       return true;
     },
-    async redirect({ url, baseUrl }) {
-      console.log('NextAuth redirect callback:', { url, baseUrl });
+    async session({ session, user, token }) {
+      console.log('🔥 NextAuth session callback:', { 
+        sessionUser: session?.user?.email,
+        userEmail: user?.email,
+        tokenSub: token?.sub 
+      });
       
-      // If user is signing in, redirect to onboarding
-      if (url.startsWith(baseUrl)) {
-        // If coming from /auth/signin or similar, redirect to onboarding
-        if (url.includes('/auth/signin') || url.includes('/healthapp')) {
-          return `${baseUrl}/onboarding`;
-        }
-        return url;
+      // Ensure session has user data
+      if (user && session.user) {
+        session.user.email = user.email;
+        session.user.name = user.name;
+        session.user.image = user.image;
       }
       
-      // For external URLs, redirect to onboarding as default
-      return `${baseUrl}/onboarding`;
+      return session;
+    },
+    async redirect({ url, baseUrl }) {
+      console.log('🔥 NextAuth redirect callback:', { url, baseUrl });
+      
+      // Always redirect to onboarding after successful authentication
+      const redirectUrl = `${baseUrl}/onboarding`;
+      console.log('🔥 Redirecting to:', redirectUrl);
+      return redirectUrl;
     },
   },
 })

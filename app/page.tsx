@@ -445,11 +445,14 @@ export default function SplashPage() {
             </div>
 
             <div className="flex justify-center">
-              <img 
-                src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749922074/WOMAN_TALKING_INTO_HER_PHONE_zi9fh8.jpg"
-                alt="Woman speaking into phone using voice AI"
-                className="w-full max-w-md rounded-2xl shadow-2xl object-cover"
-              />
+              <div className="w-full max-w-lg h-96 bg-gradient-to-br from-purple-100 to-blue-100 rounded-2xl shadow-2xl overflow-hidden">
+                <img 
+                  src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749922074/WOMAN_TALKING_INTO_HER_PHONE_zi9fh8.jpg"
+                  alt="Woman speaking into phone using voice AI"
+                  className="w-full h-full object-cover object-center"
+                  style={{objectPosition: 'center 20%'}}
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -842,7 +845,7 @@ export default function SplashPage() {
       </section>
 
       {/* Waitlist Signup Section */}
-      <section id="waitlist-signup" className="px-8 py-20 bg-helfi-green">
+      <section id="waitlist-signup" className="px-8 md:px-48 lg:px-64 py-20 bg-helfi-green">
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-4xl font-bold text-white mb-4">
             Be the first to know when we launch!
