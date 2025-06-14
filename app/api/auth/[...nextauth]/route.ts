@@ -81,6 +81,7 @@ const handler = NextAuth({
     }),
   ],
   pages: {
+    signIn: '/auth/signin',
     verifyRequest: '/auth/verify-request',
     error: '/auth/error', // Add custom error page
   },
@@ -88,6 +89,12 @@ const handler = NextAuth({
   debug: process.env.NODE_ENV === 'development',
   callbacks: {
     async redirect({ url, baseUrl }) {
+      console.log('NextAuth redirect callback:', { url, baseUrl });
+      
+      // If the user came from /onboarding, redirect them back there after authentication
+      if (url.includes('/onboarding') || url.includes('callbackUrl=%2Fonboarding')) {
+        return `${baseUrl}/onboarding`;
+      }
       // If the user came from /healthapp, redirect them back there after authentication
       if (url.includes('/healthapp') || url.includes('callbackUrl=%2Fhealthapp')) {
         return `${baseUrl}/healthapp`;
@@ -100,8 +107,8 @@ const handler = NextAuth({
       if (new URL(url).origin === baseUrl) {
         return url;
       }
-      // Otherwise, redirect to base URL
-      return baseUrl;
+      // Default to onboarding for new users
+      return `${baseUrl}/onboarding`;
     },
     async signIn({ user, account, profile, email, credentials }) {
       console.log('NextAuth signIn callback:', { user, account, profile, email, credentials });
