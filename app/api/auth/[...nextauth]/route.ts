@@ -85,6 +85,21 @@ const handler = NextAuth({
       console.log('NextAuth signIn callback:', { user, account, profile, email, credentials });
       return true;
     },
+    async redirect({ url, baseUrl }) {
+      console.log('NextAuth redirect callback:', { url, baseUrl });
+      
+      // If user is signing in, redirect to onboarding
+      if (url.startsWith(baseUrl)) {
+        // If coming from /auth/signin or similar, redirect to onboarding
+        if (url.includes('/auth/signin') || url.includes('/healthapp')) {
+          return `${baseUrl}/onboarding`;
+        }
+        return url;
+      }
+      
+      // For external URLs, redirect to onboarding as default
+      return `${baseUrl}/onboarding`;
+    },
   },
 })
 

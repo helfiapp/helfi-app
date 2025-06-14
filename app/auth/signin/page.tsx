@@ -104,7 +104,7 @@ export default function SignIn() {
           </button>
         </form>
         <button
-          onClick={() => agreed && signIn('google', { callbackUrl: '/onboarding' })}
+          onClick={() => agreed && signIn('google', { callbackUrl: '/onboarding', redirect: true })}
           className="w-full flex items-center justify-center gap-3 btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
           disabled={!agreed || loading}
         >
