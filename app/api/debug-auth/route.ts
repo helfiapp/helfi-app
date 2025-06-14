@@ -1,28 +1,41 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth/next'
+import NextAuth from 'next-auth'
+import GoogleProvider from 'next-auth/providers/google'
 
-export async function GET() {
+const authOptions = {
+  providers: [
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID || 'dummy-client-id',
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET || 'dummy-client-secret',
+    }),
+  ],
+  pages: {
+    signIn: '/auth/signin',
+  },
+}
+
+export async function GET(request: NextRequest) {
   try {
-    const config = {
-      hasGoogleClientId: !!process.env.GOOGLE_CLIENT_ID,
-      hasGoogleClientSecret: !!process.env.GOOGLE_CLIENT_SECRET,
-      hasNextAuthUrl: !!process.env.NEXTAUTH_URL,
-      hasNextAuthSecret: !!process.env.NEXTAUTH_SECRET,
-      googleClientIdLength: process.env.GOOGLE_CLIENT_ID?.length || 0,
-      googleClientSecretLength: process.env.GOOGLE_CLIENT_SECRET?.length || 0,
-      nextAuthUrl: process.env.NEXTAUTH_URL,
-      // Show first/last few chars of sensitive data for debugging
-      googleClientIdPreview: process.env.GOOGLE_CLIENT_ID ? 
-        process.env.GOOGLE_CLIENT_ID.substring(0, 10) + '...' + process.env.GOOGLE_CLIENT_ID.substring(process.env.GOOGLE_CLIENT_ID.length - 10) : 'NOT_SET',
-      googleClientSecretPreview: process.env.GOOGLE_CLIENT_SECRET ? 
-        process.env.GOOGLE_CLIENT_SECRET.substring(0, 8) + '...' + process.env.GOOGLE_CLIENT_SECRET.substring(process.env.GOOGLE_CLIENT_SECRET.length - 8) : 'NOT_SET',
-      // Check for newlines or other issues
-      googleClientIdHasNewline: process.env.GOOGLE_CLIENT_ID?.includes('\n') || false,
-      googleClientSecretHasNewline: process.env.GOOGLE_CLIENT_SECRET?.includes('\n') || false,
-      nextAuthUrlHasNewline: process.env.NEXTAUTH_URL?.includes('\n') || false,
-    };
-
-    return NextResponse.json(config);
+    const session = await getServerSession(authOptions)
+    
+    return NextResponse.json({
+      session: session,
+      hasSession: !!session,
+      user: session?.user || null,
+      timestamp: new Date().toISOString(),
+      url: request.url,
+      headers: {
+        'user-agent': request.headers.get('user-agent'),
+        'referer': request.headers.get('referer'),
+        'cookie': request.headers.get('cookie') ? 'present' : 'missing'
+      }
+    })
   } catch (error) {
-    return NextResponse.json({ error: 'Failed to get config', details: error }, { status: 500 });
+    return NextResponse.json({
+      error: 'Failed to get session',
+      details: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: new Date().toISOString()
+    }, { status: 500 })
   }
 } 
