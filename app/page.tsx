@@ -444,29 +444,12 @@ export default function SplashPage() {
               </div>
             </div>
 
-            <div className="text-center">
-              <div className="bg-gradient-to-br from-purple-100 to-blue-100 rounded-3xl p-12 relative overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-br from-purple-400/20 to-blue-400/20"></div>
-                <div className="relative z-10">
-                  <div className="mb-6 flex justify-center">
-                    <img 
-                      src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749922074/WOMAN_TALKING_INTO_HER_PHONE_zi9fh8.jpg"
-                      alt="Woman speaking into phone using voice AI"
-                      className="w-24 h-24 rounded-full object-cover shadow-lg"
-                    />
-                  </div>
-                  <h3 className="text-2xl font-bold text-gray-900 mb-4">Talk to Helfi</h3>
-                  <p className="text-gray-700 mb-6">
-                    The most natural way to track your health. Just speak, and let AI do the work.
-                  </p>
-                  <button
-                    onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}
-                    className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-8 py-4 rounded-xl font-semibold hover:from-purple-700 hover:to-blue-700 transition-all duration-200"
-                  >
-                    Try Voice AI Free
-                  </button>
-                </div>
-              </div>
+            <div className="flex justify-center">
+              <img 
+                src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749922074/WOMAN_TALKING_INTO_HER_PHONE_zi9fh8.jpg"
+                alt="Woman speaking into phone using voice AI"
+                className="w-full max-w-md rounded-2xl shadow-2xl object-cover"
+              />
             </div>
           </div>
         </div>
@@ -859,8 +842,8 @@ export default function SplashPage() {
       </section>
 
       {/* Waitlist Signup Section */}
-      <section id="waitlist-signup" className="px-6 py-20 bg-helfi-green">
-        <div className="max-w-2xl mx-auto text-center">
+      <section id="waitlist-signup" className="px-8 py-20 bg-helfi-green">
+        <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-4xl font-bold text-white mb-4">
             Be the first to know when we launch!
           </h2>
