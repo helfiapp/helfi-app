@@ -1,12 +1,45 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { useSession } from 'next-auth/react'
+import { useSession, signOut } from 'next-auth/react'
+import Image from 'next/image'
+import Link from 'next/link'
+import BottomNav from '../../components/BottomNav'
 
 export default function Dashboard() {
   const { data: session } = useSession()
   const [onboardingData, setOnboardingData] = useState<any>(null)
   const [showResetConfirm, setShowResetConfirm] = useState(false)
+  const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [userImage, setUserImage] = useState<string | null>(null)
+
+  // Load profile image from localStorage or session
+  useEffect(() => {
+    const savedImage = localStorage.getItem('userProfileImage');
+    if (savedImage) {
+      setUserImage(savedImage);
+    } else if (session?.user?.image) {
+      setUserImage(session.user.image);
+    }
+  }, [session]);
+
+  const userName = session?.user?.name || 'User';
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (!(e.target as HTMLElement).closest('#profile-dropdown') && 
+          !(e.target as HTMLElement).closest('#mobile-profile-dropdown')) {
+        setDropdownOpen(false);
+      }
+    }
+    if (dropdownOpen) {
+      document.addEventListener('mousedown', handleClick);
+    } else {
+      document.removeEventListener('mousedown', handleClick);
+    }
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [dropdownOpen]);
 
   useEffect(() => {
     // Load onboarding data
@@ -40,16 +73,242 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="bg-white rounded-lg shadow-sm p-8">
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-helfi-black mb-4">
-              Welcome to Your Health Dashboard
-            </h1>
-            <p className="text-gray-600">
-              Your personalized health intelligence platform is being built!
-            </p>
+    <div className="min-h-screen bg-gray-50 pb-20 md:pb-0">
+      {/* Navigation Header */}
+      <nav className="fixed-header safe-area-top px-4 py-3">
+        <div className="flex justify-between items-center">
+          <div className="flex items-center min-w-0">
+            <Link href="/" className="w-12 h-12 flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity">
+              <Image
+                src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/HELFI_TRANSPARENT_rmssry.png"
+                alt="Helfi Logo"
+                width={48}
+                height={48}
+                className="w-full h-full object-contain"
+                priority
+              />
+            </Link>
+            <div className="ml-3 min-w-0">
+              <h1 className="text-lg font-semibold text-gray-900 truncate">Dashboard</h1>
+              <p className="text-sm text-gray-500 hidden sm:block">Your health overview</p>
+            </div>
+          </div>
+          
+          {/* Desktop Navigation */}
+          <div className="hidden md:flex items-center space-x-6">
+            <Link href="/dashboard" className="text-gray-700 hover:text-helfi-green transition-colors font-medium">
+              Dashboard
+            </Link>
+            <Link href="/health-tracking" className="text-gray-700 hover:text-helfi-green transition-colors font-medium">
+              Health Tracking
+            </Link>
+            <Link href="/insights" className="text-gray-700 hover:text-helfi-green transition-colors font-medium">
+              AI Insights
+            </Link>
+            <Link href="/reports" className="text-gray-700 hover:text-helfi-green transition-colors font-medium">
+              Reports
+            </Link>
+            
+            {/* Desktop Profile Avatar & Dropdown */}
+            <div className="relative ml-6" id="profile-dropdown">
+              <button
+                onClick={() => setDropdownOpen((v) => !v)}
+                className="focus:outline-none"
+                aria-label="Open profile menu"
+              >
+                {userImage ? (
+                  <Image
+                    src={userImage}
+                    alt="Profile"
+                    width={48}
+                    height={48}
+                    className="rounded-full border-2 border-helfi-green shadow-sm object-cover w-12 h-12"
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded-full border-2 border-helfi-green shadow-sm bg-helfi-green flex items-center justify-center">
+                    <svg className="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                    </svg>
+                  </div>
+                )}
+              </button>
+              {dropdownOpen && (
+                <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-100 animate-fade-in">
+                  <div className="flex items-center px-4 py-3 border-b border-gray-100">
+                    {userImage ? (
+                      <Image
+                        src={userImage}
+                        alt="Profile"
+                        width={40}
+                        height={40}
+                        className="rounded-full object-cover mr-3"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-helfi-green flex items-center justify-center mr-3">
+                        <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                        </svg>
+                      </div>
+                    )}
+                    <div>
+                      <div className="font-semibold text-gray-900">{userName}</div>
+                      <div className="text-xs text-gray-500">{session?.user?.email || 'user@email.com'}</div>
+                    </div>
+                  </div>
+                  <Link href="/profile" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Profile</Link>
+                  <Link href="/account" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Account Settings</Link>
+                  <Link href="/profile/image" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Upload/Change Profile Image</Link>
+                  <Link href="/billing" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Subscription & Billing</Link>
+                  <Link href="/notifications" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Notifications</Link>
+                  <Link href="/privacy" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Privacy Settings</Link>
+                  <Link href="/help" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
+                  <button
+                    onClick={() => signOut()}
+                    className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50 font-semibold"
+                  >
+                    Logout
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Mobile Navigation */}
+          <div className="md:hidden flex items-center space-x-3">
+            {/* Mobile Profile Avatar & Dropdown */}
+            <div className="relative" id="mobile-profile-dropdown">
+              <button
+                onClick={() => setDropdownOpen((v) => !v)}
+                className="focus:outline-none"
+                aria-label="Open profile menu"
+              >
+                {userImage ? (
+                  <Image
+                    src={userImage}
+                    alt="Profile"
+                    width={40}
+                    height={40}
+                    className="rounded-full border-2 border-helfi-green shadow-sm object-cover w-10 h-10"
+                  />
+                ) : (
+                  <div className="w-10 h-10 rounded-full border-2 border-helfi-green shadow-sm bg-helfi-green flex items-center justify-center">
+                    <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                    </svg>
+                  </div>
+                )}
+              </button>
+              {dropdownOpen && (
+                <div className="absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-xl py-2 z-50 border border-gray-100 animate-fade-in">
+                  <div className="flex items-center px-4 py-3 border-b border-gray-100">
+                    {userImage ? (
+                      <Image
+                        src={userImage}
+                        alt="Profile"
+                        width={36}
+                        height={36}
+                        className="rounded-full object-cover mr-3"
+                      />
+                    ) : (
+                      <div className="w-9 h-9 rounded-full bg-helfi-green flex items-center justify-center mr-3">
+                        <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                        </svg>
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-gray-900 truncate">{userName}</div>
+                      <div className="text-xs text-gray-500 truncate">{session?.user?.email || 'user@email.com'}</div>
+                    </div>
+                  </div>
+                  <div className="py-1">
+                    <Link href="/dashboard" className="block px-4 py-3 text-gray-700 hover:bg-gray-50 text-sm">
+                      <div className="flex items-center">
+                        <svg className="w-4 h-4 mr-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2 2v0" />
+                        </svg>
+                        Dashboard
+                      </div>
+                    </Link>
+                    <Link href="/profile" className="block px-4 py-3 text-gray-700 hover:bg-gray-50 text-sm">
+                      <div className="flex items-center">
+                        <svg className="w-4 h-4 mr-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                        Profile
+                      </div>
+                    </Link>
+                    <Link href="/account" className="block px-4 py-3 text-gray-700 hover:bg-gray-50 text-sm">
+                      <div className="flex items-center">
+                        <svg className="w-4 h-4 mr-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        Account Settings
+                      </div>
+                    </Link>
+                    <Link href="/profile/image" className="block px-4 py-3 text-gray-700 hover:bg-gray-50 text-sm">
+                      <div className="flex items-center">
+                        <svg className="w-4 h-4 mr-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        Change Profile Image
+                      </div>
+                    </Link>
+                    <Link href="/billing" className="block px-4 py-3 text-gray-700 hover:bg-gray-50 text-sm">
+                      <div className="flex items-center">
+                        <svg className="w-4 h-4 mr-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                        </svg>
+                        Subscription & Billing
+                      </div>
+                    </Link>
+                    <Link href="/help" className="block px-4 py-3 text-gray-700 hover:bg-gray-50 text-sm">
+                      <div className="flex items-center">
+                        <svg className="w-4 h-4 mr-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Help & Support
+                      </div>
+                    </Link>
+                  </div>
+                  <div className="border-t border-gray-100 pt-1">
+                    <button
+                      onClick={() => signOut()}
+                      className="block w-full text-left px-4 py-3 text-red-600 hover:bg-red-50 font-semibold text-sm"
+                    >
+                      <div className="flex items-center">
+                        <svg className="w-4 h-4 mr-3 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                        </svg>
+                        Logout
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      {/* Main Content */}
+      <div className="pt-20 px-4 pb-8">
+        <div className="max-w-6xl mx-auto">
+          {/* Welcome Section */}
+          <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">Welcome back, {userName}!</h2>
+                <p className="text-gray-600 mt-1">Here's your health overview for today</p>
+              </div>
+              <div className="hidden md:block">
+                <div className="text-right">
+                  <div className="text-sm text-gray-500">Last updated</div>
+                  <div className="text-sm font-medium text-gray-900">{new Date().toLocaleDateString()}</div>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -182,23 +441,24 @@ export default function Dashboard() {
           {/* Onboarding Data Section */}
           {onboardingData && (
             <div className="mt-8 bg-gray-50 rounded-lg p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">Your Profile Information</h3>
-                <div className="space-x-3">
-                  <button
-                    onClick={handleEditOnboarding}
-                    className="bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors text-sm"
-                  >
-                    ✏️ Edit Profile
-                  </button>
-                  <button
-                    onClick={() => setShowResetConfirm(true)}
-                    className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors text-sm"
-                  >
-                    🔄 Reset All Data
-                  </button>
-                </div>
+              {/* Action Buttons - Above the heading */}
+              <div className="mb-6 space-y-3">
+                <button
+                  onClick={handleEditOnboarding}
+                  className="btn-mobile-primary w-full block"
+                >
+                  ✏️ Edit Profile
+                </button>
+                <button
+                  onClick={() => setShowResetConfirm(true)}
+                  className="bg-red-500 text-white px-4 py-3 rounded-lg hover:bg-red-600 transition-colors font-medium w-full block"
+                >
+                  🔄 Reset All Data
+                </button>
               </div>
+              
+              {/* Profile Information Heading */}
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Your Profile Information</h3>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                 <div>
@@ -314,6 +574,9 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+
+      {/* Bottom Navigation */}
+      <BottomNav />
     </div>
   )
 } 
