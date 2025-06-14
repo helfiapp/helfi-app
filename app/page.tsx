@@ -3,8 +3,6 @@
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { useSession, signOut } from 'next-auth/react'
-
 // Back to Top Button Component
 function BackToTopButton() {
   const [isVisible, setIsVisible] = useState(false)
@@ -45,12 +43,11 @@ function BackToTopButton() {
 }
 
 export default function SplashPage() {
-  const { data: session } = useSession();
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
-  // Placeholder for user image (replace with real user image from session/profile)
-  const userImage = session?.user?.image || 'https://ui-avatars.com/api/?name=User&background=E5E7EB&color=374151&rounded=true&size=128';
-  const userName = session?.user?.name || 'User';
+  // Placeholder for user image and name
+  const userImage = 'https://ui-avatars.com/api/?name=User&background=E5E7EB&color=374151&rounded=true&size=128';
+  const userName = 'User';
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -165,7 +162,7 @@ export default function SplashPage() {
                     />
                     <div>
                       <div className="font-semibold text-gray-900">{userName}</div>
-                      <div className="text-xs text-gray-500">{session?.user?.email || 'user@email.com'}</div>
+                      <div className="text-xs text-gray-500">user@email.com</div>
                     </div>
                   </div>
                   <Link href="/profile" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Profile</Link>
@@ -176,7 +173,7 @@ export default function SplashPage() {
                   <Link href="/privacy" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Privacy Settings</Link>
                   <Link href="/help" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
                   <button
-                    onClick={() => signOut()}
+                    onClick={() => window.location.href = '/'}
                     className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50 font-semibold"
                   >
                     Logout
@@ -221,7 +218,7 @@ export default function SplashPage() {
                     />
                     <div className="flex-1 min-w-0">
                       <div className="font-semibold text-gray-900 truncate">{userName}</div>
-                      <div className="text-xs text-gray-500 truncate">{session?.user?.email || 'user@email.com'}</div>
+                      <div className="text-xs text-gray-500 truncate">user@email.com</div>
                     </div>
                   </div>
                   <div className="py-1">
@@ -285,7 +282,7 @@ export default function SplashPage() {
                   </div>
                   <div className="border-t border-gray-100 pt-1">
                     <button
-                      onClick={() => signOut()}
+                      onClick={() => window.location.href = '/'}
                       className="block w-full text-left px-4 py-3 text-red-600 hover:bg-red-50 font-semibold text-sm"
                     >
                       <div className="flex items-center">
