@@ -17,9 +17,22 @@ export default function SignIn() {
 
   // Redirect authenticated users to onboarding
   useEffect(() => {
+    console.log('Session status:', status, 'Session:', session)
+    
+    // Check if user just came back from OAuth (URL might have callback params)
+    const urlParams = new URLSearchParams(window.location.search)
+    const hasCallbackUrl = urlParams.has('callbackUrl')
+    
     if (status === 'authenticated' && session) {
       console.log('User is authenticated, redirecting to onboarding:', session)
-      router.push('/onboarding')
+      console.log('Has callback URL:', hasCallbackUrl)
+      
+      // Add a small delay to ensure the session is fully established
+      setTimeout(() => {
+        router.push('/onboarding')
+      }, 100)
+    } else if (status === 'unauthenticated' && hasCallbackUrl) {
+      console.log('User returned from OAuth but not authenticated yet, waiting...')
     }
   }, [session, status, router])
 
