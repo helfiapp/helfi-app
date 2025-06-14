@@ -11,6 +11,19 @@ const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET || 'dummy-client-sec
 const nextAuthSecret = process.env.NEXTAUTH_SECRET || 'fallback-secret-key-for-development';
 const resendApiKey = process.env.RESEND_API_KEY || "re_Q2Ty3J2n_6TrpJB9dKxky37hbm8i7c4d3";
 
+// DEBUG: Log environment variables (safely)
+console.log('=== AUTH DEBUG ===');
+console.log('GOOGLE_CLIENT_ID exists:', !!process.env.GOOGLE_CLIENT_ID);
+console.log('GOOGLE_CLIENT_ID length:', process.env.GOOGLE_CLIENT_ID?.length || 0);
+console.log('GOOGLE_CLIENT_ID preview:', process.env.GOOGLE_CLIENT_ID ? 
+  process.env.GOOGLE_CLIENT_ID.substring(0, 10) + '...' + process.env.GOOGLE_CLIENT_ID.substring(process.env.GOOGLE_CLIENT_ID.length - 10) : 'NOT_SET');
+console.log('GOOGLE_CLIENT_ID has newline:', process.env.GOOGLE_CLIENT_ID?.includes('\n') || false);
+console.log('GOOGLE_CLIENT_SECRET exists:', !!process.env.GOOGLE_CLIENT_SECRET);
+console.log('GOOGLE_CLIENT_SECRET length:', process.env.GOOGLE_CLIENT_SECRET?.length || 0);
+console.log('NEXTAUTH_URL:', process.env.NEXTAUTH_URL);
+console.log('NEXTAUTH_URL has newline:', process.env.NEXTAUTH_URL?.includes('\n') || false);
+console.log('==================');
+
 const handler = NextAuth({
   adapter: PrismaAdapter(prisma),
   session: {
