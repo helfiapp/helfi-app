@@ -5,12 +5,6 @@ import { PrismaAdapter } from "@auth/prisma-adapter"
 import { prisma } from "@/lib/prisma"
 import { Resend } from 'resend'
 
-// Fallback configuration to prevent server errors
-const googleClientId = process.env.GOOGLE_CLIENT_ID || 'dummy-client-id';
-const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET || 'dummy-client-secret';
-const nextAuthSecret = process.env.NEXTAUTH_SECRET || 'fallback-secret-key-for-development';
-const resendApiKey = process.env.RESEND_API_KEY || "re_Q2Ty3J2n_6TrpJB9dKxky37hbm8i7c4d3";
-
 const handler = NextAuth({
   adapter: PrismaAdapter(prisma),
   session: {
@@ -18,8 +12,8 @@ const handler = NextAuth({
   },
   providers: [
     GoogleProvider({
-      clientId: googleClientId,
-      clientSecret: googleClientSecret,
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     }),
     EmailProvider({
       from: "Helfi Health <noreply@helfi.ai>",
@@ -27,7 +21,7 @@ const handler = NextAuth({
         console.log('NextAuth: Attempting to send verification email to:', email);
         console.log('NextAuth: Magic link URL:', url);
         
-        const resend = new Resend(resendApiKey);
+        const resend = new Resend(process.env.RESEND_API_KEY || "re_Q2Ty3J2n_6TrpJB9dKxky37hbm8i7c4d3");
         
         // Generate unsubscribe link for authentication emails (in case user wants to stop receiving them)
         const unsubscribeToken = Buffer.from(`unsubscribe_${email}_helfi`).toString('base64url');
@@ -83,66 +77,13 @@ const handler = NextAuth({
   pages: {
     signIn: '/auth/signin',
     verifyRequest: '/auth/verify-request',
-    error: '/auth/error', // Add custom error page
   },
-  secret: nextAuthSecret,
-  debug: process.env.NODE_ENV === 'development',
+  secret: process.env.NEXTAUTH_SECRET,
+  debug: true,
   callbacks: {
-    async redirect({ url, baseUrl }) {
-      console.log('NextAuth redirect callback:', { url, baseUrl });
-      
-      // If the user came from /onboarding, redirect them back there after authentication
-      if (url.includes('/onboarding') || url.includes('callbackUrl=%2Fonboarding')) {
-        return `${baseUrl}/onboarding`;
-      }
-      // If the user came from /healthapp, redirect them back there after authentication
-      if (url.includes('/healthapp') || url.includes('callbackUrl=%2Fhealthapp')) {
-        return `${baseUrl}/healthapp`;
-      }
-      // If it's a relative URL, make it absolute
-      if (url.startsWith('/')) {
-        return `${baseUrl}${url}`;
-      }
-      // If it's the same origin, allow it
-      if (new URL(url).origin === baseUrl) {
-        return url;
-      }
-      // Default to onboarding for new users
-      return `${baseUrl}/onboarding`;
-    },
     async signIn({ user, account, profile, email, credentials }) {
       console.log('NextAuth signIn callback:', { user, account, profile, email, credentials });
-      
-      // Add additional validation for Google OAuth
-      if (account?.provider === 'google') {
-        if (!googleClientId.startsWith('dummy') && !googleClientSecret.startsWith('dummy')) {
-          return true;
-        } else {
-          console.error('Google OAuth not properly configured');
-          return false;
-        }
-      }
-      
       return true;
-    },
-    async session({ session, token }) {
-      // Add any custom session data here
-      return session;
-    },
-    async jwt({ token, user, account }) {
-      // Add any custom JWT data here
-      return token;
-    },
-  },
-  events: {
-    async signIn(message) {
-      console.log('User signed in:', message);
-    },
-    async signOut(message) {
-      console.log('User signed out:', message);
-    },
-    async createUser(message) {
-      console.log('User created:', message);
     },
   },
 })
