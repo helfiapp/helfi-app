@@ -1,16 +1,27 @@
 'use client'
 
-import { signIn } from 'next-auth/react'
+import { signIn, useSession } from 'next-auth/react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 
 export default function SignIn() {
+  const { data: session, status } = useSession()
+  const router = useRouter()
   const [email, setEmail] = useState('')
   const [emailSent, setEmailSent] = useState(false)
   const [agreed, setAgreed] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  // Redirect authenticated users to onboarding
+  useEffect(() => {
+    if (status === 'authenticated' && session) {
+      console.log('User is authenticated, redirecting to onboarding:', session)
+      router.push('/onboarding')
+    }
+  }, [session, status, router])
 
   const handleEmailSignIn = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -39,6 +50,30 @@ export default function SignIn() {
     } finally {
       setLoading(false)
     }
+  }
+
+  // Show loading while checking authentication
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-white to-helfi-green-light/10">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-helfi-green mx-auto mb-4"></div>
+          <p className="text-gray-600">Checking authentication...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // If user is authenticated, they'll be redirected by useEffect
+  if (status === 'authenticated') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-white to-helfi-green-light/10">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-helfi-green mx-auto mb-4"></div>
+          <p className="text-gray-600">Redirecting to onboarding...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
