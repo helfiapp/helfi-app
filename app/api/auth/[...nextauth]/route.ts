@@ -81,13 +81,28 @@ const handler = NextAuth({
     }),
   ],
   pages: {
-    signIn: '/auth/signin',
     verifyRequest: '/auth/verify-request',
     error: '/auth/error', // Add custom error page
   },
   secret: nextAuthSecret,
   debug: process.env.NODE_ENV === 'development',
   callbacks: {
+    async redirect({ url, baseUrl }) {
+      // If the user came from /healthapp, redirect them back there after authentication
+      if (url.includes('/healthapp') || url.includes('callbackUrl=%2Fhealthapp')) {
+        return `${baseUrl}/healthapp`;
+      }
+      // If it's a relative URL, make it absolute
+      if (url.startsWith('/')) {
+        return `${baseUrl}${url}`;
+      }
+      // If it's the same origin, allow it
+      if (new URL(url).origin === baseUrl) {
+        return url;
+      }
+      // Otherwise, redirect to base URL
+      return baseUrl;
+    },
     async signIn({ user, account, profile, email, credentials }) {
       console.log('NextAuth signIn callback:', { user, account, profile, email, credentials });
       

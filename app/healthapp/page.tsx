@@ -1727,7 +1727,7 @@ export default function HealthApp() {
               
               <div className="space-y-4">
                 <Link
-                  href="/auth/signin"
+                  href="/api/auth/signin?callbackUrl=%2Fhealthapp"
                   className="w-full bg-helfi-green text-white py-3 px-4 rounded-lg hover:bg-green-700 transition-colors text-center block"
                 >
                   Sign In / Sign Up
