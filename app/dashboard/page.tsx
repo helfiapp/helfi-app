@@ -11,6 +11,7 @@ export default function Dashboard() {
   const [onboardingData, setOnboardingData] = useState<any>(null)
   const [showResetConfirm, setShowResetConfirm] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [mobileDropdownOpen, setMobileDropdownOpen] = useState(false)
   const [userImage, setUserImage] = useState<string | null>(null)
 
   // Load profile image from localStorage or session
@@ -28,18 +29,20 @@ export default function Dashboard() {
   // Close dropdown on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent) {
-      if (!(e.target as HTMLElement).closest('#profile-dropdown') && 
-          !(e.target as HTMLElement).closest('#mobile-profile-dropdown')) {
+      if (!(e.target as HTMLElement).closest('#profile-dropdown')) {
         setDropdownOpen(false);
       }
+      if (!(e.target as HTMLElement).closest('#mobile-profile-dropdown')) {
+        setMobileDropdownOpen(false);
+      }
     }
-    if (dropdownOpen) {
+    if (dropdownOpen || mobileDropdownOpen) {
       document.addEventListener('mousedown', handleClick);
     } else {
       document.removeEventListener('mousedown', handleClick);
     }
     return () => document.removeEventListener('mousedown', handleClick);
-  }, [dropdownOpen]);
+  }, [dropdownOpen, mobileDropdownOpen]);
 
   useEffect(() => {
     // Load onboarding data
@@ -178,7 +181,7 @@ export default function Dashboard() {
             {/* Mobile Profile Avatar & Dropdown */}
             <div className="relative" id="mobile-profile-dropdown">
               <button
-                onClick={() => setDropdownOpen((v) => !v)}
+                onClick={() => setMobileDropdownOpen((v) => !v)}
                 className="focus:outline-none"
                 aria-label="Open profile menu"
               >
@@ -198,7 +201,7 @@ export default function Dashboard() {
                   </div>
                 )}
               </button>
-              {dropdownOpen && (
+              {mobileDropdownOpen && (
                 <div className="absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-xl py-2 z-50 border border-gray-100 animate-fade-in">
                   <div className="flex items-center px-4 py-3 border-b border-gray-100">
                     {userImage ? (

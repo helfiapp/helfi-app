@@ -5,6 +5,12 @@ import { PrismaAdapter } from "@auth/prisma-adapter"
 import { prisma } from "@/lib/prisma"
 import { Resend } from 'resend'
 
+// Fallback configuration to prevent server errors
+const googleClientId = process.env.GOOGLE_CLIENT_ID || 'dummy-client-id';
+const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET || 'dummy-client-secret';
+const nextAuthSecret = process.env.NEXTAUTH_SECRET || 'fallback-secret-key-for-development';
+const resendApiKey = process.env.RESEND_API_KEY || "re_Q2Ty3J2n_6TrpJB9dKxky37hbm8i7c4d3";
+
 const handler = NextAuth({
   adapter: PrismaAdapter(prisma),
   session: {
@@ -12,8 +18,8 @@ const handler = NextAuth({
   },
   providers: [
     GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      clientId: googleClientId,
+      clientSecret: googleClientSecret,
     }),
     EmailProvider({
       from: "Helfi Health <noreply@helfi.ai>",
@@ -21,7 +27,7 @@ const handler = NextAuth({
         console.log('NextAuth: Attempting to send verification email to:', email);
         console.log('NextAuth: Magic link URL:', url);
         
-        const resend = new Resend(process.env.RESEND_API_KEY || "re_Q2Ty3J2n_6TrpJB9dKxky37hbm8i7c4d3");
+        const resend = new Resend(resendApiKey);
         
         // Generate unsubscribe link for authentication emails (in case user wants to stop receiving them)
         const unsubscribeToken = Buffer.from(`unsubscribe_${email}_helfi`).toString('base64url');
@@ -77,13 +83,44 @@ const handler = NextAuth({
   pages: {
     signIn: '/auth/signin',
     verifyRequest: '/auth/verify-request',
+    error: '/auth/error', // Add custom error page
   },
-  secret: process.env.NEXTAUTH_SECRET,
-  debug: true,
+  secret: nextAuthSecret,
+  debug: process.env.NODE_ENV === 'development',
   callbacks: {
     async signIn({ user, account, profile, email, credentials }) {
       console.log('NextAuth signIn callback:', { user, account, profile, email, credentials });
+      
+      // Add additional validation for Google OAuth
+      if (account?.provider === 'google') {
+        if (!googleClientId.startsWith('dummy') && !googleClientSecret.startsWith('dummy')) {
+          return true;
+        } else {
+          console.error('Google OAuth not properly configured');
+          return false;
+        }
+      }
+      
       return true;
+    },
+    async session({ session, token }) {
+      // Add any custom session data here
+      return session;
+    },
+    async jwt({ token, user, account }) {
+      // Add any custom JWT data here
+      return token;
+    },
+  },
+  events: {
+    async signIn(message) {
+      console.log('User signed in:', message);
+    },
+    async signOut(message) {
+      console.log('User signed out:', message);
+    },
+    async createUser(message) {
+      console.log('User created:', message);
     },
   },
 })
