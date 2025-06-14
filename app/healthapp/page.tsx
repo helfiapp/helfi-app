@@ -1628,6 +1628,70 @@ function PasswordProtection({ children }: { children: React.ReactNode }) {
 
 export default function HealthApp() {
   const { data: session, status } = useSession();
+  const [currentStep, setCurrentStep] = useState(0);
+  const [formData, setFormData] = useState<any>({});
+
+  const handleNext = (data: any) => {
+    setFormData((prev: any) => ({ ...prev, ...data }));
+    if (currentStep < steps.length - 1) {
+      setCurrentStep(currentStep + 1);
+    }
+  };
+
+  const handleBack = () => {
+    if (currentStep > 0) {
+      setCurrentStep(currentStep - 1);
+    }
+  };
+
+  const resetCurrentStep = () => {
+    switch (currentStep) {
+      case 0:
+        setFormData((prev: any) => ({ ...prev, gender: undefined }));
+        break;
+      case 1:
+        setFormData((prev: any) => ({ ...prev, weight: '', height: '', feet: '', inches: '', bodyType: '', unit: 'metric' }));
+        break;
+      case 2:
+        setFormData((prev: any) => ({ ...prev, exerciseFrequency: '', exerciseTypes: [], exerciseGoals: [], fitnessLevel: '' }));
+        break;
+      case 3:
+        setFormData((prev: any) => ({ ...prev, healthGoals: [] }));
+        break;
+      case 4:
+        setFormData((prev: any) => ({ ...prev, supplements: [] }));
+        break;
+      case 5:
+        setFormData((prev: any) => ({ ...prev, medications: [] }));
+        break;
+      case 6:
+        // Review step - no reset needed
+        break;
+      default:
+        break;
+    }
+  };
+
+  const renderStep = () => {
+    switch (currentStep) {
+      case 0:
+        return <GenderStep onNext={handleNext} initial={formData.gender} />;
+      case 1:
+        return <PhysicalStep onNext={handleNext} onBack={handleBack} initial={formData} />;
+      case 2:
+        return <ExerciseStep onNext={handleNext} onBack={handleBack} initial={formData} />;
+      case 3:
+        return <HealthGoalsStep onNext={handleNext} onBack={handleBack} initial={formData} />;
+      case 4:
+        return <SupplementsStep onNext={handleNext} onBack={handleBack} initial={formData} />;
+      case 5:
+        return <MedicationsStep onNext={handleNext} onBack={handleBack} initial={formData} />;
+      case 6:
+        return <ReviewStep onBack={handleBack} data={formData} />;
+      default:
+        return <GenderStep onNext={handleNext} initial={formData.gender} />;
+    }
+  };
 
   return (
     <PasswordProtection>
@@ -1686,36 +1750,64 @@ export default function HealthApp() {
           </div>
         </div>
       ) : (
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-          <div className="max-w-md mx-auto px-4 py-20">
-            <div className="bg-white rounded-lg shadow-lg p-8 text-center">
-              <h1 className="text-2xl font-bold text-helfi-black mb-4">
-                Health App Coming Soon
-              </h1>
-              <p className="text-gray-600 mb-6">
-                Our comprehensive health tracking platform is under development.
-              </p>
-              <div className="space-y-4">
-                <Link
-                  href="/onboarding"
-                  className="w-full bg-helfi-green text-white py-3 px-4 rounded-lg hover:bg-green-700 transition-colors text-center block"
-                >
-                  Try Onboarding Demo
+        <div className="min-h-screen bg-gray-50">
+          <OnboardingNav />
+          
+          {/* Header */}
+          <div className="bg-white shadow-sm border-b">
+            <div className="max-w-7xl mx-auto px-4 py-4">
+              <div className="flex justify-between items-center">
+                <Link href="/" className="text-2xl font-bold text-helfi-green">
+                  Helfi
                 </Link>
-                <Link
-                  href="/dashboard"
-                  className="w-full border border-helfi-green text-helfi-green py-3 px-4 rounded-lg hover:bg-helfi-green hover:text-white transition-colors text-center block"
-                >
-                  View Dashboard
-                </Link>
-                <Link
-                  href="/"
-                  className="text-sm text-gray-600 hover:text-helfi-green block"
-                >
-                  ← Back to main site
-                </Link>
+                <div className="flex items-center space-x-4">
+                  <div className="text-sm text-gray-600">
+                    Edit Health Info
+                  </div>
+                  {/* Reset button */}
+                  <button
+                    onClick={resetCurrentStep}
+                    className="bg-white border border-gray-300 rounded-full p-2 shadow-lg hover:shadow-xl transition-all"
+                    title="Reset current step"
+                  >
+                    <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  </button>
+                </div>
               </div>
             </div>
+          </div>
+
+          {/* Progress bar */}
+          <div className="bg-white border-b">
+            <div className="max-w-7xl mx-auto px-4 py-2">
+              <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
+                <span>Step {currentStep + 1} of {steps.length}</span>
+                <span>{Math.round(((currentStep + 1) / steps.length) * 100)}% Complete</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div 
+                  className="bg-helfi-green h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${((currentStep + 1) / steps.length) * 100}%` }}
+                ></div>
+              </div>
+            </div>
+          </div>
+
+          {/* Skip button */}
+          <div className="fixed top-20 right-4 z-40">
+            <button
+              onClick={() => handleNext({})}
+              className="bg-white border border-gray-300 rounded-full px-4 py-2 shadow-lg hover:shadow-xl transition-all text-sm text-gray-600 hover:text-gray-800"
+            >
+              Skip
+            </button>
+          </div>
+
+          {/* Main content */}
+          <div className="py-8">
+            {renderStep()}
           </div>
         </div>
       )}
