@@ -306,7 +306,7 @@ export default function ProfilePage() {
                   onClick={handleEditOnboarding}
                   className="btn-mobile-primary w-full"
                 >
-                  ✏️ Edit Profile
+                  ✏️ Edit Health Info
                 </button>
                 <button
                   onClick={() => setShowResetDialog(true)}

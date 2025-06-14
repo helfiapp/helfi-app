@@ -171,7 +171,7 @@ function HeaderProfileSection() {
                   <svg className="w-4 h-4 mr-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                   </svg>
-                  Edit Health Profile
+                  Edit Health Info
                 </div>
               </button>
               <Link href="/account" className="block px-4 py-2 text-gray-700 hover:bg-gray-50 text-sm">
@@ -213,16 +213,16 @@ function HeaderProfileSection() {
   );
 }
 
-function FloatingSkipSection({ step, stepNames, form }: { step: number, stepNames: string[], form: any }) {
+function FloatingSkipSection({ step, stepNames, form, onNext }: { step: number, stepNames: string[], form: any, onNext: (data: any) => void }) {
   return (
     <div className="fixed top-20 left-0 right-0 z-50 flex items-center justify-between px-4 py-3">
       <button
         onClick={() => {
-          localStorage.setItem('onboardingData', JSON.stringify(form));
-          window.location.href = '/dashboard';
+          // Skip current step by calling onNext with empty data
+          onNext({});
         }}
         className="text-sm bg-blue-100 text-blue-700 px-4 py-2 rounded-lg hover:bg-blue-200 transition-colors whitespace-nowrap font-medium shadow-lg"
-        title="Skip to Dashboard"
+        title="Skip this step"
       >
         Skip
       </button>
@@ -2207,6 +2207,32 @@ export default function Onboarding() {
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<any>({});
 
+  // Reset current step data
+  const resetCurrentStep = () => {
+    const stepKeys = {
+      0: ['gender'],
+      1: ['weight', 'height', 'feet', 'inches', 'bodyType', 'unit'],
+      2: ['exerciseFrequency', 'exerciseTypes'],
+      3: ['goals', 'healthGoals'],
+      4: ['healthIssues', 'healthProblems'],
+      5: ['supplements'],
+      6: ['medications'],
+      7: ['bloodResults'],
+      8: ['aiInsights'],
+      9: []
+    };
+
+    const keysToReset = stepKeys[step as keyof typeof stepKeys] || [];
+    
+    setForm((prev: any) => {
+      const newForm = { ...prev };
+      keysToReset.forEach(key => {
+        delete newForm[key];
+      });
+      return newForm;
+    });
+  };
+
   // Load existing data if editing
   useEffect(() => {
     const existingData = localStorage.getItem('onboardingData');
@@ -2353,15 +2379,25 @@ export default function Onboarding() {
 
   return (
     <div className="fixed inset-0 bg-gray-50 overflow-y-auto" id="onboarding-container">
-      <FloatingSkipSection step={step} stepNames={stepNames} form={form} />
+      <FloatingSkipSection step={step} stepNames={stepNames} form={form} onNext={handleNext} />
       <div className="min-h-full flex flex-col pb-20 sm:pb-0">
         {/* Progress bar back at top */}
         <div className="fixed-header safe-area-top px-3 sm:px-4 py-4">
           {/* Header */}
-          <div className="flex items-center justify-center mb-4">
+          <div className="flex items-center justify-center mb-4 relative">
             <h1 className="text-lg sm:text-xl font-semibold text-gray-900 truncate">
-              {Object.keys(form).length > 0 ? 'Edit Profile' : 'Setup Profile'}
+              {Object.keys(form).length > 0 ? 'Edit Health Info' : 'Setup Profile'}
             </h1>
+            {/* Reset Circle Icon */}
+            <button
+              onClick={resetCurrentStep}
+              className="absolute right-0 bg-white border border-gray-300 rounded-full p-2 shadow-lg hover:shadow-xl transition-all hover:bg-red-50 hover:border-red-300"
+              title="Reset current step"
+            >
+              <svg className="w-5 h-5 text-gray-600 hover:text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
           </div>
           
           {/* Mobile: Compact step dots with navigation arrows */}

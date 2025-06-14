@@ -447,7 +447,7 @@ export default function Dashboard() {
                   onClick={handleEditOnboarding}
                   className="btn-mobile-primary w-full block"
                 >
-                  ✏️ Edit Profile
+                  ✏️ Edit Health Info
                 </button>
                 <button
                   onClick={() => setShowResetConfirm(true)}
