@@ -6,39 +6,11 @@ import Link from 'next/link'
 import { useState } from 'react'
 
 export default function SignIn() {
-  const [email, setEmail] = useState('')
-  const [emailSent, setEmailSent] = useState(false)
-  const [agreed, setAgreed] = useState(false)
-  const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const handleEmailSignIn = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    if (!email || !agreed) return
-    
+  const handleGoogleSignIn = async () => {
     setLoading(true)
-    setError('')
-    
-    try {
-      const result = await signIn('email', { 
-        email, 
-        callbackUrl: '/onboarding',
-        redirect: false 
-      })
-      
-      if (result?.error) {
-        setError('Failed to send sign-in email. Please try again.')
-        console.error('SignIn error:', result.error)
-      } else {
-        // Redirect to verify request page
-        window.location.href = '/auth/verify-request'
-      }
-    } catch (error) {
-      console.error('Email sign in error:', error)
-      setError('An unexpected error occurred. Please try again.')
-    } finally {
-      setLoading(false)
-    }
+    await signIn('google', { callbackUrl: '/onboarding' })
   }
 
   return (
@@ -58,55 +30,19 @@ export default function SignIn() {
         </div>
 
         {/* Sign In Form */}
-        <h2 className="text-2xl font-bold text-center text-helfi-black mb-8">
-          Welcome to Helfi
-        </h2>
-        <form onSubmit={handleEmailSignIn} className="mb-6">
-          <input
-            type="email"
-            placeholder="Enter your email"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            className="input-primary w-full mb-2"
-            required
-            disabled={loading}
-          />
-          <div className="flex items-center mb-2">
-            <input
-              type="checkbox"
-              id="agree-terms"
-              checked={agreed}
-              onChange={e => setAgreed(e.target.checked)}
-              className="mr-2"
-              required
-              disabled={loading}
-            />
-            <label htmlFor="agree-terms" className="text-sm text-gray-700">
-              I agree to the <Link href="/terms" target="_blank" className="text-helfi-green underline">Terms and Conditions</Link> and <Link href="/privacy" target="_blank" className="text-helfi-green underline">Privacy Policy</Link>
-            </label>
-          </div>
-          {error && (
-            <div className="mb-2 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-              {error}
-            </div>
-          )}
-          {emailSent && (
-            <div className="mb-2 p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
-              ✅ Check your email for a magic link to sign in!
-            </div>
-          )}
-          <button
-            type="submit"
-            className="w-full btn-secondary mb-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={!email || !agreed || loading}
-          >
-            {loading ? 'Sending...' : emailSent ? 'Email Sent!' : 'Continue with Email'}
-          </button>
-        </form>
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-helfi-black mb-4">
+            Welcome to Helfi
+          </h2>
+          <p className="text-gray-600 mb-8">
+            Sign in to access your personalized health experience
+          </p>
+        </div>
+
         <button
-          onClick={() => agreed && signIn('google', { callbackUrl: '/onboarding', redirect: true })}
+          onClick={handleGoogleSignIn}
+          disabled={loading}
           className="w-full flex items-center justify-center gap-3 btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-          disabled={!agreed || loading}
         >
           <svg className="w-5 h-5" viewBox="0 0 24 24">
             <path
@@ -126,8 +62,9 @@ export default function SignIn() {
               d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
             />
           </svg>
-          Continue with Google
+          {loading ? 'Signing in...' : 'Continue with Google'}
         </button>
+
         <div className="mt-6 text-center text-sm text-gray-600">
           By signing in, you agree to our{' '}
           <Link href="/terms" className="text-helfi-green hover:underline">
