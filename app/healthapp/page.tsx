@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
-import { useSession, signOut, signIn } from 'next-auth/react';
+import { createSupabaseClient } from '@/lib/supabase-client';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
 // Protected health app with authentication
@@ -36,19 +37,30 @@ function RefreshButton() {
 }
 
 function LogoutButton() {
-  const { data: session } = useSession();
+  const [user, setUser] = useState<any>(null);
+  const supabase = createSupabaseClient();
+  const router = useRouter();
+
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+    };
+    getUser();
+  }, []);
   
-  const handleLogout = () => {
-    signOut({ callbackUrl: '/' });
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push('/');
   };
 
-  if (!session) return null;
+  if (!user) return null;
 
   return (
     <button
       onClick={handleLogout}
       className="bg-white border border-gray-300 rounded-full p-2 shadow-lg hover:shadow-xl transition-all"
-      title={`Logout (${session.user?.email})`}
+      title={`Logout (${user?.email})`}
     >
       <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -1627,9 +1639,28 @@ function PasswordProtection({ children }: { children: React.ReactNode }) {
 }
 
 export default function HealthApp() {
-  const { data: session, status } = useSession();
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState<any>({});
+  const supabase = createSupabaseClient();
+
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+      setLoading(false);
+    };
+    getUser();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   const handleNext = (data: any) => {
     setFormData((prev: any) => ({ ...prev, ...data }));
@@ -1695,11 +1726,11 @@ export default function HealthApp() {
 
   return (
     <PasswordProtection>
-      {status === 'loading' ? (
+      {loading ? (
         <div className="min-h-screen bg-gray-50 flex items-center justify-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-helfi-green"></div>
         </div>
-      ) : !session ? (
+      ) : !user ? (
         <div className="min-h-screen bg-gray-50">
           <nav className="bg-white shadow-sm border-b">
             <div className="max-w-7xl mx-auto px-4 py-4">
@@ -1727,28 +1758,13 @@ export default function HealthApp() {
               
               <div className="space-y-4">
                 <Link
-                  href="/auth/signin"
+                  href="/auth/signin-email"
                   className="w-full bg-helfi-green text-white py-3 px-4 rounded-lg hover:bg-green-700 transition-colors text-center flex items-center justify-center gap-3"
                 >
-                  <svg className="w-5 h-5" viewBox="0 0 24 24">
-                    <path
-                      fill="currentColor"
-                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                    />
-                    <path
-                      fill="currentColor"
-                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                    />
-                    <path
-                      fill="currentColor"
-                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                    />
-                    <path
-                      fill="currentColor"
-                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                    />
+                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                   </svg>
-                  Sign In with Email or Google
+                  Sign In with Email & Password
                 </Link>
                 
                 <div className="text-center">
