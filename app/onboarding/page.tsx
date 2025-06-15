@@ -2,7 +2,8 @@
 // Fixed: Added use client directive for useState compatibility
 
 import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
-import { useSession, signOut } from 'next-auth/react';
+import { createSupabaseClient } from '@/lib/supabase-client';
+import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import BottomNav from '../../components/BottomNav';
@@ -42,19 +43,30 @@ function RefreshButton() {
 }
 
 function LogoutButton() {
-  const { data: session } = useSession();
+  const [user, setUser] = useState<any>(null);
+  const supabase = createSupabaseClient();
+  const router = useRouter();
+
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+    };
+    getUser();
+  }, []);
   
-  const handleLogout = () => {
-    signOut({ callbackUrl: '/' });
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push('/');
   };
 
-  if (!session) return null;
+  if (!user) return null;
 
   return (
     <button
       onClick={handleLogout}
       className="bg-white border border-gray-300 rounded-full p-2 shadow-lg hover:shadow-xl transition-all"
-      title={`Logout (${session.user?.email})`}
+      title={`Logout (${user?.email})`}
     >
       <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -64,7 +76,17 @@ function LogoutButton() {
 }
 
 function HeaderProfileSection() {
-  const { data: session } = useSession();
+  const [user, setUser] = useState<any>(null);
+  const supabase = createSupabaseClient();
+  const router = useRouter();
+
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+    };
+    getUser();
+  }, []);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [userImage, setUserImage] = useState<string | null>(null);
   
