@@ -4,8 +4,12 @@ import { prisma } from '@/lib/prisma'
 
 export async function GET(request: NextRequest) {
   try {
-    // Get current session
+    // Get current session - for JWT sessions this should work better
     const session = await getServerSession()
+    
+    // Also check cookies directly
+    const cookies = request.headers.get('cookie') || ''
+    const hasSessionToken = cookies.includes('next-auth.session-token') || cookies.includes('__Secure-next-auth.session-token')
     
     // Check environment variables (without exposing secrets)
     const envCheck = {
@@ -41,7 +45,12 @@ export async function GET(request: NextRequest) {
       environment: envCheck,
       database: dbStatus,
       sessionInfo,
-      message: 'Authentication debug info'
+      cookieCheck: {
+        hasCookies: cookies.length > 0,
+        hasSessionToken,
+        cookieString: cookies.substring(0, 200) + (cookies.length > 200 ? '...' : '')
+      },
+      message: 'Authentication debug info - Now using JWT strategy'
     })
     
   } catch (error) {

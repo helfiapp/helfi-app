@@ -8,40 +8,10 @@ import { Resend } from 'resend'
 const handler = NextAuth({
   adapter: PrismaAdapter(prisma),
   session: {
-    strategy: "database",
+    strategy: "jwt",
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
-  cookies: {
-    sessionToken: {
-      name: `next-auth.session-token`,
-      options: {
-        httpOnly: true,
-        sameSite: 'lax',
-        path: '/',
-        secure: true,
-        domain: '.helfi.ai'
-      }
-    },
-    callbackUrl: {
-      name: `next-auth.callback-url`,
-      options: {
-        sameSite: 'lax',
-        path: '/',
-        secure: true,
-        domain: '.helfi.ai'
-      }
-    },
-    csrfToken: {
-      name: `next-auth.csrf-token`,
-      options: {
-        httpOnly: true,
-        sameSite: 'lax',
-        path: '/',
-        secure: true,
-        domain: '.helfi.ai'
-      }
-    },
-  },
+
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -123,24 +93,43 @@ const handler = NextAuth({
       // Always allow sign in
       return true;
     },
-    async session({ session, user, token }) {
-      console.log('🔥 NextAuth session callback:', { 
+    async session({ session, token }) {
+      console.log('🔥 NextAuth session callback (JWT):', { 
         sessionUser: session?.user?.email,
-        userEmail: user?.email,
         tokenSub: token?.sub,
+        tokenEmail: token?.email,
         sessionExists: !!session,
-        userExists: !!user
+        tokenExists: !!token
       });
       
-      // For database sessions, user will be available
-      if (user && session.user) {
-        session.user.email = user.email;
-        session.user.name = user.name;
-        session.user.image = user.image;
-        console.log('🔥 Session enriched with user data:', session.user.email);
+      // For JWT sessions, get user data from token
+      if (token && session.user) {
+        session.user.email = token.email;
+        session.user.name = token.name;
+        session.user.image = token.picture;
+        console.log('🔥 Session enriched with token data:', session.user.email);
       }
       
       return session;
+    },
+    async jwt({ token, user, account }) {
+      console.log('🔥 NextAuth JWT callback:', {
+        tokenExists: !!token,
+        userExists: !!user,
+        accountExists: !!account,
+        userEmail: user?.email,
+        accountProvider: account?.provider
+      });
+      
+      // Save user info to token on first sign in
+      if (user) {
+        token.email = user.email;
+        token.name = user.name;
+        token.picture = user.image;
+        console.log('🔥 Token enriched with user data:', user.email);
+      }
+      
+      return token;
     },
     async redirect({ url, baseUrl }) {
       console.log('🔥 NextAuth redirect callback:', { url, baseUrl });
