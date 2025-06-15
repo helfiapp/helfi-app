@@ -11,6 +11,37 @@ const handler = NextAuth({
     strategy: "database",
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
+  cookies: {
+    sessionToken: {
+      name: `next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: true,
+        domain: '.helfi.ai'
+      }
+    },
+    callbackUrl: {
+      name: `next-auth.callback-url`,
+      options: {
+        sameSite: 'lax',
+        path: '/',
+        secure: true,
+        domain: '.helfi.ai'
+      }
+    },
+    csrfToken: {
+      name: `next-auth.csrf-token`,
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: true,
+        domain: '.helfi.ai'
+      }
+    },
+  },
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -96,14 +127,17 @@ const handler = NextAuth({
       console.log('🔥 NextAuth session callback:', { 
         sessionUser: session?.user?.email,
         userEmail: user?.email,
-        tokenSub: token?.sub 
+        tokenSub: token?.sub,
+        sessionExists: !!session,
+        userExists: !!user
       });
       
-      // Ensure session has user data
+      // For database sessions, user will be available
       if (user && session.user) {
         session.user.email = user.email;
         session.user.name = user.name;
         session.user.image = user.image;
+        console.log('🔥 Session enriched with user data:', session.user.email);
       }
       
       return session;

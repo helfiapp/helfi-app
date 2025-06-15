@@ -855,7 +855,7 @@ export default function SplashPage() {
             Plus, get health optimization tips delivered to your inbox.
           </p>
           
-          <div className="bg-white rounded-2xl p-8 shadow-2xl">
+          <div className="bg-white rounded-2xl p-6 shadow-2xl max-w-md mx-auto">
             <form className="space-y-4" onSubmit={(e) => {
               e.preventDefault();
               const formData = new FormData(e.currentTarget);
@@ -874,7 +874,7 @@ export default function SplashPage() {
                 alert('Something went wrong. Please try again.');
               });
             }}>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-3">
                 <input
                   type="text"
                   name="name"
@@ -892,7 +892,7 @@ export default function SplashPage() {
               </div>
               <button
                 type="submit"
-                className="w-full bg-helfi-green text-white px-8 py-4 rounded-lg text-lg font-semibold hover:bg-green-700 transition-colors"
+                className="w-full bg-helfi-green text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors"
               >
                 Join the Waitlist
               </button>
