@@ -24,15 +24,11 @@ export default function AIInsightsPage() {
   useEffect(() => {
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        router.push('/auth/signin-email')
-        return
-      }
       setUser(user)
       setLoading(false)
     }
     getUser()
-  }, [router])
+  }, [])
 
   useEffect(() => {
     const savedData = localStorage.getItem('onboardingData')

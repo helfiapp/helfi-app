@@ -5,6 +5,7 @@ import { createClient } from '@supabase/supabase-js'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
+import Header from '@/components/ui/Header'
 import BottomNav from '../../components/BottomNav'
 
 const supabase = createClient(
@@ -15,14 +16,12 @@ const supabase = createClient(
 export default function AccountPage() {
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [dropdownOpen, setDropdownOpen] = useState(false)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false)
   const [accountData, setAccountData] = useState({
     fullName: '',
     email: ''
   })
-  const [userImage, setUserImage] = useState<string | null>(null)
   const router = useRouter()
 
   useEffect(() => {
@@ -40,16 +39,6 @@ export default function AccountPage() {
   }
 
   const userName = user?.user_metadata?.name || user?.email || 'User'
-
-  // Load profile image from localStorage or user metadata
-  useEffect(() => {
-    const savedImage = localStorage.getItem('userProfileImage')
-    if (savedImage) {
-      setUserImage(savedImage)
-    } else if (user?.user_metadata?.avatar_url) {
-      setUserImage(user.user_metadata.avatar_url)
-    }
-  }, [user])
 
   // Load saved data on mount
   useEffect(() => {
@@ -99,189 +88,17 @@ export default function AccountPage() {
     return () => clearTimeout(saveTimer)
   }, [accountData, twoFactorEnabled])
 
-  // Close dropdown on outside click
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (!(e.target as HTMLElement).closest('#profile-dropdown') && 
-          !(e.target as HTMLElement).closest('#mobile-profile-dropdown')) {
-        setDropdownOpen(false);
-      }
-    }
-    if (dropdownOpen) {
-      document.addEventListener('mousedown', handleClick);
-    } else {
-      document.removeEventListener('mousedown', handleClick);
-    }
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [dropdownOpen]);
+
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20 md:pb-0">
-      {/* Navigation Header */}
-      <nav className="bg-white border-b border-gray-200 px-4 py-3">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <div className="flex items-center">
-            <Link href="/" className="w-16 h-16 md:w-20 md:h-20 cursor-pointer hover:opacity-80 transition-opacity">
-              <Image
-                src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/HELFI_TRANSPARENT_rmssry.png"
-                alt="Helfi Logo"
-                width={80}
-                height={80}
-                className="w-full h-full object-contain"
-                priority
-              />
-            </Link>
-            <div className="ml-4">
-              <h1 className="text-lg md:text-xl font-semibold text-gray-900">Account Settings</h1>
-              <p className="text-sm text-gray-500 hidden sm:block">Manage your account preferences</p>
-            </div>
-          </div>
-          
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-6">
-            <Link href="/dashboard" className="text-gray-700 hover:text-helfi-green transition-colors font-medium">
-              Dashboard
-            </Link>
-            <Link href="/profile" className="text-gray-700 hover:text-helfi-green transition-colors font-medium">
-              Profile
-            </Link>
-            <Link href="/account" className="text-helfi-green font-medium">
-              Account Settings
-            </Link>
-            
-            {/* Desktop Profile Avatar & Dropdown */}
-            <div className="relative ml-6" id="profile-dropdown">
-              <button
-                onClick={() => setDropdownOpen((v) => !v)}
-                className="focus:outline-none"
-                aria-label="Open profile menu"
-              >
-                {userImage ? (
-                  <Image
-                    src={userImage}
-                    alt="Profile"
-                    width={48}
-                    height={48}
-                    className="rounded-full border-2 border-helfi-green shadow-sm object-cover w-12 h-12"
-                  />
-                ) : (
-                  <div className="w-12 h-12 rounded-full border-2 border-helfi-green shadow-sm bg-helfi-green flex items-center justify-center">
-                    <svg className="w-7 h-7 text-white" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                    </svg>
-                  </div>
-                )}
-              </button>
-              {dropdownOpen && (
-                <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg py-2 z-[9999] border border-gray-100 animate-fade-in">
-                  <div className="flex items-center px-4 py-3 border-b border-gray-100">
-                    {userImage ? (
-                      <Image
-                        src={userImage}
-                        alt="Profile"
-                        width={40}
-                        height={40}
-                        className="rounded-full object-cover mr-3"
-                      />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full bg-helfi-green flex items-center justify-center mr-3">
-                        <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                        </svg>
-                      </div>
-                    )}
-                    <div>
-                      <div className="font-semibold text-gray-900">{userName}</div>
-                      <div className="text-xs text-gray-500">{user?.email || 'user@email.com'}</div>
-                    </div>
-                  </div>
-                  <Link href="/profile" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Profile</Link>
-                  <Link href="/account" className="block px-4 py-2 text-helfi-green hover:bg-gray-50 font-medium">Account Settings</Link>
-                  <Link href="/profile/image" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Upload/Change Profile Image</Link>
-                  <Link href="/billing" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Subscription & Billing</Link>
-                  <Link href="/notifications" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Notifications</Link>
-                  <Link href="/privacy" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Privacy Settings</Link>
-                  <Link href="/help" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
-                  <button
-                    onClick={() => handleSignOut()}
-                    className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50 font-semibold"
-                  >
-                    Logout
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Mobile Navigation */}
-          <div className="md:hidden flex items-center space-x-3">
-            <div className="relative" id="mobile-profile-dropdown">
-              <button
-                onClick={() => setDropdownOpen((v) => !v)}
-                className="focus:outline-none"
-                aria-label="Open profile menu"
-              >
-                {userImage ? (
-                  <Image
-                    src={userImage}
-                    alt="Profile"
-                    width={40}
-                    height={40}
-                    className="rounded-full border-2 border-helfi-green shadow-sm object-cover w-10 h-10"
-                  />
-                ) : (
-                  <div className="w-10 h-10 rounded-full border-2 border-helfi-green shadow-sm bg-helfi-green flex items-center justify-center">
-                    <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                    </svg>
-                  </div>
-                )}
-              </button>
-              {dropdownOpen && (
-                <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg py-2 z-[9999] border border-gray-100 animate-fade-in">
-                  <div className="flex items-center px-4 py-3 border-b border-gray-100">
-                    {userImage ? (
-                      <Image
-                        src={userImage}
-                        alt="Profile"
-                        width={40}
-                        height={40}
-                        className="rounded-full object-cover mr-3"
-                      />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full bg-helfi-green flex items-center justify-center mr-3">
-                        <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                        </svg>
-                      </div>
-                    )}
-                    <div>
-                      <div className="font-semibold text-gray-900">{userName}</div>
-                      <div className="text-xs text-gray-500">{user?.email || 'user@email.com'}</div>
-                    </div>
-                  </div>
-                  <Link href="/profile" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Profile</Link>
-                  <Link href="/account" className="block px-4 py-2 text-helfi-green hover:bg-gray-50 font-medium">Account Settings</Link>
-                  <Link href="/profile/image" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Upload/Change Profile Image</Link>
-                  <Link href="/billing" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Subscription & Billing</Link>
-                  <Link href="/notifications" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Notifications</Link>
-                  <Link href="/privacy" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Privacy Settings</Link>
-                  <Link href="/help" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
-                  <button
-                    onClick={() => handleSignOut()}
-                    className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50 font-semibold"
-                  >
-                    Logout
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </nav>
+      <Header 
+        title="Account Settings" 
+        subtitle="Manage your account preferences"
+      />
 
       {/* Main Content */}
-      <div className="max-w-3xl mx-auto px-4 py-6">
+      <div className="max-w-3xl mx-auto px-4 py-6 pt-24">
         <div className="bg-white rounded-lg shadow-sm p-6">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-gray-900">Account Settings</h2>
