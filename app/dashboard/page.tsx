@@ -118,9 +118,101 @@ export default function Dashboard() {
           </Card>
         ) : (
           /* Main Dashboard Content */
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Left Column - Main Content */}
-            <div className="lg:col-span-2 space-y-6">
+          <div className="space-y-6">
+            {/* Profile Status - Always visible on mobile */}
+            <div className="lg:hidden">
+              <Card>
+                <CardHeader>
+                  <CardTitle size="md">Profile Status</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center space-x-3 mb-4">
+                    <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                      <svg className="w-6 h-6 text-green-600" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-900">{userName}</p>
+                      <p className="text-sm text-gray-500">{user?.email}</p>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Profile Complete</span>
+                      <span className="text-green-600 font-medium">
+                        {onboardingData ? '100%' : '20%'}
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div 
+                        className="bg-green-600 h-2 rounded-full transition-all duration-500"
+                        style={{ width: onboardingData ? '100%' : '20%' }}
+                      ></div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Active Goals - Always visible on mobile */}
+            {onboardingData?.healthGoals && (
+              <div className="lg:hidden">
+                <Card>
+                  <CardHeader>
+                    <CardTitle size="md">Active Goals</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {onboardingData.healthGoals.slice(0, 3).map((goal: string, index: number) => (
+                        <div key={index} className="flex items-center space-x-2">
+                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                          <span className="text-sm text-gray-700">{goal}</span>
+                        </div>
+                      ))}
+                      {onboardingData.healthGoals.length > 3 && (
+                        <p className="text-xs text-gray-500 mt-2">
+                          +{onboardingData.healthGoals.length - 3} more goals
+                        </p>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {/* Data Management - Always visible on mobile */}
+            <div className="lg:hidden">
+              <Card>
+                <CardHeader>
+                  <CardTitle size="md">Data Management</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <Button variant="outline" fullWidth>
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      Export Data
+                    </Button>
+                    <Button 
+                      variant="destructive" 
+                      fullWidth
+                      onClick={() => setShowResetConfirm(true)}
+                    >
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                      Reset Data
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Left Column - Main Content */}
+              <div className="lg:col-span-2 space-y-6">
               {/* Health Summary Card */}
               <Card>
                 <CardHeader>
@@ -350,6 +442,7 @@ export default function Dashboard() {
                 </CardContent>
               </Card>
             </div>
+          </div>
           </div>
         )}
 
