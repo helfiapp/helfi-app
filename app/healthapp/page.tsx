@@ -1558,8 +1558,8 @@ function PasswordProtection({ children }: { children: React.ReactNode }) {
     setIsLoading(true)
     setError('')
 
-    // Secure password: HelfiBeta2024!
-    const correctPassword = 'HelfiBeta2024!'
+    // Secure password: HealthBeta2024!
+    const correctPassword = 'HealthBeta2024!'
     
     if (password === correctPassword) {
       setIsAuthenticated(true)
