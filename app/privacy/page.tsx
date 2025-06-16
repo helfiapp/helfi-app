@@ -1,30 +1,57 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { useSession, signOut } from 'next-auth/react'
+import { createClient } from '@supabase/supabase-js'
+import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
 import BottomNav from '../../components/BottomNav'
 
-export default function PrivacyPage() {
-  const { data: session } = useSession()
-  const [dropdownOpen, setDropdownOpen] = useState(false)
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
-  // Privacy controls state
+export default function PrivacyPage() {
+  const [user, setUser] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [dropdownOpen, setDropdownOpen] = useState(false)
   const [privacySettings, setPrivacySettings] = useState({
     profileVisibility: false,
     activityTracking: true,
     locationServices: false
   })
-  
-  // Data retention and sharing state
   const [dataRetention, setDataRetention] = useState('never')
-  const [healthDataSharing, setHealthDataSharing] = useState('only_me')
-  const [analyticsEnabled, setAnalyticsEnabled] = useState(true)
+  const [shareLevel, setShareLevel] = useState('only_me')
+  const [analyticsOptOut, setAnalyticsOptOut] = useState(false)
+  const [userImage, setUserImage] = useState<string | null>(null)
+  const router = useRouter()
 
-  // Profile data with better fallback
-  const userImage = session?.user?.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(session?.user?.name || 'User')}&background=22c55e&color=ffffff&rounded=true&size=128`;
-  const userName = session?.user?.name || 'User';
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      setUser(user)
+      setLoading(false)
+    }
+    getUser()
+  }, [])
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+    router.push('/')
+  }
+
+  const userName = user?.user_metadata?.name || user?.email || 'User'
+
+  // Load profile image from localStorage or user metadata
+  useEffect(() => {
+    const savedImage = localStorage.getItem('userProfileImage')
+    if (savedImage) {
+      setUserImage(savedImage)
+    } else if (user?.user_metadata?.avatar_url) {
+      setUserImage(user.user_metadata.avatar_url)
+    }
+  }, [user])
 
   // Load saved preferences
   useEffect(() => {
@@ -41,12 +68,12 @@ export default function PrivacyPage() {
       
       const savedSharing = localStorage.getItem('healthDataSharing')
       if (savedSharing) {
-        setHealthDataSharing(savedSharing)
+        setShareLevel(savedSharing)
       }
       
       const savedAnalytics = localStorage.getItem('analyticsEnabled')
       if (savedAnalytics !== null) {
-        setAnalyticsEnabled(JSON.parse(savedAnalytics))
+        setAnalyticsOptOut(JSON.parse(savedAnalytics))
       }
     } catch (error) {
       console.error('Error loading privacy settings:', error)
@@ -69,13 +96,13 @@ export default function PrivacyPage() {
   }
 
   const handleHealthDataSharingChange = (value: string) => {
-    setHealthDataSharing(value)
+    setShareLevel(value)
     localStorage.setItem('healthDataSharing', value)
   }
 
   const handleAnalyticsToggle = () => {
-    const newValue = !analyticsEnabled
-    setAnalyticsEnabled(newValue)
+    const newValue = !analyticsOptOut
+    setAnalyticsOptOut(newValue)
     localStorage.setItem('analyticsEnabled', JSON.stringify(newValue))
   }
 
@@ -138,7 +165,7 @@ export default function PrivacyPage() {
                 aria-label="Open profile menu"
               >
                 <Image
-                  src={userImage}
+                  src={userImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(userName || 'User')}&background=22c55e&color=ffffff&rounded=true&size=128`}
                   alt="Profile"
                   width={48}
                   height={48}
@@ -203,7 +230,7 @@ export default function PrivacyPage() {
                   <h4 className="font-medium text-gray-900 mb-2">Health Data Sharing</h4>
                   <p className="text-sm text-gray-600 mb-3">Control who can access your health information</p>
                   <select 
-                    value={healthDataSharing}
+                    value={shareLevel}
                     onChange={(e) => handleHealthDataSharingChange(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-helfi-green focus:border-helfi-green"
                   >
@@ -221,7 +248,7 @@ export default function PrivacyPage() {
                       <p className="text-sm text-gray-600">Allow anonymized data for improving health insights</p>
                     </div>
                     <ToggleSwitch 
-                      enabled={analyticsEnabled} 
+                      enabled={analyticsOptOut} 
                       onToggle={handleAnalyticsToggle}
                     />
                   </div>

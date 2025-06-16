@@ -1,32 +1,54 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { useSession, signOut } from 'next-auth/react'
+import { createClient } from '@supabase/supabase-js'
+import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
 import BottomNav from '../../components/BottomNav'
 
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
+
 export default function HelpPage() {
-  const { data: session } = useSession()
+  const [user, setUser] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
   const [dropdownOpen, setDropdownOpen] = useState(false)
-  const [openFaq, setOpenFaq] = useState<number | null>(null)
+  const [expandedFAQ, setExpandedFAQ] = useState<number | null>(null)
+  const [contactFormData, setContactFormData] = useState({
+    subject: '',
+    message: ''
+  })
+  const [userImage, setUserImage] = useState<string | null>(null)
+  const router = useRouter()
 
-  // Profile data with localStorage integration
-  const [userImage, setUserImage] = useState<string | null>(null);
-  const userName = session?.user?.name || 'User';
-
-  // Load profile image from localStorage or session
   useEffect(() => {
-    const savedImage = localStorage.getItem('userProfileImage');
-    if (savedImage) {
-      setUserImage(savedImage);
-    } else if (session?.user?.image) {
-      setUserImage(session.user.image);
-    } else {
-      // Fallback to generated avatar
-      setUserImage(`https://ui-avatars.com/api/?name=${encodeURIComponent(session?.user?.name || 'User')}&background=22c55e&color=ffffff&rounded=true&size=128`);
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      setUser(user)
+      setLoading(false)
     }
-  }, [session]);
+    getUser()
+  }, [])
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+    router.push('/')
+  }
+
+  const userName = user?.user_metadata?.name || user?.email || 'User'
+
+  // Load profile image from localStorage or user metadata
+  useEffect(() => {
+    const savedImage = localStorage.getItem('userProfileImage')
+    if (savedImage) {
+      setUserImage(savedImage)
+    } else if (user?.user_metadata?.avatar_url) {
+      setUserImage(user.user_metadata.avatar_url)
+    }
+  }, [user])
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -147,14 +169,14 @@ export default function HelpPage() {
                     )}
                     <div>
                       <div className="font-semibold text-gray-900">{userName}</div>
-                      <div className="text-xs text-gray-500">{session?.user?.email || 'user@email.com'}</div>
+                                                  <div className="text-xs text-gray-500">{user?.email || 'user@email.com'}</div>
                     </div>
                   </div>
                   <Link href="/profile" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Profile</Link>
                   <Link href="/account" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Account Settings</Link>
                   <Link href="/help" className="block px-4 py-2 text-helfi-green hover:bg-gray-50 font-medium">Help & Support</Link>
                   <button
-                    onClick={() => signOut()}
+                                          onClick={handleSignOut}
                     className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50 font-semibold"
                   >
                     Logout
@@ -167,9 +189,9 @@ export default function HelpPage() {
       </nav>
 
       {/* Main Content */}
-      <div className="max-w-4xl mx-auto px-4 py-8">
+      <div className="max-w-3xl mx-auto px-4 py-6">
         {/* Contact Support */}
-        <div className="bg-white rounded-lg shadow-sm p-8 mb-8">
+                  <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <h2 className="text-2xl font-bold text-gray-900 mb-6">Contact Support</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="text-center p-6 border border-gray-200 rounded-lg">
@@ -214,19 +236,19 @@ export default function HelpPage() {
         </div>
 
         {/* FAQ Section */}
-        <div className="bg-white rounded-lg shadow-sm p-8">
+        <div className="bg-white rounded-lg shadow-sm p-6">
           <h2 className="text-2xl font-bold text-gray-900 mb-6">Frequently Asked Questions</h2>
           <div className="space-y-4">
             {faqs.map((faq, index) => (
               <div key={index} className="border border-gray-200 rounded-lg">
                 <button
                   className="w-full px-6 py-4 text-left flex justify-between items-center hover:bg-gray-50"
-                  onClick={() => setOpenFaq(openFaq === index ? null : index)}
+                  onClick={() => setExpandedFAQ(expandedFAQ === index ? null : index)}
                 >
                   <span className="font-medium text-gray-900">{faq.question}</span>
                   <svg
                     className={`w-5 h-5 text-gray-500 transform transition-transform ${
-                      openFaq === index ? 'rotate-180' : ''
+                      expandedFAQ === index ? 'rotate-180' : ''
                     }`}
                     fill="none"
                     stroke="currentColor"
@@ -235,7 +257,7 @@ export default function HelpPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
                 </button>
-                {openFaq === index && (
+                {expandedFAQ === index && (
                   <div className="px-6 pb-4">
                     <p className="text-gray-600">{faq.answer}</p>
                   </div>

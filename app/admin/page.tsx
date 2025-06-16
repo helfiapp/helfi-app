@@ -1,12 +1,44 @@
 'use client'
 
-import React from 'react'
-import { useSession } from 'next-auth/react'
-import { signOut } from 'next-auth/react'
+import React, { useState, useEffect } from 'react'
+import { createClient } from '@supabase/supabase-js'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
+
 export default function AdminDashboard() {
-  const { data: session } = useSession()
+  const [user, setUser] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const router = useRouter()
+
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      setUser(user)
+      setLoading(false)
+    }
+    getUser()
+  }, [])
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+    router.push('/')
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-helfi-green mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -20,11 +52,11 @@ export default function AdminDashboard() {
               <span className="text-sm text-gray-500">Backend Control Panel</span>
             </div>
             <div className="flex items-center space-x-4">
-              {session?.user && (
+              {user && (
                 <>
-                  <span className="text-sm text-gray-600">{session.user.email}</span>
+                  <span className="text-sm text-gray-600">{user.email}</span>
                   <button
-                    onClick={() => signOut()}
+                    onClick={handleSignOut}
                     className="btn-secondary text-sm"
                   >
                     Sign Out

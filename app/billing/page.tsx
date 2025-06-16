@@ -1,18 +1,66 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { useSession, signOut } from 'next-auth/react'
+import { createClient } from '@supabase/supabase-js'
+import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
 import BottomNav from '../../components/BottomNav'
 
-export default function BillingPage() {
-  const { data: session } = useSession()
-  const [dropdownOpen, setDropdownOpen] = useState(false)
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
-  // Profile data with better fallback
-  const userImage = session?.user?.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(session?.user?.name || 'User')}&background=22c55e&color=ffffff&rounded=true&size=128`;
-  const userName = session?.user?.name || 'User';
+export default function BillingPage() {
+  const [user, setUser] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [userImage, setUserImage] = useState<string | null>(null)
+  const router = useRouter()
+
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      setUser(user)
+      setLoading(false)
+    }
+    getUser()
+  }, [])
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+    router.push('/')
+  }
+
+  const userName = user?.user_metadata?.name || user?.email || 'User'
+
+  // Load profile image from localStorage or user metadata
+  useEffect(() => {
+    const savedImage = localStorage.getItem('userProfileImage')
+    if (savedImage) {
+      setUserImage(savedImage)
+    } else if (user?.user_metadata?.avatar_url) {
+      setUserImage(user.user_metadata.avatar_url)
+    }
+  }, [user])
+
+  const displayImage = userImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=22c55e&color=ffffff&rounded=true&size=128`
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (!(e.target as HTMLElement).closest('#profile-dropdown')) {
+        setDropdownOpen(false);
+      }
+    }
+    if (dropdownOpen) {
+      document.addEventListener('mousedown', handleClick);
+    } else {
+      document.removeEventListener('mousedown', handleClick);
+    }
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [dropdownOpen]);
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20 md:pb-0">
@@ -56,31 +104,58 @@ export default function BillingPage() {
                 aria-label="Open profile menu"
               >
                 <Image
-                  src={userImage}
+                  src={displayImage}
                   alt="Profile"
                   width={48}
                   height={48}
                   className="rounded-full border-2 border-helfi-green shadow-sm object-cover w-12 h-12"
                 />
               </button>
+              {dropdownOpen && (
+                <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-100 animate-fade-in">
+                  <div className="flex items-center px-4 py-3 border-b border-gray-100">
+                    <Image
+                      src={displayImage}
+                      alt="Profile"
+                      width={40}
+                      height={40}
+                      className="rounded-full object-cover mr-3"
+                    />
+                    <div>
+                      <div className="font-semibold text-gray-900">{userName}</div>
+                      <div className="text-xs text-gray-500">{user?.email || 'user@email.com'}</div>
+                    </div>
+                  </div>
+                  <Link href="/profile" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Profile</Link>
+                  <Link href="/account" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Account Settings</Link>
+                  <Link href="/billing" className="block px-4 py-2 text-helfi-green hover:bg-gray-50 font-medium">Billing</Link>
+                  <Link href="/help" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
+                  <button
+                    onClick={handleSignOut}
+                    className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50 font-semibold"
+                  >
+                    Logout
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
       </nav>
 
       {/* Main Content */}
-      <div className="max-w-4xl mx-auto px-4 py-8">
+      <div className="max-w-3xl mx-auto px-4 py-6">
         {/* Current Plan */}
-        <div className="bg-white rounded-lg shadow-sm p-8 mb-8">
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <h2 className="text-2xl font-bold text-gray-900 mb-6">Current Plan</h2>
           
           <div className="bg-gradient-to-r from-helfi-green to-green-600 rounded-lg p-6 text-white mb-6">
             <div className="flex justify-between items-start">
               <div>
-                <h3 className="text-xl font-semibold mb-2">Helfi Pro</h3>
+                <h3 className="text-xl font-semibold mb-2">AI Health Coach</h3>
                 <p className="text-green-100 mb-4">Full access to AI health insights and personalized recommendations</p>
                 <div className="flex items-center space-x-4">
-                  <span className="text-2xl font-bold">$29</span>
+                  <span className="text-2xl font-bold">$12</span>
                   <span className="text-green-100">/month</span>
                 </div>
               </div>
@@ -109,7 +184,7 @@ export default function BillingPage() {
         </div>
 
         {/* Billing Information */}
-        <div className="bg-white rounded-lg shadow-sm p-8 mb-8">
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <h2 className="text-2xl font-bold text-gray-900 mb-6">Billing Information</h2>
           
           <div className="space-y-6">
@@ -145,39 +220,39 @@ export default function BillingPage() {
         </div>
 
         {/* Billing History */}
-        <div className="bg-white rounded-lg shadow-sm p-8 mb-8">
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <h2 className="text-2xl font-bold text-gray-900 mb-6">Billing History</h2>
           
           <div className="space-y-4">
             <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
               <div>
-                <div className="font-medium text-gray-900">Helfi Pro - January 2024</div>
+                <div className="font-medium text-gray-900">AI Health Coach - January 2024</div>
                 <div className="text-sm text-gray-600">Jan 1, 2024</div>
               </div>
               <div className="text-right">
-                <div className="font-medium text-gray-900">$29.00</div>
+                <div className="font-medium text-gray-900">$12.00</div>
                 <button className="text-helfi-green hover:underline text-sm">Download</button>
               </div>
             </div>
 
             <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
               <div>
-                <div className="font-medium text-gray-900">Helfi Pro - December 2023</div>
+                <div className="font-medium text-gray-900">AI Health Coach - December 2023</div>
                 <div className="text-sm text-gray-600">Dec 1, 2023</div>
               </div>
               <div className="text-right">
-                <div className="font-medium text-gray-900">$29.00</div>
+                <div className="font-medium text-gray-900">$12.00</div>
                 <button className="text-helfi-green hover:underline text-sm">Download</button>
               </div>
             </div>
 
             <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
               <div>
-                <div className="font-medium text-gray-900">Helfi Pro - November 2023</div>
+                <div className="font-medium text-gray-900">AI Health Coach - November 2023</div>
                 <div className="text-sm text-gray-600">Nov 1, 2023</div>
               </div>
               <div className="text-right">
-                <div className="font-medium text-gray-900">$29.00</div>
+                <div className="font-medium text-gray-900">$12.00</div>
                 <button className="text-helfi-green hover:underline text-sm">Download</button>
               </div>
             </div>
@@ -185,14 +260,14 @@ export default function BillingPage() {
         </div>
 
         {/* Plan Management */}
-        <div className="bg-white rounded-lg shadow-sm p-8">
+        <div className="bg-white rounded-lg shadow-sm p-6">
           <h2 className="text-2xl font-bold text-gray-900 mb-6">Plan Management</h2>
           
           <div className="space-y-4">
             <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
               <div>
                 <h3 className="font-medium text-gray-900">Next Billing Date</h3>
-                <p className="text-sm text-gray-600">Your next payment of $29.00 will be charged on February 1, 2024</p>
+                <p className="text-sm text-gray-600">Your next payment of $12.00 will be charged on February 1, 2024</p>
               </div>
             </div>
 
@@ -201,9 +276,9 @@ export default function BillingPage() {
                 <h3 className="font-medium text-gray-900">Change Plan</h3>
                 <p className="text-sm text-gray-600">Upgrade or downgrade your subscription</p>
               </div>
-              <button className="bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors">
+              <Link href="/pricing" className="bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors inline-block text-center">
                 View Plans
-              </button>
+              </Link>
             </div>
 
             <div className="flex items-center justify-between p-4 border border-red-200 rounded-lg bg-red-50">

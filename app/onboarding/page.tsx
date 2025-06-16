@@ -1,12 +1,16 @@
 'use client';
-// Fixed: Added use client directive for useState compatibility
 
 import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
-import { createSupabaseClient } from '@/lib/supabase-client';
+import { createClient } from '@supabase/supabase-js'
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import BottomNav from '../../components/BottomNav';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 // Auth-enabled onboarding flow
 
@@ -44,27 +48,18 @@ function RefreshButton() {
 
 function LogoutButton() {
   const [user, setUser] = useState<any>(null);
-  const supabase = createSupabaseClient();
   const router = useRouter();
 
-  useEffect(() => {
-    const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
-    };
-    getUser();
-  }, []);
-  
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push('/');
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+    router.push('/')
   };
 
   if (!user) return null;
 
   return (
     <button
-      onClick={handleLogout}
+      onClick={handleSignOut}
       className="bg-white border border-gray-300 rounded-full p-2 shadow-lg hover:shadow-xl transition-all"
       title={`Logout (${user?.email})`}
     >
@@ -77,30 +72,25 @@ function LogoutButton() {
 
 function HeaderProfileSection() {
   const [user, setUser] = useState<any>(null);
-  const supabase = createSupabaseClient();
-  const router = useRouter();
-
-  useEffect(() => {
-    const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
-    };
-    getUser();
-  }, []);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [userImage, setUserImage] = useState<string | null>(null);
   
-  // Load profile image from localStorage or session
-  useEffect(() => {
-    const savedImage = localStorage.getItem('userProfileImage');
-    if (savedImage) {
-      setUserImage(savedImage);
-    } else if (session?.user?.image) {
-      setUserImage(session.user.image);
-    }
-  }, [session]);
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+    window.location.href = '/'
+  }
   
-  const userName = session?.user?.name || 'User';
+  // Load profile image from localStorage or user metadata
+  useEffect(() => {
+    const savedImage = localStorage.getItem('userProfileImage')
+    if (savedImage) {
+      setUserImage(savedImage)
+    } else if (user?.user_metadata?.avatar_url) {
+      setUserImage(user.user_metadata.avatar_url)
+    }
+  }, [user])
+  
+  const userName = user?.user_metadata?.name || user?.email || 'User';
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -162,7 +152,7 @@ function HeaderProfileSection() {
               )}
               <div className="flex-1 min-w-0">
                 <div className="font-semibold text-gray-900 truncate text-sm">{userName}</div>
-                <div className="text-xs text-gray-500 truncate">{session?.user?.email || 'user@email.com'}</div>
+                <div className="text-xs text-gray-500 truncate">{user?.email || 'user@email.com'}</div>
               </div>
             </div>
             <div className="py-1">
@@ -216,7 +206,7 @@ function HeaderProfileSection() {
             </div>
             <div className="border-t border-gray-100 pt-1">
               <button
-                onClick={() => signOut({ callbackUrl: '/' })}
+                onClick={handleSignOut}
                 className="block w-full text-left px-4 py-2 text-red-600 hover:bg-red-50 font-semibold text-sm"
               >
                 <div className="flex items-center">
@@ -2407,6 +2397,16 @@ export default function Onboarding() {
         <div className="fixed-header safe-area-top px-3 sm:px-4 py-4">
           {/* Header */}
           <div className="flex items-center justify-center mb-4 relative">
+            {/* Back to Dashboard Button */}
+            <button
+              onClick={() => window.location.href = '/dashboard'}
+              className="absolute left-0 bg-white border border-gray-300 rounded-full p-2 shadow-lg hover:shadow-xl transition-all hover:bg-gray-50"
+              title="Back to Dashboard"
+            >
+              <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
             <h1 className="text-lg sm:text-xl font-semibold text-gray-900 truncate">
               {Object.keys(form).length > 0 ? 'Edit Health Info' : 'Setup Profile'}
             </h1>

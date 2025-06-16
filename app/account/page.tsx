@@ -1,13 +1,20 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { useSession, signOut } from 'next-auth/react'
+import { createClient } from '@supabase/supabase-js'
+import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
 import BottomNav from '../../components/BottomNav'
 
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
+
 export default function AccountPage() {
-  const { data: session } = useSession()
+  const [user, setUser] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false)
@@ -15,20 +22,34 @@ export default function AccountPage() {
     fullName: '',
     email: ''
   })
+  const [userImage, setUserImage] = useState<string | null>(null)
+  const router = useRouter()
 
-  // Profile data with localStorage integration
-  const [userImage, setUserImage] = useState<string | null>(null);
-  const userName = session?.user?.name || 'User';
-
-  // Load profile image from localStorage or session
   useEffect(() => {
-    const savedImage = localStorage.getItem('userProfileImage');
-    if (savedImage) {
-      setUserImage(savedImage);
-    } else if (session?.user?.image) {
-      setUserImage(session.user.image);
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      setUser(user)
+      setLoading(false)
     }
-  }, [session]);
+    getUser()
+  }, [])
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+    router.push('/')
+  }
+
+  const userName = user?.user_metadata?.name || user?.email || 'User'
+
+  // Load profile image from localStorage or user metadata
+  useEffect(() => {
+    const savedImage = localStorage.getItem('userProfileImage')
+    if (savedImage) {
+      setUserImage(savedImage)
+    } else if (user?.user_metadata?.avatar_url) {
+      setUserImage(user.user_metadata.avatar_url)
+    }
+  }, [user])
 
   // Load saved data on mount
   useEffect(() => {
@@ -44,15 +65,15 @@ export default function AccountPage() {
     } else {
       // Initialize with session data
       setAccountData({
-        fullName: session?.user?.name || '',
-        email: session?.user?.email || ''
+        fullName: user?.user_metadata?.name || '',
+        email: user?.email || ''
       })
     }
     
     if (saved2FA) {
       setTwoFactorEnabled(saved2FA === 'true')
     }
-  }, [session])
+  }, [user])
 
   // Auto-save when data changes
   useEffect(() => {
@@ -171,7 +192,7 @@ export default function AccountPage() {
                     )}
                     <div>
                       <div className="font-semibold text-gray-900">{userName}</div>
-                      <div className="text-xs text-gray-500">{session?.user?.email || 'user@email.com'}</div>
+                      <div className="text-xs text-gray-500">{user?.email || 'user@email.com'}</div>
                     </div>
                   </div>
                   <Link href="/profile" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Profile</Link>
@@ -182,7 +203,7 @@ export default function AccountPage() {
                   <Link href="/privacy" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Privacy Settings</Link>
                   <Link href="/help" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
                   <button
-                    onClick={() => signOut()}
+                    onClick={() => handleSignOut()}
                     className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50 font-semibold"
                   >
                     Logout
@@ -236,7 +257,7 @@ export default function AccountPage() {
                     )}
                     <div>
                       <div className="font-semibold text-gray-900">{userName}</div>
-                      <div className="text-xs text-gray-500">{session?.user?.email || 'user@email.com'}</div>
+                      <div className="text-xs text-gray-500">{user?.email || 'user@email.com'}</div>
                     </div>
                   </div>
                   <Link href="/profile" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Profile</Link>
@@ -247,7 +268,7 @@ export default function AccountPage() {
                   <Link href="/privacy" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Privacy Settings</Link>
                   <Link href="/help" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
                   <button
-                    onClick={() => signOut()}
+                    onClick={() => handleSignOut()}
                     className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50 font-semibold"
                   >
                     Logout
@@ -260,8 +281,8 @@ export default function AccountPage() {
       </nav>
 
       {/* Main Content */}
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        <div className="bg-white rounded-lg shadow-sm p-8">
+      <div className="max-w-3xl mx-auto px-4 py-6">
+        <div className="bg-white rounded-lg shadow-sm p-6">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-gray-900">Account Settings</h2>
             
@@ -333,7 +354,7 @@ export default function AccountPage() {
                   <h4 className="font-medium text-gray-900">Password</h4>
                   <p className="text-sm text-gray-600">Change your account password</p>
                 </div>
-                <button className="btn-mobile-primary w-full">
+                <button className="bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors font-medium">
                   Change Password
                 </button>
               </div>
@@ -344,7 +365,7 @@ export default function AccountPage() {
                 </div>
                 <button
                   onClick={() => setTwoFactorEnabled(!twoFactorEnabled)}
-                  className={`btn-mobile-secondary w-full ${twoFactorEnabled ? 'bg-helfi-green text-white' : 'bg-gray-200 text-gray-500'}`}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${twoFactorEnabled ? 'bg-helfi-green text-white hover:bg-helfi-green/90' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
                 >
                   {twoFactorEnabled ? 'Disable 2FA' : 'Enable 2FA'}
                 </button>
@@ -361,7 +382,7 @@ export default function AccountPage() {
                   <h4 className="font-medium text-gray-900">Export Data</h4>
                   <p className="text-sm text-gray-600">Download a copy of your health data</p>
                 </div>
-                <button className="bg-blue-100 text-blue-700 px-4 py-3 rounded-lg hover:bg-blue-200 transition-colors w-full font-medium">
+                <button className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg hover:bg-blue-200 transition-colors font-medium">
                   Export Data
                 </button>
               </div>
@@ -370,7 +391,7 @@ export default function AccountPage() {
                   <h4 className="font-medium text-red-900">Delete Account</h4>
                   <p className="text-sm text-red-600">Permanently delete your account and all data</p>
                 </div>
-                <button className="btn-mobile-danger w-full">
+                <button className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors font-medium">
                   Delete Account
                 </button>
               </div>

@@ -1,19 +1,29 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { useSession } from 'next-auth/react'
-import { signOut } from 'next-auth/react'
+import { createClient } from '@supabase/supabase-js'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
 
 const ADMIN_PASSWORD = "HelfiAdmin2024"
 
 export default function AdminPanel() {
-  const { data: session } = useSession()
+  const [user, setUser] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [announcement, setAnnouncement] = useState('')
+  const [users, setUsers] = useState([])
+  const [analyticsLoading, setAnalyticsLoading] = useState(false)
+  const [eventLoading, setEventLoading] = useState(false)
+  const [error, setError] = useState('')
+  const router = useRouter()
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
   const [waitlistData, setWaitlistData] = useState([])
-  const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [testEmail, setTestEmail] = useState('')
   const [testEmailLoading, setTestEmailLoading] = useState(false)
@@ -21,13 +31,18 @@ export default function AdminPanel() {
   const [showMailingList, setShowMailingList] = useState(false)
 
   useEffect(() => {
-    // Check if already authenticated in this session
-    const adminAuth = sessionStorage.getItem('adminAuthenticated')
-    if (adminAuth === 'true') {
-      setIsAuthenticated(true)
-      loadWaitlistData()
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      setUser(user)
+      setLoading(false)
     }
+    getUser()
   }, [])
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+    router.push('/')
+  }
 
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -56,12 +71,6 @@ export default function AdminPanel() {
     setLoading(false)
   }
 
-  const handleLogout = () => {
-    sessionStorage.removeItem('adminAuthenticated')
-    setIsAuthenticated(false)
-    setPassword('')
-  }
-
   const handleTestEmail = async () => {
     if (!testEmail) return
     
@@ -84,6 +93,17 @@ export default function AdminPanel() {
     } finally {
       setTestEmailLoading(false)
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-helfi-green mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    )
   }
 
   if (!isAuthenticated) {
@@ -169,11 +189,11 @@ export default function AdminPanel() {
               <span className="text-sm text-gray-500">Backend Control Center</span>
             </div>
             <div className="flex items-center space-x-4">
-              {session?.user && (
-                <span className="text-sm text-gray-600">{session.user.email}</span>
+              {user && (
+                <span className="text-sm text-gray-600">{user.user_metadata.email}</span>
               )}
               <button
-                onClick={handleLogout}
+                onClick={handleSignOut}
                 className="btn-secondary text-sm"
               >
                 Logout

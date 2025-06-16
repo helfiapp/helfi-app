@@ -1,33 +1,54 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { useSession, signOut } from 'next-auth/react'
+import { createClient } from '@supabase/supabase-js'
+import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
 import BottomNav from '../../../components/BottomNav'
 
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+)
+
 export default function ProfileImagePage() {
-  const { data: session } = useSession()
+  const [user, setUser] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
   const [dropdownOpen, setDropdownOpen] = useState(false)
-  const [selectedImage, setSelectedImage] = useState<string | null>(null)
-  const [uploading, setUploading] = useState(false)
-  const [uploadError, setUploadError] = useState<string | null>(null)
-  const [uploadSuccess, setUploadSuccess] = useState(false)
-  const [showCropper, setShowCropper] = useState(false)
-  const [currentProfileImage, setCurrentProfileImage] = useState<string | null>(null)
+  const [selectedImage, setSelectedImage] = useState<File | null>(null)
+  const [uploadLoading, setUploadLoading] = useState(false)
+  const [currentImage, setCurrentImage] = useState<string | null>(null)
+  const [isUploading, setIsUploading] = useState(false)
+  const [isDragOver, setIsDragOver] = useState(false)
+  const [fileName, setFileName] = useState<string | null>(null)
+  const router = useRouter()
 
-  // Profile data with proper localStorage integration
-  const userName = session?.user?.name || 'User';
-
-  // Load profile image from localStorage and session
   useEffect(() => {
-    const savedImage = localStorage.getItem('userProfileImage');
-    if (savedImage) {
-      setCurrentProfileImage(savedImage);
-    } else if (session?.user?.image) {
-      setCurrentProfileImage(session.user.image);
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      setUser(user)
+      setLoading(false)
     }
-  }, [session]);
+    getUser()
+  }, [])
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+    router.push('/')
+  }
+
+  const userName = user?.user_metadata?.name || user?.email || 'User'
+
+  // Load current profile image
+  useEffect(() => {
+    const savedImage = localStorage.getItem('userProfileImage')
+    if (savedImage) {
+      setCurrentImage(savedImage)
+    } else if (user?.user_metadata?.avatar_url) {
+      setCurrentImage(user.user_metadata.avatar_url)
+    }
+  }, [user])
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -47,44 +68,15 @@ export default function ProfileImagePage() {
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
-    setUploadError(null)
-    setUploadSuccess(false)
-    
     if (file) {
-      // Validate file size (10MB limit)
-      if (file.size > 10 * 1024 * 1024) {
-        setUploadError('File size must be less than 10MB. Please choose a smaller image.')
-        return
-      }
-      
-      // Validate file type with detailed error message
-      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
-      if (!allowedTypes.includes(file.type.toLowerCase())) {
-        setUploadError(`Unsupported file format: ${file.type}. Please use JPG, PNG, GIF, or WebP images.`)
-        return
-      }
-      
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        const imageData = e.target?.result as string
-        setSelectedImage(imageData)
-        setCurrentProfileImage(imageData)
-        setShowCropper(true)
-        // Auto-save after a short delay
-        setTimeout(() => {
-          handleAutoSave(imageData)
-        }, 1000)
-      }
-      reader.onerror = () => {
-        setUploadError('Failed to read the image file. Please try again.')
-      }
-      reader.readAsDataURL(file)
+      setSelectedImage(file)
+      setCurrentImage(URL.createObjectURL(file))
+      setFileName(file.name)
     }
   }
 
   const handleAutoSave = async (imageData: string) => {
-    setUploading(true)
-    setUploadError(null)
+    setIsUploading(true)
     
     try {
       // Simulate upload delay
@@ -93,35 +85,29 @@ export default function ProfileImagePage() {
       // Store the image in localStorage (in production, you'd get a URL from your backend)
       localStorage.setItem('userProfileImage', imageData)
       
-      setUploadSuccess(true)
-      
-      // Auto-hide success message after 3 seconds
-      setTimeout(() => {
-        setUploadSuccess(false)
-      }, 3000)
+      setCurrentImage(imageData)
       
     } catch (error) {
       console.error('Error uploading image:', error)
-      setUploadError('Failed to save image. Please try again.')
     } finally {
-      setUploading(false)
+      setIsUploading(false)
     }
   }
 
   const handleSave = async () => {
     if (!selectedImage) return
     
-    setUploading(true)
+    setIsUploading(true)
     try {
       // In a real app, you'd upload to your backend/cloud storage here
       // For now, we'll simulate the upload and store in localStorage
       await new Promise(resolve => setTimeout(resolve, 2000))
       
       // Store the image in localStorage (in production, you'd get a URL from your backend)
-      localStorage.setItem('userProfileImage', selectedImage)
+      localStorage.setItem('userProfileImage', URL.createObjectURL(selectedImage))
       
       // Update the session data (this is a simulation - in production you'd update via API)
-      if (session?.user) {
+      if (user) {
         // Force a page refresh to update the session display
         window.location.reload()
       }
@@ -131,12 +117,12 @@ export default function ProfileImagePage() {
       console.error('Error uploading image:', error)
       alert('Failed to upload image. Please try again.')
     } finally {
-      setUploading(false)
+      setIsUploading(false)
     }
   }
 
   // Profile image with fallback logic
-  const displayImage = selectedImage || currentProfileImage;
+  const displayImage = currentImage || user?.user_metadata?.avatar_url;
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20 md:pb-0">
@@ -212,7 +198,7 @@ export default function ProfileImagePage() {
                     )}
                     <div className="flex-1 min-w-0">
                       <div className="font-semibold text-gray-900 truncate">{userName}</div>
-                      <div className="text-xs text-gray-500 truncate">{session?.user?.email || 'user@email.com'}</div>
+                      <div className="text-xs text-gray-500 truncate">{user?.email || 'user@email.com'}</div>
                     </div>
                   </div>
                   <Link href="/profile" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">View Profile</Link>
@@ -220,7 +206,7 @@ export default function ProfileImagePage() {
                   <Link href="/privacy" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Privacy Settings</Link>
                   <Link href="/help" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
                   <button
-                    onClick={() => signOut()}
+                    onClick={handleSignOut}
                     className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50 font-semibold"
                   >
                     Logout
@@ -274,7 +260,7 @@ export default function ProfileImagePage() {
                     )}
                     <div className="flex-1 min-w-0">
                       <div className="font-semibold text-gray-900 truncate">{userName}</div>
-                      <div className="text-sm text-gray-500 truncate">{session?.user?.email}</div>
+                      <div className="text-sm text-gray-500 truncate">{user?.email}</div>
                     </div>
                   </div>
                   <Link href="/profile" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">View Profile</Link>
@@ -282,7 +268,7 @@ export default function ProfileImagePage() {
                   <Link href="/privacy" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Privacy Settings</Link>
                   <Link href="/help" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
                   <button
-                    onClick={() => signOut()}
+                    onClick={handleSignOut}
                     className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50 font-semibold"
                   >
                     Logout
@@ -317,7 +303,7 @@ export default function ProfileImagePage() {
           </div>
 
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">{userName}</h1>
-          <p className="text-gray-600 mb-8">{session?.user?.email}</p>
+          <p className="text-gray-600 mb-8">{user?.email}</p>
 
           {/* Upload Section */}
           <div className="bg-white rounded-lg shadow-sm p-8 mb-8">
@@ -331,46 +317,24 @@ export default function ProfileImagePage() {
                 onChange={handleImageUpload}
                 className="hidden"
                 id="image-upload"
-                disabled={uploading}
+                disabled={isUploading}
               />
               <label 
                 htmlFor="image-upload"
-                className={`cursor-pointer flex flex-col items-center ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                className={`cursor-pointer flex flex-col items-center ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 <svg className="w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
                 <p className="text-lg font-medium text-gray-700 mb-2">
-                  {uploading ? 'Uploading...' : 'Click to upload or drag and drop'}
+                  {isUploading ? 'Uploading...' : 'Click to upload or drag and drop'}
                 </p>
                 <p className="text-sm text-gray-500">PNG, JPG, GIF up to 10MB</p>
               </label>
             </div>
 
             {/* Status Messages */}
-            {uploadError && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
-                <div className="flex">
-                  <svg className="w-5 h-5 text-red-400 mr-2 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                  </svg>
-                  <p className="text-red-700 text-sm">{uploadError}</p>
-                </div>
-              </div>
-            )}
-
-            {uploadSuccess && (
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-                <div className="flex">
-                  <svg className="w-5 h-5 text-green-400 mr-2 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                  <p className="text-green-700 text-sm">Profile image updated successfully!</p>
-                </div>
-              </div>
-            )}
-
-            {uploading && (
+            {isUploading && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
                 <div className="flex items-center">
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mr-2"></div>
@@ -390,10 +354,10 @@ export default function ProfileImagePage() {
               {selectedImage && (
                 <button
                   onClick={handleSave}
-                  disabled={uploading}
+                  disabled={isUploading}
                   className="flex-1 bg-helfi-green text-white px-6 py-3 rounded-lg hover:bg-helfi-green/90 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {uploading ? 'Saving...' : 'Save Profile Image'}
+                  {isUploading ? 'Saving...' : 'Save Profile Image'}
                 </button>
               )}
             </div>
