@@ -1,87 +1,54 @@
-# 🚨 EMERGENCY: CRITICAL SYSTEM FAILURE - IMMEDIATE RECOVERY REQUIRED
+🚨 EMERGENCY: CRITICAL SYSTEM FAILURE - IMMEDIATE RECOVERY REQUIRED
 
-## URGENT SITUATION
-The Helfi.ai application is currently in a **BROKEN STATE** and requires immediate emergency recovery before any feature development can proceed.
+I need urgent help with my Helfi.ai application. The app is currently in a BROKEN STATE after the previous agent attempted major changes and got stuck in repetitive failure loops.
 
-**CRITICAL:** Please read PROJECT_CONTEXT.md COMPLETELY before doing anything. It contains detailed records of the current emergency situation and multiple previous failed attempts.
+🔥 CRITICAL RULES - YOU MUST FOLLOW THESE:
+- NEVER change anything unless explicitly told to do so
+- ALWAYS examine the site first and report findings before making ANY changes  
+- Read PROJECT_CONTEXT.md COMPLETELY before doing anything - especially the "RECENT AGENT FAILURE RECORD" section
+- DO NOT repeat any of the failed attempts documented in PROJECT_CONTEXT.md
+- Test thoroughly before deploying - don't break working features
+- I'm new to coding - explain things clearly and be extremely cautious
 
-## 🔥 IMMEDIATE CRISIS STATUS
-- ❌ **App fails to compile** due to syntax errors
-- ❌ **Database connection errors** attempting to reach old Supabase instance  
-- ❌ **Build failures** preventing testing and deployment
-- ❌ **Mixed authentication state** causing instability
-- ❌ **Development environment broken** - cannot run locally
+📚 MANDATORY READING:
+You MUST read PROJECT_CONTEXT.md file completely before taking any action. This file contains:
+- Detailed record of what the previous agent tried and FAILED at
+- Specific error patterns that persist despite multiple fix attempts  
+- Critical lessons about what NOT to repeat
+- Current system state and known issues
 
-## 🚨 WHAT HAPPENED
-The previous agent attempted to completely eliminate Supabase and switch to Google Auth + PostgreSQL, but:
-1. **Created syntax errors** in `app/onboarding/page.tsx` (line 2302: malformed `} else {` statement)
-2. **Left broken database connections** still trying to reach old Supabase URLs
-3. **Partially implemented NextAuth** creating authentication conflicts
-4. **Mixed environment configurations** causing chaos
-5. **User stopped the agent** saying "ok stop you are losing it" and "I think it's time for another agent"
+IMMEDIATE CRISIS:
+❌ Persistent syntax error in app/onboarding/page.tsx (line 2302) despite code appearing correct
+❌ Development environment unstable - repeated build failures
+❌ Cross-device data sync broken - users see different data on different devices  
+❌ Previous agent got stuck in loops trying same failed solutions 10+ times
+❌ User data missing for info@sonicweb.com.au across all devices
 
-## ⚡ IMMEDIATE ACTION REQUIRED
+WHAT HAPPENED:
+The previous agent attempted to implement cross-device data synchronization but:
+1. Created persistent syntax errors that survived cache clears and rebuilds
+2. Got stuck repeating the same failed solutions over and over
+3. Made 10+ build attempts without fixing the root cause
+4. Tried cache clearing 5+ times with no success
+5. I had to stop them saying "you keep going around in circles!!!!"
 
-### STEP 1: EMERGENCY ASSESSMENT
-Check if the live site at **helfi.ai** is still working or if it's broken:
-- If working: The emergency is in the development environment only
-- If broken: Immediate production recovery needed
+CURRENT STATUS:
+✅ Production site helfi.ai is working (user can log in)
+✅ Basic onboarding flow displays correctly
+❌ Development environment has syntax errors
+❌ No cross-device data synchronization 
+❌ Previous agent's attempted fixes all failed
 
-### STEP 2: CHOOSE RECOVERY STRATEGY
+CRITICAL SUCCESS CRITERIA:
+1. DO NOT repeat any failed attempts listed in PROJECT_CONTEXT.md
+2. Identify WHY syntax error persists despite code appearing correct
+3. Stabilize development environment BEFORE attempting new features
+4. Only implement cross-device sync after development is stable
+5. Explain your approach before making changes
 
-**OPTION A: EMERGENCY REVERT (RECOMMENDED)**
-```bash
-git reset --hard ab25b39
-git push --force  
-vercel --prod --yes
-```
-This restores the last known stable version with working localStorage functionality.
+ORIGINAL GOAL (after stability restored):
+Implement cross-device data synchronization so account info@sonicweb.com.au shows same health data on Chrome and Safari.
 
-**OPTION B: SURGICAL REPAIR (RISKIER)**
-1. Fix syntax error at line 2302 in `app/onboarding/page.tsx`
-2. Remove broken Supabase connection attempts
-3. Stabilize authentication configuration
-4. Clean up environment variables
+⚠️ IMPORTANT: I've been through multiple agent failures. The previous agent tried the same solutions repeatedly despite them failing. Please read the failure record in PROJECT_CONTEXT.md and propose a DIFFERENT approach that hasn't been tried yet.
 
-### STEP 3: VERIFY RECOVERY
-- Confirm helfi.ai loads properly
-- Test authentication flow
-- Verify localStorage data saving/loading works
-- Check that terminal shows no compilation errors
-
-## 🎯 ONLY AFTER EMERGENCY RECOVERY
-Once the app is stable and working again:
-- **Original Goal:** Implement cross-device data synchronization for account info@sonicweb.com.au
-- **Approach:** Incremental implementation maintaining localStorage as backup
-- **Test Case:** Same account should show identical data on Chrome vs Safari
-
-## 🚨 CRITICAL SAFETY RULES
-1. **NEVER break working functionality** - user has been frustrated by multiple agents doing this
-2. **Emergency recovery FIRST** - no feature work until app is stable
-3. **Test thoroughly** at each step
-4. **Maintain localStorage** as reliable fallback
-5. **Deploy to helfi.ai only** (never subdomains)
-
-## 📞 CURRENT BROKEN STATE DETAILS
-**Terminal Errors:**
-- `Error: Expression expected` at line 2302 in onboarding page
-- `getaddrinfo ENOTFOUND aws-0-ap-southeast-2.pooler.supabase.co`
-- Build failures preventing local development
-
-**Modified Files That May Need Recovery:**
-- `app/onboarding/page.tsx` - Contains syntax errors
-- `lib/auth.ts` - New NextAuth config (partial)
-- `app/api/auth/[...nextauth]/route.ts` - Restructured auth
-- Environment files - Mixed configurations
-
-## 💡 USER CONTEXT
-- **Experience Level:** New to coding, needs clear explanations
-- **Frustration Level:** Very high after multiple agent failures
-- **Primary Need:** Working cross-device sync for health data
-- **Risk Tolerance:** Extremely low - values stability over new features
-
----
-
-**SUCCESS CRITERIA:** App working reliably again, user can safely test cross-device sync implementation
-
-**FAILURE IS NOT AN OPTION:** User has dealt with multiple broken attempts - this recovery must work. 
+SUCCESS CRITERIA: Stable development environment, then safely implement cross-device sync without breaking existing functionality. 

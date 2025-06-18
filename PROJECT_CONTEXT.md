@@ -182,4 +182,114 @@ If the site breaks:
 **Last Known Good Commit:** `d664341` - "Fix healthapp admin password to HealthBeta2024"
 
 ---
-*This document should be referenced at the start of any AI agent session working on Helfi.ai* 
+*This document should be referenced at the start of any AI agent session working on Helfi.ai*
+
+## 🚨 RECENT AGENT FAILURE RECORD (DECEMBER 2024)
+
+### ⚠️ CRITICAL: FAILED ATTEMPTS BY PREVIOUS AGENT
+**Read this section carefully to avoid repeating failed approaches**
+
+#### FAILED ATTEMPT #1: Cross-Device Data Sync Implementation
+**What was attempted:**
+- Created `/app/api/user-data/route.ts` for database sync
+- Modified onboarding page to save to both localStorage AND database
+- Added database loading logic with localStorage fallback
+- Multiple cache clearing and rebuilding attempts
+
+**Why it failed:**
+- Persistent syntax error at line 2302 in `app/onboarding/page.tsx`
+- Error: "Expression expected" with malformed `} else {` statement
+- Despite code appearing correct in file, error persisted through multiple builds
+- Supabase connection errors (`supabaseUrl is required`, `supabaseKey is required`)
+- Bootstrap script errors causing development instability
+
+**Specific errors encountered:**
+```
+× Expression expected
+2302 │       } else {
+     ·         ────
+```
+```
+⨯ Error: supabaseUrl is required.
+⨯ Error: supabaseKey is required.
+⨯ Error: Invariant: missing bootstrap script. This is a bug in Next.js
+```
+
+**What was tried to fix it:**
+1. ✅ Emergency revert to commit `ab25b39` (successful)
+2. ❌ Multiple cache clears: `rm -rf .next && npm run build` (failed - error persisted)
+3. ❌ Multiple npm installs and dependency updates (failed)
+4. ❌ Killing development servers and restarting (failed)
+5. ❌ Reading/checking code at line 2302 multiple times (code appeared correct)
+6. ❌ Building with clean cache repeatedly (syntax error persisted)
+7. ❌ Installing missing packages like `pg` and `@types/pg` (didn't solve syntax issue)
+
+**Current state after failures:**
+- ✅ Production app at helfi.ai is working (restored)
+- ✅ Basic authentication flow works
+- ✅ Onboarding displays correctly
+- ❌ Cross-device sync still not implemented
+- ❌ Development environment unstable (syntax errors)
+- ❌ Data shows as blank for `info@sonicweb.com.au` across devices
+
+#### FAILED ATTEMPT #2: Domain Configuration Issues
+**What was attempted:**
+- Multiple Vercel domain alias commands
+- Trying to map helfi.ai to latest deployments
+- Confusion between HELF AI (different company) and user's Helfi.ai
+
+**Why it failed:**
+- User confirmed they own helfi.ai domain
+- Domain mapping attempts were correct but didn't solve underlying app issues
+- The real problem was the syntax errors preventing proper app function
+
+#### FAILED ATTEMPT #3: Repeated Build/Deploy Cycles
+**What was attempted:**
+- Over 10 build attempts with `npm run build`
+- Multiple git commits and pushes
+- Several Vercel deployments with `vercel --prod --yes`
+- Constant cache clearing and environment reloading
+
+**Why it failed:**
+- Got stuck in endless loop of same syntax error
+- Each build showed successful compilation but development server still had errors
+- Deployed broken code to production multiple times
+- User became frustrated with repetitive failed attempts
+
+### 🔥 CRITICAL LESSONS FOR NEXT AGENT
+
+#### DO NOT ATTEMPT:
+1. **DON'T** try to fix the syntax error at line 2302 by modifying the onboarding page
+2. **DON'T** attempt cache clearing commands (`rm -rf .next`) - this was tried extensively
+3. **DON'T** try to implement cross-device sync until development environment is stable
+4. **DON'T** make multiple build/deploy attempts without solving root cause
+5. **DON'T** modify the `/app/api/user-data/route.ts` file - it was already created and causes errors
+
+#### APPROACH NEEDED:
+1. **FIRST**: Identify why syntax error persists despite code appearing correct
+2. **CONSIDER**: The file may be corrupted or have invisible characters
+3. **INVESTIGATE**: Whether the issue is in a different file that's causing the error to be reported incorrectly
+4. **ALTERNATIVE**: Complete file rewrite of onboarding page may be needed
+5. **VERIFY**: Development environment stability before attempting any new features
+
+#### ENVIRONMENT STATE:
+- **Node.js version**: Compatible (app builds in production)
+- **Next.js version**: 14.1.0
+- **Package.json**: Dependencies are correct
+- **Build process**: Works in production, fails in development
+- **Error pattern**: Consistent syntax error at same line number
+
+### 🎯 RECOMMENDED NEXT STEPS (Only if explicitly requested)
+1. **FIRST**: Examine the exact bytes/characters at line 2302 in onboarding page
+2. **SECOND**: Check if error is actually originating from different file
+3. **THIRD**: Consider creating fresh onboarding page from scratch
+4. **FOURTH**: Only after dev environment stable, attempt cross-device sync
+
+### ⛔ WHAT NOT TO REPEAT
+- Cache clearing loops (tried 5+ times)
+- Build/deploy cycles without fixing root cause (tried 10+ times)  
+- Modifying same code areas repeatedly (tried 3+ times)
+- Environment variable changes (Supabase config is correct)
+- Package installation attempts (dependencies are correct)
+
+--- 
