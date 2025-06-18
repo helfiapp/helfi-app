@@ -1,10 +1,11 @@
 import './globals.css'
 import { Inter } from 'next/font/google'
 import { AuthProvider } from '@/components/providers/AuthProvider'
+import type { Metadata } from 'next'
 
 const inter = Inter({ subsets: ['latin'] })
 
-export const metadata = {
+export const metadata: Metadata = {
   title: 'Helfi - AI-Powered Personal Health Intelligence Platform | Supplement Tracking & Voice AI',
   description: 'Transform your health with Helfi\'s AI-powered platform. Track supplements, medications, and nutrition with voice commands. Get personalized health insights, detect dangerous interactions, and optimize your wellness journey. Free trial available.',
   keywords: [
@@ -75,6 +76,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        <meta name="cache-control" content="no-cache, no-store, must-revalidate" />
+        <meta name="pragma" content="no-cache" />
+        <meta name="expires" content="0" />
+        <meta name="build-time" content={Date.now().toString()} />
+      </head>
       <body className={inter.className}>
         <AuthProvider>
           {children}
