@@ -1,28 +1,24 @@
 import { type NextAuthOptions } from 'next-auth'
-import GoogleProvider from 'next-auth/providers/google'
 import EmailProvider from 'next-auth/providers/email'
 
 export const authOptions: NextAuthOptions = {
   providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    }),
     EmailProvider({
       server: {
-        host: process.env.EMAIL_SERVER_HOST,
-        port: process.env.EMAIL_SERVER_PORT,
+        host: process.env.EMAIL_SERVER_HOST || 'smtp.gmail.com',
+        port: process.env.EMAIL_SERVER_PORT || 587,
         auth: {
-          user: process.env.EMAIL_SERVER_USER,
-          pass: process.env.EMAIL_SERVER_PASSWORD,
+          user: process.env.EMAIL_SERVER_USER || 'noreply@helfi.ai',
+          pass: process.env.EMAIL_SERVER_PASSWORD || 'temp_password',
         },
       },
-      from: process.env.EMAIL_FROM,
+      from: process.env.EMAIL_FROM || 'noreply@helfi.ai',
     }),
   ],
   callbacks: {
     async signIn({ user, account, profile }) {
       console.log('SignIn callback:', { user: user?.email, account: account?.provider })
+      // For now, allow all email signins
       return true
     },
     async redirect({ url, baseUrl }) {
@@ -33,9 +29,9 @@ export const authOptions: NextAuthOptions = {
   },
   pages: {
     signIn: '/auth/signin',
-    error: '/auth/signin', // Redirect errors back to signin
-    verifyRequest: '/auth/verify-request', // Email verification page
+    error: '/auth/signin',
+    verifyRequest: '/auth/verify-request',
   },
   debug: true,
-  secret: process.env.NEXTAUTH_SECRET
+  secret: process.env.NEXTAUTH_SECRET || 'helfi-secret-key-production-2024'
 } 
