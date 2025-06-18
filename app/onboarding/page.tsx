@@ -2135,10 +2135,36 @@ function ReviewStep({ onBack, data }: { onBack: () => void, data: any }) {
     }
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     try {
       console.log('Saving onboarding data:', safeData);
+      
+      // PHASE 1: Save to localStorage (existing functionality)
       localStorage.setItem('onboardingData', JSON.stringify(safeData));
+      console.log('✅ Data saved to localStorage');
+      
+      // PHASE 2: Save to database for cross-device sync
+      try {
+        console.log('🔄 Saving to database for cross-device sync...');
+        const response = await fetch('/api/user-data', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(safeData)
+        });
+
+        if (response.ok) {
+          console.log('✅ Data saved to database successfully');
+        } else {
+          console.warn('⚠️ Database save failed, but localStorage save succeeded');
+        }
+      } catch (dbError) {
+        console.warn('⚠️ Database save failed, but localStorage save succeeded:', dbError);
+        // Don't block the user - localStorage save succeeded
+      }
+      
+      // Navigate to dashboard
       window.location.href = '/dashboard';
     } catch (error) {
       console.error('Error saving data:', error);
@@ -2245,40 +2271,67 @@ export default function Onboarding() {
     });
   };
 
-  // Load existing data if editing
+  // Load existing data - check database first, then localStorage fallback
   useEffect(() => {
-    const existingData = localStorage.getItem('onboardingData');
-    const isEditing = localStorage.getItem('isEditing');
-    const savedStep = localStorage.getItem('onboardingCurrentStep');
-    
-    if (existingData) {
+    const loadData = async () => {
+      const isEditing = localStorage.getItem('isEditing');
+      const savedStep = localStorage.getItem('onboardingCurrentStep');
+      
+      // PHASE 1: Try loading from database for cross-device sync
       try {
-        const parsedData = JSON.parse(existingData);
-        console.log('Loading existing onboarding data:', parsedData);
-        setForm(parsedData);
+        console.log('🔄 Loading data from database...');
+        const response = await fetch('/api/user-data');
         
-        // Restore the current step if available
-        if (savedStep) {
-          const stepNumber = parseInt(savedStep, 10);
-          if (stepNumber >= 0 && stepNumber < stepNames.length) {
-            setStep(stepNumber);
-            console.log('Restored step:', stepNumber);
+        if (response.ok) {
+          const result = await response.json();
+          if (result.data) {
+            console.log('✅ Data loaded from database (cross-device sync):', result.data);
+            setForm(result.data);
+            
+            // Also save to localStorage for offline access
+            localStorage.setItem('onboardingData', JSON.stringify(result.data));
+            
+            if (isEditing === 'true') {
+              console.log('Edit mode detected - database data loaded');
+              localStorage.removeItem('isEditing');
+            }
+            return; // Successfully loaded from database
           }
         }
-        
-        // If we're editing and have data, show a message
-        if (isEditing === 'true') {
-          console.log('Edit mode detected - data loaded successfully');
-          console.log('Form state after loading:', parsedData);
-          // Clear the editing flag
-          localStorage.removeItem('isEditing');
-        }
       } catch (error) {
-        console.error('Error loading existing data:', error);
+        console.log('⚠️ Database load failed, falling back to localStorage:', error);
       }
-    } else {
-      console.log('No existing data found in localStorage');
-    }
+      
+      // PHASE 2: Fallback to localStorage (existing functionality)
+      const existingData = localStorage.getItem('onboardingData');
+      if (existingData) {
+        try {
+          const parsedData = JSON.parse(existingData);
+          console.log('📱 Loading existing data from localStorage:', parsedData);
+          setForm(parsedData);
+          
+          if (isEditing === 'true') {
+            console.log('Edit mode detected - localStorage data loaded');
+            localStorage.removeItem('isEditing');
+          }
+        } catch (error) {
+          console.error('Error loading localStorage data:', error);
+        }
+      } else {
+        console.log('ℹ️ No existing data found in localStorage or database');
+      }
+      
+      // Restore the current step if available
+      if (savedStep) {
+        const stepNumber = parseInt(savedStep, 10);
+        if (stepNumber >= 0 && stepNumber < stepNames.length) {
+          setStep(stepNumber);
+          console.log('Restored step:', stepNumber);
+        }
+      }
+    };
+    
+    loadData();
   }, []);
 
   // Debug form state changes
