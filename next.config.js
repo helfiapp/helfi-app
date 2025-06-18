@@ -4,14 +4,15 @@ const nextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: '**',
+        hostname: 'res.cloudinary.com',
       },
     ],
   },
+  // Force complete cache invalidation
   async headers() {
     return [
       {
-        source: '/onboarding',
+        source: '/(.*)',
         headers: [
           {
             key: 'Cache-Control',
@@ -25,14 +26,13 @@ const nextConfig = {
             key: 'Expires',
             value: '0',
           },
-        ],
-      },
-      {
-        source: '/(.*)',
-        headers: [
           {
-            key: 'Cache-Control',
-            value: 'no-cache, no-store, must-revalidate, max-age=0',
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
+          },
+          {
+            key: 'X-Cache-Bust',
+            value: `${Date.now()}`,
           },
         ],
       },
