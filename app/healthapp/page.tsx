@@ -118,12 +118,19 @@ function EmailSignup() {
     setMessage('')
 
     try {
-      // TODO: Implement email signup with Resend confirmation
-      // For now, simulate the process
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      setMessage('Confirmation email sent! Please check your inbox.')
+      const result = await signIn('email', { 
+        email, 
+        callbackUrl: '/onboarding',
+        redirect: false 
+      })
+      
+      if (result && !result.error) {
+        setMessage('Magic link sent! Please check your email to continue.')
+      } else {
+        setError('Failed to send email. Please try again.')
+      }
     } catch (err) {
-      setError('Failed to send confirmation email. Please try again.')
+      setError('Failed to send email. Please try again.')
     }
     
     setIsLoading(false)
@@ -163,7 +170,7 @@ function EmailSignup() {
         disabled={isLoading}
         className="w-full bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {isLoading ? 'Sending...' : 'Sign up with Email'}
+        {isLoading ? 'Sending...' : 'Sign in with Email'}
       </button>
     </form>
   )

@@ -1,12 +1,24 @@
 import NextAuth from 'next-auth'
 import GoogleProvider from 'next-auth/providers/google'
+import EmailProvider from 'next-auth/providers/email'
 
 const handler = NextAuth({
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    })
+    }),
+    EmailProvider({
+      server: {
+        host: process.env.EMAIL_SERVER_HOST,
+        port: process.env.EMAIL_SERVER_PORT,
+        auth: {
+          user: process.env.EMAIL_SERVER_USER,
+          pass: process.env.EMAIL_SERVER_PASSWORD,
+        },
+      },
+      from: process.env.EMAIL_FROM,
+    }),
   ],
   callbacks: {
     async signIn({ user, account, profile }) {
@@ -21,7 +33,8 @@ const handler = NextAuth({
   },
   pages: {
     signIn: '/auth/signin',
-    error: '/auth/signin' // Redirect errors back to signin
+    error: '/auth/signin', // Redirect errors back to signin
+    verifyRequest: '/auth/verify-request', // Email verification page
   },
   debug: true,
   secret: process.env.NEXTAUTH_SECRET
