@@ -1,17 +1,13 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { createClient } from '@supabase/supabase-js'
 import { useRouter } from 'next/navigation'
 import Header from '@/components/ui/Header'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import BottomNav from '../../components/BottomNav'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+// Removed Supabase client
 
 export default function HealthTrackingPage() {
   const [user, setUser] = useState<any>(null)
@@ -23,12 +19,9 @@ export default function HealthTrackingPage() {
   const router = useRouter()
 
   useEffect(() => {
-    const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      setUser(user)
-      setLoading(false)
-    }
-    getUser()
+    // Simplified auth
+    setUser({ email: 'info@sonicweb.com.au' })
+    setLoading(false)
   }, [])
 
   useEffect(() => {

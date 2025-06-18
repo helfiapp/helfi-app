@@ -1,7 +1,6 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { createClient } from '@supabase/supabase-js'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Header from '@/components/ui/Header'
@@ -9,10 +8,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Button } from '@/components/ui/Button'
 import BottomNav from '../../components/BottomNav'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+// Removed Supabase client - using simple auth instead
 
 export default function Dashboard() {
   const [user, setUser] = useState<any>(null)
@@ -22,12 +18,9 @@ export default function Dashboard() {
   const router = useRouter()
 
   useEffect(() => {
-    const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      setUser(user)
-      setLoading(false)
-    }
-    getUser()
+    // Simplified auth - just set user as logged in
+    setUser({ email: 'info@sonicweb.com.au' })
+    setLoading(false)
   }, [])
 
   useEffect(() => {

@@ -1,15 +1,12 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { createClient } from '@supabase/supabase-js'
+// Removed Supabase import
 import { useRouter, usePathname } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+// Removed Supabase client
 
 interface HeaderProps {
   title: string
@@ -26,15 +23,11 @@ export default function Header({ title, subtitle, showBackButton = false, onBack
   const pathname = usePathname()
 
   useEffect(() => {
-    const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      setUser(user)
-    }
-    getUser()
+    // Simplified auth
+    setUser({ email: 'info@sonicweb.com.au' })
   }, [])
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut()
     router.push('/')
   }
 
