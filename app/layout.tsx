@@ -31,7 +31,6 @@ export const metadata: Metadata = {
   category: 'Health & Wellness',
   classification: 'Health Technology',
   robots: 'index, follow',
-  googlebot: 'index, follow',
   icons: {
     icon: 'https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/FAVICON_ntiqz6.png',
     shortcut: 'https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/FAVICON_ntiqz6.png',
