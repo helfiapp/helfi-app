@@ -2137,6 +2137,7 @@ function ReviewStep({ onBack, data }: { onBack: () => void, data: any }) {
 
   const handleConfirm = async () => {
     try {
+      const safeData = data || {};
       console.log('Saving onboarding data:', safeData);
       
       // PHASE 1: Save to localStorage (existing functionality)
@@ -2169,6 +2170,32 @@ function ReviewStep({ onBack, data }: { onBack: () => void, data: any }) {
     } catch (error) {
       console.error('Error saving data:', error);
       alert('There was an issue saving your data. Please try again.');
+    }
+  };
+
+  const handleManualSync = async () => {
+    try {
+      const safeData = data || {};
+      console.log('🔄 Manual sync - Saving to database for cross-device sync...');
+      
+      const response = await fetch('/api/user-data', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(safeData)
+      });
+
+      if (response.ok) {
+        console.log('✅ Manual sync successful - Data saved to database');
+        alert('✅ Data synced successfully! Your data is now available on all devices.');
+      } else {
+        console.error('❌ Manual sync failed');
+        alert('❌ Sync failed. Please try again.');
+      }
+    } catch (error) {
+      console.error('❌ Manual sync error:', error);
+      alert('❌ Sync failed. Please try again.');
     }
   };
 
@@ -2231,6 +2258,9 @@ function ReviewStep({ onBack, data }: { onBack: () => void, data: any }) {
           onClick={handleConfirm}
         >
           Confirm &amp; Begin
+        </button>
+        <button className="w-full bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium" onClick={handleManualSync}>
+          🔄 Sync Data to All Devices
         </button>
         <button className="w-full border border-green-600 text-green-600 px-6 py-3 rounded-lg hover:bg-green-600 hover:text-white transition-colors font-medium" onClick={onBack}>
           Back
