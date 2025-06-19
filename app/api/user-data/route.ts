@@ -24,15 +24,40 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
+    // Get exercise data from either new fields or JSON fallback
+    let exerciseData = { exerciseFrequency: null, exerciseTypes: [] };
+    
+    // Try to get from new database fields first
+    if ((user as any).exerciseFrequency || (user as any).exerciseTypes) {
+      exerciseData = {
+        exerciseFrequency: (user as any).exerciseFrequency || null,
+        exerciseTypes: (user as any).exerciseTypes || []
+      };
+    } else {
+      // Fallback: check if exercise data is stored in existing user notes field or similar
+      try {
+        const storedExercise = user.healthGoals.find((goal: any) => goal.name === '__EXERCISE_DATA__');
+        if (storedExercise && storedExercise.category) {
+          const parsed = JSON.parse(storedExercise.category);
+          exerciseData = {
+            exerciseFrequency: parsed.exerciseFrequency || null,
+            exerciseTypes: parsed.exerciseTypes || []
+          };
+        }
+      } catch (e) {
+        console.log('No exercise data found in fallback storage');
+      }
+    }
+
     // Transform to onboarding format
     const onboardingData = {
       gender: user.gender?.toLowerCase(),
       weight: user.weight?.toString(),
       height: user.height?.toString(),
       bodyType: user.bodyType?.toLowerCase(),
-      exerciseFrequency: (user as any).exerciseFrequency || null,
-      exerciseTypes: (user as any).exerciseTypes || [],
-      goals: user.healthGoals.map((goal: any) => goal.name),
+      exerciseFrequency: exerciseData.exerciseFrequency,
+      exerciseTypes: exerciseData.exerciseTypes,
+      goals: user.healthGoals.filter((goal: any) => goal.name !== '__EXERCISE_DATA__').map((goal: any) => goal.name),
       supplements: user.supplements.map((supp: any) => ({
         name: supp.name,
         dosage: supp.dosage,
@@ -85,22 +110,49 @@ export async function POST(request: NextRequest) {
       bodyType: data.bodyType?.toUpperCase(),
     }
     
-    // Only add exercise fields if they exist in the database schema
+    // Handle exercise data - try new fields first, fallback to JSON storage
+    let exerciseStored = false;
     try {
       if (data.exerciseFrequency !== undefined) {
         updateData.exerciseFrequency = data.exerciseFrequency;
+        exerciseStored = true;
       }
       if (data.exerciseTypes !== undefined) {
         updateData.exerciseTypes = data.exerciseTypes || [];
+        exerciseStored = true;
       }
     } catch (error) {
-      console.log('Exercise fields not yet available in database schema');
+      console.log('Exercise fields not yet available in database schema, using fallback storage');
     }
 
     await prisma.user.update({
       where: { id: user.id },
       data: updateData
     })
+
+    // If exercise data couldn't be stored in new fields, store as JSON in healthGoals
+    if (!exerciseStored && (data.exerciseFrequency || data.exerciseTypes)) {
+      // Delete existing exercise data storage
+      await prisma.healthGoal.deleteMany({
+        where: { 
+          userId: user.id,
+          name: '__EXERCISE_DATA__'
+        }
+      })
+      
+      // Store exercise data as JSON in healthGoals table
+      await prisma.healthGoal.create({
+        data: {
+          userId: user.id,
+          name: '__EXERCISE_DATA__',
+          category: JSON.stringify({
+            exerciseFrequency: data.exerciseFrequency,
+            exerciseTypes: data.exerciseTypes || []
+          }),
+          currentRating: 0,
+        }
+      })
+    }
 
     // Update health goals
     if (data.goals && Array.isArray(data.goals)) {
