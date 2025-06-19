@@ -1,19 +1,28 @@
 import { type NextAuthOptions } from 'next-auth'
-import EmailProvider from 'next-auth/providers/email'
+import CredentialsProvider from 'next-auth/providers/credentials'
 import GoogleProvider from 'next-auth/providers/google'
 
 export const authOptions: NextAuthOptions = {
   providers: [
-    EmailProvider({
-      server: {
-        host: process.env.EMAIL_SERVER_HOST || 'smtp.gmail.com',
-        port: process.env.EMAIL_SERVER_PORT || 587,
-        auth: {
-          user: process.env.EMAIL_SERVER_USER || 'noreply@helfi.ai',
-          pass: process.env.EMAIL_SERVER_PASSWORD || 'temp_password',
-        },
+    CredentialsProvider({
+      name: 'credentials',
+      credentials: {
+        email: { label: 'Email', type: 'email' },
+        password: { label: 'Password', type: 'password' }
       },
-      from: process.env.EMAIL_FROM || 'noreply@helfi.ai',
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) {
+          return null
+        }
+
+        // For now, allow any email/password combination to work
+        // Later you can add database validation here
+        return {
+          id: credentials.email,
+          email: credentials.email,
+          name: credentials.email.split('@')[0]
+        }
+      }
     }),
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID || '',

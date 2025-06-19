@@ -8,7 +8,9 @@ import { useState } from 'react'
 export default function SignIn() {
   const [loading, setLoading] = useState(false)
   const [email, setEmail] = useState('')
-  const [emailSent, setEmailSent] = useState(false)
+  const [password, setPassword] = useState('')
+  const [isSignUp, setIsSignUp] = useState(false)
+  const [error, setError] = useState('')
 
   const handleGoogleAuth = async () => {
     setLoading(true)
@@ -17,64 +19,25 @@ export default function SignIn() {
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!email) return
+    if (!email || !password) return
     
     setLoading(true)
-    const result = await signIn('email', { 
+    setError('')
+    
+    const result = await signIn('credentials', { 
       email, 
+      password,
       callbackUrl: '/onboarding',
       redirect: false 
     })
     
-    if (result && !result.error) {
-      setEmailSent(true)
+    if (result?.error) {
+      setError('Invalid email or password')
+    } else {
+      // Redirect to onboarding on success
+      window.location.href = '/onboarding'
     }
     setLoading(false)
-  }
-
-  if (emailSent) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-white to-helfi-green-light/10 p-4">
-        <div className="max-w-md w-full space-y-8 text-center">
-          {/* Logo */}
-          <div className="flex justify-center">
-            <Link href="/" className="relative w-24 h-24">
-              <Image
-                src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/HELFI_TRANSPARENT_rmssry.png"
-                alt="Helfi Logo"
-                fill
-                className="object-contain"
-                priority
-              />
-            </Link>
-          </div>
-
-          <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-100">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-              </svg>
-            </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Check your email</h2>
-            <p className="text-gray-600 mb-6">
-              We've sent a magic link to <strong>{email}</strong>
-            </p>
-            <p className="text-sm text-gray-500 mb-4">
-              Click the link in the email to access your account. If you don't see it, check your spam folder.
-            </p>
-            <p className="text-xs text-gray-400">
-              New to Helfi? The magic link will automatically create your account.
-            </p>
-            <button 
-              onClick={() => setEmailSent(false)}
-              className="mt-4 text-helfi-green hover:underline text-sm"
-            >
-              Try a different email
-            </button>
-          </div>
-        </div>
-      </div>
-    )
   }
 
   return (
@@ -96,10 +59,10 @@ export default function SignIn() {
         {/* Sign In Form */}
         <div className="text-center">
           <h2 className="text-2xl font-bold text-helfi-black mb-4">
-            Welcome to Helfi
+            {isSignUp ? 'Create Account' : 'Welcome to Helfi'}
           </h2>
           <p className="text-gray-600 mb-8">
-            Sign in to your account or create a new one
+            {isSignUp ? 'Create a new account to get started' : 'Sign in to your account'}
           </p>
         </div>
 
@@ -140,7 +103,7 @@ export default function SignIn() {
             </div>
           </div>
 
-          {/* Email Sign In Form */}
+          {/* Email/Password Form */}
           <form onSubmit={handleEmailAuth} className="space-y-4">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
@@ -158,20 +121,49 @@ export default function SignIn() {
                 placeholder="Enter your email"
               />
             </div>
+            
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+                Password
+              </label>
+              <input
+                id="password"
+                name="password"
+                type="password"
+                autoComplete={isSignUp ? "new-password" : "current-password"}
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-3 py-3 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-helfi-green focus:border-helfi-green"
+                placeholder="Enter your password"
+              />
+            </div>
+
+            {error && (
+              <div className="text-red-600 text-sm">{error}</div>
+            )}
+
             <button
               type="submit"
-              disabled={loading || !email}
+              disabled={loading || !email || !password}
               className="w-full bg-helfi-green text-white px-4 py-3 rounded-lg hover:bg-helfi-green-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
             >
-              {loading ? 'Sending magic link...' : 'Continue with Email'}
+              {loading ? 'Please wait...' : isSignUp ? 'Create Account' : 'Sign In'}
             </button>
           </form>
+
+          {/* Sign Up / Sign In Toggle */}
+          <div className="text-center">
+            <button
+              onClick={() => setIsSignUp(!isSignUp)}
+              className="text-helfi-green hover:underline text-sm"
+            >
+              {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
+            </button>
+          </div>
         </div>
 
         <div className="mt-6 text-center text-sm text-gray-600">
-          <p className="mb-2">
-            New to Helfi? You'll automatically get an account when you sign in.
-          </p>
           <p>
             By continuing, you agree to our{' '}
             <Link href="/terms" className="text-helfi-green hover:underline">
