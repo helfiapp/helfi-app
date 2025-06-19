@@ -2039,9 +2039,9 @@ export default function Onboarding() {
   };
 
   return (
-    <div className="fixed inset-0 bg-gray-50 overflow-y-auto" id="onboarding-container">
+    <div className="fixed inset-0 bg-gray-50 overflow-y-auto overflow-x-hidden" id="onboarding-container">
       <OnboardingNav />
-      <div className="min-h-full flex flex-col">
+      <div className="min-h-full flex flex-col max-w-full">
         {/* Sophisticated Progress with Numbered Steps */}
         <div className="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 safe-area-inset-top">
           <div className="flex items-center justify-between mb-4">
@@ -2114,7 +2114,7 @@ export default function Onboarding() {
         </div>
 
         {/* Content */}
-        <div className="flex-1 px-4 py-6">
+        <div className="flex-1 px-4 py-6 pt-8">
           {step === 0 && <GenderStep onNext={handleNext} initial={form.gender} />}
           {step === 1 && <PhysicalStep onNext={handleNext} onBack={handleBack} initial={form} />}
           {step === 2 && <ExerciseStep onNext={handleNext} onBack={handleBack} initial={form} />}
