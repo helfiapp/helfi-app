@@ -30,8 +30,8 @@ export async function GET(request: NextRequest) {
       weight: user.weight?.toString(),
       height: user.height?.toString(),
       bodyType: user.bodyType?.toLowerCase(),
-      exerciseFrequency: user.exerciseFrequency,
-      exerciseTypes: user.exerciseTypes || [],
+      exerciseFrequency: (user as any).exerciseFrequency || null,
+      exerciseTypes: (user as any).exerciseTypes || [],
       goals: user.healthGoals.map((goal: any) => goal.name),
       supplements: user.supplements.map((supp: any) => ({
         name: supp.name,
@@ -78,16 +78,28 @@ export async function POST(request: NextRequest) {
     }
 
     // Update user basic data
+    const updateData: any = {
+      gender: data.gender?.toUpperCase(),
+      weight: data.weight ? parseFloat(data.weight) : null,
+      height: data.height ? parseFloat(data.height) : null,
+      bodyType: data.bodyType?.toUpperCase(),
+    }
+    
+    // Only add exercise fields if they exist in the database schema
+    try {
+      if (data.exerciseFrequency !== undefined) {
+        updateData.exerciseFrequency = data.exerciseFrequency;
+      }
+      if (data.exerciseTypes !== undefined) {
+        updateData.exerciseTypes = data.exerciseTypes || [];
+      }
+    } catch (error) {
+      console.log('Exercise fields not yet available in database schema');
+    }
+
     await prisma.user.update({
       where: { id: user.id },
-      data: {
-        gender: data.gender?.toUpperCase(),
-        weight: data.weight ? parseFloat(data.weight) : null,
-        height: data.height ? parseFloat(data.height) : null,
-        bodyType: data.bodyType?.toUpperCase(),
-        exerciseFrequency: data.exerciseFrequency,
-        exerciseTypes: data.exerciseTypes || [],
-      }
+      data: updateData
     })
 
     // Update health goals
