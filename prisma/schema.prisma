@@ -8,17 +8,19 @@ datasource db {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  emailVerified DateTime?
-  name          String?
-  image         String?
-  gender        Gender?
-  weight        Float?
-  height        Float?
-  bodyType      BodyType?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id                String    @id @default(cuid())
+  email             String    @unique
+  emailVerified     DateTime?
+  name              String?
+  image             String?
+  gender            Gender?
+  weight            Float?
+  height            Float?
+  bodyType          BodyType?
+  exerciseFrequency String?
+  exerciseTypes     String[]
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
   accounts      Account[]
   sessions      Session[]
   healthGoals   HealthGoal[]

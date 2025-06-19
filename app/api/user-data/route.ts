@@ -30,6 +30,8 @@ export async function GET(request: NextRequest) {
       weight: user.weight?.toString(),
       height: user.height?.toString(),
       bodyType: user.bodyType?.toLowerCase(),
+      exerciseFrequency: user.exerciseFrequency,
+      exerciseTypes: user.exerciseTypes || [],
       goals: user.healthGoals.map((goal: any) => goal.name),
       supplements: user.supplements.map((supp: any) => ({
         name: supp.name,
@@ -83,6 +85,8 @@ export async function POST(request: NextRequest) {
         weight: data.weight ? parseFloat(data.weight) : null,
         height: data.height ? parseFloat(data.height) : null,
         bodyType: data.bodyType?.toUpperCase(),
+        exerciseFrequency: data.exerciseFrequency,
+        exerciseTypes: data.exerciseTypes || [],
       }
     })
 
