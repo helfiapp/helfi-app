@@ -104,14 +104,14 @@ function PasswordProtection({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
-// Email Signup Component
-function EmailSignup() {
+// Email Auth Component (handles both login and signup)
+function EmailAuth() {
   const [email, setEmail] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
 
-  const handleEmailSignup = async (e: React.FormEvent) => {
+  const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
     setError('')
@@ -137,7 +137,7 @@ function EmailSignup() {
   }
 
   return (
-    <form onSubmit={handleEmailSignup} className="space-y-4">
+    <form onSubmit={handleEmailAuth} className="space-y-4">
       <div>
         <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
           Email Address
@@ -170,7 +170,7 @@ function EmailSignup() {
         disabled={isLoading}
         className="w-full bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {isLoading ? 'Sending...' : 'Sign in with Email'}
+        {isLoading ? 'Sending...' : 'Continue with Email'}
       </button>
     </form>
   )
@@ -178,7 +178,7 @@ function EmailSignup() {
 
 // Main HealthApp Component
 export default function HealthApp() {
-  const handleGoogleSignIn = () => {
+  const handleGoogleAuth = () => {
     signIn('google', { callbackUrl: '/onboarding' })
   }
 
@@ -194,17 +194,17 @@ export default function HealthApp() {
                 </svg>
               </div>
               <h1 className="text-2xl font-bold text-gray-900 mb-2">
-                Create Your Account
+                Welcome to Helfi Health
               </h1>
               <p className="text-gray-600">
-                Choose how you'd like to sign up for Helfi Health
+                Sign in to your account or create a new one to get started
               </p>
             </div>
 
             <div className="space-y-4">
-              {/* Google Sign In */}
+              {/* Google Auth */}
               <button
-                onClick={handleGoogleSignIn}
+                onClick={handleGoogleAuth}
                 className="w-full flex items-center justify-center px-6 py-3 border border-gray-300 rounded-lg font-semibold text-gray-700 bg-white hover:bg-gray-50 transition-colors"
               >
                 <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24">
@@ -226,11 +226,14 @@ export default function HealthApp() {
                 </div>
               </div>
 
-              {/* Email Signup */}
-              <EmailSignup />
+              {/* Email Auth */}
+              <EmailAuth />
             </div>
 
             <div className="mt-6 text-center">
+              <p className="text-xs text-gray-500 mb-2">
+                New to Helfi? You'll automatically get an account when you sign in.
+              </p>
               <p className="text-xs text-gray-500">
                 By continuing, you agree to our{' '}
                 <a href="/terms" className="text-green-600 hover:underline">Terms of Service</a>

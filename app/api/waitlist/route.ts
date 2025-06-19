@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { HealthDatabase } from '@/lib/database';
 
 // Add email validation function
 function isValidEmail(email: string): boolean {
@@ -17,13 +18,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid email address' }, { status: 400 });
     }
 
-    // Simple in-memory storage for now
-    console.log('Waitlist signup:', { name, email });
+    // Save to Vercel database
+    const result = await HealthDatabase.addToWaitlist(email, name);
     
-    return NextResponse.json({ 
-      success: true, 
-      message: 'Successfully added to waitlist! We\'ll be in touch soon.' 
-    });
+    if (result.success) {
+      console.log('✅ Waitlist signup successful:', { name, email });
+      return NextResponse.json({ 
+        success: true, 
+        message: 'Successfully added to waitlist! We\'ll be in touch soon.' 
+      });
+    } else {
+      console.error('❌ Database error:', result.error);
+      return NextResponse.json({ error: 'Failed to join waitlist' }, { status: 500 });
+    }
   } catch (error) {
     console.error('Waitlist error:', error);
     return NextResponse.json({ error: 'Failed to join waitlist' }, { status: 500 });
@@ -32,7 +39,14 @@ export async function POST(request: NextRequest) {
 
 export async function GET() {
   try {
-    return NextResponse.json({ waitlist: [] });
+    const result = await HealthDatabase.getWaitlist();
+    
+    if (result.success) {
+      return NextResponse.json({ waitlist: result.data });
+    } else {
+      console.error('❌ Failed to fetch waitlist:', result.error);
+      return NextResponse.json({ error: 'Failed to fetch waitlist' }, { status: 500 });
+    }
   } catch (error) {
     console.error('Waitlist GET error:', error);
     return NextResponse.json({ error: 'Failed to fetch waitlist' }, { status: 500 });
