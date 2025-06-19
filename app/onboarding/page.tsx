@@ -1934,10 +1934,32 @@ function ReviewStep({ onBack, data }: { onBack: () => void, data: any }) {
       </div>
       <div className="flex justify-between">
         <button className="btn-secondary" onClick={onBack}>Back</button>
-        <button className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors" onClick={() => {
-          // Save complete data to localStorage for now
-          localStorage.setItem('onboardingData', JSON.stringify(data));
-          window.location.href = '/dashboard';
+        <button className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors" onClick={async () => {
+          try {
+            // Save to database for cross-device sync
+            const response = await fetch('/api/user-data', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(data)
+            });
+            
+            if (response.ok) {
+              console.log('Data saved to database successfully');
+              // Also save to localStorage as backup
+              localStorage.setItem('onboardingData', JSON.stringify(data));
+              window.location.href = '/dashboard';
+            } else {
+              console.error('Failed to save to database');
+              // Fallback to localStorage only
+              localStorage.setItem('onboardingData', JSON.stringify(data));
+              window.location.href = '/dashboard';
+            }
+          } catch (error) {
+            console.error('Error saving data:', error);
+            // Fallback to localStorage only
+            localStorage.setItem('onboardingData', JSON.stringify(data));
+            window.location.href = '/dashboard';
+          }
         }}>Confirm &amp; Begin</button>
       </div>
     </div>
@@ -1949,30 +1971,40 @@ export default function Onboarding() {
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<any>({});
 
-  // Load existing data if editing
+  // Load existing data from database (cross-device sync)
   useEffect(() => {
-    const existingData = localStorage.getItem('onboardingData');
-    const isEditing = localStorage.getItem('isEditing');
-    
-    if (existingData) {
+    const loadUserData = async () => {
       try {
-        const parsedData = JSON.parse(existingData);
-        console.log('Loading existing onboarding data:', parsedData);
-        setForm(parsedData);
-        
-        // If we're editing and have data, show a message
-        if (isEditing === 'true') {
-          console.log('Edit mode detected - data loaded successfully');
-          console.log('Form state after loading:', parsedData);
-          // Clear the editing flag
-          localStorage.removeItem('isEditing');
+        const response = await fetch('/api/user-data');
+        if (response.ok) {
+          const result = await response.json();
+          if (result.data) {
+            console.log('Loading existing onboarding data from database:', result.data);
+            setForm(result.data);
+          }
+        } else if (response.status === 404) {
+          console.log('No existing data found for user');
+        } else {
+          console.log('Failed to load data, using localStorage fallback');
+          // Fallback to localStorage if API fails
+          const localData = localStorage.getItem('onboardingData');
+          if (localData) {
+            const parsedData = JSON.parse(localData);
+            setForm(parsedData);
+          }
         }
       } catch (error) {
-        console.error('Error loading existing data:', error);
+        console.error('Error loading user data:', error);
+        // Fallback to localStorage if API fails
+        const localData = localStorage.getItem('onboardingData');
+        if (localData) {
+          const parsedData = JSON.parse(localData);
+          setForm(parsedData);
+        }
       }
-    } else {
-      console.log('No existing data found in localStorage');
-    }
+    };
+
+    loadUserData();
   }, []);
 
   // Debug form state changes
@@ -2011,8 +2043,25 @@ export default function Onboarding() {
     return () => clearTimeout(timer);
   }, [step]);
 
-  const handleNext = (data: any) => {
-    setForm((prev: any) => ({ ...prev, ...data }));
+  const handleNext = async (data: any) => {
+    const updatedForm = { ...form, ...data };
+    setForm(updatedForm);
+    
+    // Save progress to database for cross-device sync
+    try {
+      await fetch('/api/user-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedForm)
+      });
+      console.log('Progress saved to database');
+    } catch (error) {
+      console.log('Failed to save progress to database:', error);
+    }
+    
+    // Also save to localStorage as backup
+    localStorage.setItem('onboardingData', JSON.stringify(updatedForm));
+    
     setStep((prev) => {
       const newStep = Math.min(stepNames.length - 1, prev + 1);
       // Force immediate scroll
