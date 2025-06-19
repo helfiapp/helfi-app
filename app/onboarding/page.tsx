@@ -2045,41 +2045,71 @@ export default function Onboarding() {
         {/* Sophisticated Progress with Numbered Steps */}
         <div className="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 safe-area-inset-top">
           <div className="flex items-center justify-between mb-4">
+            {/* Back Button */}
+            <button 
+              onClick={() => window.history.back()} 
+              className="flex items-center text-gray-600 hover:text-gray-900"
+              title="back button to Dashboard"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            
             <h1 className="text-lg font-semibold text-gray-900">
               Edit Health Info
             </h1>
-            <span className="text-sm text-gray-500">{step + 1}/10</span>
+            
+            {/* Refresh Button */}
+            <button 
+              onClick={() => window.location.reload()} 
+              className="text-gray-600 hover:text-gray-900"
+              title="Refresh"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
           </div>
           
-          {/* Numbered Steps Progress */}
-          <div className="flex items-center justify-between mb-2">
-            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((stepNum) => (
-              <div key={stepNum} className="flex flex-col items-center">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all ${
-                  stepNum <= step + 1 
-                    ? 'bg-green-600 text-white' 
-                    : 'bg-gray-200 text-gray-500'
-                }`}>
-                  {stepNum}
+          {/* Numbered Steps Progress with Connecting Lines */}
+          <div className="relative mb-3">
+            <div className="flex items-center justify-between">
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((stepNum, index) => (
+                <div key={stepNum} className="flex items-center">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all z-10 ${
+                    stepNum <= step + 1 
+                      ? 'bg-green-600 text-white' 
+                      : 'bg-gray-200 text-gray-500'
+                  }`}>
+                    {stepNum}
+                  </div>
+                  {index < 9 && (
+                    <div className={`h-0.5 flex-1 mx-1 transition-all ${
+                      stepNum < step + 1 ? 'bg-green-600' : 'bg-gray-200'
+                    }`} />
+                  )}
                 </div>
-                {stepNum < 10 && (
-                  <div className={`h-0.5 w-8 mt-1 transition-all ${
-                    stepNum < step + 1 ? 'bg-green-600' : 'bg-gray-200'
-                  }`} />
-                )}
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
           
-          {/* Current Step Name */}
-          <div className="text-center">
-            <div className="text-sm font-medium text-gray-900">{stepNames[step]}</div>
-            <div className="text-xs text-gray-500">Step {step + 1} of 10</div>
+          {/* Progress Bar */}
+          <div className="w-full bg-gray-200 rounded-full h-2 mb-3">
+            <div 
+              className="bg-green-600 h-2 rounded-full transition-all duration-300 ease-out"
+              style={{ width: `${((step + 1) / stepNames.length) * 100}%` }}
+            />
           </div>
           
-          {/* Skip Option for Current Step */}
-          <div className="flex justify-end mt-2">
-            <button className="text-xs text-gray-500 hover:text-gray-700">Skip</button>
+          {/* Skip and Step Info */}
+          <div className="flex items-center justify-between">
+            <button className="text-sm text-gray-500 hover:text-gray-700">Skip</button>
+            <div className="text-center">
+              <div className="text-sm font-medium text-gray-900">{stepNames[step]}</div>
+              <div className="text-xs text-gray-500">Step {step + 1} of 10</div>
+            </div>
+            <div className="text-sm text-gray-500">{step + 1}/10</div>
           </div>
         </div>
 
