@@ -1,1 +1,1 @@
-{"/_not-found":"/_not-found","/api/auth/[...nextauth]/route":"/api/auth/[...nextauth]","/auth/signin/page":"/auth/signin","/page":"/","/terms/page":"/terms","/onboarding/page":"/onboarding","/privacy/page":"/privacy"}
+{"/_not-found":"/_not-found","/auth/signin/page":"/auth/signin","/api/auth/[...nextauth]/route":"/api/auth/[...nextauth]","/healthapp/page":"/healthapp","/page":"/","/onboarding/page":"/onboarding","/terms/page":"/terms","/privacy/page":"/privacy"}

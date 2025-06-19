@@ -1,9 +1,10 @@
 {
   "/_not-found": "app/_not-found.js",
-  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
   "/auth/signin/page": "app/auth/signin/page.js",
+  "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
+  "/healthapp/page": "app/healthapp/page.js",
   "/page": "app/page.js",
-  "/terms/page": "app/terms/page.js",
   "/onboarding/page": "app/onboarding/page.js",
+  "/terms/page": "app/terms/page.js",
   "/privacy/page": "app/privacy/page.js"
 }
