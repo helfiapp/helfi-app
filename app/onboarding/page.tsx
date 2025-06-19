@@ -2073,7 +2073,7 @@ export default function Onboarding() {
           </div>
           
           {/* Numbered Steps Progress with Connecting Lines */}
-          <div className="relative mb-3">
+          <div className="relative mb-6">
             <div className="flex items-center justify-between">
               {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((stepNum, index) => (
                 <div key={stepNum} className="flex items-center">
