@@ -2042,19 +2042,44 @@ export default function Onboarding() {
     <div className="fixed inset-0 bg-gray-50 overflow-y-auto" id="onboarding-container">
       <OnboardingNav />
       <div className="min-h-full flex flex-col">
-        {/* Progress bar */}
+        {/* Sophisticated Progress with Numbered Steps */}
         <div className="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 safe-area-inset-top">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-between mb-4">
             <h1 className="text-lg font-semibold text-gray-900">
-              {Object.keys(form).length > 0 ? 'Edit Profile' : 'Setup Profile'}
+              Edit Health Info
             </h1>
-            <span className="text-sm text-gray-500">{step + 1} of {stepNames.length}</span>
+            <span className="text-sm text-gray-500">{step + 1}/10</span>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
-            <div 
-              className="bg-green-600 h-2 rounded-full transition-all duration-300 ease-out"
-              style={{ width: `${((step + 1) / stepNames.length) * 100}%` }}
-            />
+          
+          {/* Numbered Steps Progress */}
+          <div className="flex items-center justify-between mb-2">
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((stepNum) => (
+              <div key={stepNum} className="flex flex-col items-center">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all ${
+                  stepNum <= step + 1 
+                    ? 'bg-green-600 text-white' 
+                    : 'bg-gray-200 text-gray-500'
+                }`}>
+                  {stepNum}
+                </div>
+                {stepNum < 10 && (
+                  <div className={`h-0.5 w-8 mt-1 transition-all ${
+                    stepNum < step + 1 ? 'bg-green-600' : 'bg-gray-200'
+                  }`} />
+                )}
+              </div>
+            ))}
+          </div>
+          
+          {/* Current Step Name */}
+          <div className="text-center">
+            <div className="text-sm font-medium text-gray-900">{stepNames[step]}</div>
+            <div className="text-xs text-gray-500">Step {step + 1} of 10</div>
+          </div>
+          
+          {/* Skip Option for Current Step */}
+          <div className="flex justify-end mt-2">
+            <button className="text-xs text-gray-500 hover:text-gray-700">Skip</button>
           </div>
         </div>
 
