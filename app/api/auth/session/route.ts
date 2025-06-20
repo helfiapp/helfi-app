@@ -1,57 +1,74 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
+import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { createSession } from '@/lib/session'
+import { prisma } from '@/lib/prisma'
 
-export async function POST(request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
-    console.log('=== SESSION CREATION ENDPOINT ===')
+    console.log('=== SESSION BRIDGE API CALLED ===')
     
     // Get NextAuth session
-    const nextAuthSession = await getServerSession(authOptions)
+    const session = await getServerSession(authOptions)
+    console.log('NextAuth session:', session ? 'EXISTS' : 'NONE')
     
-    if (!nextAuthSession?.user?.email) {
-      console.log('No NextAuth session found')
-      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    if (!session?.user?.email) {
+      return NextResponse.json({ 
+        error: 'No valid NextAuth session',
+        redirect: '/auth/signin'
+      }, { status: 401 })
     }
     
-    console.log('NextAuth session found for:', nextAuthSession.user.email)
+    console.log('Creating custom session for:', session.user.email)
     
-    // Create custom database session
-    const sessionToken = await createSession(
-      nextAuthSession.user.email,
-      nextAuthSession.user.name || undefined,
-      nextAuthSession.user.image || undefined
-    )
-    
-    console.log('Custom session created with token:', sessionToken.substring(0, 8) + '...')
-    
-    // Return the session token so it can be stored in a cookie
-    const response = NextResponse.json({
-      success: true,
-      sessionToken,
-      user: {
-        email: nextAuthSession.user.email,
-        name: nextAuthSession.user.name,
-        image: nextAuthSession.user.image
+    // Get the most recent session for this user from NextAuth
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email },
+      include: {
+        sessions: {
+          orderBy: { expires: 'desc' },
+          take: 1
+        }
       }
     })
     
-    // Set the session token as an HTTP-only cookie
-    response.cookies.set('helfi-session', sessionToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-      path: '/'
+    if (!user || user.sessions.length === 0) {
+      return NextResponse.json({ 
+        error: 'No database session found',
+        details: 'NextAuth session exists but no database session'
+      }, { status: 500 })
+    }
+    
+    const dbSession = user.sessions[0]
+    console.log('Found database session:', dbSession.sessionToken.substring(0, 8) + '...')
+    
+    // Create response with proper cookie
+    const response = NextResponse.json({
+      success: true,
+      message: 'Custom session cookie set',
+      userEmail: session.user.email,
+      sessionToken: dbSession.sessionToken.substring(0, 8) + '...',
+      expires: dbSession.expires
     })
+    
+    // Set the session cookie with proper settings
+    response.cookies.set('helfi-session', dbSession.sessionToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'lax',
+      maxAge: 30 * 24 * 60 * 60, // 30 days
+      path: '/',
+      domain: '.helfi.ai' // Allow on all subdomains
+    })
+    
+    console.log('✅ Session cookie set successfully')
     
     return response
     
   } catch (error) {
-    console.error('Error creating custom session:', error)
+    console.error('Session bridge error:', error)
     return NextResponse.json({
-      error: 'Failed to create session',
+      error: 'Failed to create session bridge',
       details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
