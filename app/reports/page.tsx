@@ -14,6 +14,9 @@ export default function Reports() {
       <nav className="bg-white border-b border-gray-200 px-4 py-3">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="flex items-center">
+            <Link href="/dashboard" className="bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors mr-4">
+              Back to Dashboard
+            </Link>
             <Link href="/" className="w-16 h-16 md:w-20 md:h-20 cursor-pointer hover:opacity-80 transition-opacity">
               <Image
                 src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/HELFI_TRANSPARENT_rmssry.png"
@@ -30,9 +33,24 @@ export default function Reports() {
             </div>
           </div>
           
-          <Link href="/dashboard" className="bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors">
-            Back to Dashboard
-          </Link>
+          {/* Desktop Navigation */}
+          <div className="hidden md:flex items-center space-x-6">
+            <Link href="/dashboard" className="text-gray-700 hover:text-helfi-green transition-colors font-medium">
+              Dashboard
+            </Link>
+            <Link href="/health-tracking" className="text-gray-700 hover:text-helfi-green transition-colors font-medium">
+              Health Tracking
+            </Link>
+            <Link href="/insights" className="text-gray-700 hover:text-helfi-green transition-colors font-medium">
+              AI Insights
+            </Link>
+            <Link href="/reports" className="text-gray-700 hover:text-helfi-green transition-colors font-medium">
+              Reports
+            </Link>
+            <Link href="/onboarding?step=1" className="text-gray-700 hover:text-helfi-green transition-colors font-medium">
+              Health Info
+            </Link>
+          </div>
         </div>
       </nav>
 
