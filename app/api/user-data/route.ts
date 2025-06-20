@@ -269,10 +269,7 @@ export async function DELETE(request: NextRequest) {
         gender: null,
         weight: null,
         height: null,
-        bodyType: null,
-        // Reset exercise data if fields exist
-        exerciseFrequency: null,
-        exerciseTypes: []
+        bodyType: null
       }
     })
 
