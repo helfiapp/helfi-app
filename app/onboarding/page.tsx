@@ -103,13 +103,20 @@ function GenderStep({ onNext, initial }: { onNext: (data: any) => void, initial?
             I agree to the <a href="/terms" target="_blank" className="text-helfi-green underline">Terms and Conditions</a> and <a href="/privacy" target="_blank" className="text-helfi-green underline">Privacy Policy</a>
           </label>
         </div>
-        <button
-          className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors w-full disabled:bg-gray-300"
-          disabled={!gender || !agreed}
-          onClick={() => gender && agreed && onNext({ gender })}
-        >
-          Continue
-        </button>
+        <div className="flex justify-between pt-4">
+          <button 
+            className="text-gray-600 hover:text-gray-900 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+            onClick={() => onNext({ gender: gender || 'not specified' })}
+          >
+            Skip
+          </button>
+          <button
+            className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors"
+            onClick={() => onNext({ gender: gender || 'not specified' })}
+          >
+            Continue
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -244,13 +251,20 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
       </div>
       <div className="flex justify-between">
         <button className="border border-green-600 text-green-600 px-6 py-3 rounded-lg hover:bg-green-600 hover:text-white transition-colors" onClick={onBack}>Back</button>
-        <button 
-          className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-300" 
-          disabled={!weight || (unit === 'metric' ? !height : (!feet || !inches))} 
-          onClick={handleNext}
-        >
-          Next
-        </button>
+        <div className="flex space-x-3">
+          <button 
+            className="text-gray-600 hover:text-gray-900 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+            onClick={() => onNext({ weight: weight || '0', height: height || '0', feet: feet || '0', inches: inches || '0', bodyType: bodyType || 'not specified', unit })}
+          >
+            Skip
+          </button>
+          <button 
+            className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors" 
+            onClick={handleNext}
+          >
+            Next
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -541,13 +555,20 @@ function ExerciseStep({ onNext, onBack, initial }: { onNext: (data: any) => void
           >
             Back
           </button>
-          <button 
-            className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-300" 
-            disabled={!exerciseFrequency}
-            onClick={() => onNext({ exerciseFrequency, exerciseTypes })}
-          >
-            Continue
-          </button>
+          <div className="flex space-x-3">
+            <button 
+              className="text-gray-600 hover:text-gray-900 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+              onClick={() => onNext({ exerciseFrequency: exerciseFrequency || 'not specified', exerciseTypes: exerciseTypes || [] })}
+            >
+              Skip
+            </button>
+            <button 
+              className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors" 
+              onClick={() => onNext({ exerciseFrequency, exerciseTypes })}
+            >
+              Continue
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -862,13 +883,20 @@ function HealthGoalsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
           >
             Back
           </button>
-          <button 
-            className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-300" 
-            disabled={goals.length === 0} 
-            onClick={handleNext}
-          >
-            Next
-          </button>
+          <div className="flex space-x-3">
+            <button 
+              className="text-gray-600 hover:text-gray-900 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+              onClick={() => onNext({ goals: [], customGoals: [] })}
+            >
+              Skip
+            </button>
+            <button 
+              className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors" 
+              onClick={handleNext}
+            >
+              Next
+            </button>
+          </div>
         </div>
       </div>
     </div>
