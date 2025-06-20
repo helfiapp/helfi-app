@@ -86,16 +86,13 @@ export async function POST(request: NextRequest) {
     console.log('POST /api/user-data - Starting request processing...')
     const session = await getServerSession(authOptions)
     
-    console.log('POST /api/user-data - Session check:', {
-      hasSession: !!session,
-      hasUser: !!session?.user,
-      hasEmail: !!session?.user?.email,
-      email: session?.user?.email
-    })
+    if (!session?.user?.email) {
+      console.log('POST Authentication failed - no session or email:', { session: !!session, email: session?.user?.email })
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    }
     
-    // TEMPORARY: Use hardcoded email for testing
-    const userEmail = session?.user?.email || 'info@sonicweb.com.au'
-    console.log('POST /api/user-data - Using email:', userEmail)
+    console.log('POST /api/user-data - Authenticated user:', session.user.email)
+    const userEmail = session.user.email
 
     const data = await request.json()
     console.log('POST /api/user-data - Data received:', Object.keys(data))
