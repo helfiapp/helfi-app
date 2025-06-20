@@ -1964,6 +1964,7 @@ function ReviewStep({ onBack, data }: { onBack: () => void, data: any }) {
         <button className="btn-secondary" onClick={onBack}>Back</button>
         <button className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors" onClick={async () => {
           try {
+            console.log('Saving final onboarding data to database...');
             // Save to database for cross-device sync
             const response = await fetch('/api/user-data', {
               method: 'POST',
@@ -1972,21 +1973,15 @@ function ReviewStep({ onBack, data }: { onBack: () => void, data: any }) {
             });
             
             if (response.ok) {
-              console.log('Data saved to database successfully');
-              // Also save to localStorage as backup
-              localStorage.setItem('onboardingData', JSON.stringify(data));
+              console.log('Onboarding data saved to database successfully');
               window.location.href = '/dashboard';
             } else {
-              console.error('Failed to save to database');
-              // Fallback to localStorage only
-              localStorage.setItem('onboardingData', JSON.stringify(data));
-              window.location.href = '/dashboard';
+              console.error('Failed to save onboarding data to database:', response.status, response.statusText);
+              alert('Failed to save your data. Please try again or contact support.');
             }
           } catch (error) {
-            console.error('Error saving data:', error);
-            // Fallback to localStorage only
-            localStorage.setItem('onboardingData', JSON.stringify(data));
-            window.location.href = '/dashboard';
+            console.error('Error saving onboarding data:', error);
+            alert('Failed to save your data. Please check your connection and try again.');
           }
         }}>Confirm &amp; Begin</button>
       </div>
@@ -2015,32 +2010,34 @@ export default function Onboarding() {
   useEffect(() => {
     const loadUserData = async () => {
       try {
-        const response = await fetch('/api/user-data');
+        console.log('Loading existing onboarding data from database...');
+        const response = await fetch('/api/user-data', {
+          cache: 'no-cache',
+          headers: {
+            'Cache-Control': 'no-cache'
+          }
+        });
+        
         if (response.ok) {
           const result = await response.json();
           if (result.data) {
-            console.log('Loading existing onboarding data from database:', result.data);
+            console.log('Successfully loaded existing onboarding data from database:', result.data);
             setForm(result.data);
           }
         } else if (response.status === 404) {
-          console.log('No existing data found for user');
+          console.log('No existing data found for user - starting fresh onboarding');
+          setForm({});
+        } else if (response.status === 401) {
+          console.log('User not authenticated in onboarding');
+          setForm({});
         } else {
-          console.log('Failed to load data, using localStorage fallback');
-          // Fallback to localStorage if API fails
-          const localData = localStorage.getItem('onboardingData');
-          if (localData) {
-            const parsedData = JSON.parse(localData);
-            setForm(parsedData);
-          }
+          console.error('Failed to load data from database:', response.status, response.statusText);
+          setForm({});
         }
       } catch (error) {
-        console.error('Error loading user data:', error);
-        // Fallback to localStorage if API fails
-        const localData = localStorage.getItem('onboardingData');
-        if (localData) {
-          const parsedData = JSON.parse(localData);
-          setForm(parsedData);
-        }
+        console.error('Error loading user data from database:', error);
+        // Start fresh if database is unavailable
+        setForm({});
       }
     };
 
@@ -2089,18 +2086,20 @@ export default function Onboarding() {
     
     // Save progress to database for cross-device sync
     try {
-      await fetch('/api/user-data', {
+      const response = await fetch('/api/user-data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedForm)
       });
-      console.log('Progress saved to database');
+      
+      if (response.ok) {
+        console.log('Progress saved to database successfully');
+      } else {
+        console.error('Failed to save progress to database:', response.status, response.statusText);
+      }
     } catch (error) {
-      console.log('Failed to save progress to database:', error);
+      console.error('Error saving progress to database:', error);
     }
-    
-    // Also save to localStorage as backup
-    localStorage.setItem('onboardingData', JSON.stringify(updatedForm));
     
     setStep((prev) => {
       const newStep = Math.min(stepNames.length - 1, prev + 1);
