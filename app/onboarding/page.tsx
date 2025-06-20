@@ -1999,6 +1999,18 @@ export default function Onboarding() {
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<any>({});
 
+  // Get step from URL parameter
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const stepParam = urlParams.get('step');
+    if (stepParam) {
+      const stepIndex = parseInt(stepParam) - 1; // Convert 1-based to 0-based
+      if (stepIndex >= 0 && stepIndex < stepNames.length) {
+        setStep(stepIndex);
+      }
+    }
+  }, []);
+
   // Load existing data from database (cross-device sync)
   useEffect(() => {
     const loadUserData = async () => {
@@ -2092,6 +2104,11 @@ export default function Onboarding() {
     
     setStep((prev) => {
       const newStep = Math.min(stepNames.length - 1, prev + 1);
+      // Update URL to remember step position
+      const url = new URL(window.location.href);
+      url.searchParams.set('step', (newStep + 1).toString());
+      window.history.replaceState({}, '', url.toString());
+      
       // Force immediate scroll
       requestAnimationFrame(() => {
         window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
@@ -2105,6 +2122,11 @@ export default function Onboarding() {
   const handleBack = () => {
     setStep((prev) => {
       const newStep = Math.max(0, prev - 1);
+      // Update URL to remember step position
+      const url = new URL(window.location.href);
+      url.searchParams.set('step', (newStep + 1).toString());
+      window.history.replaceState({}, '', url.toString());
+      
       // Force immediate scroll
       requestAnimationFrame(() => {
         window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
@@ -2112,6 +2134,21 @@ export default function Onboarding() {
         if (container) container.scrollTop = 0;
       });
       return newStep;
+    });
+  };
+
+  const goToStep = (stepIndex: number) => {
+    setStep(stepIndex);
+    // Update URL to remember step position
+    const url = new URL(window.location.href);
+    url.searchParams.set('step', (stepIndex + 1).toString());
+    window.history.replaceState({}, '', url.toString());
+    
+    // Force immediate scroll
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+      const container = document.getElementById('onboarding-container');
+      if (container) container.scrollTop = 0;
     });
   };
 
@@ -2154,13 +2191,17 @@ export default function Onboarding() {
             <div className="flex items-center justify-between">
               {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((stepNum, index) => (
                 <div key={stepNum} className="flex items-center">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all z-10 ${
-                    stepNum <= step + 1 
-                      ? 'bg-green-600 text-white' 
-                      : 'bg-gray-200 text-gray-500'
-                  }`}>
+                  <button 
+                    onClick={() => goToStep(stepNum - 1)}
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all z-10 cursor-pointer hover:scale-105 ${
+                      stepNum <= step + 1 
+                        ? 'bg-green-600 text-white hover:bg-green-700' 
+                        : 'bg-gray-200 text-gray-500 hover:bg-gray-300'
+                    }`}
+                    title={`Go to step ${stepNum}: ${stepNames[stepNum - 1]}`}
+                  >
                     {stepNum}
-                  </div>
+                  </button>
                   {index < 9 && (
                     <div className={`h-0.5 flex-1 mx-1 transition-all ${
                       stepNum < step + 1 ? 'bg-green-600' : 'bg-gray-200'
@@ -2179,6 +2220,16 @@ export default function Onboarding() {
             />
           </div>
           
+          {/* Dashboard Button */}
+          <div className="flex justify-center mb-3">
+            <button 
+              onClick={() => window.location.href = '/dashboard'}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+            >
+              Dashboard
+            </button>
+          </div>
+
           {/* Skip and Step Info */}
           <div className="flex items-center justify-between">
             <button className="text-sm text-gray-500 hover:text-gray-700">Skip</button>
