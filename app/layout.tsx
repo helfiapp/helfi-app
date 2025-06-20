@@ -11,18 +11,18 @@ export const metadata = {
   icons: {
     icon: [
       {
-        url: 'https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/HELFI_TRANSPARENT_rmssry.png',
+        url: 'https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/FAVICON_ntiqz6.png',
         sizes: '32x32',
         type: 'image/png',
       },
       {
-        url: 'https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/HELFI_TRANSPARENT_rmssry.png',
+        url: 'https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/FAVICON_ntiqz6.png',
         sizes: '16x16',
         type: 'image/png',
       }
     ],
     apple: {
-      url: 'https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/HELFI_TRANSPARENT_rmssry.png',
+      url: 'https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/FAVICON_ntiqz6.png',
       sizes: '180x180',
       type: 'image/png',
     }
