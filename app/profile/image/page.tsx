@@ -279,13 +279,24 @@ export default function ProfileImage() {
           <div className="text-center mb-8">
             <div className="w-32 h-32 mx-auto mb-4 relative">
               {(imagePreview || currentProfileImage) ? (
-                <Image
-                  src={imagePreview || currentProfileImage || ''}
-                  alt="Profile Picture"
-                  width={128}
-                  height={128}
-                  className="w-full h-full object-cover rounded-full border-4 border-helfi-green"
-                />
+                <div className="relative">
+                  <Image
+                    src={imagePreview || currentProfileImage || ''}
+                    alt="Profile Picture"
+                    width={128}
+                    height={128}
+                    className="w-full h-full object-cover rounded-full border-4 border-helfi-green"
+                  />
+                  {imagePreview && (
+                    <div className="absolute -top-2 -right-2">
+                      <div className="bg-green-100 text-green-800 rounded-full p-1">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                    </div>
+                  )}
+                </div>
               ) : (
                 <div className="w-full h-full bg-helfi-green rounded-full flex items-center justify-center">
                   <svg className="w-16 h-16 text-white" fill="currentColor" viewBox="0 0 24 24">
@@ -297,6 +308,19 @@ export default function ProfileImage() {
             <p className="text-gray-600">
               {imagePreview ? 'New profile picture (auto-saved)' : currentProfileImage ? 'Current profile picture' : 'No profile picture'}
             </p>
+            {imagePreview && (
+              <div className="mt-2">
+                <button
+                  onClick={() => {
+                    setImagePreview(null);
+                    setSelectedImage(null);
+                  }}
+                  className="text-sm text-gray-500 hover:text-gray-700 underline"
+                >
+                  Remove preview
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Camera Modal */}
@@ -305,13 +329,20 @@ export default function ProfileImage() {
               <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
                 <div className="text-center mb-4">
                   <h3 className="text-lg font-semibold">Take a Photo</h3>
+                  <p className="text-sm text-gray-600">Position your face in the frame and tap capture</p>
                 </div>
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  className="w-full rounded-lg mb-4"
-                />
+                <div className="relative mb-4">
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    className="w-full rounded-lg"
+                  />
+                  {/* Overlay guide for face positioning */}
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="w-48 h-48 border-2 border-white border-dashed rounded-full opacity-50"></div>
+                  </div>
+                </div>
                 <div className="flex space-x-3">
                   <button
                     onClick={stopCamera}
