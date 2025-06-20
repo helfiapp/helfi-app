@@ -163,7 +163,7 @@ export default function BillingPage() {
             {/* Premium Plan */}
             <div className="border border-gray-200 rounded-lg p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Premium</h3>
-              <p className="text-3xl font-bold text-gray-900 mb-4">$19.99<span className="text-sm font-normal">/month</span></p>
+              <p className="text-3xl font-bold text-gray-900 mb-4">$12.99<span className="text-sm font-normal">/month</span></p>
               <ul className="space-y-2 mb-6">
                 <li className="flex items-center text-sm text-gray-600">
                   <svg className="w-4 h-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
