@@ -3,6 +3,9 @@ import CredentialsProvider from 'next-auth/providers/credentials'
 import GoogleProvider from 'next-auth/providers/google'
 
 export const authOptions: NextAuthOptions = {
+  session: {
+    strategy: 'jwt'
+  },
   providers: [
     CredentialsProvider({
       name: 'credentials',
@@ -51,13 +54,22 @@ export const authOptions: NextAuthOptions = {
       return `${baseUrl}/onboarding`
     },
     async session({ session, token }) {
-      // Add user info to session
+      // Add user info to session from JWT token
+      if (token?.email) {
+        session.user = {
+          email: token.email as string,
+          name: token.name as string,
+          image: session.user?.image || null
+        }
+      }
       return session
     },
     async jwt({ token, user, account }) {
       // Add user info to token
       if (user) {
         token.id = user.id
+        token.email = user.email
+        token.name = user.name
       }
       return token
     }
