@@ -1,201 +1,193 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { createClient } from '@supabase/supabase-js'
+import { useSession, signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
-import Header from '@/components/ui/Header'
-import BottomNav from '../../components/BottomNav'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
 
 export default function BillingPage() {
-  const [user, setUser] = useState<any>(null)
+  const { data: session } = useSession()
   const [loading, setLoading] = useState(true)
+  const [currentPlan, setCurrentPlan] = useState('free')
   const router = useRouter()
 
   useEffect(() => {
-    const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      setUser(user)
+    if (session) {
       setLoading(false)
     }
-    getUser()
-  }, [])
+  }, [session])
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut()
-    router.push('/')
+    await signOut({ callbackUrl: '/' })
   }
 
-  const userName = user?.user_metadata?.name || user?.email || 'User'
-
   return (
-    <div className="min-h-screen bg-gray-50 pb-20 md:pb-0">
-      <Header 
-        title="Subscription & Billing" 
-        subtitle="Manage your subscription"
-      />
+    <div className="min-h-screen bg-gray-50">
+      {/* Navigation Header */}
+      <nav className="bg-white border-b border-gray-200 px-4 py-3">
+        <div className="max-w-7xl mx-auto flex justify-between items-center">
+          <div className="flex items-center">
+            <Link href="/" className="w-16 h-16 md:w-20 md:h-20 cursor-pointer hover:opacity-80 transition-opacity">
+              <Image
+                src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/HELFI_TRANSPARENT_rmssry.png"
+                alt="Helfi Logo"
+                width={80}
+                height={80}
+                className="w-full h-full object-contain"
+                priority
+              />
+            </Link>
+            <div className="ml-4">
+              <h1 className="text-lg md:text-xl font-semibold text-gray-900">Subscription & Billing</h1>
+              <p className="text-sm text-gray-500 hidden sm:block">Manage your subscription and billing information</p>
+            </div>
+          </div>
+          
+          <Link href="/dashboard" className="bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors">
+            Back to Dashboard
+          </Link>
+        </div>
+      </nav>
 
       {/* Main Content */}
-      <div className="max-w-3xl mx-auto px-4 py-6 pt-24">
+      <div className="max-w-4xl mx-auto px-4 py-8">
         {/* Current Plan */}
-        <div className="mb-8">
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
           <h2 className="text-2xl font-bold text-gray-900 mb-6">Current Plan</h2>
-          <div className="bg-white rounded-lg shadow-sm p-6">
-          
-          <div className="bg-gradient-to-r from-helfi-green to-green-600 rounded-lg p-6 text-white mb-6">
-            <div className="flex justify-between items-start">
+          <div className="bg-helfi-green/10 border border-helfi-green/20 rounded-lg p-6">
+            <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-xl font-semibold mb-2">AI Health Coach</h3>
-                <p className="text-green-100 mb-4">Full access to AI health insights and personalized recommendations</p>
-                <div className="flex items-center space-x-4">
-                  <span className="text-2xl font-bold">$12</span>
-                  <span className="text-green-100">/month</span>
-                </div>
+                <h3 className="text-xl font-semibold text-helfi-green">Free Plan</h3>
+                <p className="text-gray-600 mt-2">Basic health tracking and insights</p>
               </div>
               <div className="text-right">
-                <div className="bg-white/20 rounded-lg px-3 py-1 text-sm">
-                  Active
-                </div>
+                <p className="text-3xl font-bold text-helfi-green">$0</p>
+                <p className="text-gray-600">per month</p>
               </div>
             </div>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="text-center p-4 border border-gray-200 rounded-lg">
-              <div className="text-2xl font-bold text-helfi-green mb-2">∞</div>
-              <div className="text-sm text-gray-600">AI Health Insights</div>
-            </div>
-            <div className="text-center p-4 border border-gray-200 rounded-lg">
-              <div className="text-2xl font-bold text-helfi-green mb-2">24/7</div>
-              <div className="text-sm text-gray-600">Health Monitoring</div>
-            </div>
-            <div className="text-center p-4 border border-gray-200 rounded-lg">
-              <div className="text-2xl font-bold text-helfi-green mb-2">✓</div>
-              <div className="text-sm text-gray-600">Device Integration</div>
-            </div>
-          </div>
-        </div>
         </div>
 
-        {/* Billing Information */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">Billing Information</h2>
-          
-          <div className="space-y-6">
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Payment Method</h3>
-              <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-blue-100 rounded flex items-center justify-center">
-                    <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-                      <path d="M2 8h20v2H2z"/>
-                    </svg>
-                  </div>
-                  <div>
-                    <div className="font-medium text-gray-900">•••• •••• •••• 4242</div>
-                    <div className="text-sm text-gray-600">Expires 12/25</div>
-                  </div>
-                </div>
-                <button className="text-helfi-green hover:underline">Update</button>
-              </div>
+        {/* Available Plans */}
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
+          <h2 className="text-2xl font-bold text-gray-900 mb-6">Available Plans</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Free Plan */}
+            <div className="border border-gray-200 rounded-lg p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Free</h3>
+              <p className="text-3xl font-bold text-gray-900 mb-4">$0<span className="text-sm font-normal">/month</span></p>
+              <ul className="space-y-2 mb-6">
+                <li className="flex items-center text-sm text-gray-600">
+                  <svg className="w-4 h-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Basic health tracking
+                </li>
+                <li className="flex items-center text-sm text-gray-600">
+                  <svg className="w-4 h-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Weekly insights
+                </li>
+                <li className="flex items-center text-sm text-gray-600">
+                  <svg className="w-4 h-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Basic reports
+                </li>
+              </ul>
+              <button className="w-full bg-gray-100 text-gray-400 px-4 py-2 rounded-lg cursor-not-allowed">
+                Current Plan
+              </button>
             </div>
 
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Billing Address</h3>
-              <div className="p-4 border border-gray-200 rounded-lg">
-                <div className="text-gray-900 mb-1">123 Health Street</div>
-                <div className="text-gray-900 mb-1">San Francisco, CA 94102</div>
-                <div className="text-gray-900">United States</div>
-                <button className="text-helfi-green hover:underline mt-2">Update Address</button>
+            {/* Pro Plan */}
+            <div className="border-2 border-helfi-green rounded-lg p-6 relative">
+              <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+                <span className="bg-helfi-green text-white px-3 py-1 rounded-full text-sm font-medium">
+                  Most Popular
+                </span>
               </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Pro</h3>
+              <p className="text-3xl font-bold text-gray-900 mb-4">$9.99<span className="text-sm font-normal">/month</span></p>
+              <ul className="space-y-2 mb-6">
+                <li className="flex items-center text-sm text-gray-600">
+                  <svg className="w-4 h-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Advanced health tracking
+                </li>
+                <li className="flex items-center text-sm text-gray-600">
+                  <svg className="w-4 h-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Daily AI insights
+                </li>
+                <li className="flex items-center text-sm text-gray-600">
+                  <svg className="w-4 h-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Detailed analytics
+                </li>
+                <li className="flex items-center text-sm text-gray-600">
+                  <svg className="w-4 h-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Device integrations
+                </li>
+              </ul>
+              <button className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors">
+                Upgrade to Pro
+              </button>
+            </div>
+
+            {/* Premium Plan */}
+            <div className="border border-gray-200 rounded-lg p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Premium</h3>
+              <p className="text-3xl font-bold text-gray-900 mb-4">$19.99<span className="text-sm font-normal">/month</span></p>
+              <ul className="space-y-2 mb-6">
+                <li className="flex items-center text-sm text-gray-600">
+                  <svg className="w-4 h-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Everything in Pro
+                </li>
+                <li className="flex items-center text-sm text-gray-600">
+                  <svg className="w-4 h-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Personal health coach
+                </li>
+                <li className="flex items-center text-sm text-gray-600">
+                  <svg className="w-4 h-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Priority support
+                </li>
+                <li className="flex items-center text-sm text-gray-600">
+                  <svg className="w-4 h-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Custom meal plans
+                </li>
+              </ul>
+              <button className="w-full bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors">
+                Upgrade to Premium
+              </button>
             </div>
           </div>
         </div>
 
         {/* Billing History */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">Billing History</h2>
-          
-          <div className="space-y-4">
-            <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-              <div>
-                <div className="font-medium text-gray-900">AI Health Coach - January 2024</div>
-                <div className="text-sm text-gray-600">Jan 1, 2024</div>
-              </div>
-              <div className="text-right">
-                <div className="font-medium text-gray-900">$12.00</div>
-                <button className="text-helfi-green hover:underline text-sm">Download</button>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-              <div>
-                <div className="font-medium text-gray-900">AI Health Coach - December 2023</div>
-                <div className="text-sm text-gray-600">Dec 1, 2023</div>
-              </div>
-              <div className="text-right">
-                <div className="font-medium text-gray-900">$12.00</div>
-                <button className="text-helfi-green hover:underline text-sm">Download</button>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-              <div>
-                <div className="font-medium text-gray-900">AI Health Coach - November 2023</div>
-                <div className="text-sm text-gray-600">Nov 1, 2023</div>
-              </div>
-              <div className="text-right">
-                <div className="font-medium text-gray-900">$12.00</div>
-                <button className="text-helfi-green hover:underline text-sm">Download</button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Plan Management */}
         <div className="bg-white rounded-lg shadow-sm p-6">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">Plan Management</h2>
-          
-          <div className="space-y-4">
-            <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-              <div>
-                <h3 className="font-medium text-gray-900">Next Billing Date</h3>
-                <p className="text-sm text-gray-600">Your next payment of $12.00 will be charged on February 1, 2024</p>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-              <div>
-                <h3 className="font-medium text-gray-900">Change Plan</h3>
-                <p className="text-sm text-gray-600">Upgrade or downgrade your subscription</p>
-              </div>
-              <Link href="/pricing" className="bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors inline-block text-center">
-                View Plans
-              </Link>
-            </div>
-
-            <div className="flex items-center justify-between p-4 border border-red-200 rounded-lg bg-red-50">
-              <div>
-                <h3 className="font-medium text-red-900">Cancel Subscription</h3>
-                <p className="text-sm text-red-600">Cancel your subscription (access continues until end of billing period)</p>
-              </div>
-              <button className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors">
-                Cancel Plan
-              </button>
-            </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-6">Billing History</h2>
+          <div className="text-center py-8">
+            <p className="text-gray-500">No billing history available.</p>
+            <p className="text-sm text-gray-400 mt-2">Your billing history will appear here after your first payment.</p>
           </div>
         </div>
       </div>
-
-      {/* Bottom Navigation */}
-      <BottomNav />
     </div>
   )
 } 

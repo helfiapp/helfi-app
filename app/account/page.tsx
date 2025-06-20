@@ -1,20 +1,13 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { createClient } from '@supabase/supabase-js'
+import { useSession, signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
-import Header from '@/components/ui/Header'
-import BottomNav from '../../components/BottomNav'
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
 
 export default function AccountPage() {
-  const [user, setUser] = useState<any>(null)
+  const { data: session } = useSession()
   const [loading, setLoading] = useState(true)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false)
@@ -25,20 +18,16 @@ export default function AccountPage() {
   const router = useRouter()
 
   useEffect(() => {
-    const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      setUser(user)
+    if (session) {
       setLoading(false)
     }
-    getUser()
-  }, [])
+  }, [session])
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut()
-    router.push('/')
+    await signOut({ callbackUrl: '/' })
   }
 
-  const userName = user?.user_metadata?.name || user?.email || 'User'
+  const userName = session?.user?.name || session?.user?.email || 'User'
 
   // Load saved data on mount
   useEffect(() => {
@@ -54,15 +43,15 @@ export default function AccountPage() {
     } else {
       // Initialize with session data
       setAccountData({
-        fullName: user?.user_metadata?.name || '',
-        email: user?.email || ''
+        fullName: session?.user?.name || '',
+        email: session?.user?.email || ''
       })
     }
     
     if (saved2FA) {
       setTwoFactorEnabled(saved2FA === 'true')
     }
-  }, [user])
+  }, [session])
 
   // Auto-save when data changes
   useEffect(() => {
@@ -88,17 +77,36 @@ export default function AccountPage() {
     return () => clearTimeout(saveTimer)
   }, [accountData, twoFactorEnabled])
 
-
-
   return (
-    <div className="min-h-screen bg-gray-50 pb-20 md:pb-0">
-      <Header 
-        title="Account Settings" 
-        subtitle="Manage your account preferences"
-      />
+    <div className="min-h-screen bg-gray-50">
+      {/* Navigation Header */}
+      <nav className="bg-white border-b border-gray-200 px-4 py-3">
+        <div className="max-w-7xl mx-auto flex justify-between items-center">
+          <div className="flex items-center">
+            <Link href="/" className="w-16 h-16 md:w-20 md:h-20 cursor-pointer hover:opacity-80 transition-opacity">
+              <Image
+                src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/HELFI_TRANSPARENT_rmssry.png"
+                alt="Helfi Logo"
+                width={80}
+                height={80}
+                className="w-full h-full object-contain"
+                priority
+              />
+            </Link>
+            <div className="ml-4">
+              <h1 className="text-lg md:text-xl font-semibold text-gray-900">Account Settings</h1>
+              <p className="text-sm text-gray-500 hidden sm:block">Manage your account preferences</p>
+            </div>
+          </div>
+          
+          <Link href="/dashboard" className="bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors">
+            Back to Dashboard
+          </Link>
+        </div>
+      </nav>
 
       {/* Main Content */}
-      <div className="max-w-3xl mx-auto px-4 py-6 pt-24">
+      <div className="max-w-3xl mx-auto px-4 py-8">
         <div className="bg-white rounded-lg shadow-sm p-6">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-gray-900">Account Settings</h2>
@@ -199,16 +207,16 @@ export default function AccountPage() {
                   <h4 className="font-medium text-gray-900">Export Data</h4>
                   <p className="text-sm text-gray-600">Download a copy of your health data</p>
                 </div>
-                <button className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg hover:bg-blue-200 transition-colors font-medium">
+                <button className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors font-medium">
                   Export Data
                 </button>
               </div>
               <div className="p-4 border border-red-200 rounded-lg bg-red-50">
                 <div className="mb-3">
                   <h4 className="font-medium text-red-900">Delete Account</h4>
-                  <p className="text-sm text-red-600">Permanently delete your account and all data</p>
+                  <p className="text-sm text-red-700">Permanently delete your account and all data</p>
                 </div>
-                <button className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors font-medium">
+                <button className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors font-medium">
                   Delete Account
                 </button>
               </div>
@@ -216,9 +224,6 @@ export default function AccountPage() {
           </div>
         </div>
       </div>
-
-      {/* Bottom Navigation */}
-      <BottomNav />
     </div>
   )
 } 
