@@ -83,17 +83,27 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('POST /api/user-data - Starting request processing...')
     const session = await getServerSession(authOptions)
     
     if (!session?.user?.email) {
-      console.log('POST Authentication failed - no session or email:', { session: !!session, email: session?.user?.email })
-      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+      console.error('POST Authentication failed - no session or email:', { 
+        session: !!session, 
+        email: session?.user?.email,
+        sessionUser: !!session?.user,
+        userAgent: request.headers.get('user-agent')?.substring(0, 100)
+      })
+      return NextResponse.json({ 
+        error: 'Authentication failed', 
+        debug: 'No valid session found' 
+      }, { status: 401 })
     }
     
     console.log('POST /api/user-data - Authenticated user:', session.user.email)
 
     const data = await request.json()
     console.log('POST /api/user-data - Data received:', Object.keys(data))
+    console.log('POST /api/user-data - Data size:', JSON.stringify(data).length, 'characters')
 
     // Find or create user
     let user = await prisma.user.findUnique({
@@ -222,10 +232,19 @@ export async function POST(request: NextRequest) {
       })
     }
 
+    console.log('POST /api/user-data - Successfully saved all data')
     return NextResponse.json({ success: true, message: 'Data saved successfully' })
   } catch (error) {
     console.error('Error saving user data:', error)
-    return NextResponse.json({ error: 'Failed to save data' }, { status: 500 })
+    console.error('Error details:', {
+      name: error instanceof Error ? error.name : 'Unknown',
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack?.substring(0, 500) : 'No stack'
+    })
+    return NextResponse.json({ 
+      error: 'Database error occurred', 
+      debug: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 })
   }
 }
 
