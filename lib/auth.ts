@@ -42,37 +42,8 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async signIn({ user, account, profile }) {
       console.log('SignIn callback:', { user: user?.email, account: account?.provider, profile: profile?.email })
-      try {
-        // Allow all email and Google signins
-        if (account?.provider === 'google' && user?.email) {
-          // Create custom database session for Google users
-                     try {
-             const { createSession } = await import('@/lib/session')
-             await createSession(user.email, user.name || user.email.split('@')[0], user.image || undefined)
-             console.log('✅ Custom session created for Google user:', user.email)
-           } catch (sessionError) {
-            console.error('⚠️ Failed to create custom session for Google user:', sessionError)
-            // Don't fail the signin if session creation fails
-          }
-          return true
-        }
-        if (account?.provider === 'credentials' && user?.email) {
-          // Create custom database session for email users
-                     try {
-             const { createSession } = await import('@/lib/session')
-             await createSession(user.email, user.name || user.email.split('@')[0], user.image || undefined)
-             console.log('✅ Custom session created for email user:', user.email)
-           } catch (sessionError) {
-            console.error('⚠️ Failed to create custom session for email user:', sessionError)
-            // Don't fail the signin if session creation fails
-          }
-          return true
-        }
-        return true
-      } catch (error) {
-        console.error('SignIn callback error:', error)
-        return false
-      }
+      // Allow all email and Google signins without custom session creation
+      return true
     },
     async redirect({ url, baseUrl }) {
       console.log('Redirect callback:', { url, baseUrl })
