@@ -1,22 +1,22 @@
 {
   "/_not-found": "app/_not-found.js",
   "/account/page": "app/account/page.js",
-  "/api/user-data/route": "app/api/user-data/route.js",
   "/api/auth/[...nextauth]/route": "app/api/auth/[...nextauth]/route.js",
+  "/api/user-data/route": "app/api/user-data/route.js",
   "/auth/signin/page": "app/auth/signin/page.js",
-  "/dashboard/page": "app/dashboard/page.js",
   "/billing/page": "app/billing/page.js",
+  "/dashboard/page": "app/dashboard/page.js",
   "/health-tracking/page": "app/health-tracking/page.js",
   "/healthapp/page": "app/healthapp/page.js",
-  "/help/page": "app/help/page.js",
   "/insights/page": "app/insights/page.js",
   "/notifications/page": "app/notifications/page.js",
+  "/help/page": "app/help/page.js",
   "/page": "app/page.js",
   "/privacy/page": "app/privacy/page.js",
   "/onboarding/page": "app/onboarding/page.js",
   "/profile/image/page": "app/profile/image/page.js",
   "/profile/page": "app/profile/page.js",
   "/reports/page": "app/reports/page.js",
-  "/settings/page": "app/settings/page.js",
-  "/terms/page": "app/terms/page.js"
+  "/terms/page": "app/terms/page.js",
+  "/settings/page": "app/settings/page.js"
 }
