@@ -41,44 +41,79 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     async signIn({ user, account, profile }) {
-      console.log('SignIn callback:', { user: user?.email, account: account?.provider })
-      // Allow all email and Google signins (this handles both login and signup)
-      return true
+      console.log('SignIn callback:', { user: user?.email, account: account?.provider, profile: profile?.email })
+      try {
+        // Allow all email and Google signins
+        if (account?.provider === 'google' && user?.email) {
+          return true
+        }
+        if (account?.provider === 'credentials' && user?.email) {
+          return true
+        }
+        return true
+      } catch (error) {
+        console.error('SignIn callback error:', error)
+        return false
+      }
     },
     async redirect({ url, baseUrl }) {
       console.log('Redirect callback:', { url, baseUrl })
-      // After successful login/signup, redirect to onboarding
-      if (url.startsWith(baseUrl)) {
-        return url
+      try {
+        // If URL is relative, prepend baseUrl
+        if (url.startsWith('/')) {
+          return `${baseUrl}${url}`
+        }
+        // If URL is absolute and same origin, allow it
+        if (url.startsWith(baseUrl)) {
+          return url
+        }
+        // Default redirect to onboarding after successful auth
+        return `${baseUrl}/onboarding`
+      } catch (error) {
+        console.error('Redirect callback error:', error)
+        return `${baseUrl}/onboarding`
       }
-      return `${baseUrl}/onboarding`
     },
     async session({ session, token }) {
-      // Add user info to session from JWT token
-      if (token?.email) {
-        session.user = {
-          email: token.email as string,
-          name: token.name as string,
-          image: session.user?.image || null
+      try {
+        // Add user info to session from JWT token
+        if (token?.email) {
+          session.user = {
+            email: token.email as string,
+            name: token.name as string,
+            image: token.image as string || null
+          }
         }
+        return session
+      } catch (error) {
+        console.error('Session callback error:', error)
+        return session
       }
-      return session
     },
-    async jwt({ token, user, account }) {
-      // Add user info to token
-      if (user) {
-        token.id = user.id
-        token.email = user.email
-        token.name = user.name
+    async jwt({ token, user, account, profile }) {
+      try {
+        // Add user info to token on first sign in
+        if (user) {
+          token.id = user.id
+          token.email = user.email
+          token.name = user.name
+          token.image = user.image
+        }
+        // For Google OAuth, also store profile image
+        if (account?.provider === 'google' && profile) {
+          token.image = profile.image || user?.image
+        }
+        return token
+      } catch (error) {
+        console.error('JWT callback error:', error)
+        return token
       }
-      return token
     }
   },
   pages: {
     signIn: '/auth/signin',
     error: '/auth/signin',
-    verifyRequest: '/auth/verify-request',
   },
-  debug: process.env.NODE_ENV === 'development',
+  debug: true, // Enable debug logging
   secret: process.env.NEXTAUTH_SECRET || 'helfi-secret-key-production-2024'
 } 
