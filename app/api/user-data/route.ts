@@ -1,14 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession()
+    const session = await getServerSession(authOptions)
     
     if (!session?.user?.email) {
+      console.log('GET Authentication failed - no session or email:', { session: !!session, email: session?.user?.email })
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
+    
+    console.log('GET /api/user-data - Authenticated user:', session.user.email)
 
     // Get user data by email
     const user = await prisma.user.findUnique({
@@ -79,13 +83,17 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession()
+    const session = await getServerSession(authOptions)
     
     if (!session?.user?.email) {
+      console.log('POST Authentication failed - no session or email:', { session: !!session, email: session?.user?.email })
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
+    
+    console.log('POST /api/user-data - Authenticated user:', session.user.email)
 
     const data = await request.json()
+    console.log('POST /api/user-data - Data received:', Object.keys(data))
 
     // Find or create user
     let user = await prisma.user.findUnique({
