@@ -111,6 +111,9 @@ export default function Profile() {
       <nav className="bg-white border-b border-gray-200 px-4 py-3">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="flex items-center">
+            <Link href="/dashboard" className="bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors mr-4">
+              Back to Dashboard
+            </Link>
             <Link href="/" className="w-16 h-16 md:w-20 md:h-20 cursor-pointer hover:opacity-80 transition-opacity">
               <Image
                 src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/HELFI_TRANSPARENT_rmssry.png"
@@ -127,8 +130,45 @@ export default function Profile() {
             </div>
           </div>
           
-          <div className="flex items-center space-x-4">
+          {/* Desktop Navigation */}
+          <div className="hidden md:flex items-center space-x-6">
+            <Link href="/dashboard" className="text-gray-700 hover:text-helfi-green transition-colors font-medium">
+              Dashboard
+            </Link>
+            <Link href="/health-tracking" className="text-gray-700 hover:text-helfi-green transition-colors font-medium">
+              Health Tracking
+            </Link>
+            <Link href="/insights" className="text-gray-700 hover:text-helfi-green transition-colors font-medium">
+              AI Insights
+            </Link>
+            <Link href="/reports" className="text-gray-700 hover:text-helfi-green transition-colors font-medium">
+              Reports
+            </Link>
+            <Link href="/onboarding?step=1" className="text-gray-700 hover:text-helfi-green transition-colors font-medium">
+              Health Info
+            </Link>
+            
             {/* Auto-save Status */}
+            <div className="flex items-center space-x-4">
+              {saveStatus === 'saving' && (
+                <div className="flex items-center text-blue-600">
+                  <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mr-2"></div>
+                  <span className="text-sm font-medium">Saving...</span>
+                </div>
+              )}
+              {saveStatus === 'saved' && (
+                <div className="flex items-center text-green-600">
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span className="text-sm font-medium">Saved</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Mobile Navigation - Auto-save Status */}
+          <div className="md:hidden flex items-center space-x-3">
             {saveStatus === 'saving' && (
               <div className="flex items-center text-blue-600">
                 <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mr-2"></div>
@@ -143,10 +183,6 @@ export default function Profile() {
                 <span className="text-sm font-medium">Saved</span>
               </div>
             )}
-            
-            <Link href="/dashboard" className="bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors">
-              Back to Dashboard
-            </Link>
           </div>
         </div>
       </nav>
@@ -212,16 +248,7 @@ export default function Profile() {
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
-              <input
-                type="email"
-                value={profileData.email}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
-                disabled
-              />
-              <p className="text-xs text-gray-500 mt-1">Email cannot be changed</p>
-            </div>
+
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Bio</label>
