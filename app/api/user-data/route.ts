@@ -1,30 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
+import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { getSession } from '@/lib/session'
 
 export async function GET(request: NextRequest) {
   try {
-    // Try custom session first, fallback to NextAuth
-    let userEmail: string | null = null
+    // Get NextAuth session
+    const session = await getServerSession(authOptions)
     
-    const customSession = await getSession(request)
-    if (customSession?.email) {
-      userEmail = customSession.email
-      console.log('GET /api/user-data - Custom session found for:', userEmail)
-    } else {
-      const nextAuthSession = await getServerSession(authOptions)
-      if (nextAuthSession?.user?.email) {
-        userEmail = nextAuthSession.user.email
-        console.log('GET /api/user-data - NextAuth session found for:', userEmail)
-      }
-    }
-    
-    if (!userEmail) {
+    if (!session?.user?.email) {
       console.log('GET Authentication failed - no valid session found')
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
+    
+    const userEmail = session.user.email
+    console.log('GET /api/user-data - NextAuth session found for:', userEmail)
 
     // Get user data by email
     const user = await prisma.user.findUnique({
@@ -97,25 +87,16 @@ export async function POST(request: NextRequest) {
   try {
     console.log('POST /api/user-data - Starting request processing...')
     
-    // Try custom session first, fallback to NextAuth
-    let userEmail: string | null = null
+    // Get NextAuth session
+    const session = await getServerSession(authOptions)
     
-    const customSession = await getSession(request)
-    if (customSession?.email) {
-      userEmail = customSession.email
-      console.log('POST /api/user-data - Custom session found for:', userEmail)
-    } else {
-      const nextAuthSession = await getServerSession(authOptions)
-      if (nextAuthSession?.user?.email) {
-        userEmail = nextAuthSession.user.email
-        console.log('POST /api/user-data - NextAuth session found for:', userEmail)
-      }
-    }
-    
-    if (!userEmail) {
+    if (!session?.user?.email) {
       console.log('POST Authentication failed - no valid session found')
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
+    
+    const userEmail = session.user.email
+    console.log('POST /api/user-data - NextAuth session found for:', userEmail)
 
     const data = await request.json()
     console.log('POST /api/user-data - Data received:', Object.keys(data))
@@ -266,25 +247,16 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    // Try custom session first, fallback to NextAuth
-    let userEmail: string | null = null
+    // Get NextAuth session
+    const session = await getServerSession(authOptions)
     
-    const customSession = await getSession(request)
-    if (customSession?.email) {
-      userEmail = customSession.email
-      console.log('DELETE /api/user-data - Custom session found for:', userEmail)
-    } else {
-      const nextAuthSession = await getServerSession(authOptions)
-      if (nextAuthSession?.user?.email) {
-        userEmail = nextAuthSession.user.email
-        console.log('DELETE /api/user-data - NextAuth session found for:', userEmail)
-      }
-    }
-    
-    if (!userEmail) {
+    if (!session?.user?.email) {
       console.log('DELETE Authentication failed - no valid session found')
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
+    
+    const userEmail = session.user.email
+    console.log('DELETE /api/user-data - NextAuth session found for:', userEmail)
 
     // Find user by email
     const user = await prisma.user.findUnique({
