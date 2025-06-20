@@ -34,32 +34,35 @@ export default function Dashboard() {
   useEffect(() => {
     const loadUserData = async () => {
       try {
-        const response = await fetch('/api/user-data');
+        console.log('Loading user data from database...');
+        const response = await fetch('/api/user-data', {
+          cache: 'no-cache',
+          headers: {
+            'Cache-Control': 'no-cache'
+          }
+        });
+        
         if (response.ok) {
           const result = await response.json();
           if (result.data) {
-            console.log('Loading existing onboarding data from database:', result.data);
+            console.log('Successfully loaded data from database:', result.data);
             setOnboardingData(result.data);
           }
         } else if (response.status === 404) {
-          console.log('No existing data found for user');
+          console.log('No existing data found for user in database');
+          setOnboardingData(null);
+        } else if (response.status === 401) {
+          console.log('User not authenticated - redirecting to login');
+          // Don't use localStorage fallback, force proper authentication
+          setOnboardingData(null);
         } else {
-          console.log('Failed to load data, using localStorage fallback');
-          // Fallback to localStorage if API fails
-          const localData = localStorage.getItem('onboardingData');
-          if (localData) {
-            const parsedData = JSON.parse(localData);
-            setOnboardingData(parsedData);
-          }
+          console.error('Failed to load data from database:', response.status, response.statusText);
+          setOnboardingData(null);
         }
       } catch (error) {
-        console.error('Error loading user data:', error);
-        // Fallback to localStorage if API fails
-        const localData = localStorage.getItem('onboardingData');
-        if (localData) {
-          const parsedData = JSON.parse(localData);
-          setOnboardingData(parsedData);
-        }
+        console.error('Error loading user data from database:', error);
+        // No localStorage fallback - force database-only approach
+        setOnboardingData(null);
       }
     };
 
@@ -67,34 +70,33 @@ export default function Dashboard() {
   }, []);
 
   const handleEditOnboarding = () => {
-    // Ensure data is saved before navigating
-    if (onboardingData) {
-      localStorage.setItem('onboardingData', JSON.stringify(onboardingData))
-      console.log('Preserving existing data for edit:', onboardingData)
-    }
-    // Add a flag to indicate we're editing
-    localStorage.setItem('isEditing', 'true')
+    // Navigate directly to onboarding - data will be loaded from database
+    console.log('Navigating to edit onboarding, data will be loaded from database')
     window.location.href = '/onboarding'
   }
 
   const handleResetData = async () => {
     try {
       // Delete from database
-      await fetch('/api/user-data', {
+      const response = await fetch('/api/user-data', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' }
       });
-      console.log('Data deleted from database');
+      
+      if (response.ok) {
+        console.log('Data successfully deleted from database');
+        setOnboardingData(null)
+        setShowResetConfirm(false)
+        // Redirect to onboarding to start fresh
+        window.location.href = '/onboarding'
+      } else {
+        console.error('Failed to delete from database:', response.status, response.statusText);
+        alert('Failed to reset data. Please try again.');
+      }
     } catch (error) {
-      console.error('Failed to delete from database:', error);
+      console.error('Error deleting from database:', error);
+      alert('Failed to reset data. Please try again.');
     }
-    
-    // Also remove from localStorage
-    localStorage.removeItem('onboardingData')
-    setOnboardingData(null)
-    setShowResetConfirm(false)
-    // Optionally redirect to onboarding
-    window.location.href = '/onboarding'
   }
 
   return (

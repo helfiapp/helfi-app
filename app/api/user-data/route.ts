@@ -227,4 +227,59 @@ export async function POST(request: NextRequest) {
     console.error('Error saving user data:', error)
     return NextResponse.json({ error: 'Failed to save data' }, { status: 500 })
   }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+    
+    if (!session?.user?.email) {
+      console.log('DELETE Authentication failed - no session or email:', { session: !!session, email: session?.user?.email })
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    }
+    
+    console.log('DELETE /api/user-data - Authenticated user:', session.user.email)
+
+    // Find user by email
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email }
+    })
+
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    // Delete all user-related data
+    await prisma.healthGoal.deleteMany({
+      where: { userId: user.id }
+    })
+    
+    await prisma.supplement.deleteMany({
+      where: { userId: user.id }
+    })
+    
+    await prisma.medication.deleteMany({
+      where: { userId: user.id }
+    })
+
+    // Reset user profile data
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        gender: null,
+        weight: null,
+        height: null,
+        bodyType: null,
+        // Reset exercise data if fields exist
+        exerciseFrequency: null,
+        exerciseTypes: []
+      }
+    })
+
+    console.log('Successfully deleted all user data for:', session.user.email)
+    return NextResponse.json({ success: true, message: 'All data deleted successfully' })
+  } catch (error) {
+    console.error('Error deleting user data:', error)
+    return NextResponse.json({ error: 'Failed to delete data' }, { status: 500 })
+  }
 } 
