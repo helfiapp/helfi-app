@@ -32,20 +32,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // DEBUG: Log what we actually get from database
-    console.log('DEBUG - User data from database:', {
-      id: user.id,
-      email: user.email,
-      gender: user.gender,
-      weight: user.weight,
-      height: user.height,
-      bodyType: user.bodyType,
-      exerciseFrequency: user.exerciseFrequency,
-      exerciseTypes: user.exerciseTypes,
-      healthGoalsCount: user.healthGoals.length,
-      supplementsCount: user.supplements.length,
-      medicationsCount: user.medications.length
-    })
+    console.log('GET /api/user-data - Loading data for user:', userEmail)
 
     // Get exercise data directly from User table fields
     const exerciseData = {
@@ -53,7 +40,7 @@ export async function GET(request: NextRequest) {
       exerciseTypes: user.exerciseTypes || []
     };
     
-    console.log('DEBUG - Exercise data extracted:', exerciseData)
+    console.log('GET /api/user-data - Exercise data extracted for user')
 
     // Get health situations data
     let healthSituationsData = { healthIssues: '', healthProblems: '', additionalInfo: '', skipped: false };
@@ -113,19 +100,7 @@ export async function GET(request: NextRequest) {
       }))
     }
 
-    console.log('DEBUG - Final onboarding data being returned:', {
-      gender: onboardingData.gender,
-      weight: onboardingData.weight,
-      height: onboardingData.height,
-      bodyType: onboardingData.bodyType,
-      exerciseFrequency: onboardingData.exerciseFrequency,
-      exerciseTypes: onboardingData.exerciseTypes,
-      hasGoals: onboardingData.goals.length > 0,
-      hasHealthSituations: !!onboardingData.healthSituations,
-      hasBloodResults: !!onboardingData.bloodResults,
-      hasSupplements: onboardingData.supplements.length > 0,
-      hasMedications: onboardingData.medications.length > 0
-    })
+    console.log('GET /api/user-data - Returning onboarding data for user')
 
     return NextResponse.json({ data: onboardingData })
   } catch (error) {
@@ -190,23 +165,29 @@ export async function POST(request: NextRequest) {
       if (data.gender) {
         updateData.gender = data.gender.toUpperCase() === 'MALE' ? 'MALE' : 'FEMALE'
       }
-      if (data.weight) {
-        updateData.weight = parseFloat(data.weight)
+      if (data.weight !== undefined && data.weight !== null && data.weight !== '') {
+        const weightNum = parseFloat(data.weight.toString())
+        if (!isNaN(weightNum)) {
+          updateData.weight = weightNum
+        }
       }
-      if (data.height) {
-        updateData.height = parseFloat(data.height)
+      if (data.height !== undefined && data.height !== null && data.height !== '') {
+        const heightNum = parseFloat(data.height.toString())
+        if (!isNaN(heightNum)) {
+          updateData.height = heightNum
+        }
       }
-      if (data.bodyType) {
+      if (data.bodyType && data.bodyType.trim() !== '') {
         const bodyTypeUpper = data.bodyType.toUpperCase()
         if (['ECTOMORPH', 'MESOMORPH', 'ENDOMORPH'].includes(bodyTypeUpper)) {
           updateData.bodyType = bodyTypeUpper
         }
       }
-      if (data.exerciseFrequency) {
-        updateData.exerciseFrequency = data.exerciseFrequency
+      if (data.exerciseFrequency && data.exerciseFrequency.trim() !== '') {
+        updateData.exerciseFrequency = data.exerciseFrequency.trim()
       }
-      if (data.exerciseTypes) {
-        updateData.exerciseTypes = Array.isArray(data.exerciseTypes) ? data.exerciseTypes : []
+      if (data.exerciseTypes && Array.isArray(data.exerciseTypes) && data.exerciseTypes.length > 0) {
+        updateData.exerciseTypes = data.exerciseTypes.filter((type: any) => type && type.trim() !== '')
       }
 
       if (Object.keys(updateData).length > 0) {
