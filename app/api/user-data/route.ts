@@ -145,103 +145,132 @@ export async function POST(request: NextRequest) {
       console.log('Exercise fields not yet available in database schema, using fallback storage');
     }
 
-    await prisma.user.update({
-      where: { id: user.id },
-      data: updateData
+    // Use transaction to ensure data integrity
+    await prisma.$transaction(async (tx) => {
+      // Update user basic data
+      await tx.user.update({
+        where: { id: user.id },
+        data: updateData
+      })
+
+             // Handle exercise data storage - find and update pattern
+       if (!exerciseStored && (data.exerciseFrequency !== undefined || data.exerciseTypes !== undefined)) {
+         // Check if exercise data already exists
+         const existingExerciseData = await tx.healthGoal.findFirst({
+           where: {
+             userId: user.id,
+             name: '__EXERCISE_DATA__'
+           }
+         })
+         
+         const exerciseData = {
+           userId: user.id,
+           name: '__EXERCISE_DATA__',
+           category: JSON.stringify({
+             exerciseFrequency: data.exerciseFrequency,
+             exerciseTypes: data.exerciseTypes || []
+           }),
+           currentRating: 0,
+         }
+         
+         if (existingExerciseData) {
+           await tx.healthGoal.update({
+             where: { id: existingExerciseData.id },
+             data: {
+               category: exerciseData.category
+             }
+           })
+         } else {
+           await tx.healthGoal.create({
+             data: exerciseData
+           })
+         }
+       }
+
+       // Handle health goals - find and create pattern
+       if (data.goals && Array.isArray(data.goals) && data.goals.length > 0) {
+         // Get existing goals to avoid duplicates
+         const existingGoals = await tx.healthGoal.findMany({
+           where: { 
+             userId: user.id,
+             name: { not: '__EXERCISE_DATA__' }
+           }
+         })
+         
+         // Delete goals that are no longer in the list
+         const goalsToDelete = existingGoals.filter(goal => !data.goals.includes(goal.name))
+         if (goalsToDelete.length > 0) {
+           await tx.healthGoal.deleteMany({
+             where: {
+               id: { in: goalsToDelete.map(g => g.id) }
+             }
+           })
+         }
+         
+         // Create new goals that don't exist yet
+         for (const goalName of data.goals) {
+           const exists = existingGoals.some(goal => goal.name === goalName)
+           if (!exists) {
+             await tx.healthGoal.create({
+               data: {
+                 userId: user.id,
+                 name: goalName,
+                 category: 'general',
+                 currentRating: 5,
+               }
+             })
+           }
+         }
+       }
+
+      // Handle supplements - conservative approach
+      if (data.supplements && Array.isArray(data.supplements)) {
+        // Delete all existing supplements for clean slate
+        await tx.supplement.deleteMany({
+          where: { userId: user.id }
+        })
+        
+        // Add new supplements if any
+        if (data.supplements.length > 0) {
+          for (const supp of data.supplements) {
+            if (supp.name) { // Only create if has a name
+              await tx.supplement.create({
+                data: {
+                  userId: user.id,
+                  name: supp.name,
+                  dosage: supp.dosage || '',
+                  timing: Array.isArray(supp.timing) ? supp.timing : [supp.timing || 'morning'],
+                }
+              })
+            }
+          }
+        }
+      }
+
+      // Handle medications - conservative approach
+      if (data.medications && Array.isArray(data.medications)) {
+        // Delete all existing medications for clean slate
+        await tx.medication.deleteMany({
+          where: { userId: user.id }
+        })
+        
+        // Add new medications if any
+        if (data.medications.length > 0) {
+          for (const med of data.medications) {
+            if (med.name) { // Only create if has a name
+              await tx.medication.create({
+                data: {
+                  userId: user.id,
+                  name: med.name,
+                  dosage: med.dosage || '',
+                  timing: Array.isArray(med.timing) ? med.timing : [med.timing || 'morning'],
+                }
+              })
+            }
+          }
+        }
+      }
     })
-
-    // If exercise data couldn't be stored in new fields, store as JSON in healthGoals
-    if (!exerciseStored && (data.exerciseFrequency || data.exerciseTypes)) {
-      // Delete existing exercise data storage
-      await prisma.healthGoal.deleteMany({
-        where: { 
-          userId: user.id,
-          name: '__EXERCISE_DATA__'
-        }
-      })
-      
-      // Store exercise data as JSON in healthGoals table
-      await prisma.healthGoal.create({
-        data: {
-          userId: user.id,
-          name: '__EXERCISE_DATA__',
-          category: JSON.stringify({
-            exerciseFrequency: data.exerciseFrequency,
-            exerciseTypes: data.exerciseTypes || []
-          }),
-          currentRating: 0,
-        }
-      })
-    }
-
-    // Update health goals - be more surgical to avoid conflicts
-    if (data.goals && Array.isArray(data.goals)) {
-      // Delete existing goals but preserve exercise data
-      await prisma.healthGoal.deleteMany({
-        where: { 
-          userId: user.id,
-          name: { not: '__EXERCISE_DATA__' }
-        }
-      })
-      
-      // Create new goals only if we have data
-      if (data.goals.length > 0) {
-        const goalData = data.goals.map((goalName: string) => ({
-          userId: user.id,
-          name: goalName,
-          category: 'general',
-          currentRating: 5, // Default rating
-        }))
-        
-        await prisma.healthGoal.createMany({
-          data: goalData
-        })
-      }
-    }
-
-    // Update supplements - only if we have data
-    if (data.supplements && Array.isArray(data.supplements)) {
-      // Delete existing supplements
-      await prisma.supplement.deleteMany({
-        where: { userId: user.id }
-      })
-      
-      // Create new supplements only if we have data
-      if (data.supplements.length > 0) {
-        const suppData = data.supplements.map((supp: any) => ({
-          userId: user.id,
-          name: supp.name || '',
-          dosage: supp.dosage || '',
-          timing: Array.isArray(supp.timing) ? supp.timing : [supp.timing || 'morning'],
-        }))
-        
-        await prisma.supplement.createMany({
-          data: suppData
-        })
-      }
-    }
-
-    // Update medications - only if we have data  
-    if (data.medications && Array.isArray(data.medications)) {
-      // Delete existing medications
-      await prisma.medication.deleteMany({
-        where: { userId: user.id }
-      })
-      
-      // Create new medications only if we have data
-      if (data.medications.length > 0) {
-        const medData = data.medications.map((med: any) => ({
-          userId: user.id,
-          name: med.name || '',
-          dosage: med.dosage || '',
-          timing: Array.isArray(med.timing) ? med.timing : [med.timing || 'morning'],
-        }))
-        
-        await prisma.medication.createMany({
-          data: medData
-        })
-      }
-    }
 
     console.log('POST /api/user-data - Successfully saved all data')
     return NextResponse.json({ success: true, message: 'Data saved successfully' })
