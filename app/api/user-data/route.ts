@@ -122,12 +122,12 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Update user basic data
+    // Update user basic data - convert strings to enum values
     const updateData: any = {
-      gender: data.gender?.toUpperCase(),
+      gender: data.gender ? data.gender.toUpperCase() : null,
       weight: data.weight ? parseFloat(data.weight) : null,
       height: data.height ? parseFloat(data.height) : null,
-      bodyType: data.bodyType?.toUpperCase(),
+      bodyType: data.bodyType ? data.bodyType.toUpperCase() : null,
     }
     
     // Handle exercise data - try new fields first, fallback to JSON storage
