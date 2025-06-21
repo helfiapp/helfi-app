@@ -1728,8 +1728,8 @@ function BloodResultsStep({ onNext, onBack, initial }: { onNext: (data: any) => 
   const handleNext = () => {
     const bloodResultsData = {
       uploadMethod,
-      documents: documents.map(f => f.name),
-      images: images.map(f => f.name),
+      documents: documents.filter(f => f != null).map(f => f.name),
+      images: images.filter(f => f != null).map(f => f.name),
       notes: notes.trim(),
       skipped
     };
@@ -1830,7 +1830,7 @@ function BloodResultsStep({ onNext, onBack, initial }: { onNext: (data: any) => 
             {documents.length > 0 && (
               <div className="mt-4 space-y-2">
                 <h4 className="text-sm font-medium text-gray-700">Uploaded Documents:</h4>
-                {documents.map((file, index) => (
+                {documents.filter(file => file != null).map((file, index) => (
                   <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
                     <span className="text-sm text-gray-600">{file.name}</span>
                     <button
@@ -1878,7 +1878,7 @@ function BloodResultsStep({ onNext, onBack, initial }: { onNext: (data: any) => 
             {images.length > 0 && (
               <div className="mt-4 space-y-2">
                 <h4 className="text-sm font-medium text-gray-700">Uploaded Images:</h4>
-                {images.map((file, index) => (
+                {images.filter(file => file != null).map((file, index) => (
                   <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
                     <span className="text-sm text-gray-600">{file.name}</span>
                     <button
