@@ -1702,11 +1702,11 @@ function MedicationsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
 }
 
 function BloodResultsStep({ onNext, onBack, initial }: { onNext: (data: any) => void, onBack: () => void, initial?: any }) {
-  const [uploadMethod, setUploadMethod] = useState<'documents' | 'images'>('documents');
-  const [documents, setDocuments] = useState<File[]>(initial?.documents || []);
-  const [images, setImages] = useState<File[]>(initial?.images || []);
-  const [notes, setNotes] = useState(initial?.notes || '');
-  const [skipped, setSkipped] = useState(initial?.skipped || false);
+  const [uploadMethod, setUploadMethod] = useState<'documents' | 'images'>(initial?.bloodResults?.uploadMethod || initial?.uploadMethod || 'documents');
+  const [documents, setDocuments] = useState<File[]>(initial?.bloodResults?.documents || initial?.documents || []);
+  const [images, setImages] = useState<File[]>(initial?.bloodResults?.images || initial?.images || []);
+  const [notes, setNotes] = useState(initial?.bloodResults?.notes || initial?.notes || '');
+  const [skipped, setSkipped] = useState(initial?.bloodResults?.skipped || initial?.skipped || false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'documents' | 'images') => {
     const files = Array.from(e.target.files || []);
@@ -1726,19 +1726,20 @@ function BloodResultsStep({ onNext, onBack, initial }: { onNext: (data: any) => 
   };
 
   const handleNext = () => {
-    const data = {
+    const bloodResultsData = {
       uploadMethod,
       documents: documents.map(f => f.name),
       images: images.map(f => f.name),
       notes: notes.trim(),
       skipped
     };
-    onNext(data);
+    // Pass data in the correct format expected by the API
+    onNext({ bloodResults: bloodResultsData });
   };
 
   const handleSkip = () => {
     setSkipped(true);
-    onNext({ skipped: true });
+    onNext({ bloodResults: { skipped: true, uploadMethod: 'documents', documents: [], images: [], notes: '' } });
   };
 
   return (
