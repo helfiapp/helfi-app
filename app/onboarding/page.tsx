@@ -904,24 +904,25 @@ function HealthGoalsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
 }
 
 function HealthSituationsStep({ onNext, onBack, initial }: { onNext: (data: any) => void, onBack: () => void, initial?: any }) {
-  const [healthIssues, setHealthIssues] = useState(initial?.healthIssues || '');
-  const [healthProblems, setHealthProblems] = useState(initial?.healthProblems || '');
-  const [additionalInfo, setAdditionalInfo] = useState(initial?.additionalInfo || '');
-  const [skipped, setSkipped] = useState(initial?.skipped || false);
+  const [healthIssues, setHealthIssues] = useState(initial?.healthSituations?.healthIssues || initial?.healthIssues || '');
+  const [healthProblems, setHealthProblems] = useState(initial?.healthSituations?.healthProblems || initial?.healthProblems || '');
+  const [additionalInfo, setAdditionalInfo] = useState(initial?.healthSituations?.additionalInfo || initial?.additionalInfo || '');
+  const [skipped, setSkipped] = useState(initial?.healthSituations?.skipped || initial?.skipped || false);
 
   const handleNext = () => {
-    const data = { 
+    const healthSituationsData = { 
       healthIssues: healthIssues.trim(), 
       healthProblems: healthProblems.trim(),
       additionalInfo: additionalInfo.trim(),
       skipped 
     };
-    onNext(data);
+    // Pass data in the correct format expected by the API
+    onNext({ healthSituations: healthSituationsData });
   };
 
   const handleSkip = () => {
     setSkipped(true);
-    onNext({ skipped: true });
+    onNext({ healthSituations: { skipped: true, healthIssues: '', healthProblems: '', additionalInfo: '' } });
   };
 
   return (
@@ -1956,6 +1957,20 @@ function ReviewStep({ onBack, data }: { onBack: () => void, data: any }) {
         <div><b>Exercise Frequency:</b> {data.exerciseFrequency}</div>
         <div><b>Exercise Types:</b> {(data.exerciseTypes || []).join(', ')}</div>
         <div><b>Health Goals:</b> {(data.goals || []).join(', ')}</div>
+        {data.healthSituations && !data.healthSituations.skipped && (
+          <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+            <div><b>Health Situations:</b></div>
+            {data.healthSituations.healthIssues && (
+              <div className="ml-2 text-sm"><b>Current Issues:</b> {data.healthSituations.healthIssues}</div>
+            )}
+            {data.healthSituations.healthProblems && (
+              <div className="ml-2 text-sm"><b>Ongoing Problems:</b> {data.healthSituations.healthProblems}</div>
+            )}
+            {data.healthSituations.additionalInfo && (
+              <div className="ml-2 text-sm"><b>Additional Info:</b> {data.healthSituations.additionalInfo}</div>
+            )}
+          </div>
+        )}
         <div><b>Supplements:</b> {(data.supplements || []).map((s: any) => `${s.name} (${s.dosage}, ${Array.isArray(s.timing) ? s.timing.join(', ') : s.timing})`).join('; ')}</div>
         <div><b>Medications:</b> {(data.medications || []).map((m: any) => `${m.name} (${m.dosage}, ${Array.isArray(m.timing) ? m.timing.join(', ') : m.timing})`).join('; ')}</div>
         <div><b>AI Insights:</b> {data.wantInsights === 'yes' ? 'Yes' : 'No'}</div>

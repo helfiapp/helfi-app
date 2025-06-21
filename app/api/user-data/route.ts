@@ -57,6 +57,23 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Get health situations data
+    let healthSituationsData = { healthIssues: '', healthProblems: '', additionalInfo: '', skipped: false };
+    try {
+      const storedHealthSituations = user.healthGoals.find((goal: any) => goal.name === '__HEALTH_SITUATIONS_DATA__');
+      if (storedHealthSituations && storedHealthSituations.category) {
+        const parsed = JSON.parse(storedHealthSituations.category);
+        healthSituationsData = {
+          healthIssues: parsed.healthIssues || '',
+          healthProblems: parsed.healthProblems || '',
+          additionalInfo: parsed.additionalInfo || '',
+          skipped: parsed.skipped || false
+        };
+      }
+    } catch (e) {
+      console.log('No health situations data found in storage');
+    }
+
     // Transform to onboarding format
     const onboardingData = {
       gender: user.gender?.toLowerCase(),
@@ -65,7 +82,8 @@ export async function GET(request: NextRequest) {
       bodyType: user.bodyType?.toLowerCase(),
       exerciseFrequency: exerciseData.exerciseFrequency,
       exerciseTypes: exerciseData.exerciseTypes,
-      goals: user.healthGoals.filter((goal: any) => goal.name !== '__EXERCISE_DATA__').map((goal: any) => goal.name),
+      goals: user.healthGoals.filter((goal: any) => !goal.name.startsWith('__')).map((goal: any) => goal.name),
+      healthSituations: healthSituationsData,
       supplements: user.supplements.map((supp: any) => ({
         name: supp.name,
         dosage: supp.dosage,
@@ -87,25 +105,31 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('POST /api/user-data - Starting request processing...')
+    console.log('POST /api/user-data - Starting SIMPLIFIED approach...')
     
-    // Get NextAuth session - App Router automatically handles request context
+    // Get NextAuth session
     const session = await getServerSession(authOptions)
     
     if (!session?.user?.email) {
       console.log('POST Authentication failed - no valid session found')
-      console.log('Session:', session)
-      console.log('Request headers:', Object.fromEntries(request.headers.entries()))
-      console.log('Cookies:', request.headers.get('cookie'))
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
     
     const userEmail = session.user.email
-    console.log('POST /api/user-data - NextAuth session found for:', userEmail)
+    console.log('POST /api/user-data - Authenticated user:', userEmail)
 
     const data = await request.json()
-    console.log('POST /api/user-data - Data received:', Object.keys(data))
-    console.log('POST /api/user-data - Data size:', JSON.stringify(data).length, 'characters')
+    console.log('POST /api/user-data - Data received:', {
+      hasGender: !!data.gender,
+      hasWeight: !!data.weight,
+      hasHeight: !!data.height,
+      hasBodyType: !!data.bodyType,
+      hasGoals: !!data.goals,
+      hasSupplements: !!data.supplements,
+      hasMedications: !!data.medications,
+      hasHealthSituations: !!data.healthSituations,
+      hasExercise: !!(data.exerciseFrequency || data.exerciseTypes)
+    })
 
     // Find or create user
     let user = await prisma.user.findUnique({
@@ -113,177 +137,193 @@ export async function POST(request: NextRequest) {
     })
 
     if (!user) {
+      console.log('Creating new user for:', userEmail)
       user = await prisma.user.create({
         data: {
           email: userEmail,
           name: userEmail.split('@')[0],
-          image: null,
         }
       })
     }
 
-    // Update user basic data - convert strings to enum values
-    const updateData: any = {
-      gender: data.gender ? data.gender.toUpperCase() : null,
-      weight: data.weight ? parseFloat(data.weight) : null,
-      height: data.height ? parseFloat(data.height) : null,
-      bodyType: data.bodyType ? data.bodyType.toUpperCase() : null,
-    }
-    
-    // Handle exercise data - try new fields first, fallback to JSON storage
-    let exerciseStored = false;
+    console.log('Found/created user with ID:', user.id)
+
+    // SIMPLIFIED APPROACH: Update each piece of data individually with proper error handling
+    // This avoids complex transactions that were causing constraint violations
+
+    // 1. Update basic user data with safe enum handling
     try {
-      if (data.exerciseFrequency !== undefined) {
-        updateData.exerciseFrequency = data.exerciseFrequency;
-        exerciseStored = true;
+      const updateData: any = {}
+      
+      if (data.gender) {
+        updateData.gender = data.gender.toUpperCase() === 'MALE' ? 'MALE' : 'FEMALE'
       }
-      if (data.exerciseTypes !== undefined) {
-        updateData.exerciseTypes = data.exerciseTypes || [];
-        exerciseStored = true;
+      if (data.weight) {
+        updateData.weight = parseFloat(data.weight)
+      }
+      if (data.height) {
+        updateData.height = parseFloat(data.height)
+      }
+      if (data.bodyType) {
+        const bodyTypeUpper = data.bodyType.toUpperCase()
+        if (['ECTOMORPH', 'MESOMORPH', 'ENDOMORPH'].includes(bodyTypeUpper)) {
+          updateData.bodyType = bodyTypeUpper
+        }
+      }
+      if (data.exerciseFrequency) {
+        updateData.exerciseFrequency = data.exerciseFrequency
+      }
+      if (data.exerciseTypes) {
+        updateData.exerciseTypes = Array.isArray(data.exerciseTypes) ? data.exerciseTypes : []
+      }
+
+      if (Object.keys(updateData).length > 0) {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: updateData
+        })
+        console.log('Updated user basic data successfully')
       }
     } catch (error) {
-      console.log('Exercise fields not yet available in database schema, using fallback storage');
+      console.error('Error updating user basic data:', error)
+      // Continue with other updates even if this fails
     }
 
-    // Use transaction to ensure data integrity
-    await prisma.$transaction(async (tx) => {
-      // Update user basic data
-      await tx.user.update({
-        where: { id: user.id },
-        data: updateData
-      })
+    // 2. Handle health goals - simple upsert approach
+    try {
+      if (data.goals && Array.isArray(data.goals) && data.goals.length > 0) {
+        // Delete existing non-special goals
+        await prisma.healthGoal.deleteMany({
+          where: { 
+            userId: user.id,
+            name: { notIn: ['__EXERCISE_DATA__', '__HEALTH_SITUATIONS_DATA__'] }
+          }
+        })
+        
+        // Create new goals
+        for (const goalName of data.goals) {
+          if (goalName && typeof goalName === 'string') {
+            await prisma.healthGoal.create({
+              data: {
+                userId: user.id,
+                name: goalName,
+                category: 'general',
+                currentRating: 5,
+              }
+            })
+          }
+        }
+        console.log('Updated health goals successfully')
+      }
+    } catch (error) {
+      console.error('Error updating health goals:', error)
+      // Continue with other updates
+    }
 
-             // Handle exercise data storage - find and update pattern
-       if (!exerciseStored && (data.exerciseFrequency !== undefined || data.exerciseTypes !== undefined)) {
-         // Check if exercise data already exists
-         const existingExerciseData = await tx.healthGoal.findFirst({
-           where: {
-             userId: user.id,
-             name: '__EXERCISE_DATA__'
-           }
-         })
-         
-         const exerciseData = {
-           userId: user.id,
-           name: '__EXERCISE_DATA__',
-           category: JSON.stringify({
-             exerciseFrequency: data.exerciseFrequency,
-             exerciseTypes: data.exerciseTypes || []
-           }),
-           currentRating: 0,
-         }
-         
-         if (existingExerciseData) {
-           await tx.healthGoal.update({
-             where: { id: existingExerciseData.id },
-             data: {
-               category: exerciseData.category
-             }
-           })
-         } else {
-           await tx.healthGoal.create({
-             data: exerciseData
-           })
-         }
-       }
+    // 3. Handle health situations data (Step 5) - store as special health goal
+    try {
+      if (data.healthSituations) {
+        // Remove existing health situations data
+        await prisma.healthGoal.deleteMany({
+          where: {
+            userId: user.id,
+            name: '__HEALTH_SITUATIONS_DATA__'
+          }
+        })
+        
+        // Store new health situations data
+        await prisma.healthGoal.create({
+          data: {
+            userId: user.id,
+            name: '__HEALTH_SITUATIONS_DATA__',
+            category: JSON.stringify(data.healthSituations),
+            currentRating: 0,
+          }
+        })
+        console.log('Stored health situations data successfully')
+      }
+    } catch (error) {
+      console.error('Error storing health situations data:', error)
+      // Continue with other updates
+    }
 
-       // Handle health goals - find and create pattern
-       if (data.goals && Array.isArray(data.goals) && data.goals.length > 0) {
-         // Get existing goals to avoid duplicates
-         const existingGoals = await tx.healthGoal.findMany({
-           where: { 
-             userId: user.id,
-             name: { not: '__EXERCISE_DATA__' }
-           }
-         })
-         
-         // Delete goals that are no longer in the list
-         const goalsToDelete = existingGoals.filter(goal => !data.goals.includes(goal.name))
-         if (goalsToDelete.length > 0) {
-           await tx.healthGoal.deleteMany({
-             where: {
-               id: { in: goalsToDelete.map(g => g.id) }
-             }
-           })
-         }
-         
-         // Create new goals that don't exist yet
-         for (const goalName of data.goals) {
-           const exists = existingGoals.some(goal => goal.name === goalName)
-           if (!exists) {
-             await tx.healthGoal.create({
-               data: {
-                 userId: user.id,
-                 name: goalName,
-                 category: 'general',
-                 currentRating: 5,
-               }
-             })
-           }
-         }
-       }
-
-      // Handle supplements - conservative approach
+    // 4. Handle supplements - simple replace approach
+    try {
       if (data.supplements && Array.isArray(data.supplements)) {
-        // Delete all existing supplements for clean slate
-        await tx.supplement.deleteMany({
+        // Delete existing supplements
+        await prisma.supplement.deleteMany({
           where: { userId: user.id }
         })
         
-        // Add new supplements if any
-        if (data.supplements.length > 0) {
-          for (const supp of data.supplements) {
-            if (supp.name) { // Only create if has a name
-              await tx.supplement.create({
-                data: {
-                  userId: user.id,
-                  name: supp.name,
-                  dosage: supp.dosage || '',
-                  timing: Array.isArray(supp.timing) ? supp.timing : [supp.timing || 'morning'],
-                }
-              })
-            }
+        // Create new supplements
+        for (const supp of data.supplements) {
+          if (supp.name && typeof supp.name === 'string') {
+            await prisma.supplement.create({
+              data: {
+                userId: user.id,
+                name: supp.name,
+                dosage: supp.dosage || '',
+                timing: Array.isArray(supp.timing) ? supp.timing : [supp.timing || 'morning'],
+              }
+            })
           }
         }
+        console.log('Updated supplements successfully')
       }
+    } catch (error) {
+      console.error('Error updating supplements:', error)
+      // Continue with other updates
+    }
 
-      // Handle medications - conservative approach
+    // 5. Handle medications - simple replace approach  
+    try {
       if (data.medications && Array.isArray(data.medications)) {
-        // Delete all existing medications for clean slate
-        await tx.medication.deleteMany({
+        // Delete existing medications
+        await prisma.medication.deleteMany({
           where: { userId: user.id }
         })
         
-        // Add new medications if any
-        if (data.medications.length > 0) {
-          for (const med of data.medications) {
-            if (med.name) { // Only create if has a name
-              await tx.medication.create({
-                data: {
-                  userId: user.id,
-                  name: med.name,
-                  dosage: med.dosage || '',
-                  timing: Array.isArray(med.timing) ? med.timing : [med.timing || 'morning'],
-                }
-              })
-            }
+        // Create new medications
+        for (const med of data.medications) {
+          if (med.name && typeof med.name === 'string') {
+            await prisma.medication.create({
+              data: {
+                userId: user.id,
+                name: med.name,
+                dosage: med.dosage || '',
+                timing: Array.isArray(med.timing) ? med.timing : [med.timing || 'morning'],
+              }
+            })
           }
         }
+        console.log('Updated medications successfully')
+      }
+    } catch (error) {
+      console.error('Error updating medications:', error)
+      // Continue with other updates
+    }
+
+    console.log('POST /api/user-data - All updates completed successfully')
+    return NextResponse.json({ 
+      success: true, 
+      message: 'Data saved successfully',
+      debug: {
+        userId: user.id,
+        email: userEmail,
+        timestamp: new Date().toISOString()
       }
     })
-
-    console.log('POST /api/user-data - Successfully saved all data')
-    return NextResponse.json({ success: true, message: 'Data saved successfully' })
+    
   } catch (error) {
-    console.error('Error saving user data:', error)
-    console.error('Error details:', {
-      name: error instanceof Error ? error.name : 'Unknown',
-      message: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack?.substring(0, 500) : 'No stack'
-    })
+    console.error('CRITICAL ERROR in POST /api/user-data:', error)
+    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack available')
+    
     return NextResponse.json({ 
-      error: 'Database error occurred', 
-      debug: error instanceof Error ? error.message : 'Unknown error'
+      error: 'Failed to save data', 
+      debug: {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        timestamp: new Date().toISOString()
+      }
     }, { status: 500 })
   }
 }

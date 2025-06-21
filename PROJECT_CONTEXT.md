@@ -87,6 +87,165 @@ Even though:
 
 ---
 
+## 🚨 MAJOR AGENT FAILURE - FINAL ATTEMPT (DECEMBER 22, 2024)
+
+### 🔍 COMPREHENSIVE FINAL INVESTIGATION - COMPLETE FAILURE RECORD
+
+#### ✅ WHAT WAS DISCOVERED TO WORK:
+1. **Authentication flow working** - User can log in successfully
+2. **Data loading works** - Existing data loads from database correctly
+3. **First save sometimes works** - Occasionally gets to dashboard on first attempt
+4. **Cross-device sync confirmed** - Vitamin C supplement synced between devices
+
+#### ❌ WHAT COMPLETELY FAILED:
+1. **"Confirm & Begin" button consistently fails** - Shows "Failed to save your data" error
+2. **Data gets wiped during saves** - Partial data loss on successful saves
+3. **Step 5 (Health Situations) data not appearing** - Form data not persisting to final review
+4. **500 Internal Server Errors** - Persistent API failures throughout onboarding
+
+#### 🚨 WHAT THIS AGENT ATTEMPTED (ALL FAILED):
+
+**ATTEMPT #1: NextAuth Import Fix (FAILED)**
+- **Action**: Changed `import { getServerSession } from 'next-auth'` to `import { getServerSession } from 'next-auth/next'`
+- **Reasoning**: Incorrect import path causing authentication failures
+- **Result**: ❌ FAILED - Still getting 500 errors, authentication still broken
+- **User Feedback**: Issue persisted after deployment
+
+**ATTEMPT #2: Custom Session System Removal (FAILED)**
+- **Action**: Removed custom session callbacks from `lib/auth.ts`
+- **Reasoning**: Custom session system conflicting with NextAuth
+- **Result**: ❌ FAILED - Authentication improved but still failing
+- **User Feedback**: Some progress but "Confirm & Begin" still shows error
+
+**ATTEMPT #3: Database Enum Data Type Fix (FAILED)**
+- **Action**: Added enum conversion for gender/bodyType (`Gender.MALE` vs `"male"`)
+- **Reasoning**: Database expecting enum types, code sending strings
+- **Result**: ❌ FAILED - 500 errors continued
+- **User Feedback**: No improvement in functionality
+
+**ATTEMPT #4: Diagnostic Endpoint Creation (PARTIALLY SUCCESSFUL)**
+- **Action**: Created `/app/api/debug-user-data/route.ts` to isolate failure point
+- **Result**: ✅ DIAGNOSTIC SUCCESS - Confirmed authentication and database work
+- **Findings**: `{success: true, sessionExists: true, userEmail: 'info@sonicweb.com.au'}`
+- **Conclusion**: Basic operations work, complex operations fail
+
+**ATTEMPT #5: Database Transaction Implementation (FAILED)**
+- **Action**: Wrapped all database operations in `prisma.$transaction()`
+- **Reasoning**: Race conditions and constraint conflicts causing failures
+- **Result**: ❌ FAILED - Still getting 500 errors consistently
+- **User Feedback**: "Section 5 is not appearing in the final page. I wrote Test on one of the fields and I don't see it on the final page. Also I got the error again."
+
+**ATTEMPT #6: Find/Update Pattern Instead of Upsert (FAILED)**
+- **Action**: Replaced upsert operations with find-first-then-update pattern
+- **Reasoning**: Upsert operations causing constraint violations
+- **Result**: ❌ FAILED - 500 errors persist, data still not saving
+- **User Feedback**: Same error pattern continues
+
+#### 🔍 DETAILED FAILURE ANALYSIS:
+
+**CONSISTENT ERROR PATTERN FROM USER LOGS:**
+```
+/api/user-data:1  Failed to load resource: the server responded with a status of 500 ()
+Failed to save progress to database: 500 
+Failed to save onboarding data to database: 500 
+POST https://www.helfi.ai/api/user-data 500 (Internal Server Error)
+```
+
+**SPECIFIC ISSUES IDENTIFIED:**
+1. **Step 5 Data Loss**: User enters "Test" in health situations, doesn't appear in final review
+2. **Intermittent Success**: First save sometimes works (gets to dashboard) but subsequent saves fail
+3. **Partial Data Wiping**: When saves do work, some data gets lost in the process
+4. **Consistent 500 Errors**: Every step of onboarding triggers API failures
+
+**AUTHENTICATION STATUS:**
+- ✅ `getServerSession()` now returns valid session (fixed import)
+- ✅ User authentication working
+- ✅ Database connectivity confirmed
+- ❌ Complex database operations still failing
+
+#### 🚫 APPROACHES THAT DEFINITIVELY FAILED:
+
+1. **❌ NextAuth Import Path Fix** - Changed import but didn't solve core issue
+2. **❌ Custom Session System Removal** - Simplified auth but API still fails
+3. **❌ Database Enum Conversion** - Fixed data types but operations still fail
+4. **❌ Transaction Wrapping** - Added transactions but constraint conflicts persist
+5. **❌ Find/Update Pattern** - Replaced upsert but same 500 errors continue
+6. **❌ Surgical Delete Operations** - Tried to preserve data but still causes loss
+
+#### 🎯 ROOT CAUSE ANALYSIS:
+
+**THE REAL PROBLEM APPEARS TO BE:**
+- **Database Constraint Conflicts**: Complex deleteMany/createMany operations cause violations
+- **Race Conditions**: Multiple rapid saves during onboarding cause conflicts  
+- **Data Model Issues**: Relationship constraints not properly handled
+- **Form State Management**: Step 5 data not properly captured/transmitted
+
+**EVIDENCE FROM USER TESTING:**
+- First save: "Progress saved to database successfully" ✅
+- All subsequent saves: 500 Internal Server Error ❌
+- Pattern suggests database gets into inconsistent state after first save
+
+#### 🔧 CURRENT CODEBASE STATE (DECEMBER 22, 2024):
+- **Files Modified**: `app/api/user-data/route.ts` (extensively rewritten 3+ times)
+- **Import Fixed**: NextAuth import path corrected
+- **Auth Callbacks**: Custom session system removed
+- **Database Operations**: Transaction-wrapped with find/update pattern
+- **Deploy Status**: ✅ All changes deployed to production
+- **Functionality**: ❌ Still completely broken
+
+#### 💡 CRITICAL INSIGHTS FOR NEXT AGENT:
+
+**DO NOT REPEAT THESE FAILED APPROACHES:**
+1. ❌ **NextAuth import modifications** - Already fixed, not the issue
+2. ❌ **Custom session system changes** - Already removed, not the issue  
+3. ❌ **Database transaction wrapping** - Already implemented, didn't work
+4. ❌ **Enum data type fixes** - Already done, not the core problem
+5. ❌ **Find/update patterns** - Already tried, still fails
+6. ❌ **Surgical database operations** - Attempted multiple times, still causes issues
+
+**THE REAL ISSUE IS LIKELY:**
+1. **Database Schema Constraints**: Complex relationship rules causing conflicts
+2. **Prisma Configuration**: ORM settings not handling concurrent operations
+3. **Data Validation**: Form data not properly validated before database operations
+4. **Step 5 Form Handling**: Health situations data not properly captured
+5. **Frontend State Management**: Form state not properly synchronized
+
+**RECOMMENDED NEXT APPROACH:**
+1. **Completely rewrite the API route** - Start from scratch with simple operations
+2. **Test each database operation individually** - Isolate exactly which operation fails
+3. **Fix Step 5 data capture** - Ensure health situations data is properly transmitted
+4. **Simplify database operations** - Use individual creates instead of complex bulk operations
+5. **Add comprehensive error logging** - Capture exact database errors, not just 500s
+
+#### 📊 FINAL USER TESTING EVIDENCE:
+- ❌ **Step 5 Data Missing**: "Test" entered but not appearing in final review
+- ❌ **Consistent 500 Errors**: Every save operation fails
+- ❌ **Data Loss**: Partial data wiping when saves do work
+- ❌ **Complete Failure**: "Confirm & Begin" never works reliably
+
+#### 🚨 AGENT CONCLUSION:
+**I have completely failed to resolve the cross-device sync authentication issue. Despite multiple approaches including NextAuth fixes, database transaction implementations, and various operation patterns, the core problem persists. The "Confirm & Begin" button consistently fails with 500 errors, Step 5 data is not being captured, and database operations are causing constraint conflicts. A completely fresh approach is needed.**
+
+**LAST CONSOLE LOGS FROM USER (DECEMBER 22, 2024):**
+```
+Loading existing onboarding data from database...
+Form state updated: Object
+Current step: 0
+Gender value for step 0: undefined
+Successfully loaded existing onboarding data from database: Object
+Form state updated: Object
+Current step: 9
+Gender value for step 0: undefined
+/api/user-data:1  Failed to load resource: the server responded with a status of 500 ()
+Failed to save progress to database: 500 
+Failed to save onboarding data to database: 500 
+POST https://www.helfi.ai/api/user-data 500 (Internal Server Error)
+```
+
+**DEPLOYMENT STATUS**: All failed attempts deployed to production, user confirmed issues persist on live site.
+
+---
+
 ## 🚨 COMPREHENSIVE AUDIT REPORT - DECEMBER 20, 2024 (AGENT #4 SYSTEMATIC ANALYSIS)
 
 ### 🚨 COMPREHENSIVE AUDIT REPORT - DECEMBER 20, 2024 (AGENT #4 SYSTEMATIC ANALYSIS)
