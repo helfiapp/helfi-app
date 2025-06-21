@@ -74,6 +74,24 @@ export async function GET(request: NextRequest) {
       console.log('No health situations data found in storage');
     }
 
+    // Get blood results data
+    let bloodResultsData = { uploadMethod: 'documents', documents: [], images: [], notes: '', skipped: false };
+    try {
+      const storedBloodResults = user.healthGoals.find((goal: any) => goal.name === '__BLOOD_RESULTS_DATA__');
+      if (storedBloodResults && storedBloodResults.category) {
+        const parsed = JSON.parse(storedBloodResults.category);
+        bloodResultsData = {
+          uploadMethod: parsed.uploadMethod || 'documents',
+          documents: parsed.documents || [],
+          images: parsed.images || [],
+          notes: parsed.notes || '',
+          skipped: parsed.skipped || false
+        };
+      }
+    } catch (e) {
+      console.log('No blood results data found in storage');
+    }
+
     // Transform to onboarding format
     const onboardingData = {
       gender: user.gender?.toLowerCase(),
@@ -84,6 +102,7 @@ export async function GET(request: NextRequest) {
       exerciseTypes: exerciseData.exerciseTypes,
       goals: user.healthGoals.filter((goal: any) => !goal.name.startsWith('__')).map((goal: any) => goal.name),
       healthSituations: healthSituationsData,
+      bloodResults: bloodResultsData,
       supplements: user.supplements.map((supp: any) => ({
         name: supp.name,
         dosage: supp.dosage,
@@ -128,6 +147,7 @@ export async function POST(request: NextRequest) {
       hasSupplements: !!data.supplements,
       hasMedications: !!data.medications,
       hasHealthSituations: !!data.healthSituations,
+      hasBloodResults: !!data.bloodResults,
       hasExercise: !!(data.exerciseFrequency || data.exerciseTypes)
     })
 
@@ -244,6 +264,33 @@ export async function POST(request: NextRequest) {
       }
     } catch (error) {
       console.error('Error storing health situations data:', error)
+      // Continue with other updates
+    }
+
+    // 3.5. Handle blood results data (Step 7) - store as special health goal
+    try {
+      if (data.bloodResults) {
+        // Remove existing blood results data
+        await prisma.healthGoal.deleteMany({
+          where: {
+            userId: user.id,
+            name: '__BLOOD_RESULTS_DATA__'
+          }
+        })
+        
+        // Store new blood results data
+        await prisma.healthGoal.create({
+          data: {
+            userId: user.id,
+            name: '__BLOOD_RESULTS_DATA__',
+            category: JSON.stringify(data.bloodResults),
+            currentRating: 0,
+          }
+        })
+        console.log('Stored blood results data successfully')
+      }
+    } catch (error) {
+      console.error('Error storing blood results data:', error)
       // Continue with other updates
     }
 

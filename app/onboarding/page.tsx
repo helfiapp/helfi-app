@@ -1973,6 +1973,20 @@ function ReviewStep({ onBack, data }: { onBack: () => void, data: any }) {
         )}
         <div><b>Supplements:</b> {(data.supplements || []).map((s: any) => `${s.name} (${s.dosage}, ${Array.isArray(s.timing) ? s.timing.join(', ') : s.timing})`).join('; ')}</div>
         <div><b>Medications:</b> {(data.medications || []).map((m: any) => `${m.name} (${m.dosage}, ${Array.isArray(m.timing) ? m.timing.join(', ') : m.timing})`).join('; ')}</div>
+        {data.bloodResults && !data.bloodResults.skipped && (
+          <div className="mt-4 p-3 bg-green-50 rounded-lg">
+            <div><b>Blood Results:</b></div>
+            {data.bloodResults.uploadMethod === 'documents' && data.bloodResults.documents?.length > 0 && (
+              <div className="ml-2 text-sm"><b>Documents:</b> {data.bloodResults.documents.join(', ')}</div>
+            )}
+            {data.bloodResults.uploadMethod === 'images' && data.bloodResults.images?.length > 0 && (
+              <div className="ml-2 text-sm"><b>Images:</b> {data.bloodResults.images.join(', ')}</div>
+            )}
+            {data.bloodResults.notes && (
+              <div className="ml-2 text-sm"><b>Notes:</b> {data.bloodResults.notes}</div>
+            )}
+          </div>
+        )}
         <div><b>AI Insights:</b> {data.wantInsights === 'yes' ? 'Yes' : 'No'}</div>
       </div>
       <div className="flex justify-between">
