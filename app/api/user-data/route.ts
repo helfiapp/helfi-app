@@ -32,30 +32,28 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // Get exercise data from either new fields or JSON fallback
-    let exerciseData = { exerciseFrequency: null, exerciseTypes: [] };
+    // DEBUG: Log what we actually get from database
+    console.log('DEBUG - User data from database:', {
+      id: user.id,
+      email: user.email,
+      gender: user.gender,
+      weight: user.weight,
+      height: user.height,
+      bodyType: user.bodyType,
+      exerciseFrequency: user.exerciseFrequency,
+      exerciseTypes: user.exerciseTypes,
+      healthGoalsCount: user.healthGoals.length,
+      supplementsCount: user.supplements.length,
+      medicationsCount: user.medications.length
+    })
+
+    // Get exercise data directly from User table fields
+    const exerciseData = {
+      exerciseFrequency: user.exerciseFrequency || null,
+      exerciseTypes: user.exerciseTypes || []
+    };
     
-    // Try to get from new database fields first
-    if ((user as any).exerciseFrequency || (user as any).exerciseTypes) {
-      exerciseData = {
-        exerciseFrequency: (user as any).exerciseFrequency || null,
-        exerciseTypes: (user as any).exerciseTypes || []
-      };
-    } else {
-      // Fallback: check if exercise data is stored in existing user notes field or similar
-      try {
-        const storedExercise = user.healthGoals.find((goal: any) => goal.name === '__EXERCISE_DATA__');
-        if (storedExercise && storedExercise.category) {
-          const parsed = JSON.parse(storedExercise.category);
-          exerciseData = {
-            exerciseFrequency: parsed.exerciseFrequency || null,
-            exerciseTypes: parsed.exerciseTypes || []
-          };
-        }
-      } catch (e) {
-        console.log('No exercise data found in fallback storage');
-      }
-    }
+    console.log('DEBUG - Exercise data extracted:', exerciseData)
 
     // Get health situations data
     let healthSituationsData = { healthIssues: '', healthProblems: '', additionalInfo: '', skipped: false };
@@ -114,6 +112,20 @@ export async function GET(request: NextRequest) {
         timing: med.timing
       }))
     }
+
+    console.log('DEBUG - Final onboarding data being returned:', {
+      gender: onboardingData.gender,
+      weight: onboardingData.weight,
+      height: onboardingData.height,
+      bodyType: onboardingData.bodyType,
+      exerciseFrequency: onboardingData.exerciseFrequency,
+      exerciseTypes: onboardingData.exerciseTypes,
+      hasGoals: onboardingData.goals.length > 0,
+      hasHealthSituations: !!onboardingData.healthSituations,
+      hasBloodResults: !!onboardingData.bloodResults,
+      hasSupplements: onboardingData.supplements.length > 0,
+      hasMedications: onboardingData.medications.length > 0
+    })
 
     return NextResponse.json({ data: onboardingData })
   } catch (error) {
