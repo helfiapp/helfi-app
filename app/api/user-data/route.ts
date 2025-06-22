@@ -5,8 +5,16 @@ import { prisma } from '@/lib/prisma'
 
 export async function GET(request: NextRequest) {
   try {
+    console.log('=== GET /api/user-data DEBUG START ===')
+    console.log('Request URL:', request.url)
+    console.log('Request headers:', Object.fromEntries(request.headers.entries()))
+    
     // Get NextAuth session - App Router automatically handles request context
     const session = await getServerSession(authOptions)
+    
+    console.log('NextAuth session result:', session)
+    console.log('Session user:', session?.user)
+    console.log('Session user email:', session?.user?.email)
     
     if (!session?.user?.email) {
       console.log('GET Authentication failed - no valid session found')
@@ -137,10 +145,17 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('=== POST /api/user-data DEBUG START ===')
+    console.log('Request URL:', request.url)
+    console.log('Request headers:', Object.fromEntries(request.headers.entries()))
     console.log('POST /api/user-data - Starting SIMPLIFIED approach...')
     
     // Get NextAuth session
     const session = await getServerSession(authOptions)
+    
+    console.log('NextAuth session result:', session)
+    console.log('Session user:', session?.user)
+    console.log('Session user email:', session?.user?.email)
     
     if (!session?.user?.email) {
       console.log('POST Authentication failed - no valid session found')
