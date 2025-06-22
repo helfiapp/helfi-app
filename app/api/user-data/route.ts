@@ -34,6 +34,19 @@ export async function GET(request: NextRequest) {
 
     console.log('GET /api/user-data - Loading data for user:', userEmail)
 
+    // Debug: Log actual user data from database
+    console.log('GET /api/user-data - Raw user data from DB:', {
+      gender: user.gender,
+      weight: user.weight,
+      height: user.height,
+      bodyType: user.bodyType,
+      exerciseFrequency: user.exerciseFrequency,
+      exerciseTypes: user.exerciseTypes,
+      healthGoalsCount: user.healthGoals.length,
+      supplementsCount: user.supplements.length,
+      medicationsCount: user.medications.length
+    })
+
     // Get exercise data directly from User table fields
     const exerciseData = {
       exerciseFrequency: user.exerciseFrequency || null,
@@ -79,12 +92,12 @@ export async function GET(request: NextRequest) {
 
     // Transform to onboarding format
     const onboardingData = {
-      gender: user.gender?.toLowerCase(),
-      weight: user.weight?.toString(),
-      height: user.height?.toString(),
-      bodyType: user.bodyType?.toLowerCase(),
-      exerciseFrequency: exerciseData.exerciseFrequency,
-      exerciseTypes: exerciseData.exerciseTypes,
+      gender: user.gender?.toLowerCase() || '',
+      weight: user.weight?.toString() || '',
+      height: user.height?.toString() || '',
+      bodyType: user.bodyType?.toLowerCase() || '',
+      exerciseFrequency: exerciseData.exerciseFrequency || '',
+      exerciseTypes: exerciseData.exerciseTypes || [],
       goals: user.healthGoals.filter((goal: any) => !goal.name.startsWith('__')).map((goal: any) => goal.name),
       healthSituations: healthSituationsData,
       bloodResults: bloodResultsData,
@@ -101,6 +114,19 @@ export async function GET(request: NextRequest) {
     }
 
     console.log('GET /api/user-data - Returning onboarding data for user')
+
+    // Debug: Log transformed data being returned
+    console.log('GET /api/user-data - Transformed onboarding data:', {
+      gender: onboardingData.gender,
+      weight: onboardingData.weight,
+      height: onboardingData.height,
+      bodyType: onboardingData.bodyType,
+      exerciseFrequency: onboardingData.exerciseFrequency,
+      exerciseTypes: onboardingData.exerciseTypes,
+      goalsCount: onboardingData.goals.length,
+      supplementsCount: onboardingData.supplements.length,
+      medicationsCount: onboardingData.medications.length
+    })
 
     return NextResponse.json({ data: onboardingData })
   } catch (error) {
@@ -195,7 +221,9 @@ export async function POST(request: NextRequest) {
           where: { id: user.id },
           data: updateData
         })
-        console.log('Updated user basic data successfully')
+        console.log('Updated user basic data successfully:', updateData)
+      } else {
+        console.log('No user basic data to update')
       }
     } catch (error) {
       console.error('Error updating user basic data:', error)
