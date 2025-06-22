@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-
 // Back to Top Button Component
 function BackToTopButton() {
   const [isVisible, setIsVisible] = useState(false)
@@ -44,13 +43,35 @@ function BackToTopButton() {
 }
 
 export default function SplashPage() {
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-helfi-green/5 via-white to-blue-50">
+      {/* Medical Disclaimer Banner */}
+      <div className="bg-blue-50 border-l-4 border-blue-400 p-4">
+        <div className="max-w-6xl mx-auto">
+          <div className="flex items-start">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-blue-700">
+                <strong>Medical Disclaimer:</strong> Helfi is not a medical device and does not provide medical advice, diagnosis, or treatment. Always consult with a qualified healthcare provider before making health-related decisions. <Link href="/terms" className="underline hover:text-blue-900">View full disclaimer</Link>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Navigation */}
-      <nav className="relative z-10 px-4 py-6">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
+      <nav className="relative z-10 px-6 py-6">
+        <div className="max-w-6xl mx-auto flex justify-between items-center">
           <div className="flex items-center">
-            <div className="w-24 h-24 md:w-32 md:h-32">
+            <button 
+              onClick={() => window.location.reload()}
+              className="w-24 h-24 md:w-32 md:h-32 cursor-pointer hover:opacity-80 transition-opacity"
+            >
               <Image
                 src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/HELFI_TRANSPARENT_rmssry.png"
                 alt="Helfi Logo"
@@ -59,7 +80,7 @@ export default function SplashPage() {
                 className="w-full h-full object-contain"
                 priority
               />
-            </div>
+            </button>
           </div>
           
           {/* Desktop Menu */}
@@ -76,9 +97,18 @@ export default function SplashPage() {
             >
               Pricing
             </button>
-            <Link href="/healthapp" className="text-gray-700 hover:text-helfi-green transition-colors font-medium">
-              Health App
-            </Link>
+            <button 
+              onClick={() => document.getElementById('why-helfi')?.scrollIntoView({ behavior: 'smooth' })}
+              className="text-gray-700 hover:text-helfi-green transition-colors font-medium"
+            >
+              Why Helfi
+            </button>
+            <button 
+              onClick={() => document.getElementById('faq')?.scrollIntoView({ behavior: 'smooth' })}
+              className="text-gray-700 hover:text-helfi-green transition-colors font-medium"
+            >
+              FAQ
+            </button>
             <button 
               onClick={() => document.getElementById('waitlist-signup')?.scrollIntoView({ behavior: 'smooth' })}
               className="btn-secondary hover:bg-gray-100 transition-colors"
@@ -87,11 +117,11 @@ export default function SplashPage() {
             </button>
           </div>
 
-          {/* Mobile Menu Button */}
-          <div className="md:hidden">
+          {/* Mobile Menu */}
+          <div className="md:hidden flex items-center space-x-3">
             <button 
               onClick={() => document.getElementById('waitlist-signup')?.scrollIntoView({ behavior: 'smooth' })}
-              className="btn-secondary hover:bg-gray-100 transition-colors text-sm px-4 py-2"
+              className="btn-secondary hover:bg-gray-100 transition-colors text-sm px-3 py-2"
             >
               Join Waitlist
             </button>
@@ -100,8 +130,8 @@ export default function SplashPage() {
       </nav>
 
       {/* Hero Section */}
-      <section className="px-4 py-20">
-        <div className="max-w-7xl mx-auto text-center">
+      <section className="px-6 py-20">
+        <div className="max-w-6xl mx-auto text-center">
           <div className="max-w-4xl mx-auto">
             <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold text-helfi-black mb-6 leading-tight">
               <span className="block">Your Personal</span>
@@ -131,8 +161,8 @@ export default function SplashPage() {
       </section>
 
       {/* Features Section */}
-      <section id="features" className="px-4 py-20 bg-white">
-        <div className="max-w-7xl mx-auto">
+      <section id="features" className="px-6 py-20 bg-white">
+        <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-helfi-black mb-4">
               Everything you need for optimal health
@@ -183,8 +213,8 @@ export default function SplashPage() {
       </section>
 
       {/* Why Health Tracking Matters Section */}
-      <section className="px-4 py-20 bg-gradient-to-br from-green-50 to-blue-50">
-        <div className="max-w-7xl mx-auto">
+      <section id="why-helfi" className="px-6 py-20 bg-gradient-to-br from-green-50 to-blue-50">
+        <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-helfi-black mb-6">
               Why Personal Health Intelligence Matters
@@ -195,85 +225,96 @@ export default function SplashPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            <div>
-              <h3 className="text-3xl font-bold text-helfi-black mb-6">The Modern Health Challenge</h3>
-              <div className="space-y-6">
-                <div className="flex items-start space-x-4">
-                  <div className="bg-red-100 rounded-full p-2 mt-1">
-                    <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-2">Overwhelming Information</h4>
-                    <p className="text-gray-600">Millions of health articles, supplements, and conflicting advice make it impossible to know what's right for your unique body.</p>
-                  </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-start mt-16">
+            <div className="space-y-8">
+              <div className="flex items-start space-x-4">
+                <div className="bg-red-100 rounded-full p-3 mt-1 flex-shrink-0">
+                  <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
                 </div>
-                
-                <div className="flex items-start space-x-4">
-                  <div className="bg-orange-100 rounded-full p-2 mt-1">
-                    <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-2">Supplement Interactions</h4>
-                    <p className="text-gray-600">Dangerous drug interactions happen daily because people don't track their supplements, medications, and nutrients properly.</p>
-                  </div>
+                <div>
+                  <h3 className="text-xl font-bold text-helfi-black mb-3">Hidden Health Patterns</h3>
+                  <p className="text-gray-600">
+                    Many health issues develop silently over time. Without consistent tracking, patterns that could 
+                    indicate emerging problems often go unnoticed until they become serious.
+                  </p>
                 </div>
-                
-                <div className="flex items-start space-x-4">
-                  <div className="bg-yellow-100 rounded-full p-2 mt-1">
-                    <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-1.996-.833-2.764 0L3.052 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-2">Missed Health Patterns</h4>
-                    <p className="text-gray-600">Without proper tracking, you miss crucial patterns between your diet, supplements, sleep, and how you feel.</p>
-                  </div>
+              </div>
+
+              <div className="flex items-start space-x-4">
+                <div className="bg-yellow-100 rounded-full p-3 mt-1 flex-shrink-0">
+                  <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-helfi-black mb-3">Supplement Confusion</h3>
+                  <p className="text-gray-600">
+                    With thousands of supplements available, knowing what works, what's safe, and what interacts 
+                    with your medications is overwhelming without expert guidance.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start space-x-4">
+                <div className="bg-orange-100 rounded-full p-3 mt-1 flex-shrink-0">
+                  <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-1.996-.833-2.764 0L3.052 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-helfi-black mb-3">Safety &amp; Interaction Alerts</h3>
+                  <p className="text-gray-600">
+                    Stay safe with automatic detection of dangerous drug interactions, supplement conflicts, and personalized warnings.
+                  </p>
                 </div>
               </div>
             </div>
 
-            <div>
-              <h3 className="text-3xl font-bold text-helfi-black mb-6">The Helfi Solution</h3>
-              <div className="space-y-6">
-                <div className="flex items-start space-x-4">
-                  <div className="bg-helfi-green/20 rounded-full p-2 mt-1">
-                    <svg className="w-6 h-6 text-helfi-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-2">AI-Powered Personalization</h4>
-                    <p className="text-gray-600">Our advanced AI analyzes your unique health profile to provide personalized recommendations that actually work for your body.</p>
-                  </div>
+            <div className="space-y-8">
+              <div className="flex items-start space-x-4">
+                <div className="bg-helfi-green/20 rounded-full p-3 mt-1 flex-shrink-0">
+                  <svg className="w-6 h-6 text-helfi-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
                 </div>
-                
-                <div className="flex items-start space-x-4">
-                  <div className="bg-blue-100 rounded-full p-2 mt-1">
-                    <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-2">Safety First Approach</h4>
-                    <p className="text-gray-600">Automatically detect dangerous supplement-medication interactions and get instant alerts to keep you safe.</p>
-                  </div>
+                <div>
+                  <h3 className="text-xl font-bold text-helfi-black mb-3">Personalized Insights</h3>
+                  <p className="text-gray-600">
+                    Our AI learns your unique patterns and provides recommendations tailored specifically to your 
+                    body, lifestyle, and health goals.
+                  </p>
                 </div>
-                
-                <div className="flex items-start space-x-4">
-                  <div className="bg-purple-100 rounded-full p-2 mt-1">
-                    <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-2">Effortless Tracking</h4>
-                    <p className="text-gray-600">Simply take photos of your food or say "Hey Helfi, I just took my vitamins" - our AI handles the rest automatically.</p>
-                  </div>
+              </div>
+
+              <div className="flex items-start space-x-4">
+                <div className="bg-blue-100 rounded-full p-3 mt-1 flex-shrink-0">
+                  <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-helfi-black mb-3">Proactive Prevention</h3>
+                  <p className="text-gray-600">
+                    Identify potential health issues before they become problems, allowing you to take preventive 
+                    action and maintain optimal wellness.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start space-x-4">
+                <div className="bg-purple-100 rounded-full p-3 mt-1 flex-shrink-0">
+                  <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-helfi-black mb-3">Optimization Guidance</h3>
+                  <p className="text-gray-600">
+                    Get science-backed recommendations for supplements, timing, dosages, and lifestyle changes 
+                    to maximize your health outcomes.
+                  </p>
                 </div>
               </div>
             </div>
@@ -346,8 +387,8 @@ export default function SplashPage() {
       </section>
 
       {/* Voice AI Section */}
-      <section className="px-4 py-20 bg-gradient-to-r from-purple-50 to-blue-50">
-        <div className="max-w-7xl mx-auto">
+      <section className="px-6 py-20 bg-gradient-to-r from-purple-50 to-blue-50">
+        <div className="max-w-6xl mx-auto">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div>
               <h2 className="text-4xl font-bold text-helfi-black mb-6">
@@ -403,22 +444,14 @@ export default function SplashPage() {
               </div>
             </div>
 
-            <div className="text-center">
-              <div className="bg-gradient-to-br from-purple-100 to-blue-100 rounded-3xl p-12 relative overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-br from-purple-400/20 to-blue-400/20"></div>
-                <div className="relative z-10">
-                  <div className="text-6xl mb-6">🎤</div>
-                  <h3 className="text-2xl font-bold text-gray-900 mb-4">Talk to Helfi</h3>
-                  <p className="text-gray-700 mb-6">
-                    The most natural way to track your health. Just speak, and let AI do the work.
-                  </p>
-                  <button
-                    onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}
-                    className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-8 py-4 rounded-xl font-semibold hover:from-purple-700 hover:to-blue-700 transition-all duration-200"
-                  >
-                    Try Voice AI Free
-                  </button>
-                </div>
+            <div className="flex justify-center">
+              <div className="w-full max-w-lg h-96 bg-gradient-to-br from-purple-100 to-blue-100 rounded-2xl shadow-2xl overflow-hidden">
+                <img 
+                  src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749922074/WOMAN_TALKING_INTO_HER_PHONE_zi9fh8.jpg"
+                  alt="Woman speaking into phone using voice AI"
+                  className="w-full h-full object-cover object-center"
+                  style={{objectPosition: 'center 20%'}}
+                />
               </div>
             </div>
           </div>
@@ -426,8 +459,8 @@ export default function SplashPage() {
       </section>
 
       {/* Pricing Section */}
-      <section id="pricing" className="px-4 py-20 bg-gray-50">
-        <div className="max-w-7xl mx-auto">
+      <section id="pricing" className="px-6 py-20 bg-gray-50">
+        <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-helfi-black mb-4">
               Simple, Transparent Pricing
@@ -653,8 +686,8 @@ export default function SplashPage() {
       </section>
 
       {/* FAQ Section */}
-      <section className="px-4 py-20 bg-white">
-        <div className="max-w-4xl mx-auto">
+      <section id="faq" className="px-6 py-20 bg-white">
+        <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-helfi-black mb-6">
               Frequently Asked Questions
@@ -742,7 +775,7 @@ export default function SplashPage() {
 
       {/* Benefits for Health Optimization Section */}
       <section className="px-4 py-20 bg-gradient-to-br from-helfi-green/5 to-blue-50">
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-helfi-black mb-6">
               Why Health Optimization Matters More Than Ever
@@ -812,8 +845,8 @@ export default function SplashPage() {
       </section>
 
       {/* Waitlist Signup Section */}
-      <section id="waitlist-signup" className="px-4 py-20 bg-helfi-green">
-        <div className="max-w-2xl mx-auto text-center">
+      <section id="waitlist-signup" className="px-8 md:px-48 lg:px-64 py-20 bg-helfi-green">
+        <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-4xl font-bold text-white mb-4">
             Be the first to know when we launch!
           </h2>
@@ -876,7 +909,7 @@ export default function SplashPage() {
 
       {/* Footer */}
       <footer className="bg-helfi-black text-white px-4 py-12">
-        <div className="max-w-7xl mx-auto">
+        <div className="max-w-6xl mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div className="md:col-span-2">
               <div className="text-2xl font-bold mb-4">
@@ -889,12 +922,40 @@ export default function SplashPage() {
             
             <div>
               <h4 className="font-semibold mb-4">Platform</h4>
-                             <ul className="space-y-2 text-gray-400">
-                 <li><a href="#" className="hover:text-white">Features</a></li>
-                 <li><a href="#" className="hover:text-white">Pricing</a></li>
-                 <li><a href="#" className="hover:text-white">About</a></li>
-                 <li><a href="#" className="hover:text-white">Contact</a></li>
-               </ul>
+              <ul className="space-y-2 text-gray-400">
+                <li>
+                  <button 
+                    onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}
+                    className="hover:text-white text-left"
+                  >
+                    Features
+                  </button>
+                </li>
+                <li>
+                  <button 
+                    onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}
+                    className="hover:text-white text-left"
+                  >
+                    Pricing
+                  </button>
+                </li>
+                <li>
+                  <button 
+                    onClick={() => document.getElementById('why-helfi')?.scrollIntoView({ behavior: 'smooth' })}
+                    className="hover:text-white text-left"
+                  >
+                    Why Helfi
+                  </button>
+                </li>
+                <li>
+                  <button 
+                    onClick={() => document.getElementById('faq')?.scrollIntoView({ behavior: 'smooth' })}
+                    className="hover:text-white text-left"
+                  >
+                    FAQ
+                  </button>
+                </li>
+              </ul>
             </div>
             
             <div>
