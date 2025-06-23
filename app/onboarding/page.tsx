@@ -2245,23 +2245,25 @@ export default function Onboarding() {
           
           {/* Numbered Steps Progress with Connecting Lines */}
           <div className="relative mb-6">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-center max-w-2xl mx-auto">
               {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((stepNum, index) => (
                 <div key={stepNum} className="flex items-center">
                   <button 
                     onClick={() => goToStep(stepNum - 1)}
                     className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all z-10 cursor-pointer hover:scale-105 ${
-                      stepNum <= step + 1 
+                      stepNum === step + 1 
                         ? 'bg-green-600 text-white hover:bg-green-700' 
-                        : 'bg-gray-200 text-gray-500 hover:bg-gray-300'
+                        : stepNum < step + 1
+                        ? 'bg-green-600 text-white hover:bg-green-700'
+                        : 'bg-gray-300 text-gray-600 hover:bg-gray-400'
                     }`}
                     title={`Go to step ${stepNum}: ${stepNames[stepNum - 1]}`}
                   >
                     {stepNum}
                   </button>
                   {index < 9 && (
-                    <div className={`h-0.5 flex-1 mx-1 transition-all ${
-                      stepNum < step + 1 ? 'bg-green-600' : 'bg-gray-200'
+                    <div className={`h-0.5 w-4 transition-all ${
+                      stepNum < step + 1 ? 'bg-green-600' : 'bg-gray-300'
                     }`} />
                   )}
                 </div>
