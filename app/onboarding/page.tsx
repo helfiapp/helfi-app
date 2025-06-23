@@ -2245,29 +2245,59 @@ export default function Onboarding() {
           
           {/* Numbered Steps Progress with Connecting Lines */}
           <div className="relative mb-6">
-            <div className="flex items-center justify-center max-w-2xl mx-auto">
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((stepNum, index) => (
-                <div key={stepNum} className="flex items-center">
-                  <button 
-                    onClick={() => goToStep(stepNum - 1)}
-                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all z-10 cursor-pointer hover:scale-105 ${
-                      stepNum === step + 1 
-                        ? 'bg-green-600 text-white hover:bg-green-700' 
-                        : stepNum < step + 1
-                        ? 'bg-green-600 text-white hover:bg-green-700'
-                        : 'bg-gray-300 text-gray-600 hover:bg-gray-400'
-                    }`}
-                    title={`Go to step ${stepNum}: ${stepNames[stepNum - 1]}`}
-                  >
-                    {stepNum}
-                  </button>
-                  {index < 9 && (
-                    <div className={`h-0.5 w-4 transition-all ${
-                      stepNum < step + 1 ? 'bg-green-600' : 'bg-gray-300'
-                    }`} />
-                  )}
-                </div>
-              ))}
+            {/* Mobile-first responsive design */}
+            <div className="flex items-center justify-center px-2 sm:px-4">
+              {/* Mobile: Show simplified progress with dots for smaller screens */}
+              <div className="sm:hidden flex items-center space-x-2">
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((stepNum, index) => (
+                  <React.Fragment key={stepNum}>
+                    <button 
+                      onClick={() => goToStep(stepNum - 1)}
+                      className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium transition-all z-10 cursor-pointer ${
+                        stepNum === step + 1 
+                          ? 'bg-green-600 text-white' 
+                          : stepNum < step + 1
+                          ? 'bg-green-600 text-white'
+                          : 'bg-gray-300 text-gray-600'
+                      }`}
+                      title={`Go to step ${stepNum}: ${stepNames[stepNum - 1]}`}
+                    >
+                      {stepNum <= 9 ? stepNum : '10'}
+                    </button>
+                    {index < 9 && (
+                      <div className={`h-0.5 w-2 transition-all ${
+                        stepNum < step + 1 ? 'bg-green-600' : 'bg-gray-300'
+                      }`} />
+                    )}
+                  </React.Fragment>
+                ))}
+              </div>
+              
+              {/* Desktop: Show full numbered circles */}
+              <div className="hidden sm:flex items-center justify-center max-w-4xl mx-auto">
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((stepNum, index) => (
+                  <div key={stepNum} className="flex items-center">
+                    <button 
+                      onClick={() => goToStep(stepNum - 1)}
+                      className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all z-10 cursor-pointer hover:scale-105 ${
+                        stepNum === step + 1 
+                          ? 'bg-green-600 text-white hover:bg-green-700' 
+                          : stepNum < step + 1
+                          ? 'bg-green-600 text-white hover:bg-green-700'
+                          : 'bg-gray-300 text-gray-600 hover:bg-gray-400'
+                      }`}
+                      title={`Go to step ${stepNum}: ${stepNames[stepNum - 1]}`}
+                    >
+                      {stepNum}
+                    </button>
+                    {index < 9 && (
+                      <div className={`h-0.5 w-4 transition-all ${
+                        stepNum < step + 1 ? 'bg-green-600' : 'bg-gray-300'
+                      }`} />
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
           
