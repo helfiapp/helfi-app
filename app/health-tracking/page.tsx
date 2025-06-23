@@ -88,7 +88,7 @@ export default function HealthTracking() {
           
           {/* Centered Page Title */}
           <div className="text-center">
-            <h1 className="text-lg md:text-xl font-semibold text-gray-900">Health Tracking</h1>
+            <h1 className="text-lg md:text-xl font-semibold text-gray-900">Insights</h1>
             <p className="text-sm text-gray-500 hidden sm:block">Monitor your daily health metrics</p>
           </div>
           

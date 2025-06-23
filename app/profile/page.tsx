@@ -178,26 +178,10 @@ export default function Profile() {
         </div>
       </nav>
 
-      {/* Second Row - Page Title, Auto-save Status and Profile */}
+      {/* Second Row - Page Title and Profile */}
       <div className="bg-white border-b border-gray-200 px-4 py-4">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
-          {/* Auto-save Status - Desktop Left */}
-          <div className="hidden md:flex items-center">
-            {saveStatus === 'saving' && (
-              <div className="flex items-center text-blue-600">
-                <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mr-2"></div>
-                <span className="text-sm font-medium">Saving...</span>
-              </div>
-            )}
-            {saveStatus === 'saved' && (
-              <div className="flex items-center text-green-600">
-                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-                <span className="text-sm font-medium">Saved</span>
-              </div>
-            )}
-          </div>
+          <div></div> {/* Empty div for spacing */}
           
           {/* Centered Page Title */}
           <div className="text-center">
@@ -254,24 +238,8 @@ export default function Profile() {
             </div>
           </div>
 
-          {/* Mobile Auto-save Status & Profile */}
-          <div className="md:hidden flex items-center space-x-3">
-            {saveStatus === 'saving' && (
-              <div className="flex items-center text-blue-600">
-                <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mr-2"></div>
-                <span className="text-sm font-medium">Saving...</span>
-              </div>
-            )}
-            {saveStatus === 'saved' && (
-              <div className="flex items-center text-green-600">
-                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-                <span className="text-sm font-medium">Saved</span>
-              </div>
-            )}
-            
-            {/* Mobile Profile */}
+          {/* Mobile Profile - Show on mobile */}
+          <div className="md:hidden">
             <div className="relative dropdown-container" id="mobile-profile-dropdown">
               <button
                 onClick={() => setDropdownOpen((v) => !v)}

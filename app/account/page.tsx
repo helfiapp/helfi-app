@@ -79,13 +79,36 @@ export default function AccountPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Navigation Header */}
+      {/* Navigation Header - First Row */}
       <nav className="bg-white border-b border-gray-200 px-4 py-3">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="flex items-center">
-            <Link href="/dashboard" className="bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors mr-4">
+            <Link href="/dashboard" className="bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors">
               Back to Dashboard
             </Link>
+          </div>
+          
+          {/* Desktop Navigation */}
+          <div className="hidden md:flex items-center space-x-6">
+            <Link href="/dashboard" className="text-gray-700 hover:text-helfi-green transition-colors font-medium">
+              Dashboard
+            </Link>
+            <Link href="/health-tracking" className="text-gray-700 hover:text-helfi-green transition-colors font-medium">
+              Insights
+            </Link>
+            <Link href="/profile" className="text-gray-700 hover:text-helfi-green transition-colors font-medium">
+              Profile
+            </Link>
+            <Link href="/onboarding?step=1" className="text-gray-700 hover:text-helfi-green transition-colors font-medium">
+              Intake
+            </Link>
+            <Link href="/settings" className="text-gray-700 hover:text-helfi-green transition-colors font-medium">
+              Settings
+            </Link>
+          </div>
+
+          {/* Logo on the right */}
+          <div className="flex items-center">
             <Link href="/" className="w-16 h-16 md:w-20 md:h-20 cursor-pointer hover:opacity-80 transition-opacity">
               <Image
                 src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/HELFI_TRANSPARENT_rmssry.png"
@@ -96,32 +119,25 @@ export default function AccountPage() {
                 priority
               />
             </Link>
-            <div className="ml-4">
-              <h1 className="text-lg md:text-xl font-semibold text-gray-900">Account Settings</h1>
-              <p className="text-sm text-gray-500 hidden sm:block">Manage your account preferences</p>
-            </div>
-          </div>
-          
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-6">
-            <Link href="/dashboard" className="text-gray-700 hover:text-helfi-green transition-colors font-medium">
-              Dashboard
-            </Link>
-            <Link href="/health-tracking" className="text-gray-700 hover:text-helfi-green transition-colors font-medium">
-              Health Tracking
-            </Link>
-            <Link href="/insights" className="text-gray-700 hover:text-helfi-green transition-colors font-medium">
-              AI Insights
-            </Link>
-            <Link href="/reports" className="text-gray-700 hover:text-helfi-green transition-colors font-medium">
-              Reports
-            </Link>
-            <Link href="/onboarding?step=1" className="text-gray-700 hover:text-helfi-green transition-colors font-medium">
-              Health Info
-            </Link>
           </div>
         </div>
       </nav>
+
+      {/* Second Row - Page Title and Profile */}
+      <div className="bg-white border-b border-gray-200 px-4 py-4">
+        <div className="max-w-7xl mx-auto flex justify-between items-center">
+          <div></div> {/* Empty div for spacing */}
+          
+          {/* Centered Page Title */}
+          <div className="text-center">
+            <h1 className="text-lg md:text-xl font-semibold text-gray-900">Account Settings</h1>
+            <p className="text-sm text-gray-500 hidden sm:block">Manage your account preferences</p>
+          </div>
+          
+          {/* Profile Avatar Section - placeholder for now */}
+          <div className="w-12 h-12"></div> {/* Placeholder for consistent spacing */}
+        </div>
+      </div>
 
       {/* Main Content */}
       <div className="max-w-3xl mx-auto px-4 py-8">
@@ -242,6 +258,64 @@ export default function AccountPage() {
           </div>
         </div>
       </div>
+
+      {/* Mobile Bottom Navigation - Inspired by Google, Facebook, Amazon mobile apps */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-2 z-40">
+        <div className="flex items-center justify-around">
+          
+          {/* Dashboard */}
+          <Link href="/dashboard" className="flex flex-col items-center py-2 px-1 min-w-0 flex-1">
+            <div className="text-gray-400">
+              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/>
+              </svg>
+            </div>
+            <span className="text-xs text-gray-400 mt-1 font-medium truncate">Dashboard</span>
+          </Link>
+
+          {/* Insights (renamed from Health) */}
+          <Link href="/health-tracking" className="flex flex-col items-center py-2 px-1 min-w-0 flex-1">
+            <div className="text-gray-400">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+              </svg>
+            </div>
+            <span className="text-xs text-gray-400 mt-1 font-medium truncate">Insights</span>
+          </Link>
+
+          {/* Profile */}
+          <Link href="/profile" className="flex flex-col items-center py-2 px-1 min-w-0 flex-1">
+            <div className="text-gray-400">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+            </div>
+            <span className="text-xs text-gray-400 mt-1 font-medium truncate">Profile</span>
+          </Link>
+
+          {/* Intake (Onboarding) */}
+          <Link href="/onboarding?step=1" className="flex flex-col items-center py-2 px-1 min-w-0 flex-1">
+            <div className="text-gray-400">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+            </div>
+            <span className="text-xs text-gray-400 mt-1 font-medium truncate">Intake</span>
+          </Link>
+
+          {/* Settings */}
+          <Link href="/settings" className="flex flex-col items-center py-2 px-1 min-w-0 flex-1">
+            <div className="text-gray-400">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </div>
+            <span className="text-xs text-gray-400 mt-1 font-medium truncate">Settings</span>
+          </Link>
+
+        </div>
+      </nav>
     </div>
   )
 } 
