@@ -37,27 +37,13 @@ export default function HealthTracking() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Navigation Header */}
+      {/* Navigation Header - First Row */}
       <nav className="bg-white border-b border-gray-200 px-4 py-3">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="flex items-center">
-            <Link href="/dashboard" className="bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors mr-4">
+            <Link href="/dashboard" className="bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors">
               Back to Dashboard
             </Link>
-            <Link href="/" className="w-16 h-16 md:w-20 md:h-20 cursor-pointer hover:opacity-80 transition-opacity">
-              <Image
-                src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/HELFI_TRANSPARENT_rmssry.png"
-                alt="Helfi Logo"
-                width={80}
-                height={80}
-                className="w-full h-full object-contain"
-                priority
-              />
-            </Link>
-            <div className="ml-4">
-              <h1 className="text-lg md:text-xl font-semibold text-gray-900">Health Tracking</h1>
-              <p className="text-sm text-gray-500 hidden sm:block">Monitor your daily health metrics</p>
-            </div>
           </div>
           
           {/* Desktop Navigation */}
@@ -77,9 +63,38 @@ export default function HealthTracking() {
             <Link href="/onboarding?step=1" className="text-gray-700 hover:text-helfi-green transition-colors font-medium">
               Health Info
             </Link>
-            
-            {/* Desktop Profile Avatar & Dropdown */}
-            <div className="relative ml-6" id="profile-dropdown">
+          </div>
+
+          {/* Logo on the right */}
+          <div className="flex items-center">
+            <Link href="/" className="w-16 h-16 md:w-20 md:h-20 cursor-pointer hover:opacity-80 transition-opacity">
+              <Image
+                src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/HELFI_TRANSPARENT_rmssry.png"
+                alt="Helfi Logo"
+                width={80}
+                height={80}
+                className="w-full h-full object-contain"
+                priority
+              />
+            </Link>
+          </div>
+        </div>
+      </nav>
+
+      {/* Second Row - Page Title and Profile */}
+      <div className="bg-white border-b border-gray-200 px-4 py-4">
+        <div className="max-w-7xl mx-auto flex justify-between items-center">
+          <div></div> {/* Empty div for spacing */}
+          
+          {/* Centered Page Title */}
+          <div className="text-center">
+            <h1 className="text-lg md:text-xl font-semibold text-gray-900">Health Tracking</h1>
+            <p className="text-sm text-gray-500 hidden sm:block">Monitor your daily health metrics</p>
+          </div>
+          
+          {/* Desktop Profile Avatar & Dropdown */}
+          <div className="hidden md:flex">
+            <div className="relative" id="profile-dropdown">
               <button
                 onClick={() => setDropdownOpen((v) => !v)}
                 className="focus:outline-none"
@@ -125,69 +140,59 @@ export default function HealthTracking() {
               )}
             </div>
           </div>
-        </div>
-      </nav>
 
-      {/* Mobile Top Header - Minimal */}
-      <div className="md:hidden bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center">
-          <Image
-            src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/HELFI_TRANSPARENT_rmssry.png"
-            alt="Helfi Logo"
-            width={40}
-            height={40}
-            className="object-contain"
-            priority
-          />
-        </div>
-        
-        {/* Mobile Profile */}
-        <div className="relative" id="mobile-profile-dropdown">
-          <button
-            onClick={() => setDropdownOpen((v) => !v)}
-            className="focus:outline-none"
-            aria-label="Open profile menu"
-          >
-            <Image
-              src={userImage}
-              alt="Profile"
-              width={36}
-              height={36}
-              className="rounded-full border-2 border-helfi-green shadow-sm object-cover"
-            />
-          </button>
-          {dropdownOpen && (
-            <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-100">
-              <div className="flex items-center px-4 py-3 border-b border-gray-100">
+          {/* Mobile Profile - Show on mobile */}
+          <div className="md:hidden">
+            <div className="relative" id="mobile-profile-dropdown">
+              <button
+                onClick={() => setDropdownOpen((v) => !v)}
+                className="focus:outline-none"
+                aria-label="Open profile menu"
+              >
                 <Image
                   src={userImage}
                   alt="Profile"
-                  width={40}
-                  height={40}
-                  className="rounded-full object-cover mr-3"
+                  width={36}
+                  height={36}
+                  className="rounded-full border-2 border-helfi-green shadow-sm object-cover"
                 />
-                <div>
-                  <div className="font-semibold text-gray-900">{userName}</div>
-                  <div className="text-xs text-gray-500">{session?.user?.email || 'user@email.com'}</div>
-                </div>
-              </div>
-              <Link href="/profile" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Profile</Link>
-              <Link href="/account" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Account Settings</Link>
-              <Link href="/profile/image" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Upload/Change Profile Image</Link>
-              <Link href="/billing" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Subscription & Billing</Link>
-              <Link href="/notifications" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Notifications</Link>
-              <Link href="/privacy" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Privacy Settings</Link>
-              <Link href="/help" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
-              <button
-                onClick={() => signOut()}
-                className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50 font-semibold"
-              >
-                Logout
               </button>
+              {dropdownOpen && (
+                <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-100">
+                  <div className="flex items-center px-4 py-3 border-b border-gray-100">
+                    <Image
+                      src={userImage}
+                      alt="Profile"
+                      width={40}
+                      height={40}
+                      className="rounded-full object-cover mr-3"
+                    />
+                    <div>
+                      <div className="font-semibold text-gray-900">{userName}</div>
+                      <div className="text-xs text-gray-500">{session?.user?.email || 'user@email.com'}</div>
+                    </div>
+                  </div>
+                  <Link href="/profile" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Profile</Link>
+                  <Link href="/account" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Account Settings</Link>
+                  <Link href="/profile/image" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Upload/Change Profile Image</Link>
+                  <Link href="/billing" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Subscription & Billing</Link>
+                  <Link href="/notifications" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Notifications</Link>
+                  <Link href="/privacy" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Privacy Settings</Link>
+                  <Link href="/help" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
+                  <button
+                    onClick={() => signOut()}
+                    className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50 font-semibold"
+                  >
+                    Logout
+                  </button>
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
       </div>
+
+
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-8 pb-20 md:pb-8">
