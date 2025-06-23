@@ -290,8 +290,8 @@ export default function ProfileImage() {
           </div>
           
           {/* Current Profile Picture Section */}
-          <div className="px-8 py-8 text-center">
-            <div className="w-32 h-32 mx-auto mb-6 relative">
+          <div className="px-8 py-12 text-center border-b border-gray-100">
+            <div className="w-32 h-32 mx-auto mb-8 relative">
               {(imagePreview || currentProfileImage) ? (
                 <div className="relative">
                   <Image
@@ -320,7 +320,7 @@ export default function ProfileImage() {
               )}
             </div>
             
-            <div className="space-y-2">
+            <div className="space-y-3">
               <p className="text-lg font-medium text-gray-900">
                 {imagePreview ? 'New Profile Picture' : currentProfileImage ? 'Current Profile Picture' : 'No Profile Picture'}
               </p>
@@ -385,7 +385,7 @@ export default function ProfileImage() {
           )}
 
           {/* Upload Options - Google-style clean design */}
-          <div className="px-8 py-6 space-y-4">
+          <div className="px-8 py-8 space-y-6">
             {/* Upload from device */}
             <div className="border border-gray-200 rounded-xl p-6 hover:border-gray-300 hover:shadow-sm transition-all">
               <div className="flex items-center space-x-4">
@@ -415,8 +415,8 @@ export default function ProfileImage() {
               </div>
             </div>
 
-            {/* Take photo */}
-            <div className="border border-gray-200 rounded-xl p-6 hover:border-gray-300 hover:shadow-sm transition-all">
+            {/* Take photo - Hidden on mobile, shown on desktop only */}
+            <div className="hidden md:block border border-gray-200 rounded-xl p-6 hover:border-gray-300 hover:shadow-sm transition-all">
               <div className="flex items-center space-x-4">
                 <div className="w-12 h-12 bg-green-50 rounded-full flex items-center justify-center">
                   <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -426,7 +426,7 @@ export default function ProfileImage() {
                 </div>
                 <div className="flex-1">
                   <h3 className="text-lg font-medium text-gray-900">Take a photo</h3>
-                  <p className="text-sm text-gray-600">Use your device camera</p>
+                  <p className="text-sm text-gray-600">Use your webcam camera</p>
                 </div>
                 <button 
                   onClick={startCamera}
