@@ -80,6 +80,20 @@ function GenderStep({ onNext, initial }: { onNext: (data: any) => void, initial?
     }
   }, [initial]);
   
+  // Load Terms & Conditions agreement from localStorage
+  useEffect(() => {
+    const savedAgreement = localStorage.getItem('helfi-terms-agreed');
+    if (savedAgreement === 'true') {
+      setAgreed(true);
+    }
+  }, []);
+  
+  // Save Terms & Conditions agreement to localStorage when changed
+  const handleAgreedChange = (checked: boolean) => {
+    setAgreed(checked);
+    localStorage.setItem('helfi-terms-agreed', checked.toString());
+  };
+  
   return (
     <div className="max-w-md mx-auto">
       <div className="bg-white rounded-lg shadow-sm p-6">
@@ -105,7 +119,7 @@ function GenderStep({ onNext, initial }: { onNext: (data: any) => void, initial?
             type="checkbox"
             id="agree-terms"
             checked={agreed}
-            onChange={e => setAgreed(e.target.checked)}
+            onChange={e => handleAgreedChange(e.target.checked)}
             className="mr-2"
           />
           <label htmlFor="agree-terms" className="text-sm text-gray-700">
