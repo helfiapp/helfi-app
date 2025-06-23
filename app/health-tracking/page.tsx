@@ -23,16 +23,16 @@ export default function HealthTracking() {
   // Close dropdown on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent) {
-      if (!(e.target as HTMLElement).closest('#profile-dropdown')) {
+      const target = e.target as HTMLElement;
+      // Check if click is outside both the button and the dropdown content
+      if (!target.closest('.dropdown-container')) {
         setDropdownOpen(false);
       }
     }
     if (dropdownOpen) {
       document.addEventListener('mousedown', handleClick);
-    } else {
-      document.removeEventListener('mousedown', handleClick);
+      return () => document.removeEventListener('mousedown', handleClick);
     }
-    return () => document.removeEventListener('mousedown', handleClick);
   }, [dropdownOpen]);
 
   return (
@@ -94,7 +94,7 @@ export default function HealthTracking() {
           
           {/* Desktop Profile Avatar & Dropdown */}
           <div className="hidden md:flex">
-            <div className="relative" id="profile-dropdown">
+            <div className="relative dropdown-container" id="profile-dropdown">
               <button
                 onClick={() => setDropdownOpen((v) => !v)}
                 className="focus:outline-none"
@@ -143,7 +143,7 @@ export default function HealthTracking() {
 
           {/* Mobile Profile - Show on mobile */}
           <div className="md:hidden">
-            <div className="relative" id="mobile-profile-dropdown">
+            <div className="relative dropdown-container" id="mobile-profile-dropdown">
               <button
                 onClick={() => setDropdownOpen((v) => !v)}
                 className="focus:outline-none"
