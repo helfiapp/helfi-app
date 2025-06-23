@@ -69,14 +69,21 @@ function OnboardingNav() {
   );
 }
 
-function GenderStep({ onNext, initial }: { onNext: (data: any) => void, initial?: string }) {
+function GenderStep({ onNext, initial }: { onNext: (data: any) => void, initial?: any }) {
   const [gender, setGender] = useState('');
   const [agreed, setAgreed] = useState(false);
   
-  // Properly initialize gender when initial prop changes
+  // Properly initialize gender and agreed status when initial prop changes
   useEffect(() => {
     if (initial) {
-      setGender(initial);
+      if (typeof initial === 'string') {
+        // Handle legacy case where only gender string is passed
+        setGender(initial);
+      } else if (typeof initial === 'object') {
+        // Handle new case where full object is passed
+        if (initial.gender) setGender(initial.gender);
+        if (initial.agreed !== undefined) setAgreed(initial.agreed);
+      }
     }
   }, [initial]);
   
@@ -115,13 +122,13 @@ function GenderStep({ onNext, initial }: { onNext: (data: any) => void, initial?
         <div className="flex justify-between pt-4">
           <button 
             className="text-gray-600 hover:text-gray-900 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors"
-            onClick={() => onNext({ gender: gender || 'not specified' })}
+            onClick={() => onNext({ gender: gender || 'not specified', agreed })}
           >
             Skip
           </button>
           <button
             className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors"
-            onClick={() => onNext({ gender: gender || 'not specified' })}
+            onClick={() => onNext({ gender: gender || 'not specified', agreed })}
           >
             Continue
           </button>
@@ -2281,7 +2288,7 @@ export default function Onboarding() {
 
         {/* Content */}
         <div className="flex-1 px-4 py-6 pt-8">
-          {step === 0 && <GenderStep onNext={handleNext} initial={form.gender} />}
+          {step === 0 && <GenderStep onNext={handleNext} initial={form} />}
           {step === 1 && <PhysicalStep onNext={handleNext} onBack={handleBack} initial={form} />}
           {step === 2 && <ExerciseStep onNext={handleNext} onBack={handleBack} initial={form} />}
           {step === 3 && <HealthGoalsStep onNext={handleNext} onBack={handleBack} initial={form} />}
