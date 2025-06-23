@@ -55,7 +55,7 @@ export default function HealthTracking() {
       </nav>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto px-4 py-8 pb-20 md:pb-8">
         <div className="bg-white rounded-lg shadow-sm p-8">
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold text-helfi-black mb-4">
@@ -117,6 +117,63 @@ export default function HealthTracking() {
           </div>
         </div>
       </div>
+
+      {/* Mobile Bottom Navigation - Inspired by Google, Facebook, Amazon mobile apps */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-2 z-40">
+        <div className="flex items-center justify-around">
+          
+          {/* Dashboard */}
+          <Link href="/dashboard" className="flex flex-col items-center py-2 px-1 min-w-0 flex-1">
+            <div className="text-gray-400">
+              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/>
+              </svg>
+            </div>
+            <span className="text-xs text-gray-400 mt-1 font-medium truncate">Dashboard</span>
+          </Link>
+
+          {/* Health (Active) */}
+          <Link href="/health-tracking" className="flex flex-col items-center py-2 px-1 min-w-0 flex-1">
+            <div className="text-helfi-green">
+              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+              </svg>
+            </div>
+            <span className="text-xs text-helfi-green mt-1 font-bold truncate">Health</span>
+          </Link>
+
+          {/* Profile */}
+          <Link href="/profile" className="flex flex-col items-center py-2 px-1 min-w-0 flex-1">
+            <div className="text-gray-400">
+              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+              </svg>
+            </div>
+            <span className="text-xs text-gray-400 mt-1 font-medium truncate">Profile</span>
+          </Link>
+
+          {/* Insights */}
+          <Link href="/insights" className="flex flex-col items-center py-2 px-1 min-w-0 flex-1">
+            <div className="text-gray-400">
+              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+              </svg>
+            </div>
+            <span className="text-xs text-gray-400 mt-1 font-medium truncate">Insights</span>
+          </Link>
+
+          {/* Reports */}
+          <Link href="/reports" className="flex flex-col items-center py-2 px-1 min-w-0 flex-1">
+            <div className="text-gray-400">
+              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/>
+              </svg>
+            </div>
+            <span className="text-xs text-gray-400 mt-1 font-medium truncate">Reports</span>
+          </Link>
+
+        </div>
+      </nav>
     </div>
   )
 } 
