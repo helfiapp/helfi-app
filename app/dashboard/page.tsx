@@ -25,16 +25,16 @@ export default function Dashboard() {
   // Close dropdown on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent) {
-      if (!(e.target as HTMLElement).closest('#profile-dropdown')) {
+      const target = e.target as HTMLElement;
+      // Check if click is outside both the button and the dropdown content
+      if (!target.closest('.dropdown-container')) {
         setDropdownOpen(false);
       }
     }
     if (dropdownOpen) {
       document.addEventListener('mousedown', handleClick);
-    } else {
-      document.removeEventListener('mousedown', handleClick);
+      return () => document.removeEventListener('mousedown', handleClick);
     }
-    return () => document.removeEventListener('mousedown', handleClick);
   }, [dropdownOpen]);
 
   // Load existing data from database (cross-device sync)
@@ -149,7 +149,7 @@ export default function Dashboard() {
             </Link>
             
             {/* Desktop Profile Avatar & Dropdown */}
-            <div className="relative ml-6" id="profile-dropdown">
+            <div className="relative ml-6 dropdown-container" id="profile-dropdown">
               <button
                 onClick={() => setDropdownOpen((v) => !v)}
                 className="focus:outline-none"

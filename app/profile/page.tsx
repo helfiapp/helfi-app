@@ -32,16 +32,16 @@ export default function Profile() {
   // Close dropdown on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent) {
-      if (!(e.target as HTMLElement).closest('#profile-dropdown')) {
+      const target = e.target as HTMLElement;
+      // Check if click is outside both the button and the dropdown content
+      if (!target.closest('.dropdown-container')) {
         setDropdownOpen(false);
       }
     }
     if (dropdownOpen) {
       document.addEventListener('mousedown', handleClick);
-    } else {
-      document.removeEventListener('mousedown', handleClick);
+      return () => document.removeEventListener('mousedown', handleClick);
     }
-    return () => document.removeEventListener('mousedown', handleClick);
   }, [dropdownOpen]);
 
   // Load saved data on mount
@@ -134,27 +134,13 @@ export default function Profile() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Navigation Header */}
+      {/* Navigation Header - First Row */}
       <nav className="bg-white border-b border-gray-200 px-4 py-3">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="flex items-center">
-            <Link href="/dashboard" className="bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors mr-4">
+            <Link href="/dashboard" className="bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors">
               Back to Dashboard
             </Link>
-            <Link href="/" className="w-16 h-16 md:w-20 md:h-20 cursor-pointer hover:opacity-80 transition-opacity">
-              <Image
-                src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/HELFI_TRANSPARENT_rmssry.png"
-                alt="Helfi Logo"
-                width={80}
-                height={80}
-                className="w-full h-full object-contain"
-                priority
-              />
-            </Link>
-            <div className="ml-4">
-              <h1 className="text-lg md:text-xl font-semibold text-gray-900">Profile</h1>
-              <p className="text-sm text-gray-500 hidden sm:block">Manage your profile information</p>
-            </div>
           </div>
           
           {/* Desktop Navigation */}
@@ -174,27 +160,54 @@ export default function Profile() {
             <Link href="/onboarding?step=1" className="text-gray-700 hover:text-helfi-green transition-colors font-medium">
               Health Info
             </Link>
-            
-            {/* Auto-save Status */}
-            <div className="flex items-center space-x-4">
-              {saveStatus === 'saving' && (
-                <div className="flex items-center text-blue-600">
-                  <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mr-2"></div>
-                  <span className="text-sm font-medium">Saving...</span>
-                </div>
-              )}
-              {saveStatus === 'saved' && (
-                <div className="flex items-center text-green-600">
-                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <span className="text-sm font-medium">Saved</span>
-                </div>
-              )}
-            </div>
-            
-            {/* Desktop Profile Avatar & Dropdown */}
-            <div className="relative ml-6" id="profile-dropdown">
+          </div>
+
+          {/* Logo on the right */}
+          <div className="flex items-center">
+            <Link href="/" className="w-16 h-16 md:w-20 md:h-20 cursor-pointer hover:opacity-80 transition-opacity">
+              <Image
+                src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/HELFI_TRANSPARENT_rmssry.png"
+                alt="Helfi Logo"
+                width={80}
+                height={80}
+                className="w-full h-full object-contain"
+                priority
+              />
+            </Link>
+          </div>
+        </div>
+      </nav>
+
+      {/* Second Row - Page Title, Auto-save Status and Profile */}
+      <div className="bg-white border-b border-gray-200 px-4 py-4">
+        <div className="max-w-7xl mx-auto flex justify-between items-center">
+          {/* Auto-save Status - Desktop Left */}
+          <div className="hidden md:flex items-center">
+            {saveStatus === 'saving' && (
+              <div className="flex items-center text-blue-600">
+                <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mr-2"></div>
+                <span className="text-sm font-medium">Saving...</span>
+              </div>
+            )}
+            {saveStatus === 'saved' && (
+              <div className="flex items-center text-green-600">
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <span className="text-sm font-medium">Saved</span>
+              </div>
+            )}
+          </div>
+          
+          {/* Centered Page Title */}
+          <div className="text-center">
+            <h1 className="text-lg md:text-xl font-semibold text-gray-900">Profile</h1>
+            <p className="text-sm text-gray-500 hidden sm:block">Manage your profile information</p>
+          </div>
+          
+          {/* Desktop Profile Avatar & Dropdown */}
+          <div className="hidden md:flex">
+            <div className="relative dropdown-container" id="profile-dropdown">
               <button
                 onClick={() => setDropdownOpen((v) => !v)}
                 className="focus:outline-none"
@@ -241,7 +254,7 @@ export default function Profile() {
             </div>
           </div>
 
-          {/* Mobile Navigation - Auto-save Status & Profile */}
+          {/* Mobile Auto-save Status & Profile */}
           <div className="md:hidden flex items-center space-x-3">
             {saveStatus === 'saving' && (
               <div className="flex items-center text-blue-600">
@@ -259,7 +272,7 @@ export default function Profile() {
             )}
             
             {/* Mobile Profile */}
-            <div className="relative" id="mobile-profile-dropdown">
+            <div className="relative dropdown-container" id="mobile-profile-dropdown">
               <button
                 onClick={() => setDropdownOpen((v) => !v)}
                 className="focus:outline-none"
@@ -306,7 +319,7 @@ export default function Profile() {
             </div>
           </div>
         </div>
-      </nav>
+      </div>
 
       {/* Main Content */}
       <div className="max-w-3xl mx-auto px-4 py-8 pb-20 md:pb-8">
