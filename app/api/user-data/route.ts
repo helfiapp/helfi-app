@@ -26,15 +26,27 @@ export async function GET(request: NextRequest) {
     const userEmail = session.user.email
     console.log('GET /api/user-data - NextAuth session found for:', userEmail)
 
-    // Get user data by email
-    const user = await prisma.user.findUnique({
-      where: { email: userEmail },
-      include: {
-        healthGoals: true,
-        supplements: true,
-        medications: true,
-      }
-    })
+    // Get user data by email with better error handling
+    let user
+    try {
+      user = await prisma.user.findUnique({
+        where: { email: userEmail },
+        include: {
+          healthGoals: true,
+          supplements: true,
+          medications: true,
+        }
+      })
+    } catch (prismaError) {
+      console.error('PRISMA ERROR in GET user query:', prismaError)
+      return NextResponse.json({ 
+        error: 'Database error', 
+        debug: { 
+          message: prismaError instanceof Error ? prismaError.message : 'Unknown prisma error',
+          type: 'PRISMA_QUERY_ERROR'
+        }
+      }, { status: 500 })
+    }
 
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
@@ -107,7 +119,14 @@ export async function GET(request: NextRequest) {
       bodyType: user.bodyType?.toLowerCase() || '',
       exerciseFrequency: exerciseData.exerciseFrequency || '',
       exerciseTypes: exerciseData.exerciseTypes || [],
-      agreed: (user as any).termsAccepted || false,
+      agreed: (() => {
+        try {
+          return (user as any).termsAccepted || false;
+        } catch (e) {
+          console.log('termsAccepted field not available, defaulting to false');
+          return false;
+        }
+      })(),
       goals: user.healthGoals.filter((goal: any) => !goal.name.startsWith('__')).map((goal: any) => goal.name),
       healthSituations: healthSituationsData,
       bloodResults: bloodResultsData,
