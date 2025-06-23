@@ -72,11 +72,26 @@ function OnboardingNav() {
 function GenderStep({ onNext, initial }: { onNext: (data: any) => void, initial?: string }) {
   const [gender, setGender] = useState(initial || '');
   const [agreed, setAgreed] = useState(false);
+  
+  // Debug logging
+  console.log('GenderStep - initial prop:', initial);
+  console.log('GenderStep - gender state:', gender);
+  console.log('GenderStep - gender === "male":', gender === 'male');
+  console.log('GenderStep - gender === "female":', gender === 'female');
+  
   return (
     <div className="max-w-md mx-auto">
       <div className="bg-white rounded-lg shadow-sm p-6">
         <h2 className="text-2xl font-bold mb-4">Let's get started. What's your gender?</h2>
         <p className="mb-6 text-gray-600">This helps tailor your health guidance.</p>
+        
+        {/* Debug display */}
+        <div className="mb-4 p-2 bg-yellow-100 text-xs">
+          <div>DEBUG - Initial: "{initial}"</div>
+          <div>DEBUG - Current gender state: "{gender}"</div>
+          <div>DEBUG - Type: {typeof gender}</div>
+        </div>
+        
         <div className="flex gap-4 mb-6">
           <button
             className={`flex-1 p-4 rounded border ${gender === 'male' ? 'bg-green-600 text-white' : 'border-green-600 text-green-600 hover:bg-green-50'}`}
@@ -2272,6 +2287,14 @@ export default function Onboarding() {
 
         {/* Content */}
         <div className="flex-1 px-4 py-6 pt-8">
+          {/* Debug form state */}
+          <div className="mb-4 p-2 bg-blue-100 text-xs">
+            <div>DEBUG - Main form.gender: "{form.gender}"</div>
+            <div>DEBUG - Main form.gender type: {typeof form.gender}</div>
+            <div>DEBUG - Current step: {step}</div>
+            <div>DEBUG - Full form: {JSON.stringify(form, null, 2)}</div>
+          </div>
+          
           {step === 0 && <GenderStep onNext={handleNext} initial={form.gender} />}
           {step === 1 && <PhysicalStep onNext={handleNext} onBack={handleBack} initial={form} />}
           {step === 2 && <ExerciseStep onNext={handleNext} onBack={handleBack} initial={form} />}
