@@ -11,8 +11,15 @@ export default function Dashboard() {
   const [showResetConfirm, setShowResetConfirm] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
 
-  // Profile data
-  const userImage = session?.user?.image || 'https://res.cloudinary.com/dh7qpr43n/image/upload/v1749922074/WOMAN_TALKING_INTO_HER_PHONE_zi9fh8.jpg';
+  // Profile data - using consistent green avatar
+  const defaultAvatar = 'data:image/svg+xml;base64,' + btoa(`
+    <svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="64" cy="64" r="64" fill="#10B981"/>
+      <circle cx="64" cy="48" r="20" fill="white"/>
+      <path d="M64 76c-13.33 0-24 5.34-24 12v16c0 8.84 7.16 16 16 16h16c8.84 0 16-7.16 16-16V88c0-6.66-10.67-12-24-12z" fill="white"/>
+    </svg>
+  `);
+  const userImage = session?.user?.image || defaultAvatar;
   const userName = session?.user?.name || 'User';
 
   // Close dropdown on outside click
@@ -212,7 +219,7 @@ export default function Dashboard() {
             aria-label="Open profile menu"
           >
             <Image
-              src={session?.user?.image || 'https://res.cloudinary.com/dh7qpr43n/image/upload/v1749922074/WOMAN_TALKING_INTO_HER_PHONE_zi9fh8.jpg'}
+              src={userImage}
               alt="Profile"
               width={36}
               height={36}
@@ -223,7 +230,7 @@ export default function Dashboard() {
             <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-100">
               <div className="flex items-center px-4 py-3 border-b border-gray-100">
                 <Image
-                  src={session?.user?.image || 'https://res.cloudinary.com/dh7qpr43n/image/upload/v1749922074/WOMAN_TALKING_INTO_HER_PHONE_zi9fh8.jpg'}
+                  src={userImage}
                   alt="Profile"
                   width={40}
                   height={40}
