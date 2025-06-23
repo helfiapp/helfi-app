@@ -19,7 +19,6 @@ model User {
   bodyType          BodyType?
   exerciseFrequency String?
   exerciseTypes     String[]
-  termsAccepted     Boolean?  @default(false)
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
   accounts      Account[]

@@ -69,21 +69,14 @@ function OnboardingNav() {
   );
 }
 
-function GenderStep({ onNext, initial }: { onNext: (data: any) => void, initial?: any }) {
+function GenderStep({ onNext, initial }: { onNext: (data: any) => void, initial?: string }) {
   const [gender, setGender] = useState('');
   const [agreed, setAgreed] = useState(false);
   
-  // Properly initialize gender and agreed status when initial prop changes
+  // Properly initialize gender when initial prop changes
   useEffect(() => {
     if (initial) {
-      if (typeof initial === 'string') {
-        // Handle legacy case where only gender string is passed
-        setGender(initial);
-      } else if (typeof initial === 'object') {
-        // Handle new case where full object is passed
-        if (initial.gender) setGender(initial.gender);
-        if (initial.agreed !== undefined) setAgreed(initial.agreed);
-      }
+      setGender(initial);
     }
   }, [initial]);
   
@@ -2293,7 +2286,7 @@ export default function Onboarding() {
 
         {/* Content */}
         <div className="flex-1 px-4 py-6 pt-8">
-          {step === 0 && <GenderStep onNext={handleNext} initial={form} />}
+          {step === 0 && <GenderStep onNext={handleNext} initial={form.gender} />}
           {step === 1 && <PhysicalStep onNext={handleNext} onBack={handleBack} initial={form} />}
           {step === 2 && <ExerciseStep onNext={handleNext} onBack={handleBack} initial={form} />}
           {step === 3 && <HealthGoalsStep onNext={handleNext} onBack={handleBack} initial={form} />}
