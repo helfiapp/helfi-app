@@ -127,8 +127,13 @@ function GenderStep({ onNext, initial }: { onNext: (data: any) => void, initial?
             Skip
           </button>
           <button
-            className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors"
-            onClick={() => onNext({ gender: gender || 'not specified', agreed })}
+            className={`px-6 py-3 rounded-lg transition-colors ${
+              agreed 
+                ? 'bg-green-600 text-white hover:bg-green-700' 
+                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            }`}
+            disabled={!agreed}
+            onClick={() => agreed && onNext({ gender: gender || 'not specified', agreed })}
           >
             Continue
           </button>
