@@ -70,8 +70,15 @@ function OnboardingNav() {
 }
 
 function GenderStep({ onNext, initial }: { onNext: (data: any) => void, initial?: string }) {
-  const [gender, setGender] = useState(initial || '');
+  const [gender, setGender] = useState('');
   const [agreed, setAgreed] = useState(false);
+  
+  // Properly initialize gender when initial prop changes
+  useEffect(() => {
+    if (initial) {
+      setGender(initial);
+    }
+  }, [initial]);
   
   return (
     <div className="max-w-md mx-auto">
