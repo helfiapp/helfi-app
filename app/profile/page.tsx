@@ -1,13 +1,14 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { useSession } from 'next-auth/react'
+import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
 import Image from 'next/image'
 
 export default function Profile() {
   const { data: session } = useSession()
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
+  const [dropdownOpen, setDropdownOpen] = useState(false)
   const [profileData, setProfileData] = useState({
     firstName: '',
     lastName: '',
@@ -16,6 +17,32 @@ export default function Profile() {
     dateOfBirth: '',
     gender: ''
   })
+
+  // Profile data - using consistent green avatar
+  const defaultAvatar = 'data:image/svg+xml;base64,' + btoa(`
+    <svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="64" cy="64" r="64" fill="#10B981"/>
+      <circle cx="64" cy="48" r="20" fill="white"/>
+      <path d="M64 76c-13.33 0-24 5.34-24 12v16c0 8.84 7.16 16 16 16h16c8.84 0 16-7.16 16-16V88c0-6.66-10.67-12-24-12z" fill="white"/>
+    </svg>
+  `);
+  const userImage = session?.user?.image || defaultAvatar;
+  const userName = session?.user?.name || 'User';
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (!(e.target as HTMLElement).closest('#profile-dropdown')) {
+        setDropdownOpen(false);
+      }
+    }
+    if (dropdownOpen) {
+      document.addEventListener('mousedown', handleClick);
+    } else {
+      document.removeEventListener('mousedown', handleClick);
+    }
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [dropdownOpen]);
 
   // Load saved data on mount
   useEffect(() => {
@@ -165,9 +192,56 @@ export default function Profile() {
                 </div>
               )}
             </div>
+            
+            {/* Desktop Profile Avatar & Dropdown */}
+            <div className="relative ml-6" id="profile-dropdown">
+              <button
+                onClick={() => setDropdownOpen((v) => !v)}
+                className="focus:outline-none"
+                aria-label="Open profile menu"
+              >
+                <Image
+                  src={userImage}
+                  alt="Profile"
+                  width={48}
+                  height={48}
+                  className="rounded-full border-2 border-helfi-green shadow-sm object-cover w-12 h-12"
+                />
+              </button>
+              {dropdownOpen && (
+                <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-100 animate-fade-in">
+                  <div className="flex items-center px-4 py-3 border-b border-gray-100">
+                    <Image
+                      src={userImage}
+                      alt="Profile"
+                      width={40}
+                      height={40}
+                      className="rounded-full object-cover mr-3"
+                    />
+                    <div>
+                      <div className="font-semibold text-gray-900">{userName}</div>
+                      <div className="text-xs text-gray-500">{session?.user?.email || 'user@email.com'}</div>
+                    </div>
+                  </div>
+                  <Link href="/profile" className="block px-4 py-2 text-gray-700 hover:bg-gray-50 bg-gray-50 font-medium">Profile</Link>
+                  <Link href="/account" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Account Settings</Link>
+                  <Link href="/profile/image" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Upload/Change Profile Image</Link>
+                  <Link href="/billing" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Subscription & Billing</Link>
+                  <Link href="/notifications" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Notifications</Link>
+                  <Link href="/privacy" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Privacy Settings</Link>
+                  <Link href="/help" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
+                  <button
+                    onClick={() => signOut()}
+                    className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50 font-semibold"
+                  >
+                    Logout
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Mobile Navigation - Auto-save Status */}
+          {/* Mobile Navigation - Auto-save Status & Profile */}
           <div className="md:hidden flex items-center space-x-3">
             {saveStatus === 'saving' && (
               <div className="flex items-center text-blue-600">
@@ -183,6 +257,53 @@ export default function Profile() {
                 <span className="text-sm font-medium">Saved</span>
               </div>
             )}
+            
+            {/* Mobile Profile */}
+            <div className="relative" id="mobile-profile-dropdown">
+              <button
+                onClick={() => setDropdownOpen((v) => !v)}
+                className="focus:outline-none"
+                aria-label="Open profile menu"
+              >
+                <Image
+                  src={userImage}
+                  alt="Profile"
+                  width={36}
+                  height={36}
+                  className="rounded-full border-2 border-helfi-green shadow-sm object-cover"
+                />
+              </button>
+              {dropdownOpen && (
+                <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-100">
+                  <div className="flex items-center px-4 py-3 border-b border-gray-100">
+                    <Image
+                      src={userImage}
+                      alt="Profile"
+                      width={40}
+                      height={40}
+                      className="rounded-full object-cover mr-3"
+                    />
+                    <div>
+                      <div className="font-semibold text-gray-900">{userName}</div>
+                      <div className="text-xs text-gray-500">{session?.user?.email || 'user@email.com'}</div>
+                    </div>
+                  </div>
+                  <Link href="/profile" className="block px-4 py-2 text-gray-700 hover:bg-gray-50 bg-gray-50 font-medium">Profile</Link>
+                  <Link href="/account" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Account Settings</Link>
+                  <Link href="/profile/image" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Upload/Change Profile Image</Link>
+                  <Link href="/billing" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Subscription & Billing</Link>
+                  <Link href="/notifications" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Notifications</Link>
+                  <Link href="/privacy" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Privacy Settings</Link>
+                  <Link href="/help" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
+                  <button
+                    onClick={() => signOut()}
+                    className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50 font-semibold"
+                  >
+                    Logout
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </nav>
@@ -214,9 +335,14 @@ export default function Profile() {
           {/* Profile Photo */}
           <div className="mb-8 text-center">
             <div className="w-24 h-24 bg-helfi-green rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-              </svg>
+              <Image
+                src={userImage}
+                alt={userName}
+                width={96}
+                height={96}
+                className="w-full h-full object-contain"
+                priority
+              />
             </div>
             <Link href="/profile/image" className="text-helfi-green hover:underline">
               Change Profile Picture
@@ -247,8 +373,6 @@ export default function Profile() {
                 />
               </div>
             </div>
-
-
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Bio</label>

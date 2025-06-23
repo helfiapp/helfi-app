@@ -1,12 +1,39 @@
 'use client'
 
-import React from 'react'
-import { useSession } from 'next-auth/react'
+import React, { useState, useEffect } from 'react'
+import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
 import Image from 'next/image'
 
 export default function Reports() {
   const { data: session } = useSession()
+  const [dropdownOpen, setDropdownOpen] = useState(false)
+
+  // Profile data - using consistent green avatar
+  const defaultAvatar = 'data:image/svg+xml;base64,' + btoa(`
+    <svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="64" cy="64" r="64" fill="#10B981"/>
+      <circle cx="64" cy="48" r="20" fill="white"/>
+      <path d="M64 76c-13.33 0-24 5.34-24 12v16c0 8.84 7.16 16 16 16h16c8.84 0 16-7.16 16-16V88c0-6.66-10.67-12-24-12z" fill="white"/>
+    </svg>
+  `);
+  const userImage = session?.user?.image || defaultAvatar;
+  const userName = session?.user?.name || 'User';
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (!(e.target as HTMLElement).closest('#profile-dropdown')) {
+        setDropdownOpen(false);
+      }
+    }
+    if (dropdownOpen) {
+      document.addEventListener('mousedown', handleClick);
+    } else {
+      document.removeEventListener('mousedown', handleClick);
+    }
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [dropdownOpen]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -50,9 +77,117 @@ export default function Reports() {
             <Link href="/onboarding?step=1" className="text-gray-700 hover:text-helfi-green transition-colors font-medium">
               Health Info
             </Link>
+            
+            {/* Desktop Profile Avatar & Dropdown */}
+            <div className="relative ml-6" id="profile-dropdown">
+              <button
+                onClick={() => setDropdownOpen((v) => !v)}
+                className="focus:outline-none"
+                aria-label="Open profile menu"
+              >
+                <Image
+                  src={userImage}
+                  alt="Profile"
+                  width={48}
+                  height={48}
+                  className="rounded-full border-2 border-helfi-green shadow-sm object-cover w-12 h-12"
+                />
+              </button>
+              {dropdownOpen && (
+                <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-100 animate-fade-in">
+                  <div className="flex items-center px-4 py-3 border-b border-gray-100">
+                    <Image
+                      src={userImage}
+                      alt="Profile"
+                      width={40}
+                      height={40}
+                      className="rounded-full object-cover mr-3"
+                    />
+                    <div>
+                      <div className="font-semibold text-gray-900">{userName}</div>
+                      <div className="text-xs text-gray-500">{session?.user?.email || 'user@email.com'}</div>
+                    </div>
+                  </div>
+                  <Link href="/profile" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Profile</Link>
+                  <Link href="/account" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Account Settings</Link>
+                  <Link href="/profile/image" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Upload/Change Profile Image</Link>
+                  <Link href="/billing" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Subscription & Billing</Link>
+                  <Link href="/notifications" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Notifications</Link>
+                  <Link href="/privacy" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Privacy Settings</Link>
+                  <Link href="/help" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
+                  <button
+                    onClick={() => signOut()}
+                    className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50 font-semibold"
+                  >
+                    Logout
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </nav>
+
+      {/* Mobile Top Header - Minimal */}
+      <div className="md:hidden bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center">
+          <Image
+            src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/HELFI_TRANSPARENT_rmssry.png"
+            alt="Helfi Logo"
+            width={40}
+            height={40}
+            className="object-contain"
+            priority
+          />
+        </div>
+        
+        {/* Mobile Profile */}
+        <div className="relative" id="mobile-profile-dropdown">
+          <button
+            onClick={() => setDropdownOpen((v) => !v)}
+            className="focus:outline-none"
+            aria-label="Open profile menu"
+          >
+            <Image
+              src={userImage}
+              alt="Profile"
+              width={36}
+              height={36}
+              className="rounded-full border-2 border-helfi-green shadow-sm object-cover"
+            />
+          </button>
+          {dropdownOpen && (
+            <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-100">
+              <div className="flex items-center px-4 py-3 border-b border-gray-100">
+                <Image
+                  src={userImage}
+                  alt="Profile"
+                  width={40}
+                  height={40}
+                  className="rounded-full object-cover mr-3"
+                />
+                <div>
+                  <div className="font-semibold text-gray-900">{userName}</div>
+                  <div className="text-xs text-gray-500">{session?.user?.email || 'user@email.com'}</div>
+                </div>
+              </div>
+              <Link href="/profile" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Profile</Link>
+              <Link href="/account" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Account Settings</Link>
+              <Link href="/profile/image" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Upload/Change Profile Image</Link>
+              <Link href="/billing" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Subscription & Billing</Link>
+              <Link href="/notifications" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Notifications</Link>
+              <Link href="/privacy" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Privacy Settings</Link>
+              <Link href="/help" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
+              <button
+                onClick={() => signOut()}
+                className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50 font-semibold"
+              >
+                Logout
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-8 pb-20 md:pb-8">
