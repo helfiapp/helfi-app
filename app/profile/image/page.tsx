@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
-import { useSession } from 'next-auth/react'
+import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
 import Image from 'next/image'
 
@@ -12,9 +12,36 @@ export default function ProfileImage() {
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [currentProfileImage, setCurrentProfileImage] = useState<string | null>(null)
   const [showCamera, setShowCamera] = useState(false)
+  const [dropdownOpen, setDropdownOpen] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Profile data - using consistent green avatar
+  const defaultAvatar = 'data:image/svg+xml;base64,' + btoa(`
+    <svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="64" cy="64" r="64" fill="#10B981"/>
+      <circle cx="64" cy="48" r="20" fill="white"/>
+      <path d="M64 76c-13.33 0-24 5.34-24 12v16c0 8.84 7.16 16 16 16h16c8.84 0 16-7.16 16-16V88c0-6.66-10.67-12-24-12z" fill="white"/>
+    </svg>
+  `);
+  const userImage = session?.user?.image || currentProfileImage || defaultAvatar;
+  const userName = session?.user?.name || 'User';
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (!(e.target as HTMLElement).closest('#profile-dropdown')) {
+        setDropdownOpen(false);
+      }
+    }
+    if (dropdownOpen) {
+      document.addEventListener('mousedown', handleClick);
+    } else {
+      document.removeEventListener('mousedown', handleClick);
+    }
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [dropdownOpen]);
 
   // Load current profile image on mount
   useEffect(() => {
@@ -234,7 +261,7 @@ export default function ProfileImage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Clean, Google-style header */}
+      {/* Header with Profile Dropdown */}
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-4xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
@@ -254,25 +281,72 @@ export default function ProfileImage() {
               <h1 className="text-xl font-semibold text-gray-900">Profile Picture</h1>
             </div>
 
-            {/* Auto-save status - subtle and clean */}
-            <div className="flex items-center">
-              {saveStatus === 'saving' && (
-                <div className="flex items-center text-blue-600">
-                  <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mr-2"></div>
-                  <span className="text-sm">Saving...</span>
-                </div>
-              )}
-              {saveStatus === 'saved' && (
-                <div className="flex items-center text-green-600">
-                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <span className="text-sm">Saved</span>
-                </div>
-              )}
-              {saveStatus === 'idle' && (
-                <div className="w-16"></div> // Placeholder for consistent spacing
-              )}
+            {/* Profile Dropdown and Save Status */}
+            <div className="flex items-center space-x-4">
+              {/* Auto-save status - subtle and clean */}
+              <div className="flex items-center">
+                {saveStatus === 'saving' && (
+                  <div className="flex items-center text-blue-600">
+                    <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mr-2"></div>
+                    <span className="text-sm">Saving...</span>
+                  </div>
+                )}
+                {saveStatus === 'saved' && (
+                  <div className="flex items-center text-green-600">
+                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span className="text-sm">Saved</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Profile Avatar & Dropdown */}
+              <div className="relative" id="profile-dropdown">
+                <button
+                  onClick={() => setDropdownOpen((v) => !v)}
+                  className="focus:outline-none"
+                  aria-label="Open profile menu"
+                >
+                  <Image
+                    src={userImage}
+                    alt="Profile"
+                    width={36}
+                    height={36}
+                    className="rounded-full border-2 border-helfi-green shadow-sm object-cover"
+                  />
+                </button>
+                {dropdownOpen && (
+                  <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-100">
+                    <div className="flex items-center px-4 py-3 border-b border-gray-100">
+                      <Image
+                        src={userImage}
+                        alt="Profile"
+                        width={40}
+                        height={40}
+                        className="rounded-full object-cover mr-3"
+                      />
+                      <div>
+                        <div className="font-semibold text-gray-900">{userName}</div>
+                        <div className="text-xs text-gray-500">{session?.user?.email || 'user@email.com'}</div>
+                      </div>
+                    </div>
+                    <Link href="/profile" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Profile</Link>
+                    <Link href="/account" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Account Settings</Link>
+                    <Link href="/profile/image" className="block px-4 py-2 text-gray-700 hover:bg-gray-50 bg-gray-50 font-medium">Upload/Change Profile Image</Link>
+                    <Link href="/billing" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Subscription & Billing</Link>
+                    <Link href="/notifications" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Notifications</Link>
+                    <Link href="/privacy" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Privacy Settings</Link>
+                    <Link href="/help" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
+                    <button
+                      onClick={() => signOut()}
+                      className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50 font-semibold"
+                    >
+                      Logout
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -385,10 +459,10 @@ export default function ProfileImage() {
           )}
 
           {/* Upload Options - Google-style clean design */}
-          <div className="px-8 py-8 space-y-6">
+          <div className="px-8 py-8 space-y-8">
             {/* Upload from device */}
             <div className="border border-gray-200 rounded-xl p-6 hover:border-gray-300 hover:shadow-sm transition-all">
-              <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-4 mb-4">
                 <div className="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center">
                   <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
@@ -398,6 +472,8 @@ export default function ProfileImage() {
                   <h3 className="text-lg font-medium text-gray-900">Upload from device</h3>
                   <p className="text-sm text-gray-600">PNG, JPG up to 5MB</p>
                 </div>
+              </div>
+              <div className="flex justify-center">
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -408,9 +484,9 @@ export default function ProfileImage() {
                 />
                 <label
                   htmlFor="file-upload"
-                  className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-all cursor-pointer font-medium"
+                  className="bg-white border border-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-all cursor-pointer font-medium"
                 >
-                  Choose File
+                  Choose Photo
                 </label>
               </div>
             </div>
