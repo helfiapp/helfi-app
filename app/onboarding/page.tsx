@@ -2245,15 +2245,15 @@ export default function Onboarding() {
           
           {/* Numbered Steps Progress with Connecting Lines */}
           <div className="relative mb-6">
-            {/* Mobile-first responsive design */}
-            <div className="flex items-center justify-center px-2 sm:px-4">
-              {/* Mobile: Show simplified progress with dots for smaller screens */}
-              <div className="sm:hidden flex items-center space-x-2">
+            {/* Mobile-first responsive design with better spacing */}
+            <div className="flex items-center justify-center px-1 sm:px-4">
+              {/* Mobile: Show simplified progress with properly sized circles */}
+              <div className="sm:hidden flex items-center justify-center space-x-1 overflow-x-auto max-w-full">
                 {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((stepNum, index) => (
                   <React.Fragment key={stepNum}>
                     <button 
                       onClick={() => goToStep(stepNum - 1)}
-                      className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium transition-all z-10 cursor-pointer ${
+                      className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all z-10 cursor-pointer flex-shrink-0 ${
                         stepNum === step + 1 
                           ? 'bg-green-600 text-white' 
                           : stepNum < step + 1
@@ -2262,10 +2262,10 @@ export default function Onboarding() {
                       }`}
                       title={`Go to step ${stepNum}: ${stepNames[stepNum - 1]}`}
                     >
-                      {stepNum <= 9 ? stepNum : '10'}
+                      {stepNum === 10 ? '10' : stepNum}
                     </button>
                     {index < 9 && (
-                      <div className={`h-0.5 w-2 transition-all ${
+                      <div className={`h-0.5 w-1 transition-all flex-shrink-0 ${
                         stepNum < step + 1 ? 'bg-green-600' : 'bg-gray-300'
                       }`} />
                     )}
@@ -2331,7 +2331,7 @@ export default function Onboarding() {
         </div>
 
         {/* Content */}
-        <div className="flex-1 px-4 py-6 pt-8">
+        <div className="flex-1 px-4 py-6 pt-8 pb-20">
           {step === 0 && <GenderStep onNext={handleNext} initial={form.gender} />}
           {step === 1 && <PhysicalStep onNext={handleNext} onBack={handleBack} initial={form} />}
           {step === 2 && <ExerciseStep onNext={handleNext} onBack={handleBack} initial={form} />}

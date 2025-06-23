@@ -12,7 +12,7 @@ export default function Dashboard() {
   const [dropdownOpen, setDropdownOpen] = useState(false)
 
   // Profile data
-  const userImage = session?.user?.image || 'https://ui-avatars.com/api/?name=User&background=E5E7EB&color=374151&rounded=true&size=128';
+  const userImage = session?.user?.image || 'https://res.cloudinary.com/dh7qpr43n/image/upload/v1749922074/WOMAN_TALKING_INTO_HER_PHONE_zi9fh8.jpg';
   const userName = session?.user?.name || 'User';
 
   // Close dropdown on outside click
@@ -202,7 +202,6 @@ export default function Dashboard() {
             className="object-contain"
             priority
           />
-          <h1 className="ml-3 text-lg font-semibold text-gray-900">Helfi</h1>
         </div>
         
         {/* Mobile Profile */}
@@ -213,7 +212,7 @@ export default function Dashboard() {
             aria-label="Open profile menu"
           >
             <Image
-              src={userImage}
+              src={session?.user?.image || 'https://res.cloudinary.com/dh7qpr43n/image/upload/v1749922074/WOMAN_TALKING_INTO_HER_PHONE_zi9fh8.jpg'}
               alt="Profile"
               width={36}
               height={36}
@@ -224,7 +223,7 @@ export default function Dashboard() {
             <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-100">
               <div className="flex items-center px-4 py-3 border-b border-gray-100">
                 <Image
-                  src={userImage}
+                  src={session?.user?.image || 'https://res.cloudinary.com/dh7qpr43n/image/upload/v1749922074/WOMAN_TALKING_INTO_HER_PHONE_zi9fh8.jpg'}
                   alt="Profile"
                   width={40}
                   height={40}
@@ -237,7 +236,10 @@ export default function Dashboard() {
               </div>
               <Link href="/profile" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Profile</Link>
               <Link href="/account" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Account Settings</Link>
+              <Link href="/profile/image" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Upload/Change Profile Image</Link>
               <Link href="/billing" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Subscription & Billing</Link>
+              <Link href="/notifications" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Notifications</Link>
+              <Link href="/privacy" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Privacy Settings</Link>
               <Link href="/help" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
               <button
                 onClick={() => signOut()}
@@ -393,18 +395,18 @@ export default function Dashboard() {
             {/* Onboarding Data Section */}
             {onboardingData && (
               <div className="mt-8 bg-gray-50 rounded-lg p-6">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-semibold text-gray-900">Your Profile Information</h3>
-                  <div className="space-x-3">
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Your Profile Information</h3>
+                  <div className="flex flex-col sm:flex-row gap-3">
                     <button
                       onClick={handleEditOnboarding}
-                      className="bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors text-sm"
+                      className="w-full bg-helfi-green text-white px-4 py-3 rounded-lg hover:bg-helfi-green/90 transition-colors text-sm font-medium"
                     >
                       ✏️ Edit Profile
                     </button>
                     <button
                       onClick={() => setShowResetConfirm(true)}
-                      className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors text-sm"
+                      className="w-full bg-red-500 text-white px-4 py-3 rounded-lg hover:bg-red-600 transition-colors text-sm font-medium"
                     >
                       🔄 Reset All Data
                     </button>
