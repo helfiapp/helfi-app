@@ -212,7 +212,7 @@ export default function Dashboard() {
         </div>
         
         {/* Mobile Profile */}
-        <div className="relative" id="mobile-profile-dropdown">
+        <div className="relative dropdown-container" id="mobile-profile-dropdown">
           <button
             onClick={() => setDropdownOpen((v) => !v)}
             className="focus:outline-none"

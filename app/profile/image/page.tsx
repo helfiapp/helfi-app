@@ -302,7 +302,7 @@ export default function ProfileImage() {
               </div>
 
               {/* Profile Avatar & Dropdown */}
-              <div className="relative" id="profile-dropdown">
+              <div className="relative dropdown-container" id="profile-dropdown">
                 <button
                   onClick={() => setDropdownOpen((v) => !v)}
                   className="focus:outline-none"
