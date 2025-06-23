@@ -50,6 +50,7 @@ export async function GET(request: NextRequest) {
       bodyType: user.bodyType,
       exerciseFrequency: user.exerciseFrequency,
       exerciseTypes: user.exerciseTypes,
+      termsAccepted: (user as any).termsAccepted,
       healthGoalsCount: user.healthGoals.length,
       supplementsCount: user.supplements.length,
       medicationsCount: user.medications.length
@@ -106,6 +107,7 @@ export async function GET(request: NextRequest) {
       bodyType: user.bodyType?.toLowerCase() || '',
       exerciseFrequency: exerciseData.exerciseFrequency || '',
       exerciseTypes: exerciseData.exerciseTypes || [],
+      agreed: (user as any).termsAccepted || false,
       goals: user.healthGoals.filter((goal: any) => !goal.name.startsWith('__')).map((goal: any) => goal.name),
       healthSituations: healthSituationsData,
       bloodResults: bloodResultsData,
@@ -229,6 +231,9 @@ export async function POST(request: NextRequest) {
       }
       if (data.exerciseTypes && Array.isArray(data.exerciseTypes) && data.exerciseTypes.length > 0) {
         updateData.exerciseTypes = data.exerciseTypes.filter((type: any) => type && type.trim() !== '')
+      }
+      if (data.agreed !== undefined) {
+        updateData.termsAccepted = Boolean(data.agreed)
       }
 
       if (Object.keys(updateData).length > 0) {
