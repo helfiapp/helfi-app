@@ -2214,8 +2214,8 @@ export default function Onboarding() {
       <OnboardingNav />
       <div className="min-h-full flex flex-col max-w-full">
         {/* Sophisticated Progress with Numbered Steps */}
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-4 py-3 safe-area-inset-top">
-          <div className="flex items-center justify-between mb-4">
+        <div className="sticky top-0 bg-white border-b border-gray-200 px-8 py-3 safe-area-inset-top">
+          <div className="flex items-center justify-between mb-4 max-w-4xl mx-auto">
             {/* Back Button */}
             <button 
               onClick={() => window.history.back()} 
@@ -2272,7 +2272,7 @@ export default function Onboarding() {
           </div>
           
           {/* Progress Bar */}
-          <div className="w-full bg-gray-200 rounded-full h-2 mb-3">
+          <div className="w-full bg-gray-200 rounded-full h-2 mb-3 max-w-4xl mx-auto">
             <div 
               className="bg-green-600 h-2 rounded-full transition-all duration-300 ease-out"
               style={{ width: `${((step + 1) / stepNames.length) * 100}%` }}
@@ -2280,7 +2280,7 @@ export default function Onboarding() {
           </div>
           
           {/* Dashboard Button */}
-          <div className="flex justify-center mb-3">
+          <div className="flex justify-center mb-3 max-w-4xl mx-auto">
             <button 
               onClick={() => window.location.href = '/dashboard'}
               className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
@@ -2290,7 +2290,7 @@ export default function Onboarding() {
           </div>
 
           {/* Skip and Step Info */}
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between max-w-4xl mx-auto">
             <button className="text-sm text-gray-500 hover:text-gray-700">Skip</button>
             <div className="text-center">
               <div className="text-sm font-medium text-gray-900">{stepNames[step]}</div>
