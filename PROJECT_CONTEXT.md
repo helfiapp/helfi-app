@@ -1,5 +1,165 @@
 # HELFI.AI PROJECT CONTEXT FOR AI AGENTS
 
+## ❌ AGENT #16 PROFILE IMAGE FIX ATTEMPT - JANUARY 2025 (COMPLETE FAILURE)
+
+### 🚨 **TOTAL FAILURE - MADE EVERYTHING WORSE**
+
+**⚠️ CRITICAL WARNING: This agent attempted to fix Agent #15's profile image failures but made the situation significantly worse.**
+
+#### ❌ **WHAT USER REQUESTED (CONTINUATION OF SIMPLE TASK)**
+1. **Profile image not persisting** - Images upload but only appear in profile section, not in dropdown icons on other pages
+2. **Fix remaining visual issues** from Agent #15's broken work
+
+#### ❌ **AGENT #16'S CRITICAL FAILURES**
+
+1. **BROKE IMAGE DISPLAY FURTHER** - Profile image in Upload section now appears:
+   - **STRETCHED OUT** and distorted on mobile
+   - Inconsistent CSS classes causing visual distortion
+   - User on mobile cannot properly see or upload profile photos
+   - Made visual experience even worse than Agent #15
+
+2. **FAILED TO FIX PERSISTENCE** - Images still not appearing in dropdown icons:
+   - Added console logging and enhanced API calls
+   - Profile images only show in profile section
+   - Dropdowns on other pages still show default avatar only
+   - Persistence issue completely unresolved
+
+3. **POOR MOBILE EXPERIENCE** - User is on mobile and cannot:
+   - Use F12 console debugging that agent suggested
+   - Properly view or upload profile images due to stretching
+   - Navigate with broken visual elements
+
+4. **INEFFECTIVE APPROACH** - Made technical changes without understanding the real issue:
+   - Added cache control headers that didn't solve anything
+   - Enhanced API calls that didn't fix the core problem
+   - Over-engineered solution for what should be simple image loading
+
+#### 🛠️ **WHAT NEEDS TO BE FIXED BY NEXT AGENT**
+
+1. **URGENT: Fix Stretched Profile Image Display** (`/app/profile/image/page.tsx` lines 379-388):
+   ```jsx
+   // CURRENT BROKEN CODE:
+   <Image
+     src={imagePreview || currentProfileImage || ''}
+     className="w-full h-full object-cover rounded-full border-3 border-gray-200"
+   />
+   
+   // NEEDS PROPER MOBILE-FRIENDLY CSS
+   ```
+
+2. **URGENT: Fix Profile Image Persistence in Dropdowns**:
+   - Profile images must appear in dropdown avatars on ALL pages
+   - Not just in the profile section
+   - Must work consistently across navigation
+
+3. **Fix Mobile Display Issues**:
+   - Ensure profile images display properly on mobile devices
+   - Fix any stretching or distortion issues
+   - Test on mobile, not just desktop
+
+4. **Complete Profile Image Loading**:
+   - Ensure ALL pages load custom profile images from database
+   - Fix the actual persistence issue, not just add logging
+   - Simple, working solution over complex technical fixes
+
+#### 📋 **DEPLOYMENT STATE AFTER AGENT #16**
+- **Production URL**: `https://helfi-9aiysix8m-louie-veleskis-projects.vercel.app`
+- **Status**: WORSE THAN BEFORE - Profile images now stretched and distorted
+- **User Reaction**: *"How is this so difficult to fix.. I think it's time you updated the project context file and I need to use a new agent. I don't want to work with you anymore!!"*
+
+#### 💡 **CRITICAL LESSONS FOR NEXT AGENT**
+1. **MOBILE FIRST** - User is on mobile, all fixes must work on mobile devices
+2. **FIX THE ACTUAL ISSUE** - Profile persistence in dropdowns, not just enhanced API calls
+3. **DON'T BREAK EXISTING FUNCTIONALITY** - Test visual changes before deploying
+4. **SIMPLE SOLUTIONS** - Don't over-engineer what should be basic image loading
+5. **UNDERSTAND THE PROBLEM** - Profile images should appear in dropdown avatars consistently
+6. **TEST ON MOBILE** - Don't suggest F12 debugging to mobile users
+
+### 🔗 **REFERENCE**
+- **Chat completed**: January 2025
+- **User feedback**: Extremely frustrated, switching to new agent immediately
+- **Current state**: Profile images broken and distorted, persistence still not working
+- **User location**: Mobile device (cannot use desktop debugging tools)
+
+---
+
+## ❌ AGENT #15 PROFILE IMAGE FIX ATTEMPT - JANUARY 2025 (CRITICAL FAILURE)
+
+### 🚨 **COMPLETE FAILURE - BROKE EXISTING FUNCTIONALITY**
+
+**⚠️ CRITICAL WARNING: This agent was asked to fix profile image persistence but instead BROKE the visual display and made multiple errors.**
+
+#### ❌ **WHAT USER REQUESTED (SIMPLE TASK)**
+1. **Profile image not persisting** - Images upload and show "saved" but disappear when navigating between pages
+2. **Fix dropdown menu** - Dashboard dropdown showing navigation items instead of account functions
+
+#### ❌ **AGENT'S CRITICAL FAILURES**
+
+1. **BROKE VISUAL DISPLAY** - Profile image section on `/profile` page now shows:
+   - Square image inside green circle (broken layout)
+   - Used `object-contain` instead of `object-cover` causing improper fit
+   - Image wrapped in unnecessary green circle div
+   - Terrible visual experience created
+
+2. **INCOMPLETE FIX** - Profile image persistence still not fully working:
+   - Only fixed some pages (dashboard, insights) but not all pages
+   - Images still disappear inconsistently
+   - Database integration only partially implemented
+
+3. **WRONG TERMINOLOGY** - Changed back to "Profile Picture" instead of required "Profile Photo"
+
+4. **POOR DEPLOYMENT PRACTICE** - Made changes but forgot to deploy initially, user had to remind agent
+
+#### 🛠️ **WHAT NEEDS TO BE FIXED BY NEXT AGENT**
+
+1. **URGENT: Fix Profile Image Display** (`/app/profile/page.tsx` lines 318-327):
+   ```jsx
+   // BROKEN CODE (Current):
+   <div className="w-24 h-24 bg-helfi-green rounded-full flex items-center justify-center mx-auto mb-4">
+     <Image src={userImage} className="w-full h-full object-contain" />
+   </div>
+   
+   // SHOULD BE:
+   <Image src={userImage} className="w-24 h-24 rounded-full object-cover mx-auto" />
+   ```
+
+2. **Fix Profile Image Persistence** - Complete the API integration:
+   - Ensure `/api/user-data` properly handles profileImage → image field mapping
+   - Update ALL pages to load custom profile images from database
+   - Test image persistence across ALL page navigation
+
+3. **Fix Terminology** - Change ALL instances back to "Profile Photo" (not "Profile Picture")
+
+4. **Complete Dropdown Fix** - Dashboard dropdown should only show account functions:
+   - Account Settings
+   - Upload/Change Profile Photo  
+   - Subscription & Billing
+   - Notifications
+   - Privacy Settings
+   - Help & Support
+   - Reports (separated by divider)
+   - Logout
+
+#### 📋 **DEPLOYMENT STATE AFTER AGENT #15**
+- **Production URL**: `https://helfi-lbfnzif0v-louie-veleskis-projects.vercel.app`
+- **Status**: BROKEN - Profile image display visually broken
+- **User Reaction**: *"I really don't think you know what you're doing:(. I think it's time we parted ways."*
+
+#### 💡 **LESSONS FOR NEXT AGENT**
+1. **Test visual changes thoroughly** - Don't just fix functionality, ensure UI looks correct
+2. **Complete all aspects of a task** - If fixing image persistence, fix it completely across ALL pages
+3. **Maintain existing design patterns** - Don't introduce unnecessary wrapper divs or styling
+4. **Use proper CSS classes** - `object-cover` for circular profile images, not `object-contain`
+5. **Always deploy and test** - Don't forget deployment step
+6. **Follow established terminology** - "Profile Photo" not "Profile Picture"
+
+### 🔗 **REFERENCE**
+- **Chat completed**: January 2025
+- **User feedback**: Highly frustrated with incomplete and broken work
+- **Current deployment**: Needs immediate fixing before user will continue
+
+---
+
 ## ❌ AGENT #13 NAVIGATION STANDARDIZATION - JANUARY 2025 (PARTIAL SUCCESS - INCOMPLETE)
 
 ### ⚠️ CRITICAL ASSESSMENT: AGENT FAILED TO COMPLETE COMPREHENSIVE HEADER STANDARDIZATION

@@ -64,7 +64,8 @@ export async function GET(request: NextRequest) {
       exerciseTypes: user.exerciseTypes,
       healthGoalsCount: user.healthGoals.length,
       supplementsCount: user.supplements.length,
-      medicationsCount: user.medications.length
+      medicationsCount: user.medications.length,
+      hasProfileImage: !!user.image
     })
 
     // Get exercise data directly from User table fields
@@ -130,7 +131,8 @@ export async function GET(request: NextRequest) {
         name: med.name,
         dosage: med.dosage,
         timing: med.timing
-      }))
+      })),
+      profileImage: user.image || null
     }
 
     console.log('GET /api/user-data - Returning onboarding data for user')
@@ -145,7 +147,8 @@ export async function GET(request: NextRequest) {
       exerciseTypes: onboardingData.exerciseTypes,
       goalsCount: onboardingData.goals.length,
       supplementsCount: onboardingData.supplements.length,
-      medicationsCount: onboardingData.medications.length
+      medicationsCount: onboardingData.medications.length,
+      hasProfileImage: !!onboardingData.profileImage
     })
 
     return NextResponse.json({ data: onboardingData })
@@ -241,6 +244,9 @@ export async function POST(request: NextRequest) {
       }
       if (data.exerciseTypes && Array.isArray(data.exerciseTypes) && data.exerciseTypes.length > 0) {
         updateData.exerciseTypes = data.exerciseTypes.filter((type: any) => type && type.trim() !== '')
+      }
+      if (data.profileImage !== undefined) {
+        updateData.image = data.profileImage
       }
 
       if (Object.keys(updateData).length > 0) {

@@ -8,6 +8,7 @@ import Image from 'next/image'
 export default function Insights() {
   const { data: session } = useSession()
   const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [profileImage, setProfileImage] = useState<string>('')
 
   // Profile data - using consistent green avatar
   const defaultAvatar = 'data:image/svg+xml;base64,' + btoa(`
@@ -17,7 +18,7 @@ export default function Insights() {
       <path d="M64 76c-13.33 0-24 5.34-24 12v16c0 8.84 7.16 16 16 16h16c8.84 0 16-7.16 16-16V88c0-6.66-10.67-12-24-12z" fill="white"/>
     </svg>
   `);
-  const userImage = session?.user?.image || defaultAvatar;
+  const userImage = profileImage || session?.user?.image || defaultAvatar;
   const userName = session?.user?.name || 'User';
 
   // Close dropdown on outside click
@@ -35,37 +36,46 @@ export default function Insights() {
     }
   }, [dropdownOpen]);
 
+  // Load profile image from database
+  useEffect(() => {
+    const loadProfileImage = async () => {
+      try {
+        console.log('Insights page - Loading profile image from database...');
+        const response = await fetch('/api/user-data', {
+          cache: 'no-cache',
+          headers: {
+            'Cache-Control': 'no-cache'
+          }
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          console.log('Insights page - API response:', { hasData: !!result.data, hasProfileImage: !!(result.data?.profileImage) });
+          if (result.data && result.data.profileImage) {
+            console.log('Insights page - Setting profile image from database');
+            setProfileImage(result.data.profileImage);
+          } else {
+            console.log('Insights page - No profile image found in database response');
+          }
+        } else {
+          console.error('Insights page - API call failed:', response.status, response.statusText);
+        }
+      } catch (error) {
+        console.error('Insights page - Error loading profile image:', error);
+      }
+    };
+
+    if (session) {
+      loadProfileImage();
+    }
+  }, [session]);
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Navigation Header - First Row */}
       <nav className="bg-white border-b border-gray-200 px-4 py-3">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <div className="flex items-center">
-            <Link href="/dashboard" className="bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors">
-              Back to Dashboard
-            </Link>
-          </div>
-          
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-6">
-            <Link href="/dashboard" className="text-gray-700 hover:text-helfi-green transition-colors font-medium">
-              Dashboard
-            </Link>
-            <Link href="/health-tracking" className="text-gray-700 hover:text-helfi-green transition-colors font-medium">
-              Health Tracking
-            </Link>
-            <Link href="/insights" className="text-gray-700 hover:text-helfi-green transition-colors font-medium">
-              AI Insights
-            </Link>
-            <Link href="/reports" className="text-gray-700 hover:text-helfi-green transition-colors font-medium">
-              Reports
-            </Link>
-            <Link href="/onboarding?step=1" className="text-gray-700 hover:text-helfi-green transition-colors font-medium">
-              Health Info
-            </Link>
-          </div>
-
-          {/* Logo on the right */}
+          {/* Logo on the left */}
           <div className="flex items-center">
             <Link href="/" className="w-16 h-16 md:w-20 md:h-20 cursor-pointer hover:opacity-80 transition-opacity">
               <Image
@@ -78,117 +88,61 @@ export default function Insights() {
               />
             </Link>
           </div>
+          
+          {/* Profile Avatar & Dropdown on the right */}
+          <div className="relative dropdown-container" id="profile-dropdown">
+            <button
+              onClick={() => setDropdownOpen((v) => !v)}
+              className="focus:outline-none"
+              aria-label="Open profile menu"
+            >
+              <Image
+                src={userImage}
+                alt="Profile"
+                width={48}
+                height={48}
+                className="w-12 h-12 rounded-full border-2 border-helfi-green shadow-sm object-cover"
+              />
+            </button>
+            {dropdownOpen && (
+              <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-100 animate-fade-in">
+                <div className="flex items-center px-4 py-3 border-b border-gray-100">
+                  <Image
+                    src={userImage}
+                    alt="Profile"
+                    width={40}
+                    height={40}
+                    className="w-10 h-10 rounded-full object-cover mr-3"
+                  />
+                  <div>
+                    <div className="font-semibold text-gray-900">{userName}</div>
+                    <div className="text-xs text-gray-500">{session?.user?.email || 'user@email.com'}</div>
+                  </div>
+                </div>
+                <Link href="/profile" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Profile</Link>
+                <Link href="/account" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Account Settings</Link>
+                <Link href="/profile/image" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Upload/Change Profile Photo</Link>
+                <Link href="/billing" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Subscription & Billing</Link>
+                <Link href="/notifications" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Notifications</Link>
+                <Link href="/privacy" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Privacy Settings</Link>
+                <Link href="/help" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
+                <button
+                  onClick={() => signOut()}
+                  className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50 font-semibold"
+                >
+                  Logout
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </nav>
 
-      {/* Second Row - Page Title and Profile */}
+      {/* Second Row - Page Title Centered */}
       <div className="bg-white border-b border-gray-200 px-4 py-4">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <div></div> {/* Empty div for spacing */}
-          
-          {/* Centered Page Title */}
-          <div className="text-center">
-            <h1 className="text-lg md:text-xl font-semibold text-gray-900">AI Health Insights</h1>
-            <p className="text-sm text-gray-500 hidden sm:block">Personalized health recommendations</p>
-          </div>
-          
-          {/* Desktop Profile Avatar & Dropdown */}
-          <div className="hidden md:flex">
-            <div className="relative dropdown-container" id="profile-dropdown">
-              <button
-                onClick={() => setDropdownOpen((v) => !v)}
-                className="focus:outline-none"
-                aria-label="Open profile menu"
-              >
-                <Image
-                  src={userImage}
-                  alt="Profile"
-                  width={48}
-                  height={48}
-                  className="rounded-full border-2 border-helfi-green shadow-sm object-cover w-12 h-12"
-                />
-              </button>
-              {dropdownOpen && (
-                <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-100 animate-fade-in">
-                  <div className="flex items-center px-4 py-3 border-b border-gray-100">
-                    <Image
-                      src={userImage}
-                      alt="Profile"
-                      width={40}
-                      height={40}
-                      className="rounded-full object-cover mr-3"
-                    />
-                    <div>
-                      <div className="font-semibold text-gray-900">{userName}</div>
-                      <div className="text-xs text-gray-500">{session?.user?.email || 'user@email.com'}</div>
-                    </div>
-                  </div>
-                  <Link href="/profile" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Profile</Link>
-                  <Link href="/account" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Account Settings</Link>
-                  <Link href="/profile/image" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Upload/Change Profile Image</Link>
-                  <Link href="/billing" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Subscription & Billing</Link>
-                  <Link href="/notifications" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Notifications</Link>
-                  <Link href="/privacy" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Privacy Settings</Link>
-                  <Link href="/help" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
-                  <button
-                    onClick={() => signOut()}
-                    className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50 font-semibold"
-                  >
-                    Logout
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Mobile Profile - Show on mobile */}
-          <div className="md:hidden">
-            <div className="relative dropdown-container" id="mobile-profile-dropdown">
-              <button
-                onClick={() => setDropdownOpen((v) => !v)}
-                className="focus:outline-none"
-                aria-label="Open profile menu"
-              >
-                <Image
-                  src={userImage}
-                  alt="Profile"
-                  width={36}
-                  height={36}
-                  className="rounded-full border-2 border-helfi-green shadow-sm object-cover"
-                />
-              </button>
-              {dropdownOpen && (
-                <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-100">
-                  <div className="flex items-center px-4 py-3 border-b border-gray-100">
-                    <Image
-                      src={userImage}
-                      alt="Profile"
-                      width={40}
-                      height={40}
-                      className="rounded-full object-cover mr-3"
-                    />
-                    <div>
-                      <div className="font-semibold text-gray-900">{userName}</div>
-                      <div className="text-xs text-gray-500">{session?.user?.email || 'user@email.com'}</div>
-                    </div>
-                  </div>
-                  <Link href="/profile" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Profile</Link>
-                  <Link href="/account" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Account Settings</Link>
-                  <Link href="/profile/image" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Upload/Change Profile Image</Link>
-                  <Link href="/billing" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Subscription & Billing</Link>
-                  <Link href="/notifications" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Notifications</Link>
-                  <Link href="/privacy" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Privacy Settings</Link>
-                  <Link href="/help" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
-                  <button
-                    onClick={() => signOut()}
-                    className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50 font-semibold"
-                  >
-                    Logout
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
+        <div className="max-w-7xl mx-auto text-center">
+          <h1 className="text-lg md:text-xl font-semibold text-gray-900">Insights</h1>
+          <p className="text-sm text-gray-500 hidden sm:block">Personalized health recommendations</p>
         </div>
       </div>
 
@@ -270,44 +224,35 @@ export default function Insights() {
             <span className="text-xs text-gray-400 mt-1 font-medium truncate">Dashboard</span>
           </Link>
 
-          {/* Health */}
-          <Link href="/health-tracking" className="flex flex-col items-center py-2 px-1 min-w-0 flex-1">
-            <div className="text-gray-400">
-              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-              </svg>
-            </div>
-            <span className="text-xs text-gray-400 mt-1 font-medium truncate">Health</span>
-          </Link>
-
-          {/* Profile */}
-          <Link href="/profile" className="flex flex-col items-center py-2 px-1 min-w-0 flex-1">
-            <div className="text-gray-400">
-              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-              </svg>
-            </div>
-            <span className="text-xs text-gray-400 mt-1 font-medium truncate">Profile</span>
-          </Link>
-
           {/* Insights (Active) */}
           <Link href="/insights" className="flex flex-col items-center py-2 px-1 min-w-0 flex-1">
             <div className="text-helfi-green">
-              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
               </svg>
             </div>
             <span className="text-xs text-helfi-green mt-1 font-bold truncate">Insights</span>
           </Link>
 
-          {/* Reports */}
-          <Link href="/reports" className="flex flex-col items-center py-2 px-1 min-w-0 flex-1">
+          {/* Profile */}
+          <Link href="/profile" className="flex flex-col items-center py-2 px-1 min-w-0 flex-1">
             <div className="text-gray-400">
-              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/>
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
               </svg>
             </div>
-            <span className="text-xs text-gray-400 mt-1 font-medium truncate">Reports</span>
+            <span className="text-xs text-gray-400 mt-1 font-medium truncate">Profile</span>
+          </Link>
+
+          {/* Settings */}
+          <Link href="/settings" className="flex flex-col items-center py-2 px-1 min-w-0 flex-1">
+            <div className="text-gray-400">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </div>
+            <span className="text-xs text-gray-400 mt-1 font-medium truncate">Settings</span>
           </Link>
 
         </div>

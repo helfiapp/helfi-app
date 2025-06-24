@@ -25,7 +25,7 @@ export default function ProfileImage() {
       <path d="M64 76c-13.33 0-24 5.34-24 12v16c0 8.84 7.16 16 16 16h16c8.84 0 16-7.16 16-16V88c0-6.66-10.67-12-24-12z" fill="white"/>
     </svg>
   `);
-  const userImage = session?.user?.image || currentProfileImage || defaultAvatar;
+  const userImage = currentProfileImage || session?.user?.image || defaultAvatar;
   const userName = session?.user?.name || 'User';
 
   // Close dropdown on outside click
@@ -47,16 +47,30 @@ export default function ProfileImage() {
   useEffect(() => {
     const loadCurrentImage = async () => {
       try {
-        const response = await fetch('/api/user-data');
+        console.log('Profile/Image page - Loading profile image from database...');
+        const response = await fetch('/api/user-data', {
+          cache: 'no-cache',
+          headers: {
+            'Cache-Control': 'no-cache'
+          }
+        });
         if (response.ok) {
           const result = await response.json();
+          console.log('Profile/Image page - API response:', { hasData: !!result.data, hasProfileImage: !!(result.data?.profileImage) });
           if (result.data && result.data.profileImage) {
+            console.log('Profile/Image page - Setting profile image from database');
             setCurrentProfileImage(result.data.profileImage);
+            // Also update localStorage for backup
+            localStorage.setItem('profileImage', result.data.profileImage);
+          } else {
+            console.log('Profile/Image page - No profile image found in database response');
           }
         } else {
+          console.error('Profile/Image page - API call failed:', response.status, response.statusText);
           // Fallback to localStorage
           const savedImage = localStorage.getItem('profileImage');
           if (savedImage) {
+            console.log('Using fallback profile image from localStorage');
             setCurrentProfileImage(savedImage);
           }
         }
@@ -64,6 +78,7 @@ export default function ProfileImage() {
         console.error('Error loading profile image:', error);
         const savedImage = localStorage.getItem('profileImage');
         if (savedImage) {
+          console.log('Using fallback profile image from localStorage after error');
           setCurrentProfileImage(savedImage);
         }
       }
@@ -313,7 +328,7 @@ export default function ProfileImage() {
                     alt="Profile"
                     width={36}
                     height={36}
-                    className="rounded-full border-2 border-helfi-green shadow-sm object-cover"
+                    className="w-9 h-9 rounded-full border-2 border-helfi-green shadow-sm object-cover"
                   />
                 </button>
                 {dropdownOpen && (
@@ -324,7 +339,7 @@ export default function ProfileImage() {
                         alt="Profile"
                         width={40}
                         height={40}
-                        className="rounded-full object-cover mr-3"
+                        className="w-10 h-10 rounded-full object-cover mr-3"
                       />
                       <div>
                         <div className="font-semibold text-gray-900">{userName}</div>
@@ -333,7 +348,7 @@ export default function ProfileImage() {
                     </div>
                     <Link href="/profile" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Profile</Link>
                     <Link href="/account" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Account Settings</Link>
-                    <Link href="/profile/image" className="block px-4 py-2 text-gray-700 hover:bg-gray-50 bg-gray-50 font-medium">Upload/Change Profile Image</Link>
+                    <Link href="/profile/image" className="block px-4 py-2 text-gray-700 hover:bg-gray-50 bg-gray-50 font-medium">Upload/Change Profile Photo</Link>
                     <Link href="/billing" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Subscription & Billing</Link>
                     <Link href="/notifications" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Notifications</Link>
                     <Link href="/privacy" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Privacy Settings</Link>
@@ -373,7 +388,7 @@ export default function ProfileImage() {
                     alt="Profile Picture"
                     width={128}
                     height={128}
-                    className="w-full h-full object-cover rounded-full border-3 border-gray-200 shadow-sm"
+                    className="w-32 h-32 object-cover rounded-full border-3 border-gray-200 shadow-sm"
                   />
                   {imagePreview && (
                     <div className="absolute -top-1 -right-1 bg-green-500 text-white rounded-full p-1.5 shadow-sm">

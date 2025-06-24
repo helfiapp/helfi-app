@@ -8,6 +8,7 @@ import Image from 'next/image'
 export default function Reports() {
   const { data: session } = useSession()
   const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [profileImage, setProfileImage] = useState<string>('')
 
   // Profile data - using consistent green avatar
   const defaultAvatar = 'data:image/svg+xml;base64,' + btoa(`
@@ -17,7 +18,7 @@ export default function Reports() {
       <path d="M64 76c-13.33 0-24 5.34-24 12v16c0 8.84 7.16 16 16 16h16c8.84 0 16-7.16 16-16V88c0-6.66-10.67-12-24-12z" fill="white"/>
     </svg>
   `);
-  const userImage = session?.user?.image || defaultAvatar;
+  const userImage = profileImage || session?.user?.image || defaultAvatar;
   const userName = session?.user?.name || 'User';
 
   // Close dropdown on outside click
@@ -34,6 +35,27 @@ export default function Reports() {
       return () => document.removeEventListener('mousedown', handleClick);
     }
   }, [dropdownOpen]);
+
+  // Load profile image from database
+  useEffect(() => {
+    const loadProfileImage = async () => {
+      try {
+        const response = await fetch('/api/user-data');
+        if (response.ok) {
+          const result = await response.json();
+          if (result.data && result.data.profileImage) {
+            setProfileImage(result.data.profileImage);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading profile image:', error);
+      }
+    };
+
+    if (session) {
+      loadProfileImage();
+    }
+  }, [session]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -105,7 +127,7 @@ export default function Reports() {
                   alt="Profile"
                   width={48}
                   height={48}
-                  className="rounded-full border-2 border-helfi-green shadow-sm object-cover w-12 h-12"
+                  className="w-12 h-12 rounded-full border-2 border-helfi-green shadow-sm object-cover"
                 />
               </button>
               {dropdownOpen && (
@@ -116,7 +138,7 @@ export default function Reports() {
                       alt="Profile"
                       width={40}
                       height={40}
-                      className="rounded-full object-cover mr-3"
+                      className="w-10 h-10 rounded-full object-cover mr-3"
                     />
                     <div>
                       <div className="font-semibold text-gray-900">{userName}</div>
@@ -125,7 +147,7 @@ export default function Reports() {
                   </div>
                   <Link href="/profile" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Profile</Link>
                   <Link href="/account" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Account Settings</Link>
-                  <Link href="/profile/image" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Upload/Change Profile Image</Link>
+                  <Link href="/profile/image" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Upload/Change Profile Photo</Link>
                   <Link href="/billing" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Subscription & Billing</Link>
                   <Link href="/notifications" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Notifications</Link>
                   <Link href="/privacy" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Privacy Settings</Link>
@@ -154,7 +176,7 @@ export default function Reports() {
                   alt="Profile"
                   width={36}
                   height={36}
-                  className="rounded-full border-2 border-helfi-green shadow-sm object-cover"
+                  className="w-9 h-9 rounded-full border-2 border-helfi-green shadow-sm object-cover"
                 />
               </button>
               {dropdownOpen && (
@@ -165,7 +187,7 @@ export default function Reports() {
                       alt="Profile"
                       width={40}
                       height={40}
-                      className="rounded-full object-cover mr-3"
+                      className="w-10 h-10 rounded-full object-cover mr-3"
                     />
                     <div>
                       <div className="font-semibold text-gray-900">{userName}</div>
@@ -174,7 +196,7 @@ export default function Reports() {
                   </div>
                   <Link href="/profile" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Profile</Link>
                   <Link href="/account" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Account Settings</Link>
-                  <Link href="/profile/image" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Upload/Change Profile Image</Link>
+                  <Link href="/profile/image" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Upload/Change Profile Photo</Link>
                   <Link href="/billing" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Subscription & Billing</Link>
                   <Link href="/notifications" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Notifications</Link>
                   <Link href="/privacy" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Privacy Settings</Link>

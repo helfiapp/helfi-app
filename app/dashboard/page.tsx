@@ -10,6 +10,7 @@ export default function Dashboard() {
   const [onboardingData, setOnboardingData] = useState<any>(null)
   const [showResetConfirm, setShowResetConfirm] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [profileImage, setProfileImage] = useState<string | null>(null)
 
   // Profile data - using consistent green avatar
   const defaultAvatar = 'data:image/svg+xml;base64,' + btoa(`
@@ -19,7 +20,7 @@ export default function Dashboard() {
       <path d="M64 76c-13.33 0-24 5.34-24 12v16c0 8.84 7.16 16 16 16h16c8.84 0 16-7.16 16-16V88c0-6.66-10.67-12-24-12z" fill="white"/>
     </svg>
   `);
-  const userImage = session?.user?.image || defaultAvatar;
+  const userImage = profileImage || session?.user?.image || defaultAvatar;
   const userName = session?.user?.name || 'User';
 
   // Close dropdown on outside click
@@ -54,6 +55,12 @@ export default function Dashboard() {
           if (result.data) {
             console.log('Successfully loaded data from database:', result.data);
             setOnboardingData(result.data);
+            // Load profile image from database and cache it
+            if (result.data.profileImage) {
+              setProfileImage(result.data.profileImage);
+              // Cache in localStorage for instant loading on other pages
+              localStorage.setItem('cachedProfileImage', result.data.profileImage);
+            }
           }
         } else if (response.status === 404) {
           console.log('No existing data found for user in database');
@@ -72,6 +79,12 @@ export default function Dashboard() {
         setOnboardingData(null);
       }
     };
+
+    // Load cached profile image immediately for instant display
+    const cachedImage = localStorage.getItem('cachedProfileImage');
+    if (cachedImage) {
+      setProfileImage(cachedImage);
+    }
 
     loadUserData();
   }, []);
@@ -108,11 +121,10 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Mobile-first Design: Top header for desktop, bottom nav for mobile */}
-      
-      {/* Desktop Navigation Header */}
-      <nav className="hidden md:block bg-white border-b border-gray-200 px-4 py-3">
+      {/* Navigation Header - First Row */}
+      <nav className="bg-white border-b border-gray-200 px-4 py-3">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
+          {/* Logo on the left */}
           <div className="flex items-center">
             <Link href="/" className="w-16 h-16 md:w-20 md:h-20 cursor-pointer hover:opacity-80 transition-opacity">
               <Image
@@ -124,150 +136,63 @@ export default function Dashboard() {
                 priority
               />
             </Link>
-            <div className="ml-4">
-              <h1 className="text-lg md:text-xl font-semibold text-gray-900">Health Dashboard</h1>
-              <p className="text-sm text-gray-500 hidden sm:block">Welcome back, {userName}</p>
-            </div>
           </div>
           
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-6">
-            <Link href="/dashboard" className="text-gray-700 hover:text-helfi-green transition-colors font-medium">
-              Dashboard
-            </Link>
-            <Link href="/health-tracking" className="text-gray-700 hover:text-helfi-green transition-colors font-medium">
-              Health Tracking
-            </Link>
-            <Link href="/insights" className="text-gray-700 hover:text-helfi-green transition-colors font-medium">
-              AI Insights
-            </Link>
-            <Link href="/reports" className="text-gray-700 hover:text-helfi-green transition-colors font-medium">
-              Reports
-            </Link>
-            <Link href="/onboarding?step=1" className="text-gray-700 hover:text-helfi-green transition-colors font-medium">
-              Health Info
-            </Link>
-            
-            {/* Desktop Profile Avatar & Dropdown */}
-            <div className="relative ml-6 dropdown-container" id="profile-dropdown">
-              <button
-                onClick={() => setDropdownOpen((v) => !v)}
-                className="focus:outline-none"
-                aria-label="Open profile menu"
-              >
-                <Image
-                  src={userImage}
-                  alt="Profile"
-                  width={48}
-                  height={48}
-                  className="rounded-full border-2 border-helfi-green shadow-sm object-cover w-12 h-12"
-                />
-              </button>
-              {dropdownOpen && (
-                <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-100 animate-fade-in">
-                  <div className="flex items-center px-4 py-3 border-b border-gray-100">
-                    <Image
-                      src={userImage}
-                      alt="Profile"
-                      width={40}
-                      height={40}
-                      className="rounded-full object-cover mr-3"
-                    />
-                    <div>
-                      <div className="font-semibold text-gray-900">{userName}</div>
-                      <div className="text-xs text-gray-500">{session?.user?.email || 'user@email.com'}</div>
-                    </div>
+          {/* Profile Avatar & Dropdown on the right */}
+          <div className="relative dropdown-container" id="profile-dropdown">
+            <button
+              onClick={() => setDropdownOpen((v) => !v)}
+              className="focus:outline-none"
+              aria-label="Open profile menu"
+            >
+              <Image
+                src={userImage}
+                alt="Profile"
+                width={48}
+                height={48}
+                className="w-12 h-12 rounded-full border-2 border-helfi-green shadow-sm object-cover"
+              />
+            </button>
+            {dropdownOpen && (
+              <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-100 animate-fade-in">
+                <div className="flex items-center px-4 py-3 border-b border-gray-100">
+                  <Image
+                    src={userImage}
+                    alt="Profile"
+                    width={40}
+                    height={40}
+                    className="w-10 h-10 rounded-full object-cover mr-3"
+                  />
+                  <div>
+                    <div className="font-semibold text-gray-900">{userName}</div>
+                    <div className="text-xs text-gray-500">{session?.user?.email || 'user@email.com'}</div>
                   </div>
-                  <Link href="/dashboard" className="block px-4 py-2 text-gray-700 hover:bg-gray-50 bg-gray-50 font-medium">Dashboard</Link>
-                  <Link href="/health-tracking" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Insights</Link>
-                  <Link href="/profile" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Profile</Link>
-                  <Link href="/onboarding?step=1" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Health Info</Link>
-                  <Link href="/settings" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Settings</Link>
-                  <div className="border-t border-gray-100 my-2"></div>
-                  <Link href="/reports" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Reports</Link>
-                  <Link href="/account" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Account Settings</Link>
-                  <Link href="/profile/image" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Upload/Change Profile Image</Link>
-                  <Link href="/billing" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Subscription & Billing</Link>
-                  <Link href="/notifications" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Notifications</Link>
-                  <Link href="/privacy" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Privacy Settings</Link>
-                  <Link href="/help" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
-                  <button
-                    onClick={() => signOut()}
-                    className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50 font-semibold"
-                  >
-                    Logout
-                  </button>
                 </div>
-              )}
-            </div>
+                <Link href="/account" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Account Settings</Link>
+                <Link href="/profile/image" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Upload/Change Profile Photo</Link>
+                <Link href="/billing" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Subscription & Billing</Link>
+                <Link href="/notifications" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Notifications</Link>
+                <Link href="/privacy" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Privacy Settings</Link>
+                <Link href="/help" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
+                <div className="border-t border-gray-100 my-2"></div>
+                <Link href="/reports" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Reports</Link>
+                <button
+                  onClick={() => signOut()}
+                  className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50 font-semibold"
+                >
+                  Logout
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </nav>
 
-      {/* Mobile Top Header - Minimal */}
-      <div className="md:hidden bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center">
-          <Image
-            src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/HELFI_TRANSPARENT_rmssry.png"
-            alt="Helfi Logo"
-            width={40}
-            height={40}
-            className="object-contain"
-            priority
-          />
-        </div>
-        
-        {/* Mobile Profile */}
-        <div className="relative dropdown-container" id="mobile-profile-dropdown">
-          <button
-            onClick={() => setDropdownOpen((v) => !v)}
-            className="focus:outline-none"
-            aria-label="Open profile menu"
-          >
-            <Image
-              src={userImage}
-              alt="Profile"
-              width={36}
-              height={36}
-              className="rounded-full border-2 border-helfi-green shadow-sm object-cover"
-            />
-          </button>
-          {dropdownOpen && (
-            <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-100">
-              <div className="flex items-center px-4 py-3 border-b border-gray-100">
-                <Image
-                  src={userImage}
-                  alt="Profile"
-                  width={40}
-                  height={40}
-                  className="rounded-full object-cover mr-3"
-                />
-                <div>
-                  <div className="font-semibold text-gray-900">{userName}</div>
-                  <div className="text-xs text-gray-500">{session?.user?.email || 'user@email.com'}</div>
-                </div>
-              </div>
-              <Link href="/dashboard" className="block px-4 py-2 text-gray-700 hover:bg-gray-50 bg-gray-50 font-medium">Dashboard</Link>
-              <Link href="/health-tracking" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Insights</Link>
-              <Link href="/profile" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Profile</Link>
-              <Link href="/onboarding?step=1" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Health Info</Link>
-              <Link href="/settings" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Settings</Link>
-              <div className="border-t border-gray-100 my-2"></div>
-              <Link href="/reports" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Reports</Link>
-              <Link href="/account" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Account Settings</Link>
-              <Link href="/profile/image" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Upload/Change Profile Image</Link>
-              <Link href="/billing" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Subscription & Billing</Link>
-              <Link href="/notifications" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Notifications</Link>
-              <Link href="/privacy" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Privacy Settings</Link>
-              <Link href="/help" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
-              <button
-                onClick={() => signOut()}
-                className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50 font-semibold"
-              >
-                Logout
-              </button>
-            </div>
-          )}
+      {/* Second Row - Page Title Centered */}
+      <div className="bg-white border-b border-gray-200 px-4 py-4">
+        <div className="max-w-7xl mx-auto text-center">
+          <h1 className="text-lg md:text-xl font-semibold text-gray-900">Dashboard</h1>
+          <p className="text-sm text-gray-500 hidden sm:block">Welcome back, {userName}</p>
         </div>
       </div>
 
@@ -342,203 +267,143 @@ export default function Dashboard() {
                   
                   <div className="bg-white p-3 rounded-lg border border-gray-200 hover:border-blue-300 transition-colors cursor-pointer group">
                     <div className="text-center">
-                      <div className="text-2xl mb-1">🔵</div>
-                      <div className="text-xs font-medium text-gray-700">Oura Ring</div>
-                      <div className="text-xs text-gray-500 mt-1 group-hover:text-blue-600">Connect</div>
-                    </div>
-                  </div>
-                  
-                  <div className="bg-white p-3 rounded-lg border border-gray-200 hover:border-blue-300 transition-colors cursor-pointer group">
-                    <div className="text-center">
-                      <div className="text-2xl mb-1">🏔️</div>
+                      <div className="text-2xl mb-1">💪</div>
                       <div className="text-xs font-medium text-gray-700">Garmin</div>
                       <div className="text-xs text-gray-500 mt-1 group-hover:text-blue-600">Connect</div>
                     </div>
                   </div>
-                </div>
-                
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                  <div className="bg-white p-3 rounded-lg border border-gray-200 hover:border-blue-300 transition-colors cursor-pointer group">
-                    <div className="text-center">
-                      <div className="text-2xl mb-1">🤖</div>
-                      <div className="text-xs font-medium text-gray-700">Google Fit</div>
-                      <div className="text-xs text-gray-500 mt-1 group-hover:text-blue-600">Connect</div>
-                    </div>
-                  </div>
                   
                   <div className="bg-white p-3 rounded-lg border border-gray-200 hover:border-blue-300 transition-colors cursor-pointer group">
                     <div className="text-center">
-                      <div className="text-2xl mb-1">⚖️</div>
-                      <div className="text-xs font-medium text-gray-700">Withings</div>
-                      <div className="text-xs text-gray-500 mt-1 group-hover:text-blue-600">Connect</div>
-                    </div>
-                  </div>
-                  
-                  <div className="bg-white p-3 rounded-lg border border-gray-200 hover:border-blue-300 transition-colors cursor-pointer group">
-                    <div className="text-center">
-                      <div className="text-2xl mb-1">❄️</div>
-                      <div className="text-xs font-medium text-gray-700">Polar</div>
-                      <div className="text-xs text-gray-500 mt-1 group-hover:text-blue-600">Connect</div>
-                    </div>
-                  </div>
-                  
-                  <div className="bg-white p-3 rounded-lg border border-gray-200 hover:border-blue-300 transition-colors cursor-pointer group">
-                    <div className="text-center">
-                      <div className="text-2xl mb-1">📱</div>
-                      <div className="text-xs font-medium text-gray-700">Samsung</div>
+                      <div className="text-2xl mb-1">📊</div>
+                      <div className="text-xs font-medium text-gray-700">Other</div>
                       <div className="text-xs text-gray-500 mt-1 group-hover:text-blue-600">Connect</div>
                     </div>
                   </div>
                 </div>
                 
-                <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                  <div className="flex items-start space-x-3">
-                    <div className="text-blue-600 text-lg">💡</div>
+                <div className="text-xs text-gray-500 text-center">
+                  Device integration coming soon - enhanced health monitoring with real-time data
+                </div>
+              </div>
+            )}
+
+            {/* Data Status Section */}
+            <div className="mb-8">
+              {onboardingData ? (
+                <div className="bg-green-50 border border-green-200 rounded-xl p-6">
+                  <div className="flex items-center justify-between">
                     <div>
-                      <h4 className="font-medium text-blue-900 mb-1">What data can we access?</h4>
-                      <ul className="text-sm text-blue-700 space-y-1">
-                        <li>• Heart rate, steps, and activity levels</li>
-                        <li>• Sleep quality and recovery metrics</li>
-                        <li>• Workout intensity and calories burned</li>
-                        <li>• Blood oxygen and stress indicators</li>
-                      </ul>
-                      <p className="text-xs text-blue-600 mt-2 font-medium">
-                        🔒 Your data is encrypted and never shared with third parties
+                      <h3 className="text-lg font-semibold text-green-900 mb-2">✅ Onboarding Complete</h3>
+                      <p className="text-green-700 mb-4">
+                        Your health profile has been created and synced across all devices
+                      </p>
+                      <div className="flex flex-wrap gap-2 mb-4">
+                        {onboardingData.personalInfo && (
+                          <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs">
+                            Personal Info ✓
+                          </span>
+                        )}
+                        {onboardingData.physicalMetrics && (
+                          <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs">
+                            Physical Metrics ✓
+                          </span>
+                        )}
+                        {onboardingData.healthGoals && (
+                          <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs">
+                            Health Goals ✓
+                          </span>
+                        )}
+                        {onboardingData.medications && onboardingData.medications.length > 0 && (
+                          <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs">
+                            Medications ✓
+                          </span>
+                        )}
+                        {onboardingData.supplements && onboardingData.supplements.length > 0 && (
+                          <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs">
+                            Supplements ✓
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-green-600">
+                      <svg className="w-12 h-12" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                      </svg>
+                    </div>
+                  </div>
+                  
+                  <div className="flex flex-wrap gap-3 mt-4">
+                    <button 
+                      onClick={handleEditOnboarding}
+                      className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
+                    >
+                      Edit Health Information
+                    </button>
+                    <button 
+                      onClick={() => setShowResetConfirm(true)}
+                      className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"
+                    >
+                      Reset All Data
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-semibold text-blue-900 mb-2">🚀 Get Started</h3>
+                      <p className="text-blue-700 mb-4">
+                        Complete your health profile to unlock personalized insights and tracking
                       </p>
                     </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Onboarding Data Section */}
-            {onboardingData && (
-              <div className="mt-8 bg-gray-50 rounded-lg p-6">
-                <div className="mb-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Your Profile Information</h3>
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <button
-                      onClick={handleEditOnboarding}
-                      className="w-full bg-helfi-green text-white px-4 py-3 rounded-lg hover:bg-helfi-green/90 transition-colors text-sm font-medium"
-                    >
-                      ✏️ Edit Profile
-                    </button>
-                    <button
-                      onClick={() => setShowResetConfirm(true)}
-                      className="w-full bg-red-500 text-white px-4 py-3 rounded-lg hover:bg-red-600 transition-colors text-sm font-medium"
-                    >
-                      🔄 Reset All Data
-                    </button>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <strong>Gender:</strong> {onboardingData.gender}
-                  </div>
-                  <div>
-                    <strong>Weight:</strong> {onboardingData.weight} {onboardingData.unit === 'metric' ? 'kg' : 'lbs'}
-                  </div>
-                  <div>
-                    <strong>Height:</strong> {onboardingData.height || `${onboardingData.feet}'${onboardingData.inches}"`}
-                  </div>
-                  <div>
-                    <strong>Body Type:</strong> {onboardingData.bodyType}
-                  </div>
-                  <div>
-                    <strong>Exercise Frequency:</strong> {onboardingData.exerciseFrequency}
-                  </div>
-                  <div>
-                    <strong>Exercise Types:</strong> {(onboardingData.exerciseTypes || []).join(', ')}
-                  </div>
-                  <div className="md:col-span-2">
-                    <strong>Health Goals:</strong> {(onboardingData.goals || []).join(', ')}
-                  </div>
-                  {onboardingData.healthIssues && (
-                    <div className="md:col-span-2">
-                      <strong>Health Issues:</strong> {onboardingData.healthIssues}
+                    <div className="text-blue-600">
+                      <svg className="w-12 h-12" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z"/>
+                      </svg>
                     </div>
-                  )}
-                  {onboardingData.healthProblems && (
-                    <div className="md:col-span-2">
-                      <strong>Health Problems:</strong> {onboardingData.healthProblems}
-                    </div>
-                  )}
-                  <div className="md:col-span-2">
-                    <strong>Supplements:</strong> {(onboardingData.supplements || []).map((s: any) => 
-                      `${s.name} (${s.dosage}, ${Array.isArray(s.timing) ? s.timing.join(', ') : s.timing})`
-                    ).join('; ') || 'None'}
                   </div>
-                  <div className="md:col-span-2">
-                    <strong>Medications:</strong> {(onboardingData.medications || []).map((m: any) => 
-                      `${m.name} (${m.dosage}, ${Array.isArray(m.timing) ? m.timing.join(', ') : m.timing})`
-                    ).join('; ') || 'None'}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {!onboardingData && (
-              <div className="mt-8 text-center">
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
-                  <h3 className="text-lg font-semibold text-yellow-800 mb-2">Complete Your Profile</h3>
-                  <p className="text-yellow-700 mb-4">
-                    To get personalized health insights, please complete your onboarding profile.
-                  </p>
-                  <button
-                    onClick={handleEditOnboarding}
-                    className="bg-helfi-green text-white px-6 py-3 rounded-lg hover:bg-helfi-green/90 transition-colors"
+                  
+                  <Link 
+                    href="/onboarding"
+                    className="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium"
                   >
-                    Start Profile Setup
-                  </button>
+                    Start Health Profile Setup
+                  </Link>
                 </div>
-              </div>
-            )}
-
-            <div className="text-center mt-8">
-              <div className="inline-flex items-center px-4 py-2 bg-helfi-green/10 text-helfi-green rounded-full text-sm">
-                ✨ Your health journey starts here - Features launching soon!
-              </div>
+              )}
             </div>
-
-            {session?.user && (
-              <div className="mt-8 p-4 bg-gray-50 rounded-lg">
-                <p className="text-sm text-gray-600">
-                  Logged in as: <span className="font-medium">{session.user.email}</span>
-                </p>
-              </div>
-            )}
 
             {/* Reset Confirmation Modal */}
             {showResetConfirm && (
               <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                 <div className="bg-white rounded-lg p-6 max-w-md mx-4">
-                  <h3 className="text-lg font-semibold text-red-600 mb-4">⚠️ Reset All Data</h3>
+                  <h3 className="text-lg font-bold text-red-900 mb-4">⚠️ Reset All Data</h3>
                   <p className="text-gray-700 mb-6">
-                    Are you sure you want to reset all your data? This will permanently delete all your:
+                    This will permanently delete all your health data, including:
                   </p>
                   <ul className="text-sm text-gray-600 mb-6 space-y-1">
-                    <li>• Profile information</li>
-                    <li>• Health goals and preferences</li>
-                    <li>• Supplement and medication data</li>
-                    <li>• Health situation details</li>
-                    <li>• Blood results uploads</li>
+                    <li>• Personal information</li>
+                    <li>• Physical metrics</li>
+                    <li>• Health goals</li>
+                    <li>• Medications and supplements</li>
+                    <li>• Profile image</li>
                   </ul>
                   <p className="text-red-600 font-medium mb-6">
-                    This action cannot be undone!
+                    This action cannot be undone.
                   </p>
-                  <div className="flex space-x-3">
-                    <button
+                  <div className="flex gap-3">
+                    <button 
+                      onClick={handleResetData}
+                      className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors"
+                    >
+                      Yes, Reset Everything
+                    </button>
+                    <button 
                       onClick={() => setShowResetConfirm(false)}
-                      className="flex-1 bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors"
+                      className="bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400 transition-colors"
                     >
                       Cancel
-                    </button>
-                    <button
-                      onClick={handleResetData}
-                      className="flex-1 bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors"
-                    >
-                      Yes, Reset All
                     </button>
                   </div>
                 </div>
@@ -552,55 +417,45 @@ export default function Dashboard() {
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-2 z-40">
         <div className="flex items-center justify-around">
           
-          {/* Dashboard */}
+          {/* Dashboard (Active) */}
           <Link href="/dashboard" className="flex flex-col items-center py-2 px-1 min-w-0 flex-1">
             <div className="text-helfi-green">
               <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/>
               </svg>
             </div>
-            <span className="text-xs text-helfi-green font-medium mt-1">Dashboard</span>
+            <span className="text-xs text-helfi-green mt-1 font-bold truncate">Dashboard</span>
           </Link>
 
-          {/* Insights (renamed from Health Tracking) */}
-          <Link href="/health-tracking" className="flex flex-col items-center py-2 px-1 min-w-0 flex-1">
-            <div className="text-gray-500">
+          {/* Insights */}
+          <Link href="/insights" className="flex flex-col items-center py-2 px-1 min-w-0 flex-1">
+            <div className="text-gray-400">
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
               </svg>
             </div>
-            <span className="text-xs text-gray-500 mt-1">Insights</span>
+            <span className="text-xs text-gray-400 mt-1 font-medium truncate">Insights</span>
           </Link>
 
           {/* Profile */}
           <Link href="/profile" className="flex flex-col items-center py-2 px-1 min-w-0 flex-1">
-            <div className="text-gray-500">
+            <div className="text-gray-400">
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
               </svg>
             </div>
-            <span className="text-xs text-gray-500 mt-1">Profile</span>
-          </Link>
-
-          {/* Health Info (Onboarding) */}
-          <Link href="/onboarding?step=1" className="flex flex-col items-center py-2 px-1 min-w-0 flex-1">
-            <div className="text-gray-500">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
-            </div>
-            <span className="text-xs text-gray-500 mt-1">Intake</span>
+            <span className="text-xs text-gray-400 mt-1 font-medium truncate">Profile</span>
           </Link>
 
           {/* Settings */}
           <Link href="/settings" className="flex flex-col items-center py-2 px-1 min-w-0 flex-1">
-            <div className="text-gray-500">
+            <div className="text-gray-400">
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
             </div>
-            <span className="text-xs text-gray-500 mt-1">Settings</span>
+            <span className="text-xs text-gray-400 mt-1 font-medium truncate">Settings</span>
           </Link>
 
         </div>
