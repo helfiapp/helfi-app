@@ -1,12 +1,39 @@
 'use client'
 
-import React from 'react'
-import { useSession } from 'next-auth/react'
+import React, { useState, useEffect } from 'react'
+import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
 import Image from 'next/image'
 
 export default function Settings() {
   const { data: session } = useSession()
+  const [dropdownOpen, setDropdownOpen] = useState(false)
+
+  // Profile data - using consistent green avatar
+  const defaultAvatar = 'data:image/svg+xml;base64,' + btoa(`
+    <svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="64" cy="64" r="64" fill="#10B981"/>
+      <circle cx="64" cy="48" r="20" fill="white"/>
+      <path d="M64 76c-13.33 0-24 5.34-24 12v16c0 8.84 7.16 16 16 16h16c8.84 0 16-7.16 16-16V88c0-6.66-10.67-12-24-12z" fill="white"/>
+    </svg>
+  `);
+  const userImage = session?.user?.image || defaultAvatar;
+  const userName = session?.user?.name || 'User';
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      const target = e.target as HTMLElement;
+      // Check if click is outside both the button and the dropdown content
+      if (!target.closest('.dropdown-container')) {
+        setDropdownOpen(false);
+      }
+    }
+    if (dropdownOpen) {
+      document.addEventListener('mousedown', handleClick);
+      return () => document.removeEventListener('mousedown', handleClick);
+    }
+  }, [dropdownOpen]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -27,16 +54,50 @@ export default function Settings() {
             </Link>
           </div>
           
-          {/* Profile image on the right */}
-          <div className="flex items-center">
-            {session?.user?.image && (
+          {/* Profile Avatar & Dropdown on the right */}
+          <div className="relative dropdown-container" id="profile-dropdown">
+            <button
+              onClick={() => setDropdownOpen((v) => !v)}
+              className="focus:outline-none"
+              aria-label="Open profile menu"
+            >
               <Image
-                src={session.user.image}
+                src={userImage}
                 alt="Profile"
                 width={48}
                 height={48}
                 className="w-12 h-12 rounded-full border-2 border-helfi-green shadow-sm object-cover"
               />
+            </button>
+            {dropdownOpen && (
+              <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-100 animate-fade-in">
+                <div className="flex items-center px-4 py-3 border-b border-gray-100">
+                  <Image
+                    src={userImage}
+                    alt="Profile"
+                    width={40}
+                    height={40}
+                    className="w-10 h-10 rounded-full object-cover mr-3"
+                  />
+                  <div>
+                    <div className="font-semibold text-gray-900">{userName}</div>
+                    <div className="text-xs text-gray-500">{session?.user?.email || 'user@email.com'}</div>
+                  </div>
+                </div>
+                <Link href="/profile" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Profile</Link>
+                <Link href="/account" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Account Settings</Link>
+                <Link href="/profile/image" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Upload/Change Profile Photo</Link>
+                <Link href="/billing" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Subscription & Billing</Link>
+                <Link href="/notifications" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Notifications</Link>
+                <Link href="/privacy" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Privacy Settings</Link>
+                <Link href="/help" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
+                <button
+                  onClick={() => signOut()}
+                  className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50 font-semibold"
+                >
+                  Logout
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -189,6 +250,16 @@ export default function Settings() {
               </svg>
             </div>
             <span className="text-xs text-gray-400 mt-1 font-medium truncate">Profile</span>
+          </Link>
+
+          {/* Intake (Onboarding) */}
+          <Link href="/onboarding?step=1" className="flex flex-col items-center py-2 px-1 min-w-0 flex-1">
+            <div className="text-gray-400">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+            </div>
+            <span className="text-xs text-gray-400 mt-1 font-medium truncate">Intake</span>
           </Link>
 
           {/* Settings (Active) */}
