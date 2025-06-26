@@ -373,13 +373,16 @@ Please add nutritional information manually if needed.`);
 
   const editFood = (food: any) => {
     setEditingEntry(food);
-    // Populate the form with existing data
+    // Populate the form with existing data and go directly to editing
     if (food.method === 'photo') {
       setPhotoPreview(food.photo);
       setAiDescription(food.description);
       setAnalyzedNutrition(food.nutrition);
       setShowAiResult(true);
       setShowAddFood(true);
+      // Go directly to editing mode instead of showing "Edit Description" button
+      setIsEditingDescription(true);
+      setEditedDescription(food.description);
     } else {
       // For manual entries, populate the manual form
       setManualFoodName(food.description);
