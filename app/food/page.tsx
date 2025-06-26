@@ -153,6 +153,15 @@ export default function FoodDiary() {
     setIsAnalyzing(true);
     
     try {
+      // First upload image to Cloudinary to get permanent URL
+      const cloudinaryUrl = await uploadImageToCloudinary(photoFile);
+      if (!cloudinaryUrl) {
+        throw new Error('Failed to upload image to cloud storage');
+      }
+
+      // Update photoPreview to show the Cloudinary URL
+      setPhotoPreview(cloudinaryUrl);
+
       // Create FormData for API call
       const formData = new FormData();
       formData.append('image', photoFile);
@@ -170,7 +179,7 @@ export default function FoodDiary() {
 
       const result = await response.json();
       
-      if (result.success && result.analysis) {
+      if (result.analysis) {
         setAiDescription(result.analysis);
         setAnalyzedNutrition(extractNutritionData(result.analysis));
         setShowAiResult(true);
@@ -268,13 +277,41 @@ Please add nutritional information manually if needed.`);
     }
   };
 
+  // Upload image to Cloudinary and return URL
+  const uploadImageToCloudinary = async (file: File): Promise<string | null> => {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('upload_preset', 'ml_default'); // Using default Cloudinary preset
+      formData.append('folder', 'helfi/food_entries');
+
+      const response = await fetch(
+        'https://api.cloudinary.com/v1_1/dh7qpr43n/image/upload',
+        {
+          method: 'POST',
+          body: formData,
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to upload image to cloud storage');
+      }
+
+      const result = await response.json();
+      return result.secure_url;
+    } catch (error) {
+      console.error('Error uploading image to Cloudinary:', error);
+      return null;
+    }
+  };
+
   const addFoodEntry = async (description: string, method: 'text' | 'photo', nutrition?: any) => {
     const newEntry = {
       id: Date.now(),
       description,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       method,
-      photo: method === 'photo' ? photoPreview : null,
+      photo: method === 'photo' ? photoPreview : null, // Use photoPreview which now contains Cloudinary URL
       nutrition: nutrition || analyzedNutrition
     };
     
