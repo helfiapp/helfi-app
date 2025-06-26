@@ -209,8 +209,8 @@ export default function FoodDiary() {
     setShowWebcam(false);
   };
 
-  // Compress image to reduce API costs and improve loading speed
-  const compressImage = (file: File, maxWidth: number = 600, quality: number = 0.7): Promise<File> => {
+  // Aggressive compression for ultra-fast loading
+  const compressImage = (file: File, maxWidth: number = 400, quality: number = 0.6): Promise<File> => {
     return new Promise((resolve, reject) => {
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
@@ -650,6 +650,8 @@ Please add nutritional information manually if needed.`);
                 onLoad={() => setProfileImageLoading(false)}
                 onError={() => setProfileImageLoading(false)}
                 priority
+                placeholder="blur"
+                blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyayoIiExpqrKOOmc8UNAqOV1z8VNNm1lNdvYpMeKGCKGkPP93UGJhWKhwjfvk"
               />
             </button>
             {dropdownOpen && (
@@ -696,7 +698,7 @@ Please add nutritional information manually if needed.`);
 
       {/* Main Content */}
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8 pb-24 md:pb-8">
         
         {/* Instruction Text */}
         <div className="mb-4 text-center">
@@ -1414,7 +1416,7 @@ Please add nutritional information manually if needed.`);
                         </button>
                         
                         {showEntryOptions === food.id.toString() && (
-                          <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                          <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-200 z-[60]" style={{boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'}}>
                             <button
                               onClick={() => editFood(food)}
                               className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 flex items-center"
@@ -1469,13 +1471,13 @@ Please add nutritional information manually if needed.`);
                   {expandedEntries[food.id.toString()] && (
                     <div className="border-t border-gray-100 p-4 bg-gray-50">
                       <div className="flex flex-col sm:flex-row gap-4">
-                        {/* Compact Food Image - Clickable */}
+                        {/* Food Image - Perfectly Sized to Match Nutrition Cards */}
                         {food.photo && (
-                          <div className="sm:w-20 sm:flex-shrink-0">
+                          <div className="w-full sm:w-32 sm:flex-shrink-0 mb-4 sm:mb-0">
                             <div className="relative">
                               {foodImagesLoading[food.id] && (
                                 <div className="absolute inset-0 bg-gray-100 rounded-lg animate-pulse flex items-center justify-center">
-                                  <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24">
+                                  <svg className="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24">
                                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                   </svg>
@@ -1484,26 +1486,27 @@ Please add nutritional information manually if needed.`);
                               <Image
                                 src={food.photo}
                                 alt="Food"
-                                width={80}
-                                height={80}
-                                className={`w-20 h-20 object-cover rounded-lg cursor-pointer hover:opacity-80 transition-opacity ${foodImagesLoading[food.id] ? 'opacity-0' : 'opacity-100'}`}
+                                width={128}
+                                height={128}
+                                className={`w-full sm:w-32 aspect-square object-cover rounded-lg cursor-pointer hover:opacity-80 transition-opacity ${foodImagesLoading[food.id] ? 'opacity-0' : 'opacity-100'}`}
                                 onLoadStart={() => setFoodImagesLoading(prev => ({...prev, [food.id]: true}))}
                                 onLoad={() => setFoodImagesLoading(prev => ({...prev, [food.id]: false}))}
                                 onError={() => setFoodImagesLoading(prev => ({...prev, [food.id]: false}))}
                                 onClick={() => setFullSizeImage(food.photo)}
-                                loading="lazy"
+                                loading="eager"
+                                priority
                               />
                             </div>
                           </div>
                         )}
 
-                        {/* Compact Nutrition Cards */}
-                        <div className="flex-1">
+                        {/* Nutrition Cards - Adjusted Width for Perfect Height Match */}
+                        <div className="flex-1 sm:max-w-xs">
                           {food.nutrition && (food.nutrition.calories || food.nutrition.protein || food.nutrition.carbs || food.nutrition.fat) && (
-                            <div className="grid grid-cols-2 gap-2">
+                            <div className="grid grid-cols-2 gap-2 h-32">
                               {/* Calories */}
                               {food.nutrition.calories && (
-                                <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg p-3 border border-orange-200">
+                                <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg p-2 border border-orange-200 flex items-center justify-center">
                                   <div className="text-center">
                                     <div className="text-lg font-bold text-orange-600">{food.nutrition.calories}</div>
                                     <div className="text-xs font-medium text-orange-500 uppercase tracking-wide">Calories</div>
@@ -1513,7 +1516,7 @@ Please add nutritional information manually if needed.`);
                               
                               {/* Protein */}
                               {food.nutrition.protein && (
-                                <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-3 border border-blue-200">
+                                <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-2 border border-blue-200 flex items-center justify-center">
                                   <div className="text-center">
                                     <div className="text-lg font-bold text-blue-600">{food.nutrition.protein}g</div>
                                     <div className="text-xs font-medium text-blue-500 uppercase tracking-wide">Protein</div>
@@ -1523,7 +1526,7 @@ Please add nutritional information manually if needed.`);
                               
                               {/* Carbs */}
                               {food.nutrition.carbs && (
-                                <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-3 border border-green-200">
+                                <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-2 border border-green-200 flex items-center justify-center">
                                   <div className="text-center">
                                     <div className="text-lg font-bold text-green-600">{food.nutrition.carbs}g</div>
                                     <div className="text-xs font-medium text-green-500 uppercase tracking-wide">Carbs</div>
@@ -1533,7 +1536,7 @@ Please add nutritional information manually if needed.`);
                               
                               {/* Fat */}
                               {food.nutrition.fat && (
-                                <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-3 border border-purple-200">
+                                <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-2 border border-purple-200 flex items-center justify-center">
                                   <div className="text-center">
                                     <div className="text-lg font-bold text-purple-600">{food.nutrition.fat}g</div>
                                     <div className="text-xs font-medium text-purple-500 uppercase tracking-wide">Fat</div>
