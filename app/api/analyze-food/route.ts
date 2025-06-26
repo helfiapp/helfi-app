@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 
 // Initialize OpenAI client only when API key is available
+// Updated: 2025-06-26 - Ensure environment variable is properly loaded
 const getOpenAIClient = () => {
   if (!process.env.OPENAI_API_KEY) {
     return null;
