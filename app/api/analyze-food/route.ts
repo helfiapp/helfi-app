@@ -22,34 +22,60 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const formData = await req.formData();
-    const imageFile = formData.get('image') as File;
+    const contentType = req.headers.get('content-type');
+    let messages: any[] = [];
 
-    if (!imageFile) {
-      return NextResponse.json(
-        { error: 'No image file provided' },
-        { status: 400 }
-      );
-    }
+    if (contentType?.includes('application/json')) {
+      // Handle text-based food analysis
+      const body = await req.json();
+      const { textDescription, foodType } = body;
 
-    // Convert image to base64
-    const imageBuffer = await imageFile.arrayBuffer();
-    const imageBase64 = Buffer.from(imageBuffer).toString('base64');
-    const imageDataUrl = `data:${imageFile.type};base64,${imageBase64}`;
+      if (!textDescription) {
+        return NextResponse.json(
+          { error: 'No food description provided' },
+          { status: 400 }
+        );
+      }
 
-    // Get OpenAI client
-    const openai = getOpenAIClient();
-    if (!openai) {
-      return NextResponse.json(
-        { error: 'OpenAI API key not configured' },
-        { status: 500 }
-      );
-    }
+      messages = [
+        {
+          role: "user",
+          content: `Analyze this food description and provide nutrition information in this exact format:
 
-    // Call OpenAI Vision API
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini", // Use the cheaper mini model for food analysis
-      messages: [
+[Food name] ([portion size])
+Calories: [estimate], Protein: [g], Carbs: [g], Fat: [g]
+
+Food description: ${textDescription}
+Food type: ${foodType}
+
+Examples:
+"Medium banana (1 whole)
+Calories: 105, Protein: 1g, Carbs: 27g, Fat: 0g"
+
+"Grilled chicken breast (6 oz)
+Calories: 420, Protein: 45g, Carbs: 2g, Fat: 12g"
+
+Keep it simple - just food name, portion size, and nutrition facts. No preparation methods or explanations.`
+        }
+      ];
+    } else {
+      // Handle image-based food analysis
+      const formData = await req.formData();
+      const imageFile = formData.get('image') as File;
+
+      if (!imageFile) {
+        return NextResponse.json(
+          { error: 'No image file provided' },
+          { status: 400 }
+        );
+      }
+
+      // Convert image to base64
+      const imageBuffer = await imageFile.arrayBuffer();
+      const imageBase64 = Buffer.from(imageBuffer).toString('base64');
+      const imageDataUrl = `data:${imageFile.type};base64,${imageBase64}`;
+
+      messages = [
         {
           role: "user",
           content: [
@@ -78,7 +104,22 @@ Keep it simple - just food name, portion size, and nutrition facts. No preparati
             }
           ]
         }
-      ],
+      ];
+    }
+
+    // Get OpenAI client
+    const openai = getOpenAIClient();
+    if (!openai) {
+      return NextResponse.json(
+        { error: 'OpenAI API key not configured' },
+        { status: 500 }
+      );
+    }
+
+    // Call OpenAI API
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini", // Use the cheaper mini model for food analysis
+      messages,
       max_tokens: 500,
       temperature: 0.3, // Lower temperature for more consistent food analysis
     });
@@ -117,7 +158,7 @@ Keep it simple - just food name, portion size, and nutrition facts. No preparati
     }
 
     return NextResponse.json(
-      { error: 'Failed to analyze image' },
+      { error: 'Failed to analyze food' },
       { status: 500 }
     );
   }

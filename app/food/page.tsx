@@ -20,6 +20,11 @@ export default function FoodDiary() {
   const [showAiResult, setShowAiResult] = useState(false)
   const [isEditingDescription, setIsEditingDescription] = useState(false)
   const [editedDescription, setEditedDescription] = useState('')
+  
+  // Manual food entry states
+  const [manualFoodName, setManualFoodName] = useState('')
+  const [manualFoodType, setManualFoodType] = useState('single')
+  const [manualFoodWeight, setManualFoodWeight] = useState('')
 
   // Profile data - using consistent green avatar
   const defaultAvatar = 'data:image/svg+xml;base64,' + btoa(`
@@ -133,6 +138,58 @@ Please describe your food manually, including:
       setShowAiResult(true);
     } finally {
       setIsAnalyzing(false);
+    }
+  };
+
+  const analyzeManualFood = async () => {
+    if (!manualFoodName.trim() || !manualFoodWeight.trim()) return;
+    
+    setIsAnalyzing(true);
+    
+    try {
+      // Create a text description for AI analysis
+      const foodDescription = `${manualFoodName} (${manualFoodWeight})`;
+      
+      // Call OpenAI to analyze the manual food entry
+      const response = await fetch('/api/analyze-food', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          textDescription: foodDescription,
+          foodType: manualFoodType
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to analyze food');
+      }
+
+      const result = await response.json();
+      
+      if (result.success && result.analysis) {
+        setAiDescription(result.analysis);
+        setShowAiResult(true);
+      } else {
+        throw new Error('Invalid response from AI service');
+      }
+    } catch (error) {
+      console.error('Error analyzing manual food:', error);
+      
+      // Fallback message
+      setAiDescription(`🤖 AI analysis temporarily unavailable. 
+      
+${manualFoodName} (${manualFoodWeight})
+Please add nutritional information manually if needed.`);
+      setShowAiResult(true);
+    } finally {
+      setIsAnalyzing(false);
+      // Reset manual form
+      setManualFoodName('');
+      setManualFoodType('single');
+      setManualFoodWeight('');
     }
   };
 
@@ -472,23 +529,70 @@ Please describe your food manually, including:
               </div>
             )}
 
-            {/* Manual Text Entry */}
+            {/* Manual Food Entry with Structure */}
             {!photoPreview && (
               <div>
                 <h3 className="text-lg font-semibold mb-4">✍️ Manual Food Entry</h3>
-                <textarea
-                  value={newFoodText}
-                  onChange={(e) => setNewFoodText(e.target.value)}
-                  placeholder="Describe your food in detail... e.g., Grilled chicken breast (6 oz) with steamed broccoli and quinoa"
-                  className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-helfi-green focus:border-helfi-green mb-4"
-                  rows={4}
-                />
+                
+                {/* Food Name Input */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Food Name
+                  </label>
+                  <input
+                    type="text"
+                    value={manualFoodName}
+                    onChange={(e) => setManualFoodName(e.target.value)}
+                    placeholder="e.g., Grilled chicken breast, Medium banana, etc."
+                    className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-helfi-green focus:border-helfi-green"
+                  />
+                </div>
+
+                {/* Food Type Dropdown */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Type
+                  </label>
+                  <select
+                    value={manualFoodType}
+                    onChange={(e) => setManualFoodType(e.target.value)}
+                    className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-helfi-green focus:border-helfi-green"
+                  >
+                    <option value="single">Single Food</option>
+                    <option value="ingredient">Ingredient</option>
+                  </select>
+                </div>
+
+                {/* Food Weight Input */}
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Weight/Portion
+                  </label>
+                  <input
+                    type="text"
+                    value={manualFoodWeight}
+                    onChange={(e) => setManualFoodWeight(e.target.value)}
+                    placeholder="e.g., 6 oz, 1 medium, 100g, 1 cup"
+                    className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-helfi-green focus:border-helfi-green"
+                  />
+                </div>
+
                 <button
-                  onClick={() => addFoodEntry(newFoodText, 'text')}
-                  disabled={!newFoodText.trim()}
+                  onClick={analyzeManualFood}
+                  disabled={!manualFoodName.trim() || !manualFoodWeight.trim() || isAnalyzing}
                   className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
                 >
-                  📝 Add Food Entry
+                  {isAnalyzing ? (
+                    <div className="flex items-center justify-center">
+                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Analyzing Food...
+                    </div>
+                  ) : (
+                    '🤖 Analyze Food'
+                  )}
                 </button>
               </div>
             )}
