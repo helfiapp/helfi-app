@@ -2241,11 +2241,10 @@ export default function Onboarding() {
             </div>
           </div>
           
-          {/* Mobile: Clean Step Indicator */}
-          <div className="sm:hidden mb-4">
-            <div className="text-center">
-              <div className="text-sm font-medium text-gray-900">{stepNames[step]}</div>
-              <div className="text-xs text-gray-500">Step {step + 1} of 10</div>
+          {/* Mobile: Current Page Number */}
+          <div className="sm:hidden mb-4 flex justify-center">
+            <div className="w-12 h-12 bg-green-600 text-white rounded-full flex items-center justify-center text-lg font-bold">
+              {step + 1}
             </div>
           </div>
           
