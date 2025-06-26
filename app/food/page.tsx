@@ -90,12 +90,46 @@ export default function FoodDiary() {
     if (!photoFile) return;
     
     setIsAnalyzing(true);
-    // Simulate AI analysis (replace with actual AI service)
-    setTimeout(() => {
-      setAiDescription("Grilled chicken breast with steamed broccoli and quinoa. Estimated: 350 calories, 35g protein, 8g carbs, 15g fat. Healthy, balanced meal rich in lean protein and nutrients.");
+    
+    try {
+      // Create FormData for API call
+      const formData = new FormData();
+      formData.append('image', photoFile);
+
+      // Call our OpenAI API route
+      const response = await fetch('/api/analyze-food', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to analyze image');
+      }
+
+      const result = await response.json();
+      
+      if (result.success && result.analysis) {
+        setAiDescription(result.analysis);
+        setShowAiResult(true);
+      } else {
+        throw new Error('Invalid response from AI service');
+      }
+    } catch (error) {
+      console.error('Error analyzing photo:', error);
+      
+      // Fallback to manual entry with helpful message
+      setAiDescription(`🤖 AI analysis temporarily unavailable. 
+      
+Please describe your food manually, including:
+- What foods do you see?
+- How was it prepared?
+- Approximate portion size
+- Any other details you'd like to track`);
       setShowAiResult(true);
+    } finally {
       setIsAnalyzing(false);
-    }, 2000);
+    }
   };
 
   const addFoodEntry = (description: string, method: 'text' | 'photo') => {
