@@ -506,7 +506,7 @@ Please add nutritional information manually if needed.`);
       </div>
 
       {/* Main Content */}
-      <div className="max-w-3xl mx-auto px-4 py-8 pb-20 md:pb-8">
+      <div className="max-w-3xl mx-auto px-4 py-8 pb-20 md:pb-16">
         
         {/* Instruction Text */}
         <div className="mb-4 text-center">
