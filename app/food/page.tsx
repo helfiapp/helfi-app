@@ -29,6 +29,8 @@ export default function FoodDiary() {
   const [showEntryOptions, setShowEntryOptions] = useState<string | null>(null)
   const [showIngredientOptions, setShowIngredientOptions] = useState<string | null>(null)
   const [editingEntry, setEditingEntry] = useState<any>(null)
+  const [showWebcam, setShowWebcam] = useState(false)
+  const [stream, setStream] = useState<MediaStream | null>(null)
 
   // Profile data - using consistent green avatar
   const defaultAvatar = 'data:image/svg+xml;base64,' + btoa(`
@@ -71,6 +73,15 @@ export default function FoodDiary() {
       return () => document.removeEventListener('mousedown', handleClick);
     }
   }, [dropdownOpen, showPhotoOptions, showEntryOptions, showIngredientOptions]);
+
+  // Cleanup webcam stream on unmount
+  useEffect(() => {
+    return () => {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [stream]);
 
   // Load profile image and today's foods from database
   useEffect(() => {
@@ -125,6 +136,50 @@ export default function FoodDiary() {
       reader.onload = (e) => setPhotoPreview(e.target?.result as string);
       reader.readAsDataURL(file);
     }
+  };
+
+  const startWebcam = async () => {
+    try {
+      const mediaStream = await navigator.mediaDevices.getUserMedia({ 
+        video: true 
+      });
+      setStream(mediaStream);
+      setShowWebcam(true);
+      setShowPhotoOptions(false);
+      setShowAddFood(true);
+    } catch (error) {
+      console.error('Error accessing webcam:', error);
+      alert('Unable to access webcam. Please check permissions or use upload instead.');
+    }
+  };
+
+  const capturePhoto = () => {
+    if (!stream) return;
+    
+    const video = document.getElementById('webcam-video') as HTMLVideoElement;
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    
+    const ctx = canvas.getContext('2d');
+    ctx?.drawImage(video, 0, 0);
+    
+    canvas.toBlob((blob) => {
+      if (blob) {
+        const file = new File([blob], 'webcam-photo.jpg', { type: 'image/jpeg' });
+        setPhotoFile(file);
+        setPhotoPreview(canvas.toDataURL());
+        stopWebcam();
+      }
+    }, 'image/jpeg', 0.9);
+  };
+
+  const stopWebcam = () => {
+    if (stream) {
+      stream.getTracks().forEach(track => track.stop());
+      setStream(null);
+    }
+    setShowWebcam(false);
   };
 
   // Extract nutrition data from AI response
@@ -534,7 +589,10 @@ Please add nutritional information manually if needed.`);
           {showPhotoOptions && (
             <div className="food-options-dropdown absolute top-full left-0 right-0 mt-2 bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden z-50">
               {/* Camera Option */}
-              <label className="flex items-center p-4 hover:bg-gray-50 cursor-pointer transition-colors border-b border-gray-100">
+              <button
+                onClick={startWebcam}
+                className="flex items-center p-4 hover:bg-gray-50 cursor-pointer transition-colors border-b border-gray-100 w-full text-left"
+              >
                 <div className="flex-shrink-0 w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mr-4">
                   <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
@@ -545,18 +603,7 @@ Please add nutritional information manually if needed.`);
                   <h3 className="text-lg font-semibold text-gray-900">📸 Camera</h3>
                   <p className="text-sm text-gray-500">Take a photo with your <span className="hidden md:inline">webcam</span><span className="md:hidden">camera</span></p>
                 </div>
-                <input
-                  type="file"
-                  accept="image/*"
-                  capture="user"
-                  onChange={(e) => {
-                    handlePhotoUpload(e);
-                    setShowPhotoOptions(false);
-                    setShowAddFood(true);
-                  }}
-                  className="hidden"
-                />
-              </label>
+              </button>
 
               {/* Photo Library Option */}
               <label className="flex items-center p-4 hover:bg-gray-50 cursor-pointer transition-colors">
@@ -607,8 +654,42 @@ Please add nutritional information manually if needed.`);
         {showAddFood && (
           <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
             
+            {/* Webcam Interface */}
+            {showWebcam && stream && (
+              <div className="text-center">
+                <h3 className="text-lg font-semibold mb-4">📷 Webcam</h3>
+                <div className="relative inline-block">
+                  <video
+                    id="webcam-video"
+                    autoPlay
+                    playsInline
+                    ref={(video) => {
+                      if (video && stream) {
+                        video.srcObject = stream;
+                      }
+                    }}
+                    className="w-80 h-60 object-cover rounded-lg shadow-lg"
+                  />
+                </div>
+                <div className="flex gap-4 justify-center mt-6">
+                  <button
+                    onClick={capturePhoto}
+                    className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold"
+                  >
+                    📸 Capture Photo
+                  </button>
+                  <button
+                    onClick={stopWebcam}
+                    className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 font-semibold"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+            
             {/* Photo Analysis Flow */}
-            {photoPreview && !showAiResult && !isEditingDescription && (
+            {photoPreview && !showAiResult && !isEditingDescription && !showWebcam && (
               <div className="text-center">
                 <h3 className="text-lg font-semibold mb-4">📸 Your Photo</h3>
                 <Image
