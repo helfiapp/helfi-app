@@ -111,6 +111,18 @@ export async function GET(request: NextRequest) {
       console.log('No blood results data found in storage');
     }
 
+    // Get today's food entries
+    let todaysFoods = [];
+    try {
+      const storedFoods = user.healthGoals.find((goal: any) => goal.name === '__TODAYS_FOODS_DATA__');
+      if (storedFoods && storedFoods.category) {
+        const parsed = JSON.parse(storedFoods.category);
+        todaysFoods = parsed.foods || [];
+      }
+    } catch (e) {
+      console.log('No todays foods data found in storage');
+    }
+
     // Transform to onboarding format
     const onboardingData = {
       gender: user.gender?.toLowerCase() || '',
@@ -132,7 +144,8 @@ export async function GET(request: NextRequest) {
         dosage: med.dosage,
         timing: med.timing
       })),
-      profileImage: user.image || null
+      profileImage: user.image || null,
+      todaysFoods: todaysFoods
     }
 
     console.log('GET /api/user-data - Returning onboarding data for user')
@@ -401,6 +414,33 @@ export async function POST(request: NextRequest) {
       }
     } catch (error) {
       console.error('Error updating medications:', error)
+      // Continue with other updates
+    }
+
+    // 6. Handle today's foods data - store as special health goal
+    try {
+      if (data.todaysFoods && Array.isArray(data.todaysFoods)) {
+        // Remove existing food data
+        await prisma.healthGoal.deleteMany({
+          where: {
+            userId: user.id,
+            name: '__TODAYS_FOODS_DATA__'
+          }
+        })
+        
+        // Store new food data
+        await prisma.healthGoal.create({
+          data: {
+            userId: user.id,
+            name: '__TODAYS_FOODS_DATA__',
+            category: JSON.stringify({ foods: data.todaysFoods }),
+            currentRating: 0,
+          }
+        })
+        console.log('Stored todays foods data successfully')
+      }
+    } catch (error) {
+      console.error('Error storing todays foods data:', error)
       // Continue with other updates
     }
 

@@ -20,11 +20,13 @@ export default function FoodDiary() {
   const [showAiResult, setShowAiResult] = useState(false)
   const [isEditingDescription, setIsEditingDescription] = useState(false)
   const [editedDescription, setEditedDescription] = useState('')
+  const [analyzedNutrition, setAnalyzedNutrition] = useState<any>(null)
   
   // Manual food entry states
   const [manualFoodName, setManualFoodName] = useState('')
   const [manualFoodType, setManualFoodType] = useState('single')
-  const [manualFoodWeight, setManualFoodWeight] = useState('')
+  const [manualIngredients, setManualIngredients] = useState([{ name: '', weight: '', unit: 'g' }])
+  const [showEntryOptions, setShowEntryOptions] = useState<string | null>(null)
 
   // Profile data - using consistent green avatar
   const defaultAvatar = 'data:image/svg+xml;base64,' + btoa(`
@@ -55,14 +57,17 @@ export default function FoodDiary() {
       if (!target.closest('.food-options-dropdown')) {
         setShowPhotoOptions(false);
       }
+      if (!target.closest('.entry-options-dropdown')) {
+        setShowEntryOptions(null);
+      }
     }
-    if (dropdownOpen || showPhotoOptions) {
+    if (dropdownOpen || showPhotoOptions || showEntryOptions) {
       document.addEventListener('mousedown', handleClick);
       return () => document.removeEventListener('mousedown', handleClick);
     }
-  }, [dropdownOpen, showPhotoOptions]);
+  }, [dropdownOpen, showPhotoOptions, showEntryOptions]);
 
-  // Load profile image and today's foods
+  // Load profile image and today's foods from database
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -72,8 +77,10 @@ export default function FoodDiary() {
           if (result.data?.profileImage) {
             setProfileImage(result.data.profileImage);
           }
-          // Load today's foods (placeholder for now)
-          setTodaysFoods(result.data?.todaysFoods || []);
+          // Load today's foods from database
+          if (result.data?.todaysFoods) {
+            setTodaysFoods(result.data.todaysFoods);
+          }
         }
       } catch (error) {
         console.error('Error loading data:', error);
@@ -85,6 +92,26 @@ export default function FoodDiary() {
     }
   }, [session]);
 
+  // Save food entries to database
+  const saveFoodEntries = async (updatedFoods: any[]) => {
+    try {
+      const response = await fetch('/api/user-data', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          todaysFoods: updatedFoods
+        }),
+      });
+      if (!response.ok) {
+        console.error('Failed to save food entries');
+      }
+    } catch (error) {
+      console.error('Error saving food entries:', error);
+    }
+  };
+
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -93,6 +120,26 @@ export default function FoodDiary() {
       reader.onload = (e) => setPhotoPreview(e.target?.result as string);
       reader.readAsDataURL(file);
     }
+  };
+
+  // Extract nutrition data from AI response
+  const extractNutritionData = (description: string) => {
+    // Try to parse common nutrition patterns from AI response
+    const caloriesMatch = description.match(/calories?[:\s]*(\d+)/i);
+    const proteinMatch = description.match(/protein[:\s]*(\d+(?:\.\d+)?)\s*g/i);
+    const carbsMatch = description.match(/carb(?:ohydrate)?s?[:\s]*(\d+(?:\.\d+)?)\s*g/i);
+    const fatMatch = description.match(/fat[:\s]*(\d+(?:\.\d+)?)\s*g/i);
+    const fiberMatch = description.match(/fiber[:\s]*(\d+(?:\.\d+)?)\s*g/i);
+    const sugarMatch = description.match(/sugar[:\s]*(\d+(?:\.\d+)?)\s*g/i);
+
+    return {
+      calories: caloriesMatch ? parseInt(caloriesMatch[1]) : null,
+      protein: proteinMatch ? parseFloat(proteinMatch[1]) : null,
+      carbs: carbsMatch ? parseFloat(carbsMatch[1]) : null,
+      fat: fatMatch ? parseFloat(fatMatch[1]) : null,
+      fiber: fiberMatch ? parseFloat(fiberMatch[1]) : null,
+      sugar: sugarMatch ? parseFloat(sugarMatch[1]) : null,
+    };
   };
 
   const analyzePhoto = async () => {
@@ -120,6 +167,7 @@ export default function FoodDiary() {
       
       if (result.success && result.analysis) {
         setAiDescription(result.analysis);
+        setAnalyzedNutrition(extractNutritionData(result.analysis));
         setShowAiResult(true);
       } else {
         throw new Error('Invalid response from AI service');
@@ -135,6 +183,7 @@ Please describe your food manually, including:
 - How was it prepared?
 - Approximate portion size
 - Any other details you'd like to track`);
+      setAnalyzedNutrition(null);
       setShowAiResult(true);
     } finally {
       setIsAnalyzing(false);
@@ -142,13 +191,23 @@ Please describe your food manually, including:
   };
 
   const analyzeManualFood = async () => {
-    if (!manualFoodName.trim() || !manualFoodWeight.trim()) return;
+    if (manualFoodType === 'single' && (!manualFoodName.trim())) return;
+    if (manualFoodType === 'multiple' && manualIngredients.some(ing => !ing.name.trim() || !ing.weight.trim())) return;
     
     setIsAnalyzing(true);
     
     try {
-      // Create a text description for AI analysis
-      const foodDescription = `${manualFoodName} (${manualFoodWeight})`;
+      let foodDescription = '';
+      
+      if (manualFoodType === 'single') {
+        foodDescription = manualFoodName;
+      } else {
+        // Build description from multiple ingredients
+        foodDescription = manualIngredients
+          .filter(ing => ing.name.trim() && ing.weight.trim())
+          .map(ing => `${ing.name} (${ing.weight}${ing.unit})`)
+          .join(', ');
+      }
       
       // Call OpenAI to analyze the manual food entry
       const response = await fetch('/api/analyze-food', {
@@ -171,6 +230,7 @@ Please describe your food manually, including:
       
       if (result.success && result.analysis) {
         setAiDescription(result.analysis);
+        setAnalyzedNutrition(extractNutritionData(result.analysis));
         setShowAiResult(true);
       } else {
         throw new Error('Invalid response from AI service');
@@ -181,27 +241,37 @@ Please describe your food manually, including:
       // Fallback message
       setAiDescription(`🤖 AI analysis temporarily unavailable. 
       
-${manualFoodName} (${manualFoodWeight})
+${manualFoodType === 'single' ? manualFoodName : 'Multiple ingredients'}
 Please add nutritional information manually if needed.`);
+      setAnalyzedNutrition(null);
       setShowAiResult(true);
     } finally {
       setIsAnalyzing(false);
       // Reset manual form
-      setManualFoodName('');
+      if (manualFoodType === 'single') {
+        setManualFoodName('');
+      } else {
+        setManualIngredients([{ name: '', weight: '', unit: 'g' }]);
+      }
       setManualFoodType('single');
-      setManualFoodWeight('');
     }
   };
 
-  const addFoodEntry = (description: string, method: 'text' | 'photo') => {
+  const addFoodEntry = async (description: string, method: 'text' | 'photo', nutrition?: any) => {
     const newEntry = {
       id: Date.now(),
       description,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       method,
-      photo: method === 'photo' ? photoPreview : null
+      photo: method === 'photo' ? photoPreview : null,
+      nutrition: nutrition || analyzedNutrition
     };
-    setTodaysFoods(prev => [...prev, newEntry]);
+    
+    const updatedFoods = [...todaysFoods, newEntry];
+    setTodaysFoods(updatedFoods);
+    
+    // Save to database
+    await saveFoodEntries(updatedFoods);
     
     // Reset all form states
     setNewFoodText('');
@@ -213,6 +283,30 @@ Please add nutritional information manually if needed.`);
     setEditedDescription('');
     setShowAddFood(false);
     setShowPhotoOptions(false);
+    setAnalyzedNutrition(null);
+  };
+
+  const deleteFood = async (foodId: number) => {
+    const updatedFoods = todaysFoods.filter(food => food.id !== foodId);
+    setTodaysFoods(updatedFoods);
+    await saveFoodEntries(updatedFoods);
+    setShowEntryOptions(null);
+  };
+
+  const addIngredient = () => {
+    setManualIngredients([...manualIngredients, { name: '', weight: '', unit: 'g' }]);
+  };
+
+  const removeIngredient = (index: number) => {
+    if (manualIngredients.length > 1) {
+      setManualIngredients(manualIngredients.filter((_, i) => i !== index));
+    }
+  };
+
+  const updateIngredient = (index: number, field: string, value: string) => {
+    const updated = [...manualIngredients];
+    updated[index] = { ...updated[index], [field]: value };
+    setManualIngredients(updated);
   };
 
   return (
@@ -417,38 +511,114 @@ Please add nutritional information manually if needed.`);
               </div>
             )}
 
-            {/* AI Analysis Result */}
+            {/* AI Analysis Result - Premium Cronometer-style UI */}
             {showAiResult && !isEditingDescription && (
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+              <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
                 {/* Photo Section */}
                 {photoPreview && (
-                  <div className="p-6 border-b border-gray-100">
+                  <div className="p-4 border-b border-gray-100">
                     <Image
                       src={photoPreview}
                       alt="Analyzed food"
                       width={300}
                       height={200}
-                      className="w-full h-48 object-cover rounded-xl"
+                      className="w-full h-40 object-cover rounded-xl"
                     />
                   </div>
                 )}
                 
-                {/* Analysis Content */}
+                {/* Premium Nutrition Display */}
                 <div className="p-6">
+                  {/* Food Title */}
+                  <div className="mb-4">
+                    <h3 className="text-xl font-bold text-gray-900 mb-2">Food Analysis</h3>
+                  </div>
+
+                  {/* Nutrition Cards - Cronometer Style */}
+                  {analyzedNutrition && (analyzedNutrition.calories || analyzedNutrition.protein || analyzedNutrition.carbs || analyzedNutrition.fat) && (
+                    <div className="grid grid-cols-2 gap-4 mb-6">
+                      {/* Calories */}
+                      {analyzedNutrition.calories && (
+                        <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-4 border border-orange-200">
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-orange-600">{analyzedNutrition.calories}</div>
+                            <div className="text-xs font-medium text-orange-500 uppercase tracking-wide">Calories</div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Protein */}
+                      {analyzedNutrition.protein && (
+                        <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4 border border-blue-200">
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-blue-600">{analyzedNutrition.protein}g</div>
+                            <div className="text-xs font-medium text-blue-500 uppercase tracking-wide">Protein</div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Carbs */}
+                      {analyzedNutrition.carbs && (
+                        <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4 border border-green-200">
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-green-600">{analyzedNutrition.carbs}g</div>
+                            <div className="text-xs font-medium text-green-500 uppercase tracking-wide">Carbs</div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Fat */}
+                      {analyzedNutrition.fat && (
+                        <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-4 border border-purple-200">
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-purple-600">{analyzedNutrition.fat}g</div>
+                            <div className="text-xs font-medium text-purple-500 uppercase tracking-wide">Fat</div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Additional Nutrition Info */}
+                  {analyzedNutrition && (analyzedNutrition.fiber || analyzedNutrition.sugar) && (
+                    <div className="flex gap-4 mb-6">
+                      {analyzedNutrition.fiber && (
+                        <div className="flex-1 bg-amber-50 rounded-lg p-3 border border-amber-200">
+                          <div className="text-center">
+                            <div className="text-lg font-semibold text-amber-600">{analyzedNutrition.fiber}g</div>
+                            <div className="text-xs text-amber-500 uppercase">Fiber</div>
+                          </div>
+                        </div>
+                      )}
+                      {analyzedNutrition.sugar && (
+                        <div className="flex-1 bg-pink-50 rounded-lg p-3 border border-pink-200">
+                          <div className="text-center">
+                            <div className="text-lg font-semibold text-pink-600">{analyzedNutrition.sugar}g</div>
+                            <div className="text-xs text-pink-500 uppercase">Sugar</div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* AI Description */}
                   <div className="mb-6">
-                    <pre className="text-gray-900 text-base leading-relaxed font-medium whitespace-pre-wrap">{aiDescription}</pre>
+                    <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+                      <div className="text-sm font-medium text-gray-600 mb-2">AI Analysis:</div>
+                      <div className="text-gray-900 text-sm leading-relaxed">{aiDescription}</div>
+                    </div>
                   </div>
                   
                   {/* Action Buttons */}
                   <div className="space-y-3">
                     <button
                       onClick={() => addFoodEntry(aiDescription, 'photo')}
-                      className="w-full py-3 px-4 bg-emerald-500 hover:bg-emerald-600 text-white font-medium rounded-xl transition-colors duration-200 flex items-center justify-center"
+                      className="w-full py-3 px-4 bg-emerald-500 hover:bg-emerald-600 text-white font-medium rounded-xl transition-colors duration-200 flex items-center justify-center shadow-lg"
                     >
                       <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
-                      Accept
+                      Save to Food Diary
                     </button>
                     <button
                       onClick={() => {
@@ -592,7 +762,7 @@ Please add nutritional information manually if needed.`);
                     className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white transition-colors"
                   >
                     <option value="single">Single Food</option>
-                    <option value="ingredient">Ingredient</option>
+                    <option value="multiple">Multiple Ingredients</option>
                   </select>
                 </div>
 
@@ -603,16 +773,67 @@ Please add nutritional information manually if needed.`);
                   </label>
                   <input
                     type="text"
-                    value={manualFoodWeight}
-                    onChange={(e) => setManualFoodWeight(e.target.value)}
+                    value={manualIngredients[0].weight}
+                    onChange={(e) => updateIngredient(0, 'weight', e.target.value)}
                     placeholder="e.g., 6 oz, 1 medium, 100g, 1 cup"
                     className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
                   />
                 </div>
 
+                {/* Food Unit Dropdown */}
+                <div className="mb-5">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Unit
+                  </label>
+                  <select
+                    value={manualIngredients[0].unit}
+                    onChange={(e) => updateIngredient(0, 'unit', e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white transition-colors"
+                  >
+                    <option value="g">Grams</option>
+                    <option value="oz">Ounces</option>
+                    <option value="cup">Cups</option>
+                    <option value="medium">Medium</option>
+                  </select>
+                </div>
+
+                {/* Manual Ingredients */}
+                {manualFoodType === 'multiple' && (
+                  <div className="mb-6">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Ingredients
+                    </label>
+                    <div className="space-y-2">
+                      {manualIngredients.map((ing, index) => (
+                        <div key={index} className="flex items-center">
+                          <input
+                            type="text"
+                            value={ing.name}
+                            onChange={(e) => updateIngredient(index, 'name', e.target.value)}
+                            placeholder="e.g., 1 cup of rice"
+                            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                          />
+                          <button
+                            onClick={() => removeIngredient(index)}
+                            className="px-2 py-3 text-red-500 hover:text-red-700"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ))}
+                      <button
+                        onClick={addIngredient}
+                        className="w-full px-4 py-3 bg-gray-200 text-gray-500 rounded-xl hover:bg-gray-300"
+                      >
+                        Add Ingredient
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <button
                   onClick={analyzeManualFood}
-                  disabled={!manualFoodName.trim() || !manualFoodWeight.trim() || isAnalyzing}
+                  disabled={!manualFoodName.trim() || !manualIngredients[0].weight.trim() || isAnalyzing}
                   className="w-full py-3 px-4 bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-colors duration-200 flex items-center justify-center"
                 >
                   {isAnalyzing ? (
@@ -652,25 +873,108 @@ Please add nutritional information manually if needed.`);
           ) : (
             <div className="space-y-4">
               {todaysFoods.map((food) => (
-                <div key={food.id} className="border border-gray-200 rounded-lg p-4">
-                  <div className="flex justify-between items-start mb-2">
-                    <span className="text-sm text-gray-500">{food.time}</span>
-                    <span className={`text-xs px-2 py-1 rounded ${
-                      food.method === 'photo' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
-                    }`}>
-                      {food.method === 'photo' ? 'AI Photo' : 'Text Entry'}
-                    </span>
+                <div key={food.id} className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="flex items-center">
+                      <span className="text-sm font-medium text-gray-500">{food.time}</span>
+                      <span className={`ml-3 text-xs px-2 py-1 rounded-full ${
+                        food.method === 'photo' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
+                      }`}>
+                        {food.method === 'photo' ? '📸 AI Photo' : '✍️ Manual Entry'}
+                      </span>
+                    </div>
+                    
+                    {/* 3-Dot Options Menu */}
+                    <div className="relative entry-options-dropdown">
+                      <button
+                        onClick={() => setShowEntryOptions(showEntryOptions === food.id.toString() ? null : food.id.toString())}
+                        className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                      >
+                        <svg className="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
+                        </svg>
+                      </button>
+                      
+                      {showEntryOptions === food.id.toString() && (
+                        <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                          <button
+                            onClick={() => {
+                              // TODO: Implement edit functionality
+                              setShowEntryOptions(null);
+                            }}
+                            className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 flex items-center"
+                          >
+                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                            Edit Entry
+                          </button>
+                          <button
+                            onClick={() => {
+                              // TODO: Implement re-analyze functionality
+                              setShowEntryOptions(null);
+                            }}
+                            className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 flex items-center"
+                          >
+                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            Re-analyze
+                          </button>
+                          <button
+                            onClick={() => deleteFood(food.id)}
+                            className="w-full px-4 py-2 text-left text-red-600 hover:bg-red-50 flex items-center border-t border-gray-100"
+                          >
+                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            Delete Entry
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  {food.photo && (
-                    <Image
-                      src={food.photo}
-                      alt="Food"
-                      width={100}
-                      height={100}
-                      className="w-20 h-20 object-cover rounded-lg mb-2"
-                    />
-                  )}
-                  <p className="text-gray-900">{food.description}</p>
+                  
+                  {/* Food Content */}
+                  <div className="flex gap-4">
+                    {food.photo && (
+                      <Image
+                        src={food.photo}
+                        alt="Food"
+                        width={80}
+                        height={80}
+                        className="w-20 h-20 object-cover rounded-lg flex-shrink-0"
+                      />
+                    )}
+                    <div className="flex-1">
+                      {/* Nutrition Summary */}
+                      {food.nutrition && (food.nutrition.calories || food.nutrition.protein || food.nutrition.carbs || food.nutrition.fat) && (
+                        <div className="flex gap-2 mb-3 flex-wrap">
+                          {food.nutrition.calories && (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-700">
+                              {food.nutrition.calories} cal
+                            </span>
+                          )}
+                          {food.nutrition.protein && (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                              {food.nutrition.protein}g protein
+                            </span>
+                          )}
+                          {food.nutrition.carbs && (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                              {food.nutrition.carbs}g carbs
+                            </span>
+                          )}
+                          {food.nutrition.fat && (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
+                              {food.nutrition.fat}g fat
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      <p className="text-gray-900 text-sm leading-relaxed">{food.description}</p>
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
