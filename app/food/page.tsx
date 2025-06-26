@@ -992,96 +992,109 @@ Please add nutritional information manually if needed.`);
             {/* Edit Description Flow */}
             {isEditingDescription && (
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                {/* Photo Section */}
-                {photoPreview && (
-                  <div className="p-4 border-b border-gray-100 flex justify-center">
-                    <Image
-                      src={photoPreview}
-                      alt="Food being edited"
-                      width={120}
-                      height={90}
-                      className="w-32 h-24 object-cover rounded-xl"
-                      loading="eager"
-                      priority
-                    />
-                  </div>
-                )}
-                
-                {/* Edit Content */}
-                <div className="p-4 sm:p-6">
-                  <div className="mb-6">
-                    <label className="block text-sm font-medium text-gray-700 mb-3">
-                      Edit Food Description
-                    </label>
-                    <textarea
-                      value={editedDescription}
-                      onChange={(e) => setEditedDescription(e.target.value)}
-                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 resize-none"
-                      rows={4}
-                      placeholder="Edit the AI description to make it more accurate..."
-                    />
-                  </div>
+                <div className="flex flex-col lg:flex-row">
+                  {/* Photo Section - Left Side */}
+                  {photoPreview && (
+                    <div className="lg:w-1/3 p-4 lg:p-6 border-b lg:border-b-0 lg:border-r border-gray-100">
+                      <div className="relative">
+                        {foodImagesLoading[photoPreview] && (
+                          <div className="absolute inset-0 bg-gray-100 rounded-xl flex items-center justify-center">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
+                          </div>
+                        )}
+                        <Image
+                          src={photoPreview}
+                          alt="Food being edited"
+                          width={300}
+                          height={200}
+                          className={`w-full aspect-[4/3] object-cover rounded-xl transition-opacity duration-300 ${
+                            foodImagesLoading[photoPreview] ? 'opacity-0' : 'opacity-100'
+                          }`}
+                          loading="eager"
+                          priority
+                          onLoad={() => setFoodImagesLoading((prev: Record<string, boolean>) => ({ ...prev, [photoPreview]: false }))}
+                          onLoadStart={() => setFoodImagesLoading((prev: Record<string, boolean>) => ({ ...prev, [photoPreview]: true }))}
+                        />
+                      </div>
+                    </div>
+                  )}
                   
-                  {/* Action Buttons */}
-                  <div className="space-y-3">
-                    <button
-                      onClick={() => {
-                        if (editingEntry) {
-                          updateFoodEntry(editedDescription, 'photo');
-                        } else {
-                          addFoodEntry(editedDescription, 'photo');
-                        }
-                        setIsEditingDescription(false);
-                      }}
-                      disabled={!editedDescription.trim() || isAnalyzing}
-                      className="w-full py-3 px-4 bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-colors duration-200 flex items-center justify-center"
-                    >
-                      {isAnalyzing ? (
-                        <>
-                          <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
-                          Re-analyzing...
-                        </>
-                      ) : (
-                        <>
-                          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                          {editingEntry ? 'Update & Save' : 'Save to Food Diary'}
-                        </>
-                      )}
-                    </button>
-                    <button
-                      onClick={() => {
-                        setIsEditingDescription(false);
-                        setEditedDescription('');
-                        setEditingEntry(null);
-                      }}
-                      className="w-full py-3 px-4 bg-red-500 hover:bg-red-600 text-white font-medium rounded-xl transition-colors duration-200 flex items-center justify-center"
-                    >
-                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                      Cancel Edit
-                    </button>
-                    <button
-                      onClick={() => {
-                        setPhotoFile(null);
-                        setPhotoPreview(null);
-                        setAiDescription('');
-                        setShowAiResult(false);
-                        setIsEditingDescription(false);
-                        setEditedDescription('');
-                      }}
-                      className="w-full py-3 px-4 bg-gray-400 hover:bg-gray-500 text-white font-medium rounded-xl transition-colors duration-200 flex items-center justify-center"
-                    >
-                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                      Delete Photo
-                    </button>
+                  {/* Edit Content - Right Side */}
+                  <div className={`${photoPreview ? 'lg:w-2/3' : 'w-full'} p-4 lg:p-6`}>
+                    <div className="mb-6">
+                      <label className="block text-sm font-medium text-gray-700 mb-3">
+                        Edit Food Description
+                      </label>
+                      <textarea
+                        value={editedDescription}
+                        onChange={(e) => setEditedDescription(e.target.value)}
+                        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 resize-none"
+                        rows={4}
+                        placeholder="Edit the AI description to make it more accurate..."
+                      />
+                    </div>
+                    
+                    {/* Action Buttons */}
+                    <div className="space-y-3">
+                      <button
+                        onClick={() => {
+                          if (editingEntry) {
+                            updateFoodEntry(editedDescription, 'photo');
+                          } else {
+                            addFoodEntry(editedDescription, 'photo');
+                          }
+                          setIsEditingDescription(false);
+                        }}
+                        disabled={!editedDescription.trim() || isAnalyzing}
+                        className="w-full py-3 px-4 bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-colors duration-200 flex items-center justify-center"
+                      >
+                        {isAnalyzing ? (
+                          <>
+                            <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Re-analyzing...
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            {editingEntry ? 'Update & Save' : 'Save to Food Diary'}
+                          </>
+                        )}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setIsEditingDescription(false);
+                          setEditedDescription('');
+                          setEditingEntry(null);
+                        }}
+                        className="w-full py-3 px-4 bg-red-500 hover:bg-red-600 text-white font-medium rounded-xl transition-colors duration-200 flex items-center justify-center"
+                      >
+                        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                        Cancel Edit
+                      </button>
+                      <button
+                        onClick={() => {
+                          setPhotoFile(null);
+                          setPhotoPreview(null);
+                          setAiDescription('');
+                          setShowAiResult(false);
+                          setIsEditingDescription(false);
+                          setEditedDescription('');
+                        }}
+                        className="w-full py-3 px-4 bg-gray-400 hover:bg-gray-500 text-white font-medium rounded-xl transition-colors duration-200 flex items-center justify-center"
+                      >
+                        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        Delete Photo
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
