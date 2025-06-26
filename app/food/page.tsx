@@ -153,16 +153,7 @@ export default function FoodDiary() {
     setIsAnalyzing(true);
     
     try {
-      // First upload image to Cloudinary to get permanent URL
-      const cloudinaryUrl = await uploadImageToCloudinary(photoFile);
-      if (!cloudinaryUrl) {
-        throw new Error('Failed to upload image to cloud storage');
-      }
-
-      // Update photoPreview to show the Cloudinary URL
-      setPhotoPreview(cloudinaryUrl);
-
-      // Create FormData for API call
+      // Create FormData for API call (original simple approach)
       const formData = new FormData();
       formData.append('image', photoFile);
 
@@ -179,7 +170,7 @@ export default function FoodDiary() {
 
       const result = await response.json();
       
-      if (result.analysis) {
+      if (result.success && result.analysis) {
         setAiDescription(result.analysis);
         setAnalyzedNutrition(extractNutritionData(result.analysis));
         setShowAiResult(true);
@@ -233,8 +224,8 @@ Please describe your food manually, including:
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          description: foodDescription,
-          method: 'text'
+          textDescription: foodDescription,
+          foodType: manualFoodType
         }),
       });
 
@@ -277,33 +268,7 @@ Please add nutritional information manually if needed.`);
     }
   };
 
-  // Upload image to Cloudinary and return URL
-  const uploadImageToCloudinary = async (file: File): Promise<string | null> => {
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('upload_preset', 'ml_default'); // Using default Cloudinary preset
-      formData.append('folder', 'helfi/food_entries');
 
-      const response = await fetch(
-        'https://api.cloudinary.com/v1_1/dh7qpr43n/image/upload',
-        {
-          method: 'POST',
-          body: formData,
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('Failed to upload image to cloud storage');
-      }
-
-      const result = await response.json();
-      return result.secure_url;
-    } catch (error) {
-      console.error('Error uploading image to Cloudinary:', error);
-      return null;
-    }
-  };
 
   const addFoodEntry = async (description: string, method: 'text' | 'photo', nutrition?: any) => {
     const newEntry = {
@@ -311,7 +276,7 @@ Please add nutritional information manually if needed.`);
       description,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       method,
-      photo: method === 'photo' ? photoPreview : null, // Use photoPreview which now contains Cloudinary URL
+      photo: method === 'photo' ? photoPreview : null, // Store base64 for now (TODO: optimize with cloud storage later)
       nutrition: nutrition || analyzedNutrition
     };
     
@@ -794,12 +759,12 @@ Please add nutritional information manually if needed.`);
                         setIsEditingDescription(false);
                         setEditedDescription('');
                       }}
-                      className="w-full py-3 px-4 bg-gray-500 hover:bg-gray-600 text-white font-medium rounded-xl transition-colors duration-200 flex items-center justify-center"
+                      className="p-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg transition-colors duration-200 flex items-center justify-center"
+                      title="Cancel"
                     >
-                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                       </svg>
-                      Cancel
                     </button>
                     <button
                       onClick={() => {
@@ -1022,12 +987,12 @@ Please add nutritional information manually if needed.`);
                   
                   <button
                     onClick={cancelManualEntry}
-                    className="px-6 py-3 bg-gray-500 hover:bg-gray-600 text-white font-medium rounded-xl transition-colors duration-200 flex items-center justify-center"
+                    className="p-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg transition-colors duration-200 flex items-center justify-center"
+                    title="Cancel"
                   >
-                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                     </svg>
-                    Cancel
                   </button>
                 </div>
               </div>
