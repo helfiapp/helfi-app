@@ -2231,73 +2231,49 @@ export default function Onboarding() {
               Edit Health Info
             </h1>
             
-            {/* Refresh Button */}
-            <button 
-              onClick={() => window.location.reload()} 
-              className="text-gray-600 hover:text-gray-900"
-              title="Refresh"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-            </button>
+            {/* Profile Dropdown */}
+            <div className="relative">
+              <button className="w-9 h-9 rounded-full border-2 border-gray-300 flex items-center justify-center">
+                <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+              </button>
+            </div>
           </div>
           
-          {/* Numbered Steps Progress with Connecting Lines */}
-          <div className="relative mb-6">
-            {/* Mobile-first responsive design with better spacing */}
-            <div className="flex items-center justify-center px-1 sm:px-4">
-              {/* Mobile: Show simplified progress with properly sized circles */}
-              <div className="sm:hidden flex items-center justify-center space-x-1 overflow-x-auto max-w-full">
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((stepNum, index) => (
-                  <React.Fragment key={stepNum}>
-                    <button 
-                      onClick={() => goToStep(stepNum - 1)}
-                      className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all z-10 cursor-pointer flex-shrink-0 ${
-                        stepNum === step + 1 
-                          ? 'bg-green-600 text-white' 
-                          : stepNum < step + 1
-                          ? 'bg-green-600 text-white'
-                          : 'bg-gray-300 text-gray-600'
-                      }`}
-                      title={`Go to step ${stepNum}: ${stepNames[stepNum - 1]}`}
-                    >
-                      {stepNum === 10 ? '10' : stepNum}
-                    </button>
-                    {index < 9 && (
-                      <div className={`h-0.5 w-1 transition-all flex-shrink-0 ${
-                        stepNum < step + 1 ? 'bg-green-600' : 'bg-gray-300'
-                      }`} />
-                    )}
-                  </React.Fragment>
-                ))}
-              </div>
-              
-              {/* Desktop: Show full numbered circles */}
-              <div className="hidden sm:flex items-center justify-center max-w-4xl mx-auto">
-                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((stepNum, index) => (
-                  <div key={stepNum} className="flex items-center">
-                    <button 
-                      onClick={() => goToStep(stepNum - 1)}
-                      className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all z-10 cursor-pointer hover:scale-105 ${
-                        stepNum === step + 1 
-                          ? 'bg-green-600 text-white hover:bg-green-700' 
-                          : stepNum < step + 1
-                          ? 'bg-green-600 text-white hover:bg-green-700'
-                          : 'bg-gray-300 text-gray-600 hover:bg-gray-400'
-                      }`}
-                      title={`Go to step ${stepNum}: ${stepNames[stepNum - 1]}`}
-                    >
-                      {stepNum}
-                    </button>
-                    {index < 9 && (
-                      <div className={`h-0.5 w-4 transition-all ${
-                        stepNum < step + 1 ? 'bg-green-600' : 'bg-gray-300'
-                      }`} />
-                    )}
-                  </div>
-                ))}
-              </div>
+          {/* Mobile: Clean Step Indicator */}
+          <div className="sm:hidden mb-4">
+            <div className="text-center">
+              <div className="text-sm font-medium text-gray-900">{stepNames[step]}</div>
+              <div className="text-xs text-gray-500">Step {step + 1} of 10</div>
+            </div>
+          </div>
+          
+          {/* Desktop: Full Numbered Steps */}
+          <div className="hidden sm:block relative mb-6">
+            <div className="flex items-center justify-center max-w-4xl mx-auto">
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((stepNum, index) => (
+                <div key={stepNum} className="flex items-center">
+                  <button 
+                    onClick={() => goToStep(stepNum - 1)}
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all z-10 cursor-pointer hover:scale-105 ${
+                      stepNum === step + 1 
+                        ? 'bg-green-600 text-white hover:bg-green-700' 
+                        : stepNum < step + 1
+                        ? 'bg-green-600 text-white hover:bg-green-700'
+                        : 'bg-gray-300 text-gray-600 hover:bg-gray-400'
+                    }`}
+                    title={`Go to step ${stepNum}: ${stepNames[stepNum - 1]}`}
+                  >
+                    {stepNum}
+                  </button>
+                  {index < 9 && (
+                    <div className={`h-0.5 w-4 transition-all ${
+                      stepNum < step + 1 ? 'bg-green-600' : 'bg-gray-300'
+                    }`} />
+                  )}
+                </div>
+              ))}
             </div>
           </div>
           
@@ -2319,8 +2295,8 @@ export default function Onboarding() {
             </button>
           </div>
 
-          {/* Skip and Step Info */}
-          <div className="flex items-center justify-between max-w-4xl mx-auto">
+          {/* Skip and Step Info - Desktop Only */}
+          <div className="hidden sm:flex items-center justify-between max-w-4xl mx-auto">
             <button className="text-sm text-gray-500 hover:text-gray-700">Skip</button>
             <div className="text-center">
               <div className="text-sm font-medium text-gray-900">{stepNames[step]}</div>
