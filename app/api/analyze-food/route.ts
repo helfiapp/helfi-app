@@ -55,18 +55,22 @@ export async function POST(req: NextRequest) {
           content: [
             {
               type: "text",
-              text: `Analyze this food image and provide a detailed description. Include:
-              
-1. **Food identification**: What specific foods/ingredients do you see?
-2. **Preparation method**: How is it cooked/prepared?
-3. **Portion estimation**: Approximate serving size
-4. **Nutritional estimate**: Estimated calories, protein, carbs, fat
-5. **Health assessment**: Brief comment on nutritional value
+              text: `Analyze this food image and provide a concise description in this exact format:
 
-Format your response as a natural, comprehensive description like this example:
-"Grilled chicken breast (6 oz) with steamed broccoli and quinoa. The chicken appears well-seasoned and grilled to a golden-brown color. Estimated 420 calories, 45g protein, 25g carbs, 12g fat. Excellent source of lean protein and fiber, with good balance of macronutrients for a healthy meal."
+[Food name] ([portion size])
+[Brief preparation if relevant]
+Calories: [estimate], Protein: [g], Carbs: [g], Fat: [g]
 
-Be specific about what you see and provide practical nutritional insights.`
+Examples:
+"Medium banana (1 whole)
+Raw fruit
+Calories: 105, Protein: 1g, Carbs: 27g, Fat: 0g"
+
+"Grilled chicken breast (6 oz)
+Grilled, seasoned
+Calories: 420, Protein: 45g, Carbs: 2g, Fat: 12g"
+
+Keep it simple and direct - no lengthy explanations or health assessments. Just identify the food, estimate portion, and provide basic nutrition facts.`
             },
             {
               type: "image_url",
