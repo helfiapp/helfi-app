@@ -58,19 +58,16 @@ export async function POST(req: NextRequest) {
               text: `Analyze this food image and provide a concise description in this exact format:
 
 [Food name] ([portion size])
-[Brief preparation if relevant]
 Calories: [estimate], Protein: [g], Carbs: [g], Fat: [g]
 
 Examples:
 "Medium banana (1 whole)
-Raw fruit
 Calories: 105, Protein: 1g, Carbs: 27g, Fat: 0g"
 
 "Grilled chicken breast (6 oz)
-Grilled, seasoned
 Calories: 420, Protein: 45g, Carbs: 2g, Fat: 12g"
 
-Keep it simple and direct - no lengthy explanations or health assessments. Just identify the food, estimate portion, and provide basic nutrition facts.`
+Keep it simple - just food name, portion size, and nutrition facts. No preparation methods or explanations.`
             },
             {
               type: "image_url",
