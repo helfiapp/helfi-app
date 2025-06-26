@@ -307,7 +307,6 @@ Please add nutritional information manually if needed.`);
     // Re-analyze with AI for updated nutrition info
     setIsAnalyzing(true);
     let updatedNutrition = null;
-    let newAiDescription = description;
 
     try {
       const response = await fetch('/api/analyze-food', {
@@ -323,14 +322,17 @@ Please add nutritional information manually if needed.`);
 
       if (response.ok) {
         const result = await response.json();
+        console.log('API Response:', result); // Debug log
         if (result.success && result.analysis) {
           updatedNutrition = extractNutritionData(result.analysis);
-          newAiDescription = result.analysis;
+          console.log('Extracted Nutrition:', updatedNutrition); // Debug log
           
-          // Update the UI states immediately to show new analysis
-          setAiDescription(newAiDescription);
+          // Update the UI states with new nutrition but keep clean description
+          setAiDescription(result.analysis); // Full AI response for processing
           setAnalyzedNutrition(updatedNutrition);
         }
+      } else {
+        console.error('API Error:', response.status, response.statusText);
       }
     } catch (error) {
       console.error('Error re-analyzing food:', error);
@@ -340,10 +342,10 @@ Please add nutritional information manually if needed.`);
       setIsAnalyzing(false);
     }
 
-    // Update the existing entry
+    // Update the existing entry with CLEAN description (not full AI response)
     const updatedEntry = {
       ...editingEntry,
-      description,
+      description: description, // Save the clean user description
       photo: method === 'photo' ? photoPreview : editingEntry.photo,
       nutrition: updatedNutrition || editingEntry.nutrition
     };
