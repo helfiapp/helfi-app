@@ -207,8 +207,8 @@ export default function FoodDiary() {
     setShowWebcam(false);
   };
 
-  // Compress image to reduce API costs
-  const compressImage = (file: File, maxWidth: number = 800, quality: number = 0.8): Promise<File> => {
+  // Compress image to reduce API costs and improve loading speed
+  const compressImage = (file: File, maxWidth: number = 600, quality: number = 0.7): Promise<File> => {
     return new Promise((resolve, reject) => {
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
@@ -220,7 +220,7 @@ export default function FoodDiary() {
       }
       
       img.onload = () => {
-        // Calculate new dimensions
+        // Calculate new dimensions - smaller for faster loading
         const ratio = Math.min(maxWidth / img.width, maxWidth / img.height);
         const newWidth = img.width * ratio;
         const newHeight = img.height * ratio;
@@ -238,14 +238,21 @@ export default function FoodDiary() {
               type: 'image/jpeg',
               lastModified: Date.now(),
             });
+            console.log(`Image compressed: ${file.size} → ${blob.size} bytes (${Math.round((1 - blob.size/file.size) * 100)}% reduction)`);
             resolve(compressedFile);
           } else {
             reject(new Error('Failed to compress image'));
           }
         }, 'image/jpeg', quality);
+        
+        // Clean up
+        URL.revokeObjectURL(img.src);
       };
       
-      img.onerror = () => reject(new Error('Failed to load image'));
+      img.onerror = () => {
+        URL.revokeObjectURL(img.src);
+        reject(new Error('Failed to load image'));
+      };
       img.src = URL.createObjectURL(file);
     });
   };
@@ -400,12 +407,24 @@ Please add nutritional information manually if needed.`);
 
 
   const addFoodEntry = async (description: string, method: 'text' | 'photo', nutrition?: any) => {
+    // Prevent duplicate entries - check if this exact entry already exists
+    const existingEntry = todaysFoods.find(food => 
+      food.description === description && 
+      food.method === method && 
+      Math.abs(new Date().getTime() - food.id) < 5000 // Within 5 seconds
+    );
+    
+    if (existingEntry) {
+      console.log('Duplicate entry prevented');
+      return;
+    }
+
     const newEntry = {
       id: Date.now(),
       description,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       method,
-      photo: method === 'photo' ? photoPreview : null, // Store base64 for now (TODO: optimize with cloud storage later)
+      photo: method === 'photo' ? photoPreview : null,
       nutrition: nutrition || analyzedNutrition
     };
     
@@ -827,13 +846,26 @@ Please add nutritional information manually if needed.`);
                 {/* Photo Section */}
                 {photoPreview && (
                   <div className="p-4 border-b border-gray-100 flex justify-center">
-                    <Image
-                      src={photoPreview}
-                      alt="Analyzed food"
-                      width={300}
-                      height={200}
-                      className="w-full aspect-[4/3] object-cover rounded-xl"
-                    />
+                    <div className="relative w-full">
+                      {foodImagesLoading[photoPreview] && (
+                        <div className="absolute inset-0 bg-gray-100 rounded-xl flex items-center justify-center">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
+                        </div>
+                      )}
+                      <Image
+                        src={photoPreview}
+                        alt="Analyzed food"
+                        width={300}
+                        height={200}
+                        className={`w-full aspect-[4/3] object-cover rounded-xl transition-opacity duration-300 ${
+                          foodImagesLoading[photoPreview] ? 'opacity-0' : 'opacity-100'
+                        }`}
+                        loading="eager"
+                        priority
+                        onLoad={() => setFoodImagesLoading((prev: Record<string, boolean>) => ({ ...prev, [photoPreview]: false }))}
+                        onLoadStart={() => setFoodImagesLoading((prev: Record<string, boolean>) => ({ ...prev, [photoPreview]: true }))}
+                      />
+                    </div>
                   </div>
                 )}
                 
