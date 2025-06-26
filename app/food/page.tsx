@@ -377,10 +377,10 @@ Please describe your food manually, including:
                 <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                   <p className="text-blue-800 mb-4 leading-relaxed">{aiDescription}</p>
                   
-                  <div className="flex space-x-3">
+                  <div className="space-y-3">
                     <button
                       onClick={() => addFoodEntry(aiDescription, 'photo')}
-                      className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold"
+                      className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold"
                     >
                       ✅ Accept
                     </button>
@@ -389,7 +389,7 @@ Please describe your food manually, including:
                         setIsEditingDescription(true);
                         setEditedDescription(aiDescription);
                       }}
-                      className="flex-1 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-semibold"
+                      className="w-full px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-semibold"
                     >
                       ✏️ Edit Description
                     </button>
@@ -421,14 +421,14 @@ Please describe your food manually, including:
                     placeholder="Edit the AI description to make it more accurate..."
                   />
                   
-                  <div className="flex space-x-3">
+                  <div className="space-y-3">
                     <button
                       onClick={() => {
                         addFoodEntry(editedDescription, 'photo');
                         setIsEditingDescription(false);
                       }}
                       disabled={!editedDescription.trim()}
-                      className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 font-semibold"
+                      className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 font-semibold"
                     >
                       ✅ Update & Save
                     </button>
@@ -437,7 +437,7 @@ Please describe your food manually, including:
                         setIsEditingDescription(false);
                         setEditedDescription('');
                       }}
-                      className="flex-1 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 font-semibold"
+                      className="w-full px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 font-semibold"
                     >
                       ❌ Cancel
                     </button>
