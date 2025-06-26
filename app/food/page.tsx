@@ -128,13 +128,24 @@ export default function FoodDiary() {
     }
   };
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setPhotoFile(file);
-      const reader = new FileReader();
-      reader.onload = (e) => setPhotoPreview(e.target?.result as string);
-      reader.readAsDataURL(file);
+      try {
+        // Compress the uploaded file to reduce API costs
+        const compressedFile = await compressImage(file, 800, 0.8);
+        setPhotoFile(compressedFile);
+        const reader = new FileReader();
+        reader.onload = (e) => setPhotoPreview(e.target?.result as string);
+        reader.readAsDataURL(compressedFile);
+      } catch (error) {
+        console.error('Error compressing image:', error);
+        // Fallback to original file if compression fails
+        setPhotoFile(file);
+        const reader = new FileReader();
+        reader.onload = (e) => setPhotoPreview(e.target?.result as string);
+        reader.readAsDataURL(file);
+      }
     }
   };
 
@@ -182,6 +193,49 @@ export default function FoodDiary() {
     setShowWebcam(false);
   };
 
+  // Compress image to reduce API costs
+  const compressImage = (file: File, maxWidth: number = 800, quality: number = 0.8): Promise<File> => {
+    return new Promise((resolve, reject) => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const img = document.createElement('img');
+      
+      if (!ctx) {
+        reject(new Error('Cannot get canvas context'));
+        return;
+      }
+      
+      img.onload = () => {
+        // Calculate new dimensions
+        const ratio = Math.min(maxWidth / img.width, maxWidth / img.height);
+        const newWidth = img.width * ratio;
+        const newHeight = img.height * ratio;
+        
+        // Set canvas size
+        canvas.width = newWidth;
+        canvas.height = newHeight;
+        
+        // Draw and compress
+        ctx.drawImage(img, 0, 0, newWidth, newHeight);
+        
+        canvas.toBlob((blob) => {
+          if (blob) {
+            const compressedFile = new File([blob], file.name, {
+              type: 'image/jpeg',
+              lastModified: Date.now(),
+            });
+            resolve(compressedFile);
+          } else {
+            reject(new Error('Failed to compress image'));
+          }
+        }, 'image/jpeg', quality);
+      };
+      
+      img.onerror = () => reject(new Error('Failed to load image'));
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
   // Extract nutrition data from AI response
   const extractNutritionData = (description: string) => {
     // Try to parse common nutrition patterns from AI response
@@ -208,9 +262,15 @@ export default function FoodDiary() {
     setIsAnalyzing(true);
     
     try {
-      // Create FormData for API call (original simple approach)
+      // Compress image to reduce API costs
+      console.log(`Original file size: ${(photoFile.size / 1024).toFixed(1)}KB`);
+      const compressedFile = await compressImage(photoFile, 800, 0.8);
+      console.log(`Compressed file size: ${(compressedFile.size / 1024).toFixed(1)}KB`);
+      console.log(`Savings: ${(((photoFile.size - compressedFile.size) / photoFile.size) * 100).toFixed(1)}%`);
+      
+      // Create FormData for API call with compressed image
       const formData = new FormData();
-      formData.append('image', photoFile);
+      formData.append('image', compressedFile);
 
       // Call our OpenAI API route
       const response = await fetch('/api/analyze-food', {
@@ -963,7 +1023,7 @@ Please add nutritional information manually if needed.`);
                         setEditedDescription('');
                         setEditingEntry(null);
                       }}
-                      className="w-full py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-colors duration-200 flex items-center justify-center"
+                      className="w-full py-3 px-4 bg-red-500 hover:bg-red-600 text-white font-medium rounded-xl transition-colors duration-200 flex items-center justify-center"
                     >
                       <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
