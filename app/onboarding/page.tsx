@@ -3,6 +3,8 @@
 
 import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { useSession, signOut } from 'next-auth/react';
+import Image from 'next/image';
+import Link from 'next/link';
 
 // Auth-enabled onboarding flow
 
@@ -2051,6 +2053,36 @@ export default function Onboarding() {
   const stepNames = ['Gender', 'Physical', 'Exercise', 'Health Goals', 'Health Situations', 'Supplements', 'Medications', 'Blood Results', 'AI Insights', 'Review'];
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<any>({});
+  const { data: session } = useSession();
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [profileImage, setProfileImage] = useState<string | null>(null);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+
+  // Profile data - using consistent green avatar
+  const defaultAvatar = 'data:image/svg+xml;base64,' + btoa(`
+    <svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="64" cy="64" r="64" fill="#10B981"/>
+      <circle cx="64" cy="48" r="20" fill="white"/>
+      <path d="M64 76c-13.33 0-24 5.34-24 12v16c0 8.84 7.16 16 16 16h16c8.84 0 16-7.16 16-16V88c0-6.66-10.67-12-24-12z" fill="white"/>
+    </svg>
+  `);
+  const userImage = profileImage || session?.user?.image || defaultAvatar;
+  const userName = session?.user?.name || 'User';
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      const target = e.target as HTMLElement;
+      // Check if click is outside both the button and the dropdown content
+      if (!target.closest('.dropdown-container')) {
+        setDropdownOpen(false);
+      }
+    }
+    if (dropdownOpen) {
+      document.addEventListener('mousedown', handleClick);
+      return () => document.removeEventListener('mousedown', handleClick);
+    }
+  }, [dropdownOpen]);
 
   // Get step from URL parameter
   useEffect(() => {
@@ -2081,6 +2113,10 @@ export default function Onboarding() {
           if (result.data) {
             console.log('Successfully loaded existing onboarding data from database:', result.data);
             setForm(result.data);
+            // Load profile image from database
+            if (result.data.profileImage) {
+              setProfileImage(result.data.profileImage);
+            }
           }
         } else if (response.status === 404) {
           console.log('No existing data found for user - starting fresh onboarding');
@@ -2230,11 +2266,11 @@ export default function Onboarding() {
               Edit Health Info
             </h1>
             
-            {/* Profile Dropdown & Reset Button */}
+            {/* Reset Button & Profile Dropdown */}
             <div className="flex items-center space-x-2">
               {/* Reset Button */}
               <button
-                onClick={() => window.location.reload()}
+                onClick={() => setShowResetConfirm(true)}
                 className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-50"
                 title="Reset page"
               >
@@ -2243,12 +2279,53 @@ export default function Onboarding() {
                 </svg>
               </button>
               
-              {/* Profile Dropdown */}
-              <button className="w-9 h-9 rounded-full border-2 border-gray-300 flex items-center justify-center">
-                <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-              </button>
+              {/* Profile Avatar & Dropdown */}
+              <div className="relative dropdown-container" id="profile-dropdown">
+                <button
+                  onClick={() => setDropdownOpen((v) => !v)}
+                  className="focus:outline-none"
+                  aria-label="Open profile menu"
+                >
+                  <Image
+                    src={userImage}
+                    alt="Profile"
+                    width={36}
+                    height={36}
+                    className="w-9 h-9 rounded-full border-2 border-helfi-green shadow-sm object-cover"
+                  />
+                </button>
+                {dropdownOpen && (
+                  <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-100 animate-fade-in">
+                    <div className="flex items-center px-4 py-3 border-b border-gray-100">
+                      <Image
+                        src={userImage}
+                        alt="Profile"
+                        width={40}
+                        height={40}
+                        className="w-10 h-10 rounded-full object-cover mr-3"
+                      />
+                      <div>
+                        <div className="font-semibold text-gray-900">{userName}</div>
+                        <div className="text-xs text-gray-500">{session?.user?.email || 'user@email.com'}</div>
+                      </div>
+                    </div>
+                    <Link href="/account" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Account Settings</Link>
+                    <Link href="/profile/image" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Upload/Change Profile Photo</Link>
+                    <Link href="/billing" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Subscription & Billing</Link>
+                    <Link href="/notifications" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Notifications</Link>
+                    <Link href="/privacy" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Privacy Settings</Link>
+                    <Link href="/help" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
+                    <div className="border-t border-gray-100 my-2"></div>
+                    <Link href="/reports" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Reports</Link>
+                    <button
+                      onClick={() => signOut()}
+                      className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50 font-semibold"
+                    >
+                      Logout
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
           
@@ -2377,6 +2454,35 @@ export default function Onboarding() {
 
           </div>
         </nav>
+
+        {/* Reset Confirmation Popup */}
+        {showResetConfirm && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Reset Page Data</h3>
+              <p className="text-gray-600 mb-6">
+                Are you sure you want to reset all data on this page? This will clear all your current progress and cannot be undone.
+              </p>
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => setShowResetConfirm(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    window.location.reload();
+                    setShowResetConfirm(false);
+                  }}
+                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                >
+                  Reset Page
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
