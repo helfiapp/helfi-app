@@ -307,6 +307,7 @@ Please add nutritional information manually if needed.`);
     // Re-analyze with AI for updated nutrition info
     setIsAnalyzing(true);
     let updatedNutrition = null;
+    let newAiDescription = description;
 
     try {
       const response = await fetch('/api/analyze-food', {
@@ -324,10 +325,17 @@ Please add nutritional information manually if needed.`);
         const result = await response.json();
         if (result.success && result.analysis) {
           updatedNutrition = extractNutritionData(result.analysis);
+          newAiDescription = result.analysis;
+          
+          // Update the UI states immediately to show new analysis
+          setAiDescription(newAiDescription);
+          setAnalyzedNutrition(updatedNutrition);
         }
       }
     } catch (error) {
       console.error('Error re-analyzing food:', error);
+      // Keep original nutrition if re-analysis fails
+      updatedNutrition = editingEntry.nutrition;
     } finally {
       setIsAnalyzing(false);
     }
@@ -337,7 +345,7 @@ Please add nutritional information manually if needed.`);
       ...editingEntry,
       description,
       photo: method === 'photo' ? photoPreview : editingEntry.photo,
-      nutrition: updatedNutrition || analyzedNutrition || editingEntry.nutrition
+      nutrition: updatedNutrition || editingEntry.nutrition
     };
 
     const updatedFoods = todaysFoods.map(food => 
@@ -720,11 +728,24 @@ Please add nutritional information manually if needed.`);
                     </div>
                   )}
 
-                  {/* AI Description */}
+                  {/* AI Food Detection Only */}
                   <div className="mb-6">
                     <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-                      <div className="text-sm font-medium text-gray-600 mb-2">AI Analysis:</div>
-                      <div className="text-gray-900 text-sm leading-relaxed">{aiDescription}</div>
+                      <div className="text-sm font-medium text-gray-600 mb-2">Detected Foods:</div>
+                      <div className="text-gray-900 text-sm leading-relaxed">
+                        {aiDescription.split('\n').filter(line => 
+                          !line.toLowerCase().includes('calorie') && 
+                          !line.toLowerCase().includes('protein') && 
+                          !line.toLowerCase().includes('carb') && 
+                          !line.toLowerCase().includes('fat') && 
+                          !line.toLowerCase().includes('fiber') && 
+                          !line.toLowerCase().includes('sugar') &&
+                          !line.toLowerCase().includes('nutritional') &&
+                          !line.toLowerCase().includes('nutrition') &&
+                          line.trim().length > 0
+                        ).join(' ').replace(/^(This image shows|I can see|The food appears to be|This appears to be)/i, '').trim() || 
+                        aiDescription.split(',')[0] || aiDescription}
+                      </div>
                     </div>
                   </div>
                   
