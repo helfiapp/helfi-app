@@ -33,6 +33,8 @@ export default function FoodDiary() {
   const [stream, setStream] = useState<MediaStream | null>(null)
   const [profileImageLoading, setProfileImageLoading] = useState(true)
   const [foodImagesLoading, setFoodImagesLoading] = useState<{[key: string]: boolean}>({})
+  const [expandedEntries, setExpandedEntries] = useState<{[key: string]: boolean}>({})
+  const [fullSizeImage, setFullSizeImage] = useState<string | null>(null)
 
   // Profile data - using consistent green avatar
   const defaultAvatar = 'data:image/svg+xml;base64,' + btoa(`
@@ -589,6 +591,23 @@ Please add nutritional information manually if needed.`);
     setManualFoodType('single');
     setManualIngredients([{ name: '', weight: '', unit: 'g' }]);
     setEditingEntry(null);
+  };
+
+  // Toggle expanded state for food entries
+  const toggleExpanded = (foodId: string) => {
+    setExpandedEntries(prev => ({
+      ...prev,
+      [foodId]: !prev[foodId]
+    }));
+  };
+
+  // Format time with AM/PM
+  const formatTimeWithAMPM = (timeString: string) => {
+    const [hours, minutes] = timeString.split(':');
+    const hour24 = parseInt(hours);
+    const hour12 = hour24 === 0 ? 12 : hour24 > 12 ? hour24 - 12 : hour24;
+    const ampm = hour24 >= 12 ? 'PM' : 'AM';
+    return `${hour12}:${minutes} ${ampm}`;
   };
 
   return (
@@ -1359,172 +1378,228 @@ Please add nutritional information manually if needed.`);
               <p className="text-gray-400 text-sm">Add your first meal to start tracking!</p>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {todaysFoods.map((food) => (
-                <div key={food.id} className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
-                  <div className="flex justify-between items-start mb-3">
-                    <div className="flex items-center">
-                      <span className="text-sm font-medium text-gray-500">{food.time}</span>
-                      <span className={`ml-3 text-xs px-2 py-1 rounded-full ${
-                        food.method === 'photo' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
-                      }`}>
-                        {food.method === 'photo' ? '📸 AI Photo' : '✍️ Manual Entry'}
-                      </span>
+                <div key={food.id} className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                  {/* Compact Header Row */}
+                  <div className="flex items-center justify-between p-4 hover:bg-gray-50 transition-colors">
+                    {/* Left Side - Food Name & Time */}
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3">
+                        <h3 className="font-semibold text-gray-900 text-base">
+                          {food.description.split('\n')[0].split('Calories:')[0].trim()}
+                        </h3>
+                        <span className={`text-xs px-2 py-1 rounded-full flex-shrink-0 ${
+                          food.method === 'photo' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
+                        }`}>
+                          {food.method === 'photo' ? '📸' : '✍️'}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-500 mt-1">
+                        {formatTimeWithAMPM(food.time)}
+                      </p>
                     </div>
-                    
-                    {/* 3-Dot Options Menu */}
-                    <div className="relative entry-options-dropdown">
-                      <button
-                        onClick={() => setShowEntryOptions(showEntryOptions === food.id.toString() ? null : food.id.toString())}
-                        className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-                      >
-                        <svg className="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
-                        </svg>
-                      </button>
-                      
-                      {showEntryOptions === food.id.toString() && (
-                        <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
-                          <button
-                            onClick={() => editFood(food)}
-                            className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 flex items-center"
-                          >
-                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                            Edit Entry
-                          </button>
-                          <button
-                            onClick={() => reAnalyzeFood(food)}
-                            className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 flex items-center"
-                          >
-                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                            </svg>
-                            Re-analyze
-                          </button>
-                          <button
-                            onClick={() => deleteFood(food.id)}
-                            className="w-full px-4 py-2 text-left text-red-600 hover:bg-red-50 flex items-center border-t border-gray-100"
-                          >
-                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                            Delete Entry
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  
-                  {/* Food Name Heading */}
-                  <div className="mb-4">
-                    <h3 className="text-lg font-bold text-gray-900">
-                      {food.description.split('\n')[0].split('Calories:')[0].trim()}
-                    </h3>
-                  </div>
 
-                  {/* Food Content - Image + Premium Nutrition Cards */}
-                  <div className="flex flex-col sm:flex-row gap-4">
-                    {/* Food Image */}
-                    {food.photo && (
-                      <div className="relative sm:w-32 sm:flex-shrink-0">
-                        {foodImagesLoading[food.id] && (
-                          <div className="absolute inset-0 bg-gray-100 rounded-xl animate-pulse flex items-center justify-center">
-                            <svg className="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
+                    {/* Right Side - Actions */}
+                    <div className="flex items-center gap-2">
+                      {/* 3-Dot Options Menu */}
+                      <div className="relative entry-options-dropdown">
+                        <button
+                          onClick={() => setShowEntryOptions(showEntryOptions === food.id.toString() ? null : food.id.toString())}
+                          className="p-2 rounded-lg hover:bg-gray-200 transition-colors"
+                        >
+                          <svg className="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
+                          </svg>
+                        </button>
+                        
+                        {showEntryOptions === food.id.toString() && (
+                          <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                            <button
+                              onClick={() => editFood(food)}
+                              className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 flex items-center"
+                            >
+                              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                              Edit Entry
+                            </button>
+                            <button
+                              onClick={() => reAnalyzeFood(food)}
+                              className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 flex items-center"
+                            >
+                              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                              </svg>
+                              Re-analyze
+                            </button>
+                            <button
+                              onClick={() => deleteFood(food.id)}
+                              className="w-full px-4 py-2 text-left text-red-600 hover:bg-red-50 flex items-center border-t border-gray-100"
+                            >
+                              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                              Delete Entry
+                            </button>
                           </div>
                         )}
-                        <Image
-                          src={food.photo}
-                          alt="Food"
-                          width={128}
-                          height={128}
-                          className={`w-full sm:w-32 aspect-square object-cover rounded-xl transition-opacity duration-300 ${foodImagesLoading[food.id] ? 'opacity-0' : 'opacity-100'}`}
-                          onLoadStart={() => setFoodImagesLoading(prev => ({...prev, [food.id]: true}))}
-                          onLoad={() => setFoodImagesLoading(prev => ({...prev, [food.id]: false}))}
-                          onError={() => setFoodImagesLoading(prev => ({...prev, [food.id]: false}))}
-                          loading="lazy"
-                        />
                       </div>
-                    )}
 
-                    {/* Premium Nutrition Cards */}
-                    <div className="flex-1">
-                      {food.nutrition && (food.nutrition.calories || food.nutrition.protein || food.nutrition.carbs || food.nutrition.fat) && (
-                        <div className="grid grid-cols-2 gap-3">
-                          {/* Calories */}
-                          {food.nutrition.calories && (
-                            <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-4 border border-orange-200">
-                              <div className="text-center">
-                                <div className="text-xl font-bold text-orange-600">{food.nutrition.calories}</div>
-                                <div className="text-xs font-medium text-orange-500 uppercase tracking-wide">Calories</div>
-                              </div>
-                            </div>
-                          )}
-                          
-                          {/* Protein */}
-                          {food.nutrition.protein && (
-                            <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4 border border-blue-200">
-                              <div className="text-center">
-                                <div className="text-xl font-bold text-blue-600">{food.nutrition.protein}g</div>
-                                <div className="text-xs font-medium text-blue-500 uppercase tracking-wide">Protein</div>
-                              </div>
-                            </div>
-                          )}
-                          
-                          {/* Carbs */}
-                          {food.nutrition.carbs && (
-                            <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4 border border-green-200">
-                              <div className="text-center">
-                                <div className="text-xl font-bold text-green-600">{food.nutrition.carbs}g</div>
-                                <div className="text-xs font-medium text-green-500 uppercase tracking-wide">Carbs</div>
-                              </div>
-                            </div>
-                          )}
-                          
-                          {/* Fat */}
-                          {food.nutrition.fat && (
-                            <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-4 border border-purple-200">
-                              <div className="text-center">
-                                <div className="text-xl font-bold text-purple-600">{food.nutrition.fat}g</div>
-                                <div className="text-xs font-medium text-purple-500 uppercase tracking-wide">Fat</div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Additional Nutrition Cards (Fiber/Sugar) */}
-                      {food.nutrition && (food.nutrition.fiber || food.nutrition.sugar) && (
-                        <div className="grid grid-cols-2 gap-3 mt-3">
-                          {food.nutrition.fiber && (
-                            <div className="bg-gradient-to-br from-amber-50 to-amber-100 rounded-xl p-3 border border-amber-200">
-                              <div className="text-center">
-                                <div className="text-lg font-bold text-amber-600">{food.nutrition.fiber}g</div>
-                                <div className="text-xs font-medium text-amber-500 uppercase tracking-wide">Fiber</div>
-                              </div>
-                            </div>
-                          )}
-                          {food.nutrition.sugar && (
-                            <div className="bg-gradient-to-br from-pink-50 to-pink-100 rounded-xl p-3 border border-pink-200">
-                              <div className="text-center">
-                                <div className="text-lg font-bold text-pink-600">{food.nutrition.sugar}g</div>
-                                <div className="text-xs font-medium text-pink-500 uppercase tracking-wide">Sugar</div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
+                      {/* Expand/Collapse Toggle */}
+                      <button
+                        onClick={() => toggleExpanded(food.id.toString())}
+                        className="p-2 rounded-lg hover:bg-gray-200 transition-colors"
+                      >
+                        <svg 
+                          className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${
+                            expandedEntries[food.id.toString()] ? 'rotate-180' : ''
+                          }`} 
+                          fill="none" 
+                          stroke="currentColor" 
+                          viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
                     </div>
                   </div>
+
+                  {/* Expandable Content */}
+                  {expandedEntries[food.id.toString()] && (
+                    <div className="border-t border-gray-100 p-4 bg-gray-50">
+                      <div className="flex flex-col sm:flex-row gap-4">
+                        {/* Compact Food Image - Clickable */}
+                        {food.photo && (
+                          <div className="sm:w-20 sm:flex-shrink-0">
+                            <div className="relative">
+                              {foodImagesLoading[food.id] && (
+                                <div className="absolute inset-0 bg-gray-100 rounded-lg animate-pulse flex items-center justify-center">
+                                  <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                  </svg>
+                                </div>
+                              )}
+                              <Image
+                                src={food.photo}
+                                alt="Food"
+                                width={80}
+                                height={80}
+                                className={`w-20 h-20 object-cover rounded-lg cursor-pointer hover:opacity-80 transition-opacity ${foodImagesLoading[food.id] ? 'opacity-0' : 'opacity-100'}`}
+                                onLoadStart={() => setFoodImagesLoading(prev => ({...prev, [food.id]: true}))}
+                                onLoad={() => setFoodImagesLoading(prev => ({...prev, [food.id]: false}))}
+                                onError={() => setFoodImagesLoading(prev => ({...prev, [food.id]: false}))}
+                                onClick={() => setFullSizeImage(food.photo)}
+                                loading="lazy"
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Compact Nutrition Cards */}
+                        <div className="flex-1">
+                          {food.nutrition && (food.nutrition.calories || food.nutrition.protein || food.nutrition.carbs || food.nutrition.fat) && (
+                            <div className="grid grid-cols-2 gap-2">
+                              {/* Calories */}
+                              {food.nutrition.calories && (
+                                <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg p-3 border border-orange-200">
+                                  <div className="text-center">
+                                    <div className="text-lg font-bold text-orange-600">{food.nutrition.calories}</div>
+                                    <div className="text-xs font-medium text-orange-500 uppercase tracking-wide">Calories</div>
+                                  </div>
+                                </div>
+                              )}
+                              
+                              {/* Protein */}
+                              {food.nutrition.protein && (
+                                <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-3 border border-blue-200">
+                                  <div className="text-center">
+                                    <div className="text-lg font-bold text-blue-600">{food.nutrition.protein}g</div>
+                                    <div className="text-xs font-medium text-blue-500 uppercase tracking-wide">Protein</div>
+                                  </div>
+                                </div>
+                              )}
+                              
+                              {/* Carbs */}
+                              {food.nutrition.carbs && (
+                                <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-3 border border-green-200">
+                                  <div className="text-center">
+                                    <div className="text-lg font-bold text-green-600">{food.nutrition.carbs}g</div>
+                                    <div className="text-xs font-medium text-green-500 uppercase tracking-wide">Carbs</div>
+                                  </div>
+                                </div>
+                              )}
+                              
+                              {/* Fat */}
+                              {food.nutrition.fat && (
+                                <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-3 border border-purple-200">
+                                  <div className="text-center">
+                                    <div className="text-lg font-bold text-purple-600">{food.nutrition.fat}g</div>
+                                    <div className="text-xs font-medium text-purple-500 uppercase tracking-wide">Fat</div>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Additional Nutrition Cards (Fiber/Sugar) */}
+                          {food.nutrition && (food.nutrition.fiber || food.nutrition.sugar) && (
+                            <div className="grid grid-cols-2 gap-2 mt-2">
+                              {food.nutrition.fiber && (
+                                <div className="bg-gradient-to-br from-amber-50 to-amber-100 rounded-lg p-2 border border-amber-200">
+                                  <div className="text-center">
+                                    <div className="text-sm font-bold text-amber-600">{food.nutrition.fiber}g</div>
+                                    <div className="text-xs font-medium text-amber-500 uppercase tracking-wide">Fiber</div>
+                                  </div>
+                                </div>
+                              )}
+                              {food.nutrition.sugar && (
+                                <div className="bg-gradient-to-br from-pink-50 to-pink-100 rounded-lg p-2 border border-pink-200">
+                                  <div className="text-center">
+                                    <div className="text-sm font-bold text-pink-600">{food.nutrition.sugar}g</div>
+                                    <div className="text-xs font-medium text-pink-500 uppercase tracking-wide">Sugar</div>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
           )}
         </div>
+        )}
+
+        {/* Full Size Image Modal */}
+        {fullSizeImage && (
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
+            onClick={() => setFullSizeImage(null)}
+          >
+            <div className="relative max-w-4xl max-h-full">
+              <button
+                onClick={() => setFullSizeImage(null)}
+                className="absolute -top-12 right-0 text-white hover:text-gray-300 transition-colors"
+              >
+                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+              <Image
+                src={fullSizeImage}
+                alt="Full size food image"
+                width={800}
+                height={600}
+                className="max-w-full max-h-full object-contain rounded-lg"
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
+          </div>
         )}
       </div>
 
