@@ -31,6 +31,8 @@ export default function FoodDiary() {
   const [editingEntry, setEditingEntry] = useState<any>(null)
   const [showWebcam, setShowWebcam] = useState(false)
   const [stream, setStream] = useState<MediaStream | null>(null)
+  const [profileImageLoading, setProfileImageLoading] = useState(true)
+  const [foodImagesLoading, setFoodImagesLoading] = useState<{[key: string]: boolean}>({})
 
   // Profile data - using consistent green avatar
   const defaultAvatar = 'data:image/svg+xml;base64,' + btoa(`
@@ -87,11 +89,15 @@ export default function FoodDiary() {
   useEffect(() => {
     const loadData = async () => {
       try {
+        setProfileImageLoading(true); // Start loading
         const response = await fetch('/api/user-data');
         if (response.ok) {
           const result = await response.json();
           if (result.data?.profileImage) {
             setProfileImage(result.data.profileImage);
+            // Preload the profile image for better performance
+            const img = document.createElement('img');
+            img.src = result.data.profileImage;
           }
           // Load today's foods from database
           if (result.data?.todaysFoods) {
@@ -100,6 +106,7 @@ export default function FoodDiary() {
         }
       } catch (error) {
         console.error('Error loading data:', error);
+        setProfileImageLoading(false);
       }
     };
 
@@ -107,6 +114,13 @@ export default function FoodDiary() {
       loadData();
     }
   }, [session]);
+
+  // Reset profile image loading when userImage changes
+  useEffect(() => {
+    if (userImage) {
+      setProfileImageLoading(true);
+    }
+  }, [userImage]);
 
   // Save food entries to database
   const saveFoodEntries = async (updatedFoods: any[]) => {
@@ -579,20 +593,40 @@ Please add nutritional information manually if needed.`);
           <div className="relative dropdown-container">
             <button
               onClick={() => setDropdownOpen((v) => !v)}
-              className="focus:outline-none"
+              className="focus:outline-none relative"
             >
+              {profileImageLoading && (
+                <div className="absolute inset-0 w-12 h-12 rounded-full border-2 border-helfi-green bg-gray-100 animate-pulse flex items-center justify-center">
+                  <svg className="w-6 h-6 text-gray-400 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                </div>
+              )}
               <Image
                 src={userImage}
                 alt="Profile"
                 width={48}
                 height={48}
-                className="w-12 h-12 rounded-full border-2 border-helfi-green shadow-sm object-cover"
+                className={`w-12 h-12 rounded-full border-2 border-helfi-green shadow-sm object-cover transition-opacity duration-300 ${profileImageLoading ? 'opacity-0' : 'opacity-100'}`}
+                onLoad={() => setProfileImageLoading(false)}
+                onError={() => setProfileImageLoading(false)}
+                priority
               />
             </button>
             {dropdownOpen && (
               <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-100">
                 <div className="flex items-center px-4 py-3 border-b border-gray-100">
-                  <Image src={userImage} alt="Profile" width={40} height={40} className="w-10 h-10 rounded-full object-cover mr-3" />
+                  <div className="relative mr-3">
+                    <Image 
+                      src={userImage} 
+                      alt="Profile" 
+                      width={40} 
+                      height={40} 
+                      className="w-10 h-10 rounded-full object-cover" 
+                      loading="eager"
+                    />
+                  </div>
                   <div>
                     <div className="font-semibold text-gray-900">{userName}</div>
                     <div className="text-xs text-gray-500">{session?.user?.email || 'user@email.com'}</div>
@@ -960,13 +994,15 @@ Please add nutritional information manually if needed.`);
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                 {/* Photo Section */}
                 {photoPreview && (
-                  <div className="p-6 border-b border-gray-100">
+                  <div className="p-4 border-b border-gray-100 flex justify-center">
                     <Image
                       src={photoPreview}
                       alt="Food being edited"
                       width={120}
                       height={90}
                       className="w-32 h-24 object-cover rounded-xl"
+                      loading="eager"
+                      priority
                     />
                   </div>
                 )}
@@ -1339,13 +1375,27 @@ Please add nutritional information manually if needed.`);
                   {/* Food Content */}
                   <div className="flex gap-4">
                     {food.photo && (
-                      <Image
-                        src={food.photo}
-                        alt="Food"
-                        width={80}
-                        height={80}
-                        className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-lg flex-shrink-0"
-                      />
+                      <div className="relative">
+                        {foodImagesLoading[food.id] && (
+                          <div className="absolute inset-0 w-16 h-16 sm:w-20 sm:h-20 bg-gray-100 rounded-lg animate-pulse flex items-center justify-center">
+                            <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                          </div>
+                        )}
+                        <Image
+                          src={food.photo}
+                          alt="Food"
+                          width={80}
+                          height={80}
+                          className={`w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-lg flex-shrink-0 transition-opacity duration-300 ${foodImagesLoading[food.id] ? 'opacity-0' : 'opacity-100'}`}
+                          onLoadStart={() => setFoodImagesLoading(prev => ({...prev, [food.id]: true}))}
+                          onLoad={() => setFoodImagesLoading(prev => ({...prev, [food.id]: false}))}
+                          onError={() => setFoodImagesLoading(prev => ({...prev, [food.id]: false}))}
+                          loading="lazy"
+                        />
+                      </div>
                     )}
                     <div className="flex-1">
                       {/* Nutrition Summary */}
