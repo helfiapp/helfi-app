@@ -17,6 +17,8 @@ export default function FoodDiary() {
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [aiDescription, setAiDescription] = useState('')
   const [showAiResult, setShowAiResult] = useState(false)
+  const [isEditingDescription, setIsEditingDescription] = useState(false)
+  const [editedDescription, setEditedDescription] = useState('')
 
   // Profile data - using consistent green avatar
   const defaultAvatar = 'data:image/svg+xml;base64,' + btoa(`
@@ -106,12 +108,14 @@ export default function FoodDiary() {
     };
     setTodaysFoods(prev => [...prev, newEntry]);
     
-    // Reset form
+    // Reset all form states
     setNewFoodText('');
     setPhotoFile(null);
     setPhotoPreview(null);
     setAiDescription('');
     setShowAiResult(false);
+    setIsEditingDescription(false);
+    setEditedDescription('');
     setShowAddFood(false);
   };
 
@@ -182,6 +186,13 @@ export default function FoodDiary() {
       {/* Main Content */}
       <div className="max-w-3xl mx-auto px-4 py-8 pb-20 md:pb-8">
         
+        {/* Instruction Text */}
+        <div className="mb-4 text-center">
+          <p className="text-lg text-gray-700 font-medium">
+            📸 Take a photo of your meal or snack and let AI analyze it!
+          </p>
+        </div>
+
         {/* Add Food Button */}
         <div className="mb-6">
           <button
@@ -200,80 +211,165 @@ export default function FoodDiary() {
           <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
             <h3 className="text-lg font-semibold mb-4">Add Food Entry</h3>
             
-            <div className="space-y-4">
-              {/* Text Input Method */}
+            <div className="space-y-6">
+              {/* Photo Upload Method - Primary */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Describe your food</label>
-                <textarea
-                  value={newFoodText}
-                  onChange={(e) => setNewFoodText(e.target.value)}
-                  placeholder="e.g., Grilled chicken salad with olive oil dressing"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-helfi-green focus:border-helfi-green"
-                  rows={3}
-                />
-                <button
-                  onClick={() => addFoodEntry(newFoodText, 'text')}
-                  disabled={!newFoodText.trim()}
-                  className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Add Entry
-                </button>
-              </div>
-
-              <div className="border-t border-gray-200 pt-4">
-                <p className="text-center text-gray-500 text-sm mb-4">OR</p>
-              </div>
-
-              {/* Photo Upload Method */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Take or upload a photo</label>
+                <label className="block text-sm font-medium text-gray-700 mb-3">
+                  📷 Take a photo or upload from gallery
+                </label>
                 <input
                   type="file"
                   accept="image/*"
                   capture="environment"
                   onChange={handlePhotoUpload}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  className="w-full px-3 py-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-helfi-green focus:border-helfi-green transition-colors"
                 />
                 
-                {photoPreview && (
-                  <div className="mt-4">
+                {photoPreview && !showAiResult && (
+                  <div className="mt-4 text-center">
                     <Image
                       src={photoPreview}
                       alt="Food preview"
-                      width={200}
-                      height={200}
-                      className="w-48 h-48 object-cover rounded-lg mx-auto"
+                      width={300}
+                      height={300}
+                      className="w-64 h-64 object-cover rounded-lg mx-auto shadow-lg"
                     />
                     <button
                       onClick={analyzePhoto}
                       disabled={isAnalyzing}
-                      className="mt-2 w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50"
+                      className="mt-4 w-full px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 font-semibold"
                     >
-                      {isAnalyzing ? 'Analyzing with AI...' : 'Analyze with AI'}
+                      {isAnalyzing ? (
+                        <div className="flex items-center justify-center">
+                          <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          AI is analyzing your food...
+                        </div>
+                      ) : (
+                        '🤖 Analyze with AI'
+                      )}
                     </button>
                   </div>
                 )}
 
                 {showAiResult && (
-                  <div className="mt-4 p-4 bg-purple-50 border border-purple-200 rounded-lg">
-                    <h4 className="font-medium text-purple-900 mb-2">AI Analysis:</h4>
-                    <p className="text-purple-800 text-sm mb-3">{aiDescription}</p>
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => addFoodEntry(aiDescription, 'photo')}
-                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
-                      >
-                        Accept & Add
-                      </button>
-                      <button
-                        onClick={() => setShowAiResult(false)}
-                        className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 text-sm"
-                      >
-                        Edit Description
-                      </button>
+                  <div className="mt-4">
+                    <div className="text-center mb-4">
+                      <Image
+                        src={photoPreview || ''}
+                        alt="Analyzed food"
+                        width={200}
+                        height={200}
+                        className="w-48 h-48 object-cover rounded-lg mx-auto shadow-lg"
+                      />
                     </div>
+                    
+                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                      <h4 className="font-semibold text-blue-900 mb-2">🤖 AI Analysis Result:</h4>
+                      <p className="text-blue-800 mb-4 leading-relaxed">{aiDescription}</p>
+                      
+                      <div className="flex space-x-3">
+                        <button
+                          onClick={() => addFoodEntry(aiDescription, 'photo')}
+                          className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold"
+                        >
+                          ✅ Accept
+                        </button>
+                                                 <button
+                           onClick={() => {
+                             setIsEditingDescription(true);
+                             setEditedDescription(aiDescription);
+                           }}
+                           className="flex-1 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 font-semibold"
+                         >
+                           ✏️ Edit Description
+                         </button>
+                      </div>
+                    </div>
+                                     </div>
+                 )}
+
+                 {isEditingDescription && (
+                   <div className="mt-4">
+                     <div className="text-center mb-4">
+                       <Image
+                         src={photoPreview || ''}
+                         alt="Food being edited"
+                         width={200}
+                         height={200}
+                         className="w-48 h-48 object-cover rounded-lg mx-auto shadow-lg"
+                       />
+                     </div>
+                     
+                     <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                       <h4 className="font-semibold text-orange-900 mb-2">✏️ Edit Description:</h4>
+                       <textarea
+                         value={editedDescription}
+                         onChange={(e) => setEditedDescription(e.target.value)}
+                         className="w-full px-3 py-3 border border-orange-300 rounded-lg focus:ring-orange-500 focus:border-orange-500 mb-4"
+                         rows={4}
+                         placeholder="Edit the AI description to make it more accurate..."
+                       />
+                       
+                       <div className="flex space-x-3">
+                         <button
+                           onClick={() => {
+                             addFoodEntry(editedDescription, 'photo');
+                             setIsEditingDescription(false);
+                           }}
+                           disabled={!editedDescription.trim()}
+                           className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 font-semibold"
+                         >
+                           ✅ Update & Save
+                         </button>
+                         <button
+                           onClick={() => {
+                             setIsEditingDescription(false);
+                             setEditedDescription('');
+                           }}
+                           className="flex-1 px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 font-semibold"
+                         >
+                           ❌ Cancel
+                         </button>
+                       </div>
+                     </div>
+                   </div>
+                 )}
+
+                 {!showAiResult && !isEditingDescription && photoPreview && (
+                  <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-yellow-800 text-sm">
+                      💡 <strong>Tip:</strong> Click "Analyze with AI" to get an automatic description of your food with nutritional information!
+                    </p>
                   </div>
                 )}
+              </div>
+
+              <div className="border-t border-gray-200 pt-6">
+                <p className="text-center text-gray-500 text-sm mb-4">OR</p>
+              </div>
+
+              {/* Manual Text Input - Secondary Option */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  ✍️ Manually describe your food
+                </label>
+                <textarea
+                  value={newFoodText}
+                  onChange={(e) => setNewFoodText(e.target.value)}
+                  placeholder="e.g., Grilled chicken breast with steamed broccoli and quinoa"
+                  className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:ring-helfi-green focus:border-helfi-green"
+                  rows={3}
+                />
+                <button
+                  onClick={() => addFoodEntry(newFoodText, 'text')}
+                  disabled={!newFoodText.trim()}
+                  className="mt-3 w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
+                >
+                  📝 Add Manual Entry
+                </button>
               </div>
             </div>
           </div>
