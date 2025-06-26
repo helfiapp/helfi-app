@@ -564,7 +564,7 @@ Please add nutritional information manually if needed.`);
 
       {/* Main Content */}
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-4xl mx-auto px-6 py-8">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         
         {/* Instruction Text */}
         <div className="mb-4 text-center">
@@ -671,7 +671,7 @@ Please add nutritional information manually if needed.`);
                         video.srcObject = stream;
                       }
                     }}
-                    className="w-80 h-60 object-cover rounded-lg shadow-lg"
+                    className="w-full max-w-sm aspect-video object-cover rounded-lg shadow-lg"
                   />
                 </div>
                 <div className="flex gap-4 justify-center mt-6">
@@ -700,7 +700,7 @@ Please add nutritional information manually if needed.`);
                   alt="Food preview"
                   width={300}
                   height={300}
-                  className="w-64 h-64 object-cover rounded-lg mx-auto shadow-lg mb-6"
+                  className="w-full max-w-sm aspect-square object-cover rounded-lg mx-auto shadow-lg mb-6"
                 />
                 <button
                   onClick={analyzePhoto}
@@ -738,13 +738,13 @@ Please add nutritional information manually if needed.`);
                       alt="Analyzed food"
                       width={300}
                       height={200}
-                      className="w-full h-40 object-cover rounded-xl"
+                      className="w-full aspect-[4/3] object-cover rounded-xl"
                     />
                   </div>
                 )}
                 
                 {/* Premium Nutrition Display */}
-                <div className="p-6">
+                <div className="p-4 sm:p-6">
                   {/* Food Title */}
                   <div className="mb-4">
                     <h3 className="text-xl font-bold text-gray-900 mb-2">Food Analysis</h3>
@@ -752,22 +752,22 @@ Please add nutritional information manually if needed.`);
 
                   {/* Nutrition Cards - Cronometer Style */}
                   {analyzedNutrition && (analyzedNutrition.calories || analyzedNutrition.protein || analyzedNutrition.carbs || analyzedNutrition.fat) && (
-                    <div className="grid grid-cols-2 gap-4 mb-6">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
                       {/* Calories */}
                       {analyzedNutrition.calories && (
-                        <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-4 border border-orange-200">
+                        <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-3 sm:p-4 border border-orange-200">
                           <div className="text-center">
-                            <div className="text-2xl font-bold text-orange-600">{analyzedNutrition.calories}</div>
-                            <div className="text-xs font-medium text-orange-500 uppercase tracking-wide">Calories</div>
+                                                          <div className="text-xl sm:text-2xl font-bold text-orange-600">{analyzedNutrition.calories}</div>
+                              <div className="text-xs font-medium text-orange-500 uppercase tracking-wide">Calories</div>
                           </div>
                         </div>
                       )}
                       
                       {/* Protein */}
                       {analyzedNutrition.protein && (
-                        <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4 border border-blue-200">
+                        <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-3 sm:p-4 border border-blue-200">
                           <div className="text-center">
-                            <div className="text-2xl font-bold text-blue-600">{analyzedNutrition.protein}g</div>
+                                                          <div className="text-xl sm:text-2xl font-bold text-blue-600">{analyzedNutrition.protein}g</div>
                             <div className="text-xs font-medium text-blue-500 uppercase tracking-wide">Protein</div>
                           </div>
                         </div>
@@ -775,9 +775,9 @@ Please add nutritional information manually if needed.`);
                       
                       {/* Carbs */}
                       {analyzedNutrition.carbs && (
-                        <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4 border border-green-200">
+                        <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-3 sm:p-4 border border-green-200">
                           <div className="text-center">
-                            <div className="text-2xl font-bold text-green-600">{analyzedNutrition.carbs}g</div>
+                                                          <div className="text-xl sm:text-2xl font-bold text-green-600">{analyzedNutrition.carbs}g</div>
                             <div className="text-xs font-medium text-green-500 uppercase tracking-wide">Carbs</div>
                           </div>
                         </div>
@@ -785,9 +785,9 @@ Please add nutritional information manually if needed.`);
                       
                       {/* Fat */}
                       {analyzedNutrition.fat && (
-                        <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-4 border border-purple-200">
+                        <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-3 sm:p-4 border border-purple-200">
                           <div className="text-center">
-                            <div className="text-2xl font-bold text-purple-600">{analyzedNutrition.fat}g</div>
+                                                          <div className="text-xl sm:text-2xl font-bold text-purple-600">{analyzedNutrition.fat}g</div>
                             <div className="text-xs font-medium text-purple-500 uppercase tracking-wide">Fat</div>
                           </div>
                         </div>
@@ -906,13 +906,13 @@ Please add nutritional information manually if needed.`);
                       alt="Food being edited"
                       width={300}
                       height={200}
-                      className="w-full h-48 object-cover rounded-xl"
+                                              className="w-full aspect-[4/3] object-cover rounded-xl"
                     />
                   </div>
                 )}
                 
                 {/* Edit Content */}
-                <div className="p-6">
+                <div className="p-4 sm:p-6">
                   <div className="mb-6">
                     <label className="block text-sm font-medium text-gray-700 mb-3">
                       Edit Food Description
@@ -992,7 +992,7 @@ Please add nutritional information manually if needed.`);
 
             {/* Manual Food Entry - Improved Structure */}
             {!photoPreview && (
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-6">Manual Food Entry</h3>
                 
                 {/* Type Dropdown First */}
@@ -1204,7 +1204,7 @@ Please add nutritional information manually if needed.`);
         )}
 
         {/* Today's Food Entries */}
-        <div className="bg-white rounded-lg shadow-sm p-6">
+        <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6">
           <h3 className="text-lg font-semibold mb-4">Today's Meals</h3>
           
           {todaysFoods.length === 0 ? (
@@ -1282,7 +1282,7 @@ Please add nutritional information manually if needed.`);
                         alt="Food"
                         width={80}
                         height={80}
-                        className="w-20 h-20 object-cover rounded-lg flex-shrink-0"
+                        className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-lg flex-shrink-0"
                       />
                     )}
                     <div className="flex-1">
