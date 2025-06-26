@@ -1290,28 +1290,31 @@ Please add nutritional information manually if needed.`);
                       {food.nutrition && (food.nutrition.calories || food.nutrition.protein || food.nutrition.carbs || food.nutrition.fat) && (
                         <div className="flex gap-2 mb-3 flex-wrap">
                           {food.nutrition.calories && (
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-700">
+                            <span className="inline-flex items-center px-3 py-2 rounded-full text-sm font-medium bg-orange-100 text-orange-700">
                               {food.nutrition.calories} cal
                             </span>
                           )}
                           {food.nutrition.protein && (
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                            <span className="inline-flex items-center px-3 py-2 rounded-full text-sm font-medium bg-blue-100 text-blue-700">
                               {food.nutrition.protein}g protein
                             </span>
                           )}
                           {food.nutrition.carbs && (
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                            <span className="inline-flex items-center px-3 py-2 rounded-full text-sm font-medium bg-green-100 text-green-700">
                               {food.nutrition.carbs}g carbs
                             </span>
                           )}
                           {food.nutrition.fat && (
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700">
+                            <span className="inline-flex items-center px-3 py-2 rounded-full text-sm font-medium bg-purple-100 text-purple-700">
                               {food.nutrition.fat}g fat
                             </span>
                           )}
                         </div>
                       )}
-                      <p className="text-gray-900 text-sm leading-relaxed">{food.description}</p>
+                      <p className="text-gray-900 text-sm leading-relaxed">
+                        {/* Clean description by removing any nutrition info */}
+                        {food.description.split('\n')[0].split('Calories:')[0].trim()}
+                      </p>
                     </div>
                   </div>
                 </div>
