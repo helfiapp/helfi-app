@@ -297,6 +297,70 @@ Please add nutritional information manually if needed.`);
     setShowAddFood(false);
     setShowPhotoOptions(false);
     setAnalyzedNutrition(null);
+    setEditingEntry(null);
+  };
+
+  // New function to update existing entries with AI re-analysis
+  const updateFoodEntry = async (description: string, method: 'text' | 'photo') => {
+    if (!editingEntry) return;
+
+    // Re-analyze with AI for updated nutrition info
+    setIsAnalyzing(true);
+    let updatedNutrition = null;
+
+    try {
+      const response = await fetch('/api/analyze-food', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          textDescription: description,
+          foodType: 'single'
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success && result.analysis) {
+          updatedNutrition = extractNutritionData(result.analysis);
+        }
+      }
+    } catch (error) {
+      console.error('Error re-analyzing food:', error);
+    } finally {
+      setIsAnalyzing(false);
+    }
+
+    // Update the existing entry
+    const updatedEntry = {
+      ...editingEntry,
+      description,
+      photo: method === 'photo' ? photoPreview : editingEntry.photo,
+      nutrition: updatedNutrition || analyzedNutrition || editingEntry.nutrition
+    };
+
+    const updatedFoods = todaysFoods.map(food => 
+      food.id === editingEntry.id ? updatedEntry : food
+    );
+    
+    setTodaysFoods(updatedFoods);
+    
+    // Save to database
+    await saveFoodEntries(updatedFoods);
+    
+    // Reset all form states
+    setNewFoodText('');
+    setPhotoFile(null);
+    setPhotoPreview(null);
+    setAiDescription('');
+    setShowAiResult(false);
+    setIsEditingDescription(false);
+    setEditedDescription('');
+    setShowAddFood(false);
+    setShowPhotoOptions(false);
+    setAnalyzedNutrition(null);
+    setEditingEntry(null);
   };
 
   const editFood = (food: any) => {
@@ -667,13 +731,26 @@ Please add nutritional information manually if needed.`);
                   {/* Action Buttons */}
                   <div className="space-y-3">
                     <button
-                      onClick={() => addFoodEntry(aiDescription, 'photo')}
-                      className="w-full py-3 px-4 bg-emerald-500 hover:bg-emerald-600 text-white font-medium rounded-xl transition-colors duration-200 flex items-center justify-center shadow-lg"
+                      onClick={() => editingEntry ? updateFoodEntry(aiDescription, 'photo') : addFoodEntry(aiDescription, 'photo')}
+                      disabled={isAnalyzing}
+                      className="w-full py-3 px-4 bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-300 text-white font-medium rounded-xl transition-colors duration-200 flex items-center justify-center shadow-lg"
                     >
-                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      Save to Food Diary
+                      {isAnalyzing ? (
+                        <>
+                          <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Re-analyzing...
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          {editingEntry ? 'Update & Save' : 'Save to Food Diary'}
+                        </>
+                      )}
                     </button>
                     <button
                       onClick={() => {
@@ -743,16 +820,32 @@ Please add nutritional information manually if needed.`);
                   <div className="space-y-3">
                     <button
                       onClick={() => {
-                        addFoodEntry(editedDescription, 'photo');
+                        if (editingEntry) {
+                          updateFoodEntry(editedDescription, 'photo');
+                        } else {
+                          addFoodEntry(editedDescription, 'photo');
+                        }
                         setIsEditingDescription(false);
                       }}
-                      disabled={!editedDescription.trim()}
+                      disabled={!editedDescription.trim() || isAnalyzing}
                       className="w-full py-3 px-4 bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-colors duration-200 flex items-center justify-center"
                     >
-                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      Update & Save
+                      {isAnalyzing ? (
+                        <>
+                          <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Re-analyzing...
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          {editingEntry ? 'Update & Save' : 'Save to Food Diary'}
+                        </>
+                      )}
                     </button>
                     <button
                       onClick={() => {
