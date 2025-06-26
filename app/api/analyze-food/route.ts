@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 
-// Initialize OpenAI client
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Initialize OpenAI client only when API key is available
+const getOpenAIClient = () => {
+  if (!process.env.OPENAI_API_KEY) {
+    return null;
+  }
+  return new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  });
+};
 
 export async function POST(req: NextRequest) {
   try {
@@ -30,6 +35,15 @@ export async function POST(req: NextRequest) {
     const imageBuffer = await imageFile.arrayBuffer();
     const imageBase64 = Buffer.from(imageBuffer).toString('base64');
     const imageDataUrl = `data:${imageFile.type};base64,${imageBase64}`;
+
+    // Get OpenAI client
+    const openai = getOpenAIClient();
+    if (!openai) {
+      return NextResponse.json(
+        { error: 'OpenAI API key not configured' },
+        { status: 500 }
+      );
+    }
 
     // Call OpenAI Vision API
     const response = await openai.chat.completions.create({
