@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
       messages = [
         {
           role: "user",
-          content: `Analyze this food description and provide nutrition information in this exact format:
+          content: `Analyze this food description and provide accurate nutrition information based on the EXACT portion size specified. Be precise about size differences:
 
 [Food name] ([portion size])
 Calories: [estimate], Protein: [g], Carbs: [g], Fat: [g]
@@ -48,14 +48,22 @@ Calories: [estimate], Protein: [g], Carbs: [g], Fat: [g]
 Food description: ${textDescription}
 Food type: ${foodType}
 
+IMPORTANT: Different sizes have different nutrition values:
+- Large egg: ~70 calories, 6g protein
+- Medium egg: ~55 calories, 5g protein  
+- Small egg: ~45 calories, 4g protein
+
 Examples:
 "Medium banana (1 whole)
 Calories: 105, Protein: 1g, Carbs: 27g, Fat: 0g"
 
-"Grilled chicken breast (6 oz)
-Calories: 420, Protein: 45g, Carbs: 2g, Fat: 12g"
+"Large egg (1 whole)
+Calories: 70, Protein: 6g, Carbs: 1g, Fat: 5g"
 
-Keep it simple - just food name, portion size, and nutrition facts. No preparation methods or explanations.`
+"Medium egg (1 whole)
+Calories: 55, Protein: 5g, Carbs: 1g, Fat: 4g"
+
+Pay close attention to portion size words like small, medium, large, or specific measurements. Calculate nutrition accordingly.`
         }
       ];
     } else {
@@ -81,19 +89,27 @@ Keep it simple - just food name, portion size, and nutrition facts. No preparati
           content: [
             {
               type: "text",
-              text: `Analyze this food image and provide a concise description in this exact format:
+              text: `Analyze this food image and provide accurate nutrition information based on the visible portion size. Be precise about size differences:
 
 [Food name] ([portion size])
 Calories: [estimate], Protein: [g], Carbs: [g], Fat: [g]
+
+IMPORTANT: Different sizes have different nutrition values:
+- Large egg: ~70 calories, 6g protein
+- Medium egg: ~55 calories, 5g protein  
+- Small egg: ~45 calories, 4g protein
 
 Examples:
 "Medium banana (1 whole)
 Calories: 105, Protein: 1g, Carbs: 27g, Fat: 0g"
 
-"Grilled chicken breast (6 oz)
-Calories: 420, Protein: 45g, Carbs: 2g, Fat: 12g"
+"Large egg (1 whole)
+Calories: 70, Protein: 6g, Carbs: 1g, Fat: 5g"
 
-Keep it simple - just food name, portion size, and nutrition facts. No preparation methods or explanations.`
+"Medium egg (1 whole)
+Calories: 55, Protein: 5g, Carbs: 1g, Fat: 4g"
+
+Estimate portion size carefully from the image and calculate nutrition accordingly.`
             },
             {
               type: "image_url",

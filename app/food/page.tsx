@@ -437,9 +437,11 @@ Please add nutritional information manually if needed.`);
       setAnalyzedNutrition(food.nutrition);
       setShowAiResult(true);
       setShowAddFood(true);
-      // Go directly to editing mode instead of showing "Edit Description" button
+      // Go directly to editing mode and extract clean food name only
       setIsEditingDescription(true);
-      setEditedDescription(food.description);
+      // Extract just the food name from the description (remove nutrition info)
+      const cleanDescription = food.description.split('\n')[0].split('Calories:')[0].trim();
+      setEditedDescription(cleanDescription);
     } else {
       // For manual entries, populate the manual form
       setManualFoodName(food.description);
