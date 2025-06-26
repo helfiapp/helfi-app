@@ -732,7 +732,7 @@ Please add nutritional information manually if needed.`);
               <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
                 {/* Photo Section */}
                 {photoPreview && (
-                  <div className="p-4 border-b border-gray-100">
+                  <div className="p-4 border-b border-gray-100 flex justify-center">
                     <Image
                       src={photoPreview}
                       alt="Analyzed food"
@@ -904,9 +904,9 @@ Please add nutritional information manually if needed.`);
                     <Image
                       src={photoPreview}
                       alt="Food being edited"
-                      width={300}
-                      height={200}
-                                              className="w-full aspect-[4/3] object-cover rounded-xl"
+                      width={120}
+                      height={90}
+                      className="w-32 h-24 object-cover rounded-xl"
                     />
                   </div>
                 )}
@@ -961,13 +961,14 @@ Please add nutritional information manually if needed.`);
                       onClick={() => {
                         setIsEditingDescription(false);
                         setEditedDescription('');
+                        setEditingEntry(null);
                       }}
-                      className="p-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg transition-colors duration-200 flex items-center justify-center"
-                      title="Cancel"
+                      className="w-full py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-colors duration-200 flex items-center justify-center"
                     >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                       </svg>
+                      Cancel Edit
                     </button>
                     <button
                       onClick={() => {
@@ -1203,7 +1204,8 @@ Please add nutritional information manually if needed.`);
           </div>
         )}
 
-        {/* Today's Food Entries */}
+        {/* Today's Food Entries - Hide during editing */}
+        {!editingEntry && !isEditingDescription && (
         <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6">
           <h3 className="text-lg font-semibold mb-4">Today's Meals</h3>
           
@@ -1322,6 +1324,7 @@ Please add nutritional information manually if needed.`);
             </div>
           )}
         </div>
+        )}
       </div>
 
       {/* Mobile Bottom Navigation */}
