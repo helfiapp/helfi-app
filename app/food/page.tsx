@@ -543,12 +543,12 @@ Please add nutritional information manually if needed.`);
                 </div>
                 <div className="flex-1">
                   <h3 className="text-lg font-semibold text-gray-900">📸 Camera</h3>
-                  <p className="text-sm text-gray-500">Take a photo with your camera</p>
+                  <p className="text-sm text-gray-500">Take a photo with your <span className="hidden md:inline">webcam</span><span className="md:hidden">camera</span></p>
                 </div>
                 <input
                   type="file"
                   accept="image/*"
-                  capture="environment"
+                  capture="user"
                   onChange={(e) => {
                     handlePhotoUpload(e);
                     setShowPhotoOptions(false);
