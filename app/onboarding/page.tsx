@@ -1053,6 +1053,7 @@ function SupplementsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
   const [name, setName] = useState('');
   const [dosage, setDosage] = useState('');
   const [timing, setTiming] = useState<string[]>([]);
+  const [timingDosages, setTimingDosages] = useState<{[key: string]: string}>({});
   const [frontImage, setFrontImage] = useState<File | null>(null);
   const [backImage, setBackImage] = useState<File | null>(null);
   const [uploadMethod, setUploadMethod] = useState<'manual' | 'photo'>('photo');
@@ -1065,16 +1066,19 @@ function SupplementsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
       setBackImage(null);
       setPhotoDosage('');
       setPhotoTiming([]);
+      setPhotoTimingDosages({});
     } else {
       setName('');
       setDosage('');
       setTiming([]);
+      setTimingDosages({});
     }
   };
   
   // For photo upload method
   const [photoDosage, setPhotoDosage] = useState('');
   const [photoTiming, setPhotoTiming] = useState<string[]>([]);
+  const [photoTimingDosages, setPhotoTimingDosages] = useState<{[key: string]: string}>({});
 
   const timingOptions = ['Morning', 'Afternoon', 'Evening', 'Before Bed'];
 
@@ -1091,18 +1095,31 @@ function SupplementsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
 
   const addSupplement = () => {
     if (uploadMethod === 'manual' && name && dosage && timing.length > 0) {
-      setSupplements((prev: any[]) => [...prev, { name, dosage, timing, method: 'manual' }]);
-      setName(''); setDosage(''); setTiming([]);
+      // Combine timing and individual dosages
+      const timingWithDosages = timing.map(time => 
+        timingDosages[time] ? `${time}: ${timingDosages[time]}` : `${time}: ${dosage}`
+      );
+      setSupplements((prev: any[]) => [...prev, { 
+        name, 
+        dosage, 
+        timing: timingWithDosages, 
+        method: 'manual' 
+      }]);
+      setName(''); setDosage(''); setTiming([]); setTimingDosages({});
     } else if (uploadMethod === 'photo' && frontImage && photoDosage && photoTiming.length > 0) {
+      // Combine timing and individual dosages for photos
+      const timingWithDosages = photoTiming.map(time => 
+        photoTimingDosages[time] ? `${time}: ${photoTimingDosages[time]}` : `${time}: ${photoDosage}`
+      );
       setSupplements((prev: any[]) => [...prev, { 
         frontImage: frontImage.name, 
         backImage: backImage?.name, 
         method: 'photo',
         name: frontImage.name.split('.')[0], // Use filename as temporary name
         dosage: photoDosage,
-        timing: photoTiming
+        timing: timingWithDosages
       }]);
-      setFrontImage(null); setBackImage(null); setPhotoDosage(''); setPhotoTiming([]);
+      setFrontImage(null); setBackImage(null); setPhotoDosage(''); setPhotoTiming([]); setPhotoTimingDosages({});
     }
   };
 
@@ -1226,18 +1243,43 @@ function SupplementsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 When do you take this supplement? *
               </label>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {timingOptions.map(time => (
-                  <label key={time} className="flex items-center space-x-3 cursor-pointer">
+                  <div key={time} className="flex items-center space-x-3">
                     <input
                       type="checkbox"
                       checked={photoTiming.includes(time)}
                       onChange={() => toggleTiming(time, true)}
                       className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
+                      id={`photo-timing-${time}`}
                     />
-                    <span className="text-gray-700">{time}</span>
-                  </label>
+                    <label htmlFor={`photo-timing-${time}`} className="flex-1 cursor-pointer">
+                      <span className="text-gray-700">{time}</span>
+                    </label>
+                    {photoTiming.includes(time) && (
+                      <input
+                        type="text"
+                        placeholder="Dosage (e.g., 2.5mg)"
+                        value={photoTimingDosages[time] || ''}
+                        className="w-32 px-2 py-1 border border-gray-300 rounded text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                        onChange={(e) => {
+                          setPhotoTimingDosages(prev => ({
+                            ...prev,
+                            [time]: e.target.value
+                          }));
+                        }}
+                      />
+                    )}
+                  </div>
                 ))}
+              </div>
+            </div>
+
+            {/* Tip for per-timing dosages */}
+            <div className="flex items-start space-x-2 p-3 bg-amber-50 rounded-lg">
+              <div className="text-amber-600 text-lg flex-shrink-0">💡</div>
+              <div className="text-sm text-amber-800">
+                <strong>Tip:</strong> If you split your supplement throughout the day, check multiple times and enter the specific dosage for each time.
               </div>
             </div>
 
@@ -1272,20 +1314,46 @@ function SupplementsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 When do you take this supplement? *
               </label>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {timingOptions.map(time => (
-                  <label key={time} className="flex items-center space-x-3 cursor-pointer">
+                  <div key={time} className="flex items-center space-x-3">
                     <input
                       type="checkbox"
                       checked={timing.includes(time)}
                       onChange={() => toggleTiming(time, false)}
                       className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
+                      id={`manual-timing-${time}`}
                     />
-                    <span className="text-gray-700">{time}</span>
-                  </label>
+                    <label htmlFor={`manual-timing-${time}`} className="flex-1 cursor-pointer">
+                      <span className="text-gray-700">{time}</span>
+                    </label>
+                    {timing.includes(time) && (
+                      <input
+                        type="text"
+                        placeholder="Dosage (e.g., 2.5mg)"
+                        value={timingDosages[time] || ''}
+                        className="w-32 px-2 py-1 border border-gray-300 rounded text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                        onChange={(e) => {
+                          setTimingDosages(prev => ({
+                            ...prev,
+                            [time]: e.target.value
+                          }));
+                        }}
+                      />
+                    )}
+                  </div>
                 ))}
               </div>
             </div>
+
+            {/* Tip for per-timing dosages */}
+            <div className="flex items-start space-x-2 p-3 bg-amber-50 rounded-lg">
+              <div className="text-amber-600 text-lg flex-shrink-0">💡</div>
+              <div className="text-sm text-amber-800">
+                <strong>Tip:</strong> If you split your supplement throughout the day, check multiple times and enter the specific dosage for each time.
+              </div>
+            </div>
+
             <button 
               className="w-full bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-300" 
               onClick={addSupplement}
