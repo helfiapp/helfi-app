@@ -648,13 +648,12 @@ Please add nutritional information manually if needed.`);
                   </svg>
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-gray-900">📱 Take Photo</h3>
+                  <h3 className="text-lg font-semibold text-gray-900">📱 Select Photo</h3>
                   <p className="text-sm text-gray-500">Camera, Photo Library, or Choose File</p>
                 </div>
                 <input
                   type="file"
                   accept="image/*"
-                  capture="environment"
                   onChange={(e) => {
                     handlePhotoUpload(e);
                     setShowPhotoOptions(false);
@@ -726,7 +725,6 @@ Please add nutritional information manually if needed.`);
                       <input
                         type="file"
                         accept="image/*"
-                        capture="environment"
                         onChange={(e) => {
                           handlePhotoUpload(e);
                         }}
