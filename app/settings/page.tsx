@@ -5,9 +5,76 @@ import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
 import Image from 'next/image'
 
+// Global dark mode function type
+declare global {
+  interface Window {
+    toggleDarkMode: (enabled: boolean) => void;
+  }
+}
+
 export default function Settings() {
   const { data: session } = useSession()
   const [dropdownOpen, setDropdownOpen] = useState(false)
+  
+  // Dark mode state - using global approach
+  const [darkMode, setDarkMode] = useState(false)
+  
+  // iOS detection for push notifications
+  const [isIOS, setIsIOS] = useState(false)
+  const [pushNotifications, setPushNotifications] = useState(false)
+
+  // Initialize dark mode from localStorage and listen for changes
+  useEffect(() => {
+    const saved = localStorage.getItem('darkMode')
+    if (saved) setDarkMode(saved === 'true')
+    
+    // Detect iOS devices
+    const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+                       (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+    setIsIOS(isIOSDevice)
+    
+    // Load push notification preference
+    const savedPushPref = localStorage.getItem('pushNotifications')
+    if (savedPushPref) setPushNotifications(savedPushPref === 'true')
+    
+    // Listen for dark mode changes from other sources
+    const handleDarkModeChange = (e: CustomEvent) => {
+      setDarkMode(e.detail)
+    }
+    
+    window.addEventListener('darkModeChanged', handleDarkModeChange as EventListener)
+    return () => window.removeEventListener('darkModeChanged', handleDarkModeChange as EventListener)
+  }, [])
+
+  // Handle dark mode toggle using global function
+  const handleDarkModeToggle = (enabled: boolean) => {
+    setDarkMode(enabled)
+    if (window.toggleDarkMode) {
+      window.toggleDarkMode(enabled)
+    }
+  }
+
+  // Handle push notifications toggle with iOS detection
+  const handlePushNotificationToggle = (enabled: boolean) => {
+    if (isIOS && enabled) {
+      alert('Push notifications are not available on iOS Safari. This is an Apple limitation to encourage native app downloads. Push notifications work great on Android and desktop browsers!')
+      return
+    }
+    
+    setPushNotifications(enabled)
+    localStorage.setItem('pushNotifications', enabled.toString())
+    
+    // TODO: Request actual push notification permission for non-iOS devices
+    if (enabled && !isIOS && 'Notification' in window) {
+      Notification.requestPermission().then(permission => {
+        if (permission !== 'granted') {
+          setPushNotifications(false)
+          localStorage.setItem('pushNotifications', 'false')
+          alert('Push notifications were denied. Please enable them in your browser settings.')
+        }
+      })
+    }
+  }
 
   // Profile data - using consistent green avatar
   const defaultAvatar = 'data:image/svg+xml;base64,' + btoa(`
@@ -36,9 +103,9 @@ export default function Settings() {
   }, [dropdownOpen]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Navigation Header */}
-      <nav className="bg-white border-b border-gray-200 px-4 py-3">
+      <nav className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           {/* Logo on the left */}
           <div className="flex items-center">
@@ -70,8 +137,8 @@ export default function Settings() {
               />
             </button>
             {dropdownOpen && (
-              <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-100 animate-fade-in">
-                <div className="flex items-center px-4 py-3 border-b border-gray-100">
+              <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-xl shadow-lg py-2 z-50 border border-gray-100 dark:border-gray-700 animate-fade-in">
+                <div className="flex items-center px-4 py-3 border-b border-gray-100 dark:border-gray-700">
                   <Image
                     src={userImage}
                     alt="Profile"
@@ -80,20 +147,20 @@ export default function Settings() {
                     className="w-10 h-10 rounded-full object-cover mr-3"
                   />
                   <div>
-                    <div className="font-semibold text-gray-900">{userName}</div>
-                    <div className="text-xs text-gray-500">{session?.user?.email || 'user@email.com'}</div>
+                    <div className="font-semibold text-gray-900 dark:text-white">{userName}</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">{session?.user?.email || 'user@email.com'}</div>
                   </div>
                 </div>
-                <Link href="/profile" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Profile</Link>
-                <Link href="/account" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Account Settings</Link>
-                <Link href="/profile/image" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Upload/Change Profile Photo</Link>
-                <Link href="/billing" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Subscription & Billing</Link>
-                <Link href="/notifications" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Notifications</Link>
-                <Link href="/privacy" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Privacy Settings</Link>
-                <Link href="/help" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
+                <Link href="/profile" className="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">Profile</Link>
+                <Link href="/account" className="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">Account Settings</Link>
+                <Link href="/profile/image" className="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">Upload/Change Profile Photo</Link>
+                <Link href="/billing" className="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">Subscription & Billing</Link>
+                <Link href="/notifications" className="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">Notifications</Link>
+                <Link href="/privacy" className="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">Privacy Settings</Link>
+                <Link href="/help" className="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">Help & Support</Link>
                 <button
                   onClick={() => signOut()}
-                  className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50 font-semibold"
+                  className="block w-full text-left px-4 py-2 text-red-600 dark:text-red-400 hover:bg-gray-50 dark:hover:bg-gray-700 font-semibold"
                 >
                   Logout
                 </button>
@@ -104,36 +171,41 @@ export default function Settings() {
       </nav>
 
       {/* Second Row - Page Title Centered */}
-      <div className="bg-white border-b border-gray-200 px-4 py-4">
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-4">
         <div className="max-w-7xl mx-auto text-center">
-          <h1 className="text-lg md:text-xl font-semibold text-gray-900">Settings</h1>
-          <p className="text-sm text-gray-500 hidden sm:block">Manage your app preferences</p>
+          <h1 className="text-lg md:text-xl font-semibold text-gray-900 dark:text-white">Settings</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 hidden sm:block">Manage your app preferences</p>
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="max-w-3xl mx-auto px-4 py-8">
+      {/* Main Content - Fixed bottom padding for mobile navigation */}
+      <div className="max-w-3xl mx-auto px-4 py-8 pb-24 md:pb-8">
         <div className="space-y-6">
           {/* General Settings */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-6">General Settings</h2>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">General Settings</h2>
             
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="font-medium text-gray-900">Dark Mode</h3>
-                  <p className="text-sm text-gray-600">Switch to dark theme</p>
+                  <h3 className="font-medium text-gray-900 dark:text-white">Dark Mode</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Switch to dark theme</p>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" className="sr-only peer" />
+                  <input 
+                    type="checkbox" 
+                    className="sr-only peer" 
+                    checked={darkMode}
+                    onChange={(e) => handleDarkModeToggle(e.target.checked)}
+                  />
                   <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-helfi-green/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-helfi-green"></div>
                 </label>
               </div>
               
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="font-medium text-gray-900">Email Notifications</h3>
-                  <p className="text-sm text-gray-600">Receive updates via email</p>
+                  <h3 className="font-medium text-gray-900 dark:text-white">Email Notifications</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Receive updates via email</p>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input type="checkbox" className="sr-only peer" defaultChecked />
@@ -143,28 +215,39 @@ export default function Settings() {
               
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="font-medium text-gray-900">Push Notifications</h3>
-                  <p className="text-sm text-gray-600">Get push notifications on your device</p>
+                  <h3 className="font-medium text-gray-900 dark:text-white">Push Notifications</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    {isIOS 
+                      ? 'Not available on iOS Safari (Apple limitation)' 
+                      : 'Get push notifications on your device'
+                    }
+                  </p>
                 </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" className="sr-only peer" />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-helfi-green/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-helfi-green"></div>
+                <label className={`relative inline-flex items-center ${isIOS ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                  <input 
+                    type="checkbox" 
+                    className="sr-only peer" 
+                    checked={pushNotifications}
+                    disabled={isIOS}
+                    onChange={(e) => handlePushNotificationToggle(e.target.checked)}
+                  />
+                  <div className={`w-11 h-6 ${isIOS ? 'bg-gray-100 dark:bg-gray-600' : 'bg-gray-200'} peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-helfi-green/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all ${isIOS ? '' : 'peer-checked:bg-helfi-green'} ${isIOS ? 'opacity-50' : ''}`}></div>
                 </label>
               </div>
             </div>
           </div>
 
           {/* Privacy Settings */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-6">Privacy Settings</h2>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Privacy Settings</h2>
             
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="font-medium text-gray-900">Profile Visibility</h3>
-                  <p className="text-sm text-gray-600">Make your profile visible to others</p>
+                  <h3 className="font-medium text-gray-900 dark:text-white">Profile Visibility</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Make your profile visible to others</p>
                 </div>
-                <select className="px-3 py-1 border border-gray-300 rounded">
+                <select className="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
                   <option>Private</option>
                   <option>Public</option>
                   <option>Friends Only</option>
@@ -173,8 +256,8 @@ export default function Settings() {
               
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="font-medium text-gray-900">Data Analytics</h3>
-                  <p className="text-sm text-gray-600">Help us improve by sharing anonymous usage data</p>
+                  <h3 className="font-medium text-gray-900 dark:text-white">Data Analytics</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Help us improve by sharing anonymous usage data</p>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input type="checkbox" className="sr-only peer" defaultChecked />
@@ -185,34 +268,34 @@ export default function Settings() {
           </div>
 
           {/* Account Actions */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-6">Account Actions</h2>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Account Actions</h2>
             
             <div className="space-y-4">
-              <Link href="/account" className="flex items-center p-3 border border-gray-200 rounded-lg hover:border-helfi-green transition-colors">
+              <Link href="/account" className="flex items-center p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-helfi-green transition-colors">
                 <div className="flex-1">
-                  <h3 className="font-medium text-gray-900">Account Settings</h3>
-                  <p className="text-sm text-gray-600">Manage your account information</p>
+                  <h3 className="font-medium text-gray-900 dark:text-white">Account Settings</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Manage your account information</p>
                 </div>
                 <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               </Link>
               
-              <Link href="/billing" className="flex items-center p-3 border border-gray-200 rounded-lg hover:border-helfi-green transition-colors">
+              <Link href="/billing" className="flex items-center p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-helfi-green transition-colors">
                 <div className="flex-1">
-                  <h3 className="font-medium text-gray-900">Subscription & Billing</h3>
-                  <p className="text-sm text-gray-600">Manage your subscription</p>
+                  <h3 className="font-medium text-gray-900 dark:text-white">Subscription & Billing</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Manage your subscription</p>
                 </div>
                 <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               </Link>
               
-              <Link href="/help" className="flex items-center p-3 border border-gray-200 rounded-lg hover:border-helfi-green transition-colors">
+              <Link href="/help" className="flex items-center p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-helfi-green transition-colors">
                 <div className="flex-1">
-                  <h3 className="font-medium text-gray-900">Help & Support</h3>
-                  <p className="text-sm text-gray-600">Get help and contact support</p>
+                  <h3 className="font-medium text-gray-900 dark:text-white">Help & Support</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Get help and contact support</p>
                 </div>
                 <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -222,7 +305,7 @@ export default function Settings() {
           </div>
 
           {/* Save Button */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
             <button className="w-full bg-helfi-green text-white px-6 py-3 rounded-lg hover:bg-helfi-green/90 transition-colors font-medium">
               Save Settings
             </button>
@@ -231,7 +314,7 @@ export default function Settings() {
       </div>
 
       {/* Mobile Bottom Navigation - Inspired by Google, Facebook, Amazon mobile apps */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-2 z-40">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 px-4 py-2 z-40">
         <div className="flex items-center justify-around">
           
           {/* Dashboard */}

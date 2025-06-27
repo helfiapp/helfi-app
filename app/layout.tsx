@@ -1,12 +1,13 @@
 import './globals.css'
 import { Inter } from 'next/font/google'
 import { AuthProvider } from '@/components/providers/AuthProvider'
+import type { Metadata } from 'next'
 
 const inter = Inter({ subsets: ['latin'] })
 
-export const metadata = {
-  title: 'Helfi - Personal Health Intelligence Platform',
-  description: 'Track, analyze, and optimize your health with AI-powered insights.',
+export const metadata: Metadata = {
+  title: 'Helfi - Your AI Health Intelligence Platform',
+  description: 'Transform your health with personalized AI insights, comprehensive tracking, and intelligent recommendations.',
   viewport: 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no',
   icons: {
     icon: [
@@ -131,18 +132,60 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              // Dark mode initialization - runs before React hydration to prevent flash
+              (function() {
+                try {
+                  const darkMode = localStorage.getItem('darkMode') === 'true';
+                  if (darkMode) {
+                    document.documentElement.classList.add('dark');
+                  }
+                } catch (e) {
+                  // Ignore localStorage errors in SSR
+                }
+              })();
+            `,
+          }}
+        />
+      </head>
       <body className={inter.className}>
         <AuthProvider>
-          <div className="flex h-screen bg-gray-50">
+          <div className="flex min-h-screen bg-gray-50">
             {/* Desktop Sidebar */}
             <DesktopSidebar />
             
             {/* Main Content */}
-            <div className="md:pl-64 flex flex-col flex-1 overflow-hidden">
+            <div className="md:pl-64 flex flex-col flex-1 overflow-y-auto">
               {children}
             </div>
           </div>
         </AuthProvider>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              // Global dark mode toggle function
+              window.toggleDarkMode = function(enabled) {
+                try {
+                  localStorage.setItem('darkMode', enabled.toString());
+                  document.documentElement.classList.toggle('dark', enabled);
+                  
+                  // Dispatch custom event to sync all pages
+                  window.dispatchEvent(new CustomEvent('darkModeChanged', { detail: enabled }));
+                } catch (e) {
+                  console.error('Dark mode error:', e);
+                }
+              };
+              
+              // Listen for dark mode changes
+              window.addEventListener('darkModeChanged', function(e) {
+                document.documentElement.classList.toggle('dark', e.detail);
+              });
+            `,
+          }}
+        />
       </body>
     </html>
   )

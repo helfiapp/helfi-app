@@ -2050,122 +2050,113 @@ function ReviewStep({ onBack, data }: { onBack: () => void, data: any }) {
 }
 
 export default function Onboarding() {
-  const stepNames = ['Gender', 'Physical', 'Exercise', 'Health Goals', 'Health Situations', 'Supplements', 'Medications', 'Blood Results', 'AI Insights', 'Review'];
+  const { data: session, status } = useSession();
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<any>({});
-  const { data: session } = useSession();
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [profileImage, setProfileImage] = useState<string | null>(null);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isNavigating, setIsNavigating] = useState(false);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Profile data - using consistent green avatar
-  const defaultAvatar = 'data:image/svg+xml;base64,' + btoa(`
-    <svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="64" cy="64" r="64" fill="#10B981"/>
-      <circle cx="64" cy="48" r="20" fill="white"/>
-      <path d="M64 76c-13.33 0-24 5.34-24 12v16c0 8.84 7.16 16 16 16h16c8.84 0 16-7.16 16-16V88c0-6.66-10.67-12-24-12z" fill="white"/>
-    </svg>
-  `);
-  const userImage = profileImage || session?.user?.image || defaultAvatar;
+  const stepNames = [
+    'Gender',
+    'Physical',
+    'Exercise',
+    'Health Goals',
+    'Health Situations', 
+    'Supplements',
+    'Medications',
+    'Blood Results',
+    'AI Insights',
+    'Review'
+  ];
+
+  const userImage = session?.user?.image || '/placeholder-avatar.png';
   const userName = session?.user?.name || 'User';
 
-  // Close dropdown on outside click
   useEffect(() => {
+    if (status === 'unauthenticated') {
+      window.location.href = '/auth/signin';
+      return;
+    }
+
     function handleClick(e: MouseEvent) {
-      const target = e.target as HTMLElement;
-      // Check if click is outside both the button and the dropdown content
-      if (!target.closest('.dropdown-container')) {
+      const target = e.target as Element;
+      if (dropdownOpen && !target.closest('#profile-dropdown')) {
         setDropdownOpen(false);
       }
     }
-    if (dropdownOpen) {
-      document.addEventListener('mousedown', handleClick);
-      return () => document.removeEventListener('mousedown', handleClick);
-    }
-  }, [dropdownOpen]);
 
-  // Get step from URL parameter
+    document.addEventListener('click', handleClick);
+
+    return () => {
+      document.removeEventListener('click', handleClick);
+    };
+  }, [status, dropdownOpen]);
+
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const stepParam = urlParams.get('step');
-    if (stepParam) {
-      const stepIndex = parseInt(stepParam) - 1; // Convert 1-based to 0-based
-      if (stepIndex >= 0 && stepIndex < stepNames.length) {
-        setStep(stepIndex);
+    if (status === 'authenticated') {
+      const currentStep = parseInt(new URLSearchParams(window.location.search).get('step') || '1') - 1;
+      setStep(Math.max(0, Math.min(stepNames.length - 1, currentStep)));
+    }
+  }, [status, stepNames.length]);
+
+  useEffect(() => {
+    if (status === 'authenticated') {
+      loadUserData();
+    }
+  }, [status]);
+
+  const loadUserData = async () => {
+    try {
+      const response = await fetch('/api/user-data');
+      if (response.ok) {
+        const userData = await response.json();
+        console.log('Loaded user data from database:', userData);
+        if (userData && Object.keys(userData).length > 0) {
+          setForm(userData);
+        }
       }
+    } catch (error) {
+      console.error('Error loading user data:', error);
     }
-  }, []);
+  };
 
-  // Load existing data from database (cross-device sync)
-  useEffect(() => {
-    const loadUserData = async () => {
+  // Optimized debounced save function
+  const debouncedSave = useCallback(async (data: any) => {
+    // Clear existing timeout
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    // Set new timeout for debounced save
+    saveTimeoutRef.current = setTimeout(async () => {
       try {
-        console.log('Loading existing onboarding data from database...');
         const response = await fetch('/api/user-data', {
-          cache: 'no-cache',
-          headers: {
-            'Cache-Control': 'no-cache'
-          }
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
         });
         
         if (response.ok) {
-          const result = await response.json();
-          if (result.data) {
-            console.log('Successfully loaded existing onboarding data from database:', result.data);
-            setForm(result.data);
-            // Load profile image from database
-            if (result.data.profileImage) {
-              setProfileImage(result.data.profileImage);
-            }
-          }
-        } else if (response.status === 404) {
-          console.log('No existing data found for user - starting fresh onboarding');
-          setForm({});
-        } else if (response.status === 401) {
-          console.log('User not authenticated in onboarding');
-          setForm({});
+          console.log('Progress auto-saved to database');
         } else {
-          console.error('Failed to load data from database:', response.status, response.statusText);
-          setForm({});
+          console.warn('Failed to auto-save progress:', response.status, response.statusText);
         }
       } catch (error) {
-        console.error('Error loading user data from database:', error);
-        // Start fresh if database is unavailable
-        setForm({});
+        console.warn('Error auto-saving progress:', error);
       }
-    };
-
-    loadUserData();
+    }, 1000); // Save after 1 second of inactivity
   }, []);
 
-  // Debug form state changes
   useEffect(() => {
-    console.log('Form state updated:', form);
-    console.log('Current step:', step);
-    console.log('Gender value for step 0:', form.gender);
-  }, [form, step]);
-
-  // Scroll to top when step changes
-  useEffect(() => {
-    // Multiple scroll methods to ensure it works
     const scrollToTop = () => {
-      // Method 1: Scroll the window
       window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-      
-      // Method 2: Scroll the container
       const container = document.getElementById('onboarding-container');
-      if (container) {
-        container.scrollTop = 0;
-      }
-      
-      // Method 3: Scroll to the progress bar
-      const progressBar = document.querySelector('.sticky');
-      if (progressBar) {
-        progressBar.scrollIntoView({ behavior: 'instant', block: 'start' });
-      }
+      if (container) container.scrollTop = 0;
     };
     
-    // Immediate scroll
     scrollToTop();
     
     // Backup scroll after a delay
@@ -2175,44 +2166,47 @@ export default function Onboarding() {
   }, [step]);
 
   const handleNext = async (data: any) => {
-    const updatedForm = { ...form, ...data };
-    setForm(updatedForm);
+    // Prevent double-clicks
+    if (isNavigating) return;
     
-    // Save progress to database for cross-device sync
+    setIsNavigating(true);
+    setIsLoading(true);
+
     try {
-      const response = await fetch('/api/user-data', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedForm)
-      });
+      const updatedForm = { ...form, ...data };
+      setForm(updatedForm);
       
-      if (response.ok) {
-        console.log('Progress saved to database successfully');
-      } else {
-        console.error('Failed to save progress to database:', response.status, response.statusText);
-      }
-    } catch (error) {
-      console.error('Error saving progress to database:', error);
+      // Debounced save (non-blocking)
+      debouncedSave(updatedForm);
+      
+      // Add small delay for visual feedback
+      await new Promise(resolve => setTimeout(resolve, 150));
+      
+      setStep((prev) => {
+        const newStep = Math.min(stepNames.length - 1, prev + 1);
+        // Update URL to remember step position
+        const url = new URL(window.location.href);
+        url.searchParams.set('step', (newStep + 1).toString());
+        window.history.replaceState({}, '', url.toString());
+        
+        // Force immediate scroll
+        requestAnimationFrame(() => {
+          window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+          const container = document.getElementById('onboarding-container');
+          if (container) container.scrollTop = 0;
+        });
+        return newStep;
+      });
+    } finally {
+      setIsLoading(false);
+      setIsNavigating(false);
     }
-    
-    setStep((prev) => {
-      const newStep = Math.min(stepNames.length - 1, prev + 1);
-      // Update URL to remember step position
-      const url = new URL(window.location.href);
-      url.searchParams.set('step', (newStep + 1).toString());
-      window.history.replaceState({}, '', url.toString());
-      
-      // Force immediate scroll
-      requestAnimationFrame(() => {
-        window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-        const container = document.getElementById('onboarding-container');
-        if (container) container.scrollTop = 0;
-      });
-      return newStep;
-    });
   };
 
   const handleBack = () => {
+    // Prevent navigation during loading
+    if (isNavigating) return;
+    
     setStep((prev) => {
       const newStep = Math.max(0, prev - 1);
       // Update URL to remember step position
@@ -2231,6 +2225,9 @@ export default function Onboarding() {
   };
 
   const goToStep = (stepIndex: number) => {
+    // Prevent navigation during loading
+    if (isNavigating) return;
+    
     setStep(stepIndex);
     // Update URL to remember step position
     const url = new URL(window.location.href);
@@ -2244,6 +2241,34 @@ export default function Onboarding() {
       if (container) container.scrollTop = 0;
     });
   };
+
+  // Mobile sliding window navigation
+  const getMobileProgressWindow = () => {
+    const currentStep = step + 1; // 1-indexed for display
+    const totalSteps = 10;
+    
+    // Show current + 2 before/after when possible
+    let start = Math.max(1, currentStep - 2);
+    let end = Math.min(totalSteps, currentStep + 2);
+    
+    // Adjust if we're near the beginning or end
+    if (end - start < 4) {
+      if (start === 1) {
+        end = Math.min(totalSteps, start + 4);
+      } else if (end === totalSteps) {
+        start = Math.max(1, end - 4);
+      }
+    }
+    
+    const steps = [];
+    for (let i = start; i <= end; i++) {
+      steps.push(i);
+    }
+    
+    return { steps, canGoLeft: start > 1, canGoRight: end < totalSteps };
+  };
+
+  const mobileProgress = getMobileProgressWindow();
 
   return (
     <div className="fixed inset-0 bg-gray-50 overflow-y-auto overflow-x-hidden" id="onboarding-container">
@@ -2329,19 +2354,81 @@ export default function Onboarding() {
             </div>
           </div>
           
-          {/* Mobile: Simple Page Text */}
-          <div className="sm:hidden mb-4 text-center">
-            <div className="text-sm font-medium text-gray-900">Page {step + 1}</div>
+          {/* Mobile: Sliding Window Navigation */}
+          <div className="sm:hidden mb-4">
+            <div className="flex items-center justify-center space-x-2">
+              {/* Left Arrow */}
+              <button
+                onClick={() => goToStep(step - 1)}
+                disabled={step === 0 || isNavigating}
+                className={`p-1 rounded ${
+                  step === 0 || isNavigating
+                    ? 'text-gray-300 cursor-not-allowed' 
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                }`}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+
+              {/* Sliding Step Numbers */}
+              <div className="flex items-center space-x-1">
+                {mobileProgress.steps.map((stepNum) => (
+                  <button
+                    key={stepNum}
+                    onClick={() => goToStep(stepNum - 1)}
+                    disabled={isNavigating}
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all ${
+                      stepNum === step + 1 
+                        ? 'bg-green-600 text-white' 
+                        : stepNum < step + 1
+                        ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    } ${isNavigating ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:scale-105'}`}
+                    title={`Go to step ${stepNum}: ${stepNames[stepNum - 1]}`}
+                  >
+                    {stepNum}
+                  </button>
+                ))}
+              </div>
+
+              {/* Right Arrow */}
+              <button
+                onClick={() => goToStep(step + 1)}
+                disabled={step === stepNames.length - 1 || isNavigating}
+                className={`p-1 rounded ${
+                  step === stepNames.length - 1 || isNavigating
+                    ? 'text-gray-300 cursor-not-allowed' 
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                }`}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Mobile Step Name and Progress */}
+            <div className="text-center mt-2">
+              <div className="text-sm font-medium text-gray-900">{stepNames[step]}</div>
+              <div className="text-xs text-gray-500">Step {step + 1} of {stepNames.length}</div>
+            </div>
           </div>
           
-          {/* Desktop: Full Numbered Steps */}
+          {/* Desktop: Full Numbered Steps (unchanged) */}
           <div className="hidden sm:block relative mb-6">
             <div className="flex items-center justify-center max-w-4xl mx-auto">
               {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((stepNum, index) => (
                 <div key={stepNum} className="flex items-center">
                   <button 
                     onClick={() => goToStep(stepNum - 1)}
-                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all z-10 cursor-pointer hover:scale-105 ${
+                    disabled={isNavigating}
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all z-10 ${
+                      isNavigating 
+                        ? 'cursor-not-allowed opacity-50'
+                        : 'cursor-pointer hover:scale-105'
+                    } ${
                       stepNum === step + 1 
                         ? 'bg-green-600 text-white hover:bg-green-700' 
                         : stepNum < step + 1
@@ -2369,8 +2456,19 @@ export default function Onboarding() {
               style={{ width: `${((step + 1) / stepNames.length) * 100}%` }}
             />
           </div>
-          
 
+          {/* Loading Indicator */}
+          {isLoading && (
+            <div className="flex items-center justify-center py-2">
+              <div className="flex items-center space-x-2 text-green-600">
+                <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span className="text-sm font-medium">Loading...</span>
+              </div>
+            </div>
+          )}
 
           {/* Skip and Step Info - Desktop Only */}
           <div className="hidden sm:flex items-center justify-between max-w-4xl mx-auto">

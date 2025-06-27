@@ -120,9 +120,9 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Navigation Header - First Row */}
-      <nav className="bg-white border-b border-gray-200 px-4 py-3">
+      <nav className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           {/* Logo on the left */}
           <div className="flex items-center">
@@ -189,7 +189,7 @@ export default function Dashboard() {
       </nav>
 
       {/* Second Row - Page Title Centered */}
-      <div className="bg-white border-b border-gray-200 px-4 py-4">
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-4">
         <div className="max-w-7xl mx-auto text-center">
           <h1 className="text-lg md:text-xl font-semibold text-gray-900">Dashboard</h1>
           <p className="text-sm text-gray-500 hidden sm:block">Welcome back, {userName}</p>
@@ -197,7 +197,7 @@ export default function Dashboard() {
       </div>
 
       {/* Main Content - Add padding bottom for mobile nav */}
-      <main className="flex-1 pb-20 md:pb-0">
+      <main className="flex-1 pb-24 md:pb-8">
         <div className="max-w-7xl mx-auto px-4 py-8">
           <div className="bg-white rounded-lg shadow-sm p-8">
             <div className="text-center mb-8">

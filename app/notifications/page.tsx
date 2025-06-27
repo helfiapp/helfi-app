@@ -55,7 +55,7 @@ export default function Notifications() {
       </nav>
 
       {/* Main Content */}
-      <div className="max-w-3xl mx-auto px-4 py-8">
+      <div className="max-w-3xl mx-auto px-4 py-8 pb-24 md:pb-8">
         <div className="bg-white rounded-lg shadow-sm p-6">
           <h2 className="text-2xl font-bold text-gray-900 mb-6">Notification Settings</h2>
           
