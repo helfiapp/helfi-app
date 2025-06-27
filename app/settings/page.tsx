@@ -124,7 +124,10 @@ export default function Settings() {
                   <h3 className="font-medium text-gray-900">Dark Mode</h3>
                   <p className="text-sm text-gray-600">Switch to dark theme</p>
                 </div>
-                <input type="checkbox" className="rounded" />
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" className="sr-only peer" />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-helfi-green/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-helfi-green"></div>
+                </label>
               </div>
               
               <div className="flex items-center justify-between">
@@ -132,7 +135,10 @@ export default function Settings() {
                   <h3 className="font-medium text-gray-900">Email Notifications</h3>
                   <p className="text-sm text-gray-600">Receive updates via email</p>
                 </div>
-                <input type="checkbox" className="rounded" defaultChecked />
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" className="sr-only peer" defaultChecked />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-helfi-green/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-helfi-green"></div>
+                </label>
               </div>
               
               <div className="flex items-center justify-between">
@@ -140,7 +146,10 @@ export default function Settings() {
                   <h3 className="font-medium text-gray-900">Push Notifications</h3>
                   <p className="text-sm text-gray-600">Get push notifications on your device</p>
                 </div>
-                <input type="checkbox" className="rounded" />
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" className="sr-only peer" />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-helfi-green/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-helfi-green"></div>
+                </label>
               </div>
             </div>
           </div>
@@ -167,7 +176,10 @@ export default function Settings() {
                   <h3 className="font-medium text-gray-900">Data Analytics</h3>
                   <p className="text-sm text-gray-600">Help us improve by sharing anonymous usage data</p>
                 </div>
-                <input type="checkbox" className="rounded" defaultChecked />
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" className="sr-only peer" defaultChecked />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-helfi-green/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-helfi-green"></div>
+                </label>
               </div>
             </div>
           </div>
