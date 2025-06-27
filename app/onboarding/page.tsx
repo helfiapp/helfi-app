@@ -2400,7 +2400,7 @@ export default function Onboarding() {
           </div>
           
           {/* Mobile: Sliding Window Navigation */}
-          <div className="sm:hidden mb-4">
+          <div className="sm:hidden mb-2">
             <div className="flex items-center justify-center space-x-2">
               {/* Left Arrow */}
               <button
@@ -2462,7 +2462,7 @@ export default function Onboarding() {
           </div>
           
           {/* Desktop: Full Numbered Steps (unchanged) */}
-          <div className="hidden sm:block relative mb-6">
+          <div className="hidden sm:block relative mb-3">
             <div className="flex items-center justify-center max-w-4xl mx-auto">
               {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((stepNum, index) => (
                 <div key={stepNum} className="flex items-center">
@@ -2527,7 +2527,7 @@ export default function Onboarding() {
         </div>
 
         {/* Content */}
-        <div className="flex-1 px-4 py-6 pt-8 pb-20">
+        <div className="flex-1 px-4 py-2 pb-20">
           {step === 0 && <GenderStep onNext={handleNext} initial={form.gender} />}
           {step === 1 && <PhysicalStep onNext={handleNext} onBack={handleBack} initial={form} />}
           {step === 2 && <ExerciseStep onNext={handleNext} onBack={handleBack} initial={form} />}
