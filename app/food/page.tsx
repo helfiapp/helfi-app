@@ -60,17 +60,17 @@ export default function FoodDiary() {
     function handleClick(e: MouseEvent) {
       const target = e.target as HTMLElement;
       
-      // Check if the click is inside any dropdown or its trigger button
-      if (!target.closest('.dropdown-container') && !target.closest('[data-dropdown-trigger="profile"]')) {
+      // Check if the click is inside any dropdown
+      if (!target.closest('.dropdown-container')) {
         setDropdownOpen(false);
       }
-      if (!target.closest('.food-options-dropdown') && !target.closest('[data-dropdown-trigger="food-options"]')) {
+      if (!target.closest('.food-options-dropdown')) {
         setShowPhotoOptions(false);
       }
-      if (!target.closest('.entry-options-dropdown') && !target.closest('[data-dropdown-trigger="entry-options"]')) {
+      if (!target.closest('.entry-options-dropdown')) {
         setShowEntryOptions(null);
       }
-      if (!target.closest('.ingredient-options-dropdown') && !target.closest('[data-dropdown-trigger="ingredient-options"]')) {
+      if (!target.closest('.ingredient-options-dropdown')) {
         setShowIngredientOptions(null);
       }
     }
@@ -1409,8 +1409,10 @@ Please add nutritional information manually if needed.`);
                       {/* 3-Dot Options Menu */}
                       <div className="relative entry-options-dropdown">
                         <button
-                          onClick={() => setShowEntryOptions(showEntryOptions === food.id.toString() ? null : food.id.toString())}
-                          data-dropdown-trigger="entry-options"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowEntryOptions(showEntryOptions === food.id.toString() ? null : food.id.toString());
+                          }}
                           className="p-2 rounded-lg hover:bg-gray-200 transition-colors"
                         >
                           <svg className="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
