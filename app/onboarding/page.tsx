@@ -2085,11 +2085,6 @@ export default function Onboarding() {
   const userName = session?.user?.name || 'User';
 
   useEffect(() => {
-    if (status === 'unauthenticated') {
-      window.location.href = '/auth/signin';
-      return;
-    }
-
     function handleClick(e: MouseEvent) {
       const target = e.target as Element;
       if (dropdownOpen && !target.closest('#profile-dropdown')) {
@@ -2102,7 +2097,7 @@ export default function Onboarding() {
     return () => {
       document.removeEventListener('click', handleClick);
     };
-  }, [status, dropdownOpen]);
+  }, [dropdownOpen]);
 
   useEffect(() => {
     if (status === 'authenticated') {
@@ -2373,22 +2368,7 @@ export default function Onboarding() {
                     <div className="border-t border-gray-100 my-2"></div>
                     <Link href="/reports" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Reports</Link>
                     <button
-                      onClick={async () => {
-                        // Save current progress before logout
-                        if (Object.keys(form).length > 0) {
-                          try {
-                            await fetch('/api/user-data', {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify(form)
-                            });
-                            console.log('Progress saved before logout');
-                          } catch (error) {
-                            console.warn('Failed to save progress before logout:', error);
-                          }
-                        }
-                        signOut();
-                      }}
+                      onClick={() => signOut()}
                       className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50 font-semibold"
                     >
                       Logout
