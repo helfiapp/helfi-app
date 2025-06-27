@@ -93,38 +93,53 @@ export default function FoodDiary() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        setProfileImageLoading(true); // Start loading
+        console.log('⏱️ Starting data load...');
+        const startTime = Date.now();
+        
+        // Don't block on profile image loading
+        setProfileImageLoading(false);
+        
         const response = await fetch('/api/user-data');
+        console.log(`⏱️ API response received: ${Date.now() - startTime}ms`);
+        
         if (response.ok) {
           const result = await response.json();
+          console.log(`⏱️ JSON parsed: ${Date.now() - startTime}ms`);
+          
+          // Load profile image asynchronously without blocking
           if (result.data?.profileImage) {
             setProfileImage(result.data.profileImage);
-            // Preload the profile image for better performance
-            const img = document.createElement('img');
-            img.src = result.data.profileImage;
           }
-          // Load today's foods from database
+          
+          // Load today's foods immediately
           if (result.data?.todaysFoods) {
             setTodaysFoods(result.data.todaysFoods);
+            console.log(`⏱️ Foods loaded: ${result.data.todaysFoods.length} items in ${Date.now() - startTime}ms`);
           }
         }
+        
+        console.log(`⏱️ Total load time: ${Date.now() - startTime}ms`);
       } catch (error) {
         console.error('Error loading data:', error);
+      } finally {
+        // Always reset loading state
         setProfileImageLoading(false);
       }
     };
 
-    if (session) {
-      loadData();
-    }
-  }, [session]);
+    // Start loading immediately, don't wait for session
+    loadData();
+  }, []);
 
-  // Reset profile image loading when userImage changes
+  // Handle profile image loading state properly
   useEffect(() => {
-    if (userImage) {
+    // Only set loading if we don't have an image yet
+    if (!profileImage && !session?.user?.image) {
       setProfileImageLoading(true);
+    } else {
+      setProfileImageLoading(false);
     }
-  }, [userImage]);
+  }, [profileImage, session?.user?.image]);
 
   // Save food entries to database
   const saveFoodEntries = async (updatedFoods: any[]) => {
@@ -1409,7 +1424,8 @@ Please add nutritional information manually if needed.`);
                       {/* 3-Dot Options Menu */}
                       <div className="relative entry-options-dropdown">
                         <button
-                          onClick={(e) => {
+                          onMouseDown={(e) => {
+                            e.preventDefault();
                             e.stopPropagation();
                             setShowEntryOptions(showEntryOptions === food.id.toString() ? null : food.id.toString());
                           }}
@@ -1498,8 +1514,7 @@ Please add nutritional information manually if needed.`);
                                 onLoad={() => setFoodImagesLoading(prev => ({...prev, [food.id]: false}))}
                                 onError={() => setFoodImagesLoading(prev => ({...prev, [food.id]: false}))}
                                 onClick={() => setFullSizeImage(food.photo)}
-                                loading="eager"
-                                priority
+                                loading="lazy"
                               />
                             </div>
                           </div>
