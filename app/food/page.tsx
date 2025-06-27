@@ -4,11 +4,12 @@ import React, { useState, useEffect } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { useUserData } from '@/components/providers/UserDataProvider'
 
 export default function FoodDiary() {
   const { data: session } = useSession()
+  const { userData, profileImage, updateUserData } = useUserData()
   const [dropdownOpen, setDropdownOpen] = useState(false)
-  const [profileImage, setProfileImage] = useState<string | null>(null)
   const [todaysFoods, setTodaysFoods] = useState<any[]>([])
   const [newFoodText, setNewFoodText] = useState('')
   const [showAddFood, setShowAddFood] = useState(false)
@@ -29,9 +30,7 @@ export default function FoodDiary() {
   const [showEntryOptions, setShowEntryOptions] = useState<string | null>(null)
   const [showIngredientOptions, setShowIngredientOptions] = useState<string | null>(null)
   const [editingEntry, setEditingEntry] = useState<any>(null)
-  const [showWebcam, setShowWebcam] = useState(false)
-  const [stream, setStream] = useState<MediaStream | null>(null)
-  const [profileImageLoading, setProfileImageLoading] = useState(true)
+
   const [foodImagesLoading, setFoodImagesLoading] = useState<{[key: string]: boolean}>({})
   const [expandedEntries, setExpandedEntries] = useState<{[key: string]: boolean}>({})
   const [fullSizeImage, setFullSizeImage] = useState<string | null>(null)
@@ -80,70 +79,22 @@ export default function FoodDiary() {
     }
   }, [dropdownOpen, showPhotoOptions, showEntryOptions, showIngredientOptions]);
 
-  // Cleanup webcam stream on unmount
-  useEffect(() => {
-    return () => {
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-      }
-    };
-  }, [stream]);
 
-  // Load profile image and today's foods from database
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        console.log('⏱️ Starting data load...');
-        const startTime = Date.now();
-        
-        // Don't block on profile image loading
-        setProfileImageLoading(false);
-        
-        const response = await fetch('/api/user-data');
-        console.log(`⏱️ API response received: ${Date.now() - startTime}ms`);
-        
-        if (response.ok) {
-          const result = await response.json();
-          console.log(`⏱️ JSON parsed: ${Date.now() - startTime}ms`);
-          
-          // Load profile image asynchronously without blocking
-          if (result.data?.profileImage) {
-            setProfileImage(result.data.profileImage);
-          }
-          
-          // Load today's foods immediately
-          if (result.data?.todaysFoods) {
-            setTodaysFoods(result.data.todaysFoods);
-            console.log(`⏱️ Foods loaded: ${result.data.todaysFoods.length} items in ${Date.now() - startTime}ms`);
-          }
-        }
-        
-        console.log(`⏱️ Total load time: ${Date.now() - startTime}ms`);
-      } catch (error) {
-        console.error('Error loading data:', error);
-      } finally {
-        // Always reset loading state
-        setProfileImageLoading(false);
-      }
-    };
 
-    // Start loading immediately, don't wait for session
-    loadData();
-  }, []);
-
-  // Handle profile image loading state properly
+  // Load today's foods from context data (no API calls needed!)
   useEffect(() => {
-    // Only set loading if we don't have an image yet
-    if (!profileImage && !session?.user?.image) {
-      setProfileImageLoading(true);
-    } else {
-      setProfileImageLoading(false);
+    if (userData?.todaysFoods) {
+      console.log('🚀 PERFORMANCE: Using cached foods from context - instant load!');
+      setTodaysFoods(userData.todaysFoods);
     }
-  }, [profileImage, session?.user?.image]);
+  }, [userData]);
 
-  // Save food entries to database
+  // Save food entries to database and update context
   const saveFoodEntries = async (updatedFoods: any[]) => {
     try {
+      // Update context immediately for instant UI updates
+      updateUserData({ todaysFoods: updatedFoods });
+      
       const response = await fetch('/api/user-data', {
         method: 'POST',
         headers: {
@@ -182,64 +133,7 @@ export default function FoodDiary() {
     }
   };
 
-  const startWebcam = async () => {
-    try {
-      // Request back camera on mobile devices for food photography
-      const mediaStream = await navigator.mediaDevices.getUserMedia({ 
-        video: { 
-          facingMode: { ideal: 'environment' } // Use back camera for food photos
-        }
-      });
-      setStream(mediaStream);
-      setShowWebcam(true);
-      setShowPhotoOptions(false);
-      setShowAddFood(true);
-    } catch (error) {
-      console.error('Error accessing back camera, trying default camera:', error);
-      // Fallback to any available camera if back camera fails
-      try {
-        const fallbackStream = await navigator.mediaDevices.getUserMedia({ 
-          video: true 
-        });
-        setStream(fallbackStream);
-        setShowWebcam(true);
-        setShowPhotoOptions(false);
-        setShowAddFood(true);
-      } catch (fallbackError) {
-        console.error('Error accessing any camera:', fallbackError);
-        alert('Unable to access camera. Please check permissions or use upload instead.');
-      }
-    }
-  };
 
-  const capturePhoto = () => {
-    if (!stream) return;
-    
-    const video = document.getElementById('webcam-video') as HTMLVideoElement;
-    const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    
-    const ctx = canvas.getContext('2d');
-    ctx?.drawImage(video, 0, 0);
-    
-    canvas.toBlob((blob) => {
-      if (blob) {
-        const file = new File([blob], 'webcam-photo.jpg', { type: 'image/jpeg' });
-        setPhotoFile(file);
-        setPhotoPreview(canvas.toDataURL());
-        stopWebcam();
-      }
-    }, 'image/jpeg', 0.9);
-  };
-
-  const stopWebcam = () => {
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop());
-      setStream(null);
-    }
-    setShowWebcam(false);
-  };
 
   // Aggressive compression for ultra-fast loading
   const compressImage = (file: File, maxWidth: number = 400, quality: number = 0.6): Promise<File> => {
@@ -665,25 +559,13 @@ Please add nutritional information manually if needed.`);
               onClick={() => setDropdownOpen((v) => !v)}
               className="focus:outline-none relative"
             >
-              {profileImageLoading && (
-                <div className="absolute inset-0 w-12 h-12 rounded-full border-2 border-helfi-green bg-gray-100 animate-pulse flex items-center justify-center">
-                  <svg className="w-6 h-6 text-gray-400 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                </div>
-              )}
               <Image
                 src={userImage}
                 alt="Profile"
                 width={48}
                 height={48}
-                className={`w-12 h-12 rounded-full border-2 border-helfi-green shadow-sm object-cover transition-opacity duration-300 ${profileImageLoading ? 'opacity-0' : 'opacity-100'}`}
-                onLoad={() => setProfileImageLoading(false)}
-                onError={() => setProfileImageLoading(false)}
+                className="w-12 h-12 rounded-full border-2 border-helfi-green shadow-sm object-cover"
                 priority
-                placeholder="blur"
-                blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAhEAACAQMDBQAAAAAAAAAAAAABAgMABAUGIWGRkqGx0f/EABUBAQEAAAAAAAAAAAAAAAAAAAMF/8QAGhEAAgIDAAAAAAAAAAAAAAAAAAECEgMRkf/aAAwDAQACEQMRAD8AltJagyeH0AthI5xdrLcNM91BF5pX2HaH9bcfaSXWGaRmknyayoIiExpqrKOOmc8UNAqOV1z8VNNm1lNdvYpMeKGCKGkPP93UGJhWKhwjfvk"
               />
             </button>
             {dropdownOpen && (
@@ -754,14 +636,11 @@ Please add nutritional information manually if needed.`);
             </svg>
           </button>
 
-          {/* Modern Dropdown Options */}
+          {/* Simplified Dropdown Options */}
           {showPhotoOptions && (
             <div className="food-options-dropdown absolute top-full left-0 right-0 mt-2 bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden z-50">
-              {/* Camera Option */}
-              <button
-                onClick={startWebcam}
-                className="flex items-center p-4 hover:bg-gray-50 cursor-pointer transition-colors border-b border-gray-100 w-full text-left"
-              >
+              {/* Take Photo Option - Native Mobile Experience */}
+              <label className="flex items-center p-4 hover:bg-gray-50 cursor-pointer transition-colors border-b border-gray-100">
                 <div className="flex-shrink-0 w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mr-4">
                   <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
@@ -769,29 +648,16 @@ Please add nutritional information manually if needed.`);
                   </svg>
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-gray-900">📸 Camera</h3>
-                  <p className="text-sm text-gray-500">Take a photo with your <span className="hidden md:inline">webcam</span><span className="md:hidden">camera</span></p>
-                </div>
-              </button>
-
-              {/* Photo Library Option */}
-              <label className="flex items-center p-4 hover:bg-gray-50 cursor-pointer transition-colors">
-                <div className="flex-shrink-0 w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mr-4">
-                  <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-gray-900">🖼️ <span className="hidden md:inline">Upload Image</span><span className="md:hidden">Photo Library</span></h3>
-                  <p className="text-sm text-gray-500">Choose from your <span className="hidden md:inline">files</span><span className="md:hidden">photo library</span></p>
+                  <h3 className="text-lg font-semibold text-gray-900">📱 Take Photo</h3>
+                  <p className="text-sm text-gray-500">Camera, Photo Library, or Choose File</p>
                 </div>
                 <input
                   type="file"
                   accept="image/*"
+                  capture="environment"
                   onChange={(e) => {
                     handlePhotoUpload(e);
                     setShowPhotoOptions(false);
-                    setShowAddFood(true);
                   }}
                   className="hidden"
                 />
@@ -803,7 +669,7 @@ Please add nutritional information manually if needed.`);
                   setShowPhotoOptions(false);
                   setShowAddFood(true);
                 }}
-                className="flex items-center p-4 hover:bg-gray-50 cursor-pointer transition-colors w-full text-left border-t border-gray-100"
+                className="flex items-center p-4 hover:bg-gray-50 cursor-pointer transition-colors w-full text-left"
               >
                 <div className="flex-shrink-0 w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mr-4">
                   <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -823,42 +689,8 @@ Please add nutritional information manually if needed.`);
         {showAddFood && (
           <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
             
-            {/* Webcam Interface */}
-            {showWebcam && stream && (
-              <div className="text-center">
-                <h3 className="text-lg font-semibold mb-4">📷 Webcam</h3>
-                <div className="relative inline-block">
-                  <video
-                    id="webcam-video"
-                    autoPlay
-                    playsInline
-                    ref={(video) => {
-                      if (video && stream) {
-                        video.srcObject = stream;
-                      }
-                    }}
-                    className="w-full max-w-sm aspect-video object-cover rounded-lg shadow-lg"
-                  />
-                </div>
-                <div className="flex gap-4 justify-center mt-6">
-                  <button
-                    onClick={capturePhoto}
-                    className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold"
-                  >
-                    📸 Capture Photo
-                  </button>
-                  <button
-                    onClick={stopWebcam}
-                    className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 font-semibold"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
-            
             {/* Photo Analysis Flow */}
-            {photoPreview && !showAiResult && !isEditingDescription && !showWebcam && (
+            {photoPreview && !showAiResult && !isEditingDescription && (
               <div className="text-center">
                 <h3 className="text-lg font-semibold mb-4">📸 Your Photo</h3>
                 <Image
@@ -868,23 +700,51 @@ Please add nutritional information manually if needed.`);
                   height={300}
                   className="w-full max-w-sm aspect-square object-cover rounded-lg mx-auto shadow-lg mb-6"
                 />
-                <button
-                  onClick={analyzePhoto}
-                  disabled={isAnalyzing}
-                  className="w-full px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 font-semibold"
-                >
-                  {isAnalyzing ? (
-                    <div className="flex items-center justify-center">
-                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      AI is analyzing your food...
-                    </div>
-                  ) : (
-                    '🤖 Analyze with AI'
-                  )}
-                </button>
+                <div className="space-y-3">
+                  <button
+                    onClick={analyzePhoto}
+                    disabled={isAnalyzing}
+                    className="w-full px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 font-semibold"
+                  >
+                    {isAnalyzing ? (
+                      <div className="flex items-center justify-center">
+                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        AI is analyzing your food...
+                      </div>
+                    ) : (
+                      '🤖 Analyze with AI'
+                    )}
+                  </button>
+                  
+                  {/* Photo Management Options */}
+                  <div className="flex gap-3">
+                    <label className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-center cursor-pointer text-sm font-medium">
+                      📷 Change Photo
+                      <input
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        onChange={(e) => {
+                          handlePhotoUpload(e);
+                        }}
+                        className="hidden"
+                      />
+                    </label>
+                    <button
+                      onClick={() => {
+                        setPhotoFile(null);
+                        setPhotoPreview(null);
+                        setShowAddFood(false);
+                      }}
+                      className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-medium"
+                    >
+                      🗑️ Delete Photo
+                    </button>
+                  </div>
+                </div>
                 <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
                   <p className="text-yellow-800 text-sm">
                     💡 <strong>Tip:</strong> Our AI will identify the food and provide nutritional information!

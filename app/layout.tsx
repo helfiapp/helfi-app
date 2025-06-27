@@ -1,6 +1,7 @@
 import './globals.css'
 import { Inter } from 'next/font/google'
 import { AuthProvider } from '@/components/providers/AuthProvider'
+import { UserDataProvider } from '@/components/providers/UserDataProvider'
 import type { Metadata } from 'next'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -153,15 +154,17 @@ export default function RootLayout({
       </head>
       <body className={inter.className}>
         <AuthProvider>
-          <div className="flex min-h-screen bg-gray-50">
-            {/* Desktop Sidebar */}
-            <DesktopSidebar />
-            
-            {/* Main Content */}
-            <div className="md:pl-64 flex flex-col flex-1 overflow-y-auto">
-              {children}
+          <UserDataProvider>
+            <div className="flex min-h-screen bg-gray-50">
+              {/* Desktop Sidebar */}
+              <DesktopSidebar />
+              
+              {/* Main Content */}
+              <div className="md:pl-64 flex flex-col flex-1 overflow-y-auto">
+                {children}
+              </div>
             </div>
-          </div>
+          </UserDataProvider>
         </AuthProvider>
         <script
           dangerouslySetInnerHTML={{
