@@ -2057,6 +2057,7 @@ export default function Onboarding() {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
+  const [profileImage, setProfileImage] = useState<string>('');
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const stepNames = [
@@ -2072,7 +2073,15 @@ export default function Onboarding() {
     'Review'
   ];
 
-  const userImage = session?.user?.image || '/placeholder-avatar.png';
+  // Profile data - using consistent green avatar
+  const defaultAvatar = 'data:image/svg+xml;base64,' + btoa(`
+    <svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="64" cy="64" r="64" fill="#10B981"/>
+      <circle cx="64" cy="48" r="20" fill="white"/>
+      <path d="M64 76c-13.33 0-24 5.34-24 12v16c0 8.84 7.16 16 16 16h16c8.84 0 16-7.16 16-16V88c0-6.66-10.67-12-24-12z" fill="white"/>
+    </svg>
+  `);
+  const userImage = profileImage || session?.user?.image || defaultAvatar;
   const userName = session?.user?.name || 'User';
 
   useEffect(() => {
@@ -2107,6 +2116,27 @@ export default function Onboarding() {
       loadUserData();
     }
   }, [status]);
+
+  // Load profile image from database
+  useEffect(() => {
+    const loadProfileImage = async () => {
+      try {
+        const response = await fetch('/api/user-data');
+        if (response.ok) {
+          const result = await response.json();
+          if (result.data && result.data.profileImage) {
+            setProfileImage(result.data.profileImage);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading profile image:', error);
+      }
+    };
+
+    if (session) {
+      loadProfileImage();
+    }
+  }, [session]);
 
   const loadUserData = async () => {
     try {
