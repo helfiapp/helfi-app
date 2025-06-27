@@ -64,7 +64,7 @@ export default function FoodDiary() {
       if (!target.closest('.dropdown-container')) {
         setDropdownOpen(false);
       }
-      if (!target.closest('.food-options-dropdown')) {
+      if (!target.closest('.food-options-dropdown') && !target.closest('.add-food-entry-container')) {
         setShowPhotoOptions(false);
       }
       if (!target.closest('.entry-options-dropdown')) {
@@ -184,16 +184,31 @@ export default function FoodDiary() {
 
   const startWebcam = async () => {
     try {
+      // Request back camera on mobile devices for food photography
       const mediaStream = await navigator.mediaDevices.getUserMedia({ 
-        video: true 
+        video: { 
+          facingMode: { ideal: 'environment' } // Use back camera for food photos
+        }
       });
       setStream(mediaStream);
       setShowWebcam(true);
       setShowPhotoOptions(false);
       setShowAddFood(true);
     } catch (error) {
-      console.error('Error accessing webcam:', error);
-      alert('Unable to access webcam. Please check permissions or use upload instead.');
+      console.error('Error accessing back camera, trying default camera:', error);
+      // Fallback to any available camera if back camera fails
+      try {
+        const fallbackStream = await navigator.mediaDevices.getUserMedia({ 
+          video: true 
+        });
+        setStream(fallbackStream);
+        setShowWebcam(true);
+        setShowPhotoOptions(false);
+        setShowAddFood(true);
+      } catch (fallbackError) {
+        console.error('Error accessing any camera:', fallbackError);
+        alert('Unable to access camera. Please check permissions or use upload instead.');
+      }
     }
   };
 
@@ -725,7 +740,7 @@ Please add nutritional information manually if needed.`);
         </div>
 
         {/* Add Food Button */}
-        <div className="mb-6 relative">
+        <div className="mb-6 relative add-food-entry-container">
           <button
             onClick={() => setShowPhotoOptions(!showPhotoOptions)}
             className="w-full bg-helfi-green text-white px-6 py-3 rounded-lg hover:bg-helfi-green/90 transition-colors font-medium flex items-center justify-center shadow-lg"
