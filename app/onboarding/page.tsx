@@ -2144,8 +2144,8 @@ export default function Onboarding() {
       if (response.ok) {
         const userData = await response.json();
         console.log('Loaded user data from database:', userData);
-        if (userData && Object.keys(userData).length > 0) {
-          setForm(userData);
+        if (userData && userData.data && Object.keys(userData.data).length > 0) {
+          setForm(userData.data);
         }
       }
     } catch (error) {
