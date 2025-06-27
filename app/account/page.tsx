@@ -10,7 +10,6 @@ export default function AccountPage() {
   const { data: session } = useSession()
   const [loading, setLoading] = useState(true)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
-  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false)
   const [accountData, setAccountData] = useState({
     fullName: '',
     email: session?.user?.email || ''
@@ -35,8 +34,6 @@ export default function AccountPage() {
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
   
   // Loading and feedback states
-  const [isSaving, setIsSaving] = useState(false)
-  const [saveMessage, setSaveMessage] = useState('')
   const [isExporting, setIsExporting] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
@@ -65,7 +62,6 @@ export default function AccountPage() {
   // Load saved data on mount
   useEffect(() => {
     const savedAccountData = localStorage.getItem('accountSettings')
-    const saved2FA = localStorage.getItem('twoFactorEnabled')
     
     if (savedAccountData) {
       try {
@@ -80,10 +76,6 @@ export default function AccountPage() {
         email: session?.user?.email || ''
       })
     }
-    
-    if (saved2FA) {
-      setTwoFactorEnabled(saved2FA === 'true')
-    }
   }, [session])
 
   // Auto-save when data changes
@@ -91,10 +83,15 @@ export default function AccountPage() {
     if (!accountData.fullName && !accountData.email) return // Don't save empty initial state
     
     setSaveStatus('saving')
-    const saveTimer = setTimeout(() => {
+    const saveTimer = setTimeout(async () => {
       try {
+        // TODO: Replace with actual API call to save to database
+        // For now, using localStorage but this should be a proper API call
         localStorage.setItem('accountSettings', JSON.stringify(accountData))
-        localStorage.setItem('twoFactorEnabled', twoFactorEnabled.toString())
+        
+        // Simulate API call delay for realistic UX
+        await new Promise(resolve => setTimeout(resolve, 300))
+        
         setSaveStatus('saved')
         
         // Hide saved status after 2 seconds
@@ -102,13 +99,13 @@ export default function AccountPage() {
           setSaveStatus('idle')
         }, 2000)
       } catch (error) {
-        console.error('Error saving account settings:', error)
+        console.error('Error auto-saving account settings:', error)
         setSaveStatus('idle')
       }
-    }, 1000) // Debounce saves by 1 second
+    }, 800) // Debounce saves by 800ms for smoother experience
 
     return () => clearTimeout(saveTimer)
-  }, [accountData, twoFactorEnabled])
+  }, [accountData]) // Removed twoFactorEnabled since 2FA is no longer used
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -211,13 +208,13 @@ export default function AccountPage() {
           </div>
 
           {/* Auto-save Notice */}
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
+          <div className="bg-green-50 border border-green-200 rounded-xl p-4 mb-6">
             <div className="flex items-center">
-              <svg className="w-5 h-5 text-blue-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <svg className="w-5 h-5 text-green-500 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
-              <p className="text-blue-700 text-sm">
-                <span className="font-medium">Auto-save enabled:</span> Your changes are automatically saved as you type.
+              <p className="text-green-700 text-sm">
+                <span className="font-medium">Auto-save enabled:</span> All changes are automatically saved as you type. No save button needed!
               </p>
             </div>
           </div>
@@ -248,35 +245,7 @@ export default function AccountPage() {
                 <p className="text-xs text-gray-500 mt-1">Email cannot be changed</p>
               </div>
             </div>
-            
-            {/* Save Account Info Button */}
-            <div className="mt-6">
-              <button
-                onClick={async () => {
-                  setIsSaving(true)
-                  try {
-                    // TODO: Replace with actual API call to save to database
-                    await new Promise(resolve => setTimeout(resolve, 1000)) // Simulate API call
-                    setSaveMessage('✅ Account information saved successfully!')
-                    setTimeout(() => setSaveMessage(''), 3000)
-                  } catch (error) {
-                    setSaveMessage('❌ Failed to save changes. Please try again.')
-                    setTimeout(() => setSaveMessage(''), 3000)
-                  } finally {
-                    setIsSaving(false)
-                  }
-                }}
-                className="bg-helfi-green text-white px-6 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors font-medium disabled:opacity-50"
-                disabled={isSaving || !accountData.fullName.trim()}
-              >
-                {isSaving ? 'Saving...' : 'Save Changes'}
-              </button>
-              {saveMessage && (
-                <p className={`mt-2 text-sm ${saveMessage.includes('✅') ? 'text-green-600' : 'text-red-600'}`}>
-                  {saveMessage}
-                </p>
-              )}
-            </div>
+
           </div>
 
           {/* Security Settings */}
