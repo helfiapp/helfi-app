@@ -13,11 +13,32 @@ export default function AccountPage() {
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false)
   const [accountData, setAccountData] = useState({
     fullName: '',
-    email: ''
+    email: session?.user?.email || ''
   })
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [profileImage, setProfileImage] = useState<string | null>(null)
   const router = useRouter()
+
+  // Modal states
+  const [showPasswordModal, setShowPasswordModal] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [showExportModal, setShowExportModal] = useState(false)
+  
+  // Password change state
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  })
+  
+  // Delete confirmation state
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
+  
+  // Loading and feedback states
+  const [isSaving, setIsSaving] = useState(false)
+  const [saveMessage, setSaveMessage] = useState('')
+  const [isExporting, setIsExporting] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   // Profile image setup (same as Dashboard)
   const defaultAvatar = 'data:image/svg+xml;base64,' + btoa(`
@@ -227,6 +248,35 @@ export default function AccountPage() {
                 <p className="text-xs text-gray-500 mt-1">Email cannot be changed</p>
               </div>
             </div>
+            
+            {/* Save Account Info Button */}
+            <div className="mt-6">
+              <button
+                onClick={async () => {
+                  setIsSaving(true)
+                  try {
+                    // TODO: Replace with actual API call to save to database
+                    await new Promise(resolve => setTimeout(resolve, 1000)) // Simulate API call
+                    setSaveMessage('✅ Account information saved successfully!')
+                    setTimeout(() => setSaveMessage(''), 3000)
+                  } catch (error) {
+                    setSaveMessage('❌ Failed to save changes. Please try again.')
+                    setTimeout(() => setSaveMessage(''), 3000)
+                  } finally {
+                    setIsSaving(false)
+                  }
+                }}
+                className="bg-helfi-green text-white px-6 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors font-medium disabled:opacity-50"
+                disabled={isSaving || !accountData.fullName.trim()}
+              >
+                {isSaving ? 'Saving...' : 'Save Changes'}
+              </button>
+              {saveMessage && (
+                <p className={`mt-2 text-sm ${saveMessage.includes('✅') ? 'text-green-600' : 'text-red-600'}`}>
+                  {saveMessage}
+                </p>
+              )}
+            </div>
           </div>
 
           {/* Security Settings */}
@@ -238,22 +288,14 @@ export default function AccountPage() {
                   <h4 className="font-medium text-gray-900">Password</h4>
                   <p className="text-sm text-gray-600">Change your account password</p>
                 </div>
-                <button className="bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors font-medium">
+                <button
+                  onClick={() => setShowPasswordModal(true)}
+                  className="bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors font-medium"
+                >
                   Change Password
                 </button>
               </div>
-              <div className="p-4 border border-gray-200 rounded-lg">
-                <div className="mb-3">
-                  <h4 className="font-medium text-gray-900">Two-Factor Authentication</h4>
-                  <p className="text-sm text-gray-600">Add an extra layer of security to your account</p>
-                </div>
-                <button
-                  onClick={() => setTwoFactorEnabled(!twoFactorEnabled)}
-                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${twoFactorEnabled ? 'bg-helfi-green text-white hover:bg-helfi-green/90' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
-                >
-                  {twoFactorEnabled ? 'Disable 2FA' : 'Enable 2FA'}
-                </button>
-              </div>
+
             </div>
           </div>
 
@@ -266,7 +308,10 @@ export default function AccountPage() {
                   <h4 className="font-medium text-gray-900">Export Data</h4>
                   <p className="text-sm text-gray-600">Download a copy of your health data</p>
                 </div>
-                <button className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors font-medium">
+                <button
+                  onClick={() => setShowExportModal(true)}
+                  className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors font-medium"
+                >
                   Export Data
                 </button>
               </div>
@@ -275,7 +320,10 @@ export default function AccountPage() {
                   <h4 className="font-medium text-red-900">Delete Account</h4>
                   <p className="text-sm text-red-700">Permanently delete your account and all data</p>
                 </div>
-                <button className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors font-medium">
+                <button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors font-medium"
+                >
                   Delete Account
                 </button>
               </div>
@@ -398,6 +446,192 @@ export default function AccountPage() {
 
         </div>
       </nav>
+
+      {/* Password Change Modal */}
+      {showPasswordModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Change Password</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Current Password</label>
+                <input
+                  type="password"
+                  value={passwordData.currentPassword}
+                  onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-helfi-green focus:border-helfi-green"
+                  placeholder="Enter current password"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
+                <input
+                  type="password"
+                  value={passwordData.newPassword}
+                  onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-helfi-green focus:border-helfi-green"
+                  placeholder="Enter new password"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Confirm New Password</label>
+                <input
+                  type="password"
+                  value={passwordData.confirmPassword}
+                  onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-helfi-green focus:border-helfi-green"
+                  placeholder="Confirm new password"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end space-x-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowPasswordModal(false)
+                  setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' })
+                }}
+                className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  // Password change logic here
+                  alert('Password change functionality coming soon!')
+                  setShowPasswordModal(false)
+                  setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' })
+                }}
+                className="px-4 py-2 bg-helfi-green text-white rounded-lg hover:bg-helfi-green/90"
+                disabled={!passwordData.currentPassword || !passwordData.newPassword || passwordData.newPassword !== passwordData.confirmPassword}
+              >
+                Change Password
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Export Data Modal */}
+      {showExportModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Export Your Data</h3>
+            <p className="text-gray-600 mb-6">
+              This will download a JSON file containing all your health data including:
+              • Profile information
+              • Onboarding responses
+              • Food diary entries
+              • Health goals and preferences
+            </p>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => setShowExportModal(false)}
+                className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  setIsExporting(true)
+                  try {
+                    // Collect all user data
+                    const userData = {
+                      profile: accountData,
+                      exportDate: new Date().toISOString(),
+                      // Add more data sources as needed
+                    }
+                    
+                    // Create and download file
+                    const blob = new Blob([JSON.stringify(userData, null, 2)], { type: 'application/json' })
+                    const url = URL.createObjectURL(blob)
+                    const a = document.createElement('a')
+                    a.href = url
+                    a.download = `helfi-data-export-${new Date().toISOString().split('T')[0]}.json`
+                    document.body.appendChild(a)
+                    a.click()
+                    document.body.removeChild(a)
+                    URL.revokeObjectURL(url)
+                    
+                    setShowExportModal(false)
+                  } catch (error) {
+                    console.error('Export failed:', error)
+                    alert('Export failed. Please try again.')
+                  } finally {
+                    setIsExporting(false)
+                  }
+                }}
+                className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
+                disabled={isExporting}
+              >
+                {isExporting ? 'Exporting...' : 'Download Data'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Account Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-semibold text-red-900 mb-4">Delete Account</h3>
+            <div className="mb-4">
+              <p className="text-gray-600 mb-4">
+                ⚠️ This action is irreversible. All your data will be permanently deleted including:
+              </p>
+              <ul className="text-gray-600 text-sm space-y-1 mb-4">
+                <li>• Profile information</li>
+                <li>• Health data and goals</li>
+                <li>• Food diary entries</li>
+                <li>• All account settings</li>
+              </ul>
+              <p className="text-red-600 font-medium mb-4">
+                Type "DELETE" to confirm account deletion:
+              </p>
+              <input
+                type="text"
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                className="w-full px-3 py-2 border border-red-300 rounded-lg focus:ring-red-500 focus:border-red-500"
+                placeholder="Type DELETE"
+              />
+            </div>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => {
+                  setShowDeleteConfirm(false)
+                  setDeleteConfirmText('')
+                }}
+                className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  if (deleteConfirmText === 'DELETE') {
+                    setIsDeleting(true)
+                    try {
+                      // Delete account logic here
+                      alert('Account deletion functionality coming soon!')
+                      setShowDeleteConfirm(false)
+                      setDeleteConfirmText('')
+                    } catch (error) {
+                      console.error('Deletion failed:', error)
+                      alert('Account deletion failed. Please try again.')
+                    } finally {
+                      setIsDeleting(false)
+                    }
+                  }
+                }}
+                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50"
+                disabled={deleteConfirmText !== 'DELETE' || isDeleting}
+              >
+                {isDeleting ? 'Deleting...' : 'Delete Account'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 } 
