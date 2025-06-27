@@ -59,16 +59,18 @@ export default function FoodDiary() {
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       const target = e.target as HTMLElement;
-      if (!target.closest('.dropdown-container')) {
+      
+      // Check if the click is inside any dropdown or its trigger button
+      if (!target.closest('.dropdown-container') && !target.closest('[data-dropdown-trigger="profile"]')) {
         setDropdownOpen(false);
       }
-      if (!target.closest('.food-options-dropdown')) {
+      if (!target.closest('.food-options-dropdown') && !target.closest('[data-dropdown-trigger="food-options"]')) {
         setShowPhotoOptions(false);
       }
-      if (!target.closest('.entry-options-dropdown')) {
+      if (!target.closest('.entry-options-dropdown') && !target.closest('[data-dropdown-trigger="entry-options"]')) {
         setShowEntryOptions(null);
       }
-      if (!target.closest('.ingredient-options-dropdown')) {
+      if (!target.closest('.ingredient-options-dropdown') && !target.closest('[data-dropdown-trigger="ingredient-options"]')) {
         setShowIngredientOptions(null);
       }
     }
@@ -1368,7 +1370,7 @@ Please add nutritional information manually if needed.`);
 
         {/* Today's Food Entries - Hide during editing */}
         {!editingEntry && !isEditingDescription && (
-        <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6">
+        <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 overflow-visible">
           <h3 className="text-lg font-semibold mb-4">Today's Meals</h3>
           
           {todaysFoods.length === 0 ? (
@@ -1382,7 +1384,7 @@ Please add nutritional information manually if needed.`);
           ) : (
             <div className="space-y-3">
               {todaysFoods.map((food) => (
-                <div key={food.id} className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                <div key={food.id} className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-visible">
                   {/* Compact Header Row */}
                   <div className="flex items-center justify-between p-4 hover:bg-gray-50 transition-colors">
                     {/* Left Side - Food Name & Time */}
@@ -1408,6 +1410,7 @@ Please add nutritional information manually if needed.`);
                       <div className="relative entry-options-dropdown">
                         <button
                           onClick={() => setShowEntryOptions(showEntryOptions === food.id.toString() ? null : food.id.toString())}
+                          data-dropdown-trigger="entry-options"
                           className="p-2 rounded-lg hover:bg-gray-200 transition-colors"
                         >
                           <svg className="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
@@ -1416,7 +1419,7 @@ Please add nutritional information manually if needed.`);
                         </button>
                         
                         {showEntryOptions === food.id.toString() && (
-                          <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-200 z-[60]" style={{boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'}}>
+                          <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-200 z-[9999]" style={{boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'}}>
                             <button
                               onClick={() => editFood(food)}
                               className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 flex items-center"
