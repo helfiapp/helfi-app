@@ -2304,7 +2304,7 @@ export default function Onboarding() {
     <div className="fixed inset-0 bg-gray-50 overflow-y-auto overflow-x-hidden" id="onboarding-container">
       <div className="min-h-full flex flex-col max-w-full">
         {/* Sophisticated Progress with Numbered Steps */}
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-8 py-3 safe-area-inset-top">
+        <div className="sticky top-0 bg-white border-b border-gray-200 px-8 py-3 safe-area-inset-top z-50">
           <div className="flex items-center justify-between mb-4 max-w-4xl mx-auto">
             {/* Back Button */}
             <button 
@@ -2373,7 +2373,22 @@ export default function Onboarding() {
                     <div className="border-t border-gray-100 my-2"></div>
                     <Link href="/reports" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Reports</Link>
                     <button
-                      onClick={() => signOut()}
+                      onClick={async () => {
+                        // Save current progress before logout
+                        if (Object.keys(form).length > 0) {
+                          try {
+                            await fetch('/api/user-data', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify(form)
+                            });
+                            console.log('Progress saved before logout');
+                          } catch (error) {
+                            console.warn('Failed to save progress before logout:', error);
+                          }
+                        }
+                        signOut();
+                      }}
                       className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50 font-semibold"
                     >
                       Logout
