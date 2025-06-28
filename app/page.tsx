@@ -554,20 +554,20 @@ export default function SplashPage() {
                       <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                       </svg>
-                      Food Analysis (25/month)
+                      Food Analysis (30/day)
                     </h4>
                     <ul className="space-y-2 ml-7">
                       <li className="flex items-center text-sm">
                         <svg className="w-4 h-4 text-helfi-green mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                         </svg>
-                        25 AI food photo analyses per month
+                        30 AI food photo analyses per day
                       </li>
                       <li className="flex items-center text-sm">
                         <svg className="w-4 h-4 text-helfi-green mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                         </svg>
-                        Unlimited reanalysis credits
+                        30 reanalysis credits per day
                       </li>
                     </ul>
                   </div>
@@ -577,14 +577,14 @@ export default function SplashPage() {
                       <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
-                      Medical Analysis (25/month)
+                      Medical Analysis (30/day)
                     </h4>
                     <ul className="space-y-2 ml-7">
                       <li className="flex items-center text-sm">
                         <svg className="w-4 h-4 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                         </svg>
-                        25 medical image analyses (rashes, moles, etc.)
+                        30 medical image analyses per day (rashes, moles, etc.)
                       </li>
                       <li className="flex items-center text-sm">
                         <svg className="w-4 h-4 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -628,7 +628,7 @@ export default function SplashPage() {
                 <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-lg p-4 mb-6">
                   <div className="text-sm text-gray-700">
                     <strong>Need more credits?</strong><br/>
-                    $5 for 25 extra image scans • $10 for 75 extra scans
+                    $5 for 100 credits • $10 for 150 credits (Credits don't expire)
                   </div>
                 </div>
                 
@@ -655,13 +655,13 @@ export default function SplashPage() {
                 <div className="bg-white rounded-xl p-6 shadow-sm border border-green-100 hover:shadow-md transition-shadow">
                   <div className="text-3xl mb-3">🍎</div>
                   <h5 className="font-semibold text-gray-900 mb-2">Food Analysis AI</h5>
-                  <p className="text-sm text-gray-600">25 AI food photo analyses per month with unlimited reanalysis credits</p>
+                  <p className="text-sm text-gray-600">30 AI food photo analyses per day with 30 reanalysis credits</p>
                 </div>
                 
                 <div className="bg-white rounded-xl p-6 shadow-sm border border-blue-100 hover:shadow-md transition-shadow">
                   <div className="text-3xl mb-3">🩺</div>
                   <h5 className="font-semibold text-gray-900 mb-2">Medical Image Analysis</h5>
-                  <p className="text-sm text-gray-600">25 medical photo analyses for rashes, moles, skin conditions</p>
+                  <p className="text-sm text-gray-600">30 medical photo analyses per day for rashes, moles, skin conditions</p>
                 </div>
                 
                 <div className="bg-white rounded-xl p-6 shadow-sm border border-purple-100 hover:shadow-md transition-shadow">
