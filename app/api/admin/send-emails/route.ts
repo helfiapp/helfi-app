@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { Resend } from 'resend'
+
+const resend = new Resend(process.env.RESEND_API_KEY)
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,53 +21,74 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Subject and message are required' }, { status: 400 })
     }
 
-    // For now, we'll simulate email sending
-    // In a real implementation, you'd integrate with an email service like:
-    // - Resend (recommended for developers)
-    // - SendGrid 
-    // - AWS SES
-    // - Mailgun
-    // - Postmark
-
+    // Check if Resend API key is configured
+    if (!process.env.RESEND_API_KEY) {
+      return NextResponse.json({ error: 'Email service not configured' }, { status: 500 })
+    }
+    
     const results = []
     
     for (const email of emails) {
       try {
         // Find the corresponding waitlist entry to get the name
-        const recipient = waitlistData.find((entry: any) => entry.email === email)
+        const recipient = waitlistData?.find((entry: any) => entry.email === email)
         const name = recipient?.name || 'there'
         
         // Personalize the message
         const personalizedMessage = message.replace(/{name}/g, name)
         
-        // Simulate email sending delay
-        await new Promise(resolve => setTimeout(resolve, 100))
-        
-        // In a real implementation, you'd send the email here:
-        /*
-        const emailResult = await emailService.send({
+        // Send real email using Resend
+        const emailResponse = await resend.emails.send({
+          from: 'Helfi Team <info@helfi.ai>',
           to: email,
           subject: subject,
-          html: personalizedMessage.replace(/\n/g, '<br>'),
-          from: 'info@helfi.ai' // Your verified sender
+          html: `
+            <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333; background: #f8fafc;">
+              <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 40px 30px; text-align: center; border-radius: 12px 12px 0 0;">
+                <h1 style="margin: 0; font-size: 32px; font-weight: bold; letter-spacing: -0.5px;">Helfi</h1>
+                <p style="margin: 12px 0 0 0; opacity: 0.95; font-size: 16px;">Your AI-Powered Health Coach</p>
+              </div>
+              
+              <div style="padding: 40px 30px; background: white; border-radius: 0 0 12px 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+                                 ${personalizedMessage.split('\n').map((line: string) => 
+                   line.trim() ? `<p style="margin: 18px 0; line-height: 1.7; font-size: 16px;">${line}</p>` : '<div style="height: 10px;"></div>'
+                 ).join('')}
+                
+                <div style="margin-top: 40px; padding-top: 30px; border-top: 2px solid #e5e7eb; text-align: center;">
+                  <a href="https://helfi.ai" style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; text-decoration: none; padding: 16px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; margin: 10px 0; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);">🚀 Get Started with Helfi</a>
+                </div>
+                
+                <div style="margin-top: 40px; padding-top: 30px; border-top: 1px solid #e5e7eb; font-size: 14px; color: #6b7280; text-align: center;">
+                  <p style="margin: 0 0 16px 0; font-size: 16px; color: #374151;"><strong>Best regards,<br>The Helfi Team</strong></p>
+                  <p style="margin: 20px 0 0 0; font-size: 14px;">
+                    <a href="https://helfi.ai" style="color: #10b981; text-decoration: none; font-weight: 500;">🌐 helfi.ai</a> | 
+                    <a href="mailto:support@helfi.ai" style="color: #10b981; text-decoration: none; font-weight: 500;">📧 support@helfi.ai</a>
+                  </p>
+                  <p style="margin: 16px 0 0 0; font-size: 12px; color: #9ca3af;">
+                    You received this email because you joined our waitlist. 
+                    <a href="#" style="color: #10b981; text-decoration: none;">Unsubscribe</a>
+                  </p>
+                </div>
+              </div>
+            </div>
+          `
         })
-        */
         
         results.push({
           email,
           status: 'sent',
-          messageId: `sim_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+          messageId: emailResponse.data?.id || 'unknown',
+          personalizedMessage
         })
         
-        console.log(`[EMAIL SIMULATION] To: ${email}, Subject: ${subject}`)
-        console.log(`[EMAIL SIMULATION] Message: ${personalizedMessage.substring(0, 100)}...`)
+        console.log(`✅ [EMAIL SENT] To: ${email}, Subject: ${subject}, ID: ${emailResponse.data?.id}`)
         
-      } catch (error) {
-        console.error(`Failed to send email to ${email}:`, error)
+      } catch (emailError: any) {
+        console.error(`❌ Failed to send email to ${email}:`, emailError)
         results.push({
           email,
           status: 'failed',
-          error: error instanceof Error ? error.message : 'Unknown error'
+          error: emailError.message || 'Unknown error'
         })
       }
     }
@@ -73,8 +97,10 @@ export async function POST(request: NextRequest) {
     const failCount = results.filter(r => r.status === 'failed').length
 
     return NextResponse.json({
-      success: true,
-      message: `Email campaign completed: ${successCount} sent, ${failCount} failed`,
+      success: failCount === 0,
+      message: failCount === 0 
+        ? `🎉 Successfully sent ${successCount} emails!` 
+        : `📊 Sent ${successCount} emails, ${failCount} failed`,
       results,
       summary: {
         total: emails.length,
@@ -83,10 +109,10 @@ export async function POST(request: NextRequest) {
       }
     })
 
-  } catch (error) {
-    console.error('Error sending emails:', error)
+  } catch (error: any) {
+    console.error('❌ Email sending error:', error)
     return NextResponse.json(
-      { error: 'Failed to send emails' },
+      { error: 'Failed to send emails: ' + (error.message || 'Unknown error') },
       { status: 500 }
     )
   }
