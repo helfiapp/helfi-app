@@ -932,76 +932,76 @@ Please add nutritional information manually if needed.`);
               </div>
             )}
 
-            {/* Edit Description Flow - New Mockup Design */}
+            {/* Edit Description Flow - Compact Mockup Design */}
             {isEditingDescription && (
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 p-8">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 p-6">
                   {/* Left Side - Food Title, Nutrition Cards & Photo */}
-                  <div className="space-y-6">
+                  <div className="space-y-4">
                     {/* Food Title */}
                     <div>
-                      <h2 className="text-2xl font-bold text-gray-900 mb-1">
+                      <h2 className="text-xl font-bold text-gray-900 mb-3">
                         {editedDescription.split('\n')[0].split('Calories:')[0].trim() || 'Large Egg'}
                       </h2>
                     </div>
 
-                    {/* Nutrition Cards - 2x2 Grid */}
-                    <div className="grid grid-cols-2 gap-4">
+                    {/* Nutrition Cards - 2x2 Grid - COMPACT DESIGN */}
+                    <div className="grid grid-cols-2 gap-2 mb-4">
                       {/* Calories Card */}
-                      <div className="bg-orange-400 rounded-xl p-4 text-center text-white">
-                        <div className="text-2xl font-bold">
+                      <div className="bg-orange-400 rounded-lg p-3 text-center text-white">
+                        <div className="text-lg font-bold">
                           {analyzedNutrition?.calories || '70'}
                         </div>
-                        <div className="text-sm font-medium opacity-90">
+                        <div className="text-xs font-medium opacity-90">
                           CALORIES
                         </div>
                       </div>
 
                       {/* Protein Card */}
-                      <div className="bg-blue-500 rounded-xl p-4 text-center text-white">
-                        <div className="text-2xl font-bold">
-                          {analyzedNutrition?.protein || '6g'}
+                      <div className="bg-blue-500 rounded-lg p-3 text-center text-white">
+                        <div className="text-lg font-bold">
+                          {analyzedNutrition?.protein || '6'}g
                         </div>
-                        <div className="text-sm font-medium opacity-90">
+                        <div className="text-xs font-medium opacity-90">
                           PROTEIN
                         </div>
                       </div>
 
                       {/* Carbs Card */}
-                      <div className="bg-green-400 rounded-xl p-4 text-center text-white">
-                        <div className="text-2xl font-bold">
-                          {analyzedNutrition?.carbs || '1g'}
+                      <div className="bg-green-400 rounded-lg p-3 text-center text-white">
+                        <div className="text-lg font-bold">
+                          {analyzedNutrition?.carbs || '1'}g
                         </div>
-                        <div className="text-sm font-medium opacity-90">
+                        <div className="text-xs font-medium opacity-90">
                           CARBS
                         </div>
                       </div>
 
                       {/* Fat Card */}
-                      <div className="bg-purple-500 rounded-xl p-4 text-center text-white">
-                        <div className="text-2xl font-bold">
-                          {analyzedNutrition?.fat || '5g'}
+                      <div className="bg-purple-500 rounded-lg p-3 text-center text-white">
+                        <div className="text-lg font-bold">
+                          {analyzedNutrition?.fat || '5'}g
                         </div>
-                        <div className="text-sm font-medium opacity-90">
+                        <div className="text-xs font-medium opacity-90">
                           FAT
                         </div>
                       </div>
                     </div>
 
-                    {/* Photo */}
+                    {/* Photo - Compact Size */}
                     {photoPreview && (
                       <div className="relative">
                         {foodImagesLoading[photoPreview] && (
-                          <div className="absolute inset-0 bg-gray-100 rounded-xl flex items-center justify-center">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
+                          <div className="absolute inset-0 bg-gray-100 rounded-lg flex items-center justify-center">
+                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-emerald-500"></div>
                           </div>
                         )}
                         <Image
                           src={photoPreview}
                           alt="Food being edited"
-                          width={400}
-                          height={300}
-                          className={`w-full aspect-[4/3] object-cover rounded-xl transition-opacity duration-300 ${
+                          width={300}
+                          height={200}
+                          className={`w-full aspect-[3/2] object-cover rounded-lg transition-opacity duration-300 ${
                             foodImagesLoading[photoPreview] ? 'opacity-0' : 'opacity-100'
                           }`}
                           loading="eager"
@@ -1014,17 +1014,17 @@ Please add nutritional information manually if needed.`);
                   </div>
                   
                   {/* Right Side - Edit Form & Action Buttons */}
-                  <div className="space-y-6">
+                  <div className="space-y-4">
                     {/* Edit Food Description */}
                     <div>
-                      <label className="block text-lg font-semibold text-gray-900 mb-4">
+                      <label className="block text-lg font-semibold text-gray-900 mb-3">
                         Edit Food Description
                       </label>
                       <input
                         type="text"
                         value={editedDescription}
                         onChange={(e) => setEditedDescription(e.target.value)}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-lg"
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base"
                         placeholder="Edit the food description..."
                       />
                     </div>
@@ -1032,24 +1032,81 @@ Please add nutritional information manually if needed.`);
                     {/* Action Buttons - Stacked Vertically */}
                     <div className="space-y-3">
                       <button
-                        onClick={() => {
+                        onClick={async () => {
                           if (editingEntry) {
-                            updateFoodEntry(editedDescription, 'photo');
+                            // Re-analyze with AI for updated nutrition info
+                            setIsAnalyzing(true);
+                            let updatedNutrition = null;
+
+                            try {
+                              const response = await fetch('/api/analyze-food', {
+                                method: 'POST',
+                                headers: {
+                                  'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({
+                                  textDescription: editedDescription,
+                                  foodType: 'single'
+                                }),
+                              });
+
+                              if (response.ok) {
+                                const result = await response.json();
+                                console.log('API Response:', result);
+                                if (result.success && result.analysis) {
+                                  updatedNutrition = extractNutritionData(result.analysis);
+                                  console.log('Extracted Nutrition:', updatedNutrition);
+                                  
+                                  // Update the nutrition cards immediately on the same screen
+                                  setAnalyzedNutrition(updatedNutrition);
+                                }
+                              } else {
+                                console.error('API Error:', response.status, response.statusText);
+                              }
+                            } catch (error) {
+                              console.error('Error re-analyzing food:', error);
+                              updatedNutrition = editingEntry.nutrition;
+                            } finally {
+                              setIsAnalyzing(false);
+                            }
+
+                            // Update the existing entry
+                            const updatedEntry = {
+                              ...editingEntry,
+                              description: editedDescription,
+                              photo: photoPreview || editingEntry.photo,
+                              nutrition: updatedNutrition || editingEntry.nutrition
+                            };
+
+                            const updatedFoods = todaysFoods.map(food => 
+                              food.id === editingEntry.id ? updatedEntry : food
+                            );
+                            
+                            setTodaysFoods(updatedFoods);
+                            
+                            // Save to database
+                            await saveFoodEntries(updatedFoods);
+                            
+                            // Update editing entry to reflect changes but STAY on same screen
+                            setEditingEntry(updatedEntry);
+                            
+                            // Show success feedback without leaving the screen
+                            console.log('✅ Food updated successfully - staying on edit screen');
                           } else {
                             addFoodEntry(editedDescription, 'photo');
+                            setIsEditingDescription(false);
                           }
-                          setIsEditingDescription(false);
                         }}
                         disabled={!editedDescription.trim() || isAnalyzing}
-                        className="w-full py-4 px-6 bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-colors duration-200 flex items-center justify-center text-lg"
+                        className="w-full py-3 px-6 bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors duration-200 flex items-center justify-center"
                       >
                         {isAnalyzing ? (
                           <>
                             <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 714 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                             </svg>
-                            Re-analyzing...
+                            Updating...
                           </>
                         ) : (
                           <>
@@ -1066,8 +1123,14 @@ Please add nutritional information manually if needed.`);
                           setIsEditingDescription(false);
                           setEditedDescription('');
                           setEditingEntry(null);
+                          setPhotoFile(null);
+                          setPhotoPreview(null);
+                          setAiDescription('');
+                          setShowAiResult(false);
+                          setShowAddFood(false);
+                          setAnalyzedNutrition(null);
                         }}
-                        className="w-full py-4 px-6 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-xl transition-colors duration-200 flex items-center justify-center text-lg"
+                        className="w-full py-3 px-6 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg transition-colors duration-200 flex items-center justify-center"
                       >
                         <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1084,7 +1147,7 @@ Please add nutritional information manually if needed.`);
                           setIsEditingDescription(false);
                           setEditedDescription('');
                         }}
-                        className="w-full py-4 px-6 bg-gray-500 hover:bg-gray-600 text-white font-semibold rounded-xl transition-colors duration-200 flex items-center justify-center text-lg"
+                        className="w-full py-3 px-6 bg-gray-500 hover:bg-gray-600 text-white font-semibold rounded-lg transition-colors duration-200 flex items-center justify-center"
                       >
                         <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
