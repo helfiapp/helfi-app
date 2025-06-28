@@ -39,11 +39,10 @@ function DesktopSidebar() {
         {/* Logo */}
         <div className="flex items-center flex-shrink-0 px-4">
           <img
-            className="h-8 w-auto"
+            className="h-12 w-auto"
             src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/HELFI_TRANSPARENT_rmssry.png"
             alt="Helfi"
           />
-          <span className="ml-2 text-xl font-bold text-gray-900">Helfi</span>
         </div>
         
         {/* Navigation */}
