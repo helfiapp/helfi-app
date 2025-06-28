@@ -33,6 +33,14 @@ export default function AdminPanel() {
   const [selectedUser, setSelectedUser] = useState<any>(null)
   const [showUserModal, setShowUserModal] = useState(false)
 
+  // Email functionality states
+  const [selectedEmails, setSelectedEmails] = useState<string[]>([])
+  const [showEmailModal, setShowEmailModal] = useState(false)
+  const [emailSubject, setEmailSubject] = useState('')
+  const [emailMessage, setEmailMessage] = useState('')
+  const [emailTemplate, setEmailTemplate] = useState('launch')
+  const [isLoadingEmail, setIsLoadingEmail] = useState(false)
+
   // Check if already authenticated
   useEffect(() => {
     const authStatus = sessionStorage.getItem('adminAuthenticated')
@@ -204,6 +212,115 @@ export default function AdminPanel() {
     if (activeTab === 'insights') {
       loadAiInsights()
     }
+  }
+
+  // Email functionality
+  const handleEmailSelect = (email: string) => {
+    if (selectedEmails.includes(email)) {
+      setSelectedEmails(selectedEmails.filter(e => e !== email))
+    } else {
+      setSelectedEmails([...selectedEmails, email])
+    }
+  }
+
+  const handleSelectAll = () => {
+    if (selectedEmails.length === waitlistData.length) {
+      setSelectedEmails([])
+    } else {
+      setSelectedEmails(waitlistData.map(entry => entry.email))
+    }
+  }
+
+  const handleEmailTemplate = (template: string) => {
+    setEmailTemplate(template)
+    switch (template) {
+             case 'launch':
+         setEmailSubject('🎉 Helfi is now live! Your personal AI health coach awaits')
+         setEmailMessage(`Hi {name},
+
+Great news! Helfi is officially live and ready to transform your health journey.
+
+As a valued waitlist member, you get:
+✅ 14-day free trial with full premium access
+✅ 30 AI food analyses per day + 30 medical image analyses  
+✅ Complete medication interaction checking
+✅ Priority support from our team
+
+Ready to start your AI-powered health transformation?
+
+[Get Started Now - helfi.ai]
+
+Thank you for your patience and support,
+The Helfi Team`)
+         break
+       case 'update':
+         setEmailSubject('📱 Helfi Platform Update - New Features Added')
+         setEmailMessage(`Hi {name},
+
+We've added exciting new features to Helfi that we think you'll love:
+
+🆕 What's New:
+• Enhanced AI food analysis with better accuracy
+• New medical image analysis for skin conditions
+• Improved medication interaction database
+• Faster mobile performance
+
+Your health data is more powerful than ever. Log in to explore!
+
+[Access Helfi - helfi.ai]
+
+Best regards,
+The Helfi Team`)
+         break
+       case 'custom':
+         setEmailSubject('')
+         setEmailMessage('Hi {name},\n\n\n\nBest regards,\nThe Helfi Team')
+         break
+    }
+  }
+
+  const sendEmails = async () => {
+    if (selectedEmails.length === 0) {
+      alert('Please select at least one email address')
+      return
+    }
+    
+    if (!emailSubject.trim() || !emailMessage.trim()) {
+      alert('Please enter both subject and message')
+      return
+    }
+
+    setIsLoadingEmail(true)
+    try {
+      const response = await fetch('/api/admin/send-emails', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer HelfiAdmin2024'
+        },
+        body: JSON.stringify({
+          emails: selectedEmails,
+          subject: emailSubject,
+          message: emailMessage,
+          waitlistData: waitlistData.filter(entry => selectedEmails.includes(entry.email))
+        })
+      })
+
+      if (response.ok) {
+        alert(`Successfully sent emails to ${selectedEmails.length} recipients`)
+        setShowEmailModal(false)
+        setSelectedEmails([])
+        setEmailSubject('')
+        setEmailMessage('')
+      } else {
+        const error = await response.json()
+        alert(`Failed to send emails: ${error.message}`)
+      }
+    } catch (error) {
+      console.error('Error sending emails:', error)
+      alert('Failed to send emails. Please try again.')
+    }
+    setIsLoadingEmail(false)
   }
 
   if (!isAuthenticated) {
@@ -501,61 +618,137 @@ export default function AdminPanel() {
         )}
 
         {activeTab === 'waitlist' && (
-          <div className="bg-white rounded-lg shadow">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900">Waitlist Signups</h3>
-              <p className="text-sm text-gray-600">
-                {isLoadingWaitlist ? 'Loading...' : `${waitlistData.length} people on waitlist`}
-              </p>
-            </div>
-            
-            {isLoadingWaitlist ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
-                <span className="ml-3 text-gray-600">Loading waitlist data...</span>
+          <div className="space-y-6">
+            {/* Email Actions */}
+            <div className="bg-white rounded-lg shadow p-6">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Waitlist Email Campaign</h3>
+                  <p className="text-sm text-gray-600">
+                    {selectedEmails.length > 0 
+                      ? `${selectedEmails.length} recipients selected` 
+                      : 'Select recipients to send emails'
+                    }
+                  </p>
+                </div>
+                <div className="flex space-x-3">
+                  <button
+                    onClick={() => {
+                      if (selectedEmails.length === 0) {
+                        alert('Please select at least one email address')
+                        return
+                      }
+                      handleEmailTemplate('launch')
+                      setShowEmailModal(true)
+                    }}
+                    disabled={selectedEmails.length === 0}
+                    className="bg-emerald-500 text-white px-4 py-2 rounded-lg hover:bg-emerald-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    📧 Send Launch Email
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (selectedEmails.length === 0) {
+                        alert('Please select at least one email address')
+                        return
+                      }
+                      handleEmailTemplate('custom')
+                      setShowEmailModal(true)
+                    }}
+                    disabled={selectedEmails.length === 0}
+                    className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    ✏️ Custom Email
+                  </button>
+                </div>
               </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Name
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Email
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Signed Up
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {waitlistData.length === 0 ? (
+            </div>
+
+            {/* Waitlist Table */}
+            <div className="bg-white rounded-lg shadow">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">Waitlist Signups</h3>
+                    <p className="text-sm text-gray-600">
+                      {isLoadingWaitlist ? 'Loading...' : `${waitlistData.length} people on waitlist`}
+                    </p>
+                  </div>
+                  {waitlistData.length > 0 && (
+                    <button
+                      onClick={handleSelectAll}
+                      className="text-sm text-emerald-600 hover:text-emerald-700 font-medium"
+                    >
+                      {selectedEmails.length === waitlistData.length ? 'Deselect All' : 'Select All'}
+                    </button>
+                  )}
+                </div>
+              </div>
+              
+              {isLoadingWaitlist ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
+                  <span className="ml-3 text-gray-600">Loading waitlist data...</span>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
                       <tr>
-                        <td colSpan={3} className="px-6 py-4 text-center text-gray-500">
-                          No waitlist signups yet.
-                        </td>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <input
+                            type="checkbox"
+                            checked={waitlistData.length > 0 && selectedEmails.length === waitlistData.length}
+                            onChange={handleSelectAll}
+                            className="h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded"
+                          />
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Name
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Email
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Signed Up
+                        </th>
                       </tr>
-                    ) : (
-                      waitlistData.map((entry, index) => (
-                        <tr key={entry.id || index}>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            {entry.name}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {entry.email}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {new Date(entry.createdAt).toLocaleDateString()}
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {waitlistData.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="px-6 py-4 text-center text-gray-500">
+                            No waitlist signups yet.
                           </td>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                      ) : (
+                        waitlistData.map((entry, index) => (
+                          <tr key={entry.id || index} className={selectedEmails.includes(entry.email) ? 'bg-emerald-50' : ''}>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <input
+                                type="checkbox"
+                                checked={selectedEmails.includes(entry.email)}
+                                onChange={() => handleEmailSelect(entry.email)}
+                                className="h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded"
+                              />
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                              {entry.name}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {entry.email}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {new Date(entry.createdAt).toLocaleDateString()}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -1013,6 +1206,115 @@ export default function AdminPanel() {
                          Close
                        </button>
                      </div>
+                   </div>
+                 </div>
+               </div>
+             )}
+
+             {/* Email Composition Modal */}
+             {showEmailModal && (
+               <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+                 <div className="bg-white p-6 rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-screen overflow-y-auto">
+                   <h3 className="text-xl font-semibold text-gray-900 mb-6">
+                     📧 Compose Email to {selectedEmails.length} Recipients
+                   </h3>
+                   
+                   {/* Email Template Selection */}
+                   <div className="mb-6">
+                     <label className="block text-sm font-medium text-gray-700 mb-2">Email Template</label>
+                     <div className="grid grid-cols-3 gap-3">
+                       <button
+                         onClick={() => handleEmailTemplate('launch')}
+                         className={`p-3 border rounded-lg text-sm ${emailTemplate === 'launch' 
+                           ? 'border-emerald-500 bg-emerald-50 text-emerald-700' 
+                           : 'border-gray-300 hover:border-gray-400'
+                         }`}
+                       >
+                         🚀 Launch Announcement
+                       </button>
+                       <button
+                         onClick={() => handleEmailTemplate('update')}
+                         className={`p-3 border rounded-lg text-sm ${emailTemplate === 'update' 
+                           ? 'border-blue-500 bg-blue-50 text-blue-700' 
+                           : 'border-gray-300 hover:border-gray-400'
+                         }`}
+                       >
+                         📱 Product Update
+                       </button>
+                       <button
+                         onClick={() => handleEmailTemplate('custom')}
+                         className={`p-3 border rounded-lg text-sm ${emailTemplate === 'custom' 
+                           ? 'border-purple-500 bg-purple-50 text-purple-700' 
+                           : 'border-gray-300 hover:border-gray-400'
+                         }`}
+                       >
+                         ✏️ Custom Message
+                       </button>
+                     </div>
+                   </div>
+
+                   {/* Subject Line */}
+                   <div className="mb-4">
+                     <label className="block text-sm font-medium text-gray-700 mb-2">Subject Line</label>
+                     <input
+                       type="text"
+                       value={emailSubject}
+                       onChange={(e) => setEmailSubject(e.target.value)}
+                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                       placeholder="Enter email subject..."
+                     />
+                   </div>
+
+                   {/* Email Message */}
+                                        <div className="mb-6">
+                       <label className="block text-sm font-medium text-gray-700 mb-2">
+                         Message <span className="text-xs text-gray-500">(Use {'{name}'} to personalize with recipient names)</span>
+                       </label>
+                     <textarea
+                       value={emailMessage}
+                       onChange={(e) => setEmailMessage(e.target.value)}
+                       rows={12}
+                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                       placeholder="Enter your email message..."
+                     />
+                   </div>
+
+                   {/* Recipients Preview */}
+                   <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                     <h4 className="text-sm font-medium text-gray-700 mb-2">Recipients ({selectedEmails.length})</h4>
+                     <div className="text-sm text-gray-600 max-h-20 overflow-y-auto">
+                       {selectedEmails.join(', ')}
+                     </div>
+                   </div>
+
+                   {/* Action Buttons */}
+                   <div className="flex flex-col sm:flex-row sm:justify-end space-y-2 sm:space-y-0 sm:space-x-3">
+                     <button
+                       onClick={() => {
+                         setShowEmailModal(false)
+                         setEmailSubject('')
+                         setEmailMessage('')
+                       }}
+                       className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                     >
+                       Cancel
+                     </button>
+                     <button
+                       onClick={sendEmails}
+                       disabled={isLoadingEmail || !emailSubject.trim() || !emailMessage.trim()}
+                       className="bg-emerald-500 text-white px-6 py-2 rounded-lg hover:bg-emerald-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                     >
+                       {isLoadingEmail ? (
+                         <>
+                           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                           Sending...
+                         </>
+                       ) : (
+                         <>
+                           📧 Send to {selectedEmails.length} Recipients
+                         </>
+                       )}
+                     </button>
                    </div>
                  </div>
                </div>
