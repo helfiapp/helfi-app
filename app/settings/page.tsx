@@ -16,26 +16,34 @@ export default function Settings() {
   const { data: session } = useSession()
   const [dropdownOpen, setDropdownOpen] = useState(false)
   
-  // Dark mode state - using global approach
+  // Settings states with automatic saving
   const [darkMode, setDarkMode] = useState(false)
+  const [emailNotifications, setEmailNotifications] = useState(true)
+  const [pushNotifications, setPushNotifications] = useState(false)
+  const [profileVisibility, setProfileVisibility] = useState('private')
+  const [dataAnalytics, setDataAnalytics] = useState(true)
   
   // iOS detection for push notifications
   const [isIOS, setIsIOS] = useState(false)
-  const [pushNotifications, setPushNotifications] = useState(false)
 
-  // Initialize dark mode from localStorage and listen for changes
+  // Initialize settings from localStorage
   useEffect(() => {
-    const saved = localStorage.getItem('darkMode')
-    if (saved) setDarkMode(saved === 'true')
+    const savedDarkMode = localStorage.getItem('darkMode')
+    const savedEmailNotifications = localStorage.getItem('emailNotifications')
+    const savedPushNotifications = localStorage.getItem('pushNotifications')
+    const savedProfileVisibility = localStorage.getItem('profileVisibility')
+    const savedDataAnalytics = localStorage.getItem('dataAnalytics')
+    
+    if (savedDarkMode) setDarkMode(savedDarkMode === 'true')
+    if (savedEmailNotifications) setEmailNotifications(savedEmailNotifications === 'true')
+    if (savedPushNotifications) setPushNotifications(savedPushNotifications === 'true')
+    if (savedProfileVisibility) setProfileVisibility(savedProfileVisibility)
+    if (savedDataAnalytics) setDataAnalytics(savedDataAnalytics === 'true')
     
     // Detect iOS devices
     const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
                        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
     setIsIOS(isIOSDevice)
-    
-    // Load push notification preference
-    const savedPushPref = localStorage.getItem('pushNotifications')
-    if (savedPushPref) setPushNotifications(savedPushPref === 'true')
     
     // Listen for dark mode changes from other sources
     const handleDarkModeChange = (e: CustomEvent) => {
@@ -46,11 +54,94 @@ export default function Settings() {
     return () => window.removeEventListener('darkModeChanged', handleDarkModeChange as EventListener)
   }, [])
 
-  // Handle dark mode toggle using global function
-  const handleDarkModeToggle = (enabled: boolean) => {
-    setDarkMode(enabled)
+  // Auto-save dark mode changes
+  useEffect(() => {
+    localStorage.setItem('darkMode', darkMode.toString())
     if (window.toggleDarkMode) {
-      window.toggleDarkMode(enabled)
+      window.toggleDarkMode(darkMode)
+    }
+  }, [darkMode])
+
+  // Auto-save email notifications
+  useEffect(() => {
+    localStorage.setItem('emailNotifications', emailNotifications.toString())
+    // TODO: Send to backend API to update user preferences
+  }, [emailNotifications])
+
+  // Auto-save push notifications
+  useEffect(() => {
+    localStorage.setItem('pushNotifications', pushNotifications.toString())
+    // TODO: Send to backend API to update user preferences
+  }, [pushNotifications])
+
+  // Auto-save profile visibility
+  useEffect(() => {
+    localStorage.setItem('profileVisibility', profileVisibility)
+    // TODO: Send to backend API to update user preferences
+  }, [profileVisibility])
+
+  // Auto-save data analytics with comprehensive tracking
+  useEffect(() => {
+    localStorage.setItem('dataAnalytics', dataAnalytics.toString())
+    
+    // Track analytics events if user has opted in
+    if (dataAnalytics && session?.user?.email) {
+      const analyticsEvent = {
+        userId: session.user.email,
+        action: 'settings_page_interaction',
+        timestamp: new Date().toISOString(),
+        page: '/settings',
+        userAgent: navigator.userAgent,
+        viewport: {
+          width: window.innerWidth,
+          height: window.innerHeight
+        },
+        settings: {
+          darkMode,
+          emailNotifications,
+          pushNotifications,
+          profileVisibility,
+          dataAnalytics
+        },
+        deviceInfo: {
+          platform: navigator.platform,
+          language: navigator.language,
+          cookieEnabled: navigator.cookieEnabled
+        }
+      }
+      
+      // Send to analytics API
+      fetch('/api/analytics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(analyticsEvent)
+      }).catch(err => console.log('📊 Analytics tracking error:', err))
+    }
+  }, [dataAnalytics, session, darkMode, emailNotifications, pushNotifications, profileVisibility])
+
+  // Track individual setting changes
+  const trackSettingChange = (settingName: string, newValue: any) => {
+    if (dataAnalytics && session?.user?.email) {
+      const changeEvent = {
+        userId: session.user.email,
+        action: `setting_changed_${settingName}`,
+        timestamp: new Date().toISOString(),
+        page: '/settings',
+        data: {
+          setting: settingName,
+          newValue,
+          previousValue: settingName === 'darkMode' ? !newValue : 
+                        settingName === 'emailNotifications' ? !newValue :
+                        settingName === 'pushNotifications' ? !newValue :
+                        settingName === 'dataAnalytics' ? !newValue : 'unknown'
+        }
+      }
+      
+      fetch('/api/analytics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(changeEvent)
+      }).catch(err => console.log('📊 Setting change tracking error:', err))
     }
   }
 
@@ -62,14 +153,12 @@ export default function Settings() {
     }
     
     setPushNotifications(enabled)
-    localStorage.setItem('pushNotifications', enabled.toString())
     
-    // TODO: Request actual push notification permission for non-iOS devices
+    // Request actual push notification permission for non-iOS devices
     if (enabled && !isIOS && 'Notification' in window) {
       Notification.requestPermission().then(permission => {
         if (permission !== 'granted') {
           setPushNotifications(false)
-          localStorage.setItem('pushNotifications', 'false')
           alert('Push notifications were denied. Please enable them in your browser settings.')
         }
       })
@@ -91,7 +180,6 @@ export default function Settings() {
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       const target = e.target as HTMLElement;
-      // Check if click is outside both the button and the dropdown content
       if (!target.closest('.dropdown-container')) {
         setDropdownOpen(false);
       }
@@ -196,7 +284,10 @@ export default function Settings() {
                     type="checkbox" 
                     className="sr-only peer" 
                     checked={darkMode}
-                    onChange={(e) => handleDarkModeToggle(e.target.checked)}
+                                          onChange={(e) => {
+                        setDarkMode(e.target.checked)
+                        trackSettingChange('darkMode', e.target.checked)
+                      }}
                   />
                   <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-helfi-green/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-helfi-green"></div>
                 </label>
@@ -208,7 +299,15 @@ export default function Settings() {
                   <p className="text-sm text-gray-600 dark:text-gray-400">Receive updates via email</p>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" className="sr-only peer" defaultChecked />
+                  <input 
+                    type="checkbox" 
+                    className="sr-only peer" 
+                    checked={emailNotifications}
+                                            onChange={(e) => {
+                          setEmailNotifications(e.target.checked)
+                          trackSettingChange('emailNotifications', e.target.checked)
+                        }}
+                  />
                   <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-helfi-green/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-helfi-green"></div>
                 </label>
               </div>
@@ -247,10 +346,17 @@ export default function Settings() {
                   <h3 className="font-medium text-gray-900 dark:text-white">Profile Visibility</h3>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Make your profile visible to others</p>
                 </div>
-                <select className="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
-                  <option>Private</option>
-                  <option>Public</option>
-                  <option>Friends Only</option>
+                <select 
+                  className="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  value={profileVisibility}
+                  onChange={(e) => {
+                    setProfileVisibility(e.target.value)
+                    trackSettingChange('profileVisibility', e.target.value)
+                  }}
+                >
+                  <option value="private">Private</option>
+                  <option value="public">Public</option>
+                  <option value="friends">Friends Only</option>
                 </select>
               </div>
               
@@ -260,7 +366,15 @@ export default function Settings() {
                   <p className="text-sm text-gray-600 dark:text-gray-400">Help us improve by sharing anonymous usage data</p>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" className="sr-only peer" defaultChecked />
+                  <input 
+                    type="checkbox" 
+                    className="sr-only peer" 
+                    checked={dataAnalytics}
+                    onChange={(e) => {
+                      setDataAnalytics(e.target.checked)
+                      trackSettingChange('dataAnalytics', e.target.checked)
+                    }}
+                  />
                   <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-helfi-green/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-helfi-green"></div>
                 </label>
               </div>
@@ -304,12 +418,7 @@ export default function Settings() {
             </div>
           </div>
 
-          {/* Save Button */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-            <button className="w-full bg-helfi-green text-white px-6 py-3 rounded-lg hover:bg-helfi-green/90 transition-colors font-medium">
-              Save Settings
-            </button>
-          </div>
+
         </div>
       </div>
 
