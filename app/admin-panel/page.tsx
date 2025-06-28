@@ -22,6 +22,16 @@ export default function AdminPanel() {
   const [userStats, setUserStats] = useState<any>(null)
   const [isLoadingWaitlist, setIsLoadingWaitlist] = useState(false)
   const [isLoadingUsers, setIsLoadingUsers] = useState(false)
+  
+  // User management states
+  const [managedUsers, setManagedUsers] = useState<any[]>([])
+  const [userSearch, setUserSearch] = useState('')
+  const [userFilter, setUserFilter] = useState('all')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [isLoadingManagement, setIsLoadingManagement] = useState(false)
+  const [selectedUser, setSelectedUser] = useState<any>(null)
+  const [showUserModal, setShowUserModal] = useState(false)
 
   // Check if already authenticated
   useEffect(() => {
@@ -116,6 +126,60 @@ export default function AdminPanel() {
       console.error('Error loading user stats:', error)
     }
     setIsLoadingUsers(false)
+  }
+
+  const loadUserManagement = async (search = '', filter = 'all', page = 1) => {
+    setIsLoadingManagement(true)
+    try {
+      const params = new URLSearchParams({
+        search,
+        plan: filter,
+        page: page.toString(),
+        limit: '20'
+      })
+      
+      const response = await fetch(`/api/admin/user-management?${params}`, {
+        headers: {
+          'Authorization': 'Bearer HelfiAdmin2024'
+        }
+      })
+      
+      if (response.ok) {
+        const result = await response.json()
+        setManagedUsers(result.users || [])
+        setTotalPages(result.pagination?.pages || 1)
+        setCurrentPage(result.pagination?.page || 1)
+      }
+    } catch (error) {
+      console.error('Error loading user management:', error)
+    }
+    setIsLoadingManagement(false)
+  }
+
+  const handleUserAction = async (action: string, userId: string, data?: any) => {
+    try {
+      const response = await fetch('/api/admin/user-management', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer HelfiAdmin2024'
+        },
+        body: JSON.stringify({ action, userId, data })
+      })
+
+      if (response.ok) {
+        // Reload the user list to show updated data
+        loadUserManagement(userSearch, userFilter, currentPage)
+        setShowUserModal(false)
+        setSelectedUser(null)
+        alert(`User ${action} completed successfully`)
+      } else {
+        alert('Action failed. Please try again.')
+      }
+    } catch (error) {
+      console.error('Error performing user action:', error)
+      alert('Action failed. Please try again.')
+    }
   }
 
   const loadAiInsights = async () => {
@@ -259,7 +323,8 @@ export default function AdminPanel() {
               { id: 'events', label: '📋 Events', desc: 'Raw data' },
               { id: 'insights', label: '🤖 AI Insights', desc: 'OpenAI analysis' },
               { id: 'waitlist', label: '📧 Waitlist', desc: 'Signups' },
-              { id: 'users', label: '👥 Users', desc: 'User stats' }
+              { id: 'users', label: '👥 Users', desc: 'User stats' },
+              { id: 'management', label: '🛠️ User Management', desc: 'Manage users' }
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -267,6 +332,9 @@ export default function AdminPanel() {
                   setActiveTab(tab.id)
                   if (tab.id === 'insights' && !aiInsights) {
                     loadAiInsights()
+                  }
+                  if (tab.id === 'management') {
+                    loadUserManagement(userSearch, userFilter, currentPage)
                   }
                 }}
                 className={`py-4 px-1 border-b-2 font-medium text-sm ${
@@ -611,6 +679,243 @@ export default function AdminPanel() {
               <div className="text-center py-12 text-gray-500">
                 <div className="text-4xl mb-4">👥</div>
                 <p>No user data available.</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'management' && (
+          <div className="space-y-6">
+            {/* Search and Filters */}
+            <div className="bg-white rounded-lg shadow p-6">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
+                <h3 className="text-lg font-semibold text-gray-900">User Management</h3>
+                <div className="flex flex-col md:flex-row space-y-2 md:space-y-0 md:space-x-4">
+                  <input
+                    type="text"
+                    placeholder="Search users by email or name..."
+                    value={userSearch}
+                    onChange={(e) => setUserSearch(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && loadUserManagement(userSearch, userFilter, 1)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  />
+                  <select
+                    value={userFilter}
+                    onChange={(e) => setUserFilter(e.target.value)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  >
+                    <option value="all">All Users</option>
+                    <option value="free">Free Plan</option>
+                    <option value="premium">Premium Plan</option>
+                  </select>
+                  <button
+                    onClick={() => loadUserManagement(userSearch, userFilter, 1)}
+                    className="bg-emerald-500 text-white px-4 py-2 rounded-lg hover:bg-emerald-600 transition-colors"
+                  >
+                    Search
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Users Table */}
+            <div className="bg-white rounded-lg shadow">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <h4 className="text-md font-semibold text-gray-900">
+                  {isLoadingManagement ? 'Loading...' : `${managedUsers.length} users found`}
+                </h4>
+              </div>
+              
+              {isLoadingManagement ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
+                  <span className="ml-3 text-gray-600">Loading users...</span>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          User
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Plan
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Activity
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Joined
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {managedUsers.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="px-6 py-4 text-center text-gray-500">
+                            No users found.
+                          </td>
+                        </tr>
+                      ) : (
+                        managedUsers.map((user) => (
+                          <tr key={user.id}>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div>
+                                <div className="text-sm font-medium text-gray-900">
+                                  {user.name || 'No name set'}
+                                </div>
+                                <div className="text-sm text-gray-500">{user.email}</div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                user.subscription?.plan === 'PREMIUM' 
+                                  ? 'bg-emerald-100 text-emerald-800' 
+                                  : 'bg-gray-100 text-gray-800'
+                              }`}>
+                                {user.subscription?.plan || 'FREE'}
+                                {user.subscription?.endDate && new Date(user.subscription.endDate).getFullYear() > 2050 && (
+                                  <span className="ml-1 text-xs">∞</span>
+                                )}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              <div className="flex space-x-1">
+                                {user._count.healthGoals > 0 && (
+                                  <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">
+                                    {user._count.healthGoals} goals
+                                  </span>
+                                )}
+                                {user._count.foodLogs > 0 && (
+                                  <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">
+                                    {user._count.foodLogs} foods
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {new Date(user.createdAt).toLocaleDateString()}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                              <div className="flex space-x-2">
+                                <button
+                                  onClick={() => {
+                                    setSelectedUser(user)
+                                    setShowUserModal(true)
+                                  }}
+                                  className="bg-blue-500 text-white px-3 py-1 rounded text-xs hover:bg-blue-600 transition-colors"
+                                >
+                                  Manage
+                                </button>
+                                {user.subscription?.plan === 'PREMIUM' ? (
+                                  <button
+                                    onClick={() => handleUserAction('deactivate', user.id)}
+                                    className="bg-orange-500 text-white px-3 py-1 rounded text-xs hover:bg-orange-600 transition-colors"
+                                  >
+                                    Deactivate
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => handleUserAction('activate', user.id)}
+                                    className="bg-emerald-500 text-white px-3 py-1 rounded text-xs hover:bg-emerald-600 transition-colors"
+                                  >
+                                    Activate
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => {
+                                    if (confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
+                                      handleUserAction('delete_user', user.id)
+                                    }
+                                  }}
+                                  className="bg-red-500 text-white px-3 py-1 rounded text-xs hover:bg-red-600 transition-colors"
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+                  <div className="text-sm text-gray-700">
+                    Page {currentPage} of {totalPages}
+                  </div>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => loadUserManagement(userSearch, userFilter, currentPage - 1)}
+                      disabled={currentPage === 1}
+                      className="px-3 py-2 border border-gray-300 rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                    >
+                      Previous
+                    </button>
+                    <button
+                      onClick={() => loadUserManagement(userSearch, userFilter, currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                      className="px-3 py-2 border border-gray-300 rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* User Management Modal */}
+            {showUserModal && selectedUser && (
+              <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+                <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full mx-4">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                    Manage User: {selectedUser.name || selectedUser.email}
+                  </h3>
+                  
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        onClick={() => handleUserAction('grant_trial', selectedUser.id, { trialDays: 7 })}
+                        className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors text-sm"
+                      >
+                        7-Day Trial
+                      </button>
+                      <button
+                        onClick={() => handleUserAction('grant_trial', selectedUser.id, { trialDays: 30 })}
+                        className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors text-sm"
+                      >
+                        30-Day Trial
+                      </button>
+                    </div>
+                    
+                    <button
+                      onClick={() => handleUserAction('grant_free_access', selectedUser.id)}
+                      className="w-full bg-emerald-500 text-white px-4 py-2 rounded hover:bg-emerald-600 transition-colors text-sm"
+                    >
+                      Grant Permanent Free Access
+                    </button>
+                    
+                    <div className="border-t pt-4">
+                      <button
+                        onClick={() => {
+                          setShowUserModal(false)
+                          setSelectedUser(null)
+                        }}
+                        className="w-full bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400 transition-colors text-sm"
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
           </div>
