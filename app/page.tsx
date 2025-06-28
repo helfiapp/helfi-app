@@ -470,7 +470,7 @@ export default function SplashPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
             {/* Free Plan */}
             <div className="bg-white rounded-2xl p-8 border-2 border-gray-200">
               <div className="text-center">
@@ -490,13 +490,13 @@ export default function SplashPage() {
                     <svg className="w-5 h-5 text-helfi-green mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
-                    Initial supplement interaction check
+                    3 AI food photo analyses per day
                   </li>
                   <li className="flex items-center">
                     <svg className="w-5 h-5 text-helfi-green mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
-                    3 AI food photo analyses per day
+                    1 reanalysis per food item
                   </li>
                   <li className="flex items-center">
                     <svg className="w-5 h-5 text-helfi-green mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -510,6 +510,18 @@ export default function SplashPage() {
                     </svg>
                     Weekly health summary emails
                   </li>
+                  <li className="flex items-center text-gray-400">
+                    <svg className="w-5 h-5 text-gray-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    No medication interaction analysis
+                  </li>
+                  <li className="flex items-center text-gray-400">
+                    <svg className="w-5 h-5 text-gray-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    No medical image analysis
+                  </li>
                 </ul>
                 <button 
                   onClick={() => document.getElementById('waitlist-signup')?.scrollIntoView({ behavior: 'smooth' })}
@@ -520,7 +532,7 @@ export default function SplashPage() {
               </div>
             </div>
 
-            {/* Pro Plan */}
+            {/* Premium Plan */}
             <div className="bg-white rounded-2xl p-8 border-2 border-helfi-green relative">
               <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
                 <span className="bg-helfi-green text-white px-4 py-1 rounded-full text-sm font-medium">
@@ -530,100 +542,99 @@ export default function SplashPage() {
               <div className="text-center">
                 <h3 className="text-2xl font-bold text-helfi-black mb-2">AI Health Coach</h3>
                 <div className="mb-6">
-                  <span className="text-4xl font-bold text-helfi-black">$12</span>
+                  <span className="text-4xl font-bold text-helfi-black">$20</span>
                   <span className="text-gray-600">/month</span>
-                  <div className="text-sm text-gray-500 mt-1">$99/year (save 31%)</div>
+                  <div className="text-sm text-gray-500 mt-1">$210/year (save 12.5%)</div>
                 </div>
-                <ul className="space-y-3 text-left mb-8">
-                  <li className="flex items-center">
-                    <svg className="w-5 h-5 text-helfi-green mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    Everything in Health Basics
-                  </li>
-                  <li className="flex items-center">
-                    <svg className="w-5 h-5 text-helfi-green mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    Unlimited supplement interaction updates
-                  </li>
-                  <li className="flex items-center">
-                    <svg className="w-5 h-5 text-helfi-green mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    20 AI food photo analyses per day
-                  </li>
-                  <li className="flex items-center">
-                    <svg className="w-5 h-5 text-helfi-green mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    Personalized health insights
-                  </li>
-                  <li className="flex items-center">
-                    <svg className="w-5 h-5 text-helfi-green mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    Smart symptom tracking & correlation
-                  </li>
-                </ul>
+                
+                {/* Feature Categories */}
+                <div className="text-left mb-8 space-y-6">
+                  <div>
+                    <h4 className="font-semibold text-helfi-green mb-3 flex items-center">
+                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                      </svg>
+                      Food Analysis (25/month)
+                    </h4>
+                    <ul className="space-y-2 ml-7">
+                      <li className="flex items-center text-sm">
+                        <svg className="w-4 h-4 text-helfi-green mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        25 AI food photo analyses per month
+                      </li>
+                      <li className="flex items-center text-sm">
+                        <svg className="w-4 h-4 text-helfi-green mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        25 unlimited reanalysis credits
+                      </li>
+                    </ul>
+                  </div>
+                  
+                  <div>
+                    <h4 className="font-semibold text-blue-600 mb-3 flex items-center">
+                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Medical Analysis (25/month)
+                    </h4>
+                    <ul className="space-y-2 ml-7">
+                      <li className="flex items-center text-sm">
+                        <svg className="w-4 h-4 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        25 medical image analyses (rashes, moles, etc.)
+                      </li>
+                      <li className="flex items-center text-sm">
+                        <svg className="w-4 h-4 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        AI observations & recommendations
+                      </li>
+                    </ul>
+                  </div>
+                  
+                  <div>
+                    <h4 className="font-semibold text-purple-600 mb-3 flex items-center">
+                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                      Premium Features
+                    </h4>
+                    <ul className="space-y-2 ml-7">
+                      <li className="flex items-center text-sm">
+                        <svg className="w-4 h-4 text-purple-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Full medication interaction analysis
+                      </li>
+                      <li className="flex items-center text-sm">
+                        <svg className="w-4 h-4 text-purple-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Advanced AI health insights
+                      </li>
+                      <li className="flex items-center text-sm">
+                        <svg className="w-4 h-4 text-purple-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Priority customer support
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+                
+                <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-lg p-4 mb-6">
+                  <div className="text-sm text-gray-700">
+                    <strong>Need more credits?</strong><br/>
+                    $5 for 25 extra image scans • $10 for 75 extra scans
+                  </div>
+                </div>
+                
                 <button 
                   onClick={() => document.getElementById('waitlist-signup')?.scrollIntoView({ behavior: 'smooth' })}
                   className="btn-primary w-full"
-                >
-                  Start 14-Day Free Trial
-                </button>
-              </div>
-            </div>
-
-            {/* Ultimate Plan */}
-            <div className="bg-white rounded-2xl p-8 border-2 border-purple-200 relative">
-              <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                <span className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-4 py-1 rounded-full text-sm font-medium">
-                  Premium AI
-                </span>
-              </div>
-              <div className="text-center">
-                <h3 className="text-2xl font-bold text-helfi-black mb-2">Personal Health Assistant</h3>
-                <div className="mb-6">
-                  <span className="text-4xl font-bold text-helfi-black">$20</span>
-                  <span className="text-gray-600">/month</span>
-                  <div className="text-sm text-gray-500 mt-1">$179/year (save 25%)</div>
-                </div>
-                <ul className="space-y-3 text-left mb-8">
-                  <li className="flex items-center">
-                    <svg className="w-5 h-5 text-purple-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    Everything in AI Health Coach
-                  </li>
-                  <li className="flex items-center">
-                    <svg className="w-5 h-5 text-purple-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    <strong>"Talk to Helfi" voice AI assistant</strong>
-                  </li>
-                  <li className="flex items-center">
-                    <svg className="w-5 h-5 text-purple-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    Unlimited AI food photo analyses
-                  </li>
-                  <li className="flex items-center">
-                    <svg className="w-5 h-5 text-purple-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    All device integrations (Fitbit, Apple, etc.)
-                  </li>
-                  <li className="flex items-center">
-                    <svg className="w-5 h-5 text-purple-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    Real-time health monitoring & alerts
-                  </li>
-                </ul>
-                <button 
-                  onClick={() => document.getElementById('waitlist-signup')?.scrollIntoView({ behavior: 'smooth' })}
-                  className="bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:from-purple-700 hover:to-blue-700 transition-all duration-200 w-full"
                 >
                   Start 14-Day Free Trial
                 </button>
@@ -641,23 +652,35 @@ export default function SplashPage() {
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                <div className="bg-white rounded-xl p-6 shadow-sm border border-blue-100 hover:shadow-md transition-shadow">
-                  <div className="text-3xl mb-3">🎤</div>
-                  <h5 className="font-semibold text-gray-900 mb-2">Voice AI Commands</h5>
-                  <p className="text-sm text-gray-600">Say "Hey Helfi, I just ate lunch" and watch the magic happen</p>
+                <div className="bg-white rounded-xl p-6 shadow-sm border border-green-100 hover:shadow-md transition-shadow">
+                  <div className="text-3xl mb-3">🍎</div>
+                  <h5 className="font-semibold text-gray-900 mb-2">Food Analysis AI</h5>
+                  <p className="text-sm text-gray-600">25 AI food photo analyses with unlimited reanalysis credits</p>
                 </div>
                 
                 <div className="bg-white rounded-xl p-6 shadow-sm border border-blue-100 hover:shadow-md transition-shadow">
-                  <div className="text-3xl mb-3">📱</div>
-                  <h5 className="font-semibold text-gray-900 mb-2">Device Integration</h5>
-                  <p className="text-sm text-gray-600">Connect Fitbit, Apple Watch, Oura Ring and more instantly</p>
+                  <div className="text-3xl mb-3">🩺</div>
+                  <h5 className="font-semibold text-gray-900 mb-2">Medical Image Analysis</h5>
+                  <p className="text-sm text-gray-600">25 medical photo analyses for rashes, moles, skin conditions</p>
                 </div>
                 
-                <div className="bg-white rounded-xl p-6 shadow-sm border border-blue-100 hover:shadow-md transition-shadow">
-                  <div className="text-3xl mb-3">🧠</div>
-                  <h5 className="font-semibold text-gray-900 mb-2">Unlimited AI Insights</h5>
-                  <p className="text-sm text-gray-600">Get personalized health recommendations 24/7</p>
+                <div className="bg-white rounded-xl p-6 shadow-sm border border-purple-100 hover:shadow-md transition-shadow">
+                  <div className="text-3xl mb-3">💊</div>
+                  <h5 className="font-semibold text-gray-900 mb-2">Medication Interactions</h5>
+                  <p className="text-sm text-gray-600">Full medication & supplement interaction analysis</p>
                 </div>
+              </div>
+              
+              <div className="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-xl p-6 border border-yellow-200 mb-6">
+                <div className="flex items-center justify-center mb-3">
+                  <svg className="w-6 h-6 text-yellow-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.876c1.174 0 2.138-.93 2.254-2.094L21.88 9.88c.045-.445-.071-.89-.345-1.243A1.875 1.875 0 0020.125 8H3.875c-.621 0-1.188.276-1.51.637-.274.353-.39.798-.345 1.243l1.687 7.026C3.823 17.07 4.787 18 5.961 18z" />
+                  </svg>
+                  <strong className="text-yellow-800">Medical Disclaimer</strong>
+                </div>
+                <p className="text-sm text-yellow-700">
+                  Helfi provides educational information and observations only. Always consult healthcare professionals for medical advice, diagnosis, or treatment.
+                </p>
               </div>
               
               <div className="flex flex-wrap justify-center items-center gap-6 text-sm text-blue-700 font-medium">
