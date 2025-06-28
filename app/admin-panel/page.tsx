@@ -16,6 +16,12 @@ export default function AdminPanel() {
   const [aiInsights, setAiInsights] = useState<string>('')
   const [activeTab, setActiveTab] = useState('overview')
   const [loadingInsights, setLoadingInsights] = useState(false)
+  
+  // Additional admin data states
+  const [waitlistData, setWaitlistData] = useState<any[]>([])
+  const [userStats, setUserStats] = useState<any>(null)
+  const [isLoadingWaitlist, setIsLoadingWaitlist] = useState(false)
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false)
 
   // Check if already authenticated
   useEffect(() => {
@@ -23,6 +29,8 @@ export default function AdminPanel() {
     if (authStatus === 'true') {
       setIsAuthenticated(true)
       loadAnalyticsData()
+      loadWaitlistData()
+      loadUserStats()
     }
   }, [])
 
@@ -36,6 +44,8 @@ export default function AdminPanel() {
       setIsAuthenticated(true)
       sessionStorage.setItem('adminAuthenticated', 'true')
       loadAnalyticsData()
+      loadWaitlistData()
+      loadUserStats()
     } else {
       setError('Invalid password. Please try again.')
     }
@@ -71,6 +81,43 @@ export default function AdminPanel() {
     }
   }
 
+  const loadWaitlistData = async () => {
+    setIsLoadingWaitlist(true)
+    try {
+      const response = await fetch('/api/waitlist', {
+        headers: {
+          'Authorization': 'Bearer HelfiAdmin2024'
+        }
+      })
+      if (response.ok) {
+        const result = await response.json()
+        setWaitlistData(result.waitlist || [])
+      }
+    } catch (error) {
+      console.error('Error loading waitlist:', error)
+    }
+    setIsLoadingWaitlist(false)
+  }
+
+  const loadUserStats = async () => {
+    setIsLoadingUsers(true)
+    try {
+      // We'll create a simple endpoint to get user count and basic stats
+      const response = await fetch('/api/admin/users', {
+        headers: {
+          'Authorization': 'Bearer HelfiAdmin2024'
+        }
+      })
+      if (response.ok) {
+        const result = await response.json()
+        setUserStats(result)
+      }
+    } catch (error) {
+      console.error('Error loading user stats:', error)
+    }
+    setIsLoadingUsers(false)
+  }
+
   const loadAiInsights = async () => {
     setLoadingInsights(true)
     try {
@@ -88,6 +135,8 @@ export default function AdminPanel() {
 
   const refreshData = () => {
     loadAnalyticsData()
+    loadWaitlistData()
+    loadUserStats()
     if (activeTab === 'insights') {
       loadAiInsights()
     }
@@ -208,7 +257,9 @@ export default function AdminPanel() {
             {[
               { id: 'overview', label: '📊 Overview', desc: 'Key metrics' },
               { id: 'events', label: '📋 Events', desc: 'Raw data' },
-              { id: 'insights', label: '🤖 AI Insights', desc: 'OpenAI analysis' }
+              { id: 'insights', label: '🤖 AI Insights', desc: 'OpenAI analysis' },
+              { id: 'waitlist', label: '📧 Waitlist', desc: 'Signups' },
+              { id: 'users', label: '👥 Users', desc: 'User stats' }
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -376,6 +427,190 @@ export default function AdminPanel() {
                 <div className="text-4xl mb-4">🤖</div>
                 <p>Click "Generate Insights" to get AI-powered recommendations for improving your app.</p>
                 <p className="text-sm mt-2">Requires at least 10 user interactions for meaningful analysis.</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'waitlist' && (
+          <div className="bg-white rounded-lg shadow">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">Waitlist Signups</h3>
+              <p className="text-sm text-gray-600">
+                {isLoadingWaitlist ? 'Loading...' : `${waitlistData.length} people on waitlist`}
+              </p>
+            </div>
+            
+            {isLoadingWaitlist ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
+                <span className="ml-3 text-gray-600">Loading waitlist data...</span>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Name
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Email
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Signed Up
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {waitlistData.length === 0 ? (
+                      <tr>
+                        <td colSpan={3} className="px-6 py-4 text-center text-gray-500">
+                          No waitlist signups yet.
+                        </td>
+                      </tr>
+                    ) : (
+                      waitlistData.map((entry, index) => (
+                        <tr key={entry.id || index}>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {entry.name}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {entry.email}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {new Date(entry.createdAt).toLocaleDateString()}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'users' && (
+          <div className="space-y-6">
+            {isLoadingUsers ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
+                <span className="ml-3 text-gray-600">Loading user statistics...</span>
+              </div>
+            ) : userStats ? (
+              <>
+                {/* User Stats Overview */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="bg-white rounded-lg shadow p-6">
+                    <div className="text-3xl font-bold text-blue-600">
+                      {userStats.totalUsers}
+                    </div>
+                    <div className="text-sm text-gray-600">Total Users</div>
+                  </div>
+                  <div className="bg-white rounded-lg shadow p-6">
+                    <div className="text-3xl font-bold text-green-600">
+                      {userStats.recentSignups}
+                    </div>
+                    <div className="text-sm text-gray-600">New Users (30 days)</div>
+                  </div>
+                  <div className="bg-white rounded-lg shadow p-6">
+                    <div className="text-3xl font-bold text-purple-600">
+                      {userStats.completionRate}%
+                    </div>
+                    <div className="text-sm text-gray-600">Profile Completion</div>
+                  </div>
+                </div>
+
+                {/* Engagement Stats */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  <div className="bg-white rounded-lg shadow p-6">
+                    <div className="text-2xl font-bold text-orange-600">
+                      {userStats.usersWithGoals}
+                    </div>
+                    <div className="text-sm text-gray-600">Users with Goals</div>
+                  </div>
+                  <div className="bg-white rounded-lg shadow p-6">
+                    <div className="text-2xl font-bold text-red-600">
+                      {userStats.usersWithSupplements}
+                    </div>
+                    <div className="text-sm text-gray-600">Users with Supplements</div>
+                  </div>
+                  <div className="bg-white rounded-lg shadow p-6">
+                    <div className="text-2xl font-bold text-indigo-600">
+                      {userStats.usersWithMedications}
+                    </div>
+                    <div className="text-sm text-gray-600">Users with Medications</div>
+                  </div>
+                  <div className="bg-white rounded-lg shadow p-6">
+                    <div className="text-2xl font-bold text-teal-600">
+                      {userStats.usersWithFoodLogs}
+                    </div>
+                    <div className="text-sm text-gray-600">Users with Food Logs</div>
+                  </div>
+                </div>
+
+                {/* Recent Users */}
+                <div className="bg-white rounded-lg shadow">
+                  <div className="px-6 py-4 border-b border-gray-200">
+                    <h3 className="text-lg font-semibold text-gray-900">Recent Users</h3>
+                    <p className="text-sm text-gray-600">Latest 10 user registrations</p>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Email
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Name
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Joined
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Activity
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {userStats.recentUsers?.map((user: any, index: number) => (
+                          <tr key={user.id}>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {user.email}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              {user.name || 'Not set'}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {new Date(user.createdAt).toLocaleDateString()}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              <div className="flex space-x-1">
+                                {user._count.healthGoals > 0 && (
+                                  <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">
+                                    {user._count.healthGoals} goals
+                                  </span>
+                                )}
+                                {user._count.foodLogs > 0 && (
+                                  <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">
+                                    {user._count.foodLogs} foods
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="text-center py-12 text-gray-500">
+                <div className="text-4xl mb-4">👥</div>
+                <p>No user data available.</p>
               </div>
             )}
           </div>
