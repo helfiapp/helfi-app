@@ -567,7 +567,7 @@ export default function SplashPage() {
                         <svg className="w-4 h-4 text-helfi-green mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                         </svg>
-                        25 unlimited reanalysis credits
+                        Unlimited reanalysis credits
                       </li>
                     </ul>
                   </div>
@@ -655,7 +655,7 @@ export default function SplashPage() {
                 <div className="bg-white rounded-xl p-6 shadow-sm border border-green-100 hover:shadow-md transition-shadow">
                   <div className="text-3xl mb-3">🍎</div>
                   <h5 className="font-semibold text-gray-900 mb-2">Food Analysis AI</h5>
-                  <p className="text-sm text-gray-600">25 AI food photo analyses with unlimited reanalysis credits</p>
+                  <p className="text-sm text-gray-600">25 AI food photo analyses per month with unlimited reanalysis credits</p>
                 </div>
                 
                 <div className="bg-white rounded-xl p-6 shadow-sm border border-blue-100 hover:shadow-md transition-shadow">
