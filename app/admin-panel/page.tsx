@@ -771,18 +771,33 @@ export default function AdminPanel() {
                                 <div className="text-sm text-gray-500">{user.email}</div>
                               </div>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                                user.subscription?.plan === 'PREMIUM' 
-                                  ? 'bg-emerald-100 text-emerald-800' 
-                                  : 'bg-gray-100 text-gray-800'
-                              }`}>
-                                {user.subscription?.plan || 'FREE'}
-                                {user.subscription?.endDate && new Date(user.subscription.endDate).getFullYear() > 2050 && (
-                                  <span className="ml-1 text-xs">∞</span>
-                                )}
-                              </span>
-                            </td>
+                                                         <td className="px-6 py-4 whitespace-nowrap">
+                               <div className="flex flex-col space-y-1">
+                                 <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                   user.subscription?.plan === 'PREMIUM' 
+                                     ? 'bg-emerald-100 text-emerald-800' 
+                                     : 'bg-gray-100 text-gray-800'
+                                 }`}>
+                                   {user.subscription?.plan || 'FREE'}
+                                   {user.subscription?.endDate && new Date(user.subscription.endDate).getFullYear() > 2050 && (
+                                     <span className="ml-1 text-xs">∞</span>
+                                   )}
+                                 </span>
+                                 
+                                 {user.subscription?.endDate && (
+                                   <span className="text-xs text-gray-500">
+                                     {new Date(user.subscription.endDate).getFullYear() > 2050 
+                                       ? '🎉 Permanent' 
+                                       : `⏰ Until ${new Date(user.subscription.endDate).toLocaleDateString()}`
+                                     }
+                                   </span>
+                                 )}
+                                 
+                                 {user.subscription?.plan === 'PREMIUM' && !user.subscription?.endDate && (
+                                   <span className="text-xs text-green-600">💳 Paid</span>
+                                 )}
+                               </div>
+                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                               <div className="flex space-x-1">
                                 {user._count.healthGoals > 0 && (
@@ -811,21 +826,21 @@ export default function AdminPanel() {
                                 >
                                   Manage
                                 </button>
-                                {user.subscription?.plan === 'PREMIUM' ? (
-                                  <button
-                                    onClick={() => handleUserAction('deactivate', user.id)}
-                                    className="bg-orange-500 text-white px-3 py-1 rounded text-xs hover:bg-orange-600 transition-colors"
-                                  >
-                                    Deactivate
-                                  </button>
-                                ) : (
-                                  <button
-                                    onClick={() => handleUserAction('activate', user.id)}
-                                    className="bg-emerald-500 text-white px-3 py-1 rounded text-xs hover:bg-emerald-600 transition-colors"
-                                  >
-                                    Activate
-                                  </button>
-                                )}
+                                                                 {user.subscription?.plan === 'PREMIUM' ? (
+                                   <button
+                                     onClick={() => handleUserAction('deactivate', user.id)}
+                                     className="bg-orange-500 text-white px-3 py-1 rounded text-xs hover:bg-orange-600 transition-colors"
+                                   >
+                                     ⬇️ To Free
+                                   </button>
+                                 ) : (
+                                   <button
+                                     onClick={() => handleUserAction('activate', user.id)}
+                                     className="bg-emerald-500 text-white px-3 py-1 rounded text-xs hover:bg-emerald-600 transition-colors"
+                                   >
+                                     ⬆️ To Premium
+                                   </button>
+                                 )}
                                 <button
                                   onClick={() => {
                                     if (confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
@@ -872,52 +887,136 @@ export default function AdminPanel() {
               )}
             </div>
 
-            {/* User Management Modal */}
-            {showUserModal && selectedUser && (
-              <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
-                <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full mx-4">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                    Manage User: {selectedUser.name || selectedUser.email}
-                  </h3>
-                  
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-3">
-                      <button
-                        onClick={() => handleUserAction('grant_trial', selectedUser.id, { trialDays: 7 })}
-                        className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors text-sm"
-                      >
-                        7-Day Trial
-                      </button>
-                      <button
-                        onClick={() => handleUserAction('grant_trial', selectedUser.id, { trialDays: 30 })}
-                        className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors text-sm"
-                      >
-                        30-Day Trial
-                      </button>
-                    </div>
-                    
-                    <button
-                      onClick={() => handleUserAction('grant_free_access', selectedUser.id)}
-                      className="w-full bg-emerald-500 text-white px-4 py-2 rounded hover:bg-emerald-600 transition-colors text-sm"
-                    >
-                      Grant Permanent Free Access
-                    </button>
-                    
-                    <div className="border-t pt-4">
-                      <button
-                        onClick={() => {
-                          setShowUserModal(false)
-                          setSelectedUser(null)
-                        }}
-                        className="w-full bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400 transition-colors text-sm"
-                      >
-                        Close
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
+                         {/* User Management Modal */}
+             {showUserModal && selectedUser && (
+               <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+                 <div className="bg-white p-6 rounded-lg shadow-xl max-w-lg w-full mx-4">
+                   <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                     Manage User: {selectedUser.name || selectedUser.email}
+                   </h3>
+                   
+                   {/* Current Subscription Status */}
+                   <div className="bg-gray-50 rounded-lg p-4 mb-6 border-l-4 border-blue-500">
+                     <h4 className="font-medium text-gray-900 mb-2">Current Subscription Status</h4>
+                     <div className="space-y-2">
+                       <div className="flex justify-between items-center">
+                         <span className="text-sm text-gray-600">Plan:</span>
+                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                           selectedUser.subscription?.plan === 'PREMIUM' 
+                             ? 'bg-emerald-100 text-emerald-800' 
+                             : 'bg-gray-100 text-gray-800'
+                         }`}>
+                           {selectedUser.subscription?.plan || 'FREE'}
+                         </span>
+                       </div>
+                       
+                       {selectedUser.subscription?.endDate && (
+                         <div className="flex justify-between items-center">
+                           <span className="text-sm text-gray-600">Access Type:</span>
+                           <span className="text-sm font-medium">
+                             {new Date(selectedUser.subscription.endDate).getFullYear() > 2050 
+                               ? '🎉 Permanent Free Access' 
+                               : `⏰ Trial expires ${new Date(selectedUser.subscription.endDate).toLocaleDateString()}`
+                             }
+                           </span>
+                         </div>
+                       )}
+                       
+                       {selectedUser.subscription?.plan === 'PREMIUM' && !selectedUser.subscription?.endDate && (
+                         <div className="flex justify-between items-center">
+                           <span className="text-sm text-gray-600">Access Type:</span>
+                           <span className="text-sm font-medium text-green-600">💳 Active Premium Subscription</span>
+                         </div>
+                       )}
+                       
+                       {(!selectedUser.subscription || selectedUser.subscription?.plan === 'FREE') && (
+                         <div className="flex justify-between items-center">
+                           <span className="text-sm text-gray-600">Access Type:</span>
+                           <span className="text-sm font-medium text-gray-600">🆓 Free Plan</span>
+                         </div>
+                       )}
+                       
+                       <div className="flex justify-between items-center">
+                         <span className="text-sm text-gray-600">Member since:</span>
+                         <span className="text-sm">{new Date(selectedUser.createdAt).toLocaleDateString()}</span>
+                       </div>
+                     </div>
+                   </div>
+                   
+                   {/* Actions */}
+                   <div className="space-y-4">
+                     <h4 className="font-medium text-gray-900">Grant Access</h4>
+                     
+                     <div className="grid grid-cols-2 gap-3">
+                       <button
+                         onClick={() => handleUserAction('grant_trial', selectedUser.id, { trialDays: 7 })}
+                         className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors text-sm"
+                       >
+                         7-Day Trial
+                       </button>
+                       <button
+                         onClick={() => handleUserAction('grant_trial', selectedUser.id, { trialDays: 30 })}
+                         className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors text-sm"
+                       >
+                         30-Day Trial
+                       </button>
+                     </div>
+                     
+                     <button
+                       onClick={() => handleUserAction('grant_free_access', selectedUser.id)}
+                       className="w-full bg-emerald-500 text-white px-4 py-2 rounded hover:bg-emerald-600 transition-colors text-sm"
+                     >
+                       🎉 Grant Permanent Free Access
+                     </button>
+                     
+                     {/* Plan Controls */}
+                     <div className="border-t pt-4">
+                       <h4 className="font-medium text-gray-900 mb-3">Plan Controls</h4>
+                       <div className="grid grid-cols-2 gap-3">
+                         {selectedUser.subscription?.plan === 'PREMIUM' ? (
+                           <button
+                             onClick={() => handleUserAction('deactivate', selectedUser.id)}
+                             className="bg-orange-500 text-white px-4 py-2 rounded hover:bg-orange-600 transition-colors text-sm"
+                           >
+                             ⬇️ Downgrade to Free
+                           </button>
+                         ) : (
+                           <button
+                             onClick={() => handleUserAction('activate', selectedUser.id)}
+                             className="bg-emerald-500 text-white px-4 py-2 rounded hover:bg-emerald-600 transition-colors text-sm"
+                           >
+                             ⬆️ Upgrade to Premium
+                           </button>
+                         )}
+                         
+                         <button
+                           onClick={() => {
+                             if (confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
+                               handleUserAction('delete_user', selectedUser.id)
+                             }
+                           }}
+                           className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition-colors text-sm"
+                         >
+                           🗑️ Delete User
+                         </button>
+                       </div>
+                     </div>
+                     
+                     <div className="border-t pt-4">
+                       <button
+                         onClick={() => {
+                           setShowUserModal(false)
+                           setSelectedUser(null)
+                         }}
+                         className="w-full bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400 transition-colors text-sm"
+                       >
+                         Close
+                       </button>
+                     </div>
+                   </div>
+                 </div>
+               </div>
+             )}
           </div>
         )}
       </div>
