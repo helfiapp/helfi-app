@@ -817,32 +817,36 @@ The Helfi Team`)
                   </p>
                 </div>
                 <div className="flex space-x-3">
-                  {/* Test button to verify clicks work */}
                   <button
-                    onClick={() => alert('TEST BUTTON WORKS!')}
-                    className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600"
-                  >
-                    🧪 TEST
-                  </button>
-                  
-                  <button
-                    onClick={(e) => {
-                      console.log('Launch button clicked - selectedEmails:', selectedEmails.length)
-                      e.preventDefault()
-                      e.stopPropagation()
-                      
+                    onClick={() => {
+                      console.log('Launch button - selectedEmails:', selectedEmails)
                       if (selectedEmails.length === 0) {
                         alert('Please select at least one email address')
                         return
                       }
                       
-                      console.log('Setting launch template...')
-                      handleEmailTemplate('launch')
+                      // Set launch template directly
+                      setEmailTemplate('launch')
+                      setEmailSubject('🎉 Helfi is now live! Your personal AI health coach awaits')
+                      setEmailMessage(`Hi {name},
+
+Great news! Helfi is officially live and ready to transform your health journey.
+
+As a valued waitlist member, you get:
+✅ 14-day free trial with full premium access
+✅ 30 AI food analyses per day + 30 medical image analyses  
+✅ Complete medication interaction checking
+✅ Priority support from our team
+
+Ready to start your AI-powered health transformation?
+
+[Get Started Now - helfi.ai]
+
+Thank you for your patience and support,
+The Helfi Team`)
                       
-                      console.log('Opening modal...')
+                      console.log('Opening email modal...')
                       setShowEmailModal(true)
-                      
-                      console.log('Modal state should now be true')
                     }}
                     disabled={selectedEmails.length === 0}
                     className="bg-emerald-500 text-white px-4 py-2 rounded-lg hover:bg-emerald-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -850,23 +854,20 @@ The Helfi Team`)
                     📧 Send Launch Email
                   </button>
                   <button
-                    onClick={(e) => {
-                      console.log('Custom button clicked - selectedEmails:', selectedEmails.length)
-                      e.preventDefault()
-                      e.stopPropagation()
-                      
+                    onClick={() => {
+                      console.log('Custom button - selectedEmails:', selectedEmails)
                       if (selectedEmails.length === 0) {
                         alert('Please select at least one email address')
                         return
                       }
                       
-                      console.log('Setting custom template...')
-                      handleEmailTemplate('custom')
+                      // Set custom template directly
+                      setEmailTemplate('custom')
+                      setEmailSubject('')
+                      setEmailMessage('Hi {name},\n\n\n\nBest regards,\nThe Helfi Team')
                       
-                      console.log('Opening modal...')
+                      console.log('Opening email modal...')
                       setShowEmailModal(true)
-                      
-                      console.log('Modal state should now be true')
                     }}
                     disabled={selectedEmails.length === 0}
                     className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
