@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { useUserData } from '@/components/providers/UserDataProvider'
 
 // Global dark mode function type
 declare global {
@@ -14,6 +15,7 @@ declare global {
 
 export default function Settings() {
   const { data: session } = useSession()
+  const { userData, profileImage } = useUserData()
   const [dropdownOpen, setDropdownOpen] = useState(false)
   
   // Settings states with automatic saving
@@ -165,7 +167,7 @@ export default function Settings() {
     }
   }
 
-  // Profile data - using consistent green avatar
+  // Profile data - using consistent green avatar from UserDataProvider
   const defaultAvatar = 'data:image/svg+xml;base64,' + btoa(`
     <svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
       <circle cx="64" cy="64" r="64" fill="#10B981"/>
@@ -173,7 +175,7 @@ export default function Settings() {
       <path d="M64 76c-13.33 0-24 5.34-24 12v16c0 8.84 7.16 16 16 16h16c8.84 0 16-7.16 16-16V88c0-6.66-10.67-12-24-12z" fill="white"/>
     </svg>
   `);
-  const userImage = session?.user?.image || defaultAvatar;
+  const userImage = profileImage || session?.user?.image || defaultAvatar;
   const userName = session?.user?.name || 'User';
 
   // Close dropdown on outside click

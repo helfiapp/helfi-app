@@ -4,11 +4,12 @@ import React, { useState, useEffect } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { useUserData } from '@/components/providers/UserDataProvider'
 
 export default function Reports() {
   const { data: session } = useSession()
+  const { userData, profileImage } = useUserData()
   const [dropdownOpen, setDropdownOpen] = useState(false)
-  const [profileImage, setProfileImage] = useState<string>('')
 
   // Profile data - using consistent green avatar
   const defaultAvatar = 'data:image/svg+xml;base64,' + btoa(`
@@ -36,58 +37,14 @@ export default function Reports() {
     }
   }, [dropdownOpen]);
 
-  // Load profile image from database
-  useEffect(() => {
-    const loadProfileImage = async () => {
-      try {
-        const response = await fetch('/api/user-data');
-        if (response.ok) {
-          const result = await response.json();
-          if (result.data && result.data.profileImage) {
-            setProfileImage(result.data.profileImage);
-          }
-        }
-      } catch (error) {
-        console.error('Error loading profile image:', error);
-      }
-    };
-
-    if (session) {
-      loadProfileImage();
-    }
-  }, [session]);
+  // Profile image now loaded from UserDataProvider cache - no API call needed!
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Navigation Header - First Row */}
+      {/* Navigation Header - CONSISTENT WITH OTHER PAGES */}
       <nav className="bg-white border-b border-gray-200 px-4 py-3">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <div className="flex items-center">
-            <Link href="/dashboard" className="bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors">
-              Back to Dashboard
-            </Link>
-          </div>
-          
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-6">
-            <Link href="/dashboard" className="text-gray-700 hover:text-helfi-green transition-colors font-medium">
-              Dashboard
-            </Link>
-            <Link href="/health-tracking" className="text-gray-700 hover:text-helfi-green transition-colors font-medium">
-              Health Tracking
-            </Link>
-            <Link href="/insights" className="text-gray-700 hover:text-helfi-green transition-colors font-medium">
-              AI Insights
-            </Link>
-            <Link href="/reports" className="text-gray-700 hover:text-helfi-green transition-colors font-medium">
-              Reports
-            </Link>
-            <Link href="/onboarding?step=1" className="text-gray-700 hover:text-helfi-green transition-colors font-medium">
-              Health Info
-            </Link>
-          </div>
-
-          {/* Logo on the right */}
+          {/* Logo on the left */}
           <div className="flex items-center">
             <Link href="/" className="w-16 h-16 md:w-20 md:h-20 cursor-pointer hover:opacity-80 transition-opacity">
               <Image
@@ -100,122 +57,66 @@ export default function Reports() {
               />
             </Link>
           </div>
+          
+          {/* Profile Avatar & Dropdown on the right */}
+          <div className="relative dropdown-container" id="profile-dropdown">
+            <button
+              onClick={() => setDropdownOpen((v) => !v)}
+              className="focus:outline-none"
+              aria-label="Open profile menu"
+            >
+              <Image
+                src={userImage}
+                alt="Profile"
+                width={48}
+                height={48}
+                className="w-12 h-12 rounded-full border-2 border-helfi-green shadow-sm object-cover"
+              />
+            </button>
+            {dropdownOpen && (
+              <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-100 animate-fade-in">
+                <div className="flex items-center px-4 py-3 border-b border-gray-100">
+                  <Image
+                    src={userImage}
+                    alt="Profile"
+                    width={40}
+                    height={40}
+                    className="w-10 h-10 rounded-full object-cover mr-3"
+                  />
+                  <div>
+                    <div className="font-semibold text-gray-900">{userName}</div>
+                    <div className="text-xs text-gray-500">{session?.user?.email || 'user@email.com'}</div>
+                  </div>
+                </div>
+                <Link href="/profile" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Profile</Link>
+                <Link href="/account" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Account Settings</Link>
+                <Link href="/profile/image" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Upload/Change Profile Photo</Link>
+                <Link href="/billing" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Subscription & Billing</Link>
+                <Link href="/notifications" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Notifications</Link>
+                <Link href="/privacy" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Privacy Settings</Link>
+                <Link href="/help" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
+                <button
+                  onClick={() => signOut()}
+                  className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50 font-semibold"
+                >
+                  Logout
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </nav>
 
-      {/* Second Row - Page Title and Profile */}
+      {/* Second Row - Page Title Centered (CONSISTENT WITH OTHER PAGES) */}
       <div className="bg-white border-b border-gray-200 px-4 py-4">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <div></div> {/* Empty div for spacing */}
-          
-          {/* Centered Page Title */}
-          <div className="text-center">
-            <h1 className="text-lg md:text-xl font-semibold text-gray-900">Health Reports</h1>
-            <p className="text-sm text-gray-500 hidden sm:block">Weekly health analysis and trends</p>
-          </div>
-          
-          {/* Desktop Profile Avatar & Dropdown */}
-          <div className="hidden md:flex">
-            <div className="relative dropdown-container" id="profile-dropdown">
-              <button
-                onClick={() => setDropdownOpen((v) => !v)}
-                className="focus:outline-none"
-                aria-label="Open profile menu"
-              >
-                <Image
-                  src={userImage}
-                  alt="Profile"
-                  width={48}
-                  height={48}
-                  className="w-12 h-12 rounded-full border-2 border-helfi-green shadow-sm object-cover"
-                />
-              </button>
-              {dropdownOpen && (
-                <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-100 animate-fade-in">
-                  <div className="flex items-center px-4 py-3 border-b border-gray-100">
-                    <Image
-                      src={userImage}
-                      alt="Profile"
-                      width={40}
-                      height={40}
-                      className="w-10 h-10 rounded-full object-cover mr-3"
-                    />
-                    <div>
-                      <div className="font-semibold text-gray-900">{userName}</div>
-                      <div className="text-xs text-gray-500">{session?.user?.email || 'user@email.com'}</div>
-                    </div>
-                  </div>
-                  <Link href="/profile" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Profile</Link>
-                  <Link href="/account" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Account Settings</Link>
-                  <Link href="/profile/image" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Upload/Change Profile Photo</Link>
-                  <Link href="/billing" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Subscription & Billing</Link>
-                  <Link href="/notifications" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Notifications</Link>
-                  <Link href="/privacy" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Privacy Settings</Link>
-                  <Link href="/help" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
-                  <button
-                    onClick={() => signOut()}
-                    className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50 font-semibold"
-                  >
-                    Logout
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Mobile Profile - Show on mobile */}
-          <div className="md:hidden">
-            <div className="relative dropdown-container" id="mobile-profile-dropdown">
-              <button
-                onClick={() => setDropdownOpen((v) => !v)}
-                className="focus:outline-none"
-                aria-label="Open profile menu"
-              >
-                <Image
-                  src={userImage}
-                  alt="Profile"
-                  width={36}
-                  height={36}
-                  className="w-9 h-9 rounded-full border-2 border-helfi-green shadow-sm object-cover"
-                />
-              </button>
-              {dropdownOpen && (
-                <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-100">
-                  <div className="flex items-center px-4 py-3 border-b border-gray-100">
-                    <Image
-                      src={userImage}
-                      alt="Profile"
-                      width={40}
-                      height={40}
-                      className="w-10 h-10 rounded-full object-cover mr-3"
-                    />
-                    <div>
-                      <div className="font-semibold text-gray-900">{userName}</div>
-                      <div className="text-xs text-gray-500">{session?.user?.email || 'user@email.com'}</div>
-                    </div>
-                  </div>
-                  <Link href="/profile" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Profile</Link>
-                  <Link href="/account" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Account Settings</Link>
-                  <Link href="/profile/image" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Upload/Change Profile Photo</Link>
-                  <Link href="/billing" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Subscription & Billing</Link>
-                  <Link href="/notifications" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Notifications</Link>
-                  <Link href="/privacy" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Privacy Settings</Link>
-                  <Link href="/help" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
-                  <button
-                    onClick={() => signOut()}
-                    className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50 font-semibold"
-                  >
-                    Logout
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
+        <div className="max-w-7xl mx-auto text-center">
+          <h1 className="text-lg md:text-xl font-semibold text-gray-900">Health Reports</h1>
+          <p className="text-sm text-gray-500 hidden sm:block">Weekly health analysis and trends</p>
         </div>
       </div>
 
       {/* Main Content */}
-              <div className="max-w-7xl mx-auto px-4 py-8 pb-24 md:pb-8">
+      <div className="max-w-7xl mx-auto px-4 py-8 pb-24 md:pb-8">
         <div className="bg-white rounded-lg shadow-sm p-8">
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold text-helfi-black mb-4">
@@ -278,7 +179,7 @@ export default function Reports() {
         </div>
       </div>
 
-      {/* Mobile Bottom Navigation - Inspired by Google, Facebook, Amazon mobile apps */}
+      {/* Mobile Bottom Navigation */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-2 z-40">
         <div className="flex items-center justify-around">
           

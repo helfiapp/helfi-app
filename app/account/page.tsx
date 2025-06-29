@@ -5,9 +5,11 @@ import { useSession, signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
+import { useUserData } from '@/components/providers/UserDataProvider'
 
 export default function AccountPage() {
   const { data: session } = useSession()
+  const { userData, profileImage, updateUserData } = useUserData()
   const [loading, setLoading] = useState(true)
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
   const [accountData, setAccountData] = useState({
@@ -15,7 +17,6 @@ export default function AccountPage() {
     email: session?.user?.email || ''
   })
   const [dropdownOpen, setDropdownOpen] = useState(false)
-  const [profileImage, setProfileImage] = useState<string | null>(null)
   const router = useRouter()
 
   // Modal states
@@ -163,6 +164,7 @@ export default function AccountPage() {
                 </div>
                 <Link href="/settings" className="block px-4 py-2 text-gray-700 hover:bg-gray-50 font-medium">← Back to Settings</Link>
                 <div className="border-t border-gray-100 my-2"></div>
+                <Link href="/profile" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Profile</Link>
                 <Link href="/account" className="block px-4 py-2 text-gray-700 hover:bg-gray-50 bg-gray-50 font-medium">Account Settings</Link>
                 <Link href="/profile/image" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Upload/Change Profile Photo</Link>
                 <Link href="/billing" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Subscription & Billing</Link>
