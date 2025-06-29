@@ -105,7 +105,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   const pathname = usePathname()
   
   // Pages that should NOT have the sidebar (public pages)
-  const publicPages = ['/', '/healthapp', '/auth/signin', '/privacy', '/terms', '/help']
+  const publicPages = ['/', '/healthapp', '/auth/signin', '/privacy', '/terms', '/help', '/admin-panel']
   const shouldShowSidebar = !publicPages.includes(pathname)
 
   if (shouldShowSidebar) {
