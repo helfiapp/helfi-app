@@ -82,4 +82,4 @@ helfi/
 
 ## License
 
-This project is proprietary and confidential. All rights reserved. 
+This project is proprietary and confidential. All rights reserved. # Force deployment Sun Jun 29 17:44:23 AEST 2025
