@@ -295,7 +295,9 @@ export default function AdminPanel() {
   }
 
   const handleEmailTemplate = (template: string) => {
+    console.log('handleEmailTemplate called with:', template)
     setEmailTemplate(template)
+    console.log('setEmailTemplate completed')
     switch (template) {
              case 'launch':
          setEmailSubject('🎉 Helfi is now live! Your personal AI health coach awaits')
@@ -819,12 +821,16 @@ The Helfi Team`)
                 <div className="flex space-x-3">
                   <button
                     onClick={() => {
+                      console.log('Launch button clicked, selectedEmails:', selectedEmails)
                       if (selectedEmails.length === 0) {
                         alert('Please select at least one email address')
                         return
                       }
+                      console.log('About to call handleEmailTemplate')
                       handleEmailTemplate('launch')
+                      console.log('About to setShowEmailModal(true)')
                       setShowEmailModal(true)
+                      console.log('Modal should now be visible')
                     }}
                     disabled={selectedEmails.length === 0}
                     className="bg-emerald-500 text-white px-4 py-2 rounded-lg hover:bg-emerald-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -833,12 +839,16 @@ The Helfi Team`)
                   </button>
                   <button
                     onClick={() => {
+                      console.log('Custom button clicked, selectedEmails:', selectedEmails)
                       if (selectedEmails.length === 0) {
                         alert('Please select at least one email address')
                         return
                       }
+                      console.log('About to call handleEmailTemplate with custom')
                       handleEmailTemplate('custom')
+                      console.log('About to setShowEmailModal(true)')
                       setShowEmailModal(true)
+                      console.log('Custom modal should now be visible')
                     }}
                     disabled={selectedEmails.length === 0}
                     className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
