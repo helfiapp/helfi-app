@@ -66,8 +66,8 @@ export default function AdminPanel() {
       setAdminUser(JSON.parse(adminData))
       setIsAuthenticated(true)
       loadAnalyticsData()
-      loadWaitlistData()
-      loadUserStats()
+      loadWaitlistData(token)
+      loadUserStats(token)
     }
   }, [])
 
@@ -91,8 +91,8 @@ export default function AdminPanel() {
       sessionStorage.setItem('adminToken', 'temp-admin-token')
       sessionStorage.setItem('adminUser', JSON.stringify(mockAdmin))
       loadAnalyticsData()
-      loadWaitlistData()
-      loadUserStats()
+      loadWaitlistData('temp-admin-token')
+      loadUserStats('temp-admin-token')
       setLoading(false)
       return
     }
@@ -114,8 +114,8 @@ export default function AdminPanel() {
         sessionStorage.setItem('adminToken', result.token)
         sessionStorage.setItem('adminUser', JSON.stringify(result.admin))
         loadAnalyticsData()
-        loadWaitlistData()
-        loadUserStats()
+        loadWaitlistData(result.token)
+        loadUserStats(result.token)
       } else {
         const error = await response.json()
         setError(error.message || 'Authentication failed. Please check your credentials.')
@@ -160,12 +160,13 @@ export default function AdminPanel() {
     }
   }
 
-  const loadWaitlistData = async () => {
+  const loadWaitlistData = async (token?: string) => {
     setIsLoadingWaitlist(true)
     try {
+      const authToken = token || adminToken
       const response = await fetch('/api/waitlist', {
         headers: {
-          'Authorization': `Bearer ${adminToken}`
+          'Authorization': `Bearer ${authToken}`
         }
       })
       if (response.ok) {
@@ -178,13 +179,14 @@ export default function AdminPanel() {
     setIsLoadingWaitlist(false)
   }
 
-  const loadUserStats = async () => {
+  const loadUserStats = async (token?: string) => {
     setIsLoadingUsers(true)
     try {
+      const authToken = token || adminToken
       // We'll create a simple endpoint to get user count and basic stats
       const response = await fetch('/api/admin/users', {
         headers: {
-          'Authorization': `Bearer ${adminToken}`
+          'Authorization': `Bearer ${authToken}`
         }
       })
       if (response.ok) {
@@ -268,8 +270,8 @@ export default function AdminPanel() {
 
   const refreshData = () => {
     loadAnalyticsData()
-    loadWaitlistData()
-    loadUserStats()
+    loadWaitlistData(adminToken)
+    loadUserStats(adminToken)
     if (activeTab === 'insights') {
       loadAiInsights()
     }
