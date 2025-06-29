@@ -38,9 +38,6 @@ export default function AdminPanel() {
 
   // Email functionality states
   const [selectedEmails, setSelectedEmails] = useState<string[]>([])
-  const [showCustomEmailModal, setShowCustomEmailModal] = useState(false)
-  const [customEmailSubject, setCustomEmailSubject] = useState('')
-  const [customEmailMessage, setCustomEmailMessage] = useState('')
 
   // Admin management states
   const [showCreateAdminModal, setShowCreateAdminModal] = useState(false)
@@ -780,16 +777,43 @@ The Helfi Team`,
                     📧 Send Launch Email
                   </button>
                   <button
-                    onClick={() => {
+                    onClick={async () => {
                       if (selectedEmails.length === 0) {
                         alert('Please select at least one email address')
                         return
                       }
                       
-                      // Open custom email modal
-                      setCustomEmailSubject('')
-                      setCustomEmailMessage('Hi {name},\n\n\n\nBest regards,\nThe Helfi Team')
-                      setShowCustomEmailModal(true)
+                      const subject = prompt('Email subject:')
+                      if (!subject) return
+                      
+                      const message = prompt('Email message (use {name} for personalization):')
+                      if (!message) return
+                      
+                      const confirmed = confirm(`Send custom email to ${selectedEmails.length} recipients?`)
+                      if (!confirmed) return
+                      
+                      // Send custom email directly
+                      const response = await fetch('/api/admin/send-emails', {
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': 'application/json',
+                          'Authorization': `Bearer ${adminToken}`
+                        },
+                        body: JSON.stringify({
+                          emails: selectedEmails,
+                          subject: subject,
+                          message: message,
+                          waitlistData: waitlistData.filter(entry => selectedEmails.includes(entry.email))
+                        })
+                      })
+
+                      if (response.ok) {
+                        alert(`✅ Successfully sent custom emails to ${selectedEmails.length} recipients!`)
+                        setSelectedEmails([])
+                      } else {
+                        const error = await response.json()
+                        alert(`❌ Failed to send emails: ${error.message}`)
+                      }
                     }}
                     disabled={selectedEmails.length === 0}
                     className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1347,110 +1371,7 @@ The Helfi Team`,
                </div>
              )}
 
-             {/* Custom Email Modal */}
-             {showCustomEmailModal && (
-               <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
-                 <div className="bg-white p-6 rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-screen overflow-y-auto">
-                   <h3 className="text-xl font-semibold text-gray-900 mb-6">
-                     ✏️ Compose Custom Email to {selectedEmails.length} Recipients
-                   </h3>
-                   
-                   {/* Recipients Preview */}
-                   <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-                     <h4 className="text-sm font-medium text-gray-700 mb-2">Recipients ({selectedEmails.length})</h4>
-                     <div className="text-sm text-gray-600 max-h-20 overflow-y-auto">
-                       {selectedEmails.join(', ')}
-                     </div>
-                   </div>
 
-                   {/* Subject Line */}
-                   <div className="mb-4">
-                     <label className="block text-sm font-medium text-gray-700 mb-2">Subject Line</label>
-                     <input
-                       type="text"
-                       value={customEmailSubject}
-                       onChange={(e) => setCustomEmailSubject(e.target.value)}
-                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                       placeholder="Enter email subject..."
-                       autoFocus
-                     />
-                   </div>
-
-                   {/* Email Message */}
-                   <div className="mb-6">
-                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                       Message <span className="text-xs text-gray-500">(Use {'{name}'} to personalize with recipient names)</span>
-                     </label>
-                     <textarea
-                       value={customEmailMessage}
-                       onChange={(e) => setCustomEmailMessage(e.target.value)}
-                       rows={12}
-                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                       placeholder="Enter your email message..."
-                     />
-                   </div>
-
-                   {/* Action Buttons */}
-                   <div className="flex flex-col sm:flex-row sm:justify-end space-y-2 sm:space-y-0 sm:space-x-3">
-                     <button
-                       onClick={() => {
-                         setShowCustomEmailModal(false)
-                         setCustomEmailSubject('')
-                         setCustomEmailMessage('')
-                       }}
-                       className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
-                     >
-                       Cancel
-                     </button>
-                     <button
-                       onClick={async () => {
-                         if (!customEmailSubject.trim() || !customEmailMessage.trim()) {
-                           alert('Please enter both subject and message')
-                           return
-                         }
-                         
-                         const confirmed = confirm(`Send custom email to ${selectedEmails.length} recipients?`)
-                         if (!confirmed) return
-                         
-                         try {
-                           const response = await fetch('/api/admin/send-emails', {
-                             method: 'POST',
-                             headers: {
-                               'Content-Type': 'application/json',
-                               'Authorization': `Bearer ${adminToken}`
-                             },
-                             body: JSON.stringify({
-                               emails: selectedEmails,
-                               subject: customEmailSubject,
-                               message: customEmailMessage,
-                               waitlistData: waitlistData.filter(entry => selectedEmails.includes(entry.email))
-                             })
-                           })
-
-                           if (response.ok) {
-                             alert(`✅ Successfully sent custom emails to ${selectedEmails.length} recipients!`)
-                             setShowCustomEmailModal(false)
-                             setSelectedEmails([])
-                             setCustomEmailSubject('')
-                             setCustomEmailMessage('')
-                           } else {
-                             const error = await response.json()
-                             alert(`❌ Failed to send emails: ${error.message}`)
-                           }
-                         } catch (error) {
-                           console.error('Error sending emails:', error)
-                           alert('❌ Failed to send emails. Please try again.')
-                         }
-                       }}
-                       disabled={!customEmailSubject.trim() || !customEmailMessage.trim()}
-                       className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
-                     >
-                       📧 Send to {selectedEmails.length} Recipients
-                     </button>
-                   </div>
-                 </div>
-               </div>
-             )}
 
 
           </div>
