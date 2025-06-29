@@ -185,3 +185,25 @@ enum AdminRole {
   ADMIN
   MODERATOR
 }
+
+model EmailTemplate {
+  id          String            @id @default(cuid())
+  name        String            // Display name (e.g., "Welcome New Users")
+  category    EmailCategory     @default(MARKETING)
+  subject     String            // Email subject line
+  content     String            // Email body content
+  isActive    Boolean           @default(true)
+  isBuiltIn   Boolean           @default(false) // True for system templates, false for custom
+  createdBy   String?           // Admin user ID who created it
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+}
+
+enum EmailCategory {
+  ONBOARDING
+  MARKETING
+  SUPPORT
+  ANNOUNCEMENTS
+  RETENTION
+  CUSTOM
+}

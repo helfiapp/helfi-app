@@ -51,6 +51,17 @@ export default function AdminPanel() {
   const [isComposingUserEmail, setIsComposingUserEmail] = useState(false)
   const [emailTemplate, setEmailTemplate] = useState('custom')
 
+  // Template Management states
+  const [emailTemplates, setEmailTemplates] = useState<any[]>([])
+  const [isLoadingTemplates, setIsLoadingTemplates] = useState(false)
+  const [showTemplateForm, setShowTemplateForm] = useState(false)
+  const [editingTemplate, setEditingTemplate] = useState<any>(null)
+  const [templateName, setTemplateName] = useState('')
+  const [templateCategory, setTemplateCategory] = useState('MARKETING')
+  const [templateSubject, setTemplateSubject] = useState('')
+  const [templateContent, setTemplateContent] = useState('')
+  const [isSubmittingTemplate, setIsSubmittingTemplate] = useState(false)
+
   // Admin management states
   const [showCreateAdminModal, setShowCreateAdminModal] = useState(false)
   const [showPasswordModal, setShowPasswordModal] = useState(false)
@@ -401,6 +412,15 @@ export default function AdminPanel() {
   }
 
   const applyEmailTemplate = (templateType: string) => {
+    // Check if it's a database template ID
+    const dbTemplate = emailTemplates.find(t => t.id === templateType)
+    if (dbTemplate) {
+      setUserEmailSubject(dbTemplate.subject)
+      setUserEmailMessage(dbTemplate.content)
+      return
+    }
+
+    // Fallback to hardcoded templates for backwards compatibility
     switch (templateType) {
       case 'welcome':
         setUserEmailSubject('🎉 Welcome to Helfi - Your AI Health Journey Begins!')
@@ -573,6 +593,140 @@ The Helfi Team`)
     }
     
     setIsComposingUserEmail(false)
+  }
+
+  // Template Management Functions
+  const loadEmailTemplates = async () => {
+    setIsLoadingTemplates(true)
+    try {
+      const response = await fetch('/api/admin/email-templates', {
+        headers: {
+          'Authorization': `Bearer ${adminToken}`
+        }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setEmailTemplates(data.templates || [])
+      } else {
+        alert('Failed to load email templates')
+      }
+    } catch (error) {
+      console.error('Error loading templates:', error)
+      alert('Failed to load email templates')
+    }
+    setIsLoadingTemplates(false)
+  }
+
+  const handleCreateTemplate = () => {
+    setEditingTemplate(null)
+    setTemplateName('')
+    setTemplateCategory('MARKETING')
+    setTemplateSubject('')
+    setTemplateContent('Hi {name},\n\n\n\nBest regards,\nThe Helfi Team')
+    setShowTemplateForm(true)
+  }
+
+  const handleEditTemplate = (template: any) => {
+    setEditingTemplate(template)
+    setTemplateName(template.name)
+    setTemplateCategory(template.category)
+    setTemplateSubject(template.subject)
+    setTemplateContent(template.content)
+    setShowTemplateForm(true)
+  }
+
+  const handleSaveTemplate = async () => {
+    if (!templateName.trim() || !templateSubject.trim() || !templateContent.trim()) {
+      alert('Please fill in all required fields')
+      return
+    }
+
+    setIsSubmittingTemplate(true)
+
+    try {
+      const method = editingTemplate ? 'PUT' : 'POST'
+      const body = {
+        ...(editingTemplate && { id: editingTemplate.id }),
+        name: templateName,
+        category: templateCategory,
+        subject: templateSubject,
+        content: templateContent
+      }
+
+      const response = await fetch('/api/admin/email-templates', {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${adminToken}`
+        },
+        body: JSON.stringify(body)
+      })
+
+      if (response.ok) {
+        alert(`Template ${editingTemplate ? 'updated' : 'created'} successfully!`)
+        handleCancelTemplateForm()
+        loadEmailTemplates() // Reload templates
+      } else {
+        const error = await response.json()
+        alert(`Failed to save template: ${error.message}`)
+      }
+    } catch (error) {
+      console.error('Error saving template:', error)
+      alert('Failed to save template')
+    }
+
+    setIsSubmittingTemplate(false)
+  }
+
+  const handleDeleteTemplate = async (template: any) => {
+    if (template.isBuiltIn) {
+      alert('Cannot delete built-in templates')
+      return
+    }
+
+    const confirmed = confirm(`Are you sure you want to delete "${template.name}"? This action cannot be undone.`)
+    if (!confirmed) return
+
+    try {
+      const response = await fetch(`/api/admin/email-templates?id=${template.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${adminToken}`
+        }
+      })
+
+      if (response.ok) {
+        alert('Template deleted successfully!')
+        loadEmailTemplates() // Reload templates
+      } else {
+        const error = await response.json()
+        alert(`Failed to delete template: ${error.message}`)
+      }
+    } catch (error) {
+      console.error('Error deleting template:', error)
+      alert('Failed to delete template')
+    }
+  }
+
+  const handleCancelTemplateForm = () => {
+    setShowTemplateForm(false)
+    setEditingTemplate(null)
+    setTemplateName('')
+    setTemplateCategory('MARKETING')
+    setTemplateSubject('')
+    setTemplateContent('')
+  }
+
+  const getCategoryColor = (category: string) => {
+    switch (category) {
+      case 'ONBOARDING': return 'bg-green-100 text-green-800'
+      case 'MARKETING': return 'bg-purple-100 text-purple-800'
+      case 'SUPPORT': return 'bg-blue-100 text-blue-800'
+      case 'ANNOUNCEMENTS': return 'bg-orange-100 text-orange-800'
+      case 'RETENTION': return 'bg-yellow-100 text-yellow-800'
+      default: return 'bg-gray-100 text-gray-800'
+    }
   }
 
   // Admin Management Functions
@@ -815,7 +969,8 @@ The Helfi Team`)
               { id: 'insights', label: '🤖 AI Insights', desc: 'OpenAI analysis' },
               { id: 'waitlist', label: '📧 Waitlist', desc: 'Signups' },
               { id: 'users', label: '👥 Users', desc: 'User stats' },
-              { id: 'management', label: '🛠️ User Management', desc: 'Manage users' }
+              { id: 'management', label: '🛠️ User Management', desc: 'Manage users' },
+              { id: 'templates', label: '📝 Templates', desc: 'Email templates' }
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -826,6 +981,10 @@ The Helfi Team`)
                   }
                   if (tab.id === 'management') {
                     loadUserManagement(userSearch, userFilter, currentPage)
+                    loadEmailTemplates() // Load templates for email campaigns
+                  }
+                  if (tab.id === 'templates') {
+                    loadEmailTemplates()
                   }
                 }}
                 className={`py-4 px-1 border-b-2 font-medium text-sm ${
@@ -1527,12 +1686,33 @@ The Helfi Team`,
                       }}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                     >
-                      <option value="custom">Custom Email</option>
-                      <option value="welcome">🎉 Welcome Email</option>
-                      <option value="premium_upgrade">🔥 Premium Upgrade</option>
-                      <option value="engagement">🌟 Re-engagement</option>
-                      <option value="feature_announcement">🆕 Feature Announcement</option>
-                      <option value="support_followup">🤝 Support Follow-up</option>
+                      <option value="custom">✏️ Custom Email</option>
+                      
+                      {/* Built-in Templates */}
+                      <optgroup label="📦 Built-in Templates">
+                        <option value="welcome">🎉 Welcome Email</option>
+                        <option value="premium_upgrade">🔥 Premium Upgrade</option>
+                        <option value="engagement">🌟 Re-engagement</option>
+                        <option value="feature_announcement">🆕 Feature Announcement</option>
+                        <option value="support_followup">🤝 Support Follow-up</option>
+                      </optgroup>
+                      
+                      {/* Database Templates */}
+                      {emailTemplates.length > 0 && (
+                        <optgroup label="👤 Your Custom Templates">
+                          {emailTemplates.map((template) => (
+                            <option key={template.id} value={template.id}>
+                              {template.category === 'ONBOARDING' && '🎉'} 
+                              {template.category === 'MARKETING' && '📢'} 
+                              {template.category === 'SUPPORT' && '🤝'} 
+                              {template.category === 'ANNOUNCEMENTS' && '📣'} 
+                              {template.category === 'RETENTION' && '🔄'} 
+                              {template.category === 'CUSTOM' && '⚙️'} 
+                              {' '}{template.name}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
                     </select>
                   </div>
 
@@ -1927,6 +2107,289 @@ The Helfi Team`,
 
 
 
+          </div>
+        )}
+
+        {activeTab === 'templates' && (
+          <div className="space-y-6">
+            {/* Template Management Header */}
+            <div className="bg-white rounded-lg shadow p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Email Template Management</h3>
+                  <p className="text-sm text-gray-600">
+                    Create and manage email templates for campaigns
+                  </p>
+                </div>
+                <button
+                  onClick={handleCreateTemplate}
+                  className="bg-emerald-500 text-white px-4 py-2 rounded-lg hover:bg-emerald-600 transition-colors"
+                >
+                  ➕ Create New Template
+                </button>
+              </div>
+
+              {/* Template Statistics */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="bg-green-50 rounded-lg p-4">
+                  <div className="text-xl font-bold text-green-600">
+                    {emailTemplates.filter(t => t.category === 'ONBOARDING').length}
+                  </div>
+                  <div className="text-sm text-green-700">Onboarding</div>
+                </div>
+                <div className="bg-purple-50 rounded-lg p-4">
+                  <div className="text-xl font-bold text-purple-600">
+                    {emailTemplates.filter(t => t.category === 'MARKETING').length}
+                  </div>
+                  <div className="text-sm text-purple-700">Marketing</div>
+                </div>
+                <div className="bg-blue-50 rounded-lg p-4">
+                  <div className="text-xl font-bold text-blue-600">
+                    {emailTemplates.filter(t => t.category === 'SUPPORT').length}
+                  </div>
+                  <div className="text-sm text-blue-700">Support</div>
+                </div>
+                <div className="bg-orange-50 rounded-lg p-4">
+                  <div className="text-xl font-bold text-orange-600">
+                    {emailTemplates.filter(t => !t.isBuiltIn).length}
+                  </div>
+                  <div className="text-sm text-orange-700">Custom</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Template Creation/Edit Form */}
+            {showTemplateForm && (
+              <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200 rounded-lg p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h3 className="text-lg font-semibold text-emerald-900">
+                      {editingTemplate ? '✏️ Edit Template' : '➕ Create New Template'}
+                    </h3>
+                    <p className="text-sm text-emerald-700">
+                      {editingTemplate ? `Editing: ${editingTemplate.name}` : 'Create a new email template'}
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleCancelTemplateForm}
+                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Left Column - Form Fields */}
+                  <div className="space-y-4">
+                    {/* Template Name */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Template Name <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={templateName}
+                        onChange={(e) => setTemplateName(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                        placeholder="e.g., Welcome New Users"
+                      />
+                    </div>
+
+                    {/* Category */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
+                      <select
+                        value={templateCategory}
+                        onChange={(e) => setTemplateCategory(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                      >
+                        <option value="ONBOARDING">🎉 Onboarding</option>
+                        <option value="MARKETING">📢 Marketing</option>
+                        <option value="SUPPORT">🤝 Support</option>
+                        <option value="ANNOUNCEMENTS">📢 Announcements</option>
+                        <option value="RETENTION">🔄 Retention</option>
+                        <option value="CUSTOM">⚙️ Custom</option>
+                      </select>
+                    </div>
+
+                    {/* Subject Line */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Subject Line <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={templateSubject}
+                        onChange={(e) => setTemplateSubject(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                        placeholder="Enter email subject..."
+                      />
+                    </div>
+                  </div>
+
+                  {/* Right Column - Preview */}
+                  <div className="bg-white p-4 rounded-lg border border-gray-200">
+                    <h4 className="text-sm font-medium text-gray-700 mb-2">📧 Template Preview</h4>
+                    <div className="text-sm text-gray-600 space-y-1">
+                      <div><strong>Name:</strong> {templateName || 'Untitled Template'}</div>
+                      <div>
+                        <strong>Category:</strong> 
+                        <span className={`ml-2 px-2 py-1 rounded-full text-xs ${getCategoryColor(templateCategory)}`}>
+                          {templateCategory}
+                        </span>
+                      </div>
+                      <div><strong>Subject:</strong> {templateSubject || 'No subject'}</div>
+                      <div className="max-h-24 overflow-y-auto">
+                        <strong>Content:</strong> {templateContent.slice(0, 150)}
+                        {templateContent.length > 150 && '...'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Message Content */}
+                <div className="mt-6">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Email Content <span className="text-red-500">*</span>
+                    <span className="text-xs text-gray-500 ml-2">(Use {'{name}'} for personalization)</span>
+                  </label>
+                  <textarea
+                    value={templateContent}
+                    onChange={(e) => setTemplateContent(e.target.value)}
+                    rows={10}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base leading-relaxed"
+                    placeholder="Enter your email content..."
+                  />
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex flex-col sm:flex-row gap-3 pt-6">
+                  <button
+                    onClick={handleCancelTemplateForm}
+                    className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSaveTemplate}
+                    disabled={isSubmittingTemplate || !templateName.trim() || !templateSubject.trim() || !templateContent.trim()}
+                    className="px-6 py-3 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium flex items-center justify-center"
+                  >
+                    {isSubmittingTemplate ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        {editingTemplate ? 'Updating...' : 'Creating...'}
+                      </>
+                    ) : (
+                      <>
+                        {editingTemplate ? '💾 Update Template' : '➕ Create Template'}
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Templates List */}
+            <div className="bg-white rounded-lg shadow">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <h4 className="text-md font-semibold text-gray-900">
+                  {isLoadingTemplates ? 'Loading...' : `${emailTemplates.length} templates available`}
+                </h4>
+              </div>
+              
+              {isLoadingTemplates ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
+                  <span className="ml-3 text-gray-600">Loading templates...</span>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Template
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Category
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Subject
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Type
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {emailTemplates.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="px-6 py-4 text-center text-gray-500">
+                            No email templates found. Create your first template!
+                          </td>
+                        </tr>
+                      ) : (
+                        emailTemplates.map((template) => (
+                          <tr key={template.id}>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm font-medium text-gray-900">
+                                {template.name}
+                              </div>
+                              <div className="text-sm text-gray-500">
+                                Created {new Date(template.createdAt).toLocaleDateString()}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getCategoryColor(template.category)}`}>
+                                {template.category}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="text-sm text-gray-900 max-w-xs truncate">
+                                {template.subject}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                template.isBuiltIn 
+                                  ? 'bg-blue-100 text-blue-800' 
+                                  : 'bg-green-100 text-green-800'
+                              }`}>
+                                {template.isBuiltIn ? '🔧 System' : '👤 Custom'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                              <div className="flex space-x-2">
+                                <button
+                                  onClick={() => handleEditTemplate(template)}
+                                  className="bg-blue-500 text-white px-3 py-1 rounded text-xs hover:bg-blue-600 transition-colors"
+                                >
+                                  ✏️ Edit
+                                </button>
+                                {!template.isBuiltIn && (
+                                  <button
+                                    onClick={() => handleDeleteTemplate(template)}
+                                    className="bg-red-500 text-white px-3 py-1 rounded text-xs hover:bg-red-600 transition-colors"
+                                  >
+                                    🗑️ Delete
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
