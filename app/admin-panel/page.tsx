@@ -58,7 +58,7 @@ export default function AdminPanel() {
     setError('')
 
     // Check password
-    if (password === 'HelfiAdmin2024') {
+    if (password === 'Helfi@Admin2024!Secure$9x') {
       setIsAuthenticated(true)
       sessionStorage.setItem('adminAuthenticated', 'true')
       loadAnalyticsData()
@@ -104,7 +104,7 @@ export default function AdminPanel() {
     try {
       const response = await fetch('/api/waitlist', {
         headers: {
-          'Authorization': 'Bearer HelfiAdmin2024'
+          'Authorization': 'Bearer Helfi@Admin2024!Secure$9x'
         }
       })
       if (response.ok) {
@@ -123,7 +123,7 @@ export default function AdminPanel() {
       // We'll create a simple endpoint to get user count and basic stats
       const response = await fetch('/api/admin/users', {
         headers: {
-          'Authorization': 'Bearer HelfiAdmin2024'
+          'Authorization': 'Bearer Helfi@Admin2024!Secure$9x'
         }
       })
       if (response.ok) {
@@ -148,7 +148,7 @@ export default function AdminPanel() {
       
       const response = await fetch(`/api/admin/user-management?${params}`, {
         headers: {
-          'Authorization': 'Bearer HelfiAdmin2024'
+          'Authorization': 'Bearer Helfi@Admin2024!Secure$9x'
         }
       })
       
@@ -170,7 +170,7 @@ export default function AdminPanel() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer HelfiAdmin2024'
+          'Authorization': 'Bearer Helfi@Admin2024!Secure$9x'
         },
         body: JSON.stringify({ action, userId, data })
       })
@@ -296,7 +296,7 @@ The Helfi Team`)
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer HelfiAdmin2024'
+          'Authorization': 'Bearer Helfi@Admin2024!Secure$9x'
         },
         body: JSON.stringify({
           emails: selectedEmails,

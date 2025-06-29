@@ -5,7 +5,7 @@ export async function GET(request: NextRequest) {
   try {
     // Authentication check
     const authHeader = request.headers.get('authorization')
-    if (authHeader !== 'Bearer HelfiAdmin2024') {
+    if (authHeader !== 'Bearer Helfi@Admin2024!Secure$9x') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
   try {
     // Authentication check
     const authHeader = request.headers.get('authorization')
-    if (authHeader !== 'Bearer HelfiAdmin2024') {
+    if (authHeader !== 'Bearer Helfi@Admin2024!Secure$9x') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
