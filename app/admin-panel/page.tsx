@@ -516,24 +516,23 @@ The Helfi Team`)
         break
       
       case 'support_followup':
-        setUserEmailSubject('🤝 Following Up - How Can We Help You Better?')
+        setUserEmailSubject('🌟 Hope you\'re enjoying your Helfi journey!')
         setUserEmailMessage(`Hi {name},
 
-Hope you're doing well! We wanted to follow up and see how your experience with Helfi has been going.
+Hope you're doing well! 😊
 
-🤔 **We'd love to know:**
-• Are you finding the features helpful?
-• Is there anything confusing or frustrating?
-• What would make Helfi even better for you?
+We noticed you've been using Helfi and wanted to personally check in to see how everything is going for you.
 
-💬 **Your feedback matters!** Just reply to this email with your thoughts - our team reads every response personally.
+✨ **Your health journey matters to us**, and we're here to make sure you get the most out of Helfi.
 
-🆘 **Need immediate help?** Contact us at support@helfi.ai
+If you have any questions, thoughts, or just want to share how Helfi has been helping you, we'd love to hear from you! Simply reply to this email - our team personally reads every message.
 
-Thank you for being part of the Helfi community!
+🚀 **Pro tip:** The more you use Helfi's AI analysis, the better it gets at understanding your unique health patterns!
 
-Best regards,
-The Helfi Team`)
+Wishing you the best on your health journey,
+
+The Helfi Team
+P.S. Need quick help? We're always here at support@helfi.ai`)
         break
         
       default:
