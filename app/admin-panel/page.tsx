@@ -817,6 +817,14 @@ The Helfi Team`)
                   </p>
                 </div>
                 <div className="flex space-x-3">
+                  {/* Test button to verify clicks work */}
+                  <button
+                    onClick={() => alert('TEST BUTTON WORKS!')}
+                    className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600"
+                  >
+                    🧪 TEST
+                  </button>
+                  
                   <button
                     onClick={(e) => {
                       console.log('Launch button clicked - selectedEmails:', selectedEmails.length)
