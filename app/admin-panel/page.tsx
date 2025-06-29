@@ -38,11 +38,6 @@ export default function AdminPanel() {
 
   // Email functionality states
   const [selectedEmails, setSelectedEmails] = useState<string[]>([])
-  const [showEmailModal, setShowEmailModal] = useState(false)
-  const [emailSubject, setEmailSubject] = useState('')
-  const [emailMessage, setEmailMessage] = useState('')
-  const [emailTemplate, setEmailTemplate] = useState('launch')
-  const [isLoadingEmail, setIsLoadingEmail] = useState(false)
 
   // Admin management states
   const [showCreateAdminModal, setShowCreateAdminModal] = useState(false)
@@ -294,97 +289,7 @@ export default function AdminPanel() {
     }
   }
 
-  const handleEmailTemplate = (template: string) => {
-    setEmailTemplate(template)
-    switch (template) {
-             case 'launch':
-         setEmailSubject('🎉 Helfi is now live! Your personal AI health coach awaits')
-         setEmailMessage(`Hi {name},
 
-Great news! Helfi is officially live and ready to transform your health journey.
-
-As a valued waitlist member, you get:
-✅ 14-day free trial with full premium access
-✅ 30 AI food analyses per day + 30 medical image analyses  
-✅ Complete medication interaction checking
-✅ Priority support from our team
-
-Ready to start your AI-powered health transformation?
-
-[Get Started Now - helfi.ai]
-
-Thank you for your patience and support,
-The Helfi Team`)
-         break
-       case 'update':
-         setEmailSubject('📱 Helfi Platform Update - New Features Added')
-         setEmailMessage(`Hi {name},
-
-We've added exciting new features to Helfi that we think you'll love:
-
-🆕 What's New:
-• Enhanced AI food analysis with better accuracy
-• New medical image analysis for skin conditions
-• Improved medication interaction database
-• Faster mobile performance
-
-Your health data is more powerful than ever. Log in to explore!
-
-[Access Helfi - helfi.ai]
-
-Best regards,
-The Helfi Team`)
-         break
-       case 'custom':
-         setEmailSubject('')
-         setEmailMessage('Hi {name},\n\n\n\nBest regards,\nThe Helfi Team')
-         break
-    }
-  }
-
-  const sendEmails = async () => {
-    if (selectedEmails.length === 0) {
-      alert('Please select at least one email address')
-      return
-    }
-    
-    if (!emailSubject.trim() || !emailMessage.trim()) {
-      alert('Please enter both subject and message')
-      return
-    }
-
-    setIsLoadingEmail(true)
-    try {
-      const response = await fetch('/api/admin/send-emails', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${adminToken}`
-        },
-        body: JSON.stringify({
-          emails: selectedEmails,
-          subject: emailSubject,
-          message: emailMessage,
-          waitlistData: waitlistData.filter(entry => selectedEmails.includes(entry.email))
-        })
-      })
-
-      if (response.ok) {
-        alert(`Successfully sent emails to ${selectedEmails.length} recipients`)
-        setShowEmailModal(false)
-        setSelectedEmails([])
-        setEmailSubject('')
-        setEmailMessage('')
-      } else {
-        const error = await response.json()
-        alert(`Failed to send emails: ${error.message}`)
-      }
-    } catch (error) {
-      console.error('Error sending emails:', error)
-      alert('Failed to send emails. Please try again.')
-    }
-    setIsLoadingEmail(false)
-  }
 
   // Admin Management Functions
   const loadAdminList = async () => {
@@ -815,23 +720,30 @@ The Helfi Team`)
                       : 'Select recipients to send emails'
                     }
                   </p>
-                  <p className="text-xs text-red-600 font-mono">
-                    DEBUG: showEmailModal = {String(showEmailModal)}
-                  </p>
+
                 </div>
                 <div className="flex space-x-3">
                   <button
-                    onClick={() => {
-                      alert('Launch button clicked! selectedEmails: ' + selectedEmails.length)
+                    onClick={async () => {
                       if (selectedEmails.length === 0) {
                         alert('Please select at least one email address')
                         return
                       }
                       
-                      // Set launch template directly
-                      setEmailTemplate('launch')
-                      setEmailSubject('🎉 Helfi is now live! Your personal AI health coach awaits')
-                      setEmailMessage(`Hi {name},
+                      const confirmed = confirm(`Send launch email to ${selectedEmails.length} recipients: ${selectedEmails.join(', ')}?`)
+                      if (!confirmed) return
+                      
+                      // Send email directly without modal
+                      const response = await fetch('/api/admin/send-emails', {
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': 'application/json',
+                          'Authorization': `Bearer ${adminToken}`
+                        },
+                        body: JSON.stringify({
+                          emails: selectedEmails,
+                          subject: '🎉 Helfi is now live! Your personal AI health coach awaits',
+                          message: `Hi {name},
 
 Great news! Helfi is officially live and ready to transform your health journey.
 
@@ -846,11 +758,18 @@ Ready to start your AI-powered health transformation?
 [Get Started Now - helfi.ai]
 
 Thank you for your patience and support,
-The Helfi Team`)
-                      
-                      alert('About to open modal...')
-                      setShowEmailModal(true)
-                      alert('Modal should now be open')
+The Helfi Team`,
+                          waitlistData: waitlistData.filter(entry => selectedEmails.includes(entry.email))
+                        })
+                      })
+
+                      if (response.ok) {
+                        alert(`✅ Successfully sent launch emails to ${selectedEmails.length} recipients!`)
+                        setSelectedEmails([])
+                      } else {
+                        const error = await response.json()
+                        alert(`❌ Failed to send emails: ${error.message}`)
+                      }
                     }}
                     disabled={selectedEmails.length === 0}
                     className="bg-emerald-500 text-white px-4 py-2 rounded-lg hover:bg-emerald-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -859,20 +778,43 @@ The Helfi Team`)
                   </button>
                   <button
                     onClick={() => {
-                      alert('Custom button clicked! selectedEmails: ' + selectedEmails.length)
                       if (selectedEmails.length === 0) {
                         alert('Please select at least one email address')
                         return
                       }
                       
-                      // Set custom template directly
-                      setEmailTemplate('custom')
-                      setEmailSubject('')
-                      setEmailMessage('Hi {name},\n\n\n\nBest regards,\nThe Helfi Team')
+                      const subject = prompt('Email subject:')
+                      if (!subject) return
                       
-                      alert('About to open modal...')
-                      setShowEmailModal(true)
-                      alert('Modal should now be open')
+                      const message = prompt('Email message (use {name} for personalization):')
+                      if (!message) return
+                      
+                      const confirmed = confirm(`Send custom email to ${selectedEmails.length} recipients?`)
+                      if (!confirmed) return
+                      
+                      // Send custom email directly
+                      fetch('/api/admin/send-emails', {
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': 'application/json',
+                          'Authorization': `Bearer ${adminToken}`
+                        },
+                        body: JSON.stringify({
+                          emails: selectedEmails,
+                          subject: subject,
+                          message: message,
+                          waitlistData: waitlistData.filter(entry => selectedEmails.includes(entry.email))
+                        })
+                      }).then(response => {
+                        if (response.ok) {
+                          alert(`✅ Successfully sent custom emails to ${selectedEmails.length} recipients!`)
+                          setSelectedEmails([])
+                        } else {
+                          response.json().then(error => {
+                            alert(`❌ Failed to send emails: ${error.message}`)
+                          })
+                        }
+                      })
                     }}
                     disabled={selectedEmails.length === 0}
                     className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1430,21 +1372,7 @@ The Helfi Team`)
                </div>
              )}
 
-             {/* Email Composition Modal */}
-             {showEmailModal && (
-               <div className="fixed inset-0 bg-red-600 bg-opacity-90 overflow-y-auto h-full w-full flex items-center justify-center" style={{zIndex: 99999}}>
-                 <div className="bg-white p-6 rounded-lg shadow-xl max-w-lg w-full mx-4">
-                   <h1 className="text-2xl font-bold text-center mb-4">🎉 EMAIL MODAL WORKS!</h1>
-                   <p className="text-center mb-4">Selected: {selectedEmails.join(', ')}</p>
-                   <button
-                     onClick={() => setShowEmailModal(false)}
-                     className="w-full bg-green-500 text-white px-4 py-2 rounded"
-                   >
-                     Close Modal
-                   </button>
-                 </div>
-               </div>
-             )}
+
           </div>
         )}
       </div>
