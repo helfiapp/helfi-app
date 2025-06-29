@@ -1433,108 +1433,15 @@ The Helfi Team`)
              {/* Email Composition Modal */}
              {showEmailModal && (
                <div className="fixed inset-0 bg-red-600 bg-opacity-90 overflow-y-auto h-full w-full flex items-center justify-center" style={{zIndex: 99999}}>
-                 <div className="bg-white p-6 rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-screen overflow-y-auto">
-                   <h3 className="text-xl font-semibold text-gray-900 mb-6">
-                     📧 Compose Email to {selectedEmails.length} Recipients
-                   </h3>
-                   
-                   {/* Email Template Selection */}
-                   <div className="mb-6">
-                     <label className="block text-sm font-medium text-gray-700 mb-2">Email Template</label>
-                     <div className="grid grid-cols-3 gap-3">
-                       <button
-                         onClick={() => handleEmailTemplate('launch')}
-                         className={`p-3 border rounded-lg text-sm ${emailTemplate === 'launch' 
-                           ? 'border-emerald-500 bg-emerald-50 text-emerald-700' 
-                           : 'border-gray-300 hover:border-gray-400'
-                         }`}
-                       >
-                         🚀 Launch Announcement
-                       </button>
-                       <button
-                         onClick={() => handleEmailTemplate('update')}
-                         className={`p-3 border rounded-lg text-sm ${emailTemplate === 'update' 
-                           ? 'border-blue-500 bg-blue-50 text-blue-700' 
-                           : 'border-gray-300 hover:border-gray-400'
-                         }`}
-                       >
-                         📱 Product Update
-                       </button>
-                       <button
-                         onClick={() => handleEmailTemplate('custom')}
-                         className={`p-3 border rounded-lg text-sm ${emailTemplate === 'custom' 
-                           ? 'border-purple-500 bg-purple-50 text-purple-700' 
-                           : 'border-gray-300 hover:border-gray-400'
-                         }`}
-                       >
-                         ✏️ Custom Message
-                       </button>
-                     </div>
-                   </div>
-
-                   {/* Subject Line */}
-                   <div className="mb-4">
-                     <label className="block text-sm font-medium text-gray-700 mb-2">Subject Line</label>
-                     <input
-                       type="text"
-                       value={emailSubject}
-                       onChange={(e) => setEmailSubject(e.target.value)}
-                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                       placeholder="Enter email subject..."
-                     />
-                   </div>
-
-                   {/* Email Message */}
-                                        <div className="mb-6">
-                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                         Message <span className="text-xs text-gray-500">(Use {'{name}'} to personalize with recipient names)</span>
-                       </label>
-                     <textarea
-                       value={emailMessage}
-                       onChange={(e) => setEmailMessage(e.target.value)}
-                       rows={12}
-                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                       placeholder="Enter your email message..."
-                     />
-                   </div>
-
-                   {/* Recipients Preview */}
-                   <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-                     <h4 className="text-sm font-medium text-gray-700 mb-2">Recipients ({selectedEmails.length})</h4>
-                     <div className="text-sm text-gray-600 max-h-20 overflow-y-auto">
-                       {selectedEmails.join(', ')}
-                     </div>
-                   </div>
-
-                   {/* Action Buttons */}
-                   <div className="flex flex-col sm:flex-row sm:justify-end space-y-2 sm:space-y-0 sm:space-x-3">
-                     <button
-                       onClick={() => {
-                         setShowEmailModal(false)
-                         setEmailSubject('')
-                         setEmailMessage('')
-                       }}
-                       className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
-                     >
-                       Cancel
-                     </button>
-                     <button
-                       onClick={sendEmails}
-                       disabled={isLoadingEmail || !emailSubject.trim() || !emailMessage.trim()}
-                       className="bg-emerald-500 text-white px-6 py-2 rounded-lg hover:bg-emerald-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
-                     >
-                       {isLoadingEmail ? (
-                         <>
-                           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                           Sending...
-                         </>
-                       ) : (
-                         <>
-                           📧 Send to {selectedEmails.length} Recipients
-                         </>
-                       )}
-                     </button>
-                   </div>
+                 <div className="bg-white p-6 rounded-lg shadow-xl max-w-lg w-full mx-4">
+                   <h1 className="text-2xl font-bold text-center mb-4">🎉 EMAIL MODAL WORKS!</h1>
+                   <p className="text-center mb-4">Selected: {selectedEmails.join(', ')}</p>
+                   <button
+                     onClick={() => setShowEmailModal(false)}
+                     className="w-full bg-green-500 text-white px-4 py-2 rounded"
+                   >
+                     Close Modal
+                   </button>
                  </div>
                </div>
              )}
