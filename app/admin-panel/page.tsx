@@ -68,6 +68,15 @@ export default function AdminPanel() {
   const [isTestingEmail, setIsTestingEmail] = useState(false)
   const [emailTestResult, setEmailTestResult] = useState<any>(null)
 
+  // Support ticket states
+  const [supportTickets, setSupportTickets] = useState<any[]>([])
+  const [isLoadingTickets, setIsLoadingTickets] = useState(false)
+  const [ticketFilter, setTicketFilter] = useState('all')
+  const [selectedTicket, setSelectedTicket] = useState<any>(null)
+  const [showTicketModal, setShowTicketModal] = useState(false)
+  const [ticketResponse, setTicketResponse] = useState('')
+  const [isRespondingToTicket, setIsRespondingToTicket] = useState(false)
+
   // Admin management states
   const [showCreateAdminModal, setShowCreateAdminModal] = useState(false)
   const [showPasswordModal, setShowPasswordModal] = useState(false)
@@ -911,6 +920,87 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
     }
   }
 
+  // Support ticket functions
+  const loadSupportTickets = async () => {
+    setIsLoadingTickets(true)
+    try {
+      const response = await fetch(`/api/admin/tickets?status=${ticketFilter}`, {
+        headers: {
+          'Authorization': `Bearer ${adminToken}`
+        }
+      })
+      if (response.ok) {
+        const result = await response.json()
+        setSupportTickets(result.tickets || [])
+      }
+    } catch (error) {
+      console.error('Error loading tickets:', error)
+    }
+    setIsLoadingTickets(false)
+  }
+
+  const handleTicketAction = async (action: string, ticketId: string, data?: any) => {
+    try {
+      const response = await fetch('/api/admin/tickets', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${adminToken}`
+        },
+        body: JSON.stringify({ action, ticketId, ...data })
+      })
+      
+      if (response.ok) {
+        loadSupportTickets() // Refresh tickets
+        if (action === 'add_response') {
+          setTicketResponse('')
+          setSelectedTicket(null)
+          setShowTicketModal(false)
+        }
+      }
+    } catch (error) {
+      console.error('Error handling ticket action:', error)
+    }
+  }
+
+  const openTicketModal = (ticket: any) => {
+    setSelectedTicket(ticket)
+    setShowTicketModal(true)
+    setTicketResponse('')
+  }
+
+  const sendTicketResponse = async () => {
+    if (!selectedTicket || !ticketResponse.trim()) return
+    
+    setIsRespondingToTicket(true)
+    await handleTicketAction('add_response', selectedTicket.id, {
+      message: ticketResponse
+    })
+    setIsRespondingToTicket(false)
+  }
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'OPEN': return 'bg-green-100 text-green-800'
+      case 'IN_PROGRESS': return 'bg-yellow-100 text-yellow-800'
+      case 'AWAITING_RESPONSE': return 'bg-blue-100 text-blue-800'
+      case 'RESPONDED': return 'bg-purple-100 text-purple-800'
+      case 'RESOLVED': return 'bg-gray-100 text-gray-800'
+      case 'CLOSED': return 'bg-red-100 text-red-800'
+      default: return 'bg-gray-100 text-gray-800'
+    }
+  }
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'LOW': return 'bg-gray-100 text-gray-800'
+      case 'MEDIUM': return 'bg-blue-100 text-blue-800'
+      case 'HIGH': return 'bg-orange-100 text-orange-800'
+      case 'URGENT': return 'bg-red-100 text-red-800'
+      default: return 'bg-gray-100 text-gray-800'
+    }
+  }
+
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -1045,7 +1135,8 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
               { id: 'waitlist', label: '📧 Waitlist', desc: 'Signups' },
               { id: 'users', label: '👥 Users', desc: 'User stats' },
               { id: 'management', label: '🛠️ User Management', desc: 'Manage users' },
-              { id: 'templates', label: '📝 Templates', desc: 'Email templates' }
+              { id: 'templates', label: '📝 Templates', desc: 'Email templates' },
+              { id: 'tickets', label: '🎫 Support', desc: 'Customer support' }
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -1060,6 +1151,9 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                   }
                   if (tab.id === 'templates') {
                     loadEmailTemplates()
+                  }
+                  if (tab.id === 'tickets') {
+                    loadSupportTickets()
                   }
                 }}
                 className={`py-4 px-1 border-b-2 font-medium text-sm ${
@@ -2546,6 +2640,282 @@ The Helfi Team`,
                   </table>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Support Tickets Tab */}
+        {activeTab === 'tickets' && (
+          <div className="space-y-6">
+            {/* Header */}
+            <div className="bg-white rounded-lg shadow p-6">
+              <div className="flex justify-between items-center mb-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">🎫 Support Tickets</h2>
+                  <p className="text-gray-600">Manage customer support requests and responses</p>
+                </div>
+                <div className="flex items-center space-x-4">
+                  <select
+                    value={ticketFilter}
+                    onChange={(e) => {
+                      setTicketFilter(e.target.value)
+                      // Re-load tickets with new filter
+                      setTimeout(() => loadSupportTickets(), 100)
+                    }}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  >
+                    <option value="all">All Tickets</option>
+                    <option value="OPEN">Open</option>
+                    <option value="IN_PROGRESS">In Progress</option>
+                    <option value="AWAITING_RESPONSE">Awaiting Response</option>
+                    <option value="RESPONDED">Responded</option>
+                    <option value="RESOLVED">Resolved</option>
+                    <option value="CLOSED">Closed</option>
+                  </select>
+                  <button
+                    onClick={loadSupportTickets}
+                    className="bg-emerald-500 text-white px-4 py-2 rounded-lg hover:bg-emerald-600 transition-colors"
+                  >
+                    🔄 Refresh
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Tickets List */}
+            <div className="bg-white rounded-lg shadow">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <h4 className="text-md font-semibold text-gray-900">
+                  {isLoadingTickets ? 'Loading...' : `${supportTickets.length} tickets`}
+                </h4>
+              </div>
+              
+              {isLoadingTickets ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
+                  <span className="ml-3 text-gray-600">Loading tickets...</span>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Customer
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Subject
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Status
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Priority
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Category
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Created
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {supportTickets.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                            <div className="flex flex-col items-center">
+                              <svg className="w-12 h-12 text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                              </svg>
+                              <h3 className="text-lg font-medium text-gray-900 mb-2">No support tickets yet</h3>
+                              <p className="text-gray-500">
+                                {ticketFilter === 'all' ? 'No tickets have been created yet.' : `No ${ticketFilter.toLowerCase()} tickets found.`}
+                              </p>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : (
+                        supportTickets.map((ticket) => (
+                          <tr key={ticket.id} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex items-center">
+                                <div className="h-10 w-10 flex-shrink-0">
+                                  <div className="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center">
+                                    <span className="text-emerald-600 font-medium text-sm">
+                                      {ticket.userName ? ticket.userName.charAt(0).toUpperCase() : ticket.userEmail.charAt(0).toUpperCase()}
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="ml-4">
+                                  <div className="text-sm font-medium text-gray-900">
+                                    {ticket.userName || 'Unknown User'}
+                                  </div>
+                                  <div className="text-sm text-gray-500">
+                                    {ticket.userEmail}
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="text-sm text-gray-900 font-medium max-w-xs truncate">
+                                {ticket.subject}
+                              </div>
+                              <div className="text-sm text-gray-500 max-w-xs truncate">
+                                {ticket.message}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(ticket.status)}`}>
+                                {ticket.status.replace('_', ' ')}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getPriorityColor(ticket.priority)}`}>
+                                {ticket.priority}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {ticket.category}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {new Date(ticket.createdAt).toLocaleDateString()}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                              <div className="flex space-x-2">
+                                <button
+                                  onClick={() => openTicketModal(ticket)}
+                                  className="bg-blue-500 text-white px-3 py-1 rounded text-xs hover:bg-blue-600 transition-colors"
+                                >
+                                  💬 View
+                                </button>
+                                <select
+                                  value={ticket.status}
+                                  onChange={(e) => handleTicketAction('update_status', ticket.id, { status: e.target.value })}
+                                  className="text-xs border border-gray-300 rounded px-2 py-1"
+                                >
+                                  <option value="OPEN">Open</option>
+                                  <option value="IN_PROGRESS">In Progress</option>
+                                  <option value="AWAITING_RESPONSE">Awaiting Response</option>
+                                  <option value="RESPONDED">Responded</option>
+                                  <option value="RESOLVED">Resolved</option>
+                                  <option value="CLOSED">Closed</option>
+                                </select>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Ticket Modal */}
+        {showTicketModal && selectedTicket && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900">
+                      🎫 {selectedTicket.subject}
+                    </h2>
+                    <p className="text-sm text-gray-600">
+                      From: {selectedTicket.userName || 'Unknown'} ({selectedTicket.userEmail})
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowTicketModal(false)}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+                <div className="flex items-center space-x-4 mt-3">
+                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(selectedTicket.status)}`}>
+                    {selectedTicket.status.replace('_', ' ')}
+                  </span>
+                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getPriorityColor(selectedTicket.priority)}`}>
+                    {selectedTicket.priority}
+                  </span>
+                  <span className="text-sm text-gray-500">
+                    {selectedTicket.category}
+                  </span>
+                  <span className="text-sm text-gray-500">
+                    Created: {new Date(selectedTicket.createdAt).toLocaleDateString()}
+                  </span>
+                </div>
+              </div>
+
+              <div className="px-6 py-4">
+                {/* Original Message */}
+                <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                  <h3 className="text-sm font-medium text-gray-900 mb-2">Original Message:</h3>
+                  <p className="text-gray-700 whitespace-pre-wrap">{selectedTicket.message}</p>
+                </div>
+
+                {/* Conversation History */}
+                {selectedTicket.responses && selectedTicket.responses.length > 0 && (
+                  <div className="space-y-4 mb-6">
+                    <h3 className="text-sm font-medium text-gray-900">Conversation History:</h3>
+                    {selectedTicket.responses.map((response: any, index: number) => (
+                      <div key={response.id} className={`p-4 rounded-lg ${
+                        response.isAdminResponse 
+                          ? 'bg-emerald-50 border-l-4 border-emerald-500' 
+                          : 'bg-blue-50 border-l-4 border-blue-500'
+                      }`}>
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="text-sm font-medium">
+                            {response.isAdminResponse 
+                              ? `👨‍💼 ${response.admin?.name || 'Admin'}` 
+                              : `👤 ${selectedTicket.userName || 'Customer'}`}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            {new Date(response.createdAt).toLocaleString()}
+                          </span>
+                        </div>
+                        <p className="text-gray-700 whitespace-pre-wrap">{response.message}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Response Form */}
+                <div className="border-t pt-6">
+                  <h3 className="text-sm font-medium text-gray-900 mb-3">Send Response:</h3>
+                  <textarea
+                    value={ticketResponse}
+                    onChange={(e) => setTicketResponse(e.target.value)}
+                    rows={4}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                    placeholder="Type your response to the customer..."
+                  />
+                  <div className="flex justify-end space-x-3 mt-4">
+                    <button
+                      onClick={() => setShowTicketModal(false)}
+                      className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={sendTicketResponse}
+                      disabled={isRespondingToTicket || !ticketResponse.trim()}
+                      className="px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isRespondingToTicket ? 'Sending...' : '📤 Send Response'}
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}
