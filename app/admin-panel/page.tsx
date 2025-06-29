@@ -815,11 +815,14 @@ The Helfi Team`)
                       : 'Select recipients to send emails'
                     }
                   </p>
+                  <p className="text-xs text-red-600 font-mono">
+                    DEBUG: showEmailModal = {String(showEmailModal)}
+                  </p>
                 </div>
                 <div className="flex space-x-3">
                   <button
                     onClick={() => {
-                      console.log('Launch button - selectedEmails:', selectedEmails)
+                      alert('Launch button clicked! selectedEmails: ' + selectedEmails.length)
                       if (selectedEmails.length === 0) {
                         alert('Please select at least one email address')
                         return
@@ -845,8 +848,9 @@ Ready to start your AI-powered health transformation?
 Thank you for your patience and support,
 The Helfi Team`)
                       
-                      console.log('Opening email modal...')
+                      alert('About to open modal...')
                       setShowEmailModal(true)
+                      alert('Modal should now be open')
                     }}
                     disabled={selectedEmails.length === 0}
                     className="bg-emerald-500 text-white px-4 py-2 rounded-lg hover:bg-emerald-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -855,7 +859,7 @@ The Helfi Team`)
                   </button>
                   <button
                     onClick={() => {
-                      console.log('Custom button - selectedEmails:', selectedEmails)
+                      alert('Custom button clicked! selectedEmails: ' + selectedEmails.length)
                       if (selectedEmails.length === 0) {
                         alert('Please select at least one email address')
                         return
@@ -866,8 +870,9 @@ The Helfi Team`)
                       setEmailSubject('')
                       setEmailMessage('Hi {name},\n\n\n\nBest regards,\nThe Helfi Team')
                       
-                      console.log('Opening email modal...')
+                      alert('About to open modal...')
                       setShowEmailModal(true)
+                      alert('Modal should now be open')
                     }}
                     disabled={selectedEmails.length === 0}
                     className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
