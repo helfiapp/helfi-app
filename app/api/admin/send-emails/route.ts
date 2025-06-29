@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+// Initialize Resend only when needed to avoid build-time errors
+function getResend() {
+  if (!process.env.RESEND_API_KEY) {
+    return null
+  }
+  return new Resend(process.env.RESEND_API_KEY)
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -38,6 +44,11 @@ export async function POST(request: NextRequest) {
         const personalizedMessage = message.replace(/{name}/g, name)
         
         // Send real email using Resend
+        const resend = getResend()
+        if (!resend) {
+          throw new Error('Resend API key not configured')
+        }
+        
         const emailResponse = await resend.emails.send({
           from: 'Helfi Team <info@helfi.ai>',
           to: email,

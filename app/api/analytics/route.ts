@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
+// Initialize OpenAI only when needed to avoid build-time errors
+function getOpenAI() {
+  if (!process.env.OPENAI_API_KEY) {
+    return null
+  }
+  return new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  })
+}
 
 // In-memory storage for demo (in production, use a database)
 let analyticsData: any[] = []
@@ -110,6 +116,11 @@ Please provide:
 
 Keep response concise but actionable for app developers.
 `
+    
+    const openai = getOpenAI()
+    if (!openai) {
+      return "OpenAI API key not configured. Cannot generate AI insights."
+    }
     
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
