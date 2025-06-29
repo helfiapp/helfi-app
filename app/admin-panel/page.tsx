@@ -821,19 +821,10 @@ The Helfi Team`)
                 <div className="flex space-x-3">
                   <button
                     onClick={() => {
-                      console.log('Launch button clicked, selectedEmails:', selectedEmails)
-                      if (selectedEmails.length === 0) {
-                        alert('Please select at least one email address')
-                        return
-                      }
-                      console.log('About to call handleEmailTemplate')
-                      handleEmailTemplate('launch')
-                      console.log('About to setShowEmailModal(true)')
+                      alert('Launch button clicked!')
                       setShowEmailModal(true)
-                      console.log('Modal should now be visible')
                     }}
-                    disabled={selectedEmails.length === 0}
-                    className="bg-emerald-500 text-white px-4 py-2 rounded-lg hover:bg-emerald-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="bg-emerald-500 text-white px-4 py-2 rounded-lg hover:bg-emerald-600 transition-colors"
                   >
                     📧 Send Launch Email
                   </button>
