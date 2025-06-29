@@ -1432,7 +1432,7 @@ The Helfi Team`)
 
              {/* Email Composition Modal */}
              {showEmailModal && (
-               <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+               <div className="fixed inset-0 bg-red-600 bg-opacity-90 overflow-y-auto h-full w-full flex items-center justify-center" style={{zIndex: 99999}}>
                  <div className="bg-white p-6 rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-screen overflow-y-auto">
                    <h3 className="text-xl font-semibold text-gray-900 mb-6">
                      📧 Compose Email to {selectedEmails.length} Recipients
