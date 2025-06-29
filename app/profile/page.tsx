@@ -4,12 +4,13 @@ import React, { useState, useEffect } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { useUserData } from '@/components/providers/UserDataProvider'
 
 export default function Profile() {
   const { data: session } = useSession()
+  const { userData, profileImage, updateUserData, updateProfileImage, refreshData } = useUserData()
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
   const [dropdownOpen, setDropdownOpen] = useState(false)
-  const [profileImage, setProfileImage] = useState<string>('')
   const [profileData, setProfileData] = useState({
     firstName: '',
     lastName: '',
@@ -45,75 +46,39 @@ export default function Profile() {
     }
   }, [dropdownOpen]);
 
-  // Load saved data on mount
+  // Load cached data from provider (no API call needed!)
   useEffect(() => {
-    const loadUserData = async () => {
-      try {
-        console.log('Profile page - Loading data from database...');
-        const response = await fetch('/api/user-data', {
-          cache: 'no-cache',
-          headers: {
-            'Cache-Control': 'no-cache'
-          }
-        });
-        if (response.ok) {
-          const result = await response.json();
-          console.log('Profile page - API response:', { hasData: !!result.data, hasProfileImage: !!(result.data?.profileImage) });
-          if (result.data) {
-            // Merge profile info with onboarding data, prioritizing profileInfo
-            const mergedData = {
-              firstName: result.data.profileInfo?.firstName || '',
-              lastName: result.data.profileInfo?.lastName || '',
-              bio: result.data.profileInfo?.bio || '',
-              dateOfBirth: result.data.profileInfo?.dateOfBirth || '',
-              gender: result.data.profileInfo?.gender || result.data.gender || '',
-              email: session?.user?.email || ''
-            };
-            setProfileData(mergedData);
-          }
-          // Load profile image from database
-          if (result.data && result.data.profileImage) {
-            console.log('Profile page - Setting profile image from database');
-            setProfileImage(result.data.profileImage);
-          } else {
-            console.log('Profile page - No profile image found in database response');
-          }
-        } else {
-          console.error('Profile page - API call failed:', response.status, response.statusText);
-          // Fallback to localStorage
-          const savedProfile = localStorage.getItem('profileData');
-          if (savedProfile) {
-            const parsed = JSON.parse(savedProfile);
-            setProfileData(prev => ({
-              ...prev,
-              ...parsed,
-              email: session?.user?.email || prev.email
-            }));
-          }
-        }
-      } catch (error) {
-        console.error('Error loading profile data:', error);
-        // Fallback to localStorage
-        const savedProfile = localStorage.getItem('profileData');
-        if (savedProfile) {
-          try {
-            const parsed = JSON.parse(savedProfile);
-            setProfileData(prev => ({
-              ...prev,
-              ...parsed,
-              email: session?.user?.email || prev.email
-            }));
-          } catch (e) {
-            console.error('Error parsing saved profile:', e);
-          }
+    if (userData && session) {
+      console.log('Profile page - Loading data from UserDataProvider cache (no API call)...');
+      // Use cached data from provider instead of making API call
+      const mergedData = {
+        firstName: userData.profileInfo?.firstName || '',
+        lastName: userData.profileInfo?.lastName || '',
+        bio: userData.profileInfo?.bio || '',
+        dateOfBirth: userData.profileInfo?.dateOfBirth || '',
+        gender: userData.profileInfo?.gender || userData.gender || '',
+        email: session?.user?.email || ''
+      };
+      setProfileData(mergedData);
+      console.log('Profile page - Data loaded from cache instantly!');
+    } else if (!userData && session) {
+      // Fallback to localStorage while provider loads
+      const savedProfile = localStorage.getItem('profileData');
+      if (savedProfile) {
+        try {
+          const parsed = JSON.parse(savedProfile);
+          setProfileData(prev => ({
+            ...prev,
+            ...parsed,
+            email: session?.user?.email || prev.email
+          }));
+          console.log('Profile page - Loaded from localStorage fallback');
+        } catch (e) {
+          console.error('Error parsing saved profile:', e);
         }
       }
-    };
-
-    if (session) {
-      loadUserData();
     }
-  }, [session]);
+  }, [userData, session]);
 
   // Auto-save when data changes
   useEffect(() => {
@@ -130,10 +95,11 @@ export default function Profile() {
         });
 
         if (response.ok) {
-          // Successful save to database
+          // Successful save to database - update provider cache too!
+          updateUserData({ profileInfo: profileData });
           localStorage.setItem('profileData', JSON.stringify(profileData));
           setSaveStatus('saved');
-          console.log('Profile auto-saved successfully to database');
+          console.log('Profile auto-saved successfully to database and cache updated!');
         } else {
           throw new Error(`Failed to save: ${response.status} ${response.statusText}`);
         }
