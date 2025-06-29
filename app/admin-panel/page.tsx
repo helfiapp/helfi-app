@@ -609,13 +609,43 @@ The Helfi Team`)
         const data = await response.json()
         setEmailTemplates(data.templates || [])
       } else {
-        alert('Failed to load email templates')
+        // If templates fail to load, might need database initialization
+        console.warn('Failed to load email templates - database may need initialization')
+        setEmailTemplates([])
       }
     } catch (error) {
       console.error('Error loading templates:', error)
-      alert('Failed to load email templates')
+      console.warn('Templates system may need database initialization')
+      setEmailTemplates([])
     }
     setIsLoadingTemplates(false)
+  }
+
+  const initializeTemplateDatabase = async () => {
+    if (!confirm('Initialize the email template database? This will create the required table and add built-in templates.')) {
+      return
+    }
+
+    try {
+      const response = await fetch('/api/admin/init-templates', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${adminToken}`
+        }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        alert(`✅ ${data.message}\nCreated: ${data.created} templates`)
+        loadEmailTemplates() // Reload templates
+      } else {
+        const error = await response.json()
+        alert(`❌ Failed to initialize: ${error.details || error.error}`)
+      }
+    } catch (error) {
+      console.error('Error initializing templates:', error)
+      alert('❌ Failed to initialize templates')
+    }
   }
 
   const handleCreateTemplate = () => {
@@ -2121,12 +2151,22 @@ The Helfi Team`,
                     Create and manage email templates for campaigns
                   </p>
                 </div>
-                <button
-                  onClick={handleCreateTemplate}
-                  className="bg-emerald-500 text-white px-4 py-2 rounded-lg hover:bg-emerald-600 transition-colors"
-                >
-                  ➕ Create New Template
-                </button>
+                <div className="flex space-x-3">
+                  {emailTemplates.length === 0 && (
+                    <button
+                      onClick={initializeTemplateDatabase}
+                      className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors"
+                    >
+                      🔧 Initialize Database
+                    </button>
+                  )}
+                  <button
+                    onClick={handleCreateTemplate}
+                    className="bg-emerald-500 text-white px-4 py-2 rounded-lg hover:bg-emerald-600 transition-colors"
+                  >
+                    ➕ Create New Template
+                  </button>
+                </div>
               </div>
 
               {/* Template Statistics */}
