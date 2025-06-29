@@ -89,13 +89,15 @@ export default function FoodDiary() {
     }
   }, [userData]);
 
-  // Save food entries to database and update context
+  // Save food entries to database and update context (OPTIMIZED)
   const saveFoodEntries = async (updatedFoods: any[]) => {
     try {
       // Update context immediately for instant UI updates
       updateUserData({ todaysFoods: updatedFoods });
+      console.log('🚀 PERFORMANCE: Food updated in cache instantly - UI responsive!');
       
-      const response = await fetch('/api/user-data', {
+      // Background save to database (don't wait for response)
+      fetch('/api/user-data', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -103,12 +105,17 @@ export default function FoodDiary() {
         body: JSON.stringify({
           todaysFoods: updatedFoods
         }),
+      }).then(response => {
+        if (!response.ok) {
+          console.error('Background save failed - but UI already updated');
+        } else {
+          console.log('🚀 PERFORMANCE: Food saved to database in background');
+        }
+      }).catch(error => {
+        console.error('Background save error:', error);
       });
-      if (!response.ok) {
-        console.error('Failed to save food entries');
-      }
     } catch (error) {
-      console.error('Error saving food entries:', error);
+      console.error('Error in saveFoodEntries:', error);
     }
   };
 
@@ -135,8 +142,8 @@ export default function FoodDiary() {
 
 
 
-  // Aggressive compression for ultra-fast loading
-  const compressImage = (file: File, maxWidth: number = 400, quality: number = 0.6): Promise<File> => {
+  // OPTIMIZED: Ultra-aggressive compression for speed
+  const compressImage = (file: File, maxWidth: number = 300, quality: number = 0.5): Promise<File> => {
     return new Promise((resolve, reject) => {
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
@@ -211,11 +218,15 @@ export default function FoodDiary() {
     setIsAnalyzing(true);
     
     try {
-      // Compress image to reduce API costs
+      console.log('🚀 PERFORMANCE: Starting optimized photo analysis...');
+      
+      // Compress image to reduce API costs (using optimized settings)
       console.log(`Original file size: ${(photoFile.size / 1024).toFixed(1)}KB`);
-      const compressedFile = await compressImage(photoFile, 800, 0.8);
+      const compressedFile = await compressImage(photoFile, 300, 0.5); // More aggressive compression
       console.log(`Compressed file size: ${(compressedFile.size / 1024).toFixed(1)}KB`);
       console.log(`Savings: ${(((photoFile.size - compressedFile.size) / photoFile.size) * 100).toFixed(1)}%`);
+      
+      console.log('🚀 PERFORMANCE: Sending compressed image to AI (this may take 3-5 seconds)...');
       
       // Create FormData for API call with compressed image
       const formData = new FormData();
@@ -269,6 +280,8 @@ Please describe your food manually, including:
     setIsAnalyzing(true);
     
     try {
+      console.log('🚀 PERFORMANCE: Starting fast text-based food analysis...');
+      
       let foodDescription = '';
       
       if (manualFoodType === 'single') {
@@ -280,6 +293,8 @@ Please describe your food manually, including:
         const validIngredients = manualIngredients.filter(ing => ing.name.trim() && ing.weight.trim());
         foodDescription = validIngredients.map(ing => `${ing.name}, ${ing.weight} ${ing.unit}`).join('; ');
       }
+      
+      console.log('🚀 PERFORMANCE: Analyzing text (faster than photo analysis)...');
       
       // Call OpenAI to analyze the manual food entry
       const response = await fetch('/api/analyze-food', {
