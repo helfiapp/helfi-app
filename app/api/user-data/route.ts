@@ -123,6 +123,35 @@ export async function GET(request: NextRequest) {
       console.log('No todays foods data found in storage');
     }
 
+    // Get profile info data
+    let profileInfoData = { firstName: '', lastName: '', bio: '', dateOfBirth: '', email: user.email || '' };
+    try {
+      const storedProfileInfo = user.healthGoals.find((goal: any) => goal.name === '__PROFILE_INFO_DATA__');
+      if (storedProfileInfo && storedProfileInfo.category) {
+        const parsed = JSON.parse(storedProfileInfo.category);
+        profileInfoData = {
+          firstName: parsed.firstName || '',
+          lastName: parsed.lastName || '',
+          bio: parsed.bio || '',
+          dateOfBirth: parsed.dateOfBirth || '',
+          email: parsed.email || user.email || ''
+        };
+      } else {
+        // If no stored profile info, try to extract from user.name
+        if (user.name) {
+          const nameParts = user.name.split(' ');
+          if (nameParts.length >= 2) {
+            profileInfoData.firstName = nameParts[0];
+            profileInfoData.lastName = nameParts.slice(1).join(' ');
+          } else if (nameParts.length === 1) {
+            profileInfoData.firstName = nameParts[0];
+          }
+        }
+      }
+    } catch (e) {
+      console.log('No profile info data found in storage');
+    }
+
     // Transform to onboarding format
     const onboardingData = {
       gender: user.gender?.toLowerCase() || '',
@@ -145,7 +174,8 @@ export async function GET(request: NextRequest) {
         timing: med.timing
       })),
       profileImage: user.image || null,
-      todaysFoods: todaysFoods
+      todaysFoods: todaysFoods,
+      profileInfo: profileInfoData
     }
 
     console.log('GET /api/user-data - Returning onboarding data for user')
@@ -441,6 +471,58 @@ export async function POST(request: NextRequest) {
       }
     } catch (error) {
       console.error('Error storing todays foods data:', error)
+      // Continue with other updates
+    }
+
+    // 7. Handle profileInfo data from profile page - store as special health goal
+    try {
+      if (data.profileInfo) {
+        console.log('POST /api/user-data - Handling profileInfo data:', data.profileInfo)
+        
+        // Update basic User fields if available in profileInfo
+        const profileUpdateData: any = {}
+        
+        // Handle name concatenation
+        if (data.profileInfo.firstName || data.profileInfo.lastName) {
+          const firstName = data.profileInfo.firstName || ''
+          const lastName = data.profileInfo.lastName || ''
+          profileUpdateData.name = `${firstName} ${lastName}`.trim()
+        }
+        
+        // Handle gender
+        if (data.profileInfo.gender) {
+          profileUpdateData.gender = data.profileInfo.gender.toUpperCase() === 'MALE' ? 'MALE' : 'FEMALE'
+        }
+        
+        // Update User model with basic profile data
+        if (Object.keys(profileUpdateData).length > 0) {
+          await prisma.user.update({
+            where: { id: user.id },
+            data: profileUpdateData
+          })
+          console.log('Updated user profile basic data:', profileUpdateData)
+        }
+        
+        // Store full profileInfo as special health goal for additional fields like bio, dateOfBirth
+        await prisma.healthGoal.deleteMany({
+          where: {
+            userId: user.id,
+            name: '__PROFILE_INFO_DATA__'
+          }
+        })
+        
+        await prisma.healthGoal.create({
+          data: {
+            userId: user.id,
+            name: '__PROFILE_INFO_DATA__',
+            category: JSON.stringify(data.profileInfo),
+            currentRating: 0,
+          }
+        })
+        console.log('Stored profile info data successfully')
+      }
+    } catch (error) {
+      console.error('Error storing profile info data:', error)
       // Continue with other updates
     }
 
