@@ -62,6 +62,12 @@ export default function AdminPanel() {
   const [templateContent, setTemplateContent] = useState('')
   const [isSubmittingTemplate, setIsSubmittingTemplate] = useState(false)
 
+  // Email testing states
+  const [showEmailTest, setShowEmailTest] = useState(false)
+  const [testEmail, setTestEmail] = useState('')
+  const [isTestingEmail, setIsTestingEmail] = useState(false)
+  const [emailTestResult, setEmailTestResult] = useState<any>(null)
+
   // Admin management states
   const [showCreateAdminModal, setShowCreateAdminModal] = useState(false)
   const [showPasswordModal, setShowPasswordModal] = useState(false)
@@ -746,6 +752,46 @@ The Helfi Team`)
     setTemplateCategory('MARKETING')
     setTemplateSubject('')
     setTemplateContent('')
+  }
+
+  const handleEmailTest = async () => {
+    if (!testEmail.trim()) {
+      alert('Please enter a test email address')
+      return
+    }
+
+    setIsTestingEmail(true)
+    setEmailTestResult(null)
+
+    try {
+      const response = await fetch('/api/admin/test-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${adminToken}`
+        },
+        body: JSON.stringify({ testEmail })
+      })
+
+      const result = await response.json()
+      setEmailTestResult(result)
+
+      if (result.success) {
+        alert(`✅ Test email sent successfully!\n\nMessage ID: ${result.details.messageId}\n\nCheck your inbox (and spam folder) for the test email.`)
+      } else {
+        alert(`❌ Test email failed:\n\n${result.error}\n\nDetails: ${result.details?.errorMessage || 'Unknown error'}`)
+      }
+    } catch (error) {
+      console.error('Email test error:', error)
+      setEmailTestResult({
+        success: false,
+        error: 'Network error',
+        details: { errorMessage: error instanceof Error ? error.message : 'Unknown error' }
+      })
+      alert('❌ Test email failed: Network error')
+    }
+
+    setIsTestingEmail(false)
   }
 
   const getCategoryColor = (category: string) => {
@@ -2161,6 +2207,12 @@ The Helfi Team`,
                     </button>
                   )}
                   <button
+                    onClick={() => setShowEmailTest(!showEmailTest)}
+                    className="bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition-colors"
+                  >
+                    🧪 Test Email System
+                  </button>
+                  <button
                     onClick={handleCreateTemplate}
                     className="bg-emerald-500 text-white px-4 py-2 rounded-lg hover:bg-emerald-600 transition-colors"
                   >
@@ -2197,6 +2249,72 @@ The Helfi Team`,
                 </div>
               </div>
             </div>
+
+            {/* Email Test Panel */}
+            {showEmailTest && (
+              <div className="bg-orange-50 border border-orange-200 rounded-lg p-6 mb-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-orange-800">🧪 Email Delivery Test</h3>
+                  <button
+                    onClick={() => setShowEmailTest(false)}
+                    className="text-orange-600 hover:text-orange-800"
+                  >
+                    ✕
+                  </button>
+                </div>
+                
+                <p className="text-orange-700 mb-4">
+                  Test your email delivery system to ensure emails are being sent properly. 
+                  This will send a test email to verify the Resend API configuration.
+                </p>
+
+                <div className="flex space-x-3 mb-4">
+                  <input
+                    type="email"
+                    placeholder="Enter your email address"
+                    value={testEmail}
+                    onChange={(e) => setTestEmail(e.target.value)}
+                    className="flex-1 px-3 py-2 border border-orange-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  />
+                  <button
+                    onClick={handleEmailTest}
+                    disabled={isTestingEmail || !testEmail.trim()}
+                    className="bg-orange-500 text-white px-6 py-2 rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isTestingEmail ? '🔄 Sending...' : '📧 Send Test Email'}
+                  </button>
+                </div>
+
+                {emailTestResult && (
+                  <div className={`p-4 rounded-lg border ${
+                    emailTestResult.success 
+                      ? 'bg-green-50 border-green-200 text-green-800' 
+                      : 'bg-red-50 border-red-200 text-red-800'
+                  }`}>
+                    <div className="font-semibold mb-2">
+                      {emailTestResult.success ? '✅ Test Email Sent Successfully!' : '❌ Test Email Failed'}
+                    </div>
+                    
+                    {emailTestResult.success ? (
+                      <div className="text-sm space-y-1">
+                        <div><strong>Message ID:</strong> {emailTestResult.details?.messageId}</div>
+                        <div><strong>Recipient:</strong> {emailTestResult.details?.recipient}</div>
+                        <div><strong>Timestamp:</strong> {emailTestResult.details?.timestamp}</div>
+                        <div className="mt-2 p-2 bg-green-100 rounded">
+                          📬 Check your inbox (and spam folder) for the test email!
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-sm space-y-1">
+                        <div><strong>Error:</strong> {emailTestResult.error}</div>
+                        <div><strong>Details:</strong> {emailTestResult.details?.errorMessage || 'Unknown error'}</div>
+                        <div><strong>Timestamp:</strong> {emailTestResult.details?.timestamp}</div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Template Creation/Edit Form */}
             {showTemplateForm && (
