@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
+import { extractAdminFromHeaders } from '@/lib/admin-auth'
 
 // Initialize Resend only when needed to avoid build-time errors
 function getResend() {
@@ -11,9 +12,10 @@ function getResend() {
 
 export async function POST(request: NextRequest) {
   try {
-    // Authentication check
+    // JWT authentication check
     const authHeader = request.headers.get('authorization')
-    if (authHeader !== 'Bearer Helfi@Admin2024!Secure$9x') {
+    const admin = extractAdminFromHeaders(authHeader)
+    if (!admin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 

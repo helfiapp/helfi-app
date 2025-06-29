@@ -166,3 +166,22 @@ model Waitlist {
   name      String
   createdAt DateTime @default(now())
 }
+
+model AdminUser {
+  id           String      @id @default(cuid())
+  email        String      @unique
+  password     String      // Hashed password
+  name         String
+  role         AdminRole   @default(ADMIN)
+  isActive     Boolean     @default(true)
+  lastLogin    DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  createdBy    String?     // ID of admin who created this user
+}
+
+enum AdminRole {
+  SUPER_ADMIN
+  ADMIN
+  MODERATOR
+}

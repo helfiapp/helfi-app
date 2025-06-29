@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { extractAdminFromHeaders } from '@/lib/admin-auth'
 
 export async function GET(request: NextRequest) {
   try {
-    // Authentication check
+    // JWT authentication check
     const authHeader = request.headers.get('authorization')
-    if (authHeader !== 'Bearer Helfi@Admin2024!Secure$9x') {
+    const admin = extractAdminFromHeaders(authHeader)
+    if (!admin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -73,9 +75,10 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    // Authentication check
+    // JWT authentication check
     const authHeader = request.headers.get('authorization')
-    if (authHeader !== 'Bearer Helfi@Admin2024!Secure$9x') {
+    const admin = extractAdminFromHeaders(authHeader)
+    if (!admin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 

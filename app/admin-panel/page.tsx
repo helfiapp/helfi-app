@@ -5,10 +5,13 @@ import Image from 'next/image'
 
 export default function AdminPanel() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  const [adminToken, setAdminToken] = useState('')
+  const [adminUser, setAdminUser] = useState<any>(null)
   
   // Analytics data states
   const [analyticsData, setAnalyticsData] = useState<any[]>([])
@@ -41,10 +44,26 @@ export default function AdminPanel() {
   const [emailTemplate, setEmailTemplate] = useState('launch')
   const [isLoadingEmail, setIsLoadingEmail] = useState(false)
 
+  // Admin management states
+  const [showCreateAdminModal, setShowCreateAdminModal] = useState(false)
+  const [showPasswordModal, setShowPasswordModal] = useState(false)
+  const [newAdminEmail, setNewAdminEmail] = useState('')
+  const [newAdminName, setNewAdminName] = useState('')
+  const [newAdminPassword, setNewAdminPassword] = useState('')
+  const [newAdminRole, setNewAdminRole] = useState('ADMIN')
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [adminList, setAdminList] = useState<any[]>([])
+  const [isLoadingAdmins, setIsLoadingAdmins] = useState(false)
+
   // Check if already authenticated
   useEffect(() => {
-    const authStatus = sessionStorage.getItem('adminAuthenticated')
-    if (authStatus === 'true') {
+    const token = sessionStorage.getItem('adminToken')
+    const adminData = sessionStorage.getItem('adminUser')
+    if (token && adminData) {
+      setAdminToken(token)
+      setAdminUser(JSON.parse(adminData))
       setIsAuthenticated(true)
       loadAnalyticsData()
       loadWaitlistData()
@@ -52,28 +71,49 @@ export default function AdminPanel() {
     }
   }, [])
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError('')
 
-    // Check password
-    if (password === 'Helfi@Admin2024!Secure$9x') {
-      setIsAuthenticated(true)
-      sessionStorage.setItem('adminAuthenticated', 'true')
-      loadAnalyticsData()
-      loadWaitlistData()
-      loadUserStats()
-    } else {
-      setError('Invalid password. Please try again.')
+    try {
+      const response = await fetch('/api/admin/auth', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password })
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        setAdminToken(result.token)
+        setAdminUser(result.admin)
+        setIsAuthenticated(true)
+        sessionStorage.setItem('adminToken', result.token)
+        sessionStorage.setItem('adminUser', JSON.stringify(result.admin))
+        loadAnalyticsData()
+        loadWaitlistData()
+        loadUserStats()
+      } else {
+        const error = await response.json()
+        setError(error.message || 'Authentication failed. Please check your credentials.')
+      }
+    } catch (error) {
+      console.error('Login error:', error)
+      setError('Login failed. Please try again.')
     }
     setLoading(false)
   }
 
   const handleLogout = () => {
     setIsAuthenticated(false)
-    sessionStorage.removeItem('adminAuthenticated')
+    sessionStorage.removeItem('adminToken')
+    sessionStorage.removeItem('adminUser')
+    setEmail('')
     setPassword('')
+    setAdminToken('')
+    setAdminUser(null)
     setAnalyticsData([])
     setAnalyticsSummary(null)
     setAiInsights('')
@@ -104,7 +144,7 @@ export default function AdminPanel() {
     try {
       const response = await fetch('/api/waitlist', {
         headers: {
-          'Authorization': 'Bearer Helfi@Admin2024!Secure$9x'
+          'Authorization': `Bearer ${adminToken}`
         }
       })
       if (response.ok) {
@@ -123,7 +163,7 @@ export default function AdminPanel() {
       // We'll create a simple endpoint to get user count and basic stats
       const response = await fetch('/api/admin/users', {
         headers: {
-          'Authorization': 'Bearer Helfi@Admin2024!Secure$9x'
+          'Authorization': `Bearer ${adminToken}`
         }
       })
       if (response.ok) {
@@ -148,7 +188,7 @@ export default function AdminPanel() {
       
       const response = await fetch(`/api/admin/user-management?${params}`, {
         headers: {
-          'Authorization': 'Bearer Helfi@Admin2024!Secure$9x'
+          'Authorization': `Bearer ${adminToken}`
         }
       })
       
@@ -170,7 +210,7 @@ export default function AdminPanel() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer Helfi@Admin2024!Secure$9x'
+          'Authorization': `Bearer ${adminToken}`
         },
         body: JSON.stringify({ action, userId, data })
       })
@@ -296,7 +336,7 @@ The Helfi Team`)
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer Helfi@Admin2024!Secure$9x'
+          'Authorization': `Bearer ${adminToken}`
         },
         body: JSON.stringify({
           emails: selectedEmails,
@@ -323,6 +363,113 @@ The Helfi Team`)
     setIsLoadingEmail(false)
   }
 
+  // Admin Management Functions
+  const loadAdminList = async () => {
+    if (adminUser?.role !== 'SUPER_ADMIN') return
+    
+    setIsLoadingAdmins(true)
+    try {
+      const response = await fetch('/api/admin/management', {
+        headers: {
+          'Authorization': `Bearer ${adminToken}`
+        }
+      })
+      if (response.ok) {
+        const result = await response.json()
+        setAdminList(result.admins || [])
+      }
+    } catch (error) {
+      console.error('Error loading admin list:', error)
+    }
+    setIsLoadingAdmins(false)
+  }
+
+  const createNewAdmin = async () => {
+    if (!newAdminEmail || !newAdminName || !newAdminPassword) {
+      alert('Please fill in all fields')
+      return
+    }
+
+    try {
+      const response = await fetch('/api/admin/management', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${adminToken}`
+        },
+        body: JSON.stringify({
+          action: 'create',
+          email: newAdminEmail,
+          name: newAdminName,
+          password: newAdminPassword,
+          role: newAdminRole
+        })
+      })
+
+      if (response.ok) {
+        alert('Admin account created successfully')
+        setShowCreateAdminModal(false)
+        setNewAdminEmail('')
+        setNewAdminName('')
+        setNewAdminPassword('')
+        setNewAdminRole('ADMIN')
+        loadAdminList()
+      } else {
+        const error = await response.json()
+        alert(`Failed to create admin: ${error.message}`)
+      }
+    } catch (error) {
+      console.error('Error creating admin:', error)
+      alert('Failed to create admin account')
+    }
+  }
+
+  const changePassword = async () => {
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      alert('Please fill in all password fields')
+      return
+    }
+
+    if (newPassword !== confirmPassword) {
+      alert('New passwords do not match')
+      return
+    }
+
+    if (newPassword.length < 8) {
+      alert('New password must be at least 8 characters long')
+      return
+    }
+
+    try {
+      const response = await fetch('/api/admin/management', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${adminToken}`
+        },
+        body: JSON.stringify({
+          action: 'change_password',
+          currentPassword,
+          newPassword
+        })
+      })
+
+      if (response.ok) {
+        alert('Password changed successfully')
+        setShowPasswordModal(false)
+        setCurrentPassword('')
+        setNewPassword('')
+        setConfirmPassword('')
+      } else {
+        const error = await response.json()
+        alert(`Failed to change password: ${error.message}`)
+      }
+    } catch (error) {
+      console.error('Error changing password:', error)
+      alert('Failed to change password')
+    }
+  }
+
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -336,10 +483,25 @@ The Helfi Team`)
               className="mx-auto mb-4"
             />
             <h1 className="text-2xl font-bold text-gray-900">Admin Panel</h1>
-            <p className="text-gray-600 mt-2">Enter password to access analytics dashboard</p>
+            <p className="text-gray-600 mt-2">Enter credentials to access analytics dashboard</p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-6">
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                Admin Email
+              </label>
+              <input
+                type="email"
+                id="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                placeholder="Enter admin email"
+                required
+              />
+            </div>
+
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
                 Admin Password

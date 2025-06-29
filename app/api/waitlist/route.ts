@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { extractAdminFromHeaders } from '@/lib/admin-auth'
 
 export async function POST(request: NextRequest) {
   try {
@@ -49,9 +50,10 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    // Simple authentication check - you might want to make this more secure
+    // JWT authentication check
     const authHeader = request.headers.get('authorization')
-    if (authHeader !== 'Bearer Helfi@Admin2024!Secure$9x') {
+    const admin = extractAdminFromHeaders(authHeader)
+    if (!admin) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
