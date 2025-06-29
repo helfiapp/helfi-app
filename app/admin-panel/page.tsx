@@ -818,13 +818,23 @@ The Helfi Team`)
                 </div>
                 <div className="flex space-x-3">
                   <button
-                    onClick={() => {
+                    onClick={(e) => {
+                      console.log('Launch button clicked - selectedEmails:', selectedEmails.length)
+                      e.preventDefault()
+                      e.stopPropagation()
+                      
                       if (selectedEmails.length === 0) {
                         alert('Please select at least one email address')
                         return
                       }
+                      
+                      console.log('Setting launch template...')
                       handleEmailTemplate('launch')
+                      
+                      console.log('Opening modal...')
                       setShowEmailModal(true)
+                      
+                      console.log('Modal state should now be true')
                     }}
                     disabled={selectedEmails.length === 0}
                     className="bg-emerald-500 text-white px-4 py-2 rounded-lg hover:bg-emerald-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -832,13 +842,23 @@ The Helfi Team`)
                     📧 Send Launch Email
                   </button>
                   <button
-                    onClick={() => {
+                    onClick={(e) => {
+                      console.log('Custom button clicked - selectedEmails:', selectedEmails.length)
+                      e.preventDefault()
+                      e.stopPropagation()
+                      
                       if (selectedEmails.length === 0) {
                         alert('Please select at least one email address')
                         return
                       }
+                      
+                      console.log('Setting custom template...')
                       handleEmailTemplate('custom')
+                      
+                      console.log('Opening modal...')
                       setShowEmailModal(true)
+                      
+                      console.log('Modal state should now be true')
                     }}
                     disabled={selectedEmails.length === 0}
                     className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
