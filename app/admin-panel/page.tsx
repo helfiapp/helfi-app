@@ -76,6 +76,27 @@ export default function AdminPanel() {
     setLoading(true)
     setError('')
 
+    // Temporary hardcoded admin credentials until database is fully set up
+    if (email === 'info@sonicweb.com.au' && password === 'gX8#bQ3!Vr9zM2@kLf1T') {
+      const mockAdmin = {
+        id: 'temp-admin-id',
+        email: 'info@sonicweb.com.au',
+        name: 'Louie Veleski',
+        role: 'SUPER_ADMIN'
+      }
+      
+      setAdminToken('temp-admin-token')
+      setAdminUser(mockAdmin)
+      setIsAuthenticated(true)
+      sessionStorage.setItem('adminToken', 'temp-admin-token')
+      sessionStorage.setItem('adminUser', JSON.stringify(mockAdmin))
+      loadAnalyticsData()
+      loadWaitlistData()
+      loadUserStats()
+      setLoading(false)
+      return
+    }
+
     try {
       const response = await fetch('/api/admin/auth', {
         method: 'POST',
