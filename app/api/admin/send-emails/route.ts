@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
         }
         
         const emailResponse = await resend.emails.send({
-          from: 'Helfi Team <info@helfi.ai>',
+          from: 'Helfi Team <support@helfi.ai>',
           to: email,
           subject: subject,
           html: `

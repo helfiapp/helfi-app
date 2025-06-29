@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
       const resend = new Resend(resendApiKey)
       
       const emailResponse = await resend.emails.send({
-        from: 'Helfi Team <info@helfi.ai>',
+        from: 'Helfi Team <support@helfi.ai>',
         to: testEmail,
         subject: '🧪 Helfi Email Test - ' + new Date().toLocaleString(),
         html: `
@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
               <h3 style="margin: 0 0 10px 0; color: #0369a1;">Test Details:</h3>
               <ul style="margin: 0; padding-left: 20px;">
                 <li><strong>Sent At:</strong> ${new Date().toISOString()}</li>
-                <li><strong>From:</strong> Helfi Team &lt;info@helfi.ai&gt;</li>
+                <li><strong>From:</strong> Helfi Team &lt;support@helfi.ai&gt;</li>
                 <li><strong>To:</strong> ${testEmail}</li>
                 <li><strong>Service:</strong> Resend Email API</li>
               </ul>
