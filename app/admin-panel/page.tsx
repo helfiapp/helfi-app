@@ -43,6 +43,14 @@ export default function AdminPanel() {
   const [customEmailMessage, setCustomEmailMessage] = useState('')
   const [isComposingEmail, setIsComposingEmail] = useState(false)
 
+  // User Management Email states
+  const [selectedUserEmails, setSelectedUserEmails] = useState<string[]>([])
+  const [showUserEmailInterface, setShowUserEmailInterface] = useState(false)
+  const [userEmailSubject, setUserEmailSubject] = useState('')
+  const [userEmailMessage, setUserEmailMessage] = useState('')
+  const [isComposingUserEmail, setIsComposingUserEmail] = useState(false)
+  const [emailTemplate, setEmailTemplate] = useState('custom')
+
   // Admin management states
   const [showCreateAdminModal, setShowCreateAdminModal] = useState(false)
   const [showPasswordModal, setShowPasswordModal] = useState(false)
@@ -353,6 +361,218 @@ export default function AdminPanel() {
     }
     
     setIsComposingEmail(false)
+  }
+
+  // User Management Email Functions
+  const handleUserEmailSelect = (email: string) => {
+    if (selectedUserEmails.includes(email)) {
+      setSelectedUserEmails(selectedUserEmails.filter(e => e !== email))
+    } else {
+      setSelectedUserEmails([...selectedUserEmails, email])
+    }
+  }
+
+  const handleSelectAllUsers = () => {
+    if (selectedUserEmails.length === managedUsers.length) {
+      setSelectedUserEmails([])
+    } else {
+      setSelectedUserEmails(managedUsers.map(user => user.email))
+    }
+  }
+
+  const handleSelectByTier = (tier: string) => {
+    const filteredUsers = managedUsers.filter(user => {
+      if (tier === 'premium') return user.subscription?.plan === 'PREMIUM'
+      if (tier === 'free') return !user.subscription?.plan || user.subscription.plan === 'FREE'
+      return true
+    })
+    setSelectedUserEmails(filteredUsers.map(user => user.email))
+  }
+
+  const handleStartUserEmail = (templateType = 'custom') => {
+    if (selectedUserEmails.length === 0) {
+      alert('Please select at least one user')
+      return
+    }
+    
+    setEmailTemplate(templateType)
+    applyEmailTemplate(templateType)
+    setShowUserEmailInterface(true)
+  }
+
+  const applyEmailTemplate = (templateType: string) => {
+    switch (templateType) {
+      case 'welcome':
+        setUserEmailSubject('🎉 Welcome to Helfi - Your AI Health Journey Begins!')
+        setUserEmailMessage(`Hi {name},
+
+Welcome to the Helfi community! We're thrilled to have you on board.
+
+🚀 **Getting Started:**
+• Complete your health profile for personalized insights
+• Start logging your meals with AI-powered analysis
+• Set your health goals and track your progress
+• Explore our medication interaction checker
+
+💡 **Pro Tip:** The more you use Helfi, the smarter your AI health coach becomes!
+
+Need help getting started? Just reply to this email or contact our support team.
+
+Best regards,
+The Helfi Team`)
+        break
+      
+      case 'premium_upgrade':
+        setUserEmailSubject('🔥 Unlock Your Full Health Potential with Helfi Premium')
+        setUserEmailMessage(`Hi {name},
+
+Ready to supercharge your health journey? Helfi Premium gives you everything you need:
+
+✨ **Premium Benefits:**
+• 30 AI food analyses per day (vs 3 on free)
+• 30 medical image analyses per day
+• Advanced medication interaction checking
+• Priority customer support
+• Early access to new features
+
+🎯 **Special Offer:** Get 14 days free when you upgrade today!
+
+[Upgrade to Premium - helfi.ai/billing]
+
+Your health deserves the best tools. Let's make it happen!
+
+Best regards,
+The Helfi Team`)
+        break
+      
+      case 'engagement':
+        setUserEmailSubject('🌟 Your Health Journey Awaits - Come Back to Helfi!')
+        setUserEmailMessage(`Hi {name},
+
+We miss you at Helfi! Your health journey is important, and we're here to support you every step of the way.
+
+🎯 **Quick Health Check:**
+• Log today's meals in under 2 minutes
+• Check if your medications interact safely
+• Review your progress toward your health goals
+
+💪 **Remember:** Small daily actions lead to big health transformations.
+
+Ready to continue your journey? We're excited to see your progress!
+
+[Continue Your Journey - helfi.ai]
+
+Best regards,
+The Helfi Team`)
+        break
+      
+      case 'feature_announcement':
+        setUserEmailSubject('🆕 Exciting New Features Just Dropped at Helfi!')
+        setUserEmailMessage(`Hi {name},
+
+Big news! We've just released some amazing new features that will take your health journey to the next level:
+
+🔥 **What's New:**
+• Enhanced AI food analysis with better accuracy
+• New medical image analysis for skin conditions
+• Improved medication interaction database
+• Faster mobile app performance
+• Smart health insights dashboard
+
+✨ **Ready to explore?** Log in to your Helfi account and discover these powerful new tools.
+
+[Explore New Features - helfi.ai]
+
+Your feedback helps us build better health tools. Let us know what you think!
+
+Best regards,
+The Helfi Team`)
+        break
+      
+      case 'support_followup':
+        setUserEmailSubject('🤝 Following Up - How Can We Help You Better?')
+        setUserEmailMessage(`Hi {name},
+
+Hope you're doing well! We wanted to follow up and see how your experience with Helfi has been going.
+
+🤔 **We'd love to know:**
+• Are you finding the features helpful?
+• Is there anything confusing or frustrating?
+• What would make Helfi even better for you?
+
+💬 **Your feedback matters!** Just reply to this email with your thoughts - our team reads every response personally.
+
+🆘 **Need immediate help?** Contact us at support@helfi.ai
+
+Thank you for being part of the Helfi community!
+
+Best regards,
+The Helfi Team`)
+        break
+        
+      default:
+        setUserEmailSubject('')
+        setUserEmailMessage('Hi {name},\n\n\n\nBest regards,\nThe Helfi Team')
+    }
+  }
+
+  const handleCancelUserEmail = () => {
+    setShowUserEmailInterface(false)
+    setUserEmailSubject('')
+    setUserEmailMessage('')
+    setIsComposingUserEmail(false)
+    setEmailTemplate('custom')
+  }
+
+  const handleSendUserEmail = async () => {
+    if (!userEmailSubject.trim() || !userEmailMessage.trim()) {
+      alert('Please enter both subject and message')
+      return
+    }
+    
+    const confirmed = confirm(`Send email to ${selectedUserEmails.length} users?`)
+    if (!confirmed) return
+    
+    setIsComposingUserEmail(true)
+    
+    try {
+      // Prepare user data for personalization
+      const emailData = selectedUserEmails.map(email => {
+        const user = managedUsers.find(u => u.email === email)
+        return {
+          email,
+          name: user?.name || 'there'
+        }
+      })
+      
+      const response = await fetch('/api/admin/send-emails', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${adminToken}`
+        },
+        body: JSON.stringify({
+          emails: selectedUserEmails,
+          subject: userEmailSubject,
+          message: userEmailMessage,
+          waitlistData: emailData // Using same structure for compatibility
+        })
+      })
+
+      if (response.ok) {
+        alert(`✅ Successfully sent emails to ${selectedUserEmails.length} users!`)
+        handleCancelUserEmail()
+        setSelectedUserEmails([])
+      } else {
+        const error = await response.json()
+        alert(`❌ Failed to send emails: ${error.message}`)
+      }
+    } catch (error) {
+      console.error('Error sending user emails:', error)
+      alert('❌ Failed to send emails. Please try again.')
+    }
+    
+    setIsComposingUserEmail(false)
   }
 
   // Admin Management Functions
@@ -1191,6 +1411,203 @@ The Helfi Team`,
               </div>
             </div>
 
+            {/* User Email Campaign */}
+            <div className="bg-white rounded-lg shadow p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">User Email Campaign</h3>
+                  <p className="text-sm text-gray-600">
+                    {selectedUserEmails.length > 0 
+                      ? `${selectedUserEmails.length} users selected` 
+                      : 'Select users to send emails'
+                    }
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {/* Quick Selection Buttons */}
+                  <button
+                    onClick={() => handleSelectByTier('all')}
+                    className="bg-gray-500 text-white px-3 py-2 rounded-lg hover:bg-gray-600 transition-colors text-sm"
+                  >
+                    👥 All Users ({managedUsers.length})
+                  </button>
+                  <button
+                    onClick={() => handleSelectByTier('premium')}
+                    className="bg-emerald-500 text-white px-3 py-2 rounded-lg hover:bg-emerald-600 transition-colors text-sm"
+                  >
+                    💎 Premium Users ({managedUsers.filter(u => u.subscription?.plan === 'PREMIUM').length})
+                  </button>
+                  <button
+                    onClick={() => handleSelectByTier('free')}
+                    className="bg-blue-500 text-white px-3 py-2 rounded-lg hover:bg-blue-600 transition-colors text-sm"
+                  >
+                    🆓 Free Users ({managedUsers.filter(u => !u.subscription?.plan || u.subscription.plan === 'FREE').length})
+                  </button>
+                </div>
+              </div>
+
+              {/* Email Template Buttons */}
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
+                <button
+                  onClick={() => handleStartUserEmail('welcome')}
+                  disabled={selectedUserEmails.length === 0}
+                  className="bg-green-500 text-white px-4 py-3 rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                >
+                  🎉 Welcome Email
+                </button>
+                <button
+                  onClick={() => handleStartUserEmail('premium_upgrade')}
+                  disabled={selectedUserEmails.length === 0}
+                  className="bg-purple-500 text-white px-4 py-3 rounded-lg hover:bg-purple-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                >
+                  🔥 Upgrade to Premium
+                </button>
+                <button
+                  onClick={() => handleStartUserEmail('engagement')}
+                  disabled={selectedUserEmails.length === 0}
+                  className="bg-orange-500 text-white px-4 py-3 rounded-lg hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                >
+                  🌟 Re-engagement
+                </button>
+                <button
+                  onClick={() => handleStartUserEmail('feature_announcement')}
+                  disabled={selectedUserEmails.length === 0}
+                  className="bg-indigo-500 text-white px-4 py-3 rounded-lg hover:bg-indigo-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                >
+                  🆕 New Features
+                </button>
+                <button
+                  onClick={() => handleStartUserEmail('support_followup')}
+                  disabled={selectedUserEmails.length === 0}
+                  className="bg-teal-500 text-white px-4 py-3 rounded-lg hover:bg-teal-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                >
+                  🤝 Support Follow-up
+                </button>
+                <button
+                  onClick={() => handleStartUserEmail('custom')}
+                  disabled={selectedUserEmails.length === 0}
+                  className="bg-gray-500 text-white px-4 py-3 rounded-lg hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                >
+                  ✏️ Custom Email
+                </button>
+              </div>
+            </div>
+
+            {/* User Email Composition Interface */}
+            {showUserEmailInterface && (
+              <div className="bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-lg p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h3 className="text-lg font-semibold text-purple-900">
+                      📧 Compose Email to Users ({emailTemplate === 'custom' ? 'Custom' : emailTemplate.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())})
+                    </h3>
+                    <p className="text-sm text-purple-700">
+                      Sending to {selectedUserEmails.length} users: {selectedUserEmails.slice(0, 3).join(', ')}{selectedUserEmails.length > 3 && ` and ${selectedUserEmails.length - 3} more...`}
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleCancelUserEmail}
+                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  {/* Template Selector */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Email Template</label>
+                    <select
+                      value={emailTemplate}
+                      onChange={(e) => {
+                        setEmailTemplate(e.target.value)
+                        applyEmailTemplate(e.target.value)
+                      }}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                    >
+                      <option value="custom">Custom Email</option>
+                      <option value="welcome">🎉 Welcome Email</option>
+                      <option value="premium_upgrade">🔥 Premium Upgrade</option>
+                      <option value="engagement">🌟 Re-engagement</option>
+                      <option value="feature_announcement">🆕 Feature Announcement</option>
+                      <option value="support_followup">🤝 Support Follow-up</option>
+                    </select>
+                  </div>
+
+                  {/* Subject Line */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Subject Line <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={userEmailSubject}
+                      onChange={(e) => setUserEmailSubject(e.target.value)}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-lg"
+                      placeholder="Enter email subject..."
+                    />
+                  </div>
+
+                  {/* Message Body */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Email Message <span className="text-red-500">*</span>
+                      <span className="text-xs text-gray-500 ml-2">(Use {'{name}'} to personalize with user names)</span>
+                    </label>
+                    <textarea
+                      value={userEmailMessage}
+                      onChange={(e) => setUserEmailMessage(e.target.value)}
+                      rows={12}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-base leading-relaxed"
+                      placeholder="Enter your email message..."
+                    />
+                  </div>
+
+                  {/* Preview Section */}
+                  <div className="bg-white p-4 rounded-lg border border-gray-200">
+                    <h4 className="text-sm font-medium text-gray-700 mb-2">📧 Email Preview</h4>
+                    <div className="text-sm text-gray-600 space-y-1">
+                      <div><strong>To:</strong> {selectedUserEmails.length} users</div>
+                      <div><strong>Template:</strong> {emailTemplate.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</div>
+                      <div><strong>Subject:</strong> {userEmailSubject || 'No subject'}</div>
+                      <div className="max-h-20 overflow-y-auto">
+                        <strong>Message:</strong> {userEmailMessage.slice(0, 200)}
+                        {userEmailMessage.length > 200 && '...'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex flex-col sm:flex-row gap-3 pt-4">
+                    <button
+                      onClick={handleCancelUserEmail}
+                      className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleSendUserEmail}
+                      disabled={isComposingUserEmail || !userEmailSubject.trim() || !userEmailMessage.trim()}
+                      className="px-6 py-3 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium flex items-center justify-center"
+                    >
+                      {isComposingUserEmail ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                          Sending...
+                        </>
+                      ) : (
+                        <>
+                          📧 Send to {selectedUserEmails.length} Users
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Users Table */}
             <div className="bg-white rounded-lg shadow">
               <div className="px-6 py-4 border-b border-gray-200">
@@ -1209,6 +1626,14 @@ The Helfi Team`,
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                       <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <input
+                            type="checkbox"
+                            checked={managedUsers.length > 0 && selectedUserEmails.length === managedUsers.length}
+                            onChange={handleSelectAllUsers}
+                            className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                          />
+                        </th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           User
                         </th>
@@ -1229,13 +1654,21 @@ The Helfi Team`,
                     <tbody className="bg-white divide-y divide-gray-200">
                       {managedUsers.length === 0 ? (
                         <tr>
-                          <td colSpan={5} className="px-6 py-4 text-center text-gray-500">
+                          <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
                             No users found.
                           </td>
                         </tr>
                       ) : (
                         managedUsers.map((user) => (
-                          <tr key={user.id}>
+                          <tr key={user.id} className={selectedUserEmails.includes(user.email) ? 'bg-purple-50' : ''}>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <input
+                                type="checkbox"
+                                checked={selectedUserEmails.includes(user.email)}
+                                onChange={() => handleUserEmailSelect(user.email)}
+                                className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                              />
+                            </td>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div>
                                 <div className="text-sm font-medium text-gray-900">
