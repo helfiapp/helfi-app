@@ -129,16 +129,22 @@ export default function Profile() {
           body: JSON.stringify({ profileInfo: profileData })
         });
 
-        // Also save to localStorage as backup
-        localStorage.setItem('profileData', JSON.stringify(profileData));
+        if (response.ok) {
+          // Successful save to database
+          localStorage.setItem('profileData', JSON.stringify(profileData));
+          setSaveStatus('saved');
+          console.log('Profile auto-saved successfully to database');
+        } else {
+          throw new Error(`Failed to save: ${response.status} ${response.statusText}`);
+        }
         
-        setSaveStatus('saved');
         setTimeout(() => setSaveStatus('idle'), 2000);
       } catch (error) {
-        console.error('Error saving profile:', error);
+        console.error('Error saving profile to database:', error);
         // Save to localStorage as fallback
         localStorage.setItem('profileData', JSON.stringify(profileData));
         setSaveStatus('saved');
+        console.log('Profile saved to localStorage as fallback');
         setTimeout(() => setSaveStatus('idle'), 2000);
       }
     }, 1000); // Debounce saves by 1 second
