@@ -4,32 +4,12 @@ import React, { useState, useEffect } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { useUserData } from '@/components/providers/UserDataProvider'
 
 export default function Help() {
   const { data: session } = useSession()
+  const { profileImage } = useUserData()
   const [dropdownOpen, setDropdownOpen] = useState(false)
-  const [profileImage, setProfileImage] = useState<string>('')
-
-  // Load profile image on mount
-  useEffect(() => {
-    if (session?.user?.email) {
-      fetch('/api/user-data', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      })
-      .then(res => res.json())
-      .then(data => {
-        if (data.success && data.userData?.profileImage) {
-          setProfileImage(data.userData.profileImage)
-        }
-      })
-      .catch(error => {
-        console.error('Error loading profile image:', error)
-      })
-    }
-  }, [session])
 
   // Profile data - using consistent green avatar
   const defaultAvatar = 'data:image/svg+xml;base64,' + btoa(`
