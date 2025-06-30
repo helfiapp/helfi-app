@@ -104,15 +104,24 @@ interface LayoutWrapperProps {
 
 export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   const pathname = usePathname()
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
   
   // Pages that should ALWAYS be public (no sidebar regardless of auth status)
   const publicPages = ['/', '/healthapp', '/auth/signin', '/privacy', '/terms', '/help', '/admin-panel', '/support', '/faq']
   
+  // Don't show sidebar while session is loading to prevent flickering
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen">
+        {children}
+      </div>
+    )
+  }
+  
   // Show sidebar only if:
-  // 1. User is authenticated AND
+  // 1. User is authenticated (status === 'authenticated') AND
   // 2. Current page is not in publicPages list
-  const shouldShowSidebar = session && !publicPages.includes(pathname)
+  const shouldShowSidebar = status === 'authenticated' && !publicPages.includes(pathname)
 
   if (shouldShowSidebar) {
     return (
