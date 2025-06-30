@@ -2298,7 +2298,7 @@ useEffect(() => {
 
 #### ❌ **AGENT'S CRITICAL FAILURES**
 
-1. **BROKE VISUAL DISPLAY** - Profile image section on `/profile` page now shows:
+1. **BROKE VISUAL DISPLAY** - Profile image section on `/app/profile` page now shows:
    - Square image inside green circle (broken layout)
    - Used `object-contain` instead of `object-cover` causing improper fit
    - Image wrapped in unnecessary green circle div
@@ -2514,7 +2514,7 @@ There was a working version before it broke that had every single page and dropd
 ```
 
 #### **Mobile Navigation Structure**
-```javascript
+```
 // Bottom navigation on: dashboard, health-tracking, insights, reports, profile
 // Active states: text-helfi-green, font-bold
 // Inactive states: text-gray-400, font-medium
@@ -2522,7 +2522,7 @@ There was a working version before it broke that had every single page and dropd
 ```
 
 #### **Progress Indicator Design**
-```javascript
+```
 // Mobile: w-6 h-6 circles with px-2 spacing
 // Desktop: w-8 h-8 circles with hover effects
 // Container: max-w-2xl mx-auto for closer spacing
@@ -3177,19 +3177,20 @@ POST https://www.helfi.ai/api/user-data 500 (Internal Server Error)
 #### 🚫 APPROACHES THAT DEFINITIVELY FAILED:
 
 1. **❌ NextAuth Import Path Fix** - Changed import but didn't solve core issue
-2. **❌ Custom Session System Removal** - Simplified auth but API still fails
-3. **❌ Database Enum Conversion** - Fixed data types but operations still fail
-4. **❌ Transaction Wrapping** - Added transactions but constraint conflicts persist
-5. **❌ Find/Update Pattern** - Replaced upsert but same 500 errors continue
-6. **❌ Surgical Delete Operations** - Tried to preserve data but still causes loss
+2. **❌ Custom session system changes** - Already removed, not the issue
+3. **❌ Database enum conversion** - Fixed data types but operations still fail
+4. **❌ Transaction wrapping** - Added transactions but constraint conflicts persist
+5. **❌ Find/update patterns** - Replaced upsert but same 500 errors continue
+6. **❌ Surgical delete operations** - Tried to preserve data but still causes loss
 
 #### 🎯 ROOT CAUSE ANALYSIS:
 
 **THE REAL PROBLEM APPEARS TO BE:**
 - **Database Constraint Conflicts**: Complex deleteMany/createMany operations cause violations
-- **Race Conditions**: Multiple rapid saves during onboarding cause conflicts  
-- **Data Model Issues**: Relationship constraints not properly handled
-- **Form State Management**: Step 5 data not properly captured/transmitted
+- **Prisma Configuration**: ORM settings not handling concurrent operations
+- **Data Validation**: Form data not properly validated before database operations
+- **Step 5 Form Handling**: Health situations data not properly captured
+- **Frontend State Management**: Form state not properly synchronized
 
 **EVIDENCE FROM USER TESTING:**
 - First save: "Progress saved to database successfully" ✅
@@ -3470,7 +3471,6 @@ export async function POST(req: Request) {
 ```typescript
 // DESPERATE ATTEMPT - BYPASSED AUTH ENTIRELY
 const email = "user@example.com" // Hardcoded for testing
-// Still failed - indicating deeper database connection issues
 ```
 
 ##### USER TEST RESULTS:
@@ -4089,7 +4089,7 @@ Error: Expression expected
 - Agent incorrectly assumed 8-step version was correct
 
 **Authentication Implementation:**
-```typescript
+```
 // WRONG - What agent implemented
 export default function HealthApp() {
   const handleGoogleSignIn = () => {
@@ -4650,7 +4650,7 @@ This will delete the corrupted clone and restore the user's original working dir
 - **Impact**: Inconsistent user experience across application
 
 #### FAILURE #3: Pricing Error - COMPLETELY OVERLOOKED
-- **Issue**: Billing page shows $19.99 instead of correct $12.99 from homepage
+- **Issue**: Billing page shows $19.99 instead of correct $12.99
 - **My Action**: Completely ignored this critical business issue
 - **Impact**: Customer confusion and potential billing disputes
 
@@ -4815,7 +4815,7 @@ Error: Check your logs at https://[deployment-url]/_logs
 ```
 
 **WHAT THIS SUGGESTS**:
-The issue is NOT with the code, environment files, or git state. Something in the Vercel project infrastructure itself was corrupted by Agent #9's destructive actions.
+The issue is NOT with the code, environment files, or git state. Something in the Vercel project infrastructure itself was corrupted by Agent #9's destructive git operations.
 
 ### 🚨 WHAT AGENT #10 COULD NOT SOLVE:
 
