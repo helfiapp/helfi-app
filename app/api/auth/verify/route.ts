@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
+// This API route uses dynamic data and should not be statically generated
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   try {
     const url = new URL(request.url)
@@ -8,7 +12,7 @@ export async function GET(request: NextRequest) {
     const email = url.searchParams.get('email')
 
     if (!token || !email) {
-      return NextResponse.redirect(new URL('/auth/signin?error=verification_missing_params', request.url))
+      return NextResponse.redirect(new URL('/auth/signin?error=verification_missing_params', 'https://helfi.ai'))
     }
 
     console.log('🔐 Email verification attempt:', { email, token: token.substring(0, 8) + '...' })
@@ -25,7 +29,7 @@ export async function GET(request: NextRequest) {
 
     if (!verificationRecord) {
       console.log('❌ Invalid verification token:', { email, token: token.substring(0, 8) + '...' })
-      return NextResponse.redirect(new URL('/auth/signin?error=verification_invalid_token', request.url))
+      return NextResponse.redirect(new URL('/auth/signin?error=verification_invalid_token', 'https://helfi.ai'))
     }
 
     // Check if token has expired
@@ -42,7 +46,7 @@ export async function GET(request: NextRequest) {
         }
       })
       
-      return NextResponse.redirect(new URL('/auth/signin?error=verification_expired', request.url))
+      return NextResponse.redirect(new URL('/auth/signin?error=verification_expired', 'https://helfi.ai'))
     }
 
     // Find the user
@@ -52,7 +56,7 @@ export async function GET(request: NextRequest) {
 
     if (!user) {
       console.log('❌ User not found for verification:', email)
-      return NextResponse.redirect(new URL('/auth/signin?error=verification_user_not_found', request.url))
+      return NextResponse.redirect(new URL('/auth/signin?error=verification_user_not_found', 'https://helfi.ai'))
     }
 
     // Verify the user's email
@@ -139,10 +143,10 @@ The Helfi Team`
     }
 
     // Redirect to signin with success message
-    return NextResponse.redirect(new URL('/auth/signin?message=verification_success', request.url))
+    return NextResponse.redirect(new URL('/auth/signin?message=verification_success', 'https://helfi.ai'))
 
   } catch (error) {
     console.error('❌ Email verification error:', error)
-    return NextResponse.redirect(new URL('/auth/signin?error=verification_server_error', request.url))
+    return NextResponse.redirect(new URL('/auth/signin?error=verification_server_error', 'https://helfi.ai'))
   }
 } 
