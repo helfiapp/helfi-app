@@ -48,6 +48,10 @@ export const authOptions: NextAuthOptions = {
     async redirect({ url, baseUrl }) {
       console.log('Redirect callback:', { url, baseUrl })
       try {
+        // Handle signout redirects
+        if (url.includes('signout') || url.includes('signOut')) {
+          return baseUrl // Redirect to home page after signout
+        }
         // If URL is relative, prepend baseUrl
         if (url.startsWith('/')) {
           return `${baseUrl}${url}`
