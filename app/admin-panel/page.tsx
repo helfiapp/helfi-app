@@ -308,6 +308,15 @@ export default function AdminPanel() {
     if (activeTab === 'insights') {
       loadAiInsights()
     }
+    if (activeTab === 'management') {
+      loadUserManagement(userSearch, userFilter, currentPage)
+    }
+    if (activeTab === 'templates') {
+      loadEmailTemplates()
+    }
+    if (activeTab === 'tickets') {
+      loadSupportTickets()
+    }
   }
 
   // Email functionality
