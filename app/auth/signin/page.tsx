@@ -16,33 +16,24 @@ function SearchParamsHandler({ setError, setMessage }: { setError: (error: strin
     
     if (errorParam) {
       switch (errorParam) {
-        case 'verification_missing_params':
-          setError('Invalid verification link. Please check your email and try again.')
+        case 'CredentialsSignin':
+          setError('Invalid email or password. Please try again.')
           break
-        case 'verification_invalid_token':
-          setError('Invalid or expired verification link. Please request a new verification email.')
+        case 'OAuthSignin':
+          setError('Error signing in with Google. Please try again.')
           break
-        case 'verification_expired':
-          setError('Verification link has expired. Please sign up again to receive a new verification email.')
-          break
-        case 'verification_user_not_found':
-          setError('Account not found. Please sign up first.')
-          break
-        case 'verification_server_error':
-          setError('Server error during verification. Please try again or contact support.')
+        case 'OAuthCallback':
+          setError('Error during authentication. Please try again.')
           break
         default:
-          setError('An error occurred. Please try again.')
+          setError('An error occurred during sign in. Please try again.')
       }
     }
     
     if (messageParam) {
       switch (messageParam) {
-        case 'verification_success':
-          setMessage('✅ Email verified successfully! You can now sign in to your account.')
-          break
-        case 'verification_email_sent':
-          setMessage('📧 Verification email sent! Please check your inbox and click the verification link.')
+        case 'signout':
+          setMessage('You have been signed out successfully.')
           break
         default:
           setMessage('Status updated.')
@@ -57,7 +48,7 @@ export default function SignIn() {
   const [loading, setLoading] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [isSignUp, setIsSignUp] = useState(false)
+  // Removed isSignUp state since signup is handled via Google OAuth only
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -130,10 +121,10 @@ export default function SignIn() {
           {/* Sign In Form */}
           <div className="text-center">
             <h2 className="text-2xl font-bold text-helfi-black mb-4">
-              {isSignUp ? 'Create Account' : 'Welcome to Helfi'}
+              Welcome to Helfi
             </h2>
             <p className="text-gray-600 mb-8">
-              {isSignUp ? 'Create a new account to get started' : 'Sign in to your account'}
+              Sign in to your account or create a new one
             </p>
           </div>
 
@@ -202,7 +193,7 @@ export default function SignIn() {
                     id="password"
                     name="password"
                     type={showPassword ? "text" : "password"}
-                    autoComplete={isSignUp ? "new-password" : "current-password"}
+                    autoComplete="current-password"
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -245,17 +236,14 @@ export default function SignIn() {
                 disabled={loading}
                 className="w-full bg-helfi-green text-white px-4 py-3 rounded-lg hover:bg-helfi-green-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
               >
-                {loading ? 'Please wait...' : (isSignUp ? 'Create Account' : 'Sign In')}
+                {loading ? 'Please wait...' : 'Sign In'}
               </button>
             </form>
 
             <div className="text-center">
-              <button
-                onClick={() => setIsSignUp(!isSignUp)}
-                className="text-helfi-green hover:text-helfi-green-dark font-medium text-sm"
-              >
-                {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up"}
-              </button>
+              <p className="text-gray-500 text-sm">
+                New to Helfi? Sign up using Google above
+              </p>
             </div>
           </div>
         </div>
