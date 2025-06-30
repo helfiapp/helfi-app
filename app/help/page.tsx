@@ -158,18 +158,18 @@ export default function Help() {
           <div className="mb-8">
             <h3 className="text-xl font-semibold text-gray-900 mb-4">Common Topics</h3>
             <div className="space-y-3">
-              <div className="p-3 border border-gray-200 rounded-lg">
+              <Link href="/onboarding" className="block p-3 border border-gray-200 rounded-lg hover:border-helfi-green hover:bg-gray-50 transition-colors cursor-pointer">
                 <h4 className="font-medium text-gray-900">Getting Started</h4>
                 <p className="text-sm text-gray-600">Learn how to set up your profile and start tracking</p>
-              </div>
-              <div className="p-3 border border-gray-200 rounded-lg">
+              </Link>
+              <Link href="/privacy" className="block p-3 border border-gray-200 rounded-lg hover:border-helfi-green hover:bg-gray-50 transition-colors cursor-pointer">
                 <h4 className="font-medium text-gray-900">Data Privacy</h4>
                 <p className="text-sm text-gray-600">How we protect and use your health data</p>
-              </div>
-              <div className="p-3 border border-gray-200 rounded-lg">
+              </Link>
+              <Link href="/support" className="block p-3 border border-gray-200 rounded-lg hover:border-helfi-green hover:bg-gray-50 transition-colors cursor-pointer">
                 <h4 className="font-medium text-gray-900">AI Insights</h4>
                 <p className="text-sm text-gray-600">Understanding your personalized health recommendations</p>
-              </div>
+              </Link>
             </div>
           </div>
         </div>
