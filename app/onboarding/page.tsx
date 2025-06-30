@@ -2172,6 +2172,10 @@ export default function Onboarding() {
     if (status === 'authenticated') {
       const currentStep = parseInt(new URLSearchParams(window.location.search).get('step') || '1') - 1;
       setStep(Math.max(0, Math.min(stepNames.length - 1, currentStep)));
+    } else if (status === 'unauthenticated') {
+      // Session has been invalidated (e.g., user account deleted)
+      console.log('🚫 Session invalidated - redirecting to homepage');
+      window.location.href = '/';
     }
   }, [status, stepNames.length]);
 

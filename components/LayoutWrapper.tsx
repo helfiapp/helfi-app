@@ -118,6 +118,19 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
     )
   }
   
+  // Redirect unauthenticated users away from protected pages
+  if (status === 'unauthenticated' && !publicPages.includes(pathname)) {
+    console.log('🚫 Unauthenticated user on protected page - redirecting to homepage');
+    window.location.href = '/';
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-600">Redirecting...</p>
+        </div>
+      </div>
+    )
+  }
+  
   // Show sidebar only if:
   // 1. User is authenticated (status === 'authenticated') AND
   // 2. Current page is not in publicPages list

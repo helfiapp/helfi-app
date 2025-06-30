@@ -230,6 +230,20 @@ export const authOptions: NextAuthOptions = {
       try {
         // Add user info to session from JWT token
         if (token?.email) {
+          // CRITICAL: Validate that user still exists in database
+          const dbUser = await prisma.user.findUnique({
+            where: { id: token.id as string }
+          })
+          
+          if (!dbUser) {
+            console.log('🚫 User account deleted - invalidating session:', token.email)
+            // Return null/empty session to force logout
+            return {
+              ...session,
+              user: undefined
+            }
+          }
+          
           session.user = {
             id: token.id as string,
             email: token.email as string,
@@ -238,7 +252,7 @@ export const authOptions: NextAuthOptions = {
           }
         }
         
-        console.log('✅ Session created:', { 
+        console.log('✅ Session validated:', { 
           id: session.user?.id, 
           email: session.user?.email 
         })
