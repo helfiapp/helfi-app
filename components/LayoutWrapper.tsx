@@ -118,6 +118,63 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
     )
   }
   
+  // Check if authenticated user needs email verification
+  if (status === 'authenticated' && session?.user?.needsVerification && !publicPages.includes(pathname)) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-white to-helfi-green-light/10 p-4">
+        <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-6 text-center">
+          <div className="mb-4">
+            <div className="mx-auto w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center">
+              <svg className="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+            </div>
+          </div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Email Verification Required</h2>
+          <p className="text-gray-600 mb-4">
+            Please check your email for a verification link. You must verify your email address before accessing your account.
+          </p>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+            <p className="text-blue-700 text-sm">
+              📧 Verification email sent to: <strong>{session?.user?.email}</strong>
+            </p>
+          </div>
+          <div className="space-y-3">
+            <button
+              onClick={async () => {
+                try {
+                  const response = await fetch('/api/auth/resend-verification', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: session?.user?.email })
+                  })
+                  
+                  if (response.ok) {
+                    alert('✅ Verification email sent! Please check your inbox.')
+                  } else {
+                    const error = await response.json()
+                    alert(`❌ Failed to send email: ${error.error}`)
+                  }
+                } catch (error) {
+                  alert('❌ Failed to send verification email. Please try again.')
+                }
+              }}
+              className="w-full bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors font-medium"
+            >
+              📧 Resend Verification Email
+            </button>
+            <button
+              onClick={() => window.location.href = '/auth/signin'}
+              className="w-full bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors font-medium"
+            >
+              Back to Sign In
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+  
   // Redirect unauthenticated users away from protected pages
   if (status === 'unauthenticated' && !publicPages.includes(pathname)) {
     console.log('🚫 Unauthenticated user on protected page - redirecting to homepage');

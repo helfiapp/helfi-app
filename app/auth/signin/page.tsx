@@ -3,7 +3,8 @@
 import { signIn } from 'next-auth/react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 
 export default function SignIn() {
   const [loading, setLoading] = useState(false)
@@ -11,7 +12,49 @@ export default function SignIn() {
   const [password, setPassword] = useState('')
   const [isSignUp, setIsSignUp] = useState(false)
   const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const searchParams = useSearchParams()
+
+  useEffect(() => {
+    const errorParam = searchParams.get('error')
+    const messageParam = searchParams.get('message')
+    
+    if (errorParam) {
+      switch (errorParam) {
+        case 'verification_missing_params':
+          setError('Invalid verification link. Please check your email and try again.')
+          break
+        case 'verification_invalid_token':
+          setError('Invalid or expired verification link. Please request a new verification email.')
+          break
+        case 'verification_expired':
+          setError('Verification link has expired. Please sign up again to receive a new verification email.')
+          break
+        case 'verification_user_not_found':
+          setError('Account not found. Please sign up first.')
+          break
+        case 'verification_server_error':
+          setError('Server error during verification. Please try again or contact support.')
+          break
+        default:
+          setError('An error occurred. Please try again.')
+      }
+    }
+    
+    if (messageParam) {
+      switch (messageParam) {
+        case 'verification_success':
+          setMessage('✅ Email verified successfully! You can now sign in to your account.')
+          break
+        case 'verification_email_sent':
+          setMessage('📧 Verification email sent! Please check your inbox and click the verification link.')
+          break
+        default:
+          setMessage('Status updated.')
+      }
+    }
+  }, [searchParams])
 
   const handleGoogleAuth = async () => {
     setLoading(true)
@@ -24,6 +67,7 @@ export default function SignIn() {
     
     setLoading(true)
     setError('')
+    setMessage('')
     
     const result = await signIn('credentials', { 
       email, 
@@ -35,8 +79,22 @@ export default function SignIn() {
     if (result?.error) {
       setError('Invalid email or password')
     } else {
-      // Redirect to onboarding on success
-      window.location.href = '/onboarding'
+      // Check if user needs verification by making a quick API call
+      try {
+        const sessionResponse = await fetch('/api/auth/session')
+        const sessionData = await sessionResponse.json()
+        
+        if (sessionData?.user?.needsVerification) {
+          setMessage('📧 Please check your email for a verification link. You must verify your email before accessing your account.')
+          setError('Account verification required. Check your email for the verification link.')
+        } else {
+          // Redirect to onboarding on success for verified users
+          window.location.href = '/onboarding'
+        }
+      } catch (error) {
+        console.error('Session check failed:', error)
+        window.location.href = '/onboarding' // Fallback
+      }
     }
     setLoading(false)
   }
@@ -161,7 +219,15 @@ export default function SignIn() {
 
 
             {error && (
-              <div className="text-red-600 text-sm">{error}</div>
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-red-700 text-sm">
+                {error}
+              </div>
+            )}
+
+            {message && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-green-700 text-sm">
+                {message}
+              </div>
             )}
 
             <button

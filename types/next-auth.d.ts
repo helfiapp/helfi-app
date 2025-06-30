@@ -7,6 +7,7 @@ declare module 'next-auth' {
       email: string
       name?: string | null
       image?: string | null
+      needsVerification?: boolean
     }
   }
 
@@ -15,6 +16,7 @@ declare module 'next-auth' {
     email: string
     name?: string | null
     image?: string | null
+    needsVerification?: boolean
   }
 }
 
