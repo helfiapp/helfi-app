@@ -1,6 +1,7 @@
 'use client'
 
 import { usePathname } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { ReactNode } from 'react'
 
 // Desktop Sidebar Navigation Component  
@@ -103,15 +104,20 @@ interface LayoutWrapperProps {
 
 export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   const pathname = usePathname()
+  const { data: session } = useSession()
   
-  // Pages that should NOT have the sidebar (public pages)
-  const publicPages = ['/', '/healthapp', '/auth/signin', '/privacy', '/terms', '/help', '/admin-panel']
-  const shouldShowSidebar = !publicPages.includes(pathname)
+  // Pages that should ALWAYS be public (no sidebar regardless of auth status)
+  const publicPages = ['/', '/healthapp', '/auth/signin', '/privacy', '/terms', '/help', '/admin-panel', '/support', '/faq']
+  
+  // Show sidebar only if:
+  // 1. User is authenticated AND
+  // 2. Current page is not in publicPages list
+  const shouldShowSidebar = session && !publicPages.includes(pathname)
 
   if (shouldShowSidebar) {
     return (
       <div className="flex min-h-screen bg-gray-50">
-        {/* Desktop Sidebar - Only for authenticated pages */}
+        {/* Desktop Sidebar - Only for authenticated users on app pages */}
         <DesktopSidebar />
         
         {/* Main Content */}
@@ -122,7 +128,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
     )
   }
 
-  // Public pages without sidebar
+  // Public pages or unauthenticated users - no sidebar
   return (
     <div className="min-h-screen">
       {children}
