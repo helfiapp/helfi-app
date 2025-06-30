@@ -87,7 +87,7 @@ async function sendVerificationEmail(email: string, token: string) {
   }
 
   try {
-    const verificationUrl = `https://helfi.ai/auth/verify?token=${token}&email=${encodeURIComponent(email)}`
+    const verificationUrl = `https://helfi.ai/api/auth/verify?token=${token}&email=${encodeURIComponent(email)}`
     
     const emailResponse = await resend.emails.send({
       from: 'Helfi Team <support@helfi.ai>',
