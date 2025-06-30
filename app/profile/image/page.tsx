@@ -60,26 +60,32 @@ export default function ProfileImage() {
           if (result.data && result.data.profileImage) {
             console.log('Profile/Image page - Setting profile image from database');
             setCurrentProfileImage(result.data.profileImage);
-            // Also update localStorage for backup
-            localStorage.setItem('profileImage', result.data.profileImage);
+            // Also update localStorage for backup (user-specific)
+            if (session?.user?.id) {
+              localStorage.setItem(`profileImage_${session.user.id}`, result.data.profileImage);
+            }
           } else {
             console.log('Profile/Image page - No profile image found in database response');
           }
         } else {
           console.error('Profile/Image page - API call failed:', response.status, response.statusText);
-          // Fallback to localStorage
-          const savedImage = localStorage.getItem('profileImage');
-          if (savedImage) {
-            console.log('Using fallback profile image from localStorage');
-            setCurrentProfileImage(savedImage);
+          // Fallback to localStorage (user-specific)
+          if (session?.user?.id) {
+            const savedImage = localStorage.getItem(`profileImage_${session.user.id}`);
+            if (savedImage) {
+              console.log('Using fallback profile image from localStorage');
+              setCurrentProfileImage(savedImage);
+            }
           }
         }
       } catch (error) {
         console.error('Error loading profile image:', error);
-        const savedImage = localStorage.getItem('profileImage');
-        if (savedImage) {
-          console.log('Using fallback profile image from localStorage after error');
-          setCurrentProfileImage(savedImage);
+        if (session?.user?.id) {
+          const savedImage = localStorage.getItem(`profileImage_${session.user.id}`);
+          if (savedImage) {
+            console.log('Using fallback profile image from localStorage after error');
+            setCurrentProfileImage(savedImage);
+          }
         }
       }
     };
@@ -108,16 +114,20 @@ export default function ProfileImage() {
               body: JSON.stringify({ profileImage: base64Image })
             });
 
-            // Also save to localStorage as backup
-            localStorage.setItem('profileImage', base64Image);
+            // Also save to localStorage as backup (user-specific)
+            if (session?.user?.id) {
+              localStorage.setItem(`profileImage_${session.user.id}`, base64Image);
+            }
             
             setCurrentProfileImage(base64Image);
             setSaveStatus('saved');
             setTimeout(() => setSaveStatus('idle'), 2000);
           } catch (error) {
             console.error('Error saving to database:', error);
-            // Fallback to localStorage
-            localStorage.setItem('profileImage', base64Image);
+            // Fallback to localStorage (user-specific)
+            if (session?.user?.id) {
+              localStorage.setItem(`profileImage_${session.user.id}`, base64Image);
+            }
             setCurrentProfileImage(base64Image);
             setSaveStatus('saved');
             setTimeout(() => setSaveStatus('idle'), 2000);
@@ -253,8 +263,10 @@ export default function ProfileImage() {
           body: JSON.stringify({ profileImage: null })
         });
 
-        // Remove from localStorage
-        localStorage.removeItem('profileImage');
+        // Remove from localStorage (user-specific)
+        if (session?.user?.id) {
+          localStorage.removeItem(`profileImage_${session.user.id}`);
+        }
         
         setCurrentProfileImage(null);
         setSelectedImage(null);
@@ -263,8 +275,10 @@ export default function ProfileImage() {
         setTimeout(() => setSaveStatus('idle'), 2000);
       } catch (error) {
         console.error('Error removing image:', error);
-        // Fallback to localStorage
-        localStorage.removeItem('profileImage');
+        // Fallback to localStorage (user-specific)
+        if (session?.user?.id) {
+          localStorage.removeItem(`profileImage_${session.user.id}`);
+        }
         setCurrentProfileImage(null);
         setSelectedImage(null);
         setImagePreview(null);

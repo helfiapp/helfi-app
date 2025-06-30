@@ -58,8 +58,10 @@ export default function Dashboard() {
             // Load profile image from database and cache it
             if (result.data.profileImage) {
               setProfileImage(result.data.profileImage);
-              // Cache in localStorage for instant loading on other pages
-              localStorage.setItem('cachedProfileImage', result.data.profileImage);
+              // Cache in localStorage for instant loading on other pages (user-specific)
+              if (session?.user?.id) {
+                localStorage.setItem(`cachedProfileImage_${session.user.id}`, result.data.profileImage);
+              }
             }
           }
         } else if (response.status === 404) {
@@ -80,14 +82,18 @@ export default function Dashboard() {
       }
     };
 
-    // Load cached profile image immediately for instant display
-    const cachedImage = localStorage.getItem('cachedProfileImage');
-    if (cachedImage) {
-      setProfileImage(cachedImage);
+    // Load cached profile image immediately for instant display (user-specific)
+    if (session?.user?.id) {
+      const cachedImage = localStorage.getItem(`cachedProfileImage_${session.user.id}`);
+      if (cachedImage) {
+        setProfileImage(cachedImage);
+      }
     }
 
-    loadUserData();
-  }, []);
+    if (session) {
+      loadUserData();
+    }
+  }, [session]);
 
   const handleEditOnboarding = () => {
     // Navigate directly to onboarding - data will be loaded from database
@@ -117,6 +123,15 @@ export default function Dashboard() {
       console.error('Error deleting from database:', error);
       alert('Failed to reset data. Please try again.');
     }
+  }
+
+  const handleSignOut = async () => {
+    // Clear user-specific localStorage before signing out
+    if (session?.user?.id) {
+      localStorage.removeItem(`profileImage_${session.user.id}`);
+      localStorage.removeItem(`cachedProfileImage_${session.user.id}`);
+    }
+    await signOut({ callbackUrl: '/' })
   }
 
   return (
@@ -176,12 +191,12 @@ export default function Dashboard() {
                 <Link href="/support" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
                 <div className="border-t border-gray-100 my-2"></div>
                 <Link href="/reports" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Reports</Link>
-                <button
-                  onClick={() => signOut({ callbackUrl: '/' })}
-                  className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50 font-semibold"
-                >
-                  Logout
-                </button>
+                              <button 
+                onClick={handleSignOut}
+                className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50 font-semibold"
+              >
+                Logout
+              </button>
               </div>
             )}
           </div>

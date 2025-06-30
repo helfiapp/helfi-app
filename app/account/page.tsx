@@ -62,6 +62,11 @@ export default function AccountPage() {
   }, [session])
 
   const handleSignOut = async () => {
+    // Clear user-specific localStorage before signing out
+    if (session?.user?.id) {
+      localStorage.removeItem(`profileImage_${session.user.id}`);
+      localStorage.removeItem(`cachedProfileImage_${session.user.id}`);
+    }
     await signOut({ callbackUrl: '/' })
   }
 
