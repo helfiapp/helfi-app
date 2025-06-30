@@ -341,9 +341,9 @@ export const authOptions: NextAuthOptions = {
           
           if (!dbUser) {
             console.log('🚫 User account deleted - invalidating session:', token.email)
-            // Return null/empty session to force logout
+            // Return empty session to force complete logout
             return {
-              ...session,
+              expires: session.expires,
               user: undefined
             }
           }

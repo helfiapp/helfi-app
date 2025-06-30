@@ -67,18 +67,27 @@ export default function SignIn() {
     setMessage('')
     
     if (isSignUp) {
-      // Handle signup - redirect to professional verification flow
-      const result = await signIn('credentials', { 
-        email, 
-        password,
-        redirect: false 
-      })
-      
-      if (result?.error) {
+      // Handle signup via direct API (no NextAuth flash)
+      try {
+        const response = await fetch('/api/auth/signup', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ email, password }),
+        })
+
+        const data = await response.json()
+
+        if (!response.ok) {
+          setError(data.error || 'Failed to create account. Please try again.')
+        } else {
+          // Success - redirect to check email page
+          window.location.href = `/auth/check-email?email=${encodeURIComponent(email)}`
+        }
+      } catch (error) {
+        console.error('Signup error:', error)
         setError('Failed to create account. Please try again.')
-      } else {
-        // Redirect to professional "check email" page
-        window.location.href = `/auth/check-email?email=${encodeURIComponent(email)}`
       }
     } else {
       // Handle signin
