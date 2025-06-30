@@ -10,6 +10,27 @@ export default function Help() {
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [profileImage, setProfileImage] = useState<string>('')
 
+  // Load profile image on mount
+  useEffect(() => {
+    if (session?.user?.email) {
+      fetch('/api/user-data', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.userData?.profileImage) {
+          setProfileImage(data.userData.profileImage)
+        }
+      })
+      .catch(error => {
+        console.error('Error loading profile image:', error)
+      })
+    }
+  }, [session])
+
   // Profile data - using consistent green avatar
   const defaultAvatar = 'data:image/svg+xml;base64,' + btoa(`
     <svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
@@ -41,26 +62,7 @@ export default function Help() {
       {/* Navigation Header - First Row */}
       <nav className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-6">
-            <Link href="/dashboard" className="text-gray-700 dark:text-gray-300 hover:text-helfi-green transition-colors font-medium">
-              Dashboard
-            </Link>
-            <Link href="/insights" className="text-gray-700 dark:text-gray-300 hover:text-helfi-green transition-colors font-medium">
-              AI Insights
-            </Link>
-            <Link href="/food" className="text-gray-700 dark:text-gray-300 hover:text-helfi-green transition-colors font-medium">
-              Food
-            </Link>
-            <Link href="/onboarding?step=1" className="text-gray-700 dark:text-gray-300 hover:text-helfi-green transition-colors font-medium">
-              Intake
-            </Link>
-            <Link href="/settings" className="text-gray-700 dark:text-gray-300 hover:text-helfi-green transition-colors font-medium">
-              Settings
-            </Link>
-          </div>
-
-          {/* Logo */}
+          {/* Logo on the left */}
           <div className="flex items-center">
             <Link href="/" className="w-16 h-16 md:w-20 md:h-20 cursor-pointer hover:opacity-80 transition-opacity">
               <Image
@@ -148,30 +150,13 @@ export default function Help() {
             <div className="p-4 border border-gray-200 rounded-lg hover:border-helfi-green transition-colors">
               <h3 className="font-semibold text-gray-900 mb-2">FAQ</h3>
               <p className="text-gray-600 text-sm mb-3">Find answers to common questions</p>
-              <Link href="/support" className="inline-block bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors">
+              <Link href="/faq" className="inline-block bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors">
                 View FAQ
               </Link>
             </div>
           </div>
 
-          {/* Common Topics */}
-          <div className="mb-8">
-            <h3 className="text-xl font-semibold text-gray-900 mb-4">Common Topics</h3>
-            <div className="space-y-3">
-              <Link href="/onboarding" className="block p-3 border border-gray-200 rounded-lg hover:border-helfi-green hover:bg-gray-50 transition-colors cursor-pointer">
-                <h4 className="font-medium text-gray-900">Getting Started</h4>
-                <p className="text-sm text-gray-600">Learn how to set up your profile and start tracking</p>
-              </Link>
-              <Link href="/privacy" className="block p-3 border border-gray-200 rounded-lg hover:border-helfi-green hover:bg-gray-50 transition-colors cursor-pointer">
-                <h4 className="font-medium text-gray-900">Data Privacy</h4>
-                <p className="text-sm text-gray-600">How we protect and use your health data</p>
-              </Link>
-              <Link href="/support" className="block p-3 border border-gray-200 rounded-lg hover:border-helfi-green hover:bg-gray-50 transition-colors cursor-pointer">
-                <h4 className="font-medium text-gray-900">AI Insights</h4>
-                <p className="text-sm text-gray-600">Understanding your personalized health recommendations</p>
-              </Link>
-            </div>
-          </div>
+
         </div>
       </div>
 
