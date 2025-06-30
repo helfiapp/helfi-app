@@ -2168,15 +2168,36 @@ export default function Onboarding() {
     };
   }, [dropdownOpen]);
 
+  // Enhanced session validation with forced refresh
   useEffect(() => {
-    if (status === 'authenticated') {
-      const currentStep = parseInt(new URLSearchParams(window.location.search).get('step') || '1') - 1;
-      setStep(Math.max(0, Math.min(stepNames.length - 1, currentStep)));
-    } else if (status === 'unauthenticated') {
-      // Session has been invalidated (e.g., user account deleted)
-      console.log('🚫 Session invalidated - redirecting to homepage');
-      window.location.href = '/';
-    }
+    const validateSession = async () => {
+      if (status === 'loading') return;
+      
+      if (status === 'authenticated') {
+        // Double-check session is still valid by calling API
+        try {
+          const response = await fetch('/api/user-data');
+          if (response.status === 401) {
+            console.log('🚫 Session invalidated by server - forcing logout');
+            // Force logout and redirect
+            await signOut({ redirect: false });
+            window.location.href = '/';
+            return;
+          }
+        } catch (error) {
+          console.error('Session validation error:', error);
+        }
+        
+        const currentStep = parseInt(new URLSearchParams(window.location.search).get('step') || '1') - 1;
+        setStep(Math.max(0, Math.min(stepNames.length - 1, currentStep)));
+      } else if (status === 'unauthenticated') {
+        // Session has been invalidated (e.g., user account deleted)
+        console.log('🚫 Session invalidated - redirecting to homepage');
+        window.location.href = '/';
+      }
+    };
+
+    validateSession();
   }, [status, stepNames.length]);
 
   useEffect(() => {
