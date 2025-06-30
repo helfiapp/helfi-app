@@ -109,7 +109,7 @@ export default function Help() {
                 <Link href="/account" className="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">Account Settings</Link>
                 <Link href="/profile/image" className="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">Upload/Change Profile Photo</Link>
                 <Link href="/billing" className="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">Subscription & Billing</Link>
-                <Link href="/help" className="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 bg-gray-50 dark:bg-gray-700 font-medium">Help & Support</Link>
+                <Link href="/support" className="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 bg-gray-50 dark:bg-gray-700 font-medium">Help & Support</Link>
                 <button
                   onClick={() => signOut()}
                   className="block w-full text-left px-4 py-2 text-red-600 dark:text-red-400 hover:bg-gray-50 dark:hover:bg-gray-700 font-semibold"
@@ -140,17 +140,17 @@ export default function Help() {
             <div className="p-4 border border-gray-200 rounded-lg hover:border-helfi-green transition-colors">
               <h3 className="font-semibold text-gray-900 mb-2">Contact Support</h3>
               <p className="text-gray-600 text-sm mb-3">Get personalized help from our team</p>
-              <button className="bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors">
+              <Link href="/support" className="inline-block bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors">
                 Contact Us
-              </button>
+              </Link>
             </div>
             
             <div className="p-4 border border-gray-200 rounded-lg hover:border-helfi-green transition-colors">
               <h3 className="font-semibold text-gray-900 mb-2">FAQ</h3>
               <p className="text-gray-600 text-sm mb-3">Find answers to common questions</p>
-              <button className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors">
+              <Link href="/support" className="inline-block bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors">
                 View FAQ
-              </button>
+              </Link>
             </div>
           </div>
 
