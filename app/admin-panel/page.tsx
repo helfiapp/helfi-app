@@ -966,15 +966,25 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
   const openTicketModal = (ticket: any) => {
     setSelectedTicket(ticket)
     setShowTicketModal(true)
-    setTicketResponse('')
+    
+    // Auto-populate response with customer greeting
+    const customerName = ticket.userName || 'there'
+    const greeting = `Hi ${customerName},\n\n`
+    setTicketResponse(greeting)
   }
 
   const sendTicketResponse = async () => {
     if (!selectedTicket || !ticketResponse.trim()) return
     
+    // Auto-append signature to every response
+    const signature = '\n\nWarmest Regards,\nHelfi Support Team'
+    const messageWithSignature = ticketResponse.endsWith(signature) 
+      ? ticketResponse 
+      : ticketResponse + signature
+    
     setIsRespondingToTicket(true)
     await handleTicketAction('add_response', selectedTicket.id, {
-      message: ticketResponse
+      message: messageWithSignature
     })
     setIsRespondingToTicket(false)
   }

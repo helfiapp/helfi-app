@@ -107,7 +107,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   const { data: session, status } = useSession()
   
   // Pages that should ALWAYS be public (no sidebar regardless of auth status)
-  const publicPages = ['/', '/healthapp', '/auth/signin', '/privacy', '/terms', '/help', '/admin-panel', '/support', '/faq']
+  const publicPages = ['/', '/healthapp', '/auth/signin', '/privacy', '/terms', '/help', '/admin-panel', '/faq']
   
   // Don't show sidebar while session is loading to prevent flickering
   if (status === 'loading') {
