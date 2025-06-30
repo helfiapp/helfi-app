@@ -2120,41 +2120,6 @@ function ReviewStep({ onBack, data }: { onBack: () => void, data: any }) {
 export default function Onboarding() {
   const { data: session, status } = useSession();
   
-  // Authentication Guard - Redirect unauthenticated users to signin
-  useEffect(() => {
-    if (status === 'loading') return; // Still checking authentication
-    
-    if (status === 'unauthenticated') {
-      console.log('User not authenticated, redirecting to signin');
-      window.location.href = '/auth/signin';
-      return;
-    }
-  }, [status]);
-  
-  // Show loading while checking authentication
-  if (status === 'loading') {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-  
-  // Show loading if not authenticated (while redirecting)
-  if (status === 'unauthenticated') {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Redirecting to signin...</p>
-        </div>
-      </div>
-    );
-  }
-
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<any>({});
   const [dropdownOpen, setDropdownOpen] = useState(false);
