@@ -268,7 +268,7 @@ export async function POST(request: NextRequest) {
             ticketId: ticketId,
             message: data.message,
             isAdminResponse: true,
-            adminId: 'temp-admin-id'
+            adminId: null  // Set to null instead of fake ID to avoid foreign key constraint
           }
         })
 
