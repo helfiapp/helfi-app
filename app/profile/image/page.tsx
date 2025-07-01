@@ -58,40 +58,26 @@ export default function ProfileImage() {
           const result = await response.json();
           console.log('Profile/Image page - API response:', { hasData: !!result.data, hasProfileImage: !!(result.data?.profileImage) });
           if (result.data && result.data.profileImage) {
-            console.log('Profile/Image page - Setting profile image from database');
+            console.log('Profile/Image page - Setting profile image from database (Cloudinary URL)');
             setCurrentProfileImage(result.data.profileImage);
-            // Also update localStorage for backup (user-specific)
+            
+            // Clean up old localStorage entries (migration cleanup)
             if (session?.user?.id) {
-              localStorage.setItem(`profileImage_${session.user.id}`, result.data.profileImage);
+              localStorage.removeItem(`profileImage_${session.user.id}`);
             }
           } else {
             console.log('Profile/Image page - No profile image found in database response');
           }
         } else {
           console.error('Profile/Image page - API call failed:', response.status, response.statusText);
-          // Fallback to localStorage (user-specific)
-          if (session?.user?.id) {
-            const savedImage = localStorage.getItem(`profileImage_${session.user.id}`);
-            if (savedImage) {
-              console.log('Using fallback profile image from localStorage');
-              setCurrentProfileImage(savedImage);
-            }
-          }
         }
       } catch (error) {
         console.error('Error loading profile image:', error);
-        if (session?.user?.id) {
-          const savedImage = localStorage.getItem(`profileImage_${session.user.id}`);
-          if (savedImage) {
-            console.log('Using fallback profile image from localStorage after error');
-            setCurrentProfileImage(savedImage);
-          }
-        }
       }
     };
 
     loadCurrentImage();
-  }, []);
+  }, [session?.user?.id]);
 
   // Auto-save when image changes
   useEffect(() => {
@@ -101,47 +87,45 @@ export default function ProfileImage() {
       setSaveStatus('saving');
       
       try {
-        // Convert image to base64 for storage
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-          const base64Image = e.target?.result as string;
-          
-          try {
-            // Save to database
-            await fetch('/api/user-data', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ profileImage: base64Image })
-            });
+        // Upload to Cloudinary via new API
+        const formData = new FormData();
+        formData.append('image', selectedImage);
+        
+        console.log('Uploading image to Cloudinary...');
+        const response = await fetch('/api/upload-profile-image', {
+          method: 'POST',
+          body: formData
+        });
 
-            // Also save to localStorage as backup (user-specific)
-            if (session?.user?.id) {
-              localStorage.setItem(`profileImage_${session.user.id}`, base64Image);
-            }
-            
-            setCurrentProfileImage(base64Image);
-            setSaveStatus('saved');
-            setTimeout(() => setSaveStatus('idle'), 2000);
-          } catch (error) {
-            console.error('Error saving to database:', error);
-            // Fallback to localStorage (user-specific)
-            if (session?.user?.id) {
-              localStorage.setItem(`profileImage_${session.user.id}`, base64Image);
-            }
-            setCurrentProfileImage(base64Image);
-            setSaveStatus('saved');
-            setTimeout(() => setSaveStatus('idle'), 2000);
+        const result = await response.json();
+        
+        if (result.success) {
+          console.log('Cloudinary upload successful:', result);
+          
+          // Set the Cloudinary URL as the profile image
+          setCurrentProfileImage(result.imageUrl);
+          
+          // Clear localStorage (no longer needed with Cloudinary)
+          if (session?.user?.id) {
+            localStorage.removeItem(`profileImage_${session.user.id}`);
           }
-        };
-        reader.readAsDataURL(selectedImage);
+          
+          setSaveStatus('saved');
+          setTimeout(() => setSaveStatus('idle'), 2000);
+          
+          console.log('Image optimization stats:', result.optimizations);
+        } else {
+          throw new Error(result.error || 'Upload failed');
+        }
       } catch (error) {
-        console.error('Error processing image:', error);
+        console.error('Error uploading image:', error);
         setSaveStatus('idle');
+        alert('Failed to upload image. Please try again.');
       }
     };
 
     saveImage();
-  }, [selectedImage]);
+  }, [selectedImage, session?.user?.id]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -256,34 +240,31 @@ export default function ProfileImage() {
       setSaveStatus('saving');
       
       try {
-        // Remove from database
-        await fetch('/api/user-data', {
+        // Remove profile image (set to null in database)
+        const response = await fetch('/api/user-data', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ profileImage: null })
         });
 
-        // Remove from localStorage (user-specific)
-        if (session?.user?.id) {
-          localStorage.removeItem(`profileImage_${session.user.id}`);
+        if (response.ok) {
+          // Clear localStorage (no longer needed)
+          if (session?.user?.id) {
+            localStorage.removeItem(`profileImage_${session.user.id}`);
+          }
+          
+          setCurrentProfileImage(null);
+          setSelectedImage(null);
+          setImagePreview(null);
+          setSaveStatus('saved');
+          setTimeout(() => setSaveStatus('idle'), 2000);
+        } else {
+          throw new Error('Failed to remove image');
         }
-        
-        setCurrentProfileImage(null);
-        setSelectedImage(null);
-        setImagePreview(null);
-        setSaveStatus('saved');
-        setTimeout(() => setSaveStatus('idle'), 2000);
       } catch (error) {
         console.error('Error removing image:', error);
-        // Fallback to localStorage (user-specific)
-        if (session?.user?.id) {
-          localStorage.removeItem(`profileImage_${session.user.id}`);
-        }
-        setCurrentProfileImage(null);
-        setSelectedImage(null);
-        setImagePreview(null);
-        setSaveStatus('saved');
-        setTimeout(() => setSaveStatus('idle'), 2000);
+        setSaveStatus('idle');
+        alert('Failed to remove image. Please try again.');
       }
     }
   };
