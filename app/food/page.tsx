@@ -551,6 +551,16 @@ Please add nutritional information manually if needed.`);
     return `${hour12}:${minutes} ${ampm}`;
   };
 
+  // Debug logging to track state changes
+  React.useEffect(() => {
+    console.log('🔍 State Debug:', {
+      showAddFood,
+      showAiResult,
+      isEditingDescription,
+      editingEntry: editingEntry ? 'exists' : 'null'
+    });
+  }, [showAddFood, showAiResult, isEditingDescription, editingEntry]);
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-gray-50">
       {/* Navigation Header */}
@@ -1117,6 +1127,12 @@ Please add nutritional information manually if needed.`);
                             setShowPhotoOptions(false);
                             
                             console.log('✅ Food updated successfully - returning to main screen');
+                            console.log('🔍 Debug - State values after reset:', {
+                              showAddFood: false,
+                              showAiResult: false,
+                              isEditingDescription: false,
+                              editingEntry: null
+                            });
                           } else {
                             addFoodEntry(editedDescription, 'photo');
                             setIsEditingDescription(false);
