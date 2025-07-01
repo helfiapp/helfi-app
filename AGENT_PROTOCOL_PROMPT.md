@@ -30,7 +30,7 @@ Task: [Brief description]
 • Check CURRENT_ISSUES_LIVE.md for real-time issue status
 • This file is updated by each agent with verified findings
 • Never trust hardcoded issue lists - always check the live tracker
-• Correct OpenAI key: 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
+• Check .env.local and .env files for correct OpenAI API key configuration
 
 📊 MANDATORY PROCESS:
 1. Read CURRENT_ISSUES_LIVE.md → Health check → Identify issues → Get approval
