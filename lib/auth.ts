@@ -265,38 +265,39 @@ export const authOptions: NextAuthOptions = {
     },
     async redirect({ url, baseUrl }) {
       console.log('🔄 Redirect callback:', { url, baseUrl })
-      try {
-        // Handle signout redirects
-        if (url.includes('signout') || url.includes('signOut')) {
-          return baseUrl
-        }
-        
-        // Fix local development vs production baseUrl mismatch
-        const actualBaseUrl = process.env.NODE_ENV === 'development' 
-          ? (url.startsWith('http://localhost') ? url.split('/').slice(0, 3).join('/') : 'http://localhost:3000')
-          : baseUrl
-
-        // If URL is relative, prepend actualBaseUrl
-        if (url.startsWith('/')) {
-          return `${actualBaseUrl}${url}`
-        }
-        
-        // If URL is absolute and same origin, allow it
-        if (url.startsWith(actualBaseUrl)) {
-          return url
-        }
-        
-        // For localhost development, allow localhost URLs
-        if (process.env.NODE_ENV === 'development' && url.startsWith('http://localhost')) {
-          return url
-        }
-        
-        // Default redirect to onboarding after successful auth
-        return `${actualBaseUrl}/onboarding`
-      } catch (error) {
-        console.error('❌ Redirect callback error:', error)
-        return `${baseUrl}/onboarding`
+      
+      // CRITICAL FIX: Handle development vs production environment properly
+      const isDevMode = process.env.NODE_ENV === 'development'
+      const actualBaseUrl = isDevMode ? 'http://localhost:3000' : baseUrl
+      
+      console.log('🌍 Environment:', { isDevMode, actualBaseUrl, originalBaseUrl: baseUrl })
+      
+      // Handle signout - go to home
+      if (url.includes('signout') || url.includes('signOut')) {
+        return actualBaseUrl + '/'
       }
+      
+      // If URL is relative, use it with actualBaseUrl
+      if (url.startsWith('/')) {
+        return actualBaseUrl + url
+      }
+      
+      // If URL matches actualBaseUrl origin, allow it
+      try {
+        const urlOrigin = new URL(url).origin
+        const actualBaseOrigin = new URL(actualBaseUrl).origin
+        if (urlOrigin === actualBaseOrigin) {
+          console.log('✅ URL origin matches, allowing:', url)
+          return url
+        }
+      } catch (e) {
+        console.log('⚠️ URL parsing failed, using default redirect')
+      }
+      
+      // Default: redirect to onboarding with correct base URL
+      const defaultRedirect = actualBaseUrl + '/onboarding'
+      console.log('🎯 Default redirect to:', defaultRedirect)
+      return defaultRedirect
     },
     async session({ session, token }) {
       console.log('📋 Session callback:', { 
