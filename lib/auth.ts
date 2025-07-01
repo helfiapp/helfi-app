@@ -186,10 +186,16 @@ export const authOptions: NextAuthOptions = {
             return null
           }
 
+          // CRITICAL SECURITY CHECK: Enforce email verification
+          if (!user.emailVerified) {
+            console.log('🚫 Email not verified, blocking signin:', user.email)
+            throw new Error('Please verify your email address before signing in. Check your inbox for a verification link.')
+          }
+
           // For now, since we don't have password hashing implemented,
-          // we'll allow signin for existing users
+          // we'll allow signin for verified users
           // TODO: Implement proper password verification
-          console.log('✅ User found, allowing signin:', user.email)
+          console.log('✅ Verified user found, allowing signin:', user.email)
           
           // Return user object for session creation
           return {
@@ -237,10 +243,18 @@ export const authOptions: NextAuthOptions = {
               data: {
                 email: user.email!.toLowerCase(),
                 name: user.name || user.email!.split('@')[0],
-                image: user.image
+                image: user.image,
+                emailVerified: new Date() // Google users are auto-verified
               }
             })
             isNewUser = true
+          } else if (!dbUser.emailVerified) {
+            // Auto-verify existing users who sign in with Google
+            console.log('🔄 Auto-verifying existing Google user:', dbUser.email)
+            await prisma.user.update({
+              where: { id: dbUser.id },
+              data: { emailVerified: new Date() }
+            })
           }
           
           // Send welcome email for new Google users (don't await to avoid blocking auth)
