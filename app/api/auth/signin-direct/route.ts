@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-import { SignJWT } from 'jose'
+import { encode } from 'next-auth/jwt'
 
 export async function POST(request: NextRequest) {
   try {
@@ -28,21 +26,22 @@ export async function POST(request: NextRequest) {
     // TODO: Add proper password verification later
     console.log('✅ User found for signin:', { id: user.id, email: user.email, verified: !!user.emailVerified })
 
-    // Create NextAuth JWT token manually
-    const secret = new TextEncoder().encode(process.env.NEXTAUTH_SECRET || 'helfi-secret-key-production-2024')
+    // Create NextAuth-compatible JWT token using NextAuth's encode method
+    const secret = process.env.NEXTAUTH_SECRET || 'helfi-secret-key-production-2024'
     
-    const token = await new SignJWT({
-      id: user.id,
-      email: user.email,
-      name: user.name || user.email.split('@')[0],
-      image: user.image,
-      iat: Math.floor(Date.now() / 1000),
-      exp: Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60), // 30 days
+    const token = await encode({
+      token: {
+        sub: user.id,
+        id: user.id,
+        email: user.email,
+        name: user.name || user.email.split('@')[0],
+        image: user.image,
+        iat: Math.floor(Date.now() / 1000),
+        exp: Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60), // 30 days
+      },
+      secret,
+      maxAge: 30 * 24 * 60 * 60, // 30 days
     })
-      .setProtectedHeader({ alg: 'HS256' })
-      .setIssuedAt()
-      .setExpirationTime('30d')
-      .sign(secret)
 
     // Create response with session cookie
     const response = NextResponse.json({ 
@@ -56,7 +55,7 @@ export async function POST(request: NextRequest) {
       message: 'Signin successful'
     })
 
-    // Set NextAuth session cookie
+    // Set NextAuth session cookie with proper format
     const cookieName = process.env.NODE_ENV === 'production' 
       ? '__Secure-next-auth.session-token' 
       : 'next-auth.session-token'
@@ -69,7 +68,7 @@ export async function POST(request: NextRequest) {
       path: '/'
     })
 
-    console.log('✅ Direct signin successful with session created')
+    console.log('✅ Direct signin successful with NextAuth-compatible session created')
     
     return response
 
