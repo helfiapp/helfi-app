@@ -6,13 +6,16 @@ CRITICAL ONBOARDING INSTRUCTIONS - READ EVERYTHING BEFORE STARTING
 Hi, I'm working on my Helfi.ai project and need you to follow these MANDATORY protocols to protect my site from being broken by agents (which has happened too many times).
 
 🚨 BEFORE YOU DO ANYTHING:
-1. Read AGENT_TRACKING_SYSTEM.md to see what previous agents broke
-2. Read SITE_HEALTH_CHECKER.md to understand critical functions
-3. Update your agent number in AGENT_TRACKING_SYSTEM.md
-4. Run a health check of the live site at https://helfi.ai
+1. Read CURRENT_ISSUES_LIVE.md to see what's actually broken right now
+2. Read AGENT_TRACKING_SYSTEM.md to see what previous agents broke
+3. Read SITE_HEALTH_CHECKER.md to understand critical functions
+4. Update your agent number in AGENT_TRACKING_SYSTEM.md
+5. Run a health check of the live site at https://helfi.ai
+6. Update CURRENT_ISSUES_LIVE.md with your verification findings
 
 ⛔ ABSOLUTE RULES - NO EXCEPTIONS:
 • NEVER deploy anything until you tell me what you found and how you plan to fix it
+• NEVER claim something is fixed without completing EXIT_VERIFICATION_CHECKLIST.md
 • NEVER claim something is fixed without testing it on the live site (https://helfi.ai)
 • NEVER break the food analyzer - previous agents destroyed the OpenAI API key
 • NEVER hallucinate commit information - use actual terminal commands to verify
@@ -24,20 +27,25 @@ Time: [HH:MM AM/PM]
 Task: [Brief description]
 
 🔍 CURRENT KNOWN ISSUES:
-• Food analyzer is BROKEN (OpenAI API 401 errors)
-• API key was corrupted by previous agent (ends in ***0rUA instead of correct key)
+• Check CURRENT_ISSUES_LIVE.md for real-time issue status
+• This file is updated by each agent with verified findings
+• Never trust hardcoded issue lists - always check the live tracker
 • Correct OpenAI key: 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
 
 📊 MANDATORY PROCESS:
-1. Health check → Identify issues → Get approval → Make changes → Test live site → Provide commit hash
-2. Log ALL activities in AGENT_TRACKING_SYSTEM.md
-3. Never work on multiple things at once
-4. Test every single change on https://helfi.ai immediately
+1. Read CURRENT_ISSUES_LIVE.md → Health check → Identify issues → Get approval
+2. Make changes → Test live site → Update CURRENT_ISSUES_LIVE.md
+3. Complete EXIT_VERIFICATION_CHECKLIST.md with proof of all claims
+4. Log activities in AGENT_TRACKING_SYSTEM.md → Provide commit hash
+5. Never work on multiple things at once
+6. Test every change on https://helfi.ai immediately
 
 🛡️ PROTECTION SYSTEMS IN PLACE:
+• CURRENT_ISSUES_LIVE.md - Real-time issue tracking updated by each agent
 • SITE_HEALTH_CHECKER.md - Tests all critical functions
 • AGENT_TRACKING_SYSTEM.md - Logs what every agent does
-• This protocol prevents the disasters caused by previous agents
+• EXIT_VERIFICATION_CHECKLIST.md - Prevents false claims about fixes
+• This system prevents agent hallucination and accountability gaps
 
 🚨 AGENT MEMORY/TOKEN MONITORING:
 Signs you're running out of memory:
