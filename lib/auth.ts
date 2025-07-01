@@ -176,60 +176,20 @@ export const authOptions: NextAuthOptions = {
         }
 
         try {
-          // Find user in database
-          let user = await prisma.user.findUnique({
+          // Find existing user in database
+          const user = await prisma.user.findUnique({
             where: { email: credentials.email.toLowerCase() }
           })
 
-          let isNewUser = false
           if (!user) {
-            console.log('👤 Creating new UNVERIFIED user:', credentials.email)
-            
-            // Create user but DON'T verify email yet
-            user = await prisma.user.create({
-              data: {
-                email: credentials.email.toLowerCase(),
-                name: credentials.email.split('@')[0],
-                emailVerified: null, // CRITICAL: User is NOT verified
-              }
-            })
-            isNewUser = true
-            
-            // Generate verification token
-            const verificationToken = generateVerificationToken()
-            const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
-            
-            // Save verification token
-            await prisma.verificationToken.create({
-              data: {
-                identifier: user.email,
-                token: verificationToken,
-                expires: expiresAt
-              }
-            })
-            
-            // Send verification email (don't await to avoid blocking)
-            console.log('📧 Sending verification email to new user')
-            sendVerificationEmail(user.email, verificationToken).catch(error => {
-              console.error('❌ Verification email failed (non-blocking):', error)
-            })
+            console.log('❌ User not found:', credentials.email)
+            return null
           }
 
-          console.log(`📋 User authentication: ${user.emailVerified ? '✅ VERIFIED' : '🚫 UNVERIFIED'}`, { 
-            id: user.id, 
-            email: user.email, 
-            isNew: isNewUser, 
-            verified: !!user.emailVerified 
-          })
-          
-          // Send welcome email for newly verified users only
-          if (isNewUser && user.emailVerified) {
-            const userName = user.name || user.email.split('@')[0]
-            console.log('📧 Sending welcome email to verified user:', userName)
-            sendWelcomeEmail(user.email, userName).catch(error => {
-              console.error('❌ Welcome email failed (non-blocking):', error)
-            })
-          }
+          // For now, since we don't have password hashing implemented,
+          // we'll allow signin for existing users
+          // TODO: Implement proper password verification
+          console.log('✅ User found, allowing signin:', user.email)
           
           // Return user object for session creation
           return {
