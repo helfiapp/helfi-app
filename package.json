@@ -10,7 +10,9 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "fix-api": "node bulletproof-api-fix.js",
+    "validate-api": "node bulletproof-api-fix.js"
   },
   "dependencies": {
     "@headlessui/react": "^1.7.18",
