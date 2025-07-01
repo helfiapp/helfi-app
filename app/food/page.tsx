@@ -1104,11 +1104,19 @@ Please add nutritional information manually if needed.`);
                             // Save to database
                             await saveFoodEntries(updatedFoods);
                             
-                            // Update editing entry to reflect changes but STAY on same screen
-                            setEditingEntry(updatedEntry);
+                            // Reset all form states to return to main food diary screen
+                            setIsEditingDescription(false);
+                            setEditedDescription('');
+                            setEditingEntry(null);
+                            setPhotoFile(null);
+                            setPhotoPreview(null);
+                            setAiDescription('');
+                            setShowAiResult(false);
+                            setShowAddFood(false);
+                            setAnalyzedNutrition(null);
+                            setShowPhotoOptions(false);
                             
-                            // Show success feedback without leaving the screen
-                            console.log('✅ Food updated successfully - staying on edit screen');
+                            console.log('✅ Food updated successfully - returning to main screen');
                           } else {
                             addFoodEntry(editedDescription, 'photo');
                             setIsEditingDescription(false);
