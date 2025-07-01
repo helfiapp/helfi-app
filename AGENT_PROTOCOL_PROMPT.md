@@ -34,11 +34,12 @@ Task: [Brief description]
 
 📊 MANDATORY PROCESS:
 1. Read CURRENT_ISSUES_LIVE.md → Health check → Identify issues → Get approval
-2. Make changes → Test live site → Update CURRENT_ISSUES_LIVE.md
-3. Complete EXIT_VERIFICATION_CHECKLIST.md with proof of all claims
-4. Log activities in AGENT_TRACKING_SYSTEM.md → Provide commit hash
-5. Never work on multiple things at once
-6. Test every change on https://helfi.ai immediately
+2. Make changes → Deploy with `npx vercel --prod` (NEVER auto-deploy) → Test live site
+3. Update CURRENT_ISSUES_LIVE.md with verification results
+4. Complete EXIT_VERIFICATION_CHECKLIST.md with proof of all claims
+5. Log activities in AGENT_TRACKING_SYSTEM.md → Provide commit hash
+6. Never work on multiple things at once
+7. Always use manual Vercel CLI deployment for visual confirmation
 
 🛡️ PROTECTION SYSTEMS IN PLACE:
 • CURRENT_ISSUES_LIVE.md - Real-time issue tracking updated by each agent
