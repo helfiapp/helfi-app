@@ -424,6 +424,86 @@ export default function AdminPanel() {
     setSelectedUserEmails(filteredUsers.map(user => user.email))
   }
 
+  // Bulk delete function
+  const handleBulkDelete = async () => {
+    if (selectedUserEmails.length === 0) {
+      alert('Please select users to delete')
+      return
+    }
+
+    const confirmMessage = `⚠️ DANGER: This will permanently delete ${selectedUserEmails.length} user account(s) and ALL their data.\n\nThis action CANNOT be undone!\n\nSelected users:\n${selectedUserEmails.slice(0, 5).join('\n')}${selectedUserEmails.length > 5 ? `\n...and ${selectedUserEmails.length - 5} more` : ''}\n\nType "DELETE" to confirm:`
+
+    const userConfirmation = prompt(confirmMessage)
+    if (userConfirmation !== 'DELETE') {
+      alert('Bulk delete cancelled - confirmation text did not match')
+      return
+    }
+
+    const finalConfirm = confirm(`FINAL CONFIRMATION: Delete ${selectedUserEmails.length} users permanently?`)
+    if (!finalConfirm) {
+      alert('Bulk delete cancelled')
+      return
+    }
+
+    try {
+      setIsLoadingManagement(true)
+      
+      // Get user IDs from emails
+      const usersToDelete = managedUsers.filter(user => selectedUserEmails.includes(user.email))
+      
+      let successCount = 0
+      let errorCount = 0
+      const errors = []
+
+      // Delete users one by one to handle individual failures
+      for (const user of usersToDelete) {
+        try {
+          const response = await fetch('/api/admin/user-management', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${adminToken}`
+            },
+            body: JSON.stringify({ 
+              action: 'delete_user', 
+              userId: user.id 
+            })
+          })
+
+          if (response.ok) {
+            successCount++
+          } else {
+            errorCount++
+            const error = await response.json()
+            errors.push(`${user.email}: ${error.message || 'Unknown error'}`)
+          }
+        } catch (error) {
+          errorCount++
+          errors.push(`${user.email}: Network error`)
+        }
+      }
+
+      // Show results
+      if (successCount > 0 && errorCount === 0) {
+        alert(`✅ Successfully deleted ${successCount} user accounts`)
+      } else if (successCount > 0 && errorCount > 0) {
+        alert(`⚠️ Partial success: ${successCount} users deleted, ${errorCount} failed.\n\nErrors:\n${errors.join('\n')}`)
+      } else {
+        alert(`❌ All deletions failed:\n${errors.join('\n')}`)
+      }
+
+      // Clear selections and reload
+      setSelectedUserEmails([])
+      loadUserManagement(userSearch, userFilter, currentPage)
+
+    } catch (error) {
+      console.error('Bulk delete error:', error)
+      alert('❌ Bulk delete failed due to an unexpected error')
+    } finally {
+      setIsLoadingManagement(false)
+    }
+  }
+
   const handleStartUserEmail = (templateType = 'custom') => {
     if (selectedUserEmails.length === 0) {
       alert('Please select at least one user')
@@ -1839,6 +1919,45 @@ The Helfi Team`,
                 </button>
               </div>
             </div>
+
+            {/* Bulk Delete Section - Separate and clearly marked as dangerous */}
+            {selectedUserEmails.length > 0 && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="text-lg font-semibold text-red-900">⚠️ Danger Zone</h3>
+                    <p className="text-sm text-red-700">
+                      Permanently delete {selectedUserEmails.length} selected user account(s) and ALL their data
+                    </p>
+                  </div>
+                </div>
+                <div className="bg-red-100 p-4 rounded-lg mb-4">
+                  <p className="text-sm text-red-800 font-medium mb-2">
+                    ⚠️ WARNING: This action cannot be undone!
+                  </p>
+                  <p className="text-xs text-red-700">
+                    Selected users: {selectedUserEmails.slice(0, 3).join(', ')}
+                    {selectedUserEmails.length > 3 && ` and ${selectedUserEmails.length - 3} more...`}
+                  </p>
+                </div>
+                <button
+                  onClick={handleBulkDelete}
+                  disabled={isLoadingManagement}
+                  className="bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium flex items-center justify-center"
+                >
+                  {isLoadingManagement ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Deleting Users...
+                    </>
+                  ) : (
+                    <>
+                      🗑️ Delete {selectedUserEmails.length} User{selectedUserEmails.length !== 1 ? 's' : ''} Permanently
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
 
             {/* User Email Composition Interface */}
             {showUserEmailInterface && (
