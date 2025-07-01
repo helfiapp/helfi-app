@@ -31,6 +31,10 @@ model User {
   exerciseLogs  ExerciseLog[]
   subscription  Subscription?
   supportTickets SupportTicket[]
+  
+  // File relationships (PHASE 2 addition)
+  uploadedFiles File[]     @relation("UploadedFiles")
+  profileImages File[]     @relation("ProfileImages")
 }
 
 model Account {
@@ -89,6 +93,9 @@ model Supplement {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // File relationships (PHASE 2 addition)
+  images    File[]   @relation("SupplementImages")
 }
 
 model Medication {
@@ -101,6 +108,9 @@ model Medication {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // File relationships (PHASE 2 addition)
+  images    File[]   @relation("MedicationImages")
 }
 
 model HealthLog {
@@ -123,6 +133,9 @@ model FoodLog {
   nutrients   Json?
   createdAt   DateTime @default(now())
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // File relationships (PHASE 2 addition)
+  images      File[]   @relation("FoodLogImages")
 }
 
 model ExerciseLog {
@@ -272,4 +285,49 @@ enum TicketCategory {
   FEATURE_REQUEST
   BUG_REPORT
   EMAIL
+}
+
+// File Management System - PHASE 2 ADDITION
+model File {
+  id              String      @id @default(cuid())
+  originalName    String      // Original filename from user
+  fileName        String      // Processed filename
+  fileSize        Int         // File size in bytes
+  mimeType        String      // File MIME type (image/jpeg, etc.)
+  cloudinaryId    String      // Cloudinary public_id
+  cloudinaryUrl   String      // Full Cloudinary URL
+  secureUrl       String      // Secure HTTPS Cloudinary URL
+  uploadedById    String      // User who uploaded it
+  fileType        FileType    @default(IMAGE)
+  usage           FileUsage   @default(OTHER)
+  metadata        Json?       // Additional file metadata
+  isPublic        Boolean     @default(false)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  // Relations
+  uploadedBy      User        @relation("UploadedFiles", fields: [uploadedById], references: [id], onDelete: Cascade)
+
+  // Optional relationships to existing models (for future use)
+  profileUsers    User[]      @relation("ProfileImages")
+  supplementFiles Supplement[] @relation("SupplementImages") 
+  medicationFiles Medication[] @relation("MedicationImages")
+  foodLogFiles    FoodLog[]   @relation("FoodLogImages")
+}
+
+enum FileType {
+  IMAGE
+  DOCUMENT
+  VIDEO
+  AUDIO
+  OTHER
+}
+
+enum FileUsage {
+  PROFILE_IMAGE
+  FOOD_PHOTO
+  SUPPLEMENT_IMAGE
+  MEDICATION_IMAGE
+  DOCUMENT
+  OTHER
 }
