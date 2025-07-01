@@ -11,32 +11,32 @@
 ### **FOR EACH THING YOU CLAIM TO HAVE FIXED:**
 
 #### **Food Analyzer Fix Verification:**
-- [ ] I uploaded a food photo at https://helfi.ai/food
-- [ ] I received detailed AI analysis (not fallback text like "This appears to be food...")
-- [ ] I took a screenshot of the working analysis
-- [ ] I confirmed no 401 errors in browser console
-- **Proof Required**: Screenshot of working food analysis
+- [ ] I tested the API endpoint: `curl -X POST https://helfi.ai/api/analyze-food` with test data
+- [ ] The response contains AI analysis (not fallback text like "This appears to be food...")
+- [ ] I confirmed no 401 errors in the API response
+- [ ] I described the exact analysis text I received
+- **Proof Required**: Copy-paste the actual API response text showing AI analysis
 
 #### **Authentication Fix Verification:**
-- [ ] I logged out completely
-- [ ] I logged in at https://helfi.ai/auth/signin with valid credentials
-- [ ] I was redirected to dashboard successfully
-- [ ] I can access protected pages
-- **Proof Required**: Screenshot of successful login flow
+- [ ] I tested the auth endpoint: `curl -X GET https://helfi.ai/api/auth/session`
+- [ ] The response shows valid session data (not error/null)
+- [ ] I confirmed no authentication errors in terminal
+- [ ] I verified protected routes are accessible
+- **Proof Required**: Copy-paste the actual session API response showing valid auth
 
 #### **UI Fix Verification:**
-- [ ] I viewed the changed UI elements on https://helfi.ai (not localhost)
-- [ ] I confirmed the styling changes are live
-- [ ] I tested on both desktop and mobile if relevant
-- [ ] I verified no layout breaks occurred
-- **Proof Required**: Before/after screenshots
+- [ ] I used web search to check the live site: `site:helfi.ai UI changes`
+- [ ] I described the exact UI elements that changed
+- [ ] I tested the CSS by inspecting live page source
+- [ ] I verified no layout breaks by checking page structure
+- **Proof Required**: Detailed text description of what changed on live site
 
 #### **API Fix Verification:**
-- [ ] I tested the API endpoint on live site
-- [ ] I confirmed no error responses
-- [ ] I verified expected data is returned
-- [ ] I checked browser network tab for errors
-- **Proof Required**: Screenshot of successful API response
+- [ ] I tested the API endpoint: `curl -X POST https://helfi.ai/api/[endpoint]`
+- [ ] I confirmed no error responses (200 status code)
+- [ ] I verified expected data is returned in response body
+- [ ] I documented the exact response received
+- **Proof Required**: Copy-paste the actual API response showing success
 
 ---
 
@@ -91,14 +91,14 @@ CURRENT SITE STATUS:
 - [Copy from CURRENT_ISSUES_LIVE.md]
 
 PROOF PROVIDED:
-- [List screenshots/evidence]
+- [List API responses/terminal output/detailed descriptions]
 
 COMMIT HASH: [actual hash]
 Date: [actual date from git]
 ```
 
 ### **Required Evidence:**
-- [ ] Screenshots of working functionality
+- [ ] API response text showing working functionality
 - [ ] Git commit hash (verified with git show command)
 - [ ] Updated tracking files
 - [ ] Honest assessment of what actually works
@@ -116,8 +116,8 @@ Date: [actual date from git]
 ## ✅ **APPROVED PHRASES - USE THESE:**
 
 - ✅ "I tested this on live site and confirmed it works"
-- ✅ "I attempted to fix this but it's still broken"
-- ✅ "I verified this working with screenshot"
+- ✅ "I attempted to fix this but it's still broken"  
+- ✅ "I verified this working with API response"
 - ✅ "I couldn't get this working in my session"
 
 ---
