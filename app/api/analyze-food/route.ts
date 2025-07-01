@@ -14,21 +14,28 @@ const getOpenAIClient = () => {
 
 export async function POST(req: NextRequest) {
   try {
+    console.log('=== FOOD ANALYZER DEBUG START ===');
+    
     // Check if API key is configured
     if (!process.env.OPENAI_API_KEY) {
+      console.log('❌ OpenAI API key not configured');
       return NextResponse.json(
         { error: 'OpenAI API key not configured' },
         { status: 500 }
       );
     }
+    
+    console.log('✅ OpenAI API key configured');
 
     const contentType = req.headers.get('content-type');
+    console.log('📝 Content-Type:', contentType);
     let messages: any[] = [];
 
     if (contentType?.includes('application/json')) {
       // Handle text-based food analysis
       const body = await req.json();
       const { textDescription, foodType } = body;
+      console.log('📝 Text analysis mode:', { textDescription, foodType });
 
       if (!textDescription) {
         return NextResponse.json(
@@ -68,10 +75,20 @@ Pay close attention to portion size words like small, medium, large, or specific
       ];
     } else {
       // Handle image-based food analysis
+      console.log('🖼️ Image analysis mode');
+      
       const formData = await req.formData();
       const imageFile = formData.get('image') as File;
+      
+      console.log('📊 Image file info:', {
+        hasImageFile: !!imageFile,
+        name: imageFile?.name || 'none',
+        type: imageFile?.type || 'none',
+        size: imageFile?.size || 0
+      });
 
       if (!imageFile) {
+        console.log('❌ No image file provided');
         return NextResponse.json(
           { error: 'No image file provided' },
           { status: 400 }
@@ -79,9 +96,16 @@ Pay close attention to portion size words like small, medium, large, or specific
       }
 
       // Convert image to base64
+      console.log('🔄 Converting image to base64...');
       const imageBuffer = await imageFile.arrayBuffer();
       const imageBase64 = Buffer.from(imageBuffer).toString('base64');
       const imageDataUrl = `data:${imageFile.type};base64,${imageBase64}`;
+      
+      console.log('✅ Image conversion complete:', {
+        bufferSize: imageBuffer.byteLength,
+        base64Length: imageBase64.length,
+        dataUrlPrefix: imageDataUrl.substring(0, 50) + '...'
+      });
 
       messages = [
         {
@@ -126,11 +150,18 @@ Estimate portion size carefully from the image and calculate nutrition according
     // Get OpenAI client
     const openai = getOpenAIClient();
     if (!openai) {
+      console.log('❌ Failed to create OpenAI client');
       return NextResponse.json(
         { error: 'OpenAI API key not configured' },
         { status: 500 }
       );
     }
+
+    console.log('🤖 Calling OpenAI API with:', {
+      model: 'gpt-4o',
+      messageCount: messages.length,
+      hasImageContent: messages[0]?.content && Array.isArray(messages[0].content)
+    });
 
     // Call OpenAI API
     const response = await openai.chat.completions.create({
@@ -140,14 +171,25 @@ Estimate portion size carefully from the image and calculate nutrition according
       temperature: 0.3, // Lower temperature for more consistent food analysis
     });
 
+    console.log('📋 OpenAI Response:', {
+      hasResponse: !!response,
+      hasChoices: !!response.choices,
+      choicesLength: response.choices?.length || 0,
+      hasContent: !!response.choices?.[0]?.message?.content
+    });
+
     const analysis = response.choices[0]?.message?.content;
 
     if (!analysis) {
+      console.log('❌ No analysis received from OpenAI');
       return NextResponse.json(
         { error: 'No analysis received from OpenAI' },
         { status: 500 }
       );
     }
+
+    console.log('✅ Analysis received:', analysis.substring(0, 100) + '...');
+    console.log('=== FOOD ANALYZER DEBUG END ===');
 
     return NextResponse.json({
       success: true,
@@ -155,10 +197,16 @@ Estimate portion size carefully from the image and calculate nutrition according
     });
 
   } catch (error) {
-    console.error('OpenAI API Error:', error);
+    console.error('💥 OpenAI API Error:', error);
     
     // Handle specific OpenAI errors
     if (error instanceof Error) {
+      console.log('🔍 Error details:', {
+        message: error.message,
+        name: error.name,
+        stack: error.stack?.substring(0, 200)
+      });
+      
       if (error.message.includes('insufficient_quota')) {
         return NextResponse.json(
           { error: 'OpenAI API quota exceeded. Please check your billing.' },
