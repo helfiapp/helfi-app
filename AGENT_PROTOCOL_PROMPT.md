@@ -1,10 +1,5 @@
 # 🚨 MANDATORY AGENT PROTOCOL - COPY THIS TO EVERY NEW AGENT
 
-```
-CRITICAL ONBOARDING INSTRUCTIONS - READ EVERYTHING BEFORE STARTING
-
-Hi, I'm working on my Helfi.ai project and need you to follow these MANDATORY protocols to protect my site from being broken by agents (which has happened too many times).
-
 🚨 BEFORE YOU DO ANYTHING:
 1. Read CURRENT_ISSUES_LIVE.md to see what's actually broken right now
 2. Read AGENT_TRACKING_SYSTEM.md to see what previous agents broke
@@ -67,7 +62,42 @@ Previous agents broke my site by:
 Don't be another failed agent. Follow this protocol exactly.
 
 Are you ready to proceed with this protocol? Confirm you understand before starting.
-```
+
+# 🚨 HELFI.AI AGENT PROTOCOL - MANDATORY READING
+
+**⚠️ CRITICAL**: Read this ENTIRE document before starting ANY work!
+
+---
+
+## 🔥 **EMERGENCY PROTOCOL - READ FIRST**
+
+### **CRITICAL WARNING: AGENT FAILURE PATTERNS**
+Multiple agents have failed due to:
+1. **FALSE SUCCESS CLAIMS** - Claiming fixes work when they don't
+2. **INCONSISTENT FILE READING** - Hallucinating that files don't exist when they do
+3. **SKIPPING LIVE SITE TESTING** - Not verifying changes actually work
+4. **PREMATURE DOCUMENTATION UPDATES** - Updating docs before confirming success
+
+### **MANDATORY PRE-WORK CHECKLIST:**
+- [ ] Read `AGENT_TRACKING_SYSTEM.md` completely
+- [ ] Read `CURRENT_ISSUES_LIVE.md` completely  
+- [ ] Read `SITE_HEALTH_CHECKER.md` completely
+- [ ] Update `AGENT_TRACKING_SYSTEM.md` with your agent number
+- [ ] Confirm file reading tools are working consistently
+- [ ] Never claim success without live site verification
+
+### **CRITICAL AGENT FAILURE HISTORY:**
+- **Agent #3**: Inconsistent file reading, claimed files didn't exist when they did, terminated by user
+- **Agent #2**: Made false success claims, ignored contradicting evidence
+- **Agent #24**: Broke API key, never tested on live site
+- **Agent #23**: Hallucinated commit information, provided wrong dates
+
+### **FILE READING CONSISTENCY CHECK:**
+Before starting work, verify your file reading tools work by:
+1. Running `ls -la` to list files
+2. Using `cat filename` to read contents
+3. Cross-checking with file reading tools
+4. If tools are inconsistent, STOP and inform user immediately
 
 ## 💡 **HOW TO USE THIS PROMPT:**
 
