@@ -672,6 +672,7 @@ Please add nutritional information manually if needed.`);
                   onChange={(e) => {
                     handlePhotoUpload(e);
                     setShowPhotoOptions(false);
+                    setShowAddFood(true); // 🔥 FIX: Show photo processing UI
                   }}
                   className="hidden"
                 />
@@ -742,6 +743,7 @@ Please add nutritional information manually if needed.`);
                         accept="image/*"
                         onChange={(e) => {
                           handlePhotoUpload(e);
+                          setShowAddFood(true); // 🔥 FIX: Ensure photo processing UI stays visible
                         }}
                         className="hidden"
                       />
