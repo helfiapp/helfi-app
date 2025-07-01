@@ -270,16 +270,29 @@ export const authOptions: NextAuthOptions = {
         if (url.includes('signout') || url.includes('signOut')) {
           return baseUrl
         }
-        // If URL is relative, prepend baseUrl
+        
+        // Fix local development vs production baseUrl mismatch
+        const actualBaseUrl = process.env.NODE_ENV === 'development' 
+          ? (url.startsWith('http://localhost') ? url.split('/').slice(0, 3).join('/') : 'http://localhost:3000')
+          : baseUrl
+
+        // If URL is relative, prepend actualBaseUrl
         if (url.startsWith('/')) {
-          return `${baseUrl}${url}`
+          return `${actualBaseUrl}${url}`
         }
+        
         // If URL is absolute and same origin, allow it
-        if (url.startsWith(baseUrl)) {
+        if (url.startsWith(actualBaseUrl)) {
           return url
         }
+        
+        // For localhost development, allow localhost URLs
+        if (process.env.NODE_ENV === 'development' && url.startsWith('http://localhost')) {
+          return url
+        }
+        
         // Default redirect to onboarding after successful auth
-        return `${baseUrl}/onboarding`
+        return `${actualBaseUrl}/onboarding`
       } catch (error) {
         console.error('❌ Redirect callback error:', error)
         return `${baseUrl}/onboarding`
