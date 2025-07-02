@@ -159,6 +159,18 @@ export const authOptions: NextAuthOptions = {
   session: {
     strategy: 'jwt',
     maxAge: 30 * 24 * 60 * 60, // 30 days
+    updateAge: 24 * 60 * 60, // 24 hours
+  },
+  cookies: {
+    sessionToken: {
+      name: `next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NODE_ENV === 'production'
+      }
+    }
   },
   providers: [
     CredentialsProvider({
@@ -394,5 +406,5 @@ export const authOptions: NextAuthOptions = {
     error: '/auth/signin',
   },
   debug: true,
-  secret: process.env.NEXTAUTH_SECRET || 'helfi-secret-key-production-2024'
+  secret: process.env.NEXTAUTH_SECRET || 'your-secret-here'
 } 
