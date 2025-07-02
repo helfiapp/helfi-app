@@ -624,15 +624,6 @@ Please add nutritional information manually if needed.`);
     });
   }, [showAddFood, showAiResult, isEditingDescription, editingEntry, todaysFoods.length]);
 
-  // EMERGENCY FIX: Reset all editing states on component mount to ensure food entries show
-  React.useEffect(() => {
-    console.log('🚨 EMERGENCY FIX: Resetting all editing states to show food entries');
-    setIsEditingDescription(false);
-    setEditingEntry(null);
-    setShowAddFood(false);
-    setShowAiResult(false);
-  }, []);
-
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-gray-50">
       {/* Navigation Header */}
