@@ -704,7 +704,7 @@ Please add nutritional information manually if needed.`);
         
         {/* Instruction Text */}
         <div className="mb-6 text-center">
-          <p className="text-lg text-gray-600 font-normal">
+          <p className="text-sm sm:text-base lg:text-lg text-gray-600 font-normal">
             📸 Take a photo of your meal or snack and let AI analyze it!
           </p>
         </div>
@@ -736,8 +736,8 @@ Please add nutritional information manually if needed.`);
                   </svg>
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-lg font-medium text-gray-900">📱 Select Photo</h3>
-                  <p className="text-sm text-gray-500">Camera, Photo Library, or Choose File</p>
+                  <h3 className="text-sm sm:text-base lg:text-lg font-medium text-gray-900">📱 Select Photo</h3>
+                  <p className="text-xs sm:text-sm text-gray-500">Camera, Photo Library, or Choose File</p>
                 </div>
                 <input
                   type="file"
@@ -765,8 +765,8 @@ Please add nutritional information manually if needed.`);
                   </svg>
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-lg font-medium text-gray-900">✍️ Manual Entry</h3>
-                  <p className="text-sm text-gray-500">Type your food description</p>
+                  <h3 className="text-sm sm:text-base lg:text-lg font-medium text-gray-900">✍️ Manual Entry</h3>
+                  <p className="text-xs sm:text-sm text-gray-500">Type your food description</p>
                 </div>
               </button>
             </div>
@@ -780,7 +780,7 @@ Please add nutritional information manually if needed.`);
             {/* Photo Analysis Flow */}
             {photoPreview && !showAiResult && !isEditingDescription && (
               <div className="text-center">
-                <h3 className="text-lg font-semibold mb-4">📸 Your Photo</h3>
+                <h3 className="text-base sm:text-lg font-semibold mb-4">📸 Your Photo</h3>
                 <Image
                   src={photoPreview}
                   alt="Food preview"
@@ -874,7 +874,7 @@ Please add nutritional information manually if needed.`);
                 <div className="p-4 sm:p-6">
                   {/* Food Title */}
                   <div className="mb-4">
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2">Food Analysis</h3>
+                    <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">Food Analysis</h3>
                   </div>
 
                   {/* Nutrition Cards - Cronometer Style */}
