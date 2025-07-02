@@ -1506,6 +1506,36 @@ Please add nutritional information manually if needed.`);
                       <p className="text-sm text-gray-500 mt-1">
                         {formatTimeWithAMPM(food.time)}
                       </p>
+                      
+                      {/* Compact Nutrition Display */}
+                      {food.nutrition && (food.nutrition.calories || food.nutrition.protein || food.nutrition.carbs || food.nutrition.fat) && (
+                        <div className="flex gap-2 mt-2 flex-wrap">
+                          {food.nutrition.calories && (
+                            <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded px-2 py-1 border border-orange-200">
+                              <span className="text-xs font-bold text-orange-600">{food.nutrition.calories}</span>
+                              <span className="text-xs text-orange-500 ml-1">cal</span>
+                            </div>
+                          )}
+                          {food.nutrition.protein && (
+                            <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded px-2 py-1 border border-blue-200">
+                              <span className="text-xs font-bold text-blue-600">{food.nutrition.protein}g</span>
+                              <span className="text-xs text-blue-500 ml-1">protein</span>
+                            </div>
+                          )}
+                          {food.nutrition.carbs && (
+                            <div className="bg-gradient-to-br from-green-50 to-green-100 rounded px-2 py-1 border border-green-200">
+                              <span className="text-xs font-bold text-green-600">{food.nutrition.carbs}g</span>
+                              <span className="text-xs text-green-500 ml-1">carbs</span>
+                            </div>
+                          )}
+                          {food.nutrition.fat && (
+                            <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded px-2 py-1 border border-purple-200">
+                              <span className="text-xs font-bold text-purple-600">{food.nutrition.fat}g</span>
+                              <span className="text-xs text-purple-500 ml-1">fat</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     {/* Right Side - Actions */}
