@@ -607,7 +607,7 @@ Please add nutritional information manually if needed.`);
                     />
                   </div>
                   <div>
-                    <div className="font-semibold text-gray-900">{userName}</div>
+                    <div className="font-medium text-gray-900">{userName}</div>
                     <div className="text-xs text-gray-500">{session?.user?.email || 'user@email.com'}</div>
                   </div>
                 </div>
@@ -630,8 +630,8 @@ Please add nutritional information manually if needed.`);
       {/* Page Title */}
       <div className="bg-white border-b border-gray-200 px-4 py-4">
         <div className="max-w-7xl mx-auto text-center">
-          <h1 className="text-lg md:text-xl font-semibold text-gray-900">Food Diary</h1>
-          <p className="text-sm text-gray-500">{today}</p>
+          <h1 className="text-xl md:text-2xl font-light text-gray-800 tracking-wide">Food Diary</h1>
+          <p className="text-sm text-gray-500 font-normal mt-1">{today}</p>
         </div>
       </div>
 
@@ -640,8 +640,8 @@ Please add nutritional information manually if needed.`);
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8 pb-24 md:pb-8">
         
         {/* Instruction Text */}
-        <div className="mb-4 text-center">
-          <p className="text-lg text-gray-700 font-medium">
+        <div className="mb-6 text-center">
+          <p className="text-lg text-gray-600 font-normal">
             📸 Take a photo of your meal or snack and let AI analyze it!
           </p>
         </div>
@@ -673,7 +673,7 @@ Please add nutritional information manually if needed.`);
                   </svg>
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-gray-900">📱 Select Photo</h3>
+                  <h3 className="text-lg font-medium text-gray-900">📱 Select Photo</h3>
                   <p className="text-sm text-gray-500">Camera, Photo Library, or Choose File</p>
                 </div>
                 <input
@@ -702,7 +702,7 @@ Please add nutritional information manually if needed.`);
                   </svg>
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-gray-900">✍️ Manual Entry</h3>
+                  <h3 className="text-lg font-medium text-gray-900">✍️ Manual Entry</h3>
                   <p className="text-sm text-gray-500">Type your food description</p>
                 </div>
               </button>
@@ -959,19 +959,20 @@ Please add nutritional information manually if needed.`);
               </div>
             )}
 
-            {/* Clean Edit Interface - Matching User's Desired Layout */}
+            {/* Clean Edit Interface - Professional Enterprise Style */}
             {isEditingDescription && (
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="p-6 space-y-6">
-                  {/* Clean Food Title */}
-                  <div>
-                    <h2 className="text-2xl font-medium text-gray-900">
+                <div className="p-8 space-y-8">
+                  {/* Clean Food Title - Softer Typography */}
+                  <div className="border-b border-gray-100 pb-4">
+                    <h1 className="text-3xl font-light text-gray-800 tracking-wide">
                       {editedDescription.split('\n')[0].split('Calories:')[0].trim() || 'Chocolate Cake'}
-                    </h2>
+                    </h1>
+                    <p className="text-sm text-gray-500 mt-2 font-normal">Edit food details and nutrition information</p>
                   </div>
 
-                  <div className="flex flex-col lg:flex-row lg:gap-8">
-                    {/* Left Side - Nutrition Cards & Photo */}
+                  <div className="flex flex-col lg:flex-row lg:gap-12">
+                    {/* Left Side - Nutrition Cards & Photo (UNCHANGED as requested) */}
                     <div className="lg:w-1/2 space-y-4">
                       {/* Nutrition Cards - Keep exact styling as requested */}
                       <div className="grid grid-cols-2 gap-3">
@@ -1041,23 +1042,27 @@ Please add nutritional information manually if needed.`);
                       )}
                     </div>
                     
-                    {/* Right Side - Clean Description & Action Buttons */}
-                    <div className="lg:w-1/2 space-y-6">
-                      {/* Description Section */}
-                      <div>
-                        <label className="block text-lg font-medium text-gray-700 mb-3">
-                          Description
+                    {/* Right Side - Professional Description Area */}
+                    <div className="lg:w-1/2 space-y-8">
+                      {/* Description Section - Enterprise Style */}
+                      <div className="bg-gray-50 rounded-xl p-6">
+                        <label className="block text-base font-medium text-gray-700 mb-4">
+                          Food Description
                         </label>
                         <textarea
                           value={editedDescription}
                           onChange={(e) => setEditedDescription(e.target.value)}
-                          className="w-full h-32 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base resize-none"
-                          placeholder="Edit the food description..."
+                          className="w-full h-40 px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-base resize-none bg-white shadow-sm font-normal leading-relaxed"
+                          placeholder="Enter a detailed description of the food item..."
                         />
+                        <p className="text-xs text-gray-500 mt-2 font-normal">
+                          AI will analyze this description to provide accurate nutrition information
+                        </p>
                       </div>
                       
-                      {/* Action Buttons - Clean Layout */}
-                      <div className="space-y-3">
+                      {/* Action Buttons - Professional Enterprise Style */}
+                      <div className="space-y-4">
+                        {/* Primary Action Button */}
                         <button
                           onClick={async () => {
                             if (editingEntry) {
@@ -1125,7 +1130,7 @@ Please add nutritional information manually if needed.`);
                             }
                           }}
                           disabled={!editedDescription.trim() || isAnalyzing}
-                          className="w-full py-3 px-6 bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors flex items-center justify-center"
+                          className="w-full py-4 px-6 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-all duration-300 flex items-center justify-center shadow-sm hover:shadow-md disabled:shadow-none"
                         >
                           {isAnalyzing ? (
                             <>
@@ -1133,54 +1138,57 @@ Please add nutritional information manually if needed.`);
                                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                               </svg>
-                              Updating...
+                              <span className="font-normal">Analyzing & Updating...</span>
                             </>
                           ) : (
                             <>
-                              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                               </svg>
-                              ✓ Update & Save
+                              <span className="font-normal">Update & Save Changes</span>
                             </>
                           )}
                         </button>
 
-                        <button
-                          onClick={() => {
-                            setIsEditingDescription(false);
-                            setEditedDescription('');
-                            setEditingEntry(null);
-                            setPhotoFile(null);
-                            setPhotoPreview(null);
-                            setAiDescription('');
-                            setShowAiResult(false);
-                            setShowAddFood(false);
-                            setAnalyzedNutrition(null);
-                          }}
-                          className="w-full py-3 px-6 bg-red-500 hover:bg-red-600 text-white font-medium rounded-lg transition-colors flex items-center justify-center"
-                        >
-                          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                          ✕ Cancel Edit
-                        </button>
+                        {/* Secondary Actions */}
+                        <div className="flex gap-3">
+                          <button
+                            onClick={() => {
+                              setIsEditingDescription(false);
+                              setEditedDescription('');
+                              setEditingEntry(null);
+                              setPhotoFile(null);
+                              setPhotoPreview(null);
+                              setAiDescription('');
+                              setShowAiResult(false);
+                              setShowAddFood(false);
+                              setAnalyzedNutrition(null);
+                            }}
+                            className="flex-1 py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-normal rounded-xl transition-all duration-300 flex items-center justify-center"
+                          >
+                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                            Cancel
+                          </button>
 
-                        <button
-                          onClick={() => {
-                            setPhotoFile(null);
-                            setPhotoPreview(null);
-                            setAiDescription('');
-                            setShowAiResult(false);
-                            setIsEditingDescription(false);
-                            setEditedDescription('');
-                          }}
-                          className="w-full py-3 px-6 bg-gray-500 hover:bg-gray-600 text-white font-medium rounded-lg transition-colors flex items-center justify-center"
-                        >
-                          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                          🗑️ Delete Photo
-                        </button>
+                          <button
+                            onClick={() => {
+                              setPhotoFile(null);
+                              setPhotoPreview(null);
+                              setAiDescription('');
+                              setShowAiResult(false);
+                              setIsEditingDescription(false);
+                              setEditedDescription('');
+                            }}
+                            className="flex-1 py-3 px-4 bg-red-50 hover:bg-red-100 text-red-600 font-normal rounded-xl transition-all duration-300 flex items-center justify-center border border-red-200"
+                          >
+                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            Remove Photo
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -1423,7 +1431,7 @@ Please add nutritional information manually if needed.`);
                     {/* Left Side - Food Name & Time */}
                     <div className="flex-1">
                       <div className="flex items-center gap-3">
-                        <h3 className="font-semibold text-gray-900 text-base">
+                        <h3 className="font-medium text-gray-900 text-base">
                           {food.description.split('\n')[0].split('Calories:')[0].trim()}
                         </h3>
                         <span className={`text-xs px-2 py-1 rounded-full flex-shrink-0 ${
