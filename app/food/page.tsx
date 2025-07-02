@@ -451,6 +451,7 @@ Please add nutritional information manually if needed.`);
     // Re-analyze with AI for updated nutrition info
     setIsAnalyzing(true);
     let updatedNutrition = null;
+    let fullAnalysis = null;
 
     try {
       const response = await fetch('/api/analyze-food', {
@@ -469,6 +470,7 @@ Please add nutritional information manually if needed.`);
         console.log('API Response:', result); // Debug log
         if (result.success && result.analysis) {
           updatedNutrition = extractNutritionData(result.analysis);
+          fullAnalysis = result.analysis;
           console.log('Extracted Nutrition:', updatedNutrition); // Debug log
           
           // Update the UI states with new nutrition but keep clean description
@@ -486,10 +488,10 @@ Please add nutritional information manually if needed.`);
       setIsAnalyzing(false);
     }
 
-    // Update the existing entry with CLEAN description (not full AI response)
+    // Update the existing entry with AI analysis for nutrition display
     const updatedEntry = {
       ...editingEntry,
-      description: description, // Save the clean user description
+      description: fullAnalysis || description, // Save full AI analysis with nutrition data
       photo: method === 'photo' ? photoPreview : editingEntry.photo,
       nutrition: updatedNutrition || editingEntry.nutrition
     };
@@ -541,112 +543,25 @@ Please add nutritional information manually if needed.`);
   };
 
   const reAnalyzeFood = async (food: any) => {
-    console.log('🔄 AGENT #6: Starting re-analysis for food entry:', food);
     setEditingEntry(food);
     setShowEntryOptions(null);
     
     if (food.method === 'photo' && food.photo) {
-      console.log('📸 Re-analyzing photo entry...');
-      // For photo entries, we need to re-analyze using the description text
-      // since we can't convert the stored image back to a File object
-      setIsAnalyzing(true);
-      
-      try {
-        // Extract the food description from the stored entry
-        const foodDescription = food.description.split('\n')[0].split('Calories:')[0].trim();
-        
-        console.log('🔍 Re-analyzing with description:', foodDescription);
-        
-        const response = await fetch('/api/analyze-food', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            textDescription: foodDescription,
-            foodType: 'single'
-          }),
-        });
-
-        if (response.ok) {
-          const result = await response.json();
-          console.log('✅ Re-analysis successful:', result);
-          
-          if (result.success && result.analysis) {
-            // Update the existing entry with new analysis
-            const updatedNutrition = extractNutritionData(result.analysis);
-            const updatedEntry = {
-              ...food,
-              description: result.analysis, // Update with fresh AI analysis
-              nutrition: updatedNutrition
-            };
-
-            const updatedFoods = todaysFoods.map(f => 
-              f.id === food.id ? updatedEntry : f
-            );
-            
-            setTodaysFoods(updatedFoods);
-            await saveFoodEntries(updatedFoods);
-            
-            console.log('🎉 Food entry updated with fresh analysis');
-          }
-        } else {
-          console.error('❌ Re-analysis API call failed:', response.status);
-        }
-      } catch (error) {
-        console.error('💥 Re-analysis failed:', error);
-      } finally {
-        setIsAnalyzing(false);
-        setEditingEntry(null);
-      }
+      // For photo entries, set up the re-analysis interface
+      setPhotoPreview(food.photo);
+      setAiDescription(''); // Clear previous analysis to trigger re-analysis
+      setAnalyzedNutrition(null);
+      setShowAiResult(false);
+      setShowAddFood(true);
+      setIsEditingDescription(true);
+      // Extract clean food name for editing
+      const cleanDescription = food.description.split('\n')[0].split('Calories:')[0].trim();
+      setEditedDescription(cleanDescription);
     } else {
-      console.log('📝 Re-analyzing manual text entry...');
-      // For manual entries, re-analyze the description text
-      setIsAnalyzing(true);
-      
-      try {
-        const response = await fetch('/api/analyze-food', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            textDescription: food.description,
-            foodType: 'single'
-          }),
-        });
-
-        if (response.ok) {
-          const result = await response.json();
-          console.log('✅ Manual re-analysis successful:', result);
-          
-          if (result.success && result.analysis) {
-            // Update the existing entry with new analysis
-            const updatedNutrition = extractNutritionData(result.analysis);
-            const updatedEntry = {
-              ...food,
-              description: result.analysis, // Update with fresh AI analysis
-              nutrition: updatedNutrition
-            };
-
-            const updatedFoods = todaysFoods.map(f => 
-              f.id === food.id ? updatedEntry : f
-            );
-            
-            setTodaysFoods(updatedFoods);
-            await saveFoodEntries(updatedFoods);
-            
-            console.log('🎉 Manual food entry updated with fresh analysis');
-          }
-        } else {
-          console.error('❌ Manual re-analysis API call failed:', response.status);
-        }
-      } catch (error) {
-        console.error('💥 Manual re-analysis failed:', error);
-      } finally {
-        setIsAnalyzing(false);
-        setEditingEntry(null);
-      }
+      // For manual entries, set up the manual re-analysis form
+      setManualFoodName(food.description);
+      setManualFoodType('single');
+      setShowAddFood(true);
     }
   };
 
