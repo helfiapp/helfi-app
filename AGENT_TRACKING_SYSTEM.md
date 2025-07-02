@@ -87,7 +87,7 @@
 
 ### **🚨 DON'T BREAK THE FOOD ANALYZER**
 - **Current Issue**: OpenAI API key is invalid (ends in ***0rUA)
-- **Correct Key**: Provided by user (sk-proj-OY-ICiEZ7...)
+- **Correct Key**: Provided by user [REDACTED]
 - **Test Before**: Always test food analyzer before claiming it's fixed
 - **Test After**: Always test food analyzer after any changes
 
@@ -226,7 +226,7 @@
 
 **NEXT AGENT INSTRUCTIONS**:
 1. **The API key line-wrapping issue is REAL** - terminal logs prove it
-2. **Correct API key**: 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
+2. **Correct API key**: [REDACTED - OpenAI API Key]
 3. **Issue**: Environment files keep wrapping the key, causing truncation to "AC8A"
 4. **Don't claim it's fixed** until user confirms it actually works
 5. **Test thoroughly** before making any success claims
@@ -345,7 +345,7 @@
 1. Fix line-wrapped OPENAI_API_KEY in .env and .env.local files
 2. Test thoroughly on live site before claiming success
 3. Never update documentation until verified working
-4. The key should be: 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
+4. The key should be: [REDACTED - OpenAI API Key]
 
 ## FAILED AGENTS LOG:
 - Agent #2: False success claims, ignored evidence

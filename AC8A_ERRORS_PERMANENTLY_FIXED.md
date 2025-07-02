@@ -28,7 +28,7 @@ Error: 401 Incorrect API key provided: sk-proj-*********************************
 # ⚠️ CRITICAL: DO NOT LINE-WRAP THIS API KEY! MUST BE ON SINGLE LINE!
 # Previous agents broke this by splitting it across multiple lines
 # Environment parser only reads first line, causing "AC8A" truncation errors
-OPENAI_API_KEY=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
+OPENAI_API_KEY=[REDACTED - OpenAI API Key]
 ```
 
 ### **Verification Commands**:
