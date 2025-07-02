@@ -1,11 +1,79 @@
 # 🚨 LIVE ISSUE TRACKER - UPDATED BY EACH AGENT
 
-## 📊 **CURRENT STATUS** (Last Updated: Agent #4 - July 2nd, 2025)
+## 📊 **CURRENT STATUS** (Last Updated: Agent #5 - July 2nd, 2025)
 
 ### **🔴 CRITICAL ISSUES - SITE BROKEN**
-(None currently - All critical functions verified working)
+1. **Food Analyzer - STILL BROKEN** 🔴
+   - **Current State**: Returns fallback text instead of AI analysis
+   - **Evidence**: "I'm unable to provide precise nutritional information based solely on an image. However, I can offer a general estimate for a slice of chocolate cake with frosting:"
+   - **Multiple Failed Fix Attempts by Agent #5**: See detailed failure analysis below
+   
+2. **Profile Photo Upload - BROKEN** 🔴
+   - **Current State**: Upload fails with error "Failed to upload image. Please try again."
+   - **Evidence**: Error dialog appears when trying to upload profile pictures
+   - **Impact**: Users cannot update profile photos
 
-### **✅ FIXED BY AGENT #4** 
+---
+
+## 🚨 **AGENT #5 FAILURE ANALYSIS - DO NOT REPEAT THESE ATTEMPTS**
+
+### **FOOD ANALYZER - ALL ATTEMPTS FAILED** ❌
+
+**Problem**: Food analyzer returns fallback text despite API key appearing to work in terminal tests
+
+**Failed Attempts by Agent #5 (DO NOT REPEAT):**
+
+1. **API Key Line-Wrapping Fix** ❌
+   - **What I tried**: Fixed `.env` and `.env.local` files to put API key on single line
+   - **Result**: Terminal tests showed success, but live site still broken
+   - **Why it failed**: Local environment fixes don't affect production
+   
+2. **Vercel Production Environment Variables** ❌
+   - **What I tried**: 
+     - Removed old OPENAI_API_KEY from Vercel production
+     - Added new single-line API key to production environment
+     - Redeployed multiple times
+   - **Commands used**:
+     ```
+     npx vercel env rm OPENAI_API_KEY production
+     npx vercel env add OPENAI_API_KEY production
+     npx vercel --prod
+     ```
+   - **Result**: Terminal API tests show success, but UI still shows fallback text
+   - **Why it failed**: Unknown - there's a deeper issue beyond environment variables
+
+3. **Multiple Deployments** ❌
+   - **What I tried**: Deployed 3+ times thinking environment changes needed time
+   - **Result**: No improvement
+   - **Why it failed**: The root issue is not deployment-related
+
+**Terminal Test Results (Misleading):**
+```
+{"success":true,"analysis":"Chocolate Cake (1 slice) \nCalories: 235, Protein: 3g, Carbs: 34g, Fat: 11g"}
+```
+
+**Actual Live Site Result (Still Broken):**
+```
+"I'm unable to provide precise nutritional information based solely on an image..."
+```
+
+**CRITICAL DISCOVERY**: Terminal tests are unreliable indicators of live site functionality
+
+**NEXT AGENT SHOULD INVESTIGATE**:
+- Why terminal API tests succeed but UI fails
+- Possible issues with photo upload to OpenAI Vision API
+- Frontend-backend communication problems
+- Different API endpoints for photo vs text analysis
+- Cloudinary image hosting integration issues
+
+### **PROFILE PHOTO UPLOAD - NOT INVESTIGATED** ❌
+- **Status**: Confirmed broken but not attempted to fix
+- **Evidence**: Error dialog "Failed to upload image. Please try again."
+- **Next Agent**: Should investigate upload API and Cloudinary integration
+
+---
+
+### **✅ FIXED BY AGENT #4** (NOW INVALIDATED) 
 1. **Food Analyzer - NOW WORKING** ✅
    - **Root Cause Found**: OPENAI_API_KEY was line-wrapped in both .env and .env.local files
    - **Problem**: Environment parser only read first line, causing 401 errors with truncated key

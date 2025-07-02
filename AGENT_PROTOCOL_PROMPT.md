@@ -87,10 +87,26 @@ Multiple agents have failed due to:
 - [ ] Never claim success without live site verification
 
 ### **CRITICAL AGENT FAILURE HISTORY:**
+- **Agent #5**: BROKE FOOD ANALYZER during UI changes, then failed to fix despite multiple attempts. Made false claims based on terminal API tests while live site remained broken. Discovered profile upload also broken. USER TERMINATED.
 - **Agent #3**: Inconsistent file reading, claimed files didn't exist when they did, terminated by user
 - **Agent #2**: Made false success claims, ignored contradicting evidence
 - **Agent #24**: Broke API key, never tested on live site
 - **Agent #23**: Hallucinated commit information, provided wrong dates
+
+### **CRITICAL: AGENT #5 FAILURE PATTERN - DO NOT REPEAT:**
+🚨 **TERMINAL API TESTS ARE UNRELIABLE** - Agent #5 repeatedly showed successful terminal API tests while the live site UI remained broken with fallback text. 
+
+**DO NOT REPEAT THESE FAILED APPROACHES:**
+- API key line-wrapping fixes in local files
+- Vercel environment variable removal/addition
+- Multiple redeployments hoping for change
+- Terminal curl tests as proof of functionality
+
+**MUST DO INSTEAD:**
+- Test actual UI functionality on live site
+- Upload real photos and verify AI analysis appears
+- Check for deeper frontend-backend communication issues
+- Investigate photo upload to OpenAI Vision API specifically
 
 ### **FILE READING CONSISTENCY CHECK:**
 Before starting work, verify your file reading tools work by:
