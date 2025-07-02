@@ -1069,27 +1069,35 @@ Please add nutritional information manually if needed.`);
                         <h3 className="text-sm font-medium text-gray-700 mb-3">Nutrition Information</h3>
                         <div className="grid grid-cols-2 gap-3">
                           {analyzedNutrition.calories && (
-                            <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-                              <div className="text-2xl font-semibold text-gray-900">{analyzedNutrition.calories}</div>
-                              <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">Calories</div>
+                            <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg p-4 border border-orange-200">
+                              <div className="text-center">
+                                <div className="text-2xl font-bold text-orange-600">{analyzedNutrition.calories}</div>
+                                <div className="text-xs font-medium text-orange-500 uppercase tracking-wide">Calories</div>
+                              </div>
                             </div>
                           )}
                           {analyzedNutrition.protein && (
-                            <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-                              <div className="text-2xl font-semibold text-gray-900">{analyzedNutrition.protein}g</div>
-                              <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">Protein</div>
+                            <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4 border border-blue-200">
+                              <div className="text-center">
+                                <div className="text-2xl font-bold text-blue-600">{analyzedNutrition.protein}g</div>
+                                <div className="text-xs font-medium text-blue-500 uppercase tracking-wide">Protein</div>
+                              </div>
                             </div>
                           )}
                           {analyzedNutrition.carbs && (
-                            <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-                              <div className="text-2xl font-semibold text-gray-900">{analyzedNutrition.carbs}g</div>
-                              <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">Carbs</div>
+                            <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-4 border border-green-200">
+                              <div className="text-center">
+                                <div className="text-2xl font-bold text-green-600">{analyzedNutrition.carbs}g</div>
+                                <div className="text-xs font-medium text-green-500 uppercase tracking-wide">Carbs</div>
+                              </div>
                             </div>
                           )}
                           {analyzedNutrition.fat && (
-                            <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-                              <div className="text-2xl font-semibold text-gray-900">{analyzedNutrition.fat}g</div>
-                              <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">Fat</div>
+                            <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-4 border border-purple-200">
+                              <div className="text-center">
+                                <div className="text-2xl font-bold text-purple-600">{analyzedNutrition.fat}g</div>
+                                <div className="text-xs font-medium text-purple-500 uppercase tracking-wide">Fat</div>
+                              </div>
                             </div>
                           )}
                         </div>
