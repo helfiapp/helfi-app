@@ -159,7 +159,7 @@ export const authOptions: NextAuthOptions = {
   session: {
     strategy: 'jwt',
     maxAge: 30 * 24 * 60 * 60, // 30 days
-    updateAge: 24 * 60 * 60, // 24 hours
+    updateAge: 60 * 60, // 1 hour (more frequent updates)
   },
   cookies: {
     sessionToken: {
@@ -168,7 +168,8 @@ export const authOptions: NextAuthOptions = {
         httpOnly: true,
         sameSite: 'lax',
         path: '/',
-        secure: process.env.NODE_ENV === 'production'
+        secure: process.env.NODE_ENV === 'production',
+        domain: process.env.NODE_ENV === 'production' ? '.helfi.ai' : undefined
       }
     }
   },
@@ -406,5 +407,5 @@ export const authOptions: NextAuthOptions = {
     error: '/auth/signin',
   },
   debug: true,
-  secret: process.env.NEXTAUTH_SECRET || 'your-secret-here'
+  secret: process.env.NEXTAUTH_SECRET || 'helfi-super-secure-stable-secret-2024-production-key-never-change'
 } 
