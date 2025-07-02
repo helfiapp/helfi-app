@@ -34,6 +34,13 @@ export default function FoodDiary() {
   const [foodImagesLoading, setFoodImagesLoading] = useState<{[key: string]: boolean}>({})
   const [expandedEntries, setExpandedEntries] = useState<{[key: string]: boolean}>({})
   const [fullSizeImage, setFullSizeImage] = useState<string | null>(null)
+  
+  // Re-analysis specific states - separate from editing
+  const [isReAnalyzing, setIsReAnalyzing] = useState(false)
+  const [reAnalysisEntry, setReAnalysisEntry] = useState<any>(null)
+  const [reAnalysisDescription, setReAnalysisDescription] = useState('')
+  const [reAnalysisComplete, setReAnalysisComplete] = useState(false)
+  const [reAnalysisNutrition, setReAnalysisNutrition] = useState<any>(null)
 
   // Profile data - using consistent green avatar
   const defaultAvatar = 'data:image/svg+xml;base64,' + btoa(`
@@ -543,26 +550,21 @@ Please add nutritional information manually if needed.`);
   };
 
   const reAnalyzeFood = async (food: any) => {
-    setEditingEntry(food);
+    console.log('🔄 Opening re-analysis interface for:', food.description);
+    
+    // Set up separate re-analysis interface
+    setReAnalysisEntry(food);
+    setReAnalysisDescription(food.description.split('\n')[0].split('Calories:')[0].trim());
+    setPhotoPreview(food.photo);
+    setIsReAnalyzing(true);
+    setReAnalysisComplete(false);
+    setReAnalysisNutrition(null);
     setShowEntryOptions(null);
     
-    if (food.method === 'photo' && food.photo) {
-      // For photo entries, set up the re-analysis interface
-      setPhotoPreview(food.photo);
-      setAiDescription(''); // Clear previous analysis to trigger re-analysis
-      setAnalyzedNutrition(null);
-      setShowAiResult(false);
-      setShowAddFood(true);
-      setIsEditingDescription(true);
-      // Extract clean food name for editing
-      const cleanDescription = food.description.split('\n')[0].split('Calories:')[0].trim();
-      setEditedDescription(cleanDescription);
-    } else {
-      // For manual entries, set up the manual re-analysis form
-      setManualFoodName(food.description);
-      setManualFoodType('single');
-      setShowAddFood(true);
-    }
+    // Clear other states to prevent conflicts
+    setShowAddFood(false);
+    setShowAiResult(false);
+    setIsEditingDescription(false);
   };
 
   const deleteFood = async (foodId: number) => {
@@ -1244,6 +1246,217 @@ Please add nutritional information manually if needed.`);
                   </div>
                 </div>
               )}
+
+            {/* Re-analysis Interface - Separate from Edit */}
+            {isReAnalyzing && reAnalysisEntry && (
+              <div className="fixed inset-0 bg-gray-50 z-50 overflow-y-auto">
+                <div className="min-h-screen bg-gray-50">
+                  {/* Header Bar */}
+                  <div className="bg-white border-b border-gray-200 px-4 sm:px-6 py-4 sticky top-0 z-10">
+                    <div className="max-w-4xl mx-auto flex items-center justify-between">
+                      <h1 className="text-lg sm:text-xl font-semibold text-gray-900">Re-analyze Food</h1>
+                      <button
+                        onClick={() => {
+                          setIsReAnalyzing(false);
+                          setReAnalysisEntry(null);
+                          setReAnalysisDescription('');
+                          setReAnalysisComplete(false);
+                          setReAnalysisNutrition(null);
+                          setPhotoPreview(null);
+                        }}
+                        className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                      >
+                        <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Content Area */}
+                  <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6">
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                      <div className="grid grid-cols-1 lg:grid-cols-2">
+                        
+                        {/* Left Column - Visual Content */}
+                        <div className="p-6 lg:p-8 bg-gray-50 border-r border-gray-200">
+                          
+                          {/* Photo Section */}
+                          {photoPreview && (
+                            <div className="mb-6">
+                              <div className="relative">
+                                <Image
+                                  src={photoPreview}
+                                  alt="Food being re-analyzed"
+                                  width={400}
+                                  height={300}
+                                  className="w-full aspect-[4/3] object-cover rounded-lg"
+                                  loading="eager"
+                                  priority
+                                />
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Updated Nutrition Display - Beautiful Colors */}
+                          {reAnalysisNutrition && (reAnalysisNutrition.calories || reAnalysisNutrition.protein || reAnalysisNutrition.carbs || reAnalysisNutrition.fat) && (
+                            <div>
+                              <h3 className="text-sm font-medium text-gray-700 mb-3">Updated Nutrition Information</h3>
+                              <div className="grid grid-cols-2 gap-3">
+                                {reAnalysisNutrition.calories && (
+                                  <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg p-4 border border-orange-200">
+                                    <div className="text-center">
+                                      <div className="text-2xl font-bold text-orange-600">{reAnalysisNutrition.calories}</div>
+                                      <div className="text-xs font-medium text-orange-500 uppercase tracking-wide">Calories</div>
+                                    </div>
+                                  </div>
+                                )}
+                                {reAnalysisNutrition.protein && (
+                                  <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-4 border border-blue-200">
+                                    <div className="text-center">
+                                      <div className="text-2xl font-bold text-blue-600">{reAnalysisNutrition.protein}g</div>
+                                      <div className="text-xs font-medium text-blue-500 uppercase tracking-wide">Protein</div>
+                                    </div>
+                                  </div>
+                                )}
+                                {reAnalysisNutrition.carbs && (
+                                  <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-4 border border-green-200">
+                                    <div className="text-center">
+                                      <div className="text-2xl font-bold text-green-600">{reAnalysisNutrition.carbs}g</div>
+                                      <div className="text-xs font-medium text-green-500 uppercase tracking-wide">Carbs</div>
+                                    </div>
+                                  </div>
+                                )}
+                                {reAnalysisNutrition.fat && (
+                                  <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-4 border border-purple-200">
+                                    <div className="text-center">
+                                      <div className="text-2xl font-bold text-purple-600">{reAnalysisNutrition.fat}g</div>
+                                      <div className="text-xs font-medium text-purple-500 uppercase tracking-wide">Fat</div>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* Right Column - Re-analysis Form */}
+                        <div className="p-6 lg:p-8 flex flex-col min-h-[500px]">
+                          
+                          {/* Description Input */}
+                          <div className="flex-1 mb-6">
+                            <label className="block text-sm font-medium text-gray-700 mb-3">
+                              Update Food Description
+                            </label>
+                            <textarea
+                              value={reAnalysisDescription}
+                              onChange={(e) => setReAnalysisDescription(e.target.value)}
+                              className="w-full h-40 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm resize-none bg-white transition-colors"
+                              placeholder="Update your food description for better analysis..."
+                            />
+                            <p className="text-xs text-gray-500 mt-2">
+                              Modify the description and AI will re-analyze with updated nutrition information
+                            </p>
+                          </div>
+
+                          {/* Two-Stage Action Buttons */}
+                          <div className="flex gap-3">
+                            {!reAnalysisComplete ? (
+                              <button
+                                onClick={async () => {
+                                  if (!reAnalysisDescription.trim()) return;
+                                  
+                                  setIsAnalyzing(true);
+                                  try {
+                                    const response = await fetch('/api/analyze-food', {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ 
+                                        description: reAnalysisDescription,
+                                        photo: photoPreview 
+                                      })
+                                    });
+                                    
+                                    if (response.ok) {
+                                      const data = await response.json();
+                                      const nutrition = extractNutritionData(data.analysis);
+                                      setReAnalysisNutrition(nutrition);
+                                      setReAnalysisComplete(true);
+                                    }
+                                  } catch (error) {
+                                    console.error('Re-analysis failed:', error);
+                                  } finally {
+                                    setIsAnalyzing(false);
+                                  }
+                                }}
+                                disabled={isAnalyzing || !reAnalysisDescription.trim()}
+                                className="flex-1 py-3 px-6 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
+                              >
+                                {isAnalyzing ? (
+                                  <>
+                                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    Re-analyzing...
+                                  </>
+                                ) : (
+                                  '🔄 Re-analyze'
+                                )}
+                              </button>
+                            ) : (
+                              <button
+                                onClick={async () => {
+                                  if (reAnalysisEntry && reAnalysisNutrition) {
+                                    const updatedEntry = {
+                                      ...reAnalysisEntry,
+                                      description: reAnalysisDescription,
+                                      nutrition: reAnalysisNutrition
+                                    };
+                                    
+                                    const updatedFoods = todaysFoods.map(food => 
+                                      food.id === reAnalysisEntry.id ? updatedEntry : food
+                                    );
+                                    
+                                    setTodaysFoods(updatedFoods);
+                                    await saveFoodEntries(updatedFoods);
+                                    
+                                    // Close re-analysis interface
+                                    setIsReAnalyzing(false);
+                                    setReAnalysisEntry(null);
+                                    setReAnalysisDescription('');
+                                    setReAnalysisComplete(false);
+                                    setReAnalysisNutrition(null);
+                                    setPhotoPreview(null);
+                                  }
+                                }}
+                                className="flex-1 py-3 px-6 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg transition-colors"
+                              >
+                                💾 Save Changes
+                              </button>
+                            )}
+                            
+                            <button
+                              onClick={() => {
+                                setIsReAnalyzing(false);
+                                setReAnalysisEntry(null);
+                                setReAnalysisDescription('');
+                                setReAnalysisComplete(false);
+                                setReAnalysisNutrition(null);
+                                setPhotoPreview(null);
+                              }}
+                              className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-colors"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Manual Food Entry - Improved Structure */}
             {!photoPreview && (
