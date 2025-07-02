@@ -958,8 +958,14 @@ Please add nutritional information manually if needed.`);
                           !line.toLowerCase().includes('sugar') &&
                           !line.toLowerCase().includes('nutritional') &&
                           !line.toLowerCase().includes('nutrition') &&
+                          !line.toLowerCase().includes('unable to see') &&
+                          !line.toLowerCase().includes('cannot provide') &&
+                          !line.toLowerCase().includes('general estimate') &&
+                          !line.toLowerCase().includes('approximate') &&
+                          !line.toLowerCase().includes('typical serving') &&
                           line.trim().length > 0
-                        ).join(' ').replace(/^(This image shows|I can see|The food appears to be|This appears to be)/i, '').trim() || 
+                        ).join(' ').replace(/^(This image shows|I can see|The food appears to be|This appears to be|I'm unable to see|Based on the image)/i, '').trim() || 
+                        aiDescription.split('.')[0].replace(/^(I'm unable to see.*?but I can provide a general estimate for|Based on.*?,)/i, '').trim() || 
                         aiDescription.split(',')[0] || aiDescription}
                       </div>
                     </div>
@@ -1026,12 +1032,12 @@ Please add nutritional information manually if needed.`);
             {isEditingDescription && (
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                 <div className="p-8 space-y-8">
-                  {/* Clean Food Title - Softer Typography */}
+                  {/* Clean Food Title - Mobile Responsive Typography */}
                   <div className="border-b border-gray-100 pb-4">
-                    <h1 className="text-3xl font-light text-gray-800 tracking-wide">
+                    <h1 className="text-xl sm:text-2xl lg:text-3xl font-light text-gray-800 tracking-wide">
                       {editedDescription.split('\n')[0].split('Calories:')[0].trim() || 'Chocolate Cake'}
                     </h1>
-                    <p className="text-sm text-gray-500 mt-2 font-normal">Edit food details and nutrition information</p>
+                    <p className="text-xs sm:text-sm text-gray-500 mt-2 font-normal">Edit food details and nutrition information</p>
                   </div>
 
                   <div className="flex flex-col lg:flex-row lg:gap-12">
@@ -1489,13 +1495,16 @@ Please add nutritional information manually if needed.`);
             <div className="space-y-3">
               {todaysFoods.map((food) => (
                 <div key={food.id} className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-visible">
-                  {/* Compact Header Row */}
-                  <div className="flex items-center justify-between p-4 hover:bg-gray-50 transition-colors">
-                    {/* Left Side - Food Name & Time */}
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3">
-                        <h3 className="font-medium text-gray-900 text-base">
-                          {food.description.split('\n')[0].split('Calories:')[0].trim()}
+                  {/* Mobile-Optimized Layout */}
+                  <div className="p-4 hover:bg-gray-50 transition-colors">
+                    {/* Top Row - Food Name & Method Badge */}
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex items-center gap-3 flex-1">
+                        <h3 className="font-medium text-gray-900 text-sm sm:text-base leading-tight">
+                          {food.description.split('\n')[0].split('Calories:')[0]
+                            .replace(/^(I'm unable to see.*?but I can provide a general estimate for|Based on.*?,|This image shows|I can see|The food appears to be|This appears to be)/i, '')
+                            .split('.')[0]
+                            .trim()}
                         </h3>
                         <span className={`text-xs px-2 py-1 rounded-full flex-shrink-0 ${
                           food.method === 'photo' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
@@ -1503,43 +1512,45 @@ Please add nutritional information manually if needed.`);
                           {food.method === 'photo' ? '📸' : '✍️'}
                         </span>
                       </div>
-                      <p className="text-sm text-gray-500 mt-1">
-                        {formatTimeWithAMPM(food.time)}
-                      </p>
-                      
-                      {/* Compact Nutrition Display */}
-                      {food.nutrition && (food.nutrition.calories || food.nutrition.protein || food.nutrition.carbs || food.nutrition.fat) && (
-                        <div className="flex gap-2 mt-2 flex-wrap">
-                          {food.nutrition.calories && (
-                            <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded px-2 py-1 border border-orange-200">
-                              <span className="text-xs font-bold text-orange-600">{food.nutrition.calories}</span>
-                              <span className="text-xs text-orange-500 ml-1">cal</span>
-                            </div>
-                          )}
-                          {food.nutrition.protein && (
-                            <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded px-2 py-1 border border-blue-200">
-                              <span className="text-xs font-bold text-blue-600">{food.nutrition.protein}g</span>
-                              <span className="text-xs text-blue-500 ml-1">protein</span>
-                            </div>
-                          )}
-                          {food.nutrition.carbs && (
-                            <div className="bg-gradient-to-br from-green-50 to-green-100 rounded px-2 py-1 border border-green-200">
-                              <span className="text-xs font-bold text-green-600">{food.nutrition.carbs}g</span>
-                              <span className="text-xs text-green-500 ml-1">carbs</span>
-                            </div>
-                          )}
-                          {food.nutrition.fat && (
-                            <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded px-2 py-1 border border-purple-200">
-                              <span className="text-xs font-bold text-purple-600">{food.nutrition.fat}g</span>
-                              <span className="text-xs text-purple-500 ml-1">fat</span>
-                            </div>
-                          )}
-                        </div>
-                      )}
                     </div>
-
-                    {/* Right Side - Actions */}
-                    <div className="flex items-center gap-2">
+                    
+                    {/* Middle Row - Time */}
+                    <p className="text-xs sm:text-sm text-gray-500 mb-2">
+                      {formatTimeWithAMPM(food.time)}
+                    </p>
+                    
+                    {/* Nutrition Row */}
+                    {food.nutrition && (food.nutrition.calories || food.nutrition.protein || food.nutrition.carbs || food.nutrition.fat) && (
+                      <div className="flex gap-1.5 sm:gap-2 mb-3 flex-wrap">
+                        {food.nutrition.calories && (
+                          <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded px-1.5 sm:px-2 py-0.5 sm:py-1 border border-orange-200">
+                            <span className="text-xs font-bold text-orange-600">{food.nutrition.calories}</span>
+                            <span className="text-xs text-orange-500 ml-1">cal</span>
+                          </div>
+                        )}
+                        {food.nutrition.protein && (
+                          <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded px-1.5 sm:px-2 py-0.5 sm:py-1 border border-blue-200">
+                            <span className="text-xs font-bold text-blue-600">{food.nutrition.protein}g</span>
+                            <span className="text-xs text-blue-500 ml-1">protein</span>
+                          </div>
+                        )}
+                        {food.nutrition.carbs && (
+                          <div className="bg-gradient-to-br from-green-50 to-green-100 rounded px-1.5 sm:px-2 py-0.5 sm:py-1 border border-green-200">
+                            <span className="text-xs font-bold text-green-600">{food.nutrition.carbs}g</span>
+                            <span className="text-xs text-green-500 ml-1">carbs</span>
+                          </div>
+                        )}
+                        {food.nutrition.fat && (
+                          <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded px-1.5 sm:px-2 py-0.5 sm:py-1 border border-purple-200">
+                            <span className="text-xs font-bold text-purple-600">{food.nutrition.fat}g</span>
+                            <span className="text-xs text-purple-500 ml-1">fat</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    
+                    {/* Bottom Row - Action Buttons (Right Aligned) */}
+                    <div className="flex justify-end items-center gap-2">
                       {/* 3-Dot Options Menu */}
                       <div className="relative entry-options-dropdown">
                         <button
@@ -1548,9 +1559,9 @@ Please add nutritional information manually if needed.`);
                             e.stopPropagation();
                             setShowEntryOptions(showEntryOptions === food.id.toString() ? null : food.id.toString());
                           }}
-                          className="p-2 rounded-lg hover:bg-gray-200 transition-colors"
+                          className="p-1.5 sm:p-2 rounded-lg hover:bg-gray-200 transition-colors"
                         >
-                          <svg className="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
                             <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
                           </svg>
                         </button>
@@ -1559,7 +1570,7 @@ Please add nutritional information manually if needed.`);
                           <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-200 z-[9999]" style={{boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'}}>
                             <button
                               onClick={() => editFood(food)}
-                              className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 flex items-center"
+                              className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center"
                             >
                               <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -1568,7 +1579,7 @@ Please add nutritional information manually if needed.`);
                             </button>
                             <button
                               onClick={() => reAnalyzeFood(food)}
-                              className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 flex items-center"
+                              className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center"
                             >
                               <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -1577,7 +1588,7 @@ Please add nutritional information manually if needed.`);
                             </button>
                             <button
                               onClick={() => deleteFood(food.id)}
-                              className="w-full px-4 py-2 text-left text-red-600 hover:bg-red-50 flex items-center border-t border-gray-100"
+                              className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center border-t border-gray-100"
                             >
                               <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -1591,10 +1602,10 @@ Please add nutritional information manually if needed.`);
                       {/* Expand/Collapse Toggle */}
                       <button
                         onClick={() => toggleExpanded(food.id.toString())}
-                        className="p-2 rounded-lg hover:bg-gray-200 transition-colors"
+                        className="p-1.5 sm:p-2 rounded-lg hover:bg-gray-200 transition-colors"
                       >
                         <svg 
-                          className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${
+                          className={`w-4 h-4 sm:w-5 sm:h-5 text-gray-400 transition-transform duration-200 ${
                             expandedEntries[food.id.toString()] ? 'rotate-180' : ''
                           }`} 
                           fill="none" 
