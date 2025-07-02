@@ -218,51 +218,104 @@ export default function FoodDiary() {
     setIsAnalyzing(true);
     
     try {
-      console.log('🚀 PERFORMANCE: Starting optimized photo analysis...');
+      console.log('🔍 AGENT #6 DEBUG: Starting photo analysis...');
+      console.log('📊 Original file:', { 
+        name: photoFile.name, 
+        size: photoFile.size, 
+        type: photoFile.type 
+      });
       
-      // Compress image to reduce API costs (using optimized settings)
-      console.log(`Original file size: ${(photoFile.size / 1024).toFixed(1)}KB`);
-      const compressedFile = await compressImage(photoFile, 300, 0.5); // More aggressive compression
-      console.log(`Compressed file size: ${(compressedFile.size / 1024).toFixed(1)}KB`);
-      console.log(`Savings: ${(((photoFile.size - compressedFile.size) / photoFile.size) * 100).toFixed(1)}%`);
+      // Step 1: Compress image (with better error handling)
+      let compressedFile;
+      try {
+        compressedFile = await compressImage(photoFile, 800, 0.8); // Less aggressive compression
+        console.log('✅ Image compression successful:', {
+          originalSize: photoFile.size,
+          compressedSize: compressedFile.size,
+          reduction: Math.round((1 - compressedFile.size/photoFile.size) * 100) + '%'
+        });
+      } catch (compressionError) {
+        console.warn('⚠️ Image compression failed, using original:', compressionError);
+        compressedFile = photoFile; // Fallback to original file
+      }
       
-      console.log('🚀 PERFORMANCE: Sending compressed image to AI (this may take 3-5 seconds)...');
-      
-      // Create FormData for API call with compressed image
+      // Step 2: Create FormData
+      console.log('📤 Creating FormData for upload...');
       const formData = new FormData();
       formData.append('image', compressedFile);
+      console.log('✅ FormData created successfully');
 
-      // Call our OpenAI API route
+      // Step 3: API call with detailed logging
+      console.log('🌐 Calling API endpoint...');
       const response = await fetch('/api/analyze-food', {
         method: 'POST',
         body: formData,
       });
 
+      console.log('📥 API Response received:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok
+      });
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to analyze image');
+        let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+          console.error('❌ API Error Details:', errorData);
+        } catch (parseError) {
+          console.error('❌ Could not parse error response:', parseError);
+        }
+        throw new Error(errorMessage);
       }
 
+      // Step 4: Parse response
       const result = await response.json();
+      console.log('📋 API Response Data:', {
+        success: result.success,
+        hasAnalysis: !!result.analysis,
+        analysisPreview: result.analysis?.substring(0, 100) + '...'
+      });
       
       if (result.success && result.analysis) {
+        console.log('🎉 SUCCESS: Real AI analysis received!');
         setAiDescription(result.analysis);
         setAnalyzedNutrition(extractNutritionData(result.analysis));
         setShowAiResult(true);
       } else {
-        throw new Error('Invalid response from AI service');
+        console.error('❌ Invalid API response format:', result);
+        throw new Error('Invalid response format from AI service');
       }
     } catch (error) {
-      console.error('Error analyzing photo:', error);
+      console.error('💥 PHOTO ANALYSIS FAILED:', error);
       
-      // Fallback to manual entry with helpful message
-      setAiDescription(`🤖 AI analysis temporarily unavailable. 
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error('🔍 Error details:', {
+        message: errorMessage,
+        name: error instanceof Error ? error.name : 'Unknown',
+        stack: error instanceof Error ? error.stack?.substring(0, 200) : 'No stack trace'
+      });
       
-Please describe your food manually, including:
+      // More specific error messages based on error type
+      let fallbackMessage = `🤖 Photo analysis failed: ${errorMessage}`;
+      
+      if (errorMessage.includes('fetch')) {
+        fallbackMessage = `🌐 Network error occurred while analyzing photo. Please check your connection and try again.`;
+      } else if (errorMessage.includes('HTTP 401')) {
+        fallbackMessage = `🔑 Authentication error. The AI service is temporarily unavailable.`;
+      } else if (errorMessage.includes('HTTP 429')) {
+        fallbackMessage = `⏰ AI service is busy. Please wait a moment and try again.`;
+      } else if (errorMessage.includes('HTTP 5')) {
+        fallbackMessage = `🛠️ Server error occurred. Please try again in a moment.`;
+      }
+      
+      setAiDescription(fallbackMessage + `
+      
+Meanwhile, you can describe your food manually:
 - What foods do you see?
 - How was it prepared?
-- Approximate portion size
-- Any other details you'd like to track`);
+- Approximate portion size`);
       setAnalyzedNutrition(null);
       setShowAiResult(true);
     } finally {
@@ -557,9 +610,19 @@ Please add nutritional information manually if needed.`);
       showAddFood,
       showAiResult,
       isEditingDescription,
-      editingEntry: editingEntry ? 'exists' : 'null'
+      editingEntry: editingEntry ? 'exists' : 'null',
+      todaysFoodsCount: todaysFoods.length
     });
-  }, [showAddFood, showAiResult, isEditingDescription, editingEntry]);
+  }, [showAddFood, showAiResult, isEditingDescription, editingEntry, todaysFoods.length]);
+
+  // EMERGENCY FIX: Reset all editing states on component mount to ensure food entries show
+  React.useEffect(() => {
+    console.log('🚨 EMERGENCY FIX: Resetting all editing states to show food entries');
+    setIsEditingDescription(false);
+    setEditingEntry(null);
+    setShowAddFood(false);
+    setShowAiResult(false);
+  }, []);
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-gray-50">
