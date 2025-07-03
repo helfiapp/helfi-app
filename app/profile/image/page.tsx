@@ -92,9 +92,11 @@ export default function ProfileImage() {
         formData.append('image', selectedImage);
         
         console.log('Uploading image to Cloudinary...');
+        console.log('Session status before upload:', { hasSession: !!session, userEmail: session?.user?.email });
         const response = await fetch('/api/upload-profile-image', {
           method: 'POST',
-          body: formData
+          body: formData,
+          credentials: 'include' // Ensure cookies are sent
         });
 
         const result = await response.json();
