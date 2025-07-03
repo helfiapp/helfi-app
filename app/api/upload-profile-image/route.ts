@@ -14,22 +14,9 @@ cloudinary.config({
 export async function POST(request: NextRequest) {
   try {
     console.log('=== PROFILE IMAGE UPLOAD START ===');
-    console.log('Request headers:', {
-      'content-type': request.headers.get('content-type'),
-      'user-agent': request.headers.get('user-agent'),
-      'cookie': request.headers.get('cookie') ? 'present' : 'missing',
-      'authorization': request.headers.get('authorization') ? 'present' : 'missing'
-    });
     
-    // Check authentication with detailed logging
-    console.log('Checking authentication...');
+    // Check authentication
     const session = await getServerSession(authOptions);
-    console.log('Session result:', {
-      hasSession: !!session,
-      hasUser: !!session?.user,
-      userEmail: session?.user?.email,
-      userId: session?.user?.id
-    });
     
     if (!session?.user?.email) {
       console.log('❌ Authentication failed - no session or user email');
@@ -66,18 +53,8 @@ export async function POST(request: NextRequest) {
     });
 
     // Convert file to buffer for Cloudinary upload
-    console.log('Converting file to buffer...');
     const imageBuffer = await imageFile.arrayBuffer();
     const buffer = Buffer.from(imageBuffer);
-    console.log('✅ Buffer created, size:', buffer.length);
-
-    // Test Cloudinary configuration
-    console.log('Testing Cloudinary configuration...');
-    console.log('Cloudinary config:', {
-      cloud_name: process.env.CLOUDINARY_CLOUD_NAME ? 'present' : 'missing',
-      api_key: process.env.CLOUDINARY_API_KEY ? 'present' : 'missing',
-      api_secret: process.env.CLOUDINARY_API_SECRET ? 'present' : 'missing'
-    });
 
     // Upload to Cloudinary with profile image specific settings
     console.log('Starting Cloudinary upload...');
@@ -115,7 +92,6 @@ export async function POST(request: NextRequest) {
     });
 
     // Find user by email
-    console.log('Finding user in database...');
     const user = await prisma.user.findUnique({
       where: { email: session.user.email }
     });
@@ -128,7 +104,6 @@ export async function POST(request: NextRequest) {
     console.log('✅ User found in database:', { id: user.id, email: user.email });
 
     // Create File record in database
-    console.log('Creating file record in database...');
     const fileRecord = await prisma.file.create({
       data: {
         originalName: imageFile.name,
@@ -152,10 +127,7 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    console.log('✅ File record created:', { id: fileRecord.id });
-
     // Update user's profile image URL
-    console.log('Updating user profile image...');
     await prisma.user.update({
       where: { id: user.id },
       data: { 
