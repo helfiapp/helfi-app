@@ -16,6 +16,15 @@
 • NEVER hallucinate commit information - use actual terminal commands to verify
 • ALWAYS provide commit hash in this EXACT format with copy button:
 
+🚨 CRITICAL: OPENAI API KEY PROTECTION RULE 🚨
+⚠️ You are NOT ALLOWED under ANY circumstances to modify, delete, revoke, rotate, or regenerate the OpenAI API key used for this project.
+⚠️ The .env.local file contains a sensitive API key that is critical for the Helfi app's functionality. Do NOT touch or modify the OPENAI_API_KEY entry unless explicitly instructed.
+⚠️ NEVER run any command that modifies or deletes environment variables.
+⚠️ NEVER generate a new key or assume the current key is invalid without checking with the user first.
+⚠️ NEVER edit or override the .env.local file unless asked.
+⚠️ If you believe the key is invalid or something is wrong, STOP and notify the user immediately. Do NOT attempt to fix or regenerate the key yourself.
+🚨 VIOLATION OF THIS RULE WILL RESULT IN IMMEDIATE TERMINATION 🚨
+
 COMMIT HASH: [hash]
 Date: [DD]th of [Month] [YYYY]  
 Time: [HH:MM AM/PM]
