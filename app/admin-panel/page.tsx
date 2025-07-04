@@ -5,7 +5,6 @@ import Image from 'next/image'
 
 export default function AdminPanel() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
-  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -109,12 +108,12 @@ export default function AdminPanel() {
     setLoading(true)
     setError('')
 
-    // Temporary hardcoded admin credentials until database is fully set up
-    if (email === 'info@sonicweb.com.au' && password === 'gX8#bQ3!Vr9zM2@kLf1T') {
+    // Password-only authentication for admin panel
+    if (password === 'gX8#bQ3!Vr9zM2@kLf1T') {
       const mockAdmin = {
         id: 'temp-admin-id',
-        email: 'info@sonicweb.com.au',
-        name: 'Louie Veleski',
+        email: 'admin@helfi.ai',
+        name: 'Helfi Admin',
         role: 'SUPER_ADMIN'
       }
       
@@ -128,43 +127,16 @@ export default function AdminPanel() {
       loadUserStats('temp-admin-token')
       setLoading(false)
       return
+    } else {
+      setError('Invalid password. Please try again.')
+      setLoading(false)
     }
-
-    try {
-      const response = await fetch('/api/admin/auth', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password })
-      })
-
-      if (response.ok) {
-        const result = await response.json()
-        setAdminToken(result.token)
-        setAdminUser(result.admin)
-        setIsAuthenticated(true)
-        sessionStorage.setItem('adminToken', result.token)
-        sessionStorage.setItem('adminUser', JSON.stringify(result.admin))
-        loadAnalyticsData()
-        loadWaitlistData(result.token)
-        loadUserStats(result.token)
-      } else {
-        const error = await response.json()
-        setError(error.message || 'Authentication failed. Please check your credentials.')
-      }
-    } catch (error) {
-      console.error('Login error:', error)
-      setError('Login failed. Please try again.')
-    }
-    setLoading(false)
   }
 
   const handleLogout = () => {
     setIsAuthenticated(false)
     sessionStorage.removeItem('adminToken')
     sessionStorage.removeItem('adminUser')
-    setEmail('')
     setPassword('')
     setAdminToken('')
     setAdminUser(null)
@@ -1127,21 +1099,6 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
           </div>
 
           <form onSubmit={handleLogin} className="space-y-6">
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                Admin Email
-              </label>
-              <input
-                type="email"
-                id="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                placeholder="Enter admin email"
-                required
-              />
-            </div>
-
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
                 Admin Password
