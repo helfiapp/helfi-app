@@ -105,6 +105,7 @@ export default function AdminPanel() {
       // Check for URL hash to set active tab
       const checkHashAndLoadData = () => {
         if (window.location.hash === '#tickets') {
+          console.log('🔍 Hash detected - setting active tab to tickets')
           setActiveTab('tickets')
           loadSupportTickets()
         }
@@ -114,11 +115,13 @@ export default function AdminPanel() {
       
       // Listen for hash changes (Agent #25's implementation preserved)
       const handleHashChange = () => {
+        console.log('🔍 Hash changed to:', window.location.hash)
         checkHashAndLoadData()
       }
       
       // New: Add visibility change detection for auto-loading
       const handleVisibilityChange = () => {
+        console.log('🔍 Visibility changed - document.hidden:', document.hidden, 'hash:', window.location.hash, 'activeTab:', activeTab)
         if (!document.hidden && window.location.hash === '#tickets' && activeTab === 'tickets') {
           // Auto-load tickets when returning to visible tab with tickets active
           console.log('Tab became visible with tickets active - auto-loading tickets')
@@ -128,6 +131,7 @@ export default function AdminPanel() {
       
       // New: Add focus detection for returning via back button
       const handleWindowFocus = () => {
+        console.log('🔍 Window focused - hash:', window.location.hash, 'activeTab:', activeTab)
         if (window.location.hash === '#tickets' && activeTab === 'tickets') {
           console.log('Window focused with tickets active - auto-loading tickets')
           loadSupportTickets()

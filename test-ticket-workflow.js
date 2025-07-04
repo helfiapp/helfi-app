@@ -63,6 +63,13 @@ async function testTicketWorkflow() {
     await page.click('text=🎫 Support');
     await page.waitForLoadState('networkidle');
     
+    // Check if tickets tab is active
+    const ticketsTabActive = await page.evaluate(() => {
+      const ticketsTab = document.querySelector('[data-tab="tickets"]');
+      return ticketsTab ? ticketsTab.classList.contains('active') : false;
+    });
+    console.log(`📊 Tickets tab active after click: ${ticketsTabActive}`);
+    
     // Check if tickets are visible
     const ticketsVisible = await page.isVisible('text=💬 View');
     console.log(`📊 Tickets visible after tab click: ${ticketsVisible}`);
@@ -120,11 +127,34 @@ async function testTicketWorkflow() {
     });
     console.log('📊 SessionStorage after back navigation:', sessionStorageAfterBack);
     
+    // Check if tickets tab is active after back navigation
+    const ticketsTabActiveAfterBack = await page.evaluate(() => {
+      const ticketsTab = document.querySelector('[data-tab="tickets"]');
+      return ticketsTab ? ticketsTab.classList.contains('active') : false;
+    });
+    console.log(`📊 Tickets tab active after back: ${ticketsTabActiveAfterBack}`);
+    
+    // Check if tickets section is visible
+    const ticketsSection = await page.isVisible('[data-tab-content="tickets"]');
+    console.log(`📊 Tickets section visible: ${ticketsSection}`);
+    
     const ticketsVisibleAfterBack = await page.isVisible('text=💬 View');
     console.log(`📊 Tickets visible after back button: ${ticketsVisibleAfterBack}`);
     
     if (!ticketsVisibleAfterBack) {
-      console.log('❌ ISSUE CONFIRMED: Tickets not visible after back button - manual refresh needed');
+      console.log('❌ ISSUE CONFIRMED: Tickets not visible after back button - investigating tab state');
+      
+      // Check what tab is currently active
+      const currentActiveTab = await page.evaluate(() => {
+        const tabs = document.querySelectorAll('[data-tab]');
+        for (let tab of tabs) {
+          if (tab.classList.contains('active') || tab.classList.contains('bg-emerald-100')) {
+            return tab.getAttribute('data-tab') || tab.textContent;
+          }
+        }
+        return 'none';
+      });
+      console.log(`📊 Current active tab: ${currentActiveTab}`);
       
       // Try manual refresh to see if it fixes it
       console.log('📍 Step 8: Manual refresh test');
