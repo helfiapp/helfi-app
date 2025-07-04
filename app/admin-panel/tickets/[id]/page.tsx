@@ -145,6 +145,12 @@ export default function TicketPage() {
       newExpanded.add(responseId)
     }
     setExpandedResponses(newExpanded)
+    
+    // Save to localStorage for persistence
+    if (ticket?.id) {
+      const storageKey = `ticket-${ticket.id}-expanded`
+      localStorage.setItem(storageKey, JSON.stringify(Array.from(newExpanded)))
+    }
   }
 
   const handleStatusChange = async (newStatus: string) => {
