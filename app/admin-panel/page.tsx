@@ -112,16 +112,37 @@ export default function AdminPanel() {
       
       checkHashAndLoadData()
       
-      // Listen for hash changes
+      // Listen for hash changes (Agent #25's implementation preserved)
       const handleHashChange = () => {
         checkHashAndLoadData()
       }
       
+      // New: Add visibility change detection for auto-loading
+      const handleVisibilityChange = () => {
+        if (!document.hidden && window.location.hash === '#tickets' && activeTab === 'tickets') {
+          // Auto-load tickets when returning to visible tab with tickets active
+          console.log('Tab became visible with tickets active - auto-loading tickets')
+          loadSupportTickets()
+        }
+      }
+      
+      // New: Add focus detection for returning via back button
+      const handleWindowFocus = () => {
+        if (window.location.hash === '#tickets' && activeTab === 'tickets') {
+          console.log('Window focused with tickets active - auto-loading tickets')
+          loadSupportTickets()
+        }
+      }
+      
       window.addEventListener('hashchange', handleHashChange)
+      document.addEventListener('visibilitychange', handleVisibilityChange)
+      window.addEventListener('focus', handleWindowFocus)
       
       // Cleanup
       return () => {
         window.removeEventListener('hashchange', handleHashChange)
+        document.removeEventListener('visibilitychange', handleVisibilityChange)
+        window.removeEventListener('focus', handleWindowFocus)
       }
     }
   }, [])

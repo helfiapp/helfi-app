@@ -97,19 +97,20 @@ export default function TicketPage() {
       const data = await response.json()
       setTicket(data.ticket)
       
-      // Check if we already have a saved state from localStorage
-      const savedState = localStorage.getItem(`ticket-${ticketId}-expanded`)
-      
-      if (savedState) {
-        // Use the saved state - don't change expandedResponses here
-        // The useEffect with localStorage will handle this
-        console.log('Using saved expanded state from localStorage')
-      } else {
-        // Only expand all responses by default if no saved state exists AND we don't have any expanded responses yet
-        if (expandedResponses.size === 0) {
-          console.log('No saved state found, expanding all responses by default')
-          const allResponseIds = new Set<string>(data.ticket.responses?.map((r: TicketResponse) => r.id) || [])
+      // Fix: Only set initial expanded state if we don't already have responses in state
+      // This prevents loadTicketData from overriding user's collapse preferences
+      if (data.ticket.responses && data.ticket.responses.length > 0) {
+        // Check if we already have expanded state (either from localStorage or previous load)
+        const savedState = localStorage.getItem(`ticket-${ticketId}-expanded`)
+        const hasExistingState = expandedResponses.size > 0 || savedState
+        
+        if (!hasExistingState) {
+          // Only expand all by default on first load with no saved state
+          console.log('First load - expanding all responses by default')
+          const allResponseIds = new Set<string>(data.ticket.responses.map((r: TicketResponse) => r.id))
           setExpandedResponses(allResponseIds)
+        } else {
+          console.log('Preserving existing expanded state from localStorage or previous load')
         }
       }
       
