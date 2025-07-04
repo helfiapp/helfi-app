@@ -89,22 +89,39 @@ export default function AdminPanel() {
   const [adminList, setAdminList] = useState<any[]>([])
   const [isLoadingAdmins, setIsLoadingAdmins] = useState(false)
 
-  // Check if already authenticated and handle URL hash for direct tab navigation
+  // Check for URL hash to set active tab and load data
   useEffect(() => {
     const token = sessionStorage.getItem('adminToken')
-    const adminData = sessionStorage.getItem('adminUser')
-    if (token && adminData) {
+    const user = sessionStorage.getItem('adminUser')
+    
+    if (token && user) {
       setAdminToken(token)
-      setAdminUser(JSON.parse(adminData))
+      setAdminUser(JSON.parse(user))
       setIsAuthenticated(true)
       loadAnalyticsData()
       loadWaitlistData(token)
       loadUserStats(token)
       
       // Check for URL hash to set active tab
-      if (window.location.hash === '#tickets') {
-        setActiveTab('tickets')
-        loadSupportTickets()
+      const checkHashAndLoadData = () => {
+        if (window.location.hash === '#tickets') {
+          setActiveTab('tickets')
+          loadSupportTickets()
+        }
+      }
+      
+      checkHashAndLoadData()
+      
+      // Listen for hash changes
+      const handleHashChange = () => {
+        checkHashAndLoadData()
+      }
+      
+      window.addEventListener('hashchange', handleHashChange)
+      
+      // Cleanup
+      return () => {
+        window.removeEventListener('hashchange', handleHashChange)
       }
     }
   }, [])

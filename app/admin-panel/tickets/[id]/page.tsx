@@ -97,12 +97,20 @@ export default function TicketPage() {
       const data = await response.json()
       setTicket(data.ticket)
       
-      // Only expand all responses by default if no saved state exists
+      // Check if we already have a saved state from localStorage
       const savedState = localStorage.getItem(`ticket-${ticketId}-expanded`)
-      if (!savedState) {
-        // First time viewing this ticket - expand all responses by default
-        const allResponseIds = new Set<string>(data.ticket.responses?.map((r: TicketResponse) => r.id) || [])
-        setExpandedResponses(allResponseIds)
+      
+      if (savedState) {
+        // Use the saved state - don't change expandedResponses here
+        // The useEffect with localStorage will handle this
+        console.log('Using saved expanded state from localStorage')
+      } else {
+        // Only expand all responses by default if no saved state exists AND we don't have any expanded responses yet
+        if (expandedResponses.size === 0) {
+          console.log('No saved state found, expanding all responses by default')
+          const allResponseIds = new Set<string>(data.ticket.responses?.map((r: TicketResponse) => r.id) || [])
+          setExpandedResponses(allResponseIds)
+        }
       }
       
       // Pre-fill response with greeting template
