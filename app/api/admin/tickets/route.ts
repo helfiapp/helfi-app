@@ -286,6 +286,22 @@ export async function POST(request: NextRequest) {
 
         return NextResponse.json({ response })
 
+      case 'delete':
+        // Delete a ticket and all its responses
+        await prisma.ticketResponse.deleteMany({
+          where: { ticketId: ticketId }
+        })
+        
+        const deletedTicket = await prisma.supportTicket.delete({
+          where: { id: ticketId }
+        })
+        
+        return NextResponse.json({ 
+          success: true, 
+          message: 'Ticket deleted successfully',
+          deletedTicket 
+        })
+
       default:
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
     }

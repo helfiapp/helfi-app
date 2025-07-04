@@ -2942,6 +2942,17 @@ The Helfi Team`,
                                   <option value="RESOLVED">Resolved</option>
                                   <option value="CLOSED">Closed</option>
                                 </select>
+                                <button
+                                  onClick={() => {
+                                    if (confirm(`Are you sure you want to permanently delete the ticket "${ticket.subject}"? This action cannot be undone.`)) {
+                                      handleTicketAction('delete', ticket.id)
+                                    }
+                                  }}
+                                  className="bg-red-500 text-white px-3 py-1 rounded text-xs hover:bg-red-600 transition-colors"
+                                  title="Delete ticket permanently"
+                                >
+                                  🗑️ Delete
+                                </button>
                               </div>
                             </td>
                           </tr>
