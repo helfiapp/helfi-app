@@ -10,16 +10,15 @@ const CONFIG = {
   adminPassword: 'HealthBeta2024!',
   testEmail: 'info@sonicweb.com.au',
   testPassword: 'Snoodlenoodle1@',
-  screenshotDir: './screenshots',
-  headless: false, // Set to true for headless mode
+  screenshotDir: './test-screenshots',
+  headless: false,
   timeout: 30000
 };
 
-class ProfileUploadTester {
+class UploadFixTester {
   constructor() {
     this.browser = null;
     this.page = null;
-    this.testResults = [];
   }
 
   // Initialize browser with incognito mode
@@ -34,7 +33,7 @@ class ProfileUploadTester {
     // Launch browser in incognito mode
     this.browser = await chromium.launch({
       headless: CONFIG.headless,
-      args: ['--incognito'] // Force incognito mode
+      args: ['--incognito']
     });
     
     // Create new incognito context
@@ -45,22 +44,14 @@ class ProfileUploadTester {
     
     this.page = await context.newPage();
     
-    // Enable console logging
+    // Enable console and network monitoring
     this.page.on('console', msg => {
       console.log(`📋 CONSOLE: ${msg.text()}`);
     });
     
-    // Monitor network requests
-    this.page.on('request', request => {
-      if (request.url().includes('/api/')) {
-        console.log(`🌐 API REQUEST: ${request.method()} ${request.url()}`);
-      }
-    });
-    
-    // Monitor network responses
     this.page.on('response', response => {
-      if (response.url().includes('/api/')) {
-        console.log(`📡 API RESPONSE: ${response.status()} ${response.url()}`);
+      if (response.url().includes('/api/upload-profile-image')) {
+        console.log(`📡 UPLOAD API RESPONSE: ${response.status()} ${response.url()}`);
       }
     });
     
@@ -95,25 +86,19 @@ class ProfileUploadTester {
     console.log('\n🔍 STEP 2: Enter admin password');
     
     try {
-      // Look for password input field
       const passwordInput = await this.page.locator('input[type="password"]').first();
       
       if (await passwordInput.isVisible()) {
         await passwordInput.fill(CONFIG.adminPassword);
         console.log('✅ Admin password entered');
         
-        // Look for submit button
         const submitButton = await this.page.locator('button[type="submit"]').first();
         if (await submitButton.isVisible()) {
           await submitButton.click();
-          console.log('✅ Admin password submitted');
         } else {
-          // Try pressing Enter
           await passwordInput.press('Enter');
-          console.log('✅ Admin password submitted via Enter');
         }
         
-        // Wait for navigation
         await this.page.waitForTimeout(2000);
         
         await this.page.screenshot({ 
@@ -138,34 +123,27 @@ class ProfileUploadTester {
     console.log('\n🔍 STEP 3: Login with email');
     
     try {
-      // Wait for email login form
       await this.page.waitForTimeout(2000);
       
-      // Look for email input
       const emailInput = await this.page.locator('input[type="email"]').first();
       
       if (await emailInput.isVisible()) {
         await emailInput.fill(CONFIG.testEmail);
         console.log('✅ Email entered');
         
-        // Look for password input
         const passwordInput = await this.page.locator('input[type="password"]').first();
         
         if (await passwordInput.isVisible()) {
           await passwordInput.fill(CONFIG.testPassword);
           console.log('✅ Password entered');
           
-          // Submit login
           const loginButton = await this.page.locator('button[type="submit"]').first();
           if (await loginButton.isVisible()) {
             await loginButton.click();
-            console.log('✅ Login submitted');
           } else {
             await passwordInput.press('Enter');
-            console.log('✅ Login submitted via Enter');
           }
           
-          // Wait for authentication
           await this.page.waitForTimeout(3000);
           
           await this.page.screenshot({ 
@@ -174,14 +152,11 @@ class ProfileUploadTester {
           });
           
           return true;
-        } else {
-          console.log('❌ Password field not found');
-          return false;
         }
-      } else {
-        console.log('❌ Email field not found');
-        return false;
       }
+      
+      console.log('❌ Email/password fields not found');
+      return false;
       
     } catch (error) {
       console.error('❌ Failed to login with email:', error.message);
@@ -194,7 +169,6 @@ class ProfileUploadTester {
     console.log('\n🔍 STEP 4: Navigate to profile upload');
     
     try {
-      // Navigate to profile image upload page
       await this.page.goto(`${CONFIG.baseUrl}/profile/image`, { 
         waitUntil: 'networkidle' 
       });
@@ -219,118 +193,62 @@ class ProfileUploadTester {
     
     try {
       // Create a test image file
-      const testImagePath = path.join(__dirname, 'test-image.jpg');
-      
-      // Generate a simple test image (1x1 pixel)
+      const testImagePath = path.join(__dirname, 'test-upload-image.jpg');
       const testImageBuffer = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
       fs.writeFileSync(testImagePath, testImageBuffer);
       
-      // Look for the "Choose Photo" label (the file input is hidden)
-      const choosePhotoLabel = await this.page.locator('label').filter({ hasText: 'Choose Photo' }).first();
+      // Find the hidden file input
+      const fileInput = await this.page.locator('input#file-upload[type="file"]').first();
       
-      if (await choosePhotoLabel.isVisible()) {
-        console.log('✅ "Choose Photo" label found');
+      if (await fileInput.count() > 0) {
+        console.log('✅ File input found');
         
-        // Get the hidden file input element
-        const fileInput = await this.page.locator('input#file-upload[type="file"]').first();
+        // Upload the test image
+        await fileInput.setInputFiles(testImagePath);
+        console.log('✅ Test image selected');
         
-        if (fileInput) {
-          console.log('✅ Hidden file input found');
-          
-          // Upload the test image to the hidden input
-          await fileInput.setInputFiles(testImagePath);
-          console.log('✅ Test image uploaded to hidden input');
-          
-          // Wait a moment for any preview to load and auto-upload to trigger
-          await this.page.waitForTimeout(3000);
-          
-          await this.page.screenshot({ 
-            path: `${CONFIG.screenshotDir}/05-after-file-selection.png`,
-            fullPage: true 
-          });
-          
-          // Wait for the upload to complete (since it's auto-upload)
-          console.log('🔄 Waiting for auto-upload to complete...');
-          
-          // Monitor for upload completion - look for success indicators
-          try {
-            // Wait for the upload request
-            const responsePromise = this.page.waitForResponse(response => 
-              response.url().includes('/api/upload-profile-image'), 
-              { timeout: 10000 }
-            );
-            
-            const response = await responsePromise;
-            console.log(`📡 Upload response: ${response.status()}`);
-            
-            // Get response body
-            const responseBody = await response.json().catch(() => response.text());
-            console.log('📋 Response body:', responseBody);
-            
-            // Wait for any UI updates after upload
-            await this.page.waitForTimeout(3000);
-            
-            await this.page.screenshot({ 
-              path: `${CONFIG.screenshotDir}/06-after-upload-attempt.png`,
-              fullPage: true 
-            });
-            
-            return {
-              success: response.status() === 200,
-              status: response.status(),
-              response: responseBody
-            };
-            
-          } catch (error) {
-            console.error('❌ Upload request failed or timed out:', error.message);
-            
-            await this.page.screenshot({ 
-              path: `${CONFIG.screenshotDir}/06-upload-error.png`,
-              fullPage: true 
-            });
-            
-            // Check if there are any error messages on the page
-            const errorElements = await this.page.locator('text=/failed|error|try again/i').all();
-            const errorMessages = [];
-            for (const element of errorElements) {
-              const text = await element.textContent();
-              if (text) errorMessages.push(text);
-            }
-            
-            return {
-              success: false,
-              error: error.message,
-              pageErrors: errorMessages
-            };
-          }
-          
-        } else {
-          console.log('❌ Hidden file input not found');
-          return { success: false, error: 'Hidden file input not found' };
-        }
+        // Wait for upload to process
+        await this.page.waitForTimeout(5000);
         
-      } else {
-        console.log('❌ "Choose Photo" label not found');
-        
-        // Let's see what's actually on the page
         await this.page.screenshot({ 
-          path: `${CONFIG.screenshotDir}/05-no-choose-photo-button.png`,
+          path: `${CONFIG.screenshotDir}/05-after-upload-attempt.png`,
           fullPage: true 
         });
         
-        // Look for any upload-related elements
-        const uploadElements = await this.page.locator('text=/upload|photo|image|choose/i').all();
-        const foundElements = [];
-        for (const element of uploadElements) {
-          const text = await element.textContent();
-          if (text) foundElements.push(text);
+        // Check for success or error messages
+        const successMessages = await this.page.locator('text=/uploaded successfully|upload complete|profile updated/i').all();
+        const errorMessages = await this.page.locator('text=/failed|error|try again/i').all();
+        
+        let result = { success: false, messages: [] };
+        
+        if (successMessages.length > 0) {
+          console.log('✅ Success messages found on page');
+          result.success = true;
+          for (const msg of successMessages) {
+            const text = await msg.textContent();
+            if (text) result.messages.push(`SUCCESS: ${text}`);
+          }
         }
         
-        return { 
-          success: false, 
-          error: 'Choose Photo label not found',
-          foundElements: foundElements
-        };
+        if (errorMessages.length > 0) {
+          console.log('❌ Error messages found on page');
+          result.success = false;
+          for (const msg of errorMessages) {
+            const text = await msg.textContent();
+            if (text) result.messages.push(`ERROR: ${text}`);
+          }
+        }
+        
+        // Clean up test file
+        if (fs.existsSync(testImagePath)) {
+          fs.unlinkSync(testImagePath);
+        }
+        
+        return result;
+        
+      } else {
+        console.log('❌ File input not found');
+        return { success: false, error: 'File input not found' };
       }
       
     } catch (error) {
@@ -341,7 +259,7 @@ class ProfileUploadTester {
 
   // Run complete test
   async runCompleteTest() {
-    console.log('🧪 STARTING COMPLETE PROFILE UPLOAD TEST');
+    console.log('🧪 TESTING UPLOAD FIX AS REAL USER');
     console.log('=' .repeat(50));
     
     try {
@@ -371,21 +289,21 @@ class ProfileUploadTester {
       // Step 5: Test file upload
       const uploadResult = await this.testFileUpload();
       
-      console.log('\n📊 FINAL RESULTS:');
+      console.log('\n🎯 FINAL TEST RESULTS:');
       console.log('=' .repeat(50));
       
       if (uploadResult.success) {
-        console.log('✅ PROFILE UPLOAD SUCCESSFUL');
-        console.log(`Status: ${uploadResult.status}`);
-        console.log(`Response:`, uploadResult.response);
+        console.log('🎉 UPLOAD FIX SUCCESSFUL!');
+        console.log('✅ Profile image upload is now working');
+        console.log('Messages:', uploadResult.messages);
       } else {
-        console.log('❌ PROFILE UPLOAD FAILED');
-        console.log(`Error: ${uploadResult.error}`);
-        if (uploadResult.status) {
-          console.log(`Status: ${uploadResult.status}`);
+        console.log('❌ UPLOAD FIX FAILED');
+        console.log('❌ Profile image upload is still broken');
+        if (uploadResult.error) {
+          console.log('Error:', uploadResult.error);
         }
-        if (uploadResult.response) {
-          console.log(`Response:`, uploadResult.response);
+        if (uploadResult.messages) {
+          console.log('Messages:', uploadResult.messages);
         }
       }
       
@@ -414,13 +332,18 @@ class ProfileUploadTester {
 
 // Run the test
 async function main() {
-  const tester = new ProfileUploadTester();
+  const tester = new UploadFixTester();
   const result = await tester.runCompleteTest();
   
-  console.log('\n🎯 TEST COMPLETE');
-  console.log('Result:', result);
+  console.log('\n🎯 UPLOAD FIX TEST COMPLETE');
   
-  process.exit(result.success ? 0 : 1);
+  if (result.success) {
+    console.log('🎉 SUCCESS: The trim() fix worked! Upload is now functional.');
+    process.exit(0);
+  } else {
+    console.log('❌ FAILURE: The trim() fix did not resolve the issue.');
+    process.exit(1);
+  }
 }
 
 // Run if called directly
@@ -428,4 +351,4 @@ if (require.main === module) {
   main().catch(console.error);
 }
 
-module.exports = ProfileUploadTester; 
+module.exports = UploadFixTester; 
