@@ -105,7 +105,6 @@ export default function AdminPanel() {
       // Check for URL hash to set active tab
       const checkHashAndLoadData = () => {
         if (window.location.hash === '#tickets') {
-          console.log('🔍 Hash detected - setting active tab to tickets')
           setActiveTab('tickets')
           loadSupportTickets()
         }
@@ -115,25 +114,22 @@ export default function AdminPanel() {
       
       // Listen for hash changes (Agent #25's implementation preserved)
       const handleHashChange = () => {
-        console.log('🔍 Hash changed to:', window.location.hash)
         checkHashAndLoadData()
       }
       
       // New: Add visibility change detection for auto-loading
       const handleVisibilityChange = () => {
-        console.log('🔍 Visibility changed - document.hidden:', document.hidden, 'hash:', window.location.hash, 'activeTab:', activeTab)
-        if (!document.hidden && window.location.hash === '#tickets' && activeTab === 'tickets') {
-          // Auto-load tickets when returning to visible tab with tickets active
-          console.log('Tab became visible with tickets active - auto-loading tickets')
+        if (!document.hidden && window.location.hash === '#tickets') {
+          // Auto-load tickets when returning to visible tab with tickets hash
+          setActiveTab('tickets')
           loadSupportTickets()
         }
       }
       
       // New: Add focus detection for returning via back button
       const handleWindowFocus = () => {
-        console.log('🔍 Window focused - hash:', window.location.hash, 'activeTab:', activeTab)
-        if (window.location.hash === '#tickets' && activeTab === 'tickets') {
-          console.log('Window focused with tickets active - auto-loading tickets')
+        if (window.location.hash === '#tickets') {
+          setActiveTab('tickets')
           loadSupportTickets()
         }
       }
@@ -1042,11 +1038,7 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
       })
       if (response.ok) {
         const result = await response.json()
-        console.log('🔍 API Response:', result)
-        console.log('🔍 Tickets array:', result.tickets)
-        console.log('🔍 Tickets length:', result.tickets?.length)
         setSupportTickets(result.tickets || [])
-        console.log('🔍 State updated with tickets:', result.tickets?.length || 0)
       }
     } catch (error) {
       console.error('Error loading tickets:', error)
@@ -2885,10 +2877,7 @@ The Helfi Team`,
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {(() => {
-                        console.log('🔍 Rendering tickets - supportTickets:', supportTickets);
-                        return supportTickets.length === 0;
-                      })() ? (
+                      {supportTickets.length === 0 ? (
                         <tr>
                           <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
                             <div className="flex flex-col items-center">
