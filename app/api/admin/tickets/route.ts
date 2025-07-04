@@ -59,6 +59,42 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
+    const action = searchParams.get('action')
+    const ticketId = searchParams.get('ticketId')
+    
+    // Handle single ticket retrieval
+    if (action === 'get_ticket' && ticketId) {
+      const ticket = await prisma.supportTicket.findUnique({
+        where: { id: ticketId },
+        include: {
+          user: {
+            select: {
+              email: true,
+              name: true
+            }
+          },
+          responses: {
+            orderBy: { createdAt: 'asc' },
+            include: {
+              admin: {
+                select: {
+                  name: true,
+                  email: true
+                }
+              }
+            }
+          }
+        }
+      })
+      
+      if (!ticket) {
+        return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
+      }
+      
+      return NextResponse.json({ ticket })
+    }
+    
+    // Default: Get tickets with pagination
     const status = searchParams.get('status') || 'all'
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '20')

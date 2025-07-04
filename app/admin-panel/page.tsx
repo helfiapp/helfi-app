@@ -2892,7 +2892,7 @@ The Helfi Team`,
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                               <div className="flex space-x-2">
                                 <button
-                                  onClick={() => openTicketModal(ticket)}
+                                  onClick={() => window.location.href = `/admin-panel/tickets/${ticket.id}`}
                                   className="bg-blue-500 text-white px-3 py-1 rounded text-xs hover:bg-blue-600 transition-colors"
                                 >
                                   💬 View
