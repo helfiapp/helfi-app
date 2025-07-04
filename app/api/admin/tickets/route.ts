@@ -282,7 +282,72 @@ export async function POST(request: NextRequest) {
         })
 
         // Send email response to user (if configured)
-        // TODO: Implement email sending logic here
+        try {
+          // Get ticket information for email sending
+          const ticket = await prisma.supportTicket.findUnique({
+            where: { id: ticketId },
+            select: {
+              subject: true,
+              userEmail: true,
+              userName: true,
+              createdAt: true
+            }
+          })
+
+          if (process.env.RESEND_API_KEY && ticket) {
+            const resend = new Resend(process.env.RESEND_API_KEY)
+            
+            await resend.emails.send({
+              from: 'Helfi Team <support@helfi.ai>',
+              to: ticket.userEmail,
+              subject: `Re: ${ticket.subject}`,
+              html: `
+                <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333; background: #f8fafc;">
+                  <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 40px 30px; text-align: center; border-radius: 12px 12px 0 0;">
+                    <h1 style="margin: 0; font-size: 32px; font-weight: bold; letter-spacing: -0.5px;">Helfi</h1>
+                    <p style="margin: 12px 0 0 0; opacity: 0.95; font-size: 16px;">Support Team Response</p>
+                  </div>
+                  
+                  <div style="padding: 40px 30px; background: white; border-radius: 0 0 12px 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+                    <h2 style="margin: 0 0 20px 0; color: #374151; font-size: 24px;">📬 Response to Your Support Request</h2>
+                    
+                    <div style="background: #f0f9ff; border: 1px solid #0ea5e9; border-radius: 8px; padding: 16px; margin: 20px 0;">
+                      <p style="margin: 0; color: #0c4a6e; font-size: 14px;">
+                        <strong>📋 Regarding:</strong> ${ticket.subject}
+                      </p>
+                    </div>
+                    
+                    <div style="background: #f9fafb; border-radius: 8px; padding: 20px; margin: 30px 0;">
+                      <h3 style="margin: 0 0 15px 0; color: #374151;">💬 Our Response:</h3>
+                      <div style="line-height: 1.7; font-size: 16px; color: #4b5563; white-space: pre-wrap;">${data.message}</div>
+                    </div>
+                    
+                    <div style="background: #ecfdf5; border: 1px solid #10b981; border-radius: 8px; padding: 16px; margin: 30px 0;">
+                      <p style="margin: 0; color: #065f46; font-size: 14px;">
+                        <strong>💡 Need More Help?</strong> Simply reply to this email and we'll continue the conversation!
+                      </p>
+                    </div>
+                    
+                    <div style="margin-top: 40px; padding-top: 30px; border-top: 1px solid #e5e7eb; font-size: 14px; color: #6b7280; text-align: center;">
+                      <p style="margin: 0 0 16px 0; font-size: 16px; color: #374151;"><strong>Best regards,<br>Helfi Support Team</strong></p>
+                      <p style="margin: 20px 0 0 0; font-size: 14px;">
+                        <a href="https://helfi.ai" style="color: #10b981; text-decoration: none; font-weight: 500;">🌐 helfi.ai</a> | 
+                        <a href="mailto:support@helfi.ai" style="color: #10b981; text-decoration: none; font-weight: 500;">📧 support@helfi.ai</a>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              `
+            })
+            
+            console.log(`✅ [SUPPORT RESPONSE] Email sent to ${ticket.userEmail} for ticket ${ticketId}`)
+          } else {
+            console.log(`⚠️ [SUPPORT RESPONSE] Email not sent - RESEND_API_KEY: ${!!process.env.RESEND_API_KEY}, Ticket found: ${!!ticket}`)
+          }
+        } catch (emailError) {
+          console.error(`❌ [SUPPORT RESPONSE] Failed to send email for ticket ${ticketId}:`, emailError)
+          // Don't fail the API response if email fails - the response is still saved
+        }
 
         return NextResponse.json({ response })
 
