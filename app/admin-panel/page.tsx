@@ -1029,9 +1029,11 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
   const loadSupportTickets = async () => {
     setIsLoadingTickets(true)
     try {
+      // Get token from sessionStorage directly to avoid state timing issues
+      const authToken = sessionStorage.getItem('adminToken') || adminToken
       const response = await fetch(`/api/admin/tickets?status=${ticketFilter}`, {
         headers: {
-          'Authorization': `Bearer ${adminToken}`
+          'Authorization': `Bearer ${authToken}`
         }
       })
       if (response.ok) {
@@ -1046,11 +1048,13 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
 
   const handleTicketAction = async (action: string, ticketId: string, data?: any) => {
     try {
+      // Get token from sessionStorage directly to avoid state timing issues
+      const authToken = sessionStorage.getItem('adminToken') || adminToken
       const response = await fetch('/api/admin/tickets', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${adminToken}`
+          'Authorization': `Bearer ${authToken}`
         },
         body: JSON.stringify({ action, ticketId, ...data })
       })
