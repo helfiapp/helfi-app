@@ -1070,26 +1070,20 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
       customerName = customerName.charAt(0).toUpperCase() + customerName.slice(1).toLowerCase()
     }
     
+    // Create complete template with greeting and signature
     const greeting = `Hi ${customerName},\n\n`
-    setTicketResponse(greeting)
+    const signature = `\n\nWarmest Regards,\nHelfi Support Team`
+    const completeTemplate = greeting + signature
+    setTicketResponse(completeTemplate)
   }
 
   const sendTicketResponse = async () => {
     if (!selectedTicket || !ticketResponse.trim()) return
     
-    // Ensure message always has greeting and signature
-    let finalMessage = ticketResponse.trim()
-    
-    // Auto-append signature to every response - more robust checking
-    const signature = '\n\nWarmest Regards,\nHelfi Support Team'
-    if (!finalMessage.includes('Warmest Regards,\nHelfi Support Team') && 
-        !finalMessage.includes('Warmest Regards, Helfi Support Team')) {
-      finalMessage = finalMessage + signature
-    }
-    
+    // Template already includes greeting and signature, send as-is
     setIsRespondingToTicket(true)
     await handleTicketAction('add_response', selectedTicket.id, {
-      message: finalMessage
+      message: ticketResponse.trim()
     })
     setIsRespondingToTicket(false)
   }
