@@ -59,7 +59,22 @@ export default function Profile() {
         gender: userData.profileInfo?.gender || userData.gender || '',
         email: session?.user?.email || ''
       };
-      setProfileData(mergedData);
+      
+      // 🔧 FIX: Only update state if current state is empty (initial load)
+      // This prevents overwriting user input during active editing
+      setProfileData(prev => {
+        // If user hasn't entered any data yet, load from cache
+        if (!prev.firstName && !prev.lastName && !prev.bio && !prev.dateOfBirth && !prev.gender) {
+          return mergedData;
+        }
+        
+        // If user has data, only update email and keep their current input
+        return {
+          ...prev,
+          email: session?.user?.email || prev.email
+        };
+      });
+      
       console.log('Profile page - Data loaded from cache instantly!');
     } else if (!userData && session) {
       // Fallback to localStorage while provider loads
