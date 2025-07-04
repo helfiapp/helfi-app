@@ -20,6 +20,26 @@ async function testTicketWorkflow() {
     console.log(`🔍 Browser Console: ${msg.text()}`);
   });
   
+  // Listen for network requests and responses
+  page.on('request', request => {
+    if (request.url().includes('/api/admin/tickets') || request.url().includes('/api/admin/users')) {
+      console.log(`📡 REQUEST: ${request.method()} ${request.url()}`);
+      const headers = request.headers();
+      if (headers['authorization']) {
+        console.log(`🔑 Auth Header: ${headers['authorization']}`);
+      }
+    }
+  });
+  
+  page.on('response', response => {
+    if (response.url().includes('/api/admin/tickets') || response.url().includes('/api/admin/users')) {
+      console.log(`📡 RESPONSE: ${response.status()} ${response.url()}`);
+      if (response.status() === 401) {
+        console.log(`❌ 401 UNAUTHORIZED ERROR on ${response.url()}`);
+      }
+    }
+  });
+  
   try {
     console.log('📍 Step 1: Navigate to admin panel');
     await page.goto('https://helfi.ai/admin-panel');
@@ -29,6 +49,15 @@ async function testTicketWorkflow() {
     await page.fill('input[type="password"]', 'gX8#bQ3!Vr9zM2@kLf1T');
     await page.click('button[type="submit"]');
     await page.waitForLoadState('networkidle');
+    
+    // Check sessionStorage after login
+    const sessionStorageAfterLogin = await page.evaluate(() => {
+      return {
+        adminToken: sessionStorage.getItem('adminToken'),
+        adminUser: sessionStorage.getItem('adminUser')
+      };
+    });
+    console.log('📊 SessionStorage after login:', sessionStorageAfterLogin);
     
     console.log('📍 Step 3: Navigate to tickets tab');
     await page.click('text=🎫 Support');
@@ -42,6 +71,10 @@ async function testTicketWorkflow() {
       console.log('⚠️ No tickets visible - clicking refresh button');
       await page.click('text=🔄 Refresh');
       await page.waitForLoadState('networkidle');
+      
+      // Check again after refresh
+      const ticketsVisibleAfterRefresh = await page.isVisible('text=💬 View');
+      console.log(`📊 Tickets visible after refresh: ${ticketsVisibleAfterRefresh}`);
     }
     
     console.log('📍 Step 4: Open a ticket');
@@ -78,27 +111,28 @@ async function testTicketWorkflow() {
     const backUrl = page.url();
     console.log(`📍 Back URL: ${backUrl}`);
     
+    // Check sessionStorage after back navigation
+    const sessionStorageAfterBack = await page.evaluate(() => {
+      return {
+        adminToken: sessionStorage.getItem('adminToken'),
+        adminUser: sessionStorage.getItem('adminUser')
+      };
+    });
+    console.log('📊 SessionStorage after back navigation:', sessionStorageAfterBack);
+    
     const ticketsVisibleAfterBack = await page.isVisible('text=💬 View');
     console.log(`📊 Tickets visible after back button: ${ticketsVisibleAfterBack}`);
     
-    if (ticketsVisibleAfterBack) {
-      console.log('📍 Step 8: Re-open the same ticket');
-      await page.click('text=💬 View');
+    if (!ticketsVisibleAfterBack) {
+      console.log('❌ ISSUE CONFIRMED: Tickets not visible after back button - manual refresh needed');
+      
+      // Try manual refresh to see if it fixes it
+      console.log('📍 Step 8: Manual refresh test');
+      await page.click('text=🔄 Refresh');
       await page.waitForLoadState('networkidle');
       
-      console.log('📍 Step 9: Check if response state persisted');
-      const expandedResponses = await page.locator('[class*="border-t border-gray-200"]').count();
-      console.log(`📊 Expanded responses after return: ${expandedResponses}`);
-      
-      // Check localStorage again
-      const localStorageAfter = await page.evaluate(() => {
-        const keys = Object.keys(window.localStorage);
-        const ticketKeys = keys.filter(key => key.includes('ticket'));
-        return ticketKeys.map(key => ({ key, value: window.localStorage.getItem(key) }));
-      });
-      console.log('📊 localStorage after return:', localStorageAfter);
-    } else {
-      console.log('❌ ISSUE CONFIRMED: Tickets not visible after back button - requires manual refresh');
+      const ticketsVisibleAfterManualRefresh = await page.isVisible('text=💬 View');
+      console.log(`📊 Tickets visible after manual refresh: ${ticketsVisibleAfterManualRefresh}`);
     }
     
   } catch (error) {

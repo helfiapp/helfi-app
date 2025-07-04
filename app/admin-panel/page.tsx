@@ -1038,7 +1038,11 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
       })
       if (response.ok) {
         const result = await response.json()
+        console.log('🔍 API Response:', result)
+        console.log('🔍 Tickets array:', result.tickets)
+        console.log('🔍 Tickets length:', result.tickets?.length)
         setSupportTickets(result.tickets || [])
+        console.log('🔍 State updated with tickets:', result.tickets?.length || 0)
       }
     } catch (error) {
       console.error('Error loading tickets:', error)
@@ -2877,7 +2881,10 @@ The Helfi Team`,
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {supportTickets.length === 0 ? (
+                      {(() => {
+                        console.log('🔍 Rendering tickets - supportTickets:', supportTickets);
+                        return supportTickets.length === 0;
+                      })() ? (
                         <tr>
                           <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
                             <div className="flex flex-col items-center">
