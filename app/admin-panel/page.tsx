@@ -1056,8 +1056,20 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
     setSelectedTicket(ticket)
     setShowTicketModal(true)
     
-    // Auto-populate response with customer greeting
-    const customerName = ticket.userName || 'there'
+    // Auto-populate response with customer greeting - improved name extraction
+    let customerName = 'there'
+    if (ticket.userName && ticket.userName.trim()) {
+      // If userName exists and isn't just email prefix, use it
+      if (ticket.userName.includes('@')) {
+        // If userName is actually an email, extract name part
+        customerName = ticket.userName.split('@')[0]
+      } else {
+        customerName = ticket.userName
+      }
+      // Capitalize first letter
+      customerName = customerName.charAt(0).toUpperCase() + customerName.slice(1).toLowerCase()
+    }
+    
     const greeting = `Hi ${customerName},\n\n`
     setTicketResponse(greeting)
   }
@@ -1065,15 +1077,19 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
   const sendTicketResponse = async () => {
     if (!selectedTicket || !ticketResponse.trim()) return
     
-    // Auto-append signature to every response
+    // Ensure message always has greeting and signature
+    let finalMessage = ticketResponse.trim()
+    
+    // Auto-append signature to every response - more robust checking
     const signature = '\n\nWarmest Regards,\nHelfi Support Team'
-    const messageWithSignature = ticketResponse.endsWith(signature) 
-      ? ticketResponse 
-      : ticketResponse + signature
+    if (!finalMessage.includes('Warmest Regards,\nHelfi Support Team') && 
+        !finalMessage.includes('Warmest Regards, Helfi Support Team')) {
+      finalMessage = finalMessage + signature
+    }
     
     setIsRespondingToTicket(true)
     await handleTicketAction('add_response', selectedTicket.id, {
-      message: messageWithSignature
+      message: finalMessage
     })
     setIsRespondingToTicket(false)
   }
