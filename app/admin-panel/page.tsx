@@ -89,7 +89,7 @@ export default function AdminPanel() {
   const [adminList, setAdminList] = useState<any[]>([])
   const [isLoadingAdmins, setIsLoadingAdmins] = useState(false)
 
-  // Check if already authenticated
+  // Check if already authenticated and handle URL hash for direct tab navigation
   useEffect(() => {
     const token = sessionStorage.getItem('adminToken')
     const adminData = sessionStorage.getItem('adminUser')
@@ -100,6 +100,12 @@ export default function AdminPanel() {
       loadAnalyticsData()
       loadWaitlistData(token)
       loadUserStats(token)
+      
+      // Check for URL hash to set active tab
+      if (window.location.hash === '#tickets') {
+        setActiveTab('tickets')
+        loadSupportTickets()
+      }
     }
   }, [])
 

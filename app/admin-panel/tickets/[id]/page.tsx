@@ -42,6 +42,34 @@ export default function TicketPage() {
   const [newResponse, setNewResponse] = useState('')
   const [isSendingResponse, setIsSendingResponse] = useState(false)
 
+  // Load expanded state from localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined' && ticketId) {
+      const savedState = localStorage.getItem(`ticket-${ticketId}-expanded`)
+      if (savedState) {
+        try {
+          const expandedIds = JSON.parse(savedState)
+          setExpandedResponses(new Set(expandedIds))
+        } catch (error) {
+          console.error('Failed to parse saved expanded state:', error)
+        }
+      }
+    }
+  }, [ticketId])
+
+  // Save expanded state to localStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined' && ticketId) {
+      const expandedIds = Array.from(expandedResponses)
+      if (expandedIds.length > 0) {
+        localStorage.setItem(`ticket-${ticketId}-expanded`, JSON.stringify(expandedIds))
+      } else {
+        // Remove from localStorage if no responses are expanded
+        localStorage.removeItem(`ticket-${ticketId}-expanded`)
+      }
+    }
+  }, [expandedResponses, ticketId])
+
   // Check authentication
   useEffect(() => {
     const token = sessionStorage.getItem('adminToken')
@@ -69,9 +97,13 @@ export default function TicketPage() {
       const data = await response.json()
       setTicket(data.ticket)
       
-      // Expand all responses by default
-      const allResponseIds = new Set<string>(data.ticket.responses?.map((r: TicketResponse) => r.id) || [])
-      setExpandedResponses(allResponseIds)
+      // Only expand all responses by default if no saved state exists
+      const savedState = localStorage.getItem(`ticket-${ticketId}-expanded`)
+      if (!savedState) {
+        // First time viewing this ticket - expand all responses by default
+        const allResponseIds = new Set<string>(data.ticket.responses?.map((r: TicketResponse) => r.id) || [])
+        setExpandedResponses(allResponseIds)
+      }
       
       // Pre-fill response with greeting template
       if (data.ticket && !newResponse) {
@@ -232,13 +264,16 @@ export default function TicketPage() {
         <div className="flex justify-between items-center">
           <div className="flex items-center space-x-4">
             <button
-              onClick={() => router.push('/admin-panel')}
+              onClick={() => {
+                // Use URL hash to indicate which tab should be active
+                router.push('/admin-panel#tickets')
+              }}
               className="flex items-center space-x-2 text-gray-600 hover:text-gray-800 transition-colors"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
               </svg>
-              <span>Back to Admin Panel</span>
+              <span>Back to Support Tickets</span>
             </button>
             <div className="h-6 w-px bg-gray-300"></div>
             <div className="flex items-center space-x-3">

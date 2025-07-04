@@ -107,7 +107,10 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   const { data: session, status } = useSession()
   
   // Pages that should ALWAYS be public (no sidebar regardless of auth status)
-  const publicPages = ['/', '/healthapp', '/auth/signin', '/auth/verify', '/auth/check-email', '/onboarding', '/privacy', '/terms', '/help', '/admin-panel', '/faq']
+  const publicPages = ['/', '/healthapp', '/auth/signin', '/auth/verify', '/auth/check-email', '/onboarding', '/privacy', '/terms', '/help', '/faq']
+  
+  // Admin panel paths should never show user sidebar
+  const isAdminPanelPath = pathname.startsWith('/admin-panel')
   
   // Don't show sidebar while session is loading to prevent flickering
   if (status === 'loading') {
@@ -119,7 +122,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   }
   
   // Check if authenticated user needs email verification
-  if (status === 'authenticated' && session?.user?.needsVerification && !publicPages.includes(pathname)) {
+  if (status === 'authenticated' && session?.user?.needsVerification && !publicPages.includes(pathname) && !isAdminPanelPath) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-white to-helfi-green-light/10 p-4">
         <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-6 text-center">
@@ -176,7 +179,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   }
   
   // Redirect unauthenticated users away from protected pages
-  if (status === 'unauthenticated' && !publicPages.includes(pathname)) {
+  if (status === 'unauthenticated' && !publicPages.includes(pathname) && !isAdminPanelPath) {
     console.log('🚫 Unauthenticated user on protected page - redirecting to homepage');
     window.location.href = '/';
     return (
@@ -190,8 +193,9 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   
   // Show sidebar only if:
   // 1. User is authenticated (status === 'authenticated') AND
-  // 2. Current page is not in publicPages list
-  const shouldShowSidebar = status === 'authenticated' && !publicPages.includes(pathname)
+  // 2. Current page is not in publicPages list AND
+  // 3. Current page is not an admin panel path
+  const shouldShowSidebar = status === 'authenticated' && !publicPages.includes(pathname) && !isAdminPanelPath
 
   if (shouldShowSidebar) {
     return (
