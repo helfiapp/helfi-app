@@ -859,43 +859,43 @@ Please add nutritional information manually if needed.`);
                   </div>
 
                   {/* Nutrition Cards - Cronometer Style */}
-                  {analyzedNutrition && (analyzedNutrition.calories || analyzedNutrition.protein || analyzedNutrition.carbs || analyzedNutrition.fat) && (
+                  {analyzedNutrition && (analyzedNutrition.calories !== null || analyzedNutrition.protein !== null || analyzedNutrition.carbs !== null || analyzedNutrition.fat !== null) && (
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
                       {/* Calories */}
-                      {analyzedNutrition.calories && (
+                      {analyzedNutrition.calories !== null && analyzedNutrition.calories !== undefined && (
                         <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-3 sm:p-4 border border-orange-200">
                           <div className="text-center">
-                                                          <div className="text-xl sm:text-2xl font-bold text-orange-600">{analyzedNutrition.calories}</div>
-                              <div className="text-xs font-medium text-orange-500 uppercase tracking-wide">Calories</div>
+                            <div className="text-xl sm:text-2xl font-bold text-orange-600">{analyzedNutrition.calories}</div>
+                            <div className="text-xs font-medium text-orange-500 uppercase tracking-wide">Calories</div>
                           </div>
                         </div>
                       )}
                       
                       {/* Protein */}
-                      {analyzedNutrition.protein && (
+                      {analyzedNutrition.protein !== null && analyzedNutrition.protein !== undefined && (
                         <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-3 sm:p-4 border border-blue-200">
                           <div className="text-center">
-                                                          <div className="text-xl sm:text-2xl font-bold text-blue-600">{analyzedNutrition.protein}g</div>
+                            <div className="text-xl sm:text-2xl font-bold text-blue-600">{analyzedNutrition.protein}g</div>
                             <div className="text-xs font-medium text-blue-500 uppercase tracking-wide">Protein</div>
                           </div>
                         </div>
                       )}
                       
                       {/* Carbs */}
-                      {analyzedNutrition.carbs && (
+                      {analyzedNutrition.carbs !== null && analyzedNutrition.carbs !== undefined && (
                         <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-3 sm:p-4 border border-green-200">
                           <div className="text-center">
-                                                          <div className="text-xl sm:text-2xl font-bold text-green-600">{analyzedNutrition.carbs}g</div>
+                            <div className="text-xl sm:text-2xl font-bold text-green-600">{analyzedNutrition.carbs}g</div>
                             <div className="text-xs font-medium text-green-500 uppercase tracking-wide">Carbs</div>
                           </div>
                         </div>
                       )}
                       
                       {/* Fat */}
-                      {analyzedNutrition.fat && (
+                      {analyzedNutrition.fat !== null && analyzedNutrition.fat !== undefined && (
                         <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-3 sm:p-4 border border-purple-200">
                           <div className="text-center">
-                                                          <div className="text-xl sm:text-2xl font-bold text-purple-600">{analyzedNutrition.fat}g</div>
+                            <div className="text-xl sm:text-2xl font-bold text-purple-600">{analyzedNutrition.fat}g</div>
                             <div className="text-xs font-medium text-purple-500 uppercase tracking-wide">Fat</div>
                           </div>
                         </div>
@@ -904,9 +904,9 @@ Please add nutritional information manually if needed.`);
                   )}
 
                   {/* Additional Nutrition Info */}
-                  {analyzedNutrition && (analyzedNutrition.fiber || analyzedNutrition.sugar) && (
+                  {analyzedNutrition && (analyzedNutrition.fiber !== null || analyzedNutrition.sugar !== null) && (
                     <div className="flex gap-4 mb-6">
-                      {analyzedNutrition.fiber && (
+                      {analyzedNutrition.fiber !== null && analyzedNutrition.fiber !== undefined && (
                         <div className="flex-1 bg-amber-50 rounded-lg p-3 border border-amber-200">
                           <div className="text-center">
                             <div className="text-lg font-semibold text-amber-600">{analyzedNutrition.fiber}g</div>
@@ -914,7 +914,7 @@ Please add nutritional information manually if needed.`);
                           </div>
                         </div>
                       )}
-                      {analyzedNutrition.sugar && (
+                      {analyzedNutrition.sugar !== null && analyzedNutrition.sugar !== undefined && (
                         <div className="flex-1 bg-pink-50 rounded-lg p-3 border border-pink-200">
                           <div className="text-center">
                             <div className="text-lg font-semibold text-pink-600">{analyzedNutrition.sugar}g</div>
@@ -1021,10 +1021,10 @@ Please add nutritional information manually if needed.`);
                   </div>
 
                   {/* Nutrition Cards - Match Main Page Style */}
-                  {analyzedNutrition && (analyzedNutrition.calories || analyzedNutrition.protein || analyzedNutrition.carbs || analyzedNutrition.fat) && (
+                  {analyzedNutrition && (analyzedNutrition.calories !== null || analyzedNutrition.protein !== null || analyzedNutrition.carbs !== null || analyzedNutrition.fat !== null) && (
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
                       {/* Calories */}
-                      {analyzedNutrition.calories && (
+                      {analyzedNutrition.calories !== null && analyzedNutrition.calories !== undefined && (
                         <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-3 sm:p-4 border border-orange-200">
                           <div className="text-center">
                             <div className="text-xl sm:text-2xl font-bold text-orange-600">{analyzedNutrition.calories}</div>
@@ -1034,7 +1034,7 @@ Please add nutritional information manually if needed.`);
                       )}
                       
                       {/* Protein */}
-                      {analyzedNutrition.protein && (
+                      {analyzedNutrition.protein !== null && analyzedNutrition.protein !== undefined && (
                         <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-3 sm:p-4 border border-blue-200">
                           <div className="text-center">
                             <div className="text-xl sm:text-2xl font-bold text-blue-600">{analyzedNutrition.protein}g</div>
@@ -1044,7 +1044,7 @@ Please add nutritional information manually if needed.`);
                       )}
                       
                       {/* Carbs */}
-                      {analyzedNutrition.carbs && (
+                      {analyzedNutrition.carbs !== null && analyzedNutrition.carbs !== undefined && (
                         <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-3 sm:p-4 border border-green-200">
                           <div className="text-center">
                             <div className="text-xl sm:text-2xl font-bold text-green-600">{analyzedNutrition.carbs}g</div>
@@ -1054,7 +1054,7 @@ Please add nutritional information manually if needed.`);
                       )}
                       
                       {/* Fat */}
-                      {analyzedNutrition.fat && (
+                      {analyzedNutrition.fat !== null && analyzedNutrition.fat !== undefined && (
                         <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-3 sm:p-4 border border-purple-200">
                           <div className="text-center">
                             <div className="text-xl sm:text-2xl font-bold text-purple-600">{analyzedNutrition.fat}g</div>
@@ -1506,27 +1506,27 @@ Please add nutritional information manually if needed.`);
                     </p>
                     
                     {/* Nutrition Row */}
-                    {food.nutrition && (food.nutrition.calories || food.nutrition.protein || food.nutrition.carbs || food.nutrition.fat) && (
+                    {food.nutrition && (food.nutrition.calories !== null || food.nutrition.protein !== null || food.nutrition.carbs !== null || food.nutrition.fat !== null) && (
                       <div className="flex gap-1.5 sm:gap-2 mb-3 flex-wrap">
-                        {food.nutrition.calories && (
+                        {food.nutrition.calories !== null && food.nutrition.calories !== undefined && (
                           <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded px-1.5 sm:px-2 py-0.5 sm:py-1 border border-orange-200">
                             <span className="text-xs font-bold text-orange-600">{food.nutrition.calories}</span>
                             <span className="text-xs text-orange-500 ml-1">cal</span>
                           </div>
                         )}
-                        {food.nutrition.protein && (
+                        {food.nutrition.protein !== null && food.nutrition.protein !== undefined && (
                           <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded px-1.5 sm:px-2 py-0.5 sm:py-1 border border-blue-200">
                             <span className="text-xs font-bold text-blue-600">{food.nutrition.protein}g</span>
                             <span className="text-xs text-blue-500 ml-1">protein</span>
                           </div>
                         )}
-                        {food.nutrition.carbs && (
+                        {food.nutrition.carbs !== null && food.nutrition.carbs !== undefined && (
                           <div className="bg-gradient-to-br from-green-50 to-green-100 rounded px-1.5 sm:px-2 py-0.5 sm:py-1 border border-green-200">
                             <span className="text-xs font-bold text-green-600">{food.nutrition.carbs}g</span>
                             <span className="text-xs text-green-500 ml-1">carbs</span>
                           </div>
                         )}
-                        {food.nutrition.fat && (
+                        {food.nutrition.fat !== null && food.nutrition.fat !== undefined && (
                           <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded px-1.5 sm:px-2 py-0.5 sm:py-1 border border-purple-200">
                             <span className="text-xs font-bold text-purple-600">{food.nutrition.fat}g</span>
                             <span className="text-xs text-purple-500 ml-1">fat</span>
@@ -1635,10 +1635,10 @@ Please add nutritional information manually if needed.`);
 
                         {/* Nutrition Cards - Adjusted Width for Perfect Height Match */}
                         <div className="flex-1 sm:max-w-xs">
-                          {food.nutrition && (food.nutrition.calories || food.nutrition.protein || food.nutrition.carbs || food.nutrition.fat) && (
+                          {food.nutrition && (food.nutrition.calories !== null || food.nutrition.protein !== null || food.nutrition.carbs !== null || food.nutrition.fat !== null) && (
                             <div className="grid grid-cols-2 gap-2 h-32">
                               {/* Calories */}
-                              {food.nutrition.calories && (
+                              {food.nutrition.calories !== null && food.nutrition.calories !== undefined && (
                                 <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg p-2 border border-orange-200 flex items-center justify-center">
                                   <div className="text-center">
                                     <div className="text-lg font-bold text-orange-600">{food.nutrition.calories}</div>
@@ -1648,7 +1648,7 @@ Please add nutritional information manually if needed.`);
                               )}
                               
                               {/* Protein */}
-                              {food.nutrition.protein && (
+                              {food.nutrition.protein !== null && food.nutrition.protein !== undefined && (
                                 <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-2 border border-blue-200 flex items-center justify-center">
                                   <div className="text-center">
                                     <div className="text-lg font-bold text-blue-600">{food.nutrition.protein}g</div>
@@ -1658,7 +1658,7 @@ Please add nutritional information manually if needed.`);
                               )}
                               
                               {/* Carbs */}
-                              {food.nutrition.carbs && (
+                              {food.nutrition.carbs !== null && food.nutrition.carbs !== undefined && (
                                 <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-2 border border-green-200 flex items-center justify-center">
                                   <div className="text-center">
                                     <div className="text-lg font-bold text-green-600">{food.nutrition.carbs}g</div>
@@ -1668,7 +1668,7 @@ Please add nutritional information manually if needed.`);
                               )}
                               
                               {/* Fat */}
-                              {food.nutrition.fat && (
+                              {food.nutrition.fat !== null && food.nutrition.fat !== undefined && (
                                 <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-2 border border-purple-200 flex items-center justify-center">
                                   <div className="text-center">
                                     <div className="text-lg font-bold text-purple-600">{food.nutrition.fat}g</div>
@@ -1680,9 +1680,9 @@ Please add nutritional information manually if needed.`);
                           )}
 
                           {/* Additional Nutrition Cards (Fiber/Sugar) */}
-                          {food.nutrition && (food.nutrition.fiber || food.nutrition.sugar) && (
+                          {food.nutrition && (food.nutrition.fiber !== null || food.nutrition.sugar !== null) && (
                             <div className="grid grid-cols-2 gap-2 mt-2">
-                              {food.nutrition.fiber && (
+                              {food.nutrition.fiber !== null && food.nutrition.fiber !== undefined && (
                                 <div className="bg-gradient-to-br from-amber-50 to-amber-100 rounded-lg p-2 border border-amber-200">
                                   <div className="text-center">
                                     <div className="text-sm font-bold text-amber-600">{food.nutrition.fiber}g</div>
@@ -1690,7 +1690,7 @@ Please add nutritional information manually if needed.`);
                                   </div>
                                 </div>
                               )}
-                              {food.nutrition.sugar && (
+                              {food.nutrition.sugar !== null && food.nutrition.sugar !== undefined && (
                                 <div className="bg-gradient-to-br from-pink-50 to-pink-100 rounded-lg p-2 border border-pink-200">
                                   <div className="text-center">
                                     <div className="text-sm font-bold text-pink-600">{food.nutrition.sugar}g</div>
