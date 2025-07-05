@@ -542,28 +542,7 @@ Please add nutritional information manually if needed.`);
     setShowEntryOptions(null);
   };
 
-  const reAnalyzeFood = async (food: any) => {
-    setEditingEntry(food);
-    setShowEntryOptions(null);
-    
-    if (food.method === 'photo' && food.photo) {
-      // For photo entries, set up the re-analysis interface
-      setPhotoPreview(food.photo);
-      setAiDescription(''); // Clear previous analysis to trigger re-analysis
-      setAnalyzedNutrition(null);
-      setShowAiResult(false);
-      setShowAddFood(true);
-      setIsEditingDescription(true);
-      // Extract clean food name for editing
-      const cleanDescription = food.description.split('\n')[0].split('Calories:')[0].trim();
-      setEditedDescription(cleanDescription);
-    } else {
-      // For manual entries, set up the manual re-analysis form
-      setManualFoodName(food.description);
-      setManualFoodType('single');
-      setShowAddFood(true);
-    }
-  };
+
 
   const deleteFood = async (foodId: number) => {
     const updatedFoods = todaysFoods.filter(food => food.id !== foodId);
@@ -1156,6 +1135,7 @@ Please add nutritional information manually if needed.`);
                                   if (result.success && result.analysis) {
                                     updatedNutrition = extractNutritionData(result.analysis);
                                     setAnalyzedNutrition(updatedNutrition);
+                                    setAiDescription(result.analysis);
                                   }
                                 } else {
                                   console.error('API Error:', response.status, response.statusText);
@@ -1182,17 +1162,17 @@ Please add nutritional information manually if needed.`);
                               setTodaysFoods(updatedFoods);
                               await saveFoodEntries(updatedFoods);
                               
-                              // Reset all form states
-                              setIsEditingDescription(false);
-                              setEditedDescription('');
-                              setEditingEntry(null);
-                              setPhotoFile(null);
-                              setPhotoPreview(null);
-                              setAiDescription('');
-                              setShowAiResult(false);
-                              setShowAddFood(false);
-                              setAnalyzedNutrition(null);
-                              setShowPhotoOptions(false);
+                              // Don't reset all states - keep editing mode for "Analyze Again"
+                              // setIsEditingDescription(false);
+                              // setEditedDescription('');
+                              // setEditingEntry(null);
+                              // setPhotoFile(null);
+                              // setPhotoPreview(null);
+                              // setAiDescription('');
+                              // setShowAiResult(false);
+                              // setShowAddFood(false);
+                              // setAnalyzedNutrition(null);
+                              // setShowPhotoOptions(false);
                             } else {
                               addFoodEntry(editedDescription, 'photo');
                               setIsEditingDescription(false);
@@ -1214,7 +1194,7 @@ Please add nutritional information manually if needed.`);
                               <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                               </svg>
-                              <span className="font-normal">Update & Save Changes</span>
+                              <span className="font-normal">Analyze & Update Entry</span>
                             </>
                           )}
                         </button>
@@ -1222,7 +1202,51 @@ Please add nutritional information manually if needed.`);
                         {/* Secondary Actions */}
                         <div className="flex gap-3">
                           <button
+                            onClick={async () => {
+                              // Analyze Again - Re-run analysis with current description
+                              setIsAnalyzing(true);
+                              let updatedNutrition = null;
+
+                              try {
+                                const response = await fetch('/api/analyze-food', {
+                                  method: 'POST',
+                                  headers: {
+                                    'Content-Type': 'application/json',
+                                  },
+                                  body: JSON.stringify({
+                                    textDescription: editedDescription,
+                                    foodType: 'single'
+                                  }),
+                                });
+
+                                if (response.ok) {
+                                  const result = await response.json();
+                                  if (result.success && result.analysis) {
+                                    updatedNutrition = extractNutritionData(result.analysis);
+                                    setAnalyzedNutrition(updatedNutrition);
+                                    setAiDescription(result.analysis);
+                                  }
+                                } else {
+                                  console.error('API Error:', response.status, response.statusText);
+                                }
+                              } catch (error) {
+                                console.error('Error re-analyzing food:', error);
+                              } finally {
+                                setIsAnalyzing(false);
+                              }
+                            }}
+                            disabled={!editedDescription.trim() || isAnalyzing}
+                            className="flex-1 py-3 px-4 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-normal rounded-xl transition-all duration-300 flex items-center justify-center"
+                          >
+                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            Analyze Again
+                          </button>
+
+                          <button
                             onClick={() => {
+                              // Done - Close editing mode
                               setIsEditingDescription(false);
                               setEditedDescription('');
                               setEditingEntry(null);
@@ -1232,30 +1256,14 @@ Please add nutritional information manually if needed.`);
                               setShowAiResult(false);
                               setShowAddFood(false);
                               setAnalyzedNutrition(null);
+                              setShowPhotoOptions(false);
                             }}
                             className="flex-1 py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-normal rounded-xl transition-all duration-300 flex items-center justify-center"
                           >
                             <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                             </svg>
-                            Cancel
-                          </button>
-
-                          <button
-                            onClick={() => {
-                              setPhotoFile(null);
-                              setPhotoPreview(null);
-                              setAiDescription('');
-                              setShowAiResult(false);
-                              setIsEditingDescription(false);
-                              setEditedDescription('');
-                            }}
-                            className="flex-1 py-3 px-4 bg-red-50 hover:bg-red-100 text-red-600 font-normal rounded-xl transition-all duration-300 flex items-center justify-center border border-red-200"
-                          >
-                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                            Remove Photo
+                            Done
                           </button>
                         </div>
                       </div>
@@ -1570,30 +1578,27 @@ Please add nutritional information manually if needed.`);
                           <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-200 z-[9999]" style={{boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'}}>
                             <button
                               onClick={() => editFood(food)}
-                              className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center"
+                              className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center transition-colors"
                             >
-                              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <svg className="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                               </svg>
-                              Edit Entry
-                            </button>
-                            <button
-                              onClick={() => reAnalyzeFood(food)}
-                              className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center"
-                            >
-                              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                              </svg>
-                              Re-analyze
+                              <div>
+                                <div className="font-medium">Edit Entry</div>
+                                <div className="text-xs text-gray-500">Modify description & re-analyze</div>
+                              </div>
                             </button>
                             <button
                               onClick={() => deleteFood(food.id)}
-                              className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center border-t border-gray-100"
+                              className="w-full px-4 py-3 text-left text-sm text-red-600 hover:bg-red-50 flex items-center border-t border-gray-100 transition-colors"
                             >
-                              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <svg className="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                               </svg>
-                              Delete Entry
+                              <div>
+                                <div className="font-medium">Delete Entry</div>
+                                <div className="text-xs text-gray-500">Remove from food diary</div>
+                              </div>
                             </button>
                           </div>
                         )}

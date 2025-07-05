@@ -203,7 +203,13 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    // 🔍 BACKEND PERFORMANCE MEASUREMENT START
     console.log('=== POST /api/user-data DEBUG START ===')
+    console.log('🚀 BACKEND PERFORMANCE TRACKING')
+    console.time('⏱️ Total API Processing Time')
+    console.time('⏱️ Authentication Check')
+    const apiStartTime = Date.now()
+    
     console.log('Request URL:', request.url)
     console.log('Request headers:', Object.fromEntries(request.headers.entries()))
     console.log('POST /api/user-data - Starting SIMPLIFIED approach...')
@@ -211,20 +217,25 @@ export async function POST(request: NextRequest) {
     // Get NextAuth session
     const session = await getServerSession(authOptions)
     
+    console.timeEnd('⏱️ Authentication Check')
     console.log('NextAuth session result:', session)
     console.log('Session user:', session?.user)
     console.log('Session user email:', session?.user?.email)
     
     if (!session?.user?.email) {
-      console.log('POST Authentication failed - no valid session found')
+      console.timeEnd('⏱️ Total API Processing Time')
+      console.log('❌ POST Authentication failed - no valid session found')
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
     
     const userEmail = session.user.email
-    console.log('POST /api/user-data - Authenticated user:', userEmail)
+    console.log('✅ POST /api/user-data - Authenticated user:', userEmail)
 
+    console.time('⏱️ Parse Request Data')
     const data = await request.json()
-    console.log('POST /api/user-data - Data received:', {
+    console.timeEnd('⏱️ Parse Request Data')
+    
+    console.log('📊 POST /api/user-data - Data received:', {
       hasGender: !!data.gender,
       hasWeight: !!data.weight,
       hasHeight: !!data.height,
@@ -234,30 +245,36 @@ export async function POST(request: NextRequest) {
       hasMedications: !!data.medications,
       hasHealthSituations: !!data.healthSituations,
       hasBloodResults: !!data.bloodResults,
-      hasExercise: !!(data.exerciseFrequency || data.exerciseTypes)
+      hasExercise: !!(data.exerciseFrequency || data.exerciseTypes),
+      dataSize: JSON.stringify(data).length + ' characters'
     })
 
     // Find or create user
+    console.time('⏱️ User Lookup/Creation')
     let user = await prisma.user.findUnique({
       where: { email: userEmail }
     })
 
     if (!user) {
-      console.log('Creating new user for:', userEmail)
+      console.log('🔨 Creating new user for:', userEmail)
       user = await prisma.user.create({
         data: {
           email: userEmail,
           name: userEmail.split('@')[0],
         }
       })
+      console.log('✅ Created new user with ID:', user.id)
+    } else {
+      console.log('✅ Found existing user with ID:', user.id)
     }
-
-    console.log('Found/created user with ID:', user.id)
+    
+    console.timeEnd('⏱️ User Lookup/Creation')
 
     // SIMPLIFIED APPROACH: Update each piece of data individually with proper error handling
     // This avoids complex transactions that were causing constraint violations
 
     // 1. Update basic user data with safe enum handling
+    console.time('⏱️ Basic User Data Update')
     try {
       const updateData: any = {}
       
@@ -297,25 +314,30 @@ export async function POST(request: NextRequest) {
           where: { id: user.id },
           data: updateData
         })
-        console.log('Updated user basic data successfully:', updateData)
+        console.log('✅ Updated user basic data successfully:', updateData)
       } else {
-        console.log('No user basic data to update')
+        console.log('ℹ️ No user basic data to update')
       }
     } catch (error) {
-      console.error('Error updating user basic data:', error)
+      console.error('❌ Error updating user basic data:', error)
       // Continue with other updates even if this fails
     }
+    console.timeEnd('⏱️ Basic User Data Update')
 
     // 2. Handle health goals - simple upsert approach
+    console.time('⏱️ Health Goals Update')
     try {
       if (data.goals && Array.isArray(data.goals) && data.goals.length > 0) {
+        console.log('🎯 Processing', data.goals.length, 'health goals')
+        
         // Delete existing non-special goals
-        await prisma.healthGoal.deleteMany({
+        const deleteResult = await prisma.healthGoal.deleteMany({
           where: { 
             userId: user.id,
             name: { notIn: ['__EXERCISE_DATA__', '__HEALTH_SITUATIONS_DATA__'] }
           }
         })
+        console.log('🗑️ Deleted', deleteResult.count, 'existing health goals')
         
         // Create new goals
         for (const goalName of data.goals) {
@@ -330,12 +352,15 @@ export async function POST(request: NextRequest) {
             })
           }
         }
-        console.log('Updated health goals successfully')
+        console.log('✅ Updated health goals successfully')
+      } else {
+        console.log('ℹ️ No health goals to update')
       }
     } catch (error) {
-      console.error('Error updating health goals:', error)
+      console.error('❌ Error updating health goals:', error)
       // Continue with other updates
     }
+    console.timeEnd('⏱️ Health Goals Update')
 
     // 3. Handle health situations data (Step 5) - store as special health goal
     try {
@@ -392,12 +417,16 @@ export async function POST(request: NextRequest) {
     }
 
     // 4. Handle supplements - simple replace approach
+    console.time('⏱️ Supplements Update')
     try {
       if (data.supplements && Array.isArray(data.supplements)) {
+        console.log('💊 Processing', data.supplements.length, 'supplements')
+        
         // Delete existing supplements
-        await prisma.supplement.deleteMany({
+        const deleteResult = await prisma.supplement.deleteMany({
           where: { userId: user.id }
         })
+        console.log('🗑️ Deleted', deleteResult.count, 'existing supplements')
         
         // Create new supplements
         for (const supp of data.supplements) {
@@ -412,20 +441,27 @@ export async function POST(request: NextRequest) {
             })
           }
         }
-        console.log('Updated supplements successfully')
+        console.log('✅ Updated supplements successfully')
+      } else {
+        console.log('ℹ️ No supplements to update')
       }
     } catch (error) {
-      console.error('Error updating supplements:', error)
+      console.error('❌ Error updating supplements:', error)
       // Continue with other updates
     }
+    console.timeEnd('⏱️ Supplements Update')
 
     // 5. Handle medications - simple replace approach  
+    console.time('⏱️ Medications Update')
     try {
       if (data.medications && Array.isArray(data.medications)) {
+        console.log('💉 Processing', data.medications.length, 'medications')
+        
         // Delete existing medications
-        await prisma.medication.deleteMany({
+        const deleteResult = await prisma.medication.deleteMany({
           where: { userId: user.id }
         })
+        console.log('🗑️ Deleted', deleteResult.count, 'existing medications')
         
         // Create new medications
         for (const med of data.medications) {
@@ -440,12 +476,15 @@ export async function POST(request: NextRequest) {
             })
           }
         }
-        console.log('Updated medications successfully')
+        console.log('✅ Updated medications successfully')
+      } else {
+        console.log('ℹ️ No medications to update')
       }
     } catch (error) {
-      console.error('Error updating medications:', error)
+      console.error('❌ Error updating medications:', error)
       // Continue with other updates
     }
+    console.timeEnd('⏱️ Medications Update')
 
     // 6. Handle today's foods data - store as special health goal
     try {
@@ -526,14 +565,26 @@ export async function POST(request: NextRequest) {
       // Continue with other updates
     }
 
-    console.log('POST /api/user-data - All updates completed successfully')
+    console.log('✅ POST /api/user-data - All updates completed successfully')
+    
+    // 🔍 FINAL PERFORMANCE MEASUREMENT
+    const totalApiTime = Date.now() - apiStartTime
+    console.timeEnd('⏱️ Total API Processing Time')
+    console.log('📊 API PERFORMANCE SUMMARY:', {
+      totalProcessingTime: totalApiTime + 'ms',
+      userId: user.id,
+      email: userEmail,
+      timestamp: new Date().toISOString()
+    })
+    
     return NextResponse.json({ 
       success: true, 
       message: 'Data saved successfully',
       debug: {
         userId: user.id,
         email: userEmail,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        processingTime: totalApiTime + 'ms'
       }
     })
     

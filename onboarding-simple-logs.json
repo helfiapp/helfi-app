@@ -1,0 +1,30 @@
+{
+  "consoleLogs": [],
+  "networkLogs": [
+    {
+      "url": "https://www.helfi.ai/api/auth/session",
+      "method": "GET",
+      "timestamp": "2025-07-05T03:02:45.762Z",
+      "type": "request"
+    },
+    {
+      "url": "https://www.helfi.ai/api/auth/session",
+      "status": 200,
+      "timestamp": "2025-07-05T03:02:46.004Z",
+      "type": "response"
+    },
+    {
+      "url": "https://www.helfi.ai/api/auth/session",
+      "method": "GET",
+      "timestamp": "2025-07-05T03:02:46.227Z",
+      "type": "request"
+    },
+    {
+      "url": "https://www.helfi.ai/api/auth/session",
+      "status": 200,
+      "timestamp": "2025-07-05T03:02:46.486Z",
+      "type": "response"
+    }
+  ],
+  "timestamp": "2025-07-05T03:02:50.093Z"
+}

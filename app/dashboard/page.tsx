@@ -42,7 +42,12 @@ export default function Dashboard() {
   useEffect(() => {
     const loadUserData = async () => {
       try {
-        console.log('Loading user data from database...');
+        // 🔍 DASHBOARD PERFORMANCE MEASUREMENT START
+        console.log('🚀 DASHBOARD LOADING PERFORMANCE TRACKING')
+        console.time('⏱️ Dashboard Data Loading')
+        const dashboardStartTime = Date.now()
+        
+        console.log('📤 Loading user data from database...');
         const response = await fetch('/api/user-data', {
           cache: 'no-cache',
           headers: {
@@ -50,10 +55,25 @@ export default function Dashboard() {
           }
         });
         
+        const dataLoadTime = Date.now() - dashboardStartTime
+        console.log('📈 Dashboard API Response:', {
+          duration: dataLoadTime + 'ms',
+          status: response.status,
+          statusText: response.statusText
+        })
+        
         if (response.ok) {
           const result = await response.json();
           if (result.data) {
-            console.log('Successfully loaded data from database:', result.data);
+            console.log('✅ Successfully loaded data from database');
+            console.log('📊 Dashboard Data Summary:', {
+              hasProfileImage: !!result.data.profileImage,
+              hasHealthGoals: !!result.data.goals?.length,
+              hasSupplements: !!result.data.supplements?.length,
+              hasMedications: !!result.data.medications?.length,
+              dataSize: JSON.stringify(result.data).length + ' characters'
+            });
+            
             setOnboardingData(result.data);
             // Load profile image from database and cache it
             if (result.data.profileImage) {
@@ -65,18 +85,22 @@ export default function Dashboard() {
             }
           }
         } else if (response.status === 404) {
-          console.log('No existing data found for user in database');
+          console.log('ℹ️ No existing data found for user in database');
           setOnboardingData(null);
         } else if (response.status === 401) {
-          console.log('User not authenticated - redirecting to login');
+          console.log('⚠️ User not authenticated - redirecting to login');
           // Don't use localStorage fallback, force proper authentication
           setOnboardingData(null);
         } else {
-          console.error('Failed to load data from database:', response.status, response.statusText);
+          console.error('❌ Failed to load data from database:', response.status, response.statusText);
           setOnboardingData(null);
         }
+        
+        console.timeEnd('⏱️ Dashboard Data Loading')
+        console.log('🏁 Dashboard loading completed in', Date.now() - dashboardStartTime + 'ms')
       } catch (error) {
-        console.error('Error loading user data from database:', error);
+        console.timeEnd('⏱️ Dashboard Data Loading')
+        console.error('💥 Error loading user data from database:', error);
         // No localStorage fallback - force database-only approach
         setOnboardingData(null);
       }
