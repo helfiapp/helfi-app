@@ -2044,10 +2044,106 @@ function AIInsightsStep({ onNext, onBack, initial }: { onNext: (data: any) => vo
 }
 
 function ReviewStep({ onBack, data }: { onBack: () => void, data: any }) {
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [statusText, setStatusText] = useState('');
+
+  const handleConfirmBegin = async () => {
+    if (isProcessing) return; // Prevent double clicks
+    
+    setIsProcessing(true);
+    setProgress(0);
+    setStatusText('Initializing...');
+    
+    try {
+      // 🔍 PERFORMANCE MEASUREMENT START
+      console.log('🚀 ONBOARDING COMPLETION PERFORMANCE TRACKING');
+      console.time('⏱️ Total Onboarding Completion Time');
+      console.time('⏱️ API Request Duration');
+      const startTime = Date.now();
+      
+      // Simulate progress stages with smooth animation
+      const updateProgress = async (percent: number, status: string) => {
+        setProgress(percent);
+        setStatusText(status);
+        await new Promise(resolve => setTimeout(resolve, 150)); // Small delay for smooth animation
+      };
+
+      await updateProgress(5, 'Preparing your data...');
+      
+      console.log('📤 Starting onboarding data save to database...');
+      console.log('📊 Data being saved:', {
+        hasGender: !!data.gender,
+        hasWeight: !!data.weight,
+        hasHeight: !!data.height,
+        hasGoals: !!data.goals?.length,
+        hasSupplements: !!data.supplements?.length,
+        hasMedications: !!data.medications?.length,
+        hasHealthSituations: !!data.healthSituations,
+        hasBloodResults: !!data.bloodResults,
+        totalDataSize: JSON.stringify(data).length + ' characters'
+      });
+      
+      await updateProgress(15, 'Validating health profile...');
+      
+      // Start the API request
+      const response = await fetch('/api/user-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      
+      // Progress updates during API processing
+      setTimeout(() => updateProgress(35, 'Saving your profile...'), 1000);
+      setTimeout(() => updateProgress(55, 'Processing health goals...'), 3000);
+      setTimeout(() => updateProgress(75, 'Storing supplements & medications...'), 5000);
+      setTimeout(() => updateProgress(90, 'Finalizing your data...'), 8000);
+      
+      const apiDuration = Date.now() - startTime;
+      console.timeEnd('⏱️ API Request Duration');
+      console.log(`📈 API Response Details:`, {
+        duration: apiDuration + 'ms',
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries())
+      });
+      
+      if (response.ok) {
+        await updateProgress(100, 'Welcome to Helfi! 🎉');
+        console.log('✅ Onboarding data saved to database successfully');
+        console.log('🔄 Starting redirect to dashboard...');
+        
+        // Brief moment to show completion
+        await new Promise(resolve => setTimeout(resolve, 800));
+        
+        const redirectStart = Date.now();
+        window.location.href = '/dashboard';
+        
+        // Note: This won't log because page will unload, but the timing will be captured in dashboard
+        console.log('🏁 Redirect initiated in', Date.now() - redirectStart + 'ms');
+      } else {
+        console.timeEnd('⏱️ Total Onboarding Completion Time');
+        console.error('❌ Failed to save onboarding data to database:', response.status, response.statusText);
+        setIsProcessing(false);
+        setProgress(0);
+        setStatusText('');
+        alert('Failed to save your data. Please try again or contact support.');
+      }
+    } catch (error) {
+      console.timeEnd('⏱️ Total Onboarding Completion Time');
+      console.error('💥 Error saving onboarding data:', error);
+      setIsProcessing(false);
+      setProgress(0);
+      setStatusText('');
+      alert('Failed to save your data. Please check your connection and try again.');
+    }
+  };
+
   return (
     <div className="max-w-md mx-auto mt-12 p-6 bg-white rounded shadow">
       <h2 className="text-2xl font-bold mb-4">Here's what we have so far</h2>
       <p className="mb-4 text-gray-600">Double-check your inputs before we take you to your dashboard.</p>
+      
       <div className="mb-4 text-left">
         <div><b>Gender:</b> {data.gender}</div>
         <div><b>Weight:</b> {data.weight}</div>
@@ -2088,30 +2184,83 @@ function ReviewStep({ onBack, data }: { onBack: () => void, data: any }) {
         )}
         <div><b>AI Insights:</b> {data.wantInsights === 'yes' ? 'Yes' : 'No'}</div>
       </div>
+
+      {/* Modern Loading Progress Bar */}
+      {isProcessing && (
+        <div className="mb-6 p-5 bg-gradient-to-br from-blue-50 to-green-50 rounded-xl border border-blue-200 shadow-lg">
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-lg font-semibold text-gray-800">Processing your health data</span>
+            <span className="text-lg font-bold text-blue-600">{progress}%</span>
+          </div>
+          
+          {/* Modern Progress Bar with Gradient */}
+          <div className="w-full bg-gray-200 rounded-full h-4 mb-4 overflow-hidden shadow-inner">
+            <div 
+              className="h-full rounded-full transition-all duration-500 ease-out relative overflow-hidden"
+              style={{ 
+                width: `${progress}%`,
+                background: progress === 100 
+                  ? 'linear-gradient(90deg, #10b981, #059669, #34d399)' 
+                  : 'linear-gradient(90deg, #3b82f6, #1d4ed8, #2563eb)',
+                boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.1)'
+              }}
+            >
+              {/* Animated shimmer effect */}
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent opacity-30 transform -skew-x-12 animate-pulse"></div>
+            </div>
+          </div>
+          
+          {/* Status Text with Icon */}
+          <div className="flex items-center text-base text-gray-700">
+            <div className="flex items-center mr-3">
+              {progress === 100 ? (
+                <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+              ) : (
+                <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce"></div>
+              )}
+            </div>
+            <span className="font-medium">{statusText}</span>
+          </div>
+
+          {/* Time estimate */}
+          <div className="mt-3 text-sm text-gray-500">
+            {progress < 50 && "This may take up to 15 seconds..."}
+            {progress >= 50 && progress < 90 && "Almost there! Just a few more seconds..."}
+            {progress >= 90 && progress < 100 && "Finishing up..."}
+            {progress === 100 && "Complete! Redirecting to your dashboard..."}
+          </div>
+        </div>
+      )}
+      
       <div className="flex justify-between">
-        <button className="btn-secondary" onClick={onBack}>Back</button>
-        <button className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors" onClick={async () => {
-          try {
-            console.log('Saving final onboarding data to database...');
-            // Save to database for cross-device sync
-            const response = await fetch('/api/user-data', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(data)
-            });
-            
-            if (response.ok) {
-              console.log('Onboarding data saved to database successfully');
-              window.location.href = '/dashboard';
-            } else {
-              console.error('Failed to save onboarding data to database:', response.status, response.statusText);
-              alert('Failed to save your data. Please try again or contact support.');
-            }
-          } catch (error) {
-            console.error('Error saving onboarding data:', error);
-            alert('Failed to save your data. Please check your connection and try again.');
-          }
-        }}>Confirm &amp; Begin</button>
+        <button 
+          className="btn-secondary" 
+          onClick={onBack}
+          disabled={isProcessing}
+        >
+          Back
+        </button>
+        <button 
+          className={`px-6 py-3 rounded-lg font-semibold transition-all duration-300 ${
+            isProcessing 
+              ? 'bg-blue-600 text-white cursor-not-allowed scale-95' 
+              : 'bg-green-600 text-white hover:bg-green-700 hover:scale-105 active:scale-95'
+          }`}
+          onClick={handleConfirmBegin}
+          disabled={isProcessing}
+        >
+          {isProcessing ? (
+            <div className="flex items-center">
+              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Processing...
+            </div>
+          ) : (
+            'Confirm & Begin'
+          )}
+        </button>
       </div>
     </div>
   );
