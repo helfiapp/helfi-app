@@ -30,6 +30,7 @@ export default function FoodDiary() {
   const [showEntryOptions, setShowEntryOptions] = useState<string | null>(null)
   const [showIngredientOptions, setShowIngredientOptions] = useState<string | null>(null)
   const [editingEntry, setEditingEntry] = useState<any>(null)
+  const [hasReAnalyzed, setHasReAnalyzed] = useState<boolean>(false)
 
   const [foodImagesLoading, setFoodImagesLoading] = useState<{[key: string]: boolean}>({})
   const [expandedEntries, setExpandedEntries] = useState<{[key: string]: boolean}>({})
@@ -521,6 +522,7 @@ Please add nutritional information manually if needed.`);
 
   const editFood = (food: any) => {
     setEditingEntry(food);
+    setHasReAnalyzed(false); // Reset button state for new editing session
     // Populate the form with existing data and go directly to editing
     if (food.method === 'photo') {
       setPhotoPreview(food.photo);
@@ -1075,15 +1077,16 @@ Please add nutritional information manually if needed.`);
                       placeholder="Enter a detailed description of the food item..."
                     />
                     <p className="text-sm text-gray-600 font-normal">
-                      AI will analyze this description to provide accurate nutrition information
+                      Change the food description and click on the 'Re-Analyze' button.
                     </p>
                   </div>
                   
                   {/* Full-Width Action Buttons */}
                   <div className="space-y-3">
-                    {/* Primary Action Button */}
-                    <button
-                      onClick={async () => {
+                    {/* Initial State: Re-Analyze Button */}
+                    {!hasReAnalyzed && (
+                      <button
+                        onClick={async () => {
                         if (editingEntry) {
                           // Re-analyze with AI for updated nutrition info
                           setIsAnalyzing(true);
@@ -1112,30 +1115,13 @@ Please add nutritional information manually if needed.`);
                               console.error('API Error:', response.status, response.statusText);
                             }
                           } catch (error) {
-                            console.error('Error re-analyzing food:', error);
-                            updatedNutrition = editingEntry.nutrition;
-                          } finally {
-                            setIsAnalyzing(false);
-                          }
+                                                          console.error('Error re-analyzing food:', error);
+                            } finally {
+                              setIsAnalyzing(false);
+                            }
 
-                          // Update the existing entry
-                          const updatedEntry = {
-                            ...editingEntry,
-                            description: editedDescription,
-                            photo: photoPreview || editingEntry.photo,
-                            nutrition: updatedNutrition || editingEntry.nutrition
-                          };
-
-                          const updatedFoods = todaysFoods.map(food => 
-                            food.id === editingEntry.id ? updatedEntry : food
-                          );
-                          
-                          setTodaysFoods(updatedFoods);
-                          await saveFoodEntries(updatedFoods);
-                        } else {
-                          addFoodEntry(editedDescription, 'photo');
-                          setIsEditingDescription(false);
-                        }
+                            // Set state to show Update Entry button
+                            setHasReAnalyzed(true);
                       }}
                       disabled={!editedDescription.trim() || isAnalyzing}
                       className="w-full py-4 px-6 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-all duration-300 flex items-center justify-center shadow-sm hover:shadow-md disabled:shadow-none"
@@ -1146,20 +1132,55 @@ Please add nutritional information manually if needed.`);
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                           </svg>
-                          <span className="font-normal">Analyzing & Updating...</span>
+                          <span className="font-normal">Re-Analyzing...</span>
                         </>
                       ) : (
                         <>
                           <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                           </svg>
-                          <span className="font-normal">Analyze & Update Entry</span>
+                          <span className="font-normal">Re-Analyze</span>
                         </>
                       )}
                     </button>
+                    )}
 
-                    {/* Analyze Again Button - Full Width */}
-                    <button
+                    {/* After Re-Analyze: Update Entry Button */}
+                    {hasReAnalyzed && (
+                      <button
+                        onClick={async () => {
+                          if (editingEntry) {
+                            // Update the existing entry
+                            const updatedEntry = {
+                              ...editingEntry,
+                              description: editedDescription,
+                              photo: photoPreview || editingEntry.photo,
+                              nutrition: analyzedNutrition || editingEntry.nutrition
+                            };
+
+                            const updatedFoods = todaysFoods.map(food => 
+                              food.id === editingEntry.id ? updatedEntry : food
+                            );
+                            
+                            setTodaysFoods(updatedFoods);
+                            await saveFoodEntries(updatedFoods);
+                          } else {
+                            addFoodEntry(editedDescription, 'photo');
+                            setIsEditingDescription(false);
+                          }
+                        }}
+                        className="w-full py-4 px-6 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-xl transition-all duration-300 flex items-center justify-center shadow-sm hover:shadow-md"
+                      >
+                        <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        <span className="font-normal">Update Entry</span>
+                      </button>
+                    )}
+
+                    {/* After Re-Analyze: Analyze Again Button */}
+                    {hasReAnalyzed && (
+                      <button
                       onClick={async () => {
                         // Analyze Again - Re-run analysis with current description
                         setIsAnalyzing(true);
@@ -1201,14 +1222,16 @@ Please add nutritional information manually if needed.`);
                       </svg>
                       Analyze Again
                     </button>
+                    )}
 
                     {/* Done Button - Full Width */}
                     <button
                       onClick={() => {
-                        // Done - Close editing mode
+                        // Done - Close editing mode and reset state
                         setIsEditingDescription(false);
                         setEditedDescription('');
                         setEditingEntry(null);
+                        setHasReAnalyzed(false); // Reset button state
                         setPhotoFile(null);
                         setPhotoPreview(null);
                         setAiDescription('');
