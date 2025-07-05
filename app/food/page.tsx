@@ -683,12 +683,14 @@ Please add nutritional information manually if needed.`);
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8 pb-24 md:pb-8">
         
-        {/* Instruction Text */}
+        {/* Instruction Text - Hidden during edit mode */}
+        {!isEditingDescription && (
         <div className="mb-6 text-center">
           <p className="text-lg text-gray-600 font-normal">
             📸 Take a photo of your meal or snack and let AI analyze it!
           </p>
         </div>
+        )}
 
         {/* Add Food Button - Hidden during edit mode */}
         {!isEditingDescription && (
