@@ -1007,267 +1007,223 @@ Please add nutritional information manually if needed.`);
               </div>
             )}
 
-            {/* Clean Edit Interface - Professional Enterprise Style */}
+            {/* Clean Edit Interface - Improved UX Design */}
             {isEditingDescription && (
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="p-8 space-y-8">
-                  {/* Clean Food Title - Mobile Responsive Typography */}
+                <div className="p-4 sm:p-6 space-y-6">
+                  {/* Simple Food Title Only */}
                   <div className="border-b border-gray-100 pb-4">
-                    <h1 className="text-xl sm:text-2xl lg:text-3xl font-light text-gray-800 tracking-wide">
-                      {editedDescription.split('\n')[0].split('Calories:')[0].trim() || 'Chocolate Cake'}
+                    <h1 className="text-xl sm:text-2xl font-medium text-gray-900">
+                      {editedDescription.split('\n')[0].split('Calories:')[0].trim().split(',')[0].split('.')[0] || 'Food Item'}
                     </h1>
-                    <p className="text-xs sm:text-sm text-gray-500 mt-2 font-normal">Edit food details and nutrition information</p>
                   </div>
 
-                  <div className="flex flex-col lg:flex-row lg:gap-12">
-                    {/* Left Side - Nutrition Cards & Photo (UNCHANGED as requested) */}
-                    <div className="lg:w-1/2 space-y-4">
-                      {/* Nutrition Cards - Keep exact styling as requested */}
-                      <div className="grid grid-cols-2 gap-3">
-                        {/* Calories Card */}
-                        <div className="bg-orange-400 rounded-lg p-4 text-center text-white">
-                          <div className="text-2xl font-bold">
-                            {analyzedNutrition?.calories || '350'}
-                          </div>
-                          <div className="text-xs font-medium opacity-90">
-                            CALORIES
+                  {/* Nutrition Cards - Match Main Page Style */}
+                  {analyzedNutrition && (analyzedNutrition.calories || analyzedNutrition.protein || analyzedNutrition.carbs || analyzedNutrition.fat) && (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+                      {/* Calories */}
+                      {analyzedNutrition.calories && (
+                        <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-3 sm:p-4 border border-orange-200">
+                          <div className="text-center">
+                            <div className="text-xl sm:text-2xl font-bold text-orange-600">{analyzedNutrition.calories}</div>
+                            <div className="text-xs font-medium text-orange-500 uppercase tracking-wide">Calories</div>
                           </div>
                         </div>
-
-                        {/* Protein Card */}
-                        <div className="bg-blue-500 rounded-lg p-4 text-center text-white">
-                          <div className="text-2xl font-bold">
-                            {analyzedNutrition?.protein || '4'}g
-                          </div>
-                          <div className="text-xs font-medium opacity-90">
-                            PROTEIN
-                          </div>
-                        </div>
-
-                        {/* Carbs Card */}
-                        <div className="bg-green-400 rounded-lg p-4 text-center text-white">
-                          <div className="text-2xl font-bold">
-                            {analyzedNutrition?.carbs || '45'}g
-                          </div>
-                          <div className="text-xs font-medium opacity-90">
-                            CARBS
+                      )}
+                      
+                      {/* Protein */}
+                      {analyzedNutrition.protein && (
+                        <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-3 sm:p-4 border border-blue-200">
+                          <div className="text-center">
+                            <div className="text-xl sm:text-2xl font-bold text-blue-600">{analyzedNutrition.protein}g</div>
+                            <div className="text-xs font-medium text-blue-500 uppercase tracking-wide">Protein</div>
                           </div>
                         </div>
-
-                        {/* Fat Card */}
-                        <div className="bg-purple-500 rounded-lg p-4 text-center text-white">
-                          <div className="text-2xl font-bold">
-                            {analyzedNutrition?.fat || '18'}g
-                          </div>
-                          <div className="text-xs font-medium opacity-90">
-                            FAT
+                      )}
+                      
+                      {/* Carbs */}
+                      {analyzedNutrition.carbs && (
+                        <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-3 sm:p-4 border border-green-200">
+                          <div className="text-center">
+                            <div className="text-xl sm:text-2xl font-bold text-green-600">{analyzedNutrition.carbs}g</div>
+                            <div className="text-xs font-medium text-green-500 uppercase tracking-wide">Carbs</div>
                           </div>
                         </div>
-                      </div>
-
-                      {/* Photo - Keep exact positioning as requested */}
-                      {photoPreview && (
-                        <div className="relative">
-                          {foodImagesLoading[photoPreview] && (
-                            <div className="absolute inset-0 bg-gray-100 rounded-lg flex items-center justify-center">
-                              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-emerald-500"></div>
-                            </div>
-                          )}
-                          <Image
-                            src={photoPreview}
-                            alt="Food being edited"
-                            width={400}
-                            height={300}
-                            className={`w-full aspect-[4/3] object-cover rounded-lg transition-opacity duration-300 ${
-                              foodImagesLoading[photoPreview] ? 'opacity-0' : 'opacity-100'
-                            }`}
-                            loading="eager"
-                            priority
-                            onLoad={() => setFoodImagesLoading((prev: Record<string, boolean>) => ({ ...prev, [photoPreview]: false }))}
-                            onLoadStart={() => setFoodImagesLoading((prev: Record<string, boolean>) => ({ ...prev, [photoPreview]: true }))}
-                          />
+                      )}
+                      
+                      {/* Fat */}
+                      {analyzedNutrition.fat && (
+                        <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-3 sm:p-4 border border-purple-200">
+                          <div className="text-center">
+                            <div className="text-xl sm:text-2xl font-bold text-purple-600">{analyzedNutrition.fat}g</div>
+                            <div className="text-xs font-medium text-purple-500 uppercase tracking-wide">Fat</div>
+                          </div>
                         </div>
                       )}
                     </div>
-                    
-                    {/* Right Side - Professional Description Area */}
-                    <div className="lg:w-1/2 space-y-8">
-                      {/* Description Section - Enterprise Style */}
-                      <div className="bg-gray-50 rounded-xl p-6">
-                        <label className="block text-base font-medium text-gray-700 mb-4">
-                          Food Description
-                        </label>
-                        <textarea
-                          value={editedDescription}
-                          onChange={(e) => setEditedDescription(e.target.value)}
-                          className="w-full h-40 px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-base resize-none bg-white shadow-sm font-normal leading-relaxed"
-                          placeholder="Enter a detailed description of the food item..."
-                        />
-                        <p className="text-xs text-gray-500 mt-2 font-normal">
-                          AI will analyze this description to provide accurate nutrition information
-                        </p>
-                      </div>
-                      
-                      {/* Action Buttons - Professional Enterprise Style */}
-                      <div className="space-y-4">
-                        {/* Primary Action Button */}
-                        <button
-                          onClick={async () => {
-                            if (editingEntry) {
-                              // Re-analyze with AI for updated nutrition info
-                              setIsAnalyzing(true);
-                              let updatedNutrition = null;
+                  )}
 
-                              try {
-                                const response = await fetch('/api/analyze-food', {
-                                  method: 'POST',
-                                  headers: {
-                                    'Content-Type': 'application/json',
-                                  },
-                                  body: JSON.stringify({
-                                    textDescription: editedDescription,
-                                    foodType: 'single'
-                                  }),
-                                });
+                  {/* Enhanced Description Section */}
+                  <div className="space-y-4">
+                    <label className="block text-lg font-medium text-gray-900">
+                      Food Description
+                    </label>
+                    <textarea
+                      value={editedDescription}
+                      onChange={(e) => setEditedDescription(e.target.value)}
+                      className="w-full h-32 px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 text-base resize-none bg-white shadow-sm font-normal leading-relaxed"
+                      placeholder="Enter a detailed description of the food item..."
+                    />
+                    <p className="text-sm text-gray-600 font-normal">
+                      AI will analyze this description to provide accurate nutrition information
+                    </p>
+                  </div>
+                  
+                  {/* Full-Width Action Buttons */}
+                  <div className="space-y-3">
+                    {/* Primary Action Button */}
+                    <button
+                      onClick={async () => {
+                        if (editingEntry) {
+                          // Re-analyze with AI for updated nutrition info
+                          setIsAnalyzing(true);
+                          let updatedNutrition = null;
 
-                                if (response.ok) {
-                                  const result = await response.json();
-                                  if (result.success && result.analysis) {
-                                    updatedNutrition = extractNutritionData(result.analysis);
-                                    setAnalyzedNutrition(updatedNutrition);
-                                    setAiDescription(result.analysis);
-                                  }
-                                } else {
-                                  console.error('API Error:', response.status, response.statusText);
-                                }
-                              } catch (error) {
-                                console.error('Error re-analyzing food:', error);
-                                updatedNutrition = editingEntry.nutrition;
-                              } finally {
-                                setIsAnalyzing(false);
+                          try {
+                            const response = await fetch('/api/analyze-food', {
+                              method: 'POST',
+                              headers: {
+                                'Content-Type': 'application/json',
+                              },
+                              body: JSON.stringify({
+                                textDescription: editedDescription,
+                                foodType: 'single'
+                              }),
+                            });
+
+                            if (response.ok) {
+                              const result = await response.json();
+                              if (result.success && result.analysis) {
+                                updatedNutrition = extractNutritionData(result.analysis);
+                                setAnalyzedNutrition(updatedNutrition);
+                                setAiDescription(result.analysis);
                               }
-
-                              // Update the existing entry
-                              const updatedEntry = {
-                                ...editingEntry,
-                                description: editedDescription,
-                                photo: photoPreview || editingEntry.photo,
-                                nutrition: updatedNutrition || editingEntry.nutrition
-                              };
-
-                              const updatedFoods = todaysFoods.map(food => 
-                                food.id === editingEntry.id ? updatedEntry : food
-                              );
-                              
-                              setTodaysFoods(updatedFoods);
-                              await saveFoodEntries(updatedFoods);
-                              
-                              // Don't reset all states - keep editing mode for "Analyze Again"
-                              // setIsEditingDescription(false);
-                              // setEditedDescription('');
-                              // setEditingEntry(null);
-                              // setPhotoFile(null);
-                              // setPhotoPreview(null);
-                              // setAiDescription('');
-                              // setShowAiResult(false);
-                              // setShowAddFood(false);
-                              // setAnalyzedNutrition(null);
-                              // setShowPhotoOptions(false);
                             } else {
-                              addFoodEntry(editedDescription, 'photo');
-                              setIsEditingDescription(false);
+                              console.error('API Error:', response.status, response.statusText);
                             }
-                          }}
-                          disabled={!editedDescription.trim() || isAnalyzing}
-                          className="w-full py-4 px-6 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-all duration-300 flex items-center justify-center shadow-sm hover:shadow-md disabled:shadow-none"
-                        >
-                          {isAnalyzing ? (
-                            <>
-                              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                              </svg>
-                              <span className="font-normal">Analyzing & Updating...</span>
-                            </>
-                          ) : (
-                            <>
-                              <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                              </svg>
-                              <span className="font-normal">Analyze & Update Entry</span>
-                            </>
-                          )}
-                        </button>
+                          } catch (error) {
+                            console.error('Error re-analyzing food:', error);
+                            updatedNutrition = editingEntry.nutrition;
+                          } finally {
+                            setIsAnalyzing(false);
+                          }
 
-                        {/* Secondary Actions */}
-                        <div className="flex gap-3">
-                          <button
-                            onClick={async () => {
-                              // Analyze Again - Re-run analysis with current description
-                              setIsAnalyzing(true);
-                              let updatedNutrition = null;
+                          // Update the existing entry
+                          const updatedEntry = {
+                            ...editingEntry,
+                            description: editedDescription,
+                            photo: photoPreview || editingEntry.photo,
+                            nutrition: updatedNutrition || editingEntry.nutrition
+                          };
 
-                              try {
-                                const response = await fetch('/api/analyze-food', {
-                                  method: 'POST',
-                                  headers: {
-                                    'Content-Type': 'application/json',
-                                  },
-                                  body: JSON.stringify({
-                                    textDescription: editedDescription,
-                                    foodType: 'single'
-                                  }),
-                                });
+                          const updatedFoods = todaysFoods.map(food => 
+                            food.id === editingEntry.id ? updatedEntry : food
+                          );
+                          
+                          setTodaysFoods(updatedFoods);
+                          await saveFoodEntries(updatedFoods);
+                        } else {
+                          addFoodEntry(editedDescription, 'photo');
+                          setIsEditingDescription(false);
+                        }
+                      }}
+                      disabled={!editedDescription.trim() || isAnalyzing}
+                      className="w-full py-4 px-6 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-all duration-300 flex items-center justify-center shadow-sm hover:shadow-md disabled:shadow-none"
+                    >
+                      {isAnalyzing ? (
+                        <>
+                          <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          <span className="font-normal">Analyzing & Updating...</span>
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          <span className="font-normal">Analyze & Update Entry</span>
+                        </>
+                      )}
+                    </button>
 
-                                if (response.ok) {
-                                  const result = await response.json();
-                                  if (result.success && result.analysis) {
-                                    updatedNutrition = extractNutritionData(result.analysis);
-                                    setAnalyzedNutrition(updatedNutrition);
-                                    setAiDescription(result.analysis);
-                                  }
-                                } else {
-                                  console.error('API Error:', response.status, response.statusText);
-                                }
-                              } catch (error) {
-                                console.error('Error re-analyzing food:', error);
-                              } finally {
-                                setIsAnalyzing(false);
-                              }
-                            }}
-                            disabled={!editedDescription.trim() || isAnalyzing}
-                            className="flex-1 py-3 px-4 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-normal rounded-xl transition-all duration-300 flex items-center justify-center"
-                          >
-                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                            </svg>
-                            Analyze Again
-                          </button>
+                    {/* Analyze Again Button - Full Width */}
+                    <button
+                      onClick={async () => {
+                        // Analyze Again - Re-run analysis with current description
+                        setIsAnalyzing(true);
+                        let updatedNutrition = null;
 
-                          <button
-                            onClick={() => {
-                              // Done - Close editing mode
-                              setIsEditingDescription(false);
-                              setEditedDescription('');
-                              setEditingEntry(null);
-                              setPhotoFile(null);
-                              setPhotoPreview(null);
-                              setAiDescription('');
-                              setShowAiResult(false);
-                              setShowAddFood(false);
-                              setAnalyzedNutrition(null);
-                              setShowPhotoOptions(false);
-                            }}
-                            className="flex-1 py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-normal rounded-xl transition-all duration-300 flex items-center justify-center"
-                          >
-                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
-                            Done
-                          </button>
-                        </div>
-                      </div>
-                    </div>
+                        try {
+                          const response = await fetch('/api/analyze-food', {
+                            method: 'POST',
+                            headers: {
+                              'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                              textDescription: editedDescription,
+                              foodType: 'single'
+                            }),
+                          });
+
+                          if (response.ok) {
+                            const result = await response.json();
+                            if (result.success && result.analysis) {
+                              updatedNutrition = extractNutritionData(result.analysis);
+                              setAnalyzedNutrition(updatedNutrition);
+                              setAiDescription(result.analysis);
+                            }
+                          } else {
+                            console.error('API Error:', response.status, response.statusText);
+                          }
+                        } catch (error) {
+                          console.error('Error re-analyzing food:', error);
+                        } finally {
+                          setIsAnalyzing(false);
+                        }
+                      }}
+                      disabled={!editedDescription.trim() || isAnalyzing}
+                      className="w-full py-3 px-4 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-all duration-300 flex items-center justify-center"
+                    >
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      Analyze Again
+                    </button>
+
+                    {/* Done Button - Full Width */}
+                    <button
+                      onClick={() => {
+                        // Done - Close editing mode
+                        setIsEditingDescription(false);
+                        setEditedDescription('');
+                        setEditingEntry(null);
+                        setPhotoFile(null);
+                        setPhotoPreview(null);
+                        setAiDescription('');
+                        setShowAiResult(false);
+                        setShowAddFood(false);
+                        setAnalyzedNutrition(null);
+                        setShowPhotoOptions(false);
+                      }}
+                      className="w-full py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-all duration-300 flex items-center justify-center"
+                    >
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      Done
+                    </button>
                   </div>
                 </div>
               </div>
