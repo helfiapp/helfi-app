@@ -690,7 +690,8 @@ Please add nutritional information manually if needed.`);
           </p>
         </div>
 
-        {/* Add Food Button */}
+        {/* Add Food Button - Hidden during edit mode */}
+        {!isEditingDescription && (
         <div className="mb-6 relative add-food-entry-container">
           <button
             onClick={() => setShowPhotoOptions(!showPhotoOptions)}
@@ -753,6 +754,7 @@ Please add nutritional information manually if needed.`);
             </div>
           )}
         </div>
+        )}
 
                 {/* Food Processing Area */}
         {showAddFood && (
