@@ -1087,7 +1087,6 @@ Please add nutritional information manually if needed.`);
                     {!hasReAnalyzed && (
                       <button
                         onClick={async () => {
-                        if (editingEntry) {
                           // Re-analyze with AI for updated nutrition info
                           setIsAnalyzing(true);
                           let updatedNutrition = null;
@@ -1115,14 +1114,14 @@ Please add nutritional information manually if needed.`);
                               console.error('API Error:', response.status, response.statusText);
                             }
                           } catch (error) {
-                                                          console.error('Error re-analyzing food:', error);
-                            } finally {
-                              setIsAnalyzing(false);
-                            }
+                            console.error('Error re-analyzing food:', error);
+                          } finally {
+                            setIsAnalyzing(false);
+                          }
 
-                            // Set state to show Update Entry button
-                            setHasReAnalyzed(true);
-                      }}
+                          // Set state to show Update Entry button
+                          setHasReAnalyzed(true);
+                        }}
                       disabled={!editedDescription.trim() || isAnalyzing}
                       className="w-full py-4 px-6 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-all duration-300 flex items-center justify-center shadow-sm hover:shadow-md disabled:shadow-none"
                     >
