@@ -1063,6 +1063,17 @@ function SupplementsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
   // New dosing schedule states
   const [dosageSchedule, setDosageSchedule] = useState<'daily' | 'specific'>('daily');
   const [selectedDays, setSelectedDays] = useState<string[]>([]);
+  
+  // Edit functionality states
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [showDropdown, setShowDropdown] = useState<number | null>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => setShowDropdown(null);
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
 
   const handleUploadMethodChange = (method: 'manual' | 'photo') => {
     setUploadMethod(method);
@@ -1139,6 +1150,8 @@ function SupplementsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
   };
 
   const addSupplement = () => {
+    const currentDate = new Date().toISOString();
+    
     if (uploadMethod === 'manual' && name && dosage && timing.length > 0) {
       // Combine timing and individual dosages with units
       const timingWithDosages = timing.map(time => {
@@ -1151,21 +1164,28 @@ function SupplementsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
       
       const scheduleInfo = dosageSchedule === 'daily' ? 'Daily' : selectedDays.join(', ');
       
-      setSupplements((prev: any[]) => [...prev, { 
+      const supplementData = { 
+        id: Date.now().toString(), // Unique ID for editing
         name, 
         dosage: `${dosage} ${dosageUnit}`, 
         timing: timingWithDosages, 
-        scheduleInfo: scheduleInfo, // Store as separate field for now
-        method: 'manual' 
-      }]);
-      setName(''); 
-      setDosage(''); 
-      setDosageUnit('mg');
-      setTiming([]); 
-      setTimingDosages({});
-      setTimingDosageUnits({});
-      setDosageSchedule('daily');
-      setSelectedDays([]);
+        scheduleInfo: scheduleInfo,
+        method: 'manual',
+        dateAdded: currentDate
+      };
+      
+      if (editingIndex !== null) {
+        // Update existing supplement
+        setSupplements((prev: any[]) => prev.map((item: any, index: number) => 
+          index === editingIndex ? supplementData : item
+        ));
+        setEditingIndex(null);
+      } else {
+        // Add new supplement
+        setSupplements((prev: any[]) => [...prev, supplementData]);
+      }
+      
+      clearForm();
     } else if (uploadMethod === 'photo' && frontImage && photoDosage && photoTiming.length > 0) {
       // Combine timing and individual dosages with units for photos
       const timingWithDosages = photoTiming.map(time => {
@@ -1178,24 +1198,89 @@ function SupplementsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
       
       const scheduleInfo = photoDosageSchedule === 'daily' ? 'Daily' : photoSelectedDays.join(', ');
       
-      setSupplements((prev: any[]) => [...prev, { 
+      const supplementData = { 
+        id: Date.now().toString(), // Unique ID for editing
         frontImage: frontImage.name, 
         backImage: backImage?.name, 
         method: 'photo',
         name: frontImage.name.split('.')[0], // Use filename as temporary name
         dosage: `${photoDosage} ${photoDosageUnit}`,
         timing: timingWithDosages,
-        scheduleInfo: scheduleInfo // Store as separate field for now
-      }]);
-      setFrontImage(null); 
-      setBackImage(null); 
-      setPhotoDosage(''); 
-      setPhotoDosageUnit('mg');
-      setPhotoTiming([]); 
-      setPhotoTimingDosages({});
-      setPhotoTimingDosageUnits({});
-      setPhotoDosageSchedule('daily');
-      setPhotoSelectedDays([]);
+        scheduleInfo: scheduleInfo,
+        dateAdded: currentDate
+      };
+      
+      if (editingIndex !== null) {
+        // Update existing supplement
+        setSupplements((prev: any[]) => prev.map((item: any, index: number) => 
+          index === editingIndex ? supplementData : item
+        ));
+        setEditingIndex(null);
+      } else {
+        // Add new supplement
+        setSupplements((prev: any[]) => [...prev, supplementData]);
+      }
+      
+      clearPhotoForm();
+    }
+  };
+
+  const clearForm = () => {
+    setName(''); 
+    setDosage(''); 
+    setDosageUnit('mg');
+    setTiming([]); 
+    setTimingDosages({});
+    setTimingDosageUnits({});
+    setDosageSchedule('daily');
+    setSelectedDays([]);
+  };
+
+  const clearPhotoForm = () => {
+    setFrontImage(null); 
+    setBackImage(null); 
+    setPhotoDosage(''); 
+    setPhotoDosageUnit('mg');
+    setPhotoTiming([]); 
+    setPhotoTimingDosages({});
+    setPhotoTimingDosageUnits({});
+    setPhotoDosageSchedule('daily');
+    setPhotoSelectedDays([]);
+  };
+
+  const editSupplement = (index: number) => {
+    const supplement = supplements[index];
+    setEditingIndex(index);
+    setShowDropdown(null);
+    
+    if (supplement.method === 'manual') {
+      setUploadMethod('manual');
+      setName(supplement.name);
+      
+      // Parse dosage and unit
+      const dosageParts = supplement.dosage.split(' ');
+      setDosage(dosageParts[0]);
+      setDosageUnit(dosageParts[1] || 'mg');
+      
+      // Parse timing data
+      const timingArray = supplement.timing.map((t: string) => t.split(':')[0]);
+      setTiming(timingArray);
+      
+      // Set schedule
+      setDosageSchedule(supplement.scheduleInfo === 'Daily' ? 'daily' : 'specific');
+      if (supplement.scheduleInfo !== 'Daily') {
+        setSelectedDays(supplement.scheduleInfo.split(', '));
+      }
+    } else {
+      setUploadMethod('photo');
+      // For photo method, we'll need to handle this differently
+      // For now, we'll just set the basic info
+      setPhotoDosage(supplement.dosage.split(' ')[0]);
+      setPhotoDosageUnit(supplement.dosage.split(' ')[1] || 'mg');
+      setPhotoDosageSchedule(supplement.scheduleInfo === 'Daily' ? 'daily' : 'specific');
+      if (supplement.scheduleInfo !== 'Daily') {
+        setPhotoSelectedDays(supplement.scheduleInfo.split(', '));
+      }
     }
   };
 
@@ -1445,7 +1530,7 @@ function SupplementsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
               onClick={addSupplement}
               disabled={!frontImage || !photoDosage || photoTiming.length === 0 || (photoDosageSchedule === 'specific' && photoSelectedDays.length === 0)}
             >
-              Add Supplement Photos
+              {editingIndex !== null ? 'Update Supplement' : 'Add Supplement Photos'}
             </button>
           </div>
         )}
@@ -1602,7 +1687,7 @@ function SupplementsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
               onClick={addSupplement}
               disabled={!name || !dosage || timing.length === 0 || (dosageSchedule === 'specific' && selectedDays.length === 0)}
             >
-              Add Supplement
+              {editingIndex !== null ? 'Update Supplement' : 'Add Supplement'}
             </button>
           </div>
         )}
@@ -1621,24 +1706,63 @@ function SupplementsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
                         <div className="text-sm text-gray-600">
                           Photos: Front {s.backImage ? '+ Back' : 'only'}
                         </div>
+                        <div className="text-sm text-gray-600">{s.dosage} - {Array.isArray(s.timing) ? s.timing.join(', ') : s.timing}</div>
+                        <div className="text-xs text-gray-500">Schedule: {s.scheduleInfo}</div>
+                        {s.dateAdded && (
+                          <div className="text-xs text-gray-400">
+                            Added: {new Date(s.dateAdded).toLocaleDateString()}
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div>
                         <div className="font-medium">{s.name}</div>
                         <div className="text-sm text-gray-600">{s.dosage} - {Array.isArray(s.timing) ? s.timing.join(', ') : s.timing}</div>
                         <div className="text-xs text-gray-500">Schedule: {s.scheduleInfo}</div>
+                        {s.dateAdded && (
+                          <div className="text-xs text-gray-400">
+                            Added: {new Date(s.dateAdded).toLocaleDateString()}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
-                  <button
-                    onClick={() => removeSupplement(i)}
-                    className="text-red-500 hover:text-red-700 p-1 transition-colors"
-                    title="Remove supplement"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowDropdown(showDropdown === i ? null : i)}
+                      className="text-gray-500 hover:text-gray-700 p-1 transition-colors"
+                      title="Options"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                      </svg>
+                    </button>
+                    {showDropdown === i && (
+                      <div className="absolute right-0 top-8 bg-white border border-gray-200 rounded-lg shadow-lg z-10 min-w-[120px]">
+                        <button
+                          onClick={() => editSupplement(i)}
+                          className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center space-x-2"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                          <span>Edit</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            removeSupplement(i);
+                            setShowDropdown(null);
+                          }}
+                          className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center space-x-2"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                          <span>Delete</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -1704,6 +1828,17 @@ function MedicationsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
   const [photoTimingDosageUnits, setPhotoTimingDosageUnits] = useState<{[key: string]: string}>({});
   const [photoDosageSchedule, setPhotoDosageSchedule] = useState<'daily' | 'specific'>('daily');
   const [photoSelectedDays, setPhotoSelectedDays] = useState<string[]>([]);
+  
+  // Edit functionality states
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [showDropdown, setShowDropdown] = useState<number | null>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => setShowDropdown(null);
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
 
   const timingOptions = ['Morning', 'Afternoon', 'Evening', 'Before Bed'];
   const dosageUnits = ['mg', 'mcg', 'g', 'IU', 'capsules', 'tablets', 'drops', 'ml', 'tsp', 'tbsp'];
@@ -1746,6 +1881,8 @@ function MedicationsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
   };
 
   const addMedication = () => {
+    const currentDate = new Date().toISOString();
+    
     if (uploadMethod === 'manual' && name && dosage && timing.length > 0) {
       // Combine timing and individual dosages with units
       const timingWithDosages = timing.map(time => {
@@ -1758,21 +1895,28 @@ function MedicationsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
       
       const scheduleInfo = dosageSchedule === 'daily' ? 'Daily' : selectedDays.join(', ');
       
-      setMedications((prev: any[]) => [...prev, { 
+      const medicationData = { 
+        id: Date.now().toString(), // Unique ID for editing
         name, 
         dosage: `${dosage} ${dosageUnit}`, 
         timing: timingWithDosages, 
-        scheduleInfo: scheduleInfo, // Store as separate field for now
-        method: 'manual' 
-      }]);
-      setName(''); 
-      setDosage(''); 
-      setDosageUnit('mg');
-      setTiming([]); 
-      setTimingDosages({});
-      setTimingDosageUnits({});
-      setDosageSchedule('daily');
-      setSelectedDays([]);
+        scheduleInfo: scheduleInfo,
+        method: 'manual',
+        dateAdded: currentDate
+      };
+      
+      if (editingIndex !== null) {
+        // Update existing medication
+        setMedications((prev: any[]) => prev.map((item: any, index: number) => 
+          index === editingIndex ? medicationData : item
+        ));
+        setEditingIndex(null);
+      } else {
+        // Add new medication
+        setMedications((prev: any[]) => [...prev, medicationData]);
+      }
+      
+      clearMedForm();
     } else if (uploadMethod === 'photo' && frontImage && photoDosage && photoTiming.length > 0) {
       // Combine timing and individual dosages with units for photos
       const timingWithDosages = photoTiming.map(time => {
@@ -1785,24 +1929,87 @@ function MedicationsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
       
       const scheduleInfo = photoDosageSchedule === 'daily' ? 'Daily' : photoSelectedDays.join(', ');
       
-      setMedications((prev: any[]) => [...prev, { 
+      const medicationData = { 
+        id: Date.now().toString(), // Unique ID for editing
         frontImage: frontImage.name, 
         backImage: backImage?.name, 
         method: 'photo',
         name: frontImage.name.split('.')[0], // Use filename as temporary name
         dosage: `${photoDosage} ${photoDosageUnit}`,
         timing: timingWithDosages,
-        scheduleInfo: scheduleInfo // Store as separate field for now
-      }]);
-      setFrontImage(null); 
-      setBackImage(null); 
-      setPhotoDosage(''); 
-      setPhotoDosageUnit('mg');
-      setPhotoTiming([]); 
-      setPhotoTimingDosages({});
-      setPhotoTimingDosageUnits({});
-      setPhotoDosageSchedule('daily');
-      setPhotoSelectedDays([]);
+        scheduleInfo: scheduleInfo,
+        dateAdded: currentDate
+      };
+      
+      if (editingIndex !== null) {
+        // Update existing medication
+        setMedications((prev: any[]) => prev.map((item: any, index: number) => 
+          index === editingIndex ? medicationData : item
+        ));
+        setEditingIndex(null);
+      } else {
+        // Add new medication
+        setMedications((prev: any[]) => [...prev, medicationData]);
+      }
+      
+      clearMedPhotoForm();
+    }
+  };
+
+  const clearMedForm = () => {
+    setName(''); 
+    setDosage(''); 
+    setDosageUnit('mg');
+    setTiming([]); 
+    setTimingDosages({});
+    setTimingDosageUnits({});
+    setDosageSchedule('daily');
+    setSelectedDays([]);
+  };
+
+  const clearMedPhotoForm = () => {
+    setFrontImage(null); 
+    setBackImage(null); 
+    setPhotoDosage(''); 
+    setPhotoDosageUnit('mg');
+    setPhotoTiming([]); 
+    setPhotoTimingDosages({});
+    setPhotoTimingDosageUnits({});
+    setPhotoDosageSchedule('daily');
+    setPhotoSelectedDays([]);
+  };
+
+  const editMedication = (index: number) => {
+    const medication = medications[index];
+    setEditingIndex(index);
+    setShowDropdown(null);
+    
+    if (medication.method === 'manual') {
+      setUploadMethod('manual');
+      setName(medication.name);
+      
+      // Parse dosage and unit
+      const dosageParts = medication.dosage.split(' ');
+      setDosage(dosageParts[0]);
+      setDosageUnit(dosageParts[1] || 'mg');
+      
+      // Parse timing data
+      const timingArray = medication.timing.map((t: string) => t.split(':')[0]);
+      setTiming(timingArray);
+      
+      // Set schedule
+      setDosageSchedule(medication.scheduleInfo === 'Daily' ? 'daily' : 'specific');
+      if (medication.scheduleInfo !== 'Daily') {
+        setSelectedDays(medication.scheduleInfo.split(', '));
+      }
+    } else {
+      setUploadMethod('photo');
+      setPhotoDosage(medication.dosage.split(' ')[0]);
+      setPhotoDosageUnit(medication.dosage.split(' ')[1] || 'mg');
+      setPhotoDosageSchedule(medication.scheduleInfo === 'Daily' ? 'daily' : 'specific');
+      if (medication.scheduleInfo !== 'Daily') {
+        setPhotoSelectedDays(medication.scheduleInfo.split(', '));
+      }
     }
   };
 
@@ -2048,7 +2255,7 @@ function MedicationsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
               onClick={addMedication}
               disabled={!frontImage || !photoDosage || photoTiming.length === 0 || (photoDosageSchedule === 'specific' && photoSelectedDays.length === 0)}
             >
-              Add Medication Photos
+              {editingIndex !== null ? 'Update Medication' : 'Add Medication Photos'}
             </button>
           </div>
         )}
@@ -2200,7 +2407,7 @@ function MedicationsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
               onClick={addMedication}
               disabled={!name || !dosage || timing.length === 0 || (dosageSchedule === 'specific' && selectedDays.length === 0)}
             >
-              Add Medication
+              {editingIndex !== null ? 'Update Medication' : 'Add Medication'}
             </button>
           </div>
         )}
@@ -2219,24 +2426,63 @@ function MedicationsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
                         <div className="text-sm text-gray-600">
                           Photos: Front {m.backImage ? '+ Back' : 'only'}
                         </div>
+                        <div className="text-sm text-gray-600">{m.dosage} - {Array.isArray(m.timing) ? m.timing.join(', ') : m.timing}</div>
+                        <div className="text-xs text-gray-500">Schedule: {m.scheduleInfo}</div>
+                        {m.dateAdded && (
+                          <div className="text-xs text-gray-400">
+                            Added: {new Date(m.dateAdded).toLocaleDateString()}
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div>
                         <div className="font-medium">{m.name}</div>
                         <div className="text-sm text-gray-600">{m.dosage} - {Array.isArray(m.timing) ? m.timing.join(', ') : m.timing}</div>
                         <div className="text-xs text-gray-500">Schedule: {m.scheduleInfo}</div>
+                        {m.dateAdded && (
+                          <div className="text-xs text-gray-400">
+                            Added: {new Date(m.dateAdded).toLocaleDateString()}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
-                  <button
-                    onClick={() => removeMedication(i)}
-                    className="text-red-500 hover:text-red-700 p-1 transition-colors"
-                    title="Remove medication"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowDropdown(showDropdown === i ? null : i)}
+                      className="text-gray-500 hover:text-gray-700 p-1 transition-colors"
+                      title="Options"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                      </svg>
+                    </button>
+                    {showDropdown === i && (
+                      <div className="absolute right-0 top-8 bg-white border border-gray-200 rounded-lg shadow-lg z-10 min-w-[120px]">
+                        <button
+                          onClick={() => editMedication(i)}
+                          className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center space-x-2"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                          <span>Edit</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            removeMedication(i);
+                            setShowDropdown(null);
+                          }}
+                          className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center space-x-2"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                          <span>Delete</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
