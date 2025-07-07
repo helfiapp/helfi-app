@@ -1070,7 +1070,13 @@ function SupplementsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
 
   // Close dropdown when clicking outside
   useEffect(() => {
-    const handleClickOutside = () => setShowDropdown(null);
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      // Only close if click is outside dropdown container
+      if (!target.closest('.dropdown-container')) {
+        setShowDropdown(null);
+      }
+    };
     document.addEventListener('click', handleClickOutside);
     return () => document.removeEventListener('click', handleClickOutside);
   }, []);
@@ -1727,7 +1733,7 @@ function SupplementsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
                       </div>
                     )}
                   </div>
-                  <div className="relative">
+                  <div className="relative dropdown-container">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -1842,7 +1848,13 @@ function MedicationsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
 
   // Close dropdown when clicking outside
   useEffect(() => {
-    const handleClickOutside = () => setShowDropdown(null);
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      // Only close if click is outside dropdown container
+      if (!target.closest('.dropdown-container')) {
+        setShowDropdown(null);
+      }
+    };
     document.addEventListener('click', handleClickOutside);
     return () => document.removeEventListener('click', handleClickOutside);
   }, []);
@@ -2454,7 +2466,7 @@ function MedicationsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
                       </div>
                     )}
                   </div>
-                  <div className="relative">
+                  <div className="relative dropdown-container">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
