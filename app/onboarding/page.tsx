@@ -1052,11 +1052,17 @@ function SupplementsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
   const [supplements, setSupplements] = useState(initial?.supplements || []);
   const [name, setName] = useState('');
   const [dosage, setDosage] = useState('');
+  const [dosageUnit, setDosageUnit] = useState('mg');
   const [timing, setTiming] = useState<string[]>([]);
   const [timingDosages, setTimingDosages] = useState<{[key: string]: string}>({});
+  const [timingDosageUnits, setTimingDosageUnits] = useState<{[key: string]: string}>({});
   const [frontImage, setFrontImage] = useState<File | null>(null);
   const [backImage, setBackImage] = useState<File | null>(null);
   const [uploadMethod, setUploadMethod] = useState<'manual' | 'photo'>('photo');
+  
+  // New dosing schedule states
+  const [dosageSchedule, setDosageSchedule] = useState<'daily' | 'specific'>('daily');
+  const [selectedDays, setSelectedDays] = useState<string[]>([]);
 
   const handleUploadMethodChange = (method: 'manual' | 'photo') => {
     setUploadMethod(method);
@@ -1065,22 +1071,36 @@ function SupplementsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
       setFrontImage(null);
       setBackImage(null);
       setPhotoDosage('');
+      setPhotoDosageUnit('mg');
       setPhotoTiming([]);
       setPhotoTimingDosages({});
+      setPhotoTimingDosageUnits({});
+      setPhotoDosageSchedule('daily');
+      setPhotoSelectedDays([]);
     } else {
       setName('');
       setDosage('');
+      setDosageUnit('mg');
       setTiming([]);
       setTimingDosages({});
+      setTimingDosageUnits({});
+      setDosageSchedule('daily');
+      setSelectedDays([]);
     }
   };
   
   // For photo upload method
   const [photoDosage, setPhotoDosage] = useState('');
+  const [photoDosageUnit, setPhotoDosageUnit] = useState('mg');
   const [photoTiming, setPhotoTiming] = useState<string[]>([]);
   const [photoTimingDosages, setPhotoTimingDosages] = useState<{[key: string]: string}>({});
+  const [photoTimingDosageUnits, setPhotoTimingDosageUnits] = useState<{[key: string]: string}>({});
+  const [photoDosageSchedule, setPhotoDosageSchedule] = useState<'daily' | 'specific'>('daily');
+  const [photoSelectedDays, setPhotoSelectedDays] = useState<string[]>([]);
 
   const timingOptions = ['Morning', 'Afternoon', 'Evening', 'Before Bed'];
+  const dosageUnits = ['mg', 'mcg', 'g', 'IU', 'capsules', 'tablets', 'drops', 'ml', 'tsp', 'tbsp'];
+  const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
   const toggleTiming = (time: string, isPhoto: boolean = false) => {
     const currentTiming = isPhoto ? photoTiming : timing;
@@ -1093,33 +1113,89 @@ function SupplementsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
     );
   };
 
+  const toggleDay = (day: string, isPhoto: boolean = false) => {
+    const currentDays = isPhoto ? photoSelectedDays : selectedDays;
+    const setCurrentDays = isPhoto ? setPhotoSelectedDays : setSelectedDays;
+    
+    setCurrentDays(prev => 
+      prev.includes(day) 
+        ? prev.filter(d => d !== day)
+        : [...prev, day]
+    );
+  };
+
+  const handleScheduleChange = (schedule: 'daily' | 'specific', isPhoto: boolean = false) => {
+    if (isPhoto) {
+      setPhotoDosageSchedule(schedule);
+      if (schedule === 'daily') {
+        setPhotoSelectedDays([]);
+      }
+    } else {
+      setDosageSchedule(schedule);
+      if (schedule === 'daily') {
+        setSelectedDays([]);
+      }
+    }
+  };
+
   const addSupplement = () => {
     if (uploadMethod === 'manual' && name && dosage && timing.length > 0) {
-      // Combine timing and individual dosages
-      const timingWithDosages = timing.map(time => 
-        timingDosages[time] ? `${time}: ${timingDosages[time]}` : `${time}: ${dosage}`
-      );
+      // Combine timing and individual dosages with units
+      const timingWithDosages = timing.map(time => {
+        const timeSpecificDosage = timingDosages[time];
+        const timeSpecificUnit = timingDosageUnits[time] || dosageUnit;
+        return timeSpecificDosage 
+          ? `${time}: ${timeSpecificDosage} ${timeSpecificUnit}` 
+          : `${time}: ${dosage} ${dosageUnit}`;
+      });
+      
+      const scheduleInfo = dosageSchedule === 'daily' ? 'Daily' : selectedDays.join(', ');
+      
       setSupplements((prev: any[]) => [...prev, { 
         name, 
-        dosage, 
+        dosage: `${dosage} ${dosageUnit}`, 
         timing: timingWithDosages, 
+        scheduleInfo: scheduleInfo, // Store as separate field for now
         method: 'manual' 
       }]);
-      setName(''); setDosage(''); setTiming([]); setTimingDosages({});
+      setName(''); 
+      setDosage(''); 
+      setDosageUnit('mg');
+      setTiming([]); 
+      setTimingDosages({});
+      setTimingDosageUnits({});
+      setDosageSchedule('daily');
+      setSelectedDays([]);
     } else if (uploadMethod === 'photo' && frontImage && photoDosage && photoTiming.length > 0) {
-      // Combine timing and individual dosages for photos
-      const timingWithDosages = photoTiming.map(time => 
-        photoTimingDosages[time] ? `${time}: ${photoTimingDosages[time]}` : `${time}: ${photoDosage}`
-      );
+      // Combine timing and individual dosages with units for photos
+      const timingWithDosages = photoTiming.map(time => {
+        const timeSpecificDosage = photoTimingDosages[time];
+        const timeSpecificUnit = photoTimingDosageUnits[time] || photoDosageUnit;
+        return timeSpecificDosage 
+          ? `${time}: ${timeSpecificDosage} ${timeSpecificUnit}` 
+          : `${time}: ${photoDosage} ${photoDosageUnit}`;
+      });
+      
+      const scheduleInfo = photoDosageSchedule === 'daily' ? 'Daily' : photoSelectedDays.join(', ');
+      
       setSupplements((prev: any[]) => [...prev, { 
         frontImage: frontImage.name, 
         backImage: backImage?.name, 
         method: 'photo',
         name: frontImage.name.split('.')[0], // Use filename as temporary name
-        dosage: photoDosage,
-        timing: timingWithDosages
+        dosage: `${photoDosage} ${photoDosageUnit}`,
+        timing: timingWithDosages,
+        scheduleInfo: scheduleInfo // Store as separate field for now
       }]);
-      setFrontImage(null); setBackImage(null); setPhotoDosage(''); setPhotoTiming([]); setPhotoTimingDosages({});
+      setFrontImage(null); 
+      setBackImage(null); 
+      setPhotoDosage(''); 
+      setPhotoDosageUnit('mg');
+      setPhotoTiming([]); 
+      setPhotoTimingDosages({});
+      setPhotoTimingDosageUnits({});
+      setPhotoDosageSchedule('daily');
+      setPhotoSelectedDays([]);
     }
   };
 
@@ -1230,13 +1306,78 @@ function SupplementsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Dosage *
               </label>
-              <input 
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-green-500 focus:ring-1 focus:ring-green-500" 
-                type="text" 
-                placeholder="e.g., 1000mg, 2 capsules" 
-                value={photoDosage} 
-                onChange={e => setPhotoDosage(e.target.value)} 
-              />
+              <div className="flex space-x-2">
+                <input 
+                  className="flex-1 rounded-lg border border-gray-300 px-3 py-2 focus:border-green-500 focus:ring-1 focus:ring-green-500" 
+                  type="text" 
+                  placeholder="e.g., 1000, 2" 
+                  value={photoDosage} 
+                  onChange={e => setPhotoDosage(e.target.value)} 
+                />
+                <select
+                  value={photoDosageUnit}
+                  onChange={e => setPhotoDosageUnit(e.target.value)}
+                  className="w-24 rounded-lg border border-gray-300 px-2 py-2 focus:border-green-500 focus:ring-1 focus:ring-green-500 text-sm"
+                >
+                  {dosageUnits.map(unit => (
+                    <option key={unit} value={unit}>{unit}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                How often do you take this supplement? *
+              </label>
+              <div className="space-y-3">
+                <div className="flex items-center space-x-3">
+                  <input
+                    type="radio"
+                    checked={photoDosageSchedule === 'daily'}
+                    onChange={() => handleScheduleChange('daily', true)}
+                    className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 focus:ring-green-500 focus:ring-2"
+                    id="photo-daily"
+                  />
+                  <label htmlFor="photo-daily" className="cursor-pointer">
+                    <span className="text-gray-700">Every day</span>
+                  </label>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <input
+                    type="radio"
+                    checked={photoDosageSchedule === 'specific'}
+                    onChange={() => handleScheduleChange('specific', true)}
+                    className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 focus:ring-green-500 focus:ring-2"
+                    id="photo-specific"
+                  />
+                  <label htmlFor="photo-specific" className="cursor-pointer">
+                    <span className="text-gray-700">Specific days only</span>
+                  </label>
+                </div>
+                
+                {photoDosageSchedule === 'specific' && (
+                  <div className="ml-7 space-y-2">
+                    <div className="text-sm text-gray-600 mb-2">Select the days you take this supplement:</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {daysOfWeek.map(day => (
+                        <div key={day} className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            checked={photoSelectedDays.includes(day)}
+                            onChange={() => toggleDay(day, true)}
+                            className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
+                            id={`photo-day-${day}`}
+                          />
+                          <label htmlFor={`photo-day-${day}`} className="text-sm cursor-pointer">
+                            {day.substring(0, 3)}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div>
@@ -1257,18 +1398,34 @@ function SupplementsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
                       <span className="text-gray-700">{time}</span>
                     </label>
                     {photoTiming.includes(time) && (
-                      <input
-                        type="text"
-                        placeholder="Dosage (e.g., 2.5mg)"
-                        value={photoTimingDosages[time] || ''}
-                        className="w-32 px-2 py-1 border border-gray-300 rounded text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
-                        onChange={(e) => {
-                          setPhotoTimingDosages(prev => ({
-                            ...prev,
-                            [time]: e.target.value
-                          }));
-                        }}
-                      />
+                      <div className="flex space-x-1">
+                        <input
+                          type="text"
+                          placeholder="Amount"
+                          value={photoTimingDosages[time] || ''}
+                          className="w-16 px-2 py-1 border border-gray-300 rounded text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                          onChange={(e) => {
+                            setPhotoTimingDosages(prev => ({
+                              ...prev,
+                              [time]: e.target.value
+                            }));
+                          }}
+                        />
+                        <select
+                          value={photoTimingDosageUnits[time] || photoDosageUnit}
+                          onChange={(e) => {
+                            setPhotoTimingDosageUnits(prev => ({
+                              ...prev,
+                              [time]: e.target.value
+                            }));
+                          }}
+                          className="w-16 px-1 py-1 border border-gray-300 rounded text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                        >
+                          {dosageUnits.map(unit => (
+                            <option key={unit} value={unit}>{unit}</option>
+                          ))}
+                        </select>
+                      </div>
                     )}
                   </div>
                 ))}
@@ -1286,7 +1443,7 @@ function SupplementsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
             <button 
               className="w-full bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-300" 
               onClick={addSupplement}
-              disabled={!frontImage || !photoDosage || photoTiming.length === 0}
+              disabled={!frontImage || !photoDosage || photoTiming.length === 0 || (photoDosageSchedule === 'specific' && photoSelectedDays.length === 0)}
             >
               Add Supplement Photos
             </button>
@@ -1303,13 +1460,83 @@ function SupplementsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
               value={name} 
               onChange={e => setName(e.target.value)} 
             />
-            <input 
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-green-500 focus:ring-1 focus:ring-green-500" 
-              type="text" 
-              placeholder="Dosage (e.g., 1000mg)" 
-              value={dosage} 
-              onChange={e => setDosage(e.target.value)} 
-            />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Dosage *
+              </label>
+              <div className="flex space-x-2">
+                <input 
+                  className="flex-1 rounded-lg border border-gray-300 px-3 py-2 focus:border-green-500 focus:ring-1 focus:ring-green-500" 
+                  type="text" 
+                  placeholder="e.g., 1000, 2" 
+                  value={dosage} 
+                  onChange={e => setDosage(e.target.value)} 
+                />
+                <select
+                  value={dosageUnit}
+                  onChange={e => setDosageUnit(e.target.value)}
+                  className="w-24 rounded-lg border border-gray-300 px-2 py-2 focus:border-green-500 focus:ring-1 focus:ring-green-500 text-sm"
+                >
+                  {dosageUnits.map(unit => (
+                    <option key={unit} value={unit}>{unit}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                How often do you take this supplement? *
+              </label>
+              <div className="space-y-3">
+                <div className="flex items-center space-x-3">
+                  <input
+                    type="radio"
+                    checked={dosageSchedule === 'daily'}
+                    onChange={() => handleScheduleChange('daily', false)}
+                    className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 focus:ring-green-500 focus:ring-2"
+                    id="manual-daily"
+                  />
+                  <label htmlFor="manual-daily" className="cursor-pointer">
+                    <span className="text-gray-700">Every day</span>
+                  </label>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <input
+                    type="radio"
+                    checked={dosageSchedule === 'specific'}
+                    onChange={() => handleScheduleChange('specific', false)}
+                    className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 focus:ring-green-500 focus:ring-2"
+                    id="manual-specific"
+                  />
+                  <label htmlFor="manual-specific" className="cursor-pointer">
+                    <span className="text-gray-700">Specific days only</span>
+                  </label>
+                </div>
+                
+                {dosageSchedule === 'specific' && (
+                  <div className="ml-7 space-y-2">
+                    <div className="text-sm text-gray-600 mb-2">Select the days you take this supplement:</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {daysOfWeek.map(day => (
+                        <div key={day} className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            checked={selectedDays.includes(day)}
+                            onChange={() => toggleDay(day, false)}
+                            className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
+                            id={`manual-day-${day}`}
+                          />
+                          <label htmlFor={`manual-day-${day}`} className="text-sm cursor-pointer">
+                            {day.substring(0, 3)}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 When do you take this supplement? *
@@ -1328,18 +1555,34 @@ function SupplementsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
                       <span className="text-gray-700">{time}</span>
                     </label>
                     {timing.includes(time) && (
-                      <input
-                        type="text"
-                        placeholder="Dosage (e.g., 2.5mg)"
-                        value={timingDosages[time] || ''}
-                        className="w-32 px-2 py-1 border border-gray-300 rounded text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
-                        onChange={(e) => {
-                          setTimingDosages(prev => ({
-                            ...prev,
-                            [time]: e.target.value
-                          }));
-                        }}
-                      />
+                      <div className="flex space-x-1">
+                        <input
+                          type="text"
+                          placeholder="Amount"
+                          value={timingDosages[time] || ''}
+                          className="w-16 px-2 py-1 border border-gray-300 rounded text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                          onChange={(e) => {
+                            setTimingDosages(prev => ({
+                              ...prev,
+                              [time]: e.target.value
+                            }));
+                          }}
+                        />
+                        <select
+                          value={timingDosageUnits[time] || dosageUnit}
+                          onChange={(e) => {
+                            setTimingDosageUnits(prev => ({
+                              ...prev,
+                              [time]: e.target.value
+                            }));
+                          }}
+                          className="w-16 px-1 py-1 border border-gray-300 rounded text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                        >
+                          {dosageUnits.map(unit => (
+                            <option key={unit} value={unit}>{unit}</option>
+                          ))}
+                        </select>
+                      </div>
                     )}
                   </div>
                 ))}
@@ -1357,7 +1600,7 @@ function SupplementsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
             <button 
               className="w-full bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-300" 
               onClick={addSupplement}
-              disabled={!name || !dosage || timing.length === 0}
+              disabled={!name || !dosage || timing.length === 0 || (dosageSchedule === 'specific' && selectedDays.length === 0)}
             >
               Add Supplement
             </button>
@@ -1383,6 +1626,7 @@ function SupplementsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
                       <div>
                         <div className="font-medium">{s.name}</div>
                         <div className="text-sm text-gray-600">{s.dosage} - {Array.isArray(s.timing) ? s.timing.join(', ') : s.timing}</div>
+                        <div className="text-xs text-gray-500">Schedule: {s.scheduleInfo}</div>
                       </div>
                     )}
                   </div>
@@ -1440,18 +1684,30 @@ function MedicationsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
   const [medications, setMedications] = useState(initial?.medications || []);
   const [name, setName] = useState('');
   const [dosage, setDosage] = useState('');
+  const [dosageUnit, setDosageUnit] = useState('mg');
   const [timing, setTiming] = useState<string[]>([]);
   const [timingDosages, setTimingDosages] = useState<{[key: string]: string}>({});
+  const [timingDosageUnits, setTimingDosageUnits] = useState<{[key: string]: string}>({});
   const [frontImage, setFrontImage] = useState<File | null>(null);
   const [backImage, setBackImage] = useState<File | null>(null);
   const [uploadMethod, setUploadMethod] = useState<'manual' | 'photo'>('photo');
   
+  // New dosing schedule states
+  const [dosageSchedule, setDosageSchedule] = useState<'daily' | 'specific'>('daily');
+  const [selectedDays, setSelectedDays] = useState<string[]>([]);
+  
   // For photo upload method
   const [photoDosage, setPhotoDosage] = useState('');
+  const [photoDosageUnit, setPhotoDosageUnit] = useState('mg');
   const [photoTiming, setPhotoTiming] = useState<string[]>([]);
   const [photoTimingDosages, setPhotoTimingDosages] = useState<{[key: string]: string}>({});
+  const [photoTimingDosageUnits, setPhotoTimingDosageUnits] = useState<{[key: string]: string}>({});
+  const [photoDosageSchedule, setPhotoDosageSchedule] = useState<'daily' | 'specific'>('daily');
+  const [photoSelectedDays, setPhotoSelectedDays] = useState<string[]>([]);
 
   const timingOptions = ['Morning', 'Afternoon', 'Evening', 'Before Bed'];
+  const dosageUnits = ['mg', 'mcg', 'g', 'IU', 'capsules', 'tablets', 'drops', 'ml', 'tsp', 'tbsp'];
+  const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
   const toggleTiming = (time: string, isPhoto: boolean = false) => {
     const currentTiming = isPhoto ? photoTiming : timing;
@@ -1464,33 +1720,89 @@ function MedicationsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
     );
   };
 
+  const toggleDay = (day: string, isPhoto: boolean = false) => {
+    const currentDays = isPhoto ? photoSelectedDays : selectedDays;
+    const setCurrentDays = isPhoto ? setPhotoSelectedDays : setSelectedDays;
+    
+    setCurrentDays(prev => 
+      prev.includes(day) 
+        ? prev.filter(d => d !== day)
+        : [...prev, day]
+    );
+  };
+
+  const handleScheduleChange = (schedule: 'daily' | 'specific', isPhoto: boolean = false) => {
+    if (isPhoto) {
+      setPhotoDosageSchedule(schedule);
+      if (schedule === 'daily') {
+        setPhotoSelectedDays([]);
+      }
+    } else {
+      setDosageSchedule(schedule);
+      if (schedule === 'daily') {
+        setSelectedDays([]);
+      }
+    }
+  };
+
   const addMedication = () => {
     if (uploadMethod === 'manual' && name && dosage && timing.length > 0) {
-      // Combine timing and individual dosages
-      const timingWithDosages = timing.map(time => 
-        timingDosages[time] ? `${time}: ${timingDosages[time]}` : `${time}: ${dosage}`
-      );
+      // Combine timing and individual dosages with units
+      const timingWithDosages = timing.map(time => {
+        const timeSpecificDosage = timingDosages[time];
+        const timeSpecificUnit = timingDosageUnits[time] || dosageUnit;
+        return timeSpecificDosage 
+          ? `${time}: ${timeSpecificDosage} ${timeSpecificUnit}` 
+          : `${time}: ${dosage} ${dosageUnit}`;
+      });
+      
+      const scheduleInfo = dosageSchedule === 'daily' ? 'Daily' : selectedDays.join(', ');
+      
       setMedications((prev: any[]) => [...prev, { 
         name, 
-        dosage, 
+        dosage: `${dosage} ${dosageUnit}`, 
         timing: timingWithDosages, 
+        scheduleInfo: scheduleInfo, // Store as separate field for now
         method: 'manual' 
       }]);
-      setName(''); setDosage(''); setTiming([]); setTimingDosages({});
+      setName(''); 
+      setDosage(''); 
+      setDosageUnit('mg');
+      setTiming([]); 
+      setTimingDosages({});
+      setTimingDosageUnits({});
+      setDosageSchedule('daily');
+      setSelectedDays([]);
     } else if (uploadMethod === 'photo' && frontImage && photoDosage && photoTiming.length > 0) {
-      // Combine timing and individual dosages for photos
-      const timingWithDosages = photoTiming.map(time => 
-        photoTimingDosages[time] ? `${time}: ${photoTimingDosages[time]}` : `${time}: ${photoDosage}`
-      );
+      // Combine timing and individual dosages with units for photos
+      const timingWithDosages = photoTiming.map(time => {
+        const timeSpecificDosage = photoTimingDosages[time];
+        const timeSpecificUnit = photoTimingDosageUnits[time] || photoDosageUnit;
+        return timeSpecificDosage 
+          ? `${time}: ${timeSpecificDosage} ${timeSpecificUnit}` 
+          : `${time}: ${photoDosage} ${photoDosageUnit}`;
+      });
+      
+      const scheduleInfo = photoDosageSchedule === 'daily' ? 'Daily' : photoSelectedDays.join(', ');
+      
       setMedications((prev: any[]) => [...prev, { 
         frontImage: frontImage.name, 
         backImage: backImage?.name, 
         method: 'photo',
         name: frontImage.name.split('.')[0], // Use filename as temporary name
-        dosage: photoDosage,
-        timing: timingWithDosages
+        dosage: `${photoDosage} ${photoDosageUnit}`,
+        timing: timingWithDosages,
+        scheduleInfo: scheduleInfo // Store as separate field for now
       }]);
-      setFrontImage(null); setBackImage(null); setPhotoDosage(''); setPhotoTiming([]); setPhotoTimingDosages({});
+      setFrontImage(null); 
+      setBackImage(null); 
+      setPhotoDosage(''); 
+      setPhotoDosageUnit('mg');
+      setPhotoTiming([]); 
+      setPhotoTimingDosages({});
+      setPhotoTimingDosageUnits({});
+      setPhotoDosageSchedule('daily');
+      setPhotoSelectedDays([]);
     }
   };
 
@@ -1601,13 +1913,78 @@ function MedicationsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Dosage *
               </label>
-              <input 
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-green-500 focus:ring-1 focus:ring-green-500" 
-                type="text" 
-                placeholder="e.g., 10mg, 1 tablet" 
-                value={photoDosage} 
-                onChange={e => setPhotoDosage(e.target.value)} 
-              />
+              <div className="flex space-x-2">
+                <input 
+                  className="flex-1 rounded-lg border border-gray-300 px-3 py-2 focus:border-green-500 focus:ring-1 focus:ring-green-500" 
+                  type="text" 
+                  placeholder="e.g., 10, 1" 
+                  value={photoDosage} 
+                  onChange={e => setPhotoDosage(e.target.value)} 
+                />
+                <select
+                  value={photoDosageUnit}
+                  onChange={e => setPhotoDosageUnit(e.target.value)}
+                  className="w-24 rounded-lg border border-gray-300 px-2 py-2 focus:border-green-500 focus:ring-1 focus:ring-green-500 text-sm"
+                >
+                  {dosageUnits.map(unit => (
+                    <option key={unit} value={unit}>{unit}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                How often do you take this medication? *
+              </label>
+              <div className="space-y-3">
+                <div className="flex items-center space-x-3">
+                  <input
+                    type="radio"
+                    checked={photoDosageSchedule === 'daily'}
+                    onChange={() => handleScheduleChange('daily', true)}
+                    className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 focus:ring-green-500 focus:ring-2"
+                    id="photo-med-daily"
+                  />
+                  <label htmlFor="photo-med-daily" className="cursor-pointer">
+                    <span className="text-gray-700">Every day</span>
+                  </label>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <input
+                    type="radio"
+                    checked={photoDosageSchedule === 'specific'}
+                    onChange={() => handleScheduleChange('specific', true)}
+                    className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 focus:ring-green-500 focus:ring-2"
+                    id="photo-med-specific"
+                  />
+                  <label htmlFor="photo-med-specific" className="cursor-pointer">
+                    <span className="text-gray-700">Specific days only</span>
+                  </label>
+                </div>
+                
+                {photoDosageSchedule === 'specific' && (
+                  <div className="ml-7 space-y-2">
+                    <div className="text-sm text-gray-600 mb-2">Select the days you take this medication:</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {daysOfWeek.map(day => (
+                        <div key={day} className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            checked={photoSelectedDays.includes(day)}
+                            onChange={() => toggleDay(day, true)}
+                            className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
+                            id={`photo-med-day-${day}`}
+                          />
+                          <label htmlFor={`photo-med-day-${day}`} className="text-sm cursor-pointer">
+                            {day.substring(0, 3)}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div>
@@ -1628,18 +2005,34 @@ function MedicationsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
                       <span className="text-gray-700">{time}</span>
                     </label>
                     {photoTiming.includes(time) && (
-                      <input
-                        type="text"
-                        placeholder="Dosage (e.g., 2.5mg)"
-                        value={photoTimingDosages[time] || ''}
-                        className="w-32 px-2 py-1 border border-gray-300 rounded text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
-                        onChange={(e) => {
-                          setPhotoTimingDosages(prev => ({
-                            ...prev,
-                            [time]: e.target.value
-                          }));
-                        }}
-                      />
+                      <div className="flex space-x-1">
+                        <input
+                          type="text"
+                          placeholder="Amount"
+                          value={photoTimingDosages[time] || ''}
+                          className="w-16 px-2 py-1 border border-gray-300 rounded text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                          onChange={(e) => {
+                            setPhotoTimingDosages(prev => ({
+                              ...prev,
+                              [time]: e.target.value
+                            }));
+                          }}
+                        />
+                        <select
+                          value={photoTimingDosageUnits[time] || photoDosageUnit}
+                          onChange={(e) => {
+                            setPhotoTimingDosageUnits(prev => ({
+                              ...prev,
+                              [time]: e.target.value
+                            }));
+                          }}
+                          className="w-16 px-1 py-1 border border-gray-300 rounded text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                        >
+                          {dosageUnits.map(unit => (
+                            <option key={unit} value={unit}>{unit}</option>
+                          ))}
+                        </select>
+                      </div>
                     )}
                   </div>
                 ))}
@@ -1653,7 +2046,7 @@ function MedicationsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
             <button 
               className="w-full bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-300" 
               onClick={addMedication}
-              disabled={!frontImage || !photoDosage || photoTiming.length === 0}
+              disabled={!frontImage || !photoDosage || photoTiming.length === 0 || (photoDosageSchedule === 'specific' && photoSelectedDays.length === 0)}
             >
               Add Medication Photos
             </button>
@@ -1670,13 +2063,83 @@ function MedicationsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
               value={name} 
               onChange={e => setName(e.target.value)} 
             />
-            <input 
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-green-500 focus:ring-1 focus:ring-green-500" 
-              type="text" 
-              placeholder="Dosage (e.g., 10mg)" 
-              value={dosage} 
-              onChange={e => setDosage(e.target.value)} 
-            />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Dosage *
+              </label>
+              <div className="flex space-x-2">
+                <input 
+                  className="flex-1 rounded-lg border border-gray-300 px-3 py-2 focus:border-green-500 focus:ring-1 focus:ring-green-500" 
+                  type="text" 
+                  placeholder="e.g., 10, 1" 
+                  value={dosage} 
+                  onChange={e => setDosage(e.target.value)} 
+                />
+                <select
+                  value={dosageUnit}
+                  onChange={e => setDosageUnit(e.target.value)}
+                  className="w-24 rounded-lg border border-gray-300 px-2 py-2 focus:border-green-500 focus:ring-1 focus:ring-green-500 text-sm"
+                >
+                  {dosageUnits.map(unit => (
+                    <option key={unit} value={unit}>{unit}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                How often do you take this medication? *
+              </label>
+              <div className="space-y-3">
+                <div className="flex items-center space-x-3">
+                  <input
+                    type="radio"
+                    checked={dosageSchedule === 'daily'}
+                    onChange={() => handleScheduleChange('daily', false)}
+                    className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 focus:ring-green-500 focus:ring-2"
+                    id="manual-med-daily"
+                  />
+                  <label htmlFor="manual-med-daily" className="cursor-pointer">
+                    <span className="text-gray-700">Every day</span>
+                  </label>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <input
+                    type="radio"
+                    checked={dosageSchedule === 'specific'}
+                    onChange={() => handleScheduleChange('specific', false)}
+                    className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 focus:ring-green-500 focus:ring-2"
+                    id="manual-med-specific"
+                  />
+                  <label htmlFor="manual-med-specific" className="cursor-pointer">
+                    <span className="text-gray-700">Specific days only</span>
+                  </label>
+                </div>
+                
+                {dosageSchedule === 'specific' && (
+                  <div className="ml-7 space-y-2">
+                    <div className="text-sm text-gray-600 mb-2">Select the days you take this medication:</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {daysOfWeek.map(day => (
+                        <div key={day} className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            checked={selectedDays.includes(day)}
+                            onChange={() => toggleDay(day, false)}
+                            className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
+                            id={`manual-med-day-${day}`}
+                          />
+                          <label htmlFor={`manual-med-day-${day}`} className="text-sm cursor-pointer">
+                            {day.substring(0, 3)}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 When do you take this medication? *
@@ -1695,18 +2158,34 @@ function MedicationsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
                       <span className="text-gray-700">{time}</span>
                     </label>
                     {timing.includes(time) && (
-                      <input
-                        type="text"
-                        placeholder="Dosage (e.g., 2.5mg)"
-                        value={timingDosages[time] || ''}
-                        className="w-32 px-2 py-1 border border-gray-300 rounded text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
-                        onChange={(e) => {
-                          setTimingDosages(prev => ({
-                            ...prev,
-                            [time]: e.target.value
-                          }));
-                        }}
-                      />
+                      <div className="flex space-x-1">
+                        <input
+                          type="text"
+                          placeholder="Amount"
+                          value={timingDosages[time] || ''}
+                          className="w-16 px-2 py-1 border border-gray-300 rounded text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                          onChange={(e) => {
+                            setTimingDosages(prev => ({
+                              ...prev,
+                              [time]: e.target.value
+                            }));
+                          }}
+                        />
+                        <select
+                          value={timingDosageUnits[time] || dosageUnit}
+                          onChange={(e) => {
+                            setTimingDosageUnits(prev => ({
+                              ...prev,
+                              [time]: e.target.value
+                            }));
+                          }}
+                          className="w-16 px-1 py-1 border border-gray-300 rounded text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                        >
+                          {dosageUnits.map(unit => (
+                            <option key={unit} value={unit}>{unit}</option>
+                          ))}
+                        </select>
+                      </div>
                     )}
                   </div>
                 ))}
@@ -1719,7 +2198,7 @@ function MedicationsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
             <button 
               className="w-full bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-300" 
               onClick={addMedication}
-              disabled={!name || !dosage || timing.length === 0}
+              disabled={!name || !dosage || timing.length === 0 || (dosageSchedule === 'specific' && selectedDays.length === 0)}
             >
               Add Medication
             </button>
@@ -1745,6 +2224,7 @@ function MedicationsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
                       <div>
                         <div className="font-medium">{m.name}</div>
                         <div className="text-sm text-gray-600">{m.dosage} - {Array.isArray(m.timing) ? m.timing.join(', ') : m.timing}</div>
+                        <div className="text-xs text-gray-500">Schedule: {m.scheduleInfo}</div>
                       </div>
                     )}
                   </div>
