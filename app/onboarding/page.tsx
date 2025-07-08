@@ -3065,7 +3065,12 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
       }
 
       const result = await response.json();
-      setAnalysisResult(result);
+      // Handle the API response structure - it returns { success: true, analysis: {...} }
+      if (result.success && result.analysis) {
+        setAnalysisResult(result.analysis);
+      } else {
+        throw new Error('Invalid API response structure');
+      }
     } catch (err) {
       console.error('Error performing interaction analysis:', err);
       setError('Failed to analyze interactions. Please try again.');
@@ -3167,7 +3172,10 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
         {/* Summary */}
         <div className="mb-6 p-4 bg-blue-50 rounded-lg">
           <h3 className="font-semibold text-blue-900 mb-2">Summary</h3>
-          <p className="text-blue-800">{analysisResult.summary}</p>
+          <p className="text-blue-800">
+            {analysisResult.summary || 
+             `Analysis completed for ${analysisResult.supplementCount || 0} supplement${(analysisResult.supplementCount || 0) !== 1 ? 's' : ''} and ${analysisResult.medicationCount || 0} medication${(analysisResult.medicationCount || 0) !== 1 ? 's' : ''}. Overall risk level: ${analysisResult.overallRisk || 'unknown'}.`}
+          </p>
         </div>
 
         {/* Interactions */}
@@ -3178,7 +3186,7 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
               {analysisResult.interactions.map((interaction: any, index: number) => (
                 <div key={index} className="border rounded-lg p-4">
                   <div className="flex items-start justify-between mb-2">
-                    <div className="font-medium">{interaction.substances.join(' + ')}</div>
+                    <div className="font-medium">{interaction.substance1} + {interaction.substance2}</div>
                     <div className={`px-2 py-1 rounded text-xs font-medium ${
                       interaction.severity === 'low' 
                         ? 'bg-green-100 text-green-800'
@@ -3225,11 +3233,11 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
         )}
 
         {/* Recommendations */}
-        {analysisResult.recommendations && analysisResult.recommendations.length > 0 && (
+        {analysisResult.generalRecommendations && analysisResult.generalRecommendations.length > 0 && (
           <div className="mb-6">
             <h3 className="text-lg font-semibold mb-4">Recommendations</h3>
             <div className="space-y-2">
-              {analysisResult.recommendations.map((rec: string, index: number) => (
+              {analysisResult.generalRecommendations.map((rec: string, index: number) => (
                 <div key={index} className="flex items-start space-x-2">
                   <div className="text-green-600 mt-1">✓</div>
                   <div className="text-gray-700">{rec}</div>
