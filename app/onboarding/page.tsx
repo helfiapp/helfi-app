@@ -3038,12 +3038,9 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
         const data = await response.json();
         const analyses = data.analyses || [];
         setPreviousAnalyses(analyses);
-        setIsLoadingHistory(false);
         
-        // Only perform new analysis if there are no previous analyses
-        if (analyses.length === 0) {
-          performAnalysis();
-        }
+        // Always perform new analysis for now - user can see previous ones too
+        performAnalysis();
       } else {
         setIsLoadingHistory(false);
         // If API fails, still perform analysis
@@ -3060,6 +3057,7 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
   const performAnalysis = async () => {
     setIsAnalyzing(true);
     setError(null);
+    setIsLoadingHistory(false); // Stop loading history when we start analysis
 
     try {
       const supplements = initial?.supplements || [];
@@ -3207,23 +3205,7 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
     );
   }
 
-  if (!analysisResult) {
-    return (
-      <div className="max-w-2xl mx-auto">
-        <div className="bg-white rounded-lg shadow-sm p-8 text-center">
-          <div className="text-gray-400 text-6xl mb-4">🤔</div>
-          <h2 className="text-2xl font-bold mb-4">No Analysis Available</h2>
-          <p className="text-gray-600 mb-6">Unable to load interaction analysis results.</p>
-          <button
-            onClick={onBack}
-            className="w-full border border-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            Go Back
-          </button>
-        </div>
-      </div>
-    );
-  }
+  // This check is moved below, after we handle the previous analyses case
 
   // Show loading state while fetching history
   if (isLoadingHistory) {
@@ -3348,6 +3330,25 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
             </div>
           </div>
         )}
+      </div>
+    );
+  }
+
+  // Final fallback - if we don't have analysis results and we're not loading/analyzing
+  if (!analysisResult) {
+    return (
+      <div className="max-w-2xl mx-auto">
+        <div className="bg-white rounded-lg shadow-sm p-8 text-center">
+          <div className="text-gray-400 text-6xl mb-4">🤔</div>
+          <h2 className="text-2xl font-bold mb-4">No Analysis Available</h2>
+          <p className="text-gray-600 mb-6">Unable to load interaction analysis results.</p>
+          <button
+            onClick={onBack}
+            className="w-full border border-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            Go Back
+          </button>
+        </div>
       </div>
     );
   }
