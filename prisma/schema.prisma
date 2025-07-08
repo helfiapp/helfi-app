@@ -31,6 +31,7 @@ model User {
   exerciseLogs  ExerciseLog[]
   subscription  Subscription?
   supportTickets SupportTicket[]
+  interactionAnalyses InteractionAnalysis[]
   
   // File relationships (PHASE 2 addition)
   uploadedFiles File[]     @relation("UploadedFiles")
@@ -330,4 +331,23 @@ enum FileUsage {
   MEDICATION_IMAGE
   DOCUMENT
   OTHER
+}
+
+model InteractionAnalysis {
+  id                    String   @id @default(cuid())
+  userId                String
+  analysisName          String   // User-friendly name for the analysis
+  overallRisk           String   // low, medium, high
+  supplementCount       Int      @default(0)
+  medicationCount       Int      @default(0)
+  analysisData          Json     // Full analysis results (interactions, recommendations, etc.)
+  supplementsAnalyzed   Json     // Array of supplements that were analyzed
+  medicationsAnalyzed   Json     // Array of medications that were analyzed
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  // Relations
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId, createdAt])
 }

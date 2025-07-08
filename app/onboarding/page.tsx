@@ -3022,11 +3022,40 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [previousAnalyses, setPreviousAnalyses] = useState<any[]>([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+  const [showReanalyzeConfirm, setShowReanalyzeConfirm] = useState(false);
 
   useEffect(() => {
-    // Perform analysis when component mounts
-    performAnalysis();
+    // Load previous analyses first, then perform new analysis
+    loadPreviousAnalyses();
   }, []);
+
+  const loadPreviousAnalyses = async () => {
+    try {
+      const response = await fetch('/api/interaction-history');
+      if (response.ok) {
+        const data = await response.json();
+        const analyses = data.analyses || [];
+        setPreviousAnalyses(analyses);
+        setIsLoadingHistory(false);
+        
+        // Only perform new analysis if there are no previous analyses
+        if (analyses.length === 0) {
+          performAnalysis();
+        }
+      } else {
+        setIsLoadingHistory(false);
+        // If API fails, still perform analysis
+        performAnalysis();
+      }
+    } catch (error) {
+      console.error('Error loading previous analyses:', error);
+      setIsLoadingHistory(false);
+      // If API fails, still perform analysis
+      performAnalysis();
+    }
+  };
 
   const performAnalysis = async () => {
     setIsAnalyzing(true);
@@ -3086,6 +3115,51 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
   const handleNext = () => {
     // Save analysis result and proceed
     onNext({ interactionAnalysis: analysisResult });
+  };
+
+  const handleReanalyzeAll = async () => {
+    setShowReanalyzeConfirm(false);
+    try {
+      // Delete all previous analyses
+      const deleteResponse = await fetch('/api/interaction-history', {
+        method: 'DELETE',
+      });
+      
+      if (deleteResponse.ok) {
+        setPreviousAnalyses([]);
+        setAnalysisResult(null);
+        // Perform new analysis
+        performAnalysis();
+      } else {
+        setError('Failed to delete previous analyses');
+      }
+    } catch (error) {
+      console.error('Error deleting analyses:', error);
+      setError('Failed to delete previous analyses');
+    }
+  };
+
+  const handleNewAnalysis = () => {
+    setAnalysisResult(null);
+    performAnalysis();
+  };
+
+  const getRiskColor = (risk: string) => {
+    switch (risk) {
+      case 'low': return 'bg-green-100 text-green-800';
+      case 'medium': return 'bg-orange-100 text-orange-800';
+      case 'high': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getRiskIcon = (risk: string) => {
+    switch (risk) {
+      case 'low': return '🟢';
+      case 'medium': return '🟠';
+      case 'high': return '🔴';
+      default: return '⚪';
+    }
   };
 
   if (isAnalyzing) {
@@ -3151,11 +3225,138 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
     );
   }
 
+  // Show loading state while fetching history
+  if (isLoadingHistory) {
+    return (
+      <div className="max-w-2xl mx-auto">
+        <div className="bg-white rounded-lg shadow-sm p-8 text-center">
+          <div className="mb-6">
+            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-green-600 mx-auto"></div>
+          </div>
+          <h2 className="text-2xl font-bold mb-4">Loading Analysis History</h2>
+          <p className="text-gray-600">Checking for previous analyses...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show previous analyses and option to create new one
+  if (!analysisResult && !isAnalyzing) {
+    return (
+      <div className="max-w-4xl mx-auto">
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold">Interaction Analysis</h2>
+            <div className="flex space-x-3">
+              {previousAnalyses.length > 0 && (
+                <button
+                  onClick={() => setShowReanalyzeConfirm(true)}
+                  className="px-4 py-2 border border-red-300 text-red-700 rounded-lg hover:bg-red-50 transition-colors text-sm"
+                >
+                  Re-analyze All
+                </button>
+              )}
+              <button
+                onClick={handleNewAnalysis}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+              >
+                New Analysis
+              </button>
+            </div>
+          </div>
+
+          {/* Previous Analyses */}
+          {previousAnalyses.length > 0 && (
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold mb-4">Previous Analyses</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {previousAnalyses.map((analysis) => (
+                  <div key={analysis.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="font-medium text-sm text-gray-900 line-clamp-2">
+                        {analysis.analysisName}
+                      </div>
+                      <div className={`px-2 py-1 rounded text-xs font-medium ml-2 flex-shrink-0 ${getRiskColor(analysis.overallRisk)}`}>
+                        {getRiskIcon(analysis.overallRisk)} {analysis.overallRisk}
+                      </div>
+                    </div>
+                    <div className="text-xs text-gray-500 mb-2">
+                      {analysis.supplementCount} supplements, {analysis.medicationCount} medications
+                    </div>
+                    <div className="text-xs text-gray-400">
+                      {new Date(analysis.createdAt).toLocaleDateString()}
+                    </div>
+                    <div className="mt-3 text-xs text-blue-600 font-medium">
+                      Previous Analysis
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* No previous analyses message */}
+          {previousAnalyses.length === 0 && (
+            <div className="text-center py-8">
+              <div className="text-gray-400 text-6xl mb-4">🔬</div>
+              <h3 className="text-lg font-semibold mb-2">No Previous Analyses</h3>
+              <p className="text-gray-600 mb-6">
+                This will be your first interaction analysis. We'll analyze your current supplements and medications for potential interactions.
+              </p>
+            </div>
+          )}
+
+          {/* Navigation */}
+          <div className="flex space-x-4">
+            <button
+              onClick={onBack}
+              className="flex-1 border border-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              Back to Medications
+            </button>
+            <button
+              onClick={handleNewAnalysis}
+              className="flex-1 bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors"
+            >
+              {previousAnalyses.length > 0 ? 'Run New Analysis' : 'Start Analysis'}
+            </button>
+          </div>
+        </div>
+
+        {/* Re-analyze Confirmation Modal */}
+        {showReanalyzeConfirm && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Re-analyze All Supplements & Medications</h3>
+              <p className="text-gray-600 mb-6">
+                This will delete all your previous interaction analyses and create a fresh analysis with your current supplements and medications. This action cannot be undone.
+              </p>
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => setShowReanalyzeConfirm(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleReanalyzeAll}
+                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                >
+                  Delete & Re-analyze
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-4xl mx-auto">
       <div className="bg-white rounded-lg shadow-sm p-6">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold">Interaction Analysis Results</h2>
+          <h2 className="text-2xl font-bold">Latest Analysis Results</h2>
           <div className={`px-3 py-1 rounded-full text-sm font-medium ${
             analysisResult.overallRisk === 'low' 
               ? 'bg-green-100 text-green-800'

@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
 import OpenAI from 'openai';
 
 const openai = new OpenAI({
@@ -7,7 +10,13 @@ const openai = new OpenAI({
 
 export async function POST(request: NextRequest) {
   try {
-    const { supplements, medications } = await request.json();
+    // Check authentication
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { supplements, medications, analysisName } = await request.json();
 
     if (!supplements || !medications) {
       return NextResponse.json({ error: 'Missing supplements or medications data' }, { status: 400 });
@@ -143,9 +152,37 @@ Be thorough but not alarmist. Provide actionable recommendations.`;
     analysis.supplementCount = supplements.length;
     analysis.medicationCount = medications.length;
 
+    // Find user in database
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email }
+    });
+
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    // Generate analysis name if not provided
+    const defaultAnalysisName = analysisName || 
+      `Analysis ${new Date().toLocaleDateString()} - ${supplements.length} supplements, ${medications.length} medications`;
+
+    // Save analysis to database
+    const savedAnalysis = await prisma.interactionAnalysis.create({
+      data: {
+        userId: user.id,
+        analysisName: defaultAnalysisName,
+        overallRisk: analysis.overallRisk,
+        supplementCount: supplements.length,
+        medicationCount: medications.length,
+        analysisData: analysis,
+        supplementsAnalyzed: supplements,
+        medicationsAnalyzed: medications,
+      }
+    });
+
     return NextResponse.json({ 
       success: true, 
-      analysis 
+      analysis,
+      analysisId: savedAnalysis.id
     });
 
   } catch (error) {
