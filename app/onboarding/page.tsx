@@ -3018,6 +3018,263 @@ function ReviewStep({ onBack, data }: { onBack: () => void, data: any }) {
   );
 }
 
+function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: any) => void, onBack: () => void, initial?: any }) {
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Perform analysis when component mounts
+    performAnalysis();
+  }, []);
+
+  const performAnalysis = async () => {
+    setIsAnalyzing(true);
+    setError(null);
+
+    try {
+      const supplements = initial?.supplements || [];
+      const medications = initial?.medications || [];
+
+      if (supplements.length === 0 && medications.length === 0) {
+        setAnalysisResult({
+          overallRisk: 'low',
+          summary: 'No supplements or medications to analyze.',
+          interactions: [],
+          timingOptimization: {},
+          recommendations: ['Consider adding supplements to support your health goals.'],
+          disclaimer: 'This analysis is for informational purposes only and should not replace professional medical advice.'
+        });
+        setIsAnalyzing(false);
+        return;
+      }
+
+      const response = await fetch('/api/analyze-interactions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          supplements,
+          medications,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Analysis failed: ${response.status}`);
+      }
+
+      const result = await response.json();
+      setAnalysisResult(result);
+    } catch (err) {
+      console.error('Error performing interaction analysis:', err);
+      setError('Failed to analyze interactions. Please try again.');
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const handleRetry = () => {
+    performAnalysis();
+  };
+
+  const handleNext = () => {
+    // Save analysis result and proceed
+    onNext({ interactionAnalysis: analysisResult });
+  };
+
+  if (isAnalyzing) {
+    return (
+      <div className="max-w-2xl mx-auto">
+        <div className="bg-white rounded-lg shadow-sm p-8 text-center">
+          <div className="mb-6">
+            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-green-600 mx-auto"></div>
+          </div>
+          <h2 className="text-2xl font-bold mb-4">Analyzing Interactions</h2>
+          <p className="text-gray-600 mb-4">
+            Our AI is analyzing potential interactions between your supplements and medications...
+          </p>
+          <div className="text-sm text-gray-500">
+            This may take a few moments
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-2xl mx-auto">
+        <div className="bg-white rounded-lg shadow-sm p-8 text-center">
+          <div className="text-red-500 text-6xl mb-4">⚠️</div>
+          <h2 className="text-2xl font-bold mb-4">Analysis Error</h2>
+          <p className="text-gray-600 mb-6">{error}</p>
+          <div className="space-y-3">
+            <button
+              onClick={handleRetry}
+              className="w-full bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors"
+            >
+              Try Again
+            </button>
+            <button
+              onClick={onBack}
+              className="w-full border border-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              Go Back
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!analysisResult) {
+    return (
+      <div className="max-w-2xl mx-auto">
+        <div className="bg-white rounded-lg shadow-sm p-8 text-center">
+          <div className="text-gray-400 text-6xl mb-4">🤔</div>
+          <h2 className="text-2xl font-bold mb-4">No Analysis Available</h2>
+          <p className="text-gray-600 mb-6">Unable to load interaction analysis results.</p>
+          <button
+            onClick={onBack}
+            className="w-full border border-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            Go Back
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-4xl mx-auto">
+      <div className="bg-white rounded-lg shadow-sm p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-bold">Interaction Analysis Results</h2>
+          <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+            analysisResult.overallRisk === 'low' 
+              ? 'bg-green-100 text-green-800'
+              : analysisResult.overallRisk === 'medium'
+              ? 'bg-orange-100 text-orange-800'
+              : 'bg-red-100 text-red-800'
+          }`}>
+            {analysisResult.overallRisk === 'low' && '🟢 Low Risk'}
+            {analysisResult.overallRisk === 'medium' && '🟠 Medium Risk'}
+            {analysisResult.overallRisk === 'high' && '🔴 High Risk'}
+          </div>
+        </div>
+
+        {/* Summary */}
+        <div className="mb-6 p-4 bg-blue-50 rounded-lg">
+          <h3 className="font-semibold text-blue-900 mb-2">Summary</h3>
+          <p className="text-blue-800">{analysisResult.summary}</p>
+        </div>
+
+        {/* Interactions */}
+        {analysisResult.interactions && analysisResult.interactions.length > 0 && (
+          <div className="mb-6">
+            <h3 className="text-lg font-semibold mb-4">Potential Interactions</h3>
+            <div className="space-y-3">
+              {analysisResult.interactions.map((interaction: any, index: number) => (
+                <div key={index} className="border rounded-lg p-4">
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="font-medium">{interaction.substances.join(' + ')}</div>
+                    <div className={`px-2 py-1 rounded text-xs font-medium ${
+                      interaction.severity === 'low' 
+                        ? 'bg-green-100 text-green-800'
+                        : interaction.severity === 'medium'
+                        ? 'bg-orange-100 text-orange-800'
+                        : 'bg-red-100 text-red-800'
+                    }`}>
+                      {interaction.severity === 'low' && '🟢 Low'}
+                      {interaction.severity === 'medium' && '🟠 Medium'}
+                      {interaction.severity === 'high' && '🔴 High'}
+                    </div>
+                  </div>
+                  <p className="text-gray-600 text-sm mb-2">{interaction.description}</p>
+                  {interaction.recommendation && (
+                    <p className="text-blue-600 text-sm font-medium">
+                      💡 {interaction.recommendation}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Timing Optimization */}
+        {analysisResult.timingOptimization && Object.keys(analysisResult.timingOptimization).length > 0 && (
+          <div className="mb-6">
+            <h3 className="text-lg font-semibold mb-4">Optimal Timing Schedule</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {Object.entries(analysisResult.timingOptimization).map(([timeSlot, substances]: [string, any]) => (
+                <div key={timeSlot} className="border rounded-lg p-3">
+                  <div className="font-medium text-gray-900 mb-2">{timeSlot}</div>
+                  <div className="space-y-1">
+                    {substances.map((substance: string, index: number) => (
+                      <div key={index} className="text-sm text-gray-600 bg-gray-50 rounded px-2 py-1">
+                        {substance}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Recommendations */}
+        {analysisResult.recommendations && analysisResult.recommendations.length > 0 && (
+          <div className="mb-6">
+            <h3 className="text-lg font-semibold mb-4">Recommendations</h3>
+            <div className="space-y-2">
+              {analysisResult.recommendations.map((rec: string, index: number) => (
+                <div key={index} className="flex items-start space-x-2">
+                  <div className="text-green-600 mt-1">✓</div>
+                  <div className="text-gray-700">{rec}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Disclaimer */}
+        <div className="mb-6 p-4 bg-yellow-50 border-l-4 border-yellow-400">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-yellow-700">
+                <strong>Important:</strong> {analysisResult.disclaimer}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Navigation */}
+        <div className="flex space-x-4">
+          <button
+            onClick={onBack}
+            className="flex-1 border border-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            Back to Medications
+          </button>
+          <button
+            onClick={handleNext}
+            className="flex-1 bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors"
+          >
+            Continue to Blood Results
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Onboarding() {
   const { data: session, status } = useSession();
   
@@ -3038,6 +3295,7 @@ export default function Onboarding() {
     'Health Situations', 
     'Supplements',
     'Medications',
+    'Interaction Analysis',
     'Blood Results',
     'AI Insights',
     'Review'
@@ -3249,7 +3507,7 @@ export default function Onboarding() {
   // Mobile sliding window navigation
   const getMobileProgressWindow = () => {
     const currentStep = step + 1; // 1-indexed for display
-    const totalSteps = 10;
+    const totalSteps = 11;
     
     // Show current + 2 before/after when possible
     let start = Math.max(1, currentStep - 2);
@@ -3424,7 +3682,7 @@ export default function Onboarding() {
           {/* Desktop: Full Numbered Steps (unchanged) */}
           <div className="hidden sm:block relative mb-3">
             <div className="flex items-center justify-center max-w-4xl mx-auto">
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((stepNum, index) => (
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((stepNum, index) => (
                 <div key={stepNum} className="flex items-center">
                   <button 
                     onClick={() => goToStep(stepNum - 1)}
@@ -3444,7 +3702,7 @@ export default function Onboarding() {
                   >
                     {stepNum}
                   </button>
-                  {index < 9 && (
+                  {index < 10 && (
                     <div className={`h-0.5 w-4 transition-all ${
                       stepNum < step + 1 ? 'bg-green-600' : 'bg-gray-300'
                     }`} />
@@ -3480,9 +3738,9 @@ export default function Onboarding() {
             <button className="text-sm text-gray-500 hover:text-gray-700">Skip</button>
             <div className="text-center">
               <div className="text-sm font-medium text-gray-900">{stepNames[step]}</div>
-              <div className="text-xs text-gray-500">Step {step + 1} of 10</div>
+              <div className="text-xs text-gray-500">Step {step + 1} of 11</div>
             </div>
-            <div className="text-sm text-gray-500">{step + 1}/10</div>
+            <div className="text-sm text-gray-500">{step + 1}/11</div>
           </div>
         </div>
 
@@ -3495,9 +3753,10 @@ export default function Onboarding() {
           {step === 4 && <HealthSituationsStep onNext={handleNext} onBack={handleBack} initial={form} />}
           {step === 5 && <SupplementsStep onNext={handleNext} onBack={handleBack} initial={form} />}
           {step === 6 && <MedicationsStep onNext={handleNext} onBack={handleBack} initial={form} />}
-          {step === 7 && <BloodResultsStep onNext={handleNext} onBack={handleBack} initial={form} />}
-          {step === 8 && <AIInsightsStep onNext={handleNext} onBack={handleBack} initial={form} />}
-          {step === 9 && <ReviewStep onBack={handleBack} data={form} />}
+          {step === 7 && <InteractionAnalysisStep onNext={handleNext} onBack={handleBack} initial={form} />}
+          {step === 8 && <BloodResultsStep onNext={handleNext} onBack={handleBack} initial={form} />}
+          {step === 9 && <AIInsightsStep onNext={handleNext} onBack={handleBack} initial={form} />}
+          {step === 10 && <ReviewStep onBack={handleBack} data={form} />}
         </div>
 
         {/* Mobile Bottom Navigation */}
