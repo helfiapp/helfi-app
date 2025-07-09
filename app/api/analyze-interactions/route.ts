@@ -22,6 +22,50 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing supplements or medications data' }, { status: 400 });
     }
 
+    // Find user and check credit quota
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email },
+      include: { subscription: true }
+    });
+
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    // Check if daily quota needs reset (new day)
+    const today = new Date();
+    const lastReset = user.lastAnalysisResetDate;
+    const needsReset = !lastReset || 
+      lastReset.getDate() !== today.getDate() ||
+      lastReset.getMonth() !== today.getMonth() ||
+      lastReset.getFullYear() !== today.getFullYear();
+
+    if (needsReset) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          dailyAnalysisUsed: 0,
+          lastAnalysisResetDate: today
+        }
+      });
+      user.dailyAnalysisUsed = 0;
+    }
+
+    // Check credit availability
+    const hasCredits = user.dailyAnalysisUsed < user.dailyAnalysisCredits || user.additionalCredits > 0;
+    
+    if (!hasCredits) {
+      return NextResponse.json({ 
+        error: 'Insufficient credits',
+        creditInfo: {
+          dailyUsed: user.dailyAnalysisUsed,
+          dailyLimit: user.dailyAnalysisCredits,
+          additionalCredits: user.additionalCredits,
+          plan: user.subscription?.plan || 'FREE'
+        }
+      }, { status: 402 }); // Payment Required
+    }
+
     // Prepare the data for OpenAI analysis
     const supplementList = (supplements as any[]).map((s: any) => ({
       name: s.name,
@@ -69,6 +113,12 @@ Please provide a comprehensive interaction analysis in the following JSON format
   ],
   "disclaimer": "Important medical disclaimer text"
 }
+
+CRITICAL INSTRUCTIONS:
+1. ONLY include interactions that are MEDIUM or HIGH severity - do not include low/safe interactions
+2. For timing optimization, DO NOT include substances that have HIGH severity interactions with each other
+3. For MEDIUM severity interactions, include timing recommendations but note spacing requirements
+4. Focus on actionable, significant interactions only
 
 Focus on:
 1. Drug-supplement interactions
@@ -152,15 +202,6 @@ Be thorough but not alarmist. Provide actionable recommendations.`;
     analysis.supplementCount = supplements.length;
     analysis.medicationCount = medications.length;
 
-    // Find user in database
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email }
-    });
-
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    }
-
     // Generate analysis name if not provided
     const defaultAnalysisName = analysisName || 
       `Analysis ${new Date().toLocaleDateString()} - ${supplements.length} supplements, ${medications.length} medications`;
@@ -178,6 +219,27 @@ Be thorough but not alarmist. Provide actionable recommendations.`;
         medicationsAnalyzed: medications,
       }
     });
+
+    // Consume credit after successful analysis
+    if (user.dailyAnalysisUsed < user.dailyAnalysisCredits) {
+      // Use daily credit
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { 
+          dailyAnalysisUsed: user.dailyAnalysisUsed + 1,
+          totalAnalysisCount: user.totalAnalysisCount + 1
+        }
+      });
+    } else {
+      // Use additional credit
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { 
+          additionalCredits: user.additionalCredits - 1,
+          totalAnalysisCount: user.totalAnalysisCount + 1
+        }
+      });
+    }
 
     return NextResponse.json({ 
       success: true, 

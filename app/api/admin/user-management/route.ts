@@ -97,6 +97,11 @@ export async function POST(request: NextRequest) {
           update: { plan: 'PREMIUM' },
           create: { userId, plan: 'PREMIUM' }
         })
+        // Update daily credits for premium
+        await prisma.user.update({
+          where: { id: userId },
+          data: { dailyAnalysisCredits: 30 }
+        })
         break
 
       case 'deactivate':
@@ -105,6 +110,11 @@ export async function POST(request: NextRequest) {
           where: { userId },
           update: { plan: 'FREE' },
           create: { userId, plan: 'FREE' }
+        })
+        // Update daily credits for free
+        await prisma.user.update({
+          where: { id: userId },
+          data: { dailyAnalysisCredits: 3 }
         })
         break
 
@@ -167,6 +177,55 @@ export async function POST(request: NextRequest) {
           where: { id: userId }
         })
         break
+
+      case 'add_credits':
+        // Add additional credits to user account
+        const creditAmount = data?.creditAmount || 0
+        if (creditAmount <= 0) {
+          return NextResponse.json({ error: 'Invalid credit amount' }, { status: 400 })
+        }
+        await prisma.user.update({
+          where: { id: userId },
+          data: {
+            additionalCredits: {
+              increment: creditAmount
+            }
+          }
+        })
+        break
+
+      case 'reset_daily_quota':
+        // Reset daily analysis quota
+        await prisma.user.update({
+          where: { id: userId },
+          data: {
+            dailyAnalysisUsed: 0,
+            lastAnalysisResetDate: new Date()
+          }
+        })
+        break
+
+      case 'view_credit_usage':
+        // Get detailed credit usage information
+        const user = await prisma.user.findUnique({
+          where: { id: userId },
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            dailyAnalysisCredits: true,
+            additionalCredits: true,
+            dailyAnalysisUsed: true,
+            totalAnalysisCount: true,
+            lastAnalysisResetDate: true,
+            subscription: {
+              select: {
+                plan: true
+              }
+            }
+          }
+        })
+        return NextResponse.json({ success: true, creditUsage: user })
 
       default:
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 })

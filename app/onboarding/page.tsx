@@ -5,6 +5,7 @@ import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import Image from 'next/image';
 import Link from 'next/link';
+import CreditPurchaseModal from '@/components/CreditPurchaseModal';
 
 // Auth-enabled onboarding flow
 
@@ -3025,11 +3026,37 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
   const [previousAnalyses, setPreviousAnalyses] = useState<any[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [showReanalyzeConfirm, setShowReanalyzeConfirm] = useState(false);
+  const [showCreditModal, setShowCreditModal] = useState(false);
+  const [creditInfo, setCreditInfo] = useState<any>(null);
+  const [autoAnalysisTimeout, setAutoAnalysisTimeout] = useState<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     // Load previous analyses first, then perform new analysis
     loadPreviousAnalyses();
   }, []);
+
+  // Auto-analysis effect with debounce when supplements/medications change
+  useEffect(() => {
+    if (autoAnalysisTimeout) {
+      clearTimeout(autoAnalysisTimeout);
+    }
+
+    // Set up debounced auto-analysis (2-3 second delay)
+    const timeout = setTimeout(() => {
+      if (analysisResult && !isAnalyzing) {
+        console.log('🔄 Auto-reanalyzing due to input changes...');
+        performAnalysis();
+      }
+    }, 2500); // 2.5 second debounce
+
+    setAutoAnalysisTimeout(timeout);
+
+    return () => {
+      if (timeout) {
+        clearTimeout(timeout);
+      }
+    };
+  }, [initial?.supplements, initial?.medications]);
 
   const loadPreviousAnalyses = async () => {
     try {
@@ -3086,6 +3113,15 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
           medications,
         }),
       });
+
+      if (response.status === 402) {
+        // Handle insufficient credits
+        const errorData = await response.json();
+        setCreditInfo(errorData.creditInfo);
+        setShowCreditModal(true);
+        setIsAnalyzing(false);
+        return;
+      }
 
       if (!response.ok) {
         throw new Error(`Analysis failed: ${response.status}`);
@@ -3355,10 +3391,10 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
 
   return (
     <div className="max-w-4xl mx-auto">
-      <div className="bg-white rounded-lg shadow-sm p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold">Latest Analysis Results</h2>
-          <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+      <div className="bg-white rounded-lg shadow-sm p-4 md:p-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 space-y-3 md:space-y-0">
+          <h2 className="text-xl md:text-2xl font-bold">Latest Analysis Results</h2>
+          <div className={`px-3 py-1 rounded-full text-sm font-medium self-start md:self-auto ${
             analysisResult.overallRisk === 'low' 
               ? 'bg-green-100 text-green-800'
               : analysisResult.overallRisk === 'medium'
@@ -3386,10 +3422,12 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
             <h3 className="text-lg font-semibold mb-4">Potential Interactions</h3>
             <div className="space-y-3">
               {analysisResult.interactions.map((interaction: any, index: number) => (
-                <div key={index} className="border rounded-lg p-4">
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="font-medium">{interaction.substance1} + {interaction.substance2}</div>
-                    <div className={`px-2 py-1 rounded text-xs font-medium ${
+                <div key={index} className="border rounded-lg p-3 md:p-4">
+                  <div className="flex flex-col md:flex-row md:items-start md:justify-between mb-2 space-y-2 md:space-y-0">
+                    <div className="font-medium text-sm md:text-base break-words">
+                      {interaction.substance1} + {interaction.substance2}
+                    </div>
+                    <div className={`px-2 py-1 rounded text-xs font-medium self-start md:self-auto flex-shrink-0 ${
                       interaction.severity === 'low' 
                         ? 'bg-green-100 text-green-800'
                         : interaction.severity === 'medium'
@@ -3401,11 +3439,13 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
                       {interaction.severity === 'high' && '🔴 High'}
                     </div>
                   </div>
-                  <p className="text-gray-600 text-sm mb-2">{interaction.description}</p>
+                  <p className="text-gray-600 text-sm mb-2 leading-relaxed">{interaction.description}</p>
                   {interaction.recommendation && (
-                    <p className="text-blue-600 text-sm font-medium">
-                      💡 {interaction.recommendation}
-                    </p>
+                    <div className="bg-blue-50 p-2 rounded text-sm">
+                      <p className="text-blue-600 font-medium">
+                        💡 {interaction.recommendation}
+                      </p>
+                    </div>
                   )}
                 </div>
               ))}
@@ -3417,13 +3457,15 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
         {analysisResult.timingOptimization && Object.keys(analysisResult.timingOptimization).length > 0 && (
           <div className="mb-6">
             <h3 className="text-lg font-semibold mb-4">Optimal Timing Schedule</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
               {Object.entries(analysisResult.timingOptimization).map(([timeSlot, substances]: [string, any]) => (
                 <div key={timeSlot} className="border rounded-lg p-3">
-                  <div className="font-medium text-gray-900 mb-2">{timeSlot}</div>
+                  <div className="font-medium text-gray-900 mb-2 text-sm md:text-base capitalize">
+                    {timeSlot.replace(/([A-Z])/g, ' $1').trim()}
+                  </div>
                   <div className="space-y-1">
                     {substances.map((substance: string, index: number) => (
-                      <div key={index} className="text-sm text-gray-600 bg-gray-50 rounded px-2 py-1">
+                      <div key={index} className="text-xs md:text-sm text-gray-600 bg-gray-50 rounded px-2 py-1 break-words">
                         {substance}
                       </div>
                     ))}
@@ -3466,21 +3508,30 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
         </div>
 
         {/* Navigation */}
-        <div className="flex space-x-4">
+        <div className="flex flex-col md:flex-row space-y-3 md:space-y-0 md:space-x-4">
           <button
             onClick={onBack}
-            className="flex-1 border border-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-50 transition-colors"
+            className="flex-1 border border-gray-300 text-gray-700 px-4 md:px-6 py-3 rounded-lg hover:bg-gray-50 transition-colors text-sm md:text-base"
           >
             Back to Medications
           </button>
           <button
             onClick={handleNext}
-            className="flex-1 bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors"
+            className="flex-1 bg-green-600 text-white px-4 md:px-6 py-3 rounded-lg hover:bg-green-700 transition-colors text-sm md:text-base"
           >
             Continue to Blood Results
           </button>
         </div>
       </div>
+
+      {/* Credit Purchase Modal */}
+      {showCreditModal && creditInfo && (
+        <CreditPurchaseModal
+          isOpen={showCreditModal}
+          onClose={() => setShowCreditModal(false)}
+          creditInfo={creditInfo}
+        />
+      )}
     </div>
   );
 }

@@ -2207,17 +2207,25 @@ The Helfi Team`,
                                </div>
                              </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              <div className="flex space-x-1">
-                                {user._count.healthGoals > 0 && (
-                                  <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">
-                                    {user._count.healthGoals} goals
-                                  </span>
-                                )}
-                                {user._count.foodLogs > 0 && (
-                                  <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">
-                                    {user._count.foodLogs} foods
-                                  </span>
-                                )}
+                              <div className="flex flex-col space-y-1">
+                                <div className="flex space-x-1">
+                                  {user._count.healthGoals > 0 && (
+                                    <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">
+                                      {user._count.healthGoals} goals
+                                    </span>
+                                  )}
+                                  {user._count.foodLogs > 0 && (
+                                    <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">
+                                      {user._count.foodLogs} foods
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  📊 {user.dailyAnalysisUsed || 0}/{user.dailyAnalysisCredits || 3} daily
+                                  {user.additionalCredits > 0 && (
+                                    <span className="text-green-600"> (+{user.additionalCredits})</span>
+                                  )}
+                                </div>
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -2233,6 +2241,17 @@ The Helfi Team`,
                                   className="bg-blue-500 text-white px-3 py-1 rounded text-xs hover:bg-blue-600 transition-colors"
                                 >
                                   Manage
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    const credits = prompt('Enter number of credits to add:')
+                                    if (credits && !isNaN(parseInt(credits)) && parseInt(credits) > 0) {
+                                      handleUserAction('add_credits', user.id, { creditAmount: parseInt(credits) })
+                                    }
+                                  }}
+                                  className="bg-green-500 text-white px-3 py-1 rounded text-xs hover:bg-green-600 transition-colors"
+                                >
+                                  💳 Credits
                                 </button>
                                                                  {user.subscription?.plan === 'PREMIUM' ? (
                                    <button
@@ -2351,6 +2370,63 @@ The Helfi Team`,
                      </div>
                    </div>
                    
+                   {/* Credit Management */}
+                   <div className="bg-green-50 rounded-lg p-4 mb-6 border-l-4 border-green-500">
+                     <h4 className="font-medium text-gray-900 mb-3">📊 Credit Management</h4>
+                     <div className="space-y-2">
+                       <div className="flex justify-between items-center">
+                         <span className="text-sm text-gray-600">Daily Credits:</span>
+                         <span className="text-sm font-medium">
+                           {selectedUser.dailyAnalysisUsed || 0} / {selectedUser.dailyAnalysisCredits || 3} used
+                         </span>
+                       </div>
+                       <div className="flex justify-between items-center">
+                         <span className="text-sm text-gray-600">Additional Credits:</span>
+                         <span className="text-sm font-medium text-green-600">
+                           {selectedUser.additionalCredits || 0} credits
+                         </span>
+                       </div>
+                       <div className="flex justify-between items-center">
+                         <span className="text-sm text-gray-600">Total Analyses:</span>
+                         <span className="text-sm font-medium">
+                           {selectedUser.totalAnalysisCount || 0} lifetime
+                         </span>
+                       </div>
+                       {selectedUser.lastAnalysisResetDate && (
+                         <div className="flex justify-between items-center">
+                           <span className="text-sm text-gray-600">Last Reset:</span>
+                           <span className="text-sm">
+                             {new Date(selectedUser.lastAnalysisResetDate).toLocaleDateString()}
+                           </span>
+                         </div>
+                       )}
+                     </div>
+                     
+                     <div className="mt-4 grid grid-cols-2 gap-3">
+                       <button
+                         onClick={() => {
+                           const credits = prompt('Enter number of credits to add:')
+                           if (credits && !isNaN(parseInt(credits)) && parseInt(credits) > 0) {
+                             handleUserAction('add_credits', selectedUser.id, { creditAmount: parseInt(credits) })
+                           }
+                         }}
+                         className="bg-green-500 text-white px-3 py-2 rounded text-sm hover:bg-green-600 transition-colors"
+                       >
+                         💳 Add Credits
+                       </button>
+                       <button
+                         onClick={() => {
+                           if (confirm('Reset daily quota for this user?')) {
+                             handleUserAction('reset_daily_quota', selectedUser.id)
+                           }
+                         }}
+                         className="bg-blue-500 text-white px-3 py-2 rounded text-sm hover:bg-blue-600 transition-colors"
+                       >
+                         🔄 Reset Daily
+                       </button>
+                     </div>
+                   </div>
+
                    {/* Actions */}
                    <div className="space-y-4">
                      <h4 className="font-medium text-gray-900">Grant Access</h4>

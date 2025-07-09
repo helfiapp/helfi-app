@@ -19,6 +19,12 @@ model User {
   bodyType          BodyType?
   exerciseFrequency String?
   exerciseTypes     String[]
+  // Credit system fields
+  dailyAnalysisCredits     Int @default(3)  // Free: 3, Premium: 30
+  additionalCredits        Int @default(0)  // Purchased credits that don't expire
+  lastAnalysisResetDate    DateTime?        // Track daily reset
+  totalAnalysisCount       Int @default(0)  // Lifetime usage counter
+  dailyAnalysisUsed        Int @default(0)  // Used today
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
   accounts      Account[]
