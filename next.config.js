@@ -2,6 +2,25 @@ module.exports = {
   images: {
     domains: ['res.cloudinary.com'],
   },
+  // Session preservation during development
+  experimental: {
+    serverComponentsExternalPackages: ['prisma'],
+  },
+  // Prevent session invalidation during hot reloads
+  onDemandEntries: {
+    maxInactiveAge: 25 * 1000,
+    pagesBufferLength: 2,
+  },
+  // Fast refresh configuration
+  webpack: (config, { dev }) => {
+    if (dev) {
+      config.watchOptions = {
+        poll: 1000,
+        aggregateTimeout: 300,
+      }
+    }
+    return config
+  },
   env: {
     NEXTAUTH_URL: process.env.NEXTAUTH_URL,
     NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,

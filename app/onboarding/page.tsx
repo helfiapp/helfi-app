@@ -3029,13 +3029,13 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
   const [error, setError] = useState<string | null>(null);
   const [previousAnalyses, setPreviousAnalyses] = useState<any[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
-  const [showReanalyzeConfirm, setShowReanalyzeConfirm] = useState(false);
   const [showCreditModal, setShowCreditModal] = useState(false);
   const [creditInfo, setCreditInfo] = useState<any>(null);
   const [isAnalysisOutdated, setIsAnalysisOutdated] = useState(false);
   const [showReanalysisPrompt, setShowReanalysisPrompt] = useState(false);
   const [lastAnalyzedData, setLastAnalyzedData] = useState<any>(null);
   const [userSubscriptionStatus, setUserSubscriptionStatus] = useState<'FREE' | 'PREMIUM' | null>(null);
+  const [expandedInteractions, setExpandedInteractions] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     // Load previous analyses first, then perform new analysis
@@ -3192,26 +3192,14 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
     onNext({ interactionAnalysis: analysisResult });
   };
 
-  const handleReanalyzeAll = async () => {
-    setShowReanalyzeConfirm(false);
-    try {
-      // Delete all previous analyses
-      const deleteResponse = await fetch('/api/interaction-history', {
-        method: 'DELETE',
-      });
-      
-      if (deleteResponse.ok) {
-        setPreviousAnalyses([]);
-        setAnalysisResult(null);
-        // Perform new analysis
-        performAnalysis();
-      } else {
-        setError('Failed to delete previous analyses');
-      }
-    } catch (error) {
-      console.error('Error deleting analyses:', error);
-      setError('Failed to delete previous analyses');
+  const toggleInteractionExpansion = (index: number) => {
+    const newExpanded = new Set(expandedInteractions);
+    if (newExpanded.has(index)) {
+      newExpanded.delete(index);
+    } else {
+      newExpanded.add(index);
     }
+    setExpandedInteractions(newExpanded);
   };
 
   const handleNewAnalysis = () => {
@@ -3317,22 +3305,12 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
         <div className="bg-white rounded-lg shadow-sm p-6">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold">Interaction Analysis</h2>
-            <div className="flex space-x-3">
-              {previousAnalyses.length > 0 && (
-                <button
-                  onClick={() => setShowReanalyzeConfirm(true)}
-                  className="px-4 py-2 border border-red-300 text-red-700 rounded-lg hover:bg-red-50 transition-colors text-sm"
-                >
-                  Re-analyze All
-                </button>
-              )}
-              <button
-                onClick={handleNewAnalysis}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
-              >
-                New Analysis
-              </button>
-            </div>
+            <button
+              onClick={handleNewAnalysis}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+            >
+              Analyze Interactions
+            </button>
           </div>
 
           {/* Previous Analyses */}
@@ -3393,31 +3371,7 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
           </div>
         </div>
 
-        {/* Re-analyze Confirmation Modal */}
-        {showReanalyzeConfirm && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg p-6 max-w-md w-full">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Re-analyze All Supplements & Medications</h3>
-              <p className="text-gray-600 mb-6">
-                This will delete all your previous interaction analyses and create a fresh analysis with your current supplements and medications. This action cannot be undone.
-              </p>
-              <div className="flex space-x-3">
-                <button
-                  onClick={() => setShowReanalyzeConfirm(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleReanalyzeAll}
-                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-                >
-                  Delete & Re-analyze
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+
       </div>
     );
   }
@@ -3471,13 +3425,13 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
                 </div>
                 <div className="ml-3">
                   <p className="text-sm text-yellow-700">
-                    <strong>Analysis Outdated:</strong> You've made changes to your supplements or medications. This analysis may not reflect your current regimen.
+                    <strong>Would you like to update your supplement and medication interaction analysis?</strong> You've made changes to your supplements or medications.
                   </p>
                 </div>
               </div>
               <button
                 onClick={handleNewAnalysis}
-                className="ml-4 px-3 py-1 bg-yellow-600 text-white text-sm rounded hover:bg-yellow-700 transition-colors flex-shrink-0"
+                className="ml-4 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors flex-shrink-0"
               >
                 Update Analysis
               </button>
@@ -3494,42 +3448,88 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
           </p>
         </div>
 
-        {/* Interactions */}
-        {analysisResult.interactions && analysisResult.interactions.length > 0 && (
+        {/* Interactions - Accordion Style */}
+        {analysisResult.interactions && analysisResult.interactions.length > 0 ? (
           <div className="mb-6">
             <h3 className="text-lg font-semibold mb-4">Potential Interactions</h3>
-            <div className="space-y-3">
-              {analysisResult.interactions.map((interaction: any, index: number) => (
-                <div key={index} className="border rounded-lg p-3 md:p-4">
-                  <div className="flex flex-col md:flex-row md:items-start md:justify-between mb-2 space-y-2 md:space-y-0">
-                    <div className="font-medium text-sm md:text-base break-words">
-                      {interaction.substance1} + {interaction.substance2}
-                    </div>
-                    <div className={`px-2 py-1 rounded text-xs font-medium self-start md:self-auto flex-shrink-0 ${
-                      interaction.severity === 'low' 
-                        ? 'bg-green-100 text-green-800'
-                        : interaction.severity === 'medium'
-                        ? 'bg-orange-100 text-orange-800'
-                        : 'bg-red-100 text-red-800'
-                    }`}>
-                      {interaction.severity === 'low' && '🟢 Low'}
-                      {interaction.severity === 'medium' && '🟠 Medium'}
-                      {interaction.severity === 'high' && '🔴 High'}
-                    </div>
+            <div className="space-y-2">
+              {analysisResult.interactions.map((interaction: any, index: number) => {
+                const isExpanded = expandedInteractions.has(index);
+                const severityIcon = interaction.severity === 'high' ? '🚨' : interaction.severity === 'medium' ? '⚠️' : '🟢';
+                
+                return (
+                  <div key={index} className="border border-gray-200 rounded-lg overflow-hidden">
+                    {/* Accordion Header */}
+                    <button
+                      onClick={() => toggleInteractionExpansion(index)}
+                      className="w-full px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors flex items-center justify-between text-left"
+                    >
+                      <div className="flex items-center space-x-3 flex-1">
+                        <span className="text-lg">{severityIcon}</span>
+                        <span className="font-medium text-gray-900">
+                          {interaction.substance1} + {interaction.substance2}
+                        </span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${
+                          interaction.severity === 'high' 
+                            ? 'bg-red-100 text-red-800'
+                            : interaction.severity === 'medium'
+                            ? 'bg-orange-100 text-orange-800'
+                            : 'bg-green-100 text-green-800'
+                        }`}>
+                          {interaction.severity.toUpperCase()}
+                        </span>
+                        <svg 
+                          className={`w-5 h-5 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                          fill="none" 
+                          stroke="currentColor" 
+                          viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </div>
+                    </button>
+                    
+                    {/* Accordion Content */}
+                    {isExpanded && (
+                      <div className="px-4 py-4 bg-white border-t border-gray-200">
+                        <div className="space-y-3">
+                          <div>
+                            <h4 className="font-medium text-gray-900 mb-1">Effect:</h4>
+                            <p className="text-gray-700 text-sm leading-relaxed">{interaction.description}</p>
+                          </div>
+                          
+                          {interaction.recommendation && (
+                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                              <h4 className="font-medium text-blue-900 mb-1">💡 Recommendation:</h4>
+                              <p className="text-blue-800 text-sm leading-relaxed">{interaction.recommendation}</p>
+                            </div>
+                          )}
+                          
+                          {interaction.severity === 'high' && (
+                            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                              <h4 className="font-medium text-red-900 mb-1">⚠️ Important:</h4>
+                              <p className="text-red-800 text-sm">This is a high-risk interaction. Please consult with your healthcare provider immediately.</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  <p className="text-gray-600 text-sm mb-2 leading-relaxed">{interaction.description}</p>
-                  {interaction.recommendation && (
-                    <div className="bg-blue-50 p-2 rounded text-sm">
-                      <p className="text-blue-600 font-medium">
-                        💡 {interaction.recommendation}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
-        )}
+        ) : analysisResult.interactions && analysisResult.interactions.length === 0 ? (
+          <div className="mb-6">
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
+              <div className="text-green-600 text-4xl mb-2">✅</div>
+              <h3 className="text-lg font-semibold text-green-900 mb-1">No Dangerous Interactions Found</h3>
+              <p className="text-green-800 text-sm">Your current supplements and medications appear to be safe to take together.</p>
+            </div>
+          </div>
+        ) : null}
 
         {/* Timing Optimization */}
         {analysisResult.timingOptimization && Object.keys(analysisResult.timingOptimization).length > 0 && (
@@ -3619,7 +3619,7 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
               <div className="text-4xl mb-4">🔄</div>
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Update Your Analysis?</h3>
               <p className="text-gray-600">
-                You have just added a new supplement or medication. Would you like to update your supplement and medication interaction report?
+                Would you like to update your supplement and medication interaction analysis? You've made changes to your supplements or medications.
               </p>
             </div>
             
@@ -3641,7 +3641,7 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
               </button>
               <button
                 onClick={handleReanalysisPromptAccept}
-                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
               >
                 Update Analysis
               </button>
