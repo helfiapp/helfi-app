@@ -1495,7 +1495,7 @@ function SupplementsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
                           type="text"
                           placeholder="Amount"
                           value={photoTimingDosages[time] || ''}
-                          className="w-16 px-2 py-1 border border-gray-300 rounded text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                          className="w-16 px-2 py-1 border border-gray-300 rounded text-base focus:border-green-500 focus:ring-1 focus:ring-green-500"
                           onChange={(e) => {
                             setPhotoTimingDosages(prev => ({
                               ...prev,
@@ -1511,7 +1511,7 @@ function SupplementsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
                               [time]: e.target.value
                             }));
                           }}
-                          className="w-16 px-1 py-1 border border-gray-300 rounded text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                          className="w-16 px-1 py-1 border border-gray-300 rounded text-base focus:border-green-500 focus:ring-1 focus:ring-green-500"
                         >
                           {dosageUnits.map(unit => (
                             <option key={unit} value={unit}>{unit}</option>
@@ -1652,7 +1652,7 @@ function SupplementsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
                           type="text"
                           placeholder="Amount"
                           value={timingDosages[time] || ''}
-                          className="w-16 px-2 py-1 border border-gray-300 rounded text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                          className="w-16 px-2 py-1 border border-gray-300 rounded text-base focus:border-green-500 focus:ring-1 focus:ring-green-500"
                           onChange={(e) => {
                             setTimingDosages(prev => ({
                               ...prev,
@@ -1668,7 +1668,7 @@ function SupplementsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
                               [time]: e.target.value
                             }));
                           }}
-                          className="w-16 px-1 py-1 border border-gray-300 rounded text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                          className="w-16 px-1 py-1 border border-gray-300 rounded text-base focus:border-green-500 focus:ring-1 focus:ring-green-500"
                         >
                           {dosageUnits.map(unit => (
                             <option key={unit} value={unit}>{unit}</option>
@@ -2237,7 +2237,7 @@ function MedicationsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
                           type="text"
                           placeholder="Amount"
                           value={photoTimingDosages[time] || ''}
-                          className="w-16 px-2 py-1 border border-gray-300 rounded text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                          className="w-16 px-2 py-1 border border-gray-300 rounded text-base focus:border-green-500 focus:ring-1 focus:ring-green-500"
                           onChange={(e) => {
                             setPhotoTimingDosages(prev => ({
                               ...prev,
@@ -2253,7 +2253,7 @@ function MedicationsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
                               [time]: e.target.value
                             }));
                           }}
-                          className="w-16 px-1 py-1 border border-gray-300 rounded text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                          className="w-16 px-1 py-1 border border-gray-300 rounded text-base focus:border-green-500 focus:ring-1 focus:ring-green-500"
                         >
                           {dosageUnits.map(unit => (
                             <option key={unit} value={unit}>{unit}</option>
@@ -2390,7 +2390,7 @@ function MedicationsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
                           type="text"
                           placeholder="Amount"
                           value={timingDosages[time] || ''}
-                          className="w-16 px-2 py-1 border border-gray-300 rounded text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                          className="w-16 px-2 py-1 border border-gray-300 rounded text-base focus:border-green-500 focus:ring-1 focus:ring-green-500"
                           onChange={(e) => {
                             setTimingDosages(prev => ({
                               ...prev,
@@ -2406,7 +2406,7 @@ function MedicationsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
                               [time]: e.target.value
                             }));
                           }}
-                          className="w-16 px-1 py-1 border border-gray-300 rounded text-xs focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                          className="w-16 px-1 py-1 border border-gray-300 rounded text-base focus:border-green-500 focus:ring-1 focus:ring-green-500"
                         >
                           {dosageUnits.map(unit => (
                             <option key={unit} value={unit}>{unit}</option>
