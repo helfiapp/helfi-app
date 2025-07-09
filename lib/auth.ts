@@ -12,6 +12,37 @@ function getResend() {
   return new Resend(process.env.RESEND_API_KEY)
 }
 
+// Check if user has completed onboarding
+async function isOnboardingComplete(userId: string): Promise<boolean> {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        healthGoals: true,
+        supplements: true,
+        medications: true,
+      }
+    })
+    
+    if (!user) return false
+    
+    // Check if user has basic profile data
+    const hasBasicProfile = user.gender && user.weight && user.height
+    
+    // Check if user has at least one health goal (excluding special data storage goals)
+    const hasHealthGoals = user.healthGoals.some(goal => 
+      !goal.name.startsWith('__') && goal.name !== '__EXERCISE_DATA__' && 
+      goal.name !== '__HEALTH_SITUATIONS_DATA__' && goal.name !== '__BLOOD_RESULTS_DATA__'
+    )
+    
+    // Consider onboarding complete if user has basic profile and health goals
+    return !!(hasBasicProfile && hasHealthGoals)
+  } catch (error) {
+    console.error('Error checking onboarding completion:', error)
+    return false
+  }
+}
+
 // Function to send welcome email
 async function sendWelcomeEmail(email: string, name: string) {
   const resend = getResend()
@@ -310,7 +341,7 @@ export const authOptions: NextAuthOptions = {
       
       // Default: redirect to onboarding with correct base URL
       const defaultRedirect = actualBaseUrl + '/onboarding'
-      console.log('🎯 Default redirect to:', defaultRedirect)
+      console.log('🎯 Default redirect to onboarding:', defaultRedirect)
       return defaultRedirect
     },
     async session({ session, token }) {

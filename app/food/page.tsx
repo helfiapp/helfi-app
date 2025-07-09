@@ -934,24 +934,29 @@ Please add nutritional information manually if needed.`);
                     <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
                       <div className="text-sm font-medium text-gray-600 mb-2">Detected Foods:</div>
                       <div className="text-gray-900 text-sm leading-relaxed">
-                        {aiDescription.split('\n').filter(line => 
-                          !line.toLowerCase().includes('calorie') && 
-                          !line.toLowerCase().includes('protein') && 
-                          !line.toLowerCase().includes('carb') && 
-                          !line.toLowerCase().includes('fat') && 
-                          !line.toLowerCase().includes('fiber') && 
-                          !line.toLowerCase().includes('sugar') &&
-                          !line.toLowerCase().includes('nutritional') &&
-                          !line.toLowerCase().includes('nutrition') &&
-                          !line.toLowerCase().includes('unable to see') &&
-                          !line.toLowerCase().includes('cannot provide') &&
-                          !line.toLowerCase().includes('general estimate') &&
-                          !line.toLowerCase().includes('approximate') &&
-                          !line.toLowerCase().includes('typical serving') &&
-                          line.trim().length > 0
-                        ).join(' ').replace(/^(This image shows|I can see|The food appears to be|This appears to be|I'm unable to see|Based on the image)/i, '').trim() || 
-                        aiDescription.split('.')[0].replace(/^(I'm unable to see.*?but I can provide a general estimate for|Based on.*?,)/i, '').trim() || 
-                        aiDescription.split(',')[0] || aiDescription}
+                        {(() => {
+                          const cleanDescription = aiDescription.split('\n').filter(line => 
+                            !line.toLowerCase().includes('calorie') && 
+                            !line.toLowerCase().includes('protein') && 
+                            !line.toLowerCase().includes('carb') && 
+                            !line.toLowerCase().includes('fat') && 
+                            !line.toLowerCase().includes('fiber') && 
+                            !line.toLowerCase().includes('sugar') &&
+                            !line.toLowerCase().includes('nutritional') &&
+                            !line.toLowerCase().includes('nutrition') &&
+                            !line.toLowerCase().includes('unable to see') &&
+                            !line.toLowerCase().includes('cannot provide') &&
+                            !line.toLowerCase().includes('general estimate') &&
+                            !line.toLowerCase().includes('approximate') &&
+                            !line.toLowerCase().includes('typical serving') &&
+                            line.trim().length > 0
+                          ).join(' ').replace(/^(This image shows|I can see|The food appears to be|This appears to be|I'm unable to see|Based on the image)/i, '').trim() || 
+                          aiDescription.split('.')[0].replace(/^(I'm unable to see.*?but I can provide a general estimate for|Based on.*?,)/i, '').trim() || 
+                          aiDescription.split(',')[0] || aiDescription;
+                          
+                          // Capitalize first letter
+                          return cleanDescription.replace(/^./, (match: string) => match.toUpperCase());
+                        })()}
                       </div>
                     </div>
                   </div>
@@ -1020,7 +1025,10 @@ Please add nutritional information manually if needed.`);
                   {/* Simple Food Title Only */}
                   <div className="border-b border-gray-100 pb-4">
                     <h1 className="text-xl sm:text-2xl font-medium text-gray-900">
-                      {editedDescription.split('\n')[0].split('Calories:')[0].trim().split(',')[0].split('.')[0] || 'Food Item'}
+                      {(() => {
+                        const title = editedDescription.split('\n')[0].split('Calories:')[0].trim().split(',')[0].split('.')[0] || 'Food Item';
+                        return title.replace(/^./, (match: string) => match.toUpperCase());
+                      })()}
                     </h1>
                   </div>
 
@@ -1494,7 +1502,8 @@ Please add nutritional information manually if needed.`);
                           {food.description.split('\n')[0].split('Calories:')[0]
                             .replace(/^(I'm unable to see.*?but I can provide a general estimate for|Based on.*?,|This image shows|I can see|The food appears to be|This appears to be)/i, '')
                             .split('.')[0]
-                            .trim()}
+                            .trim()
+                            .replace(/^./, (match: string) => match.toUpperCase())}
                         </h3>
                         <span className={`text-xs px-2 py-1 rounded-full flex-shrink-0 ${
                           food.method === 'photo' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'

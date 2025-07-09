@@ -3637,6 +3637,7 @@ export default function Onboarding() {
   const [isLoading, setIsLoading] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
   const [profileImage, setProfileImage] = useState<string>('');
+  const [onboardingComplete, setOnboardingComplete] = useState(false);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const stepNames = [
@@ -3652,6 +3653,48 @@ export default function Onboarding() {
     'AI Insights',
     'Review'
   ];
+
+  // Check if onboarding is complete and redirect to dashboard if so
+  useEffect(() => {
+    const checkOnboardingCompletion = async () => {
+      if (status === 'authenticated' && session?.user?.id) {
+        try {
+          const response = await fetch('/api/user-data');
+          if (response.ok) {
+            const userData = await response.json();
+            const data = userData.data;
+            
+            // Check if user has completed onboarding
+            const hasBasicProfile = data.gender && data.weight && data.height;
+            const hasHealthGoals = data.goals && data.goals.length > 0;
+            
+            if (hasBasicProfile && hasHealthGoals) {
+              console.log('🎯 User has completed onboarding, redirecting to dashboard');
+              setOnboardingComplete(true);
+              window.location.href = '/dashboard';
+              return;
+            }
+          }
+        } catch (error) {
+          console.error('Error checking onboarding completion:', error);
+        }
+      }
+    };
+
+    checkOnboardingCompletion();
+  }, [status, session]);
+
+  // Don't render onboarding if user has completed it
+  if (onboardingComplete) {
+    return (
+      <div className="fixed inset-0 bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Redirecting to dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Profile data - using consistent green avatar
   const defaultAvatar = 'data:image/svg+xml;base64,' + btoa(`
@@ -3679,36 +3722,18 @@ export default function Onboarding() {
     };
   }, [dropdownOpen]);
 
-  // Enhanced session validation with forced refresh
+  // Basic session validation without aggressive checks
   useEffect(() => {
-    const validateSession = async () => {
-      if (status === 'loading') return;
-      
-      if (status === 'authenticated') {
-        // Double-check session is still valid by calling API
-        try {
-          const response = await fetch('/api/user-data');
-          if (response.status === 401) {
-            console.log('🚫 Session invalidated by server - forcing logout');
-            // Force logout and redirect
-            await signOut({ redirect: false });
-            window.location.href = '/';
-            return;
-          }
-        } catch (error) {
-          console.error('Session validation error:', error);
-        }
-        
-        const currentStep = parseInt(new URLSearchParams(window.location.search).get('step') || '1') - 1;
-        setStep(Math.max(0, Math.min(stepNames.length - 1, currentStep)));
-      } else if (status === 'unauthenticated') {
-        // Session has been invalidated (e.g., user account deleted)
-        console.log('🚫 Session invalidated - redirecting to homepage');
-        window.location.href = '/';
-      }
-    };
-
-    validateSession();
+    if (status === 'loading') return;
+    
+    if (status === 'authenticated') {
+      const currentStep = parseInt(new URLSearchParams(window.location.search).get('step') || '1') - 1;
+      setStep(Math.max(0, Math.min(stepNames.length - 1, currentStep)));
+    } else if (status === 'unauthenticated') {
+      // Only redirect if truly unauthenticated
+      console.log('🚫 User not authenticated - redirecting to homepage');
+      window.location.href = '/';
+    }
   }, [status, stepNames.length]);
 
   useEffect(() => {
