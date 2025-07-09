@@ -3804,8 +3804,8 @@ export default function Onboarding() {
       const updatedForm = { ...form, ...data };
       setForm(updatedForm);
       
-      // Debounced save (non-blocking)
-      debouncedSave(updatedForm);
+      // Debounced save temporarily disabled to fix supplement data loss issue
+      // debouncedSave(updatedForm);
       
       // Add small delay for visual feedback
       await new Promise(resolve => setTimeout(resolve, 150));
