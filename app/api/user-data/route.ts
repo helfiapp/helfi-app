@@ -416,32 +416,74 @@ export async function POST(request: NextRequest) {
       // Continue with other updates
     }
 
-    // 4. Handle supplements - simple replace approach
+    // 4. Handle supplements - safe upsert approach (same as medications)
     console.time('⏱️ Supplements Update')
     try {
       if (data.supplements && Array.isArray(data.supplements)) {
         console.log('💊 Processing', data.supplements.length, 'supplements')
         
-        // Delete existing supplements
-        const deleteResult = await prisma.supplement.deleteMany({
-          where: { userId: user.id }
-        })
-        console.log('🗑️ Deleted', deleteResult.count, 'existing supplements')
-        
-        // Create new supplements
-        for (const supp of data.supplements) {
-          if (supp.name && typeof supp.name === 'string') {
-            await prisma.supplement.create({
-              data: {
-                userId: user.id,
-                name: supp.name,
-                dosage: supp.dosage || '',
-                timing: Array.isArray(supp.timing) ? supp.timing : [supp.timing || 'morning'],
+        // Use database transaction for data safety
+        await prisma.$transaction(async (tx) => {
+          // Get existing supplements
+          const existingSupplements = await tx.supplement.findMany({
+            where: { userId: user.id }
+          })
+          
+          // Track which supplements to keep
+          const supplementsToKeep = new Set()
+          
+          // Process each supplement from the form
+          for (const supp of data.supplements) {
+            if (supp.name && typeof supp.name === 'string') {
+              // Try to find existing supplement with same name
+              const existing = existingSupplements.find(
+                (existing) => existing.name.toLowerCase() === supp.name.toLowerCase()
+              )
+              
+              if (existing) {
+                // Update existing supplement
+                await tx.supplement.update({
+                  where: { id: existing.id },
+                  data: {
+                    name: supp.name,
+                    dosage: supp.dosage || '',
+                    timing: Array.isArray(supp.timing) ? supp.timing : [supp.timing || 'morning'],
+                  }
+                })
+                supplementsToKeep.add(existing.id)
+                console.log('📝 Updated existing supplement:', supp.name)
+              } else {
+                // Create new supplement
+                const newSupplement = await tx.supplement.create({
+                  data: {
+                    userId: user.id,
+                    name: supp.name,
+                    dosage: supp.dosage || '',
+                    timing: Array.isArray(supp.timing) ? supp.timing : [supp.timing || 'morning'],
+                  }
+                })
+                supplementsToKeep.add(newSupplement.id)
+                console.log('➕ Created new supplement:', supp.name)
+              }
+            }
+          }
+          
+          // Remove supplements that are no longer in the form
+          const supplementsToDelete = existingSupplements.filter(
+            (existing) => !supplementsToKeep.has(existing.id)
+          )
+          
+          if (supplementsToDelete.length > 0) {
+            await tx.supplement.deleteMany({
+              where: {
+                id: { in: supplementsToDelete.map(s => s.id) }
               }
             })
+            console.log('🗑️ Removed', supplementsToDelete.length, 'supplements no longer in form')
           }
-        }
-        console.log('✅ Updated supplements successfully')
+        })
+        
+        console.log('✅ Updated supplements safely with transaction')
       } else {
         console.log('ℹ️ No supplements to update')
       }
@@ -451,32 +493,74 @@ export async function POST(request: NextRequest) {
     }
     console.timeEnd('⏱️ Supplements Update')
 
-    // 5. Handle medications - simple replace approach  
+    // 5. Handle medications - safe upsert approach (same as supplements)
     console.time('⏱️ Medications Update')
     try {
       if (data.medications && Array.isArray(data.medications)) {
         console.log('💉 Processing', data.medications.length, 'medications')
         
-        // Delete existing medications
-        const deleteResult = await prisma.medication.deleteMany({
-          where: { userId: user.id }
-        })
-        console.log('🗑️ Deleted', deleteResult.count, 'existing medications')
-        
-        // Create new medications
-        for (const med of data.medications) {
-          if (med.name && typeof med.name === 'string') {
-            await prisma.medication.create({
-              data: {
-                userId: user.id,
-                name: med.name,
-                dosage: med.dosage || '',
-                timing: Array.isArray(med.timing) ? med.timing : [med.timing || 'morning'],
+        // Use database transaction for data safety
+        await prisma.$transaction(async (tx) => {
+          // Get existing medications
+          const existingMedications = await tx.medication.findMany({
+            where: { userId: user.id }
+          })
+          
+          // Track which medications to keep
+          const medicationsToKeep = new Set()
+          
+          // Process each medication from the form
+          for (const med of data.medications) {
+            if (med.name && typeof med.name === 'string') {
+              // Try to find existing medication with same name
+              const existing = existingMedications.find(
+                (existing) => existing.name.toLowerCase() === med.name.toLowerCase()
+              )
+              
+              if (existing) {
+                // Update existing medication
+                await tx.medication.update({
+                  where: { id: existing.id },
+                  data: {
+                    name: med.name,
+                    dosage: med.dosage || '',
+                    timing: Array.isArray(med.timing) ? med.timing : [med.timing || 'morning'],
+                  }
+                })
+                medicationsToKeep.add(existing.id)
+                console.log('📝 Updated existing medication:', med.name)
+              } else {
+                // Create new medication
+                const newMedication = await tx.medication.create({
+                  data: {
+                    userId: user.id,
+                    name: med.name,
+                    dosage: med.dosage || '',
+                    timing: Array.isArray(med.timing) ? med.timing : [med.timing || 'morning'],
+                  }
+                })
+                medicationsToKeep.add(newMedication.id)
+                console.log('➕ Created new medication:', med.name)
+              }
+            }
+          }
+          
+          // Remove medications that are no longer in the form
+          const medicationsToDelete = existingMedications.filter(
+            (existing) => !medicationsToKeep.has(existing.id)
+          )
+          
+          if (medicationsToDelete.length > 0) {
+            await tx.medication.deleteMany({
+              where: {
+                id: { in: medicationsToDelete.map(m => m.id) }
               }
             })
+            console.log('🗑️ Removed', medicationsToDelete.length, 'medications no longer in form')
           }
-        }
-        console.log('✅ Updated medications successfully')
+        })
+        
+        console.log('✅ Updated medications safely with transaction')
       } else {
         console.log('ℹ️ No medications to update')
       }
