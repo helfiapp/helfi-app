@@ -416,11 +416,33 @@ export async function POST(request: NextRequest) {
       // Continue with other updates
     }
 
-    // 4. Handle supplements - safe upsert approach (same as medications)
+    // 4. Handle supplements - safe upsert approach with enhanced logging
     console.time('⏱️ Supplements Update')
     try {
+      console.log('🔍 SUPPLEMENT DEBUG - Raw data.supplements:', JSON.stringify(data.supplements, null, 2))
+      
       if (data.supplements && Array.isArray(data.supplements)) {
-        console.log('💊 Processing', data.supplements.length, 'supplements')
+        console.log('💊 Processing', data.supplements.length, 'supplements for user:', user.id)
+        
+        // Validate supplement data before processing
+        const validSupplements = data.supplements.filter((supp: any) => {
+          const isValid = supp && supp.name && typeof supp.name === 'string' && supp.name.trim().length > 0
+          if (!isValid) {
+            console.warn('⚠️ Invalid supplement data:', supp)
+          }
+          return isValid
+        })
+        
+        console.log('✅ Valid supplements to process:', validSupplements.length)
+        
+        if (validSupplements.length === 0) {
+          console.log('⚠️ No valid supplements to save - all supplement data was invalid')
+          return NextResponse.json({ 
+            success: true, 
+            warning: 'No valid supplements to save',
+            debug: { originalSupplements: data.supplements }
+          })
+        }
         
         // Use database transaction for data safety
         await prisma.$transaction(async (tx) => {
@@ -429,42 +451,44 @@ export async function POST(request: NextRequest) {
             where: { userId: user.id }
           })
           
+          console.log('📋 Found', existingSupplements.length, 'existing supplements in database')
+          
           // Track which supplements to keep
           const supplementsToKeep = new Set()
           
-          // Process each supplement from the form
-          for (const supp of data.supplements) {
-            if (supp.name && typeof supp.name === 'string') {
-              // Try to find existing supplement with same name
-              const existing = existingSupplements.find(
-                (existing) => existing.name.toLowerCase() === supp.name.toLowerCase()
-              )
-              
-              if (existing) {
-                // Update existing supplement
-                await tx.supplement.update({
-                  where: { id: existing.id },
-                  data: {
-                    name: supp.name,
-                    dosage: supp.dosage || '',
-                    timing: Array.isArray(supp.timing) ? supp.timing : [supp.timing || 'morning'],
-                  }
-                })
-                supplementsToKeep.add(existing.id)
-                console.log('📝 Updated existing supplement:', supp.name)
-              } else {
-                // Create new supplement
-                const newSupplement = await tx.supplement.create({
-                  data: {
-                    userId: user.id,
-                    name: supp.name,
-                    dosage: supp.dosage || '',
-                    timing: Array.isArray(supp.timing) ? supp.timing : [supp.timing || 'morning'],
-                  }
-                })
-                supplementsToKeep.add(newSupplement.id)
-                console.log('➕ Created new supplement:', supp.name)
-              }
+          // Process each valid supplement from the form
+          for (const supp of validSupplements) {
+            console.log('🔄 Processing supplement:', supp.name, 'with dosage:', supp.dosage, 'and timing:', supp.timing)
+            
+            // Try to find existing supplement with same name
+            const existing = existingSupplements.find(
+              (existing) => existing.name.toLowerCase() === supp.name.toLowerCase()
+            )
+            
+            if (existing) {
+              // Update existing supplement
+              const updatedSupplement = await tx.supplement.update({
+                where: { id: existing.id },
+                data: {
+                  name: supp.name,
+                  dosage: supp.dosage || '',
+                  timing: Array.isArray(supp.timing) ? supp.timing : [supp.timing || 'morning'],
+                }
+              })
+              supplementsToKeep.add(existing.id)
+              console.log('📝 Updated existing supplement:', supp.name, '- New data:', updatedSupplement)
+            } else {
+              // Create new supplement
+              const newSupplement = await tx.supplement.create({
+                data: {
+                  userId: user.id,
+                  name: supp.name,
+                  dosage: supp.dosage || '',
+                  timing: Array.isArray(supp.timing) ? supp.timing : [supp.timing || 'morning'],
+                }
+              })
+              supplementsToKeep.add(newSupplement.id)
+              console.log('➕ Created new supplement:', supp.name, '- Full data:', newSupplement)
             }
           }
           
@@ -474,21 +498,85 @@ export async function POST(request: NextRequest) {
           )
           
           if (supplementsToDelete.length > 0) {
+            console.log('🗑️ About to delete supplements:', supplementsToDelete.map(s => s.name))
             await tx.supplement.deleteMany({
               where: {
                 id: { in: supplementsToDelete.map(s => s.id) }
               }
             })
             console.log('🗑️ Removed', supplementsToDelete.length, 'supplements no longer in form')
+          } else {
+            console.log('ℹ️ No supplements to delete')
           }
+          
+          // Verify final state
+          const finalSupplements = await tx.supplement.findMany({
+            where: { userId: user.id }
+          })
+          console.log('🏁 Final supplement count after transaction:', finalSupplements.length)
+          console.log('🏁 Final supplements:', finalSupplements.map(s => ({ name: s.name, dosage: s.dosage, timing: s.timing })))
         })
         
         console.log('✅ Updated supplements safely with transaction')
+        
+        // BACKUP: Also store supplements as JSON in health goals as failsafe
+        try {
+          await prisma.healthGoal.deleteMany({
+            where: {
+              userId: user.id,
+              name: '__SUPPLEMENTS_BACKUP_DATA__'
+            }
+          })
+          
+          await prisma.healthGoal.create({
+            data: {
+              userId: user.id,
+              name: '__SUPPLEMENTS_BACKUP_DATA__',
+              category: JSON.stringify({ supplements: validSupplements, timestamp: new Date().toISOString() }),
+              currentRating: 0,
+            }
+          })
+          console.log('💾 Created supplements backup in health goals')
+        } catch (backupError) {
+          console.error('❌ Failed to create supplements backup:', backupError)
+        }
+        
       } else {
-        console.log('ℹ️ No supplements to update')
+        console.log('ℹ️ No supplements to update - data.supplements is:', typeof data.supplements, data.supplements)
       }
     } catch (error) {
       console.error('❌ Error updating supplements:', error)
+      console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack available')
+      
+      // EMERGENCY BACKUP: If supplement save fails completely, store in health goals
+      try {
+        if (data.supplements && Array.isArray(data.supplements) && data.supplements.length > 0) {
+          console.log('🚨 EMERGENCY: Saving supplements to health goals as backup')
+          await prisma.healthGoal.deleteMany({
+            where: {
+              userId: user.id,
+              name: '__SUPPLEMENTS_EMERGENCY_BACKUP__'
+            }
+          })
+          
+          await prisma.healthGoal.create({
+            data: {
+              userId: user.id,
+              name: '__SUPPLEMENTS_EMERGENCY_BACKUP__',
+              category: JSON.stringify({ 
+                supplements: data.supplements, 
+                timestamp: new Date().toISOString(),
+                error: error instanceof Error ? error.message : 'Unknown error'
+              }),
+              currentRating: 0,
+            }
+          })
+          console.log('🚨 EMERGENCY backup created successfully')
+        }
+      } catch (emergencyError) {
+        console.error('💥 CRITICAL: Emergency backup also failed:', emergencyError)
+      }
+      
       // Continue with other updates
     }
     console.timeEnd('⏱️ Supplements Update')

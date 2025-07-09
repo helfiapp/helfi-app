@@ -1402,6 +1402,7 @@ function SupplementsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
                 <input 
                   className="flex-1 rounded-lg border border-gray-300 px-3 py-2 focus:border-green-500 focus:ring-1 focus:ring-green-500" 
                   type="text" 
+                  inputMode="numeric"
                   placeholder="e.g., 1000, 2" 
                   value={photoDosage} 
                   onChange={e => setPhotoDosage(e.target.value)} 
@@ -1493,7 +1494,7 @@ function SupplementsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
                       <div className="flex space-x-1">
                         <input
                           type="text"
-                          placeholder="Amount"
+                          inputMode="numeric" placeholder="Amount"
                           value={photoTimingDosages[time] || ''}
                           className="w-16 px-2 py-1 border border-gray-300 rounded text-base focus:border-green-500 focus:ring-1 focus:ring-green-500"
                           onChange={(e) => {
@@ -1560,6 +1561,7 @@ function SupplementsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
                 <input 
                   className="flex-1 rounded-lg border border-gray-300 px-3 py-2 focus:border-green-500 focus:ring-1 focus:ring-green-500" 
                   type="text" 
+                  inputMode="numeric"
                   placeholder="e.g., 1000, 2" 
                   value={dosage} 
                   onChange={e => setDosage(e.target.value)} 
@@ -1650,7 +1652,7 @@ function SupplementsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
                       <div className="flex space-x-1">
                         <input
                           type="text"
-                          placeholder="Amount"
+                          inputMode="numeric" placeholder="Amount"
                           value={timingDosages[time] || ''}
                           className="w-16 px-2 py-1 border border-gray-300 rounded text-base focus:border-green-500 focus:ring-1 focus:ring-green-500"
                           onChange={(e) => {
@@ -2144,6 +2146,7 @@ function MedicationsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
                 <input 
                   className="flex-1 rounded-lg border border-gray-300 px-3 py-2 focus:border-green-500 focus:ring-1 focus:ring-green-500" 
                   type="text" 
+                  inputMode="numeric"
                   placeholder="e.g., 10, 1" 
                   value={photoDosage} 
                   onChange={e => setPhotoDosage(e.target.value)} 
@@ -2235,7 +2238,7 @@ function MedicationsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
                       <div className="flex space-x-1">
                         <input
                           type="text"
-                          placeholder="Amount"
+                          inputMode="numeric" placeholder="Amount"
                           value={photoTimingDosages[time] || ''}
                           className="w-16 px-2 py-1 border border-gray-300 rounded text-base focus:border-green-500 focus:ring-1 focus:ring-green-500"
                           onChange={(e) => {
@@ -2298,6 +2301,7 @@ function MedicationsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
                 <input 
                   className="flex-1 rounded-lg border border-gray-300 px-3 py-2 focus:border-green-500 focus:ring-1 focus:ring-green-500" 
                   type="text" 
+                  inputMode="numeric"
                   placeholder="e.g., 10, 1" 
                   value={dosage} 
                   onChange={e => setDosage(e.target.value)} 
@@ -2388,7 +2392,7 @@ function MedicationsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
                       <div className="flex space-x-1">
                         <input
                           type="text"
-                          placeholder="Amount"
+                          inputMode="numeric" placeholder="Amount"
                           value={timingDosages[time] || ''}
                           className="w-16 px-2 py-1 border border-gray-300 rounded text-base focus:border-green-500 focus:ring-1 focus:ring-green-500"
                           onChange={(e) => {
