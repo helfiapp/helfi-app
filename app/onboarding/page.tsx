@@ -3111,16 +3111,24 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
     setIsLoadingHistory(false); // Stop loading history when we start analysis
 
     try {
-      const supplements = initial?.supplements || [];
-      const medications = initial?.medications || [];
+      // Get fresh data from the current form state instead of just initial
+      const currentSupplements = initial?.supplements || [];
+      const currentMedications = initial?.medications || [];
+      
+      console.log('🔍 INTERACTION ANALYSIS DEBUG:', {
+        initialSupplements: initial?.supplements?.length || 0,
+        initialMedications: initial?.medications?.length || 0,
+        currentSupplements: currentSupplements.length,
+        currentMedications: currentMedications.length
+      });
 
-      if (supplements.length === 0 && medications.length === 0) {
+      if (currentSupplements.length === 0 && currentMedications.length === 0) {
         setAnalysisResult({
           overallRisk: 'low',
-          summary: 'No supplements or medications to analyze.',
+          summary: 'No supplements or medications to analyze. Please add your supplements and medications in the previous steps.',
           interactions: [],
           timingOptimization: {},
-          recommendations: ['Consider adding supplements to support your health goals.'],
+          recommendations: ['Go back to add your supplements and medications for a comprehensive interaction analysis.'],
           disclaimer: 'This analysis is for informational purposes only and should not replace professional medical advice.'
         });
         setIsAnalyzing(false);
@@ -3133,8 +3141,8 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          supplements,
-          medications,
+          supplements: currentSupplements,
+          medications: currentMedications,
         }),
       });
 
@@ -3158,8 +3166,8 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
         
         // Store the analyzed data for change detection
         setLastAnalyzedData({
-          supplements: supplements,
-          medications: medications
+          supplements: currentSupplements,
+          medications: currentMedications
         });
         
         // Reset outdated flag since we just performed fresh analysis
@@ -3808,8 +3816,8 @@ export default function Onboarding() {
       const updatedForm = { ...form, ...data };
       setForm(updatedForm);
       
-      // Debounced save temporarily disabled to fix supplement data loss issue
-      // debouncedSave(updatedForm);
+      // Re-enabled debounced save with safer mechanism
+      debouncedSave(updatedForm);
       
       // Add small delay for visual feedback
       await new Promise(resolve => setTimeout(resolve, 150));
