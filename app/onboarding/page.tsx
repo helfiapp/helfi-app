@@ -3028,35 +3028,15 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
   const [showReanalyzeConfirm, setShowReanalyzeConfirm] = useState(false);
   const [showCreditModal, setShowCreditModal] = useState(false);
   const [creditInfo, setCreditInfo] = useState<any>(null);
-  const [autoAnalysisTimeout, setAutoAnalysisTimeout] = useState<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     // Load previous analyses first, then perform new analysis
     loadPreviousAnalyses();
   }, []);
 
-  // Auto-analysis effect with debounce when supplements/medications change
-  useEffect(() => {
-    if (autoAnalysisTimeout) {
-      clearTimeout(autoAnalysisTimeout);
-    }
-
-    // Set up debounced auto-analysis (2-3 second delay)
-    const timeout = setTimeout(() => {
-      if (analysisResult && !isAnalyzing) {
-        console.log('🔄 Auto-reanalyzing due to input changes...');
-        performAnalysis();
-      }
-    }, 2500); // 2.5 second debounce
-
-    setAutoAnalysisTimeout(timeout);
-
-    return () => {
-      if (timeout) {
-        clearTimeout(timeout);
-      }
-    };
-  }, [initial?.supplements, initial?.medications]);
+  // Auto-analysis effect removed to prevent performance issues and supplement form conflicts
+  // The analysis will run once when the step loads, but won't re-run automatically on changes
+  // Users can manually trigger re-analysis if needed
 
   const loadPreviousAnalyses = async () => {
     try {
