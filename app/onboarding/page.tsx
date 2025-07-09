@@ -3038,9 +3038,17 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
   const [expandedInteractions, setExpandedInteractions] = useState<Set<number>>(new Set());
 
   useEffect(() => {
-    // Load previous analyses but don't auto-trigger analysis
-    // This prevents navigation state conflicts
-    loadPreviousAnalyses();
+    // Load previous analyses first, then automatically perform new analysis when landing on page 8
+    loadPreviousAnalyses().then(() => {
+      // Auto-trigger analysis when coming from page 7 (medications page)
+      const currentSupplements = initial?.supplements || [];
+      const currentMedications = initial?.medications || [];
+      
+      if ((currentSupplements.length > 0 || currentMedications.length > 0) && !analysisResult) {
+        // Automatically perform analysis when landing on this page
+        performAnalysis();
+      }
+    });
   }, []);
 
   // Check if supplements/medications have changed since last analysis
@@ -3192,10 +3200,7 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
     setExpandedInteractions(newExpanded);
   };
 
-  const handleNewAnalysis = () => {
-    setAnalysisResult(null);
-    performAnalysis();
-  };
+
 
   const handleReanalysisPromptAccept = () => {
     setShowReanalysisPrompt(false);
@@ -3288,90 +3293,55 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
     );
   }
 
-  // Show initial state with analysis button - this is the main page 8 view
-  if (!analysisResult && !isAnalyzing) {
-    const currentSupplements = initial?.supplements || [];
-    const currentMedications = initial?.medications || [];
-    
+  // Show loading state while analysis is running
+  if (!analysisResult && isAnalyzing) {
     return (
       <div className="max-w-4xl mx-auto">
         <div className="bg-white rounded-lg shadow-sm p-6">
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Interaction Analysis</h2>
+          <div className="text-center py-8">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Analyzing Interactions...</h3>
             <p className="text-gray-600">
-              We'll analyze your {currentSupplements.length} supplement{currentSupplements.length !== 1 ? 's' : ''} and {currentMedications.length} medication{currentMedications.length !== 1 ? 's' : ''} for potential interactions.
+              We're checking your supplements and medications for potential interactions.
             </p>
           </div>
+        </div>
+      </div>
+    );
+  }
 
-          {/* Current Items Summary */}
-          <div className="mb-6 p-4 bg-blue-50 rounded-lg">
-            <h3 className="font-semibold text-blue-900 mb-3">Items to Analyze:</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {currentSupplements.length > 0 && (
-                <div>
-                  <h4 className="font-medium text-blue-800 mb-2">Supplements ({currentSupplements.length})</h4>
-                  <div className="space-y-1">
-                    {currentSupplements.slice(0, 3).map((supplement: any, index: number) => (
-                      <div key={index} className="text-sm text-blue-700">
-                        • {supplement.name} ({supplement.dosage})
-                      </div>
-                    ))}
-                    {currentSupplements.length > 3 && (
-                      <div className="text-sm text-blue-600">
-                        ... and {currentSupplements.length - 3} more
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-              {currentMedications.length > 0 && (
-                <div>
-                  <h4 className="font-medium text-blue-800 mb-2">Medications ({currentMedications.length})</h4>
-                  <div className="space-y-1">
-                    {currentMedications.slice(0, 3).map((medication: any, index: number) => (
-                      <div key={index} className="text-sm text-blue-700">
-                        • {medication.name} ({medication.dosage})
-                      </div>
-                    ))}
-                    {currentMedications.length > 3 && (
-                      <div className="text-sm text-blue-600">
-                        ... and {currentMedications.length - 3} more
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Safety Notice */}
-          <div className="mb-6 p-4 bg-orange-50 rounded-lg">
-            <div className="flex items-start gap-3">
-              <div className="text-orange-600 text-xl">⚠️</div>
-              <div>
-                <div className="font-medium text-orange-900">Important Safety Check</div>
-                <div className="text-sm text-orange-700">
-                  This analysis will check for potential interactions between your medications and supplements, focusing on medium and high-risk interactions that require attention.
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Navigation */}
-          <div className="flex space-x-4">
+  // Show error state if analysis failed
+  if (!analysisResult && !isAnalyzing && error) {
+    return (
+      <div className="max-w-4xl mx-auto">
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          <div className="text-center py-8">
+            <div className="text-red-500 text-4xl mb-4">❌</div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Analysis Failed</h3>
+            <p className="text-gray-600 mb-4">{error}</p>
             <button
-              onClick={onBack}
-              className="flex-1 border border-gray-300 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-50 transition-colors"
+              onClick={handleRetry}
+              className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors"
             >
-              Back to Medications
+              Try Again
             </button>
-            <button
-              onClick={handleNewAnalysis}
-              className="flex-1 bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors"
-              disabled={currentSupplements.length === 0 && currentMedications.length === 0}
-            >
-              Analyze for Interactions & Contraindications
-            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // If no analysis result and not analyzing, show minimal loading state
+  if (!analysisResult && !isAnalyzing) {
+    return (
+      <div className="max-w-4xl mx-auto">
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          <div className="text-center py-8">
+            <div className="text-gray-400 text-4xl mb-4">🔬</div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Preparing Analysis...</h3>
+            <p className="text-gray-600">
+              Please wait while we prepare your interaction analysis.
+            </p>
           </div>
         </div>
       </div>
@@ -3432,7 +3402,7 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
                 </div>
               </div>
               <button
-                onClick={handleNewAnalysis}
+                onClick={handleReanalysisPromptAccept}
                 className="ml-4 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors flex-shrink-0"
               >
                 Update Analysis
@@ -3595,19 +3565,13 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
           </div>
         </div>
 
-        {/* Navigation */}
-        <div className="flex flex-col md:flex-row space-y-3 md:space-y-0 md:space-x-4">
+        {/* Navigation - Only Back to Medications button as specified */}
+        <div className="flex justify-center">
           <button
             onClick={onBack}
-            className="flex-1 border border-gray-300 text-gray-700 px-4 md:px-6 py-3 rounded-lg hover:bg-gray-50 transition-colors text-sm md:text-base"
+            className="px-8 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-base font-medium"
           >
             Back to Medications
-          </button>
-          <button
-            onClick={handleNext}
-            className="flex-1 bg-green-600 text-white px-4 md:px-6 py-3 rounded-lg hover:bg-green-700 transition-colors text-sm md:text-base"
-          >
-            Continue to Blood Results
           </button>
         </div>
       </div>
