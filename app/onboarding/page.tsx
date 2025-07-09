@@ -3028,15 +3028,33 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
   const [showReanalyzeConfirm, setShowReanalyzeConfirm] = useState(false);
   const [showCreditModal, setShowCreditModal] = useState(false);
   const [creditInfo, setCreditInfo] = useState<any>(null);
+  const [isAnalysisOutdated, setIsAnalysisOutdated] = useState(false);
+  const [showReanalysisPrompt, setShowReanalysisPrompt] = useState(false);
+  const [lastAnalyzedData, setLastAnalyzedData] = useState<any>(null);
+  const [userSubscriptionStatus, setUserSubscriptionStatus] = useState<'FREE' | 'PREMIUM' | null>(null);
 
   useEffect(() => {
     // Load previous analyses first, then perform new analysis
     loadPreviousAnalyses();
   }, []);
 
-  // Auto-analysis effect removed to prevent performance issues and supplement form conflicts
-  // The analysis will run once when the step loads, but won't re-run automatically on changes
-  // Users can manually trigger re-analysis if needed
+  // Check if supplements/medications have changed since last analysis
+  useEffect(() => {
+    if (analysisResult && lastAnalyzedData) {
+      const currentSupplements = initial?.supplements || [];
+      const currentMedications = initial?.medications || [];
+      
+      // Compare current data with last analyzed data
+      const supplementsChanged = JSON.stringify(currentSupplements) !== JSON.stringify(lastAnalyzedData.supplements);
+      const medicationsChanged = JSON.stringify(currentMedications) !== JSON.stringify(lastAnalyzedData.medications);
+      
+      if (supplementsChanged || medicationsChanged) {
+        setIsAnalysisOutdated(true);
+        // Show re-analysis prompt if user has made changes
+        setShowReanalysisPrompt(true);
+      }
+    }
+  }, [initial?.supplements, initial?.medications, analysisResult, lastAnalyzedData]);
 
   const loadPreviousAnalyses = async () => {
     try {
@@ -3046,18 +3064,40 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
         const analyses = data.analyses || [];
         setPreviousAnalyses(analyses);
         
-        // Always perform new analysis for now - user can see previous ones too
-        performAnalysis();
+        // Show most recent analysis if available, don't auto-analyze
+        if (analyses.length > 0) {
+          // Load the most recent analysis result
+          const mostRecent = analyses[0];
+          setAnalysisResult(mostRecent.analysisData);
+          
+          // Set the last analyzed data for change detection
+          setLastAnalyzedData({
+            supplements: mostRecent.supplementsAnalyzed || [],
+            medications: mostRecent.medicationsAnalyzed || []
+          });
+        }
+        
+        setIsLoadingHistory(false);
       } else {
         setIsLoadingHistory(false);
-        // If API fails, still perform analysis
-        performAnalysis();
       }
     } catch (error) {
       console.error('Error loading previous analyses:', error);
       setIsLoadingHistory(false);
-      // If API fails, still perform analysis
-      performAnalysis();
+    }
+    
+    // Load user subscription status
+    try {
+      const userResponse = await fetch('/api/user-data');
+      if (userResponse.ok) {
+        const userData = await userResponse.json();
+        // Check if user has premium subscription
+        const isPremium = userData.subscription?.plan === 'PREMIUM';
+        setUserSubscriptionStatus(isPremium ? 'PREMIUM' : 'FREE');
+      }
+    } catch (error) {
+      console.error('Error loading user subscription status:', error);
+      setUserSubscriptionStatus('FREE'); // Default to free if error
     }
   };
 
@@ -3111,6 +3151,15 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
       // Handle the API response structure - it returns { success: true, analysis: {...} }
       if (result.success && result.analysis) {
         setAnalysisResult(result.analysis);
+        
+        // Store the analyzed data for change detection
+        setLastAnalyzedData({
+          supplements: supplements,
+          medications: medications
+        });
+        
+        // Reset outdated flag since we just performed fresh analysis
+        setIsAnalysisOutdated(false);
       } else {
         throw new Error('Invalid API response structure');
       }
@@ -3156,6 +3205,17 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
   const handleNewAnalysis = () => {
     setAnalysisResult(null);
     performAnalysis();
+  };
+
+  const handleReanalysisPromptAccept = () => {
+    setShowReanalysisPrompt(false);
+    setAnalysisResult(null);
+    performAnalysis();
+  };
+
+  const handleReanalysisPromptDecline = () => {
+    setShowReanalysisPrompt(false);
+    // Keep the outdated flag so we show the warning banner
   };
 
   const getRiskColor = (risk: string) => {
@@ -3387,6 +3447,32 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
           </div>
         </div>
 
+        {/* Outdated Analysis Warning */}
+        {isAnalysisOutdated && (
+          <div className="mb-6 p-4 bg-yellow-50 border-l-4 border-yellow-400">
+            <div className="flex items-center justify-between">
+              <div className="flex items-start">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-yellow-400 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm text-yellow-700">
+                    <strong>Analysis Outdated:</strong> You've made changes to your supplements or medications. This analysis may not reflect your current regimen.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleNewAnalysis}
+                className="ml-4 px-3 py-1 bg-yellow-600 text-white text-sm rounded hover:bg-yellow-700 transition-colors flex-shrink-0"
+              >
+                Update Analysis
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Summary */}
         <div className="mb-6 p-4 bg-blue-50 rounded-lg">
           <h3 className="font-semibold text-blue-900 mb-2">Summary</h3>
@@ -3511,6 +3597,45 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
           onClose={() => setShowCreditModal(false)}
           creditInfo={creditInfo}
         />
+      )}
+
+      {/* Re-analysis Prompt Modal */}
+      {showReanalysisPrompt && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+            <div className="text-center mb-6">
+              <div className="text-4xl mb-4">🔄</div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Update Your Analysis?</h3>
+              <p className="text-gray-600">
+                You have just added a new supplement or medication. Would you like to update your supplement and medication interaction report?
+              </p>
+            </div>
+            
+            {/* Check if user is on trial and show subscription prompt */}
+            {userSubscriptionStatus === 'FREE' && (
+              <div className="mb-4 p-3 bg-blue-50 rounded-lg">
+                <p className="text-sm text-blue-700">
+                  💡 <strong>Upgrade to Premium</strong> for unlimited analysis updates and advanced features!
+                </p>
+              </div>
+            )}
+            
+            <div className="flex space-x-3">
+              <button
+                onClick={handleReanalysisPromptDecline}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+              >
+                Not Now
+              </button>
+              <button
+                onClick={handleReanalysisPromptAccept}
+                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+              >
+                Update Analysis
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
