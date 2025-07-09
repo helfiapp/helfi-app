@@ -133,7 +133,7 @@ Be thorough but not alarmist. Provide actionable recommendations.`;
     const analysisText = completion.choices[0].message.content;
     console.log('OpenAI Response:', analysisText);
     
-    // Parse the JSON response
+    // Parse the JSON response with improved error handling
     let analysis;
     try {
       if (!analysisText) {
@@ -141,44 +141,41 @@ Be thorough but not alarmist. Provide actionable recommendations.`;
       }
       
       // Try to extract JSON from the response if it's wrapped in markdown
-      let jsonText = analysisText;
-      if (analysisText.includes('```json')) {
-        const jsonMatch = analysisText.match(/```json\n([\s\S]*?)\n```/);
+      let jsonText = analysisText.trim();
+      
+      // Handle different markdown formats
+      if (jsonText.includes('```json')) {
+        const jsonMatch = jsonText.match(/```json\s*\n([\s\S]*?)\n```/);
         if (jsonMatch) {
-          jsonText = jsonMatch[1];
+          jsonText = jsonMatch[1].trim();
         }
-      } else if (analysisText.includes('```')) {
-        const jsonMatch = analysisText.match(/```\n([\s\S]*?)\n```/);
+      } else if (jsonText.includes('```')) {
+        const jsonMatch = jsonText.match(/```\s*\n([\s\S]*?)\n```/);
         if (jsonMatch) {
-          jsonText = jsonMatch[1];
+          jsonText = jsonMatch[1].trim();
         }
       }
       
+      // Clean up common JSON formatting issues
+      jsonText = jsonText.replace(/^[^{]*({[\s\S]*})[^}]*$/, '$1');
+      
       analysis = JSON.parse(jsonText);
+      
+      // Validate the parsed analysis has required fields
+      if (!analysis.overallRisk || !Array.isArray(analysis.interactions)) {
+        throw new Error('Invalid analysis structure');
+      }
+      
     } catch (parseError) {
       console.error('Failed to parse OpenAI response:', parseError);
       console.error('Raw response:', analysisText);
       
-      // Return a fallback response instead of failing
-      analysis = {
-        overallRisk: "medium",
-        interactions: [{
-          substance1: "Analysis",
-          substance2: "Pending",
-          severity: "medium",
-          description: "Unable to parse detailed analysis. Please consult your healthcare provider.",
-          recommendation: "Consult your healthcare provider for personalized advice.",
-          timingAdjustment: "No specific timing adjustments available."
-        }],
-        timingOptimization: {
-          morning: [],
-          afternoon: [],
-          evening: [],
-          beforeBed: []
-        },
-        generalRecommendations: ["Consult your healthcare provider for personalized medication and supplement guidance."],
-        disclaimer: "This analysis is for informational purposes only. Always consult your healthcare provider before making changes to your medication or supplement regimen."
-      };
+      // Instead of showing broken placeholder data, return a proper error
+      return NextResponse.json({ 
+        error: 'Analysis parsing failed',
+        details: 'Unable to process the interaction analysis. Please try again.',
+        rawResponse: analysisText?.substring(0, 500) // First 500 chars for debugging
+      }, { status: 500 });
     }
 
     // Add metadata

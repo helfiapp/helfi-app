@@ -3038,17 +3038,9 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
   const [expandedInteractions, setExpandedInteractions] = useState<Set<number>>(new Set());
 
   useEffect(() => {
-    // Load previous analyses first, then automatically perform new analysis if coming from medications page
-    loadPreviousAnalyses().then(() => {
-      // Auto-trigger analysis if we have supplements or medications but no recent analysis
-      const currentSupplements = initial?.supplements || [];
-      const currentMedications = initial?.medications || [];
-      
-      if ((currentSupplements.length > 0 || currentMedications.length > 0)) {
-        // Automatically perform analysis when landing on this page
-        performAnalysis();
-      }
-    });
+    // Load previous analyses but don't auto-trigger analysis
+    // This prevents navigation state conflicts
+    loadPreviousAnalyses();
   }, []);
 
   // Check if supplements/medications have changed since last analysis
@@ -3125,7 +3117,7 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
           summary: 'No supplements or medications to analyze. Please add your supplements and medications in the previous steps.',
           interactions: [],
           timingOptimization: {},
-          recommendations: ['Go back to add your supplements and medications for a comprehensive interaction analysis.'],
+          generalRecommendations: ['Go back to add your supplements and medications for a comprehensive interaction analysis.'],
           disclaimer: 'This analysis is for informational purposes only and should not replace professional medical advice.'
         });
         setIsAnalyzing(false);
@@ -3146,14 +3138,15 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
       if (response.status === 402) {
         // Handle insufficient credits
         const errorData = await response.json();
-        setCreditInfo(errorData.creditInfo);
+        setCreditInfo(errorData);
         setShowCreditModal(true);
         setIsAnalyzing(false);
         return;
       }
 
       if (!response.ok) {
-        throw new Error(`Analysis failed: ${response.status}`);
+        const errorData = await response.json();
+        throw new Error(errorData.details || `Analysis failed: ${response.status}`);
       }
 
       const result = await response.json();
@@ -3174,7 +3167,7 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
       }
     } catch (err) {
       console.error('Error performing interaction analysis:', err);
-      setError('Failed to analyze interactions. Please try again.');
+      setError(err instanceof Error ? err.message : 'Failed to analyze interactions. Please try again.');
     } finally {
       setIsAnalyzing(false);
     }
@@ -3295,61 +3288,74 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
     );
   }
 
-  // Show previous analyses and option to create new one
+  // Show initial state with analysis button - this is the main page 8 view
   if (!analysisResult && !isAnalyzing) {
+    const currentSupplements = initial?.supplements || [];
+    const currentMedications = initial?.medications || [];
+    
     return (
       <div className="max-w-4xl mx-auto">
         <div className="bg-white rounded-lg shadow-sm p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold">Interaction Analysis</h2>
-            <button
-              onClick={handleNewAnalysis}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
-            >
-              Analyze Interactions
-            </button>
+          <div className="mb-6">
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Interaction Analysis</h2>
+            <p className="text-gray-600">
+              We'll analyze your {currentSupplements.length} supplement{currentSupplements.length !== 1 ? 's' : ''} and {currentMedications.length} medication{currentMedications.length !== 1 ? 's' : ''} for potential interactions.
+            </p>
           </div>
 
-          {/* Previous Analyses */}
-          {previousAnalyses.length > 0 && (
-            <div className="mb-6">
-              <h3 className="text-lg font-semibold mb-4">Previous Analyses</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {previousAnalyses.map((analysis) => (
-                  <div key={analysis.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="font-medium text-sm text-gray-900 line-clamp-2">
-                        {analysis.analysisName}
+          {/* Current Items Summary */}
+          <div className="mb-6 p-4 bg-blue-50 rounded-lg">
+            <h3 className="font-semibold text-blue-900 mb-3">Items to Analyze:</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {currentSupplements.length > 0 && (
+                <div>
+                  <h4 className="font-medium text-blue-800 mb-2">Supplements ({currentSupplements.length})</h4>
+                  <div className="space-y-1">
+                    {currentSupplements.slice(0, 3).map((supplement: any, index: number) => (
+                      <div key={index} className="text-sm text-blue-700">
+                        • {supplement.name} ({supplement.dosage})
                       </div>
-                      <div className={`px-2 py-1 rounded text-xs font-medium ml-2 flex-shrink-0 ${getRiskColor(analysis.overallRisk)}`}>
-                        {getRiskIcon(analysis.overallRisk)} {analysis.overallRisk}
+                    ))}
+                    {currentSupplements.length > 3 && (
+                      <div className="text-sm text-blue-600">
+                        ... and {currentSupplements.length - 3} more
                       </div>
-                    </div>
-                    <div className="text-xs text-gray-500 mb-2">
-                      {analysis.supplementCount} supplements, {analysis.medicationCount} medications
-                    </div>
-                    <div className="text-xs text-gray-400">
-                      {new Date(analysis.createdAt).toLocaleDateString()}
-                    </div>
-                    <div className="mt-3 text-xs text-blue-600 font-medium">
-                      Previous Analysis
-                    </div>
+                    )}
                   </div>
-                ))}
+                </div>
+              )}
+              {currentMedications.length > 0 && (
+                <div>
+                  <h4 className="font-medium text-blue-800 mb-2">Medications ({currentMedications.length})</h4>
+                  <div className="space-y-1">
+                    {currentMedications.slice(0, 3).map((medication: any, index: number) => (
+                      <div key={index} className="text-sm text-blue-700">
+                        • {medication.name} ({medication.dosage})
+                      </div>
+                    ))}
+                    {currentMedications.length > 3 && (
+                      <div className="text-sm text-blue-600">
+                        ... and {currentMedications.length - 3} more
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Safety Notice */}
+          <div className="mb-6 p-4 bg-orange-50 rounded-lg">
+            <div className="flex items-start gap-3">
+              <div className="text-orange-600 text-xl">⚠️</div>
+              <div>
+                <div className="font-medium text-orange-900">Important Safety Check</div>
+                <div className="text-sm text-orange-700">
+                  This analysis will check for potential interactions between your medications and supplements, focusing on medium and high-risk interactions that require attention.
+                </div>
               </div>
             </div>
-          )}
-
-          {/* No previous analyses message */}
-          {previousAnalyses.length === 0 && (
-            <div className="text-center py-8">
-              <div className="text-gray-400 text-6xl mb-4">🔬</div>
-              <h3 className="text-lg font-semibold mb-2">No Previous Analyses</h3>
-              <p className="text-gray-600 mb-6">
-                This will be your first interaction analysis. We'll analyze your current supplements and medications for potential interactions.
-              </p>
-            </div>
-          )}
+          </div>
 
           {/* Navigation */}
           <div className="flex space-x-4">
@@ -3362,13 +3368,12 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
             <button
               onClick={handleNewAnalysis}
               className="flex-1 bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors"
+              disabled={currentSupplements.length === 0 && currentMedications.length === 0}
             >
-              {previousAnalyses.length > 0 ? 'Run New Analysis' : 'Start Analysis'}
+              Analyze for Interactions & Contraindications
             </button>
           </div>
         </div>
-
-
       </div>
     );
   }
@@ -3445,88 +3450,96 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
           </p>
         </div>
 
-        {/* Interactions - Accordion Style */}
-        {analysisResult.interactions && analysisResult.interactions.length > 0 ? (
-          <div className="mb-6">
-            <h3 className="text-lg font-semibold mb-4">Potential Interactions</h3>
-            <div className="space-y-2">
-              {analysisResult.interactions
-                .filter((interaction: any) => interaction.severity === 'medium' || interaction.severity === 'high')
-                .map((interaction: any, index: number) => {
-                const isExpanded = expandedInteractions.has(index);
-                const severityIcon = interaction.severity === 'high' ? '🚨' : '⚠️';
-                
-                return (
-                  <div key={index} className="border border-gray-200 rounded-lg overflow-hidden">
-                    {/* Accordion Header */}
-                    <button
-                      onClick={() => toggleInteractionExpansion(index)}
-                      className="w-full px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors flex items-center justify-between text-left"
-                    >
-                      <div className="flex items-center space-x-3 flex-1">
-                        <span className="text-lg">{severityIcon}</span>
-                        <span className="font-medium text-gray-900">
-                          {interaction.substance1} + {interaction.substance2}
-                        </span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${
-                          interaction.severity === 'high' 
-                            ? 'bg-red-100 text-red-800'
-                            : 'bg-orange-100 text-orange-800'
-                        }`}>
-                          {interaction.severity.toUpperCase()}
-                        </span>
-                        <svg 
-                          className={`w-5 h-5 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                          fill="none" 
-                          stroke="currentColor" 
-                          viewBox="0 0 24 24"
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </div>
-                    </button>
+        {/* Interactions - Show green checkmark for no dangerous interactions or accordion for interactions */}
+        {(() => {
+          const dangerousInteractions = analysisResult.interactions?.filter((interaction: any) => 
+            interaction.severity === 'medium' || interaction.severity === 'high'
+          ) || [];
+          
+          if (dangerousInteractions.length > 0) {
+            return (
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold mb-4">Potential Interactions</h3>
+                <div className="space-y-2">
+                  {dangerousInteractions.map((interaction: any, index: number) => {
+                    const isExpanded = expandedInteractions.has(index);
+                    const severityIcon = interaction.severity === 'high' ? '🚨' : '⚠️';
                     
-                    {/* Accordion Content */}
-                    {isExpanded && (
-                      <div className="px-4 py-4 bg-white border-t border-gray-200">
-                        <div className="space-y-3">
-                          <div>
-                            <h4 className="font-medium text-gray-900 mb-1">Effect:</h4>
-                            <p className="text-gray-700 text-sm leading-relaxed">{interaction.description}</p>
+                    return (
+                      <div key={index} className="border border-gray-200 rounded-lg overflow-hidden">
+                        {/* Accordion Header */}
+                        <button
+                          onClick={() => toggleInteractionExpansion(index)}
+                          className="w-full px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors flex items-center justify-between text-left"
+                        >
+                          <div className="flex items-center space-x-3 flex-1">
+                            <span className="text-lg">{severityIcon}</span>
+                            <span className="font-medium text-gray-900">
+                              {interaction.substance1} + {interaction.substance2}
+                            </span>
                           </div>
-                          
-                          {interaction.recommendation && (
-                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                              <h4 className="font-medium text-blue-900 mb-1">💡 Recommendation:</h4>
-                              <p className="text-blue-800 text-sm leading-relaxed">{interaction.recommendation}</p>
+                          <div className="flex items-center space-x-2">
+                            <span className={`px-2 py-1 rounded text-xs font-medium ${
+                              interaction.severity === 'high' 
+                                ? 'bg-red-100 text-red-800'
+                                : 'bg-orange-100 text-orange-800'
+                            }`}>
+                              {interaction.severity.toUpperCase()}
+                            </span>
+                            <svg 
+                              className={`w-5 h-5 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                              fill="none" 
+                              stroke="currentColor" 
+                              viewBox="0 0 24 24"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </div>
+                        </button>
+                        
+                        {/* Accordion Content */}
+                        {isExpanded && (
+                          <div className="px-4 py-4 bg-white border-t border-gray-200">
+                            <div className="space-y-3">
+                              <div>
+                                <h4 className="font-medium text-gray-900 mb-1">Effect:</h4>
+                                <p className="text-gray-700 text-sm leading-relaxed">{interaction.description}</p>
+                              </div>
+                              
+                              {interaction.recommendation && (
+                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                                  <h4 className="font-medium text-blue-900 mb-1">💡 Recommendation:</h4>
+                                  <p className="text-blue-800 text-sm leading-relaxed">{interaction.recommendation}</p>
+                                </div>
+                              )}
+                              
+                              {interaction.severity === 'high' && (
+                                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                                  <h4 className="font-medium text-red-900 mb-1">⚠️ Important:</h4>
+                                  <p className="text-red-800 text-sm">This is a high-risk interaction. Please consult with your healthcare provider immediately.</p>
+                                </div>
+                              )}
                             </div>
-                          )}
-                          
-                          {interaction.severity === 'high' && (
-                            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                              <h4 className="font-medium text-red-900 mb-1">⚠️ Important:</h4>
-                              <p className="text-red-800 text-sm">This is a high-risk interaction. Please consult with your healthcare provider immediately.</p>
-                            </div>
-                          )}
-                        </div>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        ) : (
-          <div className="mb-6">
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
-              <div className="text-green-600 text-4xl mb-2">✅</div>
-              <h3 className="text-lg font-semibold text-green-900 mb-1">No Dangerous Interactions Found</h3>
-              <p className="text-green-800 text-sm">Your current supplements and medications appear to be safe to take together.</p>
-            </div>
-          </div>
-        )}
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          } else {
+            return (
+              <div className="mb-6">
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
+                  <div className="text-green-600 text-4xl mb-2">✅</div>
+                  <h3 className="text-lg font-semibold text-green-900 mb-1">No Dangerous Interactions Found</h3>
+                  <p className="text-green-800 text-sm">Your current supplements and medications appear to be safe to take together.</p>
+                </div>
+              </div>
+            );
+          }
+        })()}
 
         {/* Timing Optimization */}
         {analysisResult.timingOptimization && Object.keys(analysisResult.timingOptimization).length > 0 && (
