@@ -3038,8 +3038,17 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
   const [expandedInteractions, setExpandedInteractions] = useState<Set<number>>(new Set());
 
   useEffect(() => {
-    // Load previous analyses first, then perform new analysis
-    loadPreviousAnalyses();
+    // Load previous analyses first, then automatically perform new analysis if coming from medications page
+    loadPreviousAnalyses().then(() => {
+      // Auto-trigger analysis if we have supplements or medications but no recent analysis
+      const currentSupplements = initial?.supplements || [];
+      const currentMedications = initial?.medications || [];
+      
+      if ((currentSupplements.length > 0 || currentMedications.length > 0)) {
+        // Automatically perform analysis when landing on this page
+        performAnalysis();
+      }
+    });
   }, []);
 
   // Check if supplements/medications have changed since last analysis
@@ -3068,19 +3077,7 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
         const analyses = data.analyses || [];
         setPreviousAnalyses(analyses);
         
-        // Show most recent analysis if available, don't auto-analyze
-        if (analyses.length > 0) {
-          // Load the most recent analysis result
-          const mostRecent = analyses[0];
-          setAnalysisResult(mostRecent.analysisData);
-          
-          // Set the last analyzed data for change detection
-          setLastAnalyzedData({
-            supplements: mostRecent.supplementsAnalyzed || [],
-            medications: mostRecent.medicationsAnalyzed || []
-          });
-        }
-        
+        // DON'T auto-load previous analysis - we want fresh analysis each time
         setIsLoadingHistory(false);
       } else {
         setIsLoadingHistory(false);
@@ -3453,9 +3450,11 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
           <div className="mb-6">
             <h3 className="text-lg font-semibold mb-4">Potential Interactions</h3>
             <div className="space-y-2">
-              {analysisResult.interactions.map((interaction: any, index: number) => {
+              {analysisResult.interactions
+                .filter((interaction: any) => interaction.severity === 'medium' || interaction.severity === 'high')
+                .map((interaction: any, index: number) => {
                 const isExpanded = expandedInteractions.has(index);
-                const severityIcon = interaction.severity === 'high' ? '🚨' : interaction.severity === 'medium' ? '⚠️' : '🟢';
+                const severityIcon = interaction.severity === 'high' ? '🚨' : '⚠️';
                 
                 return (
                   <div key={index} className="border border-gray-200 rounded-lg overflow-hidden">
@@ -3474,9 +3473,7 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
                         <span className={`px-2 py-1 rounded text-xs font-medium ${
                           interaction.severity === 'high' 
                             ? 'bg-red-100 text-red-800'
-                            : interaction.severity === 'medium'
-                            ? 'bg-orange-100 text-orange-800'
-                            : 'bg-green-100 text-green-800'
+                            : 'bg-orange-100 text-orange-800'
                         }`}>
                           {interaction.severity.toUpperCase()}
                         </span>
@@ -3521,7 +3518,7 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
               })}
             </div>
           </div>
-        ) : analysisResult.interactions && analysisResult.interactions.length === 0 ? (
+        ) : (
           <div className="mb-6">
             <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
               <div className="text-green-600 text-4xl mb-2">✅</div>
@@ -3529,7 +3526,7 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
               <p className="text-green-800 text-sm">Your current supplements and medications appear to be safe to take together.</p>
             </div>
           </div>
-        ) : null}
+        )}
 
         {/* Timing Optimization */}
         {analysisResult.timingOptimization && Object.keys(analysisResult.timingOptimization).length > 0 && (
