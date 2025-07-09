@@ -1,4 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+import { CreditManager, CREDIT_COSTS } from '@/lib/credit-system';
 import OpenAI from 'openai';
 
 // Initialize OpenAI client only when API key is available
@@ -15,6 +19,39 @@ const getOpenAIClient = () => {
 export async function POST(req: NextRequest) {
   try {
     console.log('=== FOOD ANALYZER DEBUG START ===');
+    
+    // Check authentication
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Find user and check credit quota
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email },
+      include: { subscription: true }
+    });
+
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    // Check credit availability using new credit system
+    const creditManager = new CreditManager(user.id);
+    const creditStatus = await creditManager.checkCredits('FOOD_ANALYSIS');
+    
+    if (!creditStatus.hasCredits) {
+      return NextResponse.json({ 
+        error: 'Insufficient credits',
+        creditsRemaining: creditStatus.totalCreditsRemaining,
+        dailyCreditsRemaining: creditStatus.dailyCreditsRemaining,
+        additionalCredits: creditStatus.additionalCreditsRemaining,
+        creditCost: CREDIT_COSTS.FOOD_ANALYSIS,
+        featureUsageToday: creditStatus.featureUsageToday,
+        dailyLimits: creditStatus.dailyLimits,
+        plan: user.subscription?.plan || 'FREE'
+      }, { status: 402 }); // Payment Required
+    }
     
     // Check if API key is configured
     if (!process.env.OPENAI_API_KEY) {
@@ -189,6 +226,10 @@ Estimate portion size carefully from the image and calculate nutrition according
     }
 
     console.log('✅ Analysis received:', analysis.substring(0, 100) + '...');
+    
+    // Consume credits after successful analysis
+    await creditManager.consumeCredits('FOOD_ANALYSIS');
+    
     console.log('=== FOOD ANALYZER DEBUG END ===');
 
     return NextResponse.json({

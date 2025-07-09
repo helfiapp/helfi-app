@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { extractAdminFromHeaders } from '@/lib/admin-auth'
+import { CreditManager } from '@/lib/credit-system'
 
 export async function GET(request: NextRequest) {
   try {
@@ -179,53 +180,23 @@ export async function POST(request: NextRequest) {
         break
 
       case 'add_credits':
-        // Add additional credits to user account
+        // Add additional credits to user account using new credit system
         const creditAmount = data?.creditAmount || 0
         if (creditAmount <= 0) {
           return NextResponse.json({ error: 'Invalid credit amount' }, { status: 400 })
         }
-        await prisma.user.update({
-          where: { id: userId },
-          data: {
-            additionalCredits: {
-              increment: creditAmount
-            }
-          }
-        })
+        await CreditManager.addCredits(userId, creditAmount)
         break
 
       case 'reset_daily_quota':
-        // Reset daily analysis quota
-        await prisma.user.update({
-          where: { id: userId },
-          data: {
-            dailyAnalysisUsed: 0,
-            lastAnalysisResetDate: new Date()
-          }
-        })
+        // Reset daily analysis quota using new credit system
+        await CreditManager.resetDailyQuota(userId)
         break
 
       case 'view_credit_usage':
-        // Get detailed credit usage information
-        const user = await prisma.user.findUnique({
-          where: { id: userId },
-          select: {
-            id: true,
-            email: true,
-            name: true,
-            dailyAnalysisCredits: true,
-            additionalCredits: true,
-            dailyAnalysisUsed: true,
-            totalAnalysisCount: true,
-            lastAnalysisResetDate: true,
-            subscription: {
-              select: {
-                plan: true
-              }
-            }
-          }
-        })
-        return NextResponse.json({ success: true, creditUsage: user })
+        // Get detailed credit usage information using new credit system
+        const creditUsage = await CreditManager.getCreditUsage(userId)
+        return NextResponse.json({ success: true, creditUsage })
 
       default:
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 })

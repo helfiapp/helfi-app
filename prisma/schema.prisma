@@ -25,6 +25,12 @@ model User {
   lastAnalysisResetDate    DateTime?        // Track daily reset
   totalAnalysisCount       Int @default(0)  // Lifetime usage counter
   dailyAnalysisUsed        Int @default(0)  // Used today
+  
+  // Feature-specific credit tracking
+  dailyFoodAnalysisUsed      Int @default(0)  // Food analysis credits used today
+  dailyInteractionAnalysisUsed Int @default(0)  // Interaction analysis credits used today
+  totalFoodAnalysisCount     Int @default(0)  // Lifetime food analysis count
+  totalInteractionAnalysisCount Int @default(0)  // Lifetime interaction analysis count
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
   accounts      Account[]

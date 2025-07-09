@@ -2392,6 +2392,21 @@ The Helfi Team`,
                            {selectedUser.totalAnalysisCount || 0} lifetime
                          </span>
                        </div>
+                       
+                       {/* Feature-specific usage */}
+                       <div className="pt-2 border-t border-gray-200">
+                         <div className="text-xs text-gray-500 mb-2">Today's Feature Usage:</div>
+                         <div className="grid grid-cols-2 gap-2 text-xs">
+                           <div className="flex justify-between">
+                             <span>Food Analysis:</span>
+                             <span className="font-medium">{selectedUser.dailyFoodAnalysisUsed || 0}</span>
+                           </div>
+                           <div className="flex justify-between">
+                             <span>Interaction Analysis:</span>
+                             <span className="font-medium">{selectedUser.dailyInteractionAnalysisUsed || 0}</span>
+                           </div>
+                         </div>
+                       </div>
                        {selectedUser.lastAnalysisResetDate && (
                          <div className="flex justify-between items-center">
                            <span className="text-sm text-gray-600">Last Reset:</span>

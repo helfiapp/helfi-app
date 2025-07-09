@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { CreditManager, CREDIT_COSTS } from '@/lib/credit-system';
 import OpenAI from 'openai';
 
 const openai = new OpenAI({
@@ -32,37 +33,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    // Check if daily quota needs reset (new day)
-    const today = new Date();
-    const lastReset = user.lastAnalysisResetDate;
-    const needsReset = !lastReset || 
-      lastReset.getDate() !== today.getDate() ||
-      lastReset.getMonth() !== today.getMonth() ||
-      lastReset.getFullYear() !== today.getFullYear();
-
-    if (needsReset) {
-      await prisma.user.update({
-        where: { id: user.id },
-        data: {
-          dailyAnalysisUsed: 0,
-          lastAnalysisResetDate: today
-        }
-      });
-      user.dailyAnalysisUsed = 0;
-    }
-
-    // Check credit availability
-    const hasCredits = user.dailyAnalysisUsed < user.dailyAnalysisCredits || user.additionalCredits > 0;
+    // Check credit availability using new credit system
+    const creditManager = new CreditManager(user.id);
+    const creditStatus = await creditManager.checkCredits('INTERACTION_ANALYSIS');
     
-    if (!hasCredits) {
+    if (!creditStatus.hasCredits) {
       return NextResponse.json({ 
         error: 'Insufficient credits',
-        creditInfo: {
-          dailyUsed: user.dailyAnalysisUsed,
-          dailyLimit: user.dailyAnalysisCredits,
-          additionalCredits: user.additionalCredits,
-          plan: user.subscription?.plan || 'FREE'
-        }
+        creditsRemaining: creditStatus.totalCreditsRemaining,
+        dailyCreditsRemaining: creditStatus.dailyCreditsRemaining,
+        additionalCredits: creditStatus.additionalCreditsRemaining,
+        creditCost: CREDIT_COSTS.INTERACTION_ANALYSIS,
+        featureUsageToday: creditStatus.featureUsageToday,
+        dailyLimits: creditStatus.dailyLimits,
+        plan: user.subscription?.plan || 'FREE'
       }, { status: 402 }); // Payment Required
     }
 
@@ -220,26 +204,8 @@ Be thorough but not alarmist. Provide actionable recommendations.`;
       }
     });
 
-    // Consume credit after successful analysis
-    if (user.dailyAnalysisUsed < user.dailyAnalysisCredits) {
-      // Use daily credit
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { 
-          dailyAnalysisUsed: user.dailyAnalysisUsed + 1,
-          totalAnalysisCount: user.totalAnalysisCount + 1
-        }
-      });
-    } else {
-      // Use additional credit
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { 
-          additionalCredits: user.additionalCredits - 1,
-          totalAnalysisCount: user.totalAnalysisCount + 1
-        }
-      });
-    }
+    // Consume credits after successful analysis
+    await creditManager.consumeCredits('INTERACTION_ANALYSIS');
 
     return NextResponse.json({ 
       success: true, 

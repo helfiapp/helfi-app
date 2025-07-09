@@ -5,6 +5,16 @@ interface CreditInfo {
   dailyLimit: number;
   additionalCredits: number;
   plan: string;
+  creditCost?: number;
+  featureUsageToday?: {
+    foodAnalysis: number;
+    interactionAnalysis: number;
+  };
+  dailyLimits?: {
+    total: number;
+    foodAnalysis: number;
+    interactionAnalysis: number;
+  };
 }
 
 interface CreditPurchaseModalProps {
@@ -51,10 +61,11 @@ const CreditPurchaseModal: React.FC<CreditPurchaseModalProps> = ({
               </div>
               <div className="ml-3">
                 <h3 className="text-sm font-medium text-yellow-800">
-                  Daily Analysis Limit Reached
+                  Insufficient Credits
                 </h3>
                 <p className="text-sm text-yellow-700 mt-1">
-                  You've used {creditInfo.dailyUsed} of {creditInfo.dailyLimit} daily analyses.
+                  You need {creditInfo.creditCost || 1} credits for this analysis.
+                  You've used {creditInfo.dailyUsed} of {creditInfo.dailyLimit} daily credits.
                   {creditInfo.additionalCredits > 0 
                     ? ` You have ${creditInfo.additionalCredits} additional credits remaining.`
                     : ' You have no additional credits remaining.'
@@ -68,13 +79,30 @@ const CreditPurchaseModal: React.FC<CreditPurchaseModalProps> = ({
             <strong>Current Plan:</strong> {creditInfo.plan}
           </div>
 
+          {/* Feature-specific usage breakdown */}
+          {creditInfo.featureUsageToday && (
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
+              <h4 className="font-medium text-gray-900 mb-2">Today's Feature Usage</h4>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-700">Food Analysis (1 credit each):</span>
+                  <span className="font-medium text-gray-900">{creditInfo.featureUsageToday.foodAnalysis}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-700">Interaction Analysis (3 credits each):</span>
+                  <span className="font-medium text-gray-900">{creditInfo.featureUsageToday.interactionAnalysis}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
           {creditInfo.plan === 'FREE' && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
               <h4 className="font-medium text-blue-900 mb-2">
                 Upgrade to Premium
               </h4>
               <p className="text-sm text-blue-800 mb-3">
-                Get 30 daily analyses plus unlimited additional credits
+                Get 30 daily credits plus unlimited additional credits. Perfect for both food analysis (1 credit) and interaction analysis (3 credits).
               </p>
               <button
                 onClick={() => handlePurchase('premium')}
