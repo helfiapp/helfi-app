@@ -1927,7 +1927,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
         onClose={() => setShowUpdatePopup(false)}
         onUpdate={async () => {
           try {
-            // Save supplements data when user confirms
+            // Save supplements data when user confirms  
             onNext({ supplements: supplementsToSave });
             // Clear existing analysis to trigger re-analysis
             const response = await fetch('/api/interaction-history', {
@@ -1936,9 +1936,11 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
             if (response.ok) {
               console.log('✅ Cleared existing analysis - will navigate to page 8 for fresh analysis');
             }
-            // Navigate to analysis page after saving data
+            // Navigate directly to analysis page without advancing step
             if (onNavigateToAnalysis) {
-              onNavigateToAnalysis();
+              setTimeout(() => {
+                onNavigateToAnalysis();
+              }, 100);
             }
           } catch (error) {
             console.error('Error clearing analysis:', error);
@@ -2750,9 +2752,11 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
             if (response.ok) {
               console.log('✅ Cleared existing analysis - will navigate to page 8 for fresh analysis');
             }
-            // Navigate to analysis page after saving data
+            // Navigate directly to analysis page without advancing step
             if (onNavigateToAnalysis) {
-              onNavigateToAnalysis();
+              setTimeout(() => {
+                onNavigateToAnalysis();
+              }, 100);
             }
           } catch (error) {
             console.error('Error clearing analysis:', error);
@@ -3249,6 +3253,19 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
     loadPreviousAnalyses();
   }, []);
 
+  // Reset navigation state when analysis completes to prevent freeze
+  useEffect(() => {
+    if (analysisResult && !isAnalyzing) {
+      // Ensure navigation is not stuck after analysis
+      setTimeout(() => {
+        // This will be handled by parent component
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage({ type: 'RESET_NAVIGATION_STATE' }, '*');
+        }
+      }, 500);
+    }
+  }, [analysisResult, isAnalyzing]);
+
   const loadPreviousAnalyses = async () => {
     try {
       const response = await fetch('/api/interaction-history');
@@ -3714,28 +3731,7 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
           }
         })()}
 
-        {/* Timing Optimization */}
-        {analysisResult.timingOptimization && Object.keys(analysisResult.timingOptimization).length > 0 && (
-          <div className="mb-6">
-            <h3 className="text-lg font-semibold mb-4">Optimal Timing Schedule</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-              {Object.entries(analysisResult.timingOptimization).map(([timeSlot, substances]: [string, any]) => (
-                <div key={timeSlot} className="border rounded-lg p-3">
-                  <div className="font-medium text-gray-900 mb-2 text-sm md:text-base capitalize">
-                    {timeSlot.replace(/([A-Z])/g, ' $1').trim()}
-                  </div>
-                  <div className="space-y-1">
-                    {substances.map((substance: string, index: number) => (
-                      <div key={index} className="text-xs md:text-sm text-gray-600 bg-gray-50 rounded px-2 py-1 break-words">
-                        {substance}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+
 
         {/* Recommendations */}
         {analysisResult.generalRecommendations && analysisResult.generalRecommendations.length > 0 && (
@@ -3976,10 +3972,19 @@ export default function Onboarding() {
       }
     }
 
+    function handleMessage(e: MessageEvent) {
+      if (e.data?.type === 'RESET_NAVIGATION_STATE') {
+        setIsNavigating(false);
+        setIsLoading(false);
+      }
+    }
+
     document.addEventListener('click', handleClick);
+    window.addEventListener('message', handleMessage);
 
     return () => {
       document.removeEventListener('click', handleClick);
+      window.removeEventListener('message', handleMessage);
     };
   }, [dropdownOpen]);
 
@@ -4107,6 +4112,10 @@ export default function Onboarding() {
     // Prevent navigation during loading
     if (isNavigating) return;
     
+    // Reset navigation state to prevent freeze
+    setIsNavigating(false);
+    setIsLoading(false);
+    
     setStep((prev) => {
       const newStep = Math.max(0, prev - 1);
       // Update URL to remember step position
@@ -4127,6 +4136,10 @@ export default function Onboarding() {
   const goToStep = (stepIndex: number) => {
     // Prevent navigation during loading
     if (isNavigating) return;
+    
+    // Reset navigation state to prevent freeze
+    setIsNavigating(false);
+    setIsLoading(false);
     
     setStep(stepIndex);
     // Update URL to remember step position
