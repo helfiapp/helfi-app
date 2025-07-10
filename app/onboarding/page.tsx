@@ -9,6 +9,52 @@ import CreditPurchaseModal from '@/components/CreditPurchaseModal';
 
 // Auth-enabled onboarding flow
 
+// Interaction Analysis Update Popup Component
+function InteractionAnalysisUpdatePopup({ isOpen, onClose, onUpdate }: { isOpen: boolean, onClose: () => void, onUpdate: () => void }) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+        <div className="flex items-center mb-4">
+          <div className="flex-shrink-0">
+            <svg className="h-6 w-6 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+          </div>
+          <h3 className="ml-3 text-lg font-medium text-gray-900">
+            Update Interaction Analysis?
+          </h3>
+        </div>
+        
+        <div className="mb-6">
+          <p className="text-sm text-gray-600">
+            You've made changes to your supplements or medications. Would you like to update your interaction analysis to reflect these changes?
+          </p>
+        </div>
+        
+        <div className="flex space-x-3">
+          <button
+            onClick={onClose}
+            className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            Not Now
+          </button>
+          <button
+            onClick={() => {
+              onUpdate();
+              onClose();
+            }}
+            className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Update Analysis
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const steps = [
   'gender',
   'physical',
@@ -1068,6 +1114,10 @@ function SupplementsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
   // Edit functionality states
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [showDropdown, setShowDropdown] = useState<number | null>(null);
+  
+  // Interaction analysis update popup state
+  const [showUpdatePopup, setShowUpdatePopup] = useState(false);
+  const [hasExistingAnalysis, setHasExistingAnalysis] = useState(false);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -1080,6 +1130,23 @@ function SupplementsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
     };
     document.addEventListener('click', handleClickOutside);
     return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
+
+  // Check for existing interaction analysis
+  useEffect(() => {
+    const checkExistingAnalysis = async () => {
+      try {
+        const response = await fetch('/api/interaction-history');
+        if (response.ok) {
+          const data = await response.json();
+          const analyses = data.analyses || [];
+          setHasExistingAnalysis(analyses.length > 0);
+        }
+      } catch (error) {
+        console.error('Error checking existing analysis:', error);
+      }
+    };
+    checkExistingAnalysis();
   }, []);
 
   const handleUploadMethodChange = (method: 'manual' | 'photo') => {
@@ -1193,6 +1260,11 @@ function SupplementsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
       }
       
       clearForm();
+      
+      // Show popup if there's an existing analysis
+      if (hasExistingAnalysis) {
+        setShowUpdatePopup(true);
+      }
     } else if (uploadMethod === 'photo' && frontImage && photoDosage && photoTiming.length > 0) {
       // Combine timing and individual dosages with units for photos
       const timingWithDosages = photoTiming.map(time => {
@@ -1229,6 +1301,11 @@ function SupplementsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
       }
       
       clearPhotoForm();
+      
+      // Show popup if there's an existing analysis
+      if (hasExistingAnalysis) {
+        setShowUpdatePopup(true);
+      }
     }
   };
 
@@ -1259,6 +1336,11 @@ function SupplementsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
     const supplement = supplements[index];
     setEditingIndex(index);
     setShowDropdown(null);
+    
+    // Show popup if there's an existing analysis (editing will trigger update)
+    if (hasExistingAnalysis) {
+      setShowUpdatePopup(true);
+    }
     
     if (supplement.method === 'manual') {
       setUploadMethod('manual');
@@ -1816,6 +1898,25 @@ function SupplementsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
           </button>
         </div>
       </div>
+      
+      {/* Interaction Analysis Update Popup */}
+      <InteractionAnalysisUpdatePopup
+        isOpen={showUpdatePopup}
+        onClose={() => setShowUpdatePopup(false)}
+        onUpdate={async () => {
+          try {
+            // Clear existing analysis to trigger re-analysis
+            const response = await fetch('/api/interaction-history', {
+              method: 'DELETE'
+            });
+            if (response.ok) {
+              console.log('✅ Cleared existing analysis - will re-analyze when user reaches page 8');
+            }
+          } catch (error) {
+            console.error('Error clearing analysis:', error);
+          }
+        }}
+      />
     </div>
   );
 }
@@ -1848,6 +1949,10 @@ function MedicationsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
   // Edit functionality states
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [showDropdown, setShowDropdown] = useState<number | null>(null);
+  
+  // Interaction analysis update popup state
+  const [showUpdatePopup, setShowUpdatePopup] = useState(false);
+  const [hasExistingAnalysis, setHasExistingAnalysis] = useState(false);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -1860,6 +1965,23 @@ function MedicationsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
     };
     document.addEventListener('click', handleClickOutside);
     return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
+
+  // Check for existing interaction analysis
+  useEffect(() => {
+    const checkExistingAnalysis = async () => {
+      try {
+        const response = await fetch('/api/interaction-history');
+        if (response.ok) {
+          const data = await response.json();
+          const analyses = data.analyses || [];
+          setHasExistingAnalysis(analyses.length > 0);
+        }
+      } catch (error) {
+        console.error('Error checking existing analysis:', error);
+      }
+    };
+    checkExistingAnalysis();
   }, []);
 
   const timingOptions = ['Morning', 'Afternoon', 'Evening', 'Before Bed'];
@@ -1939,6 +2061,11 @@ function MedicationsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
       }
       
       clearMedForm();
+      
+      // Show popup if there's an existing analysis
+      if (hasExistingAnalysis) {
+        setShowUpdatePopup(true);
+      }
     } else if (uploadMethod === 'photo' && frontImage && photoDosage && photoTiming.length > 0) {
       // Combine timing and individual dosages with units for photos
       const timingWithDosages = photoTiming.map(time => {
@@ -1975,6 +2102,11 @@ function MedicationsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
       }
       
       clearMedPhotoForm();
+      
+      // Show popup if there's an existing analysis
+      if (hasExistingAnalysis) {
+        setShowUpdatePopup(true);
+      }
     }
   };
 
@@ -2005,6 +2137,11 @@ function MedicationsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
     const medication = medications[index];
     setEditingIndex(index);
     setShowDropdown(null);
+    
+    // Show popup if there's an existing analysis (editing will trigger update)
+    if (hasExistingAnalysis) {
+      setShowUpdatePopup(true);
+    }
     
     if (medication.method === 'manual') {
       setUploadMethod('manual');
@@ -2552,6 +2689,25 @@ function MedicationsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
           </button>
         </div>
       </div>
+      
+      {/* Interaction Analysis Update Popup */}
+      <InteractionAnalysisUpdatePopup
+        isOpen={showUpdatePopup}
+        onClose={() => setShowUpdatePopup(false)}
+        onUpdate={async () => {
+          try {
+            // Clear existing analysis to trigger re-analysis
+            const response = await fetch('/api/interaction-history', {
+              method: 'DELETE'
+            });
+            if (response.ok) {
+              console.log('✅ Cleared existing analysis - will re-analyze when user reaches page 8');
+            }
+          } catch (error) {
+            console.error('Error clearing analysis:', error);
+          }
+        }}
+      />
     </div>
   );
 }
@@ -3031,9 +3187,6 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [showCreditModal, setShowCreditModal] = useState(false);
   const [creditInfo, setCreditInfo] = useState<any>(null);
-  const [isAnalysisOutdated, setIsAnalysisOutdated] = useState(false);
-  const [showReanalysisPrompt, setShowReanalysisPrompt] = useState(false);
-  const [lastAnalyzedData, setLastAnalyzedData] = useState<any>(null);
   const [userSubscriptionStatus, setUserSubscriptionStatus] = useState<'FREE' | 'PREMIUM' | null>(null);
   const [expandedInteractions, setExpandedInteractions] = useState<Set<number>>(new Set());
 
@@ -3041,28 +3194,6 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
     // Load previous analyses and show the last one (no auto-analysis)
     loadPreviousAnalyses();
   }, []);
-
-  // Check if supplements/medications have changed since last analysis
-  useEffect(() => {
-    if (analysisResult && lastAnalyzedData) {
-      const currentSupplements = initial?.supplements || [];
-      const currentMedications = initial?.medications || [];
-      
-      // Compare current data with last analyzed data
-      const supplementsChanged = JSON.stringify(currentSupplements) !== JSON.stringify(lastAnalyzedData.supplements);
-      const medicationsChanged = JSON.stringify(currentMedications) !== JSON.stringify(lastAnalyzedData.medications);
-      
-      if (supplementsChanged || medicationsChanged) {
-        setIsAnalysisOutdated(true);
-        // Show re-analysis prompt if user has made changes
-        setShowReanalysisPrompt(true);
-        console.log('🔄 Supplements/medications changed - showing update prompt');
-      } else {
-        setIsAnalysisOutdated(false);
-        setShowReanalysisPrompt(false);
-      }
-    }
-  }, [initial?.supplements, initial?.medications, analysisResult, lastAnalyzedData]);
 
   const loadPreviousAnalyses = async () => {
     try {
@@ -3076,10 +3207,6 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
         if (analyses.length > 0) {
           const mostRecentAnalysis = analyses[0]; // Assuming newest first
           setAnalysisResult(mostRecentAnalysis.analysisData);
-          setLastAnalyzedData({
-            supplements: mostRecentAnalysis.supplementsAnalyzed || [],
-            medications: mostRecentAnalysis.medicationsAnalyzed || []
-          });
           console.log('✅ Loaded most recent analysis for display');
         } else {
           console.log('ℹ️ No previous analyses found - showing empty state');
@@ -3091,10 +3218,6 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
             timingOptimization: {},
             generalRecommendations: ['Go back to add your supplements and medications for a comprehensive interaction analysis.'],
             disclaimer: 'This analysis is for informational purposes only and should not replace professional medical advice.'
-          });
-          setLastAnalyzedData({
-            supplements: [],
-            medications: []
           });
         }
         
@@ -3181,15 +3304,6 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
       // Handle the API response structure - it returns { success: true, analysis: {...} }
       if (result.success && result.analysis) {
         setAnalysisResult(result.analysis);
-        
-        // Store the analyzed data for change detection
-        setLastAnalyzedData({
-          supplements: currentSupplements,
-          medications: currentMedications
-        });
-        
-        // Reset outdated flag since we just performed fresh analysis
-        setIsAnalysisOutdated(false);
       } else {
         throw new Error('Invalid API response structure');
       }
@@ -3218,19 +3332,6 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
       newExpanded.add(index);
     }
     setExpandedInteractions(newExpanded);
-  };
-
-
-
-  const handleReanalysisPromptAccept = () => {
-    setShowReanalysisPrompt(false);
-    setAnalysisResult(null);
-    performAnalysis();
-  };
-
-  const handleReanalysisPromptDecline = () => {
-    setShowReanalysisPrompt(false);
-    setIsAnalysisOutdated(false);
   };
 
   const getRiskColor = (risk: string) => {
@@ -3405,39 +3506,7 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
           </div>
         </div>
 
-        {/* Update Analysis Prompt - Only show when changes detected */}
-        {showReanalysisPrompt && (
-          <div className="mb-6 p-4 bg-blue-50 border-l-4 border-blue-400">
-            <div className="flex items-center justify-between">
-              <div className="flex items-start">
-                <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-blue-400 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <p className="text-sm text-blue-700">
-                    <strong>Would you like to update your supplement and medication interaction analysis?</strong> You've made changes to your supplements or medications.
-                  </p>
-                </div>
-              </div>
-              <div className="flex space-x-2 ml-4">
-                <button
-                  onClick={handleReanalysisPromptDecline}
-                  className="px-3 py-1 text-sm border border-gray-300 text-gray-700 rounded hover:bg-gray-50 transition-colors"
-                >
-                  Not Now
-                </button>
-                <button
-                  onClick={handleReanalysisPromptAccept}
-                  className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors flex-shrink-0"
-                >
-                  Update Analysis
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+
 
         {/* Summary */}
         <div className="mb-6 p-4 bg-blue-50 rounded-lg">
