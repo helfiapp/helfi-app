@@ -10,7 +10,7 @@ import CreditPurchaseModal from '@/components/CreditPurchaseModal';
 // Auth-enabled onboarding flow
 
 // Interaction Analysis Update Popup Component
-function InteractionAnalysisUpdatePopup({ isOpen, onClose, onUpdate }: { isOpen: boolean, onClose: () => void, onUpdate: () => void }) {
+function InteractionAnalysisUpdatePopup({ isOpen, onClose, onUpdate, onNavigateToAnalysis }: { isOpen: boolean, onClose: () => void, onUpdate: () => void, onNavigateToAnalysis?: () => void }) {
   if (!isOpen) return null;
 
   return (
@@ -29,7 +29,10 @@ function InteractionAnalysisUpdatePopup({ isOpen, onClose, onUpdate }: { isOpen:
         
         <div className="mb-6">
           <p className="text-sm text-gray-600">
-            You've made changes to your supplements or medications. Would you like to update your interaction analysis to reflect these changes?
+            You've made changes to your supplements or medications. Would you like to run a fresh analysis that includes all your current entries?
+          </p>
+          <p className="text-sm text-gray-500 mt-2">
+            This will take you to the analysis page and generate a new comprehensive report.
           </p>
         </div>
         
@@ -44,10 +47,13 @@ function InteractionAnalysisUpdatePopup({ isOpen, onClose, onUpdate }: { isOpen:
             onClick={() => {
               onUpdate();
               onClose();
+              if (onNavigateToAnalysis) {
+                onNavigateToAnalysis();
+              }
             }}
             className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
-            Update Analysis
+            Run Fresh Analysis
           </button>
         </div>
       </div>
@@ -1095,7 +1101,7 @@ function HealthSituationsStep({ onNext, onBack, initial }: { onNext: (data: any)
   );
 }
 
-function SupplementsStep({ onNext, onBack, initial }: { onNext: (data: any) => void, onBack: () => void, initial?: any }) {
+function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { onNext: (data: any) => void, onBack: () => void, initial?: any, onNavigateToAnalysis?: () => void }) {
   const [supplements, setSupplements] = useState(initial?.supplements || []);
   const [name, setName] = useState('');
   const [dosage, setDosage] = useState('');
@@ -1905,23 +1911,27 @@ function SupplementsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
         onClose={() => setShowUpdatePopup(false)}
         onUpdate={async () => {
           try {
+            // First, save current supplements data to form
+            onNext({ supplements });
+            
             // Clear existing analysis to trigger re-analysis
             const response = await fetch('/api/interaction-history', {
               method: 'DELETE'
             });
             if (response.ok) {
-              console.log('✅ Cleared existing analysis - will re-analyze when user reaches page 8');
+              console.log('✅ Cleared existing analysis - will navigate to page 8 for fresh analysis');
             }
           } catch (error) {
             console.error('Error clearing analysis:', error);
           }
         }}
+        onNavigateToAnalysis={onNavigateToAnalysis}
       />
     </div>
   );
 }
 
-function MedicationsStep({ onNext, onBack, initial }: { onNext: (data: any) => void, onBack: () => void, initial?: any }) {
+function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { onNext: (data: any) => void, onBack: () => void, initial?: any, onNavigateToAnalysis?: () => void }) {
   const [medications, setMedications] = useState(initial?.medications || []);
   const [name, setName] = useState('');
   const [dosage, setDosage] = useState('');
@@ -2696,17 +2706,21 @@ function MedicationsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
         onClose={() => setShowUpdatePopup(false)}
         onUpdate={async () => {
           try {
+            // First, save current medications data to form
+            onNext({ medications });
+            
             // Clear existing analysis to trigger re-analysis
             const response = await fetch('/api/interaction-history', {
               method: 'DELETE'
             });
             if (response.ok) {
-              console.log('✅ Cleared existing analysis - will re-analyze when user reaches page 8');
+              console.log('✅ Cleared existing analysis - will navigate to page 8 for fresh analysis');
             }
           } catch (error) {
             console.error('Error clearing analysis:', error);
           }
         }}
+        onNavigateToAnalysis={onNavigateToAnalysis}
       />
     </div>
   );
@@ -3189,6 +3203,8 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
   const [creditInfo, setCreditInfo] = useState<any>(null);
   const [userSubscriptionStatus, setUserSubscriptionStatus] = useState<'FREE' | 'PREMIUM' | null>(null);
   const [expandedInteractions, setExpandedInteractions] = useState<Set<number>>(new Set());
+  const [expandedHistoryItems, setExpandedHistoryItems] = useState<Set<number>>(new Set());
+  const [showAnalysisHistory, setShowAnalysisHistory] = useState(false);
 
   useEffect(() => {
     // Load previous analyses and show the last one (no auto-analysis)
@@ -3202,6 +3218,19 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
         const data = await response.json();
         const analyses = data.analyses || [];
         setPreviousAnalyses(analyses);
+        
+        // Check if we have supplements or medications to analyze
+        const currentSupplements = initial?.supplements || [];
+        const currentMedications = initial?.medications || [];
+        const hasDataToAnalyze = currentSupplements.length > 0 || currentMedications.length > 0;
+        
+        // If no previous analyses AND we have data to analyze, trigger fresh analysis
+        if (analyses.length === 0 && hasDataToAnalyze) {
+          console.log('🔄 No previous analyses found but have data - triggering fresh analysis');
+          setIsLoadingHistory(false);
+          performAnalysis();
+          return;
+        }
         
         // Load the most recent analysis to display on page 8
         if (analyses.length > 0) {
@@ -3350,6 +3379,45 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
       case 'high': return '🔴';
       default: return '⚪';
     }
+  };
+
+  const toggleHistoryExpansion = (index: number) => {
+    const newExpanded = new Set(expandedHistoryItems);
+    if (newExpanded.has(index)) {
+      newExpanded.delete(index);
+    } else {
+      newExpanded.add(index);
+    }
+    setExpandedHistoryItems(newExpanded);
+  };
+
+  const deleteAnalysis = async (analysisId: string) => {
+    try {
+      const response = await fetch(`/api/interaction-history/${analysisId}`, {
+        method: 'DELETE'
+      });
+      
+      if (response.ok) {
+        // Refresh the analyses list
+        loadPreviousAnalyses();
+        console.log('✅ Analysis deleted successfully');
+      } else {
+        console.error('Failed to delete analysis');
+      }
+    } catch (error) {
+      console.error('Error deleting analysis:', error);
+    }
+  };
+
+  const formatAnalysisDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
   if (isAnalyzing) {
@@ -3661,6 +3729,134 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
             </div>
           </div>
         </div>
+
+        {/* Analysis History Section */}
+        {previousAnalyses.length > 0 && (
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Previous Analysis History</h3>
+              <button
+                onClick={() => setShowAnalysisHistory(!showAnalysisHistory)}
+                className="flex items-center space-x-2 text-sm text-blue-600 hover:text-blue-800 transition-colors"
+              >
+                <span>{showAnalysisHistory ? 'Hide' : 'Show'} History</span>
+                <svg 
+                  className={`w-4 h-4 transition-transform ${showAnalysisHistory ? 'rotate-180' : ''}`}
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+            </div>
+            
+            {showAnalysisHistory && (
+              <div className="space-y-3">
+                {previousAnalyses.map((analysis, index) => {
+                  const isExpanded = expandedHistoryItems.has(index);
+                  const analysisData = analysis.analysisData || {};
+                  
+                  return (
+                    <div key={analysis.id || index} className="border border-gray-200 rounded-lg overflow-hidden">
+                      {/* History Item Header */}
+                      <div className="bg-gray-50 px-4 py-3 flex items-center justify-between">
+                        <button
+                          onClick={() => toggleHistoryExpansion(index)}
+                          className="flex items-center space-x-3 flex-1 text-left hover:bg-gray-100 transition-colors rounded p-1 -m-1"
+                        >
+                          <div className="flex items-center space-x-2">
+                            <span className="text-sm font-medium text-gray-900">
+                              {formatAnalysisDate(analysis.createdAt)}
+                            </span>
+                            <span className={`px-2 py-1 rounded text-xs font-medium ${
+                              analysisData.overallRisk === 'low' 
+                                ? 'bg-green-100 text-green-800'
+                                : analysisData.overallRisk === 'medium'
+                                ? 'bg-orange-100 text-orange-800'
+                                : 'bg-red-100 text-red-800'
+                            }`}>
+                              {getRiskIcon(analysisData.overallRisk)} {analysisData.overallRisk?.toUpperCase() || 'UNKNOWN'}
+                            </span>
+                          </div>
+                          <svg 
+                            className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                            fill="none" 
+                            stroke="currentColor" 
+                            viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+                        
+                        <button
+                          onClick={() => deleteAnalysis(analysis.id)}
+                          className="ml-3 p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
+                          title="Delete this analysis"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
+                      
+                      {/* History Item Content */}
+                      {isExpanded && (
+                        <div className="p-4 bg-white border-t border-gray-200">
+                          <div className="space-y-4">
+                            {/* Summary */}
+                            <div>
+                              <h4 className="font-medium text-gray-900 mb-2">Summary</h4>
+                              <p className="text-sm text-gray-700">{analysisData.summary || 'No summary available'}</p>
+                            </div>
+                            
+                            {/* Interactions */}
+                            {analysisData.interactions && analysisData.interactions.length > 0 && (
+                              <div>
+                                <h4 className="font-medium text-gray-900 mb-2">Key Interactions</h4>
+                                <div className="space-y-2">
+                                  {analysisData.interactions.slice(0, 3).map((interaction: any, idx: number) => (
+                                    <div key={idx} className="text-sm text-gray-700 bg-gray-50 p-2 rounded">
+                                      <span className="font-medium">{interaction.substance1} + {interaction.substance2}:</span> {interaction.description}
+                                    </div>
+                                  ))}
+                                  {analysisData.interactions.length > 3 && (
+                                    <div className="text-sm text-gray-500">
+                                      +{analysisData.interactions.length - 3} more interactions
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                            
+                            {/* Timing Optimization */}
+                            {analysisData.timingOptimization && Object.keys(analysisData.timingOptimization).length > 0 && (
+                              <div>
+                                <h4 className="font-medium text-gray-900 mb-2">Timing Recommendations</h4>
+                                <div className="grid grid-cols-2 gap-2">
+                                  {Object.entries(analysisData.timingOptimization).slice(0, 4).map(([timeSlot, substances]: [string, any]) => (
+                                    <div key={timeSlot} className="text-sm bg-blue-50 p-2 rounded">
+                                      <div className="font-medium text-blue-900 capitalize">
+                                        {timeSlot.replace(/([A-Z])/g, ' $1').trim()}
+                                      </div>
+                                      <div className="text-blue-700 text-xs">
+                                        {substances.length} item{substances.length !== 1 ? 's' : ''}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Navigation - Only Back to Medications button as specified */}
         <div className="flex justify-center">
@@ -4149,8 +4345,8 @@ export default function Onboarding() {
           {step === 2 && <ExerciseStep onNext={handleNext} onBack={handleBack} initial={form} />}
           {step === 3 && <HealthGoalsStep onNext={handleNext} onBack={handleBack} initial={form} />}
           {step === 4 && <HealthSituationsStep onNext={handleNext} onBack={handleBack} initial={form} />}
-          {step === 5 && <SupplementsStep onNext={handleNext} onBack={handleBack} initial={form} />}
-          {step === 6 && <MedicationsStep onNext={handleNext} onBack={handleBack} initial={form} />}
+          {step === 5 && <SupplementsStep onNext={handleNext} onBack={handleBack} initial={form} onNavigateToAnalysis={() => goToStep(7)} />}
+          {step === 6 && <MedicationsStep onNext={handleNext} onBack={handleBack} initial={form} onNavigateToAnalysis={() => goToStep(7)} />}
           {step === 7 && <InteractionAnalysisStep onNext={handleNext} onBack={handleBack} initial={form} />}
           {step === 8 && <BloodResultsStep onNext={handleNext} onBack={handleBack} initial={form} />}
           {step === 9 && <AIInsightsStep onNext={handleNext} onBack={handleBack} initial={form} />}
