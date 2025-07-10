@@ -1857,3 +1857,35 @@ User is extremely frustrated with repeated failures. Agent #35 made false claims
 **CRITICAL**: User reported mobile-specific data persistence issues and completely missing popup functionality. These are the highest priority fixes needed.
 
 ---
+
+## **🤖 AGENT #36 - JANUARY 3RD, 2025** ❌ **FAILED**
+
+**Mission**: Fix 3 critical onboarding issues - page 6 supplements disappearing on refresh, missing popup prompts, and page 7 navigation getting stuck
+
+**Status**: ❌ **TERMINATED** - Completely misunderstood the actual issues and attempted wrong fixes
+
+**What Agent #36 Tried**:
+1. **Issue #1 (Page 6 Refresh)**: Added `useEffect` hooks to update state when props change - WRONG approach, didn't fix the issue
+2. **Issue #2 (Missing Popup)**: Assumed conditional logic was broken and tried to fix `else if` structure - WRONG diagnosis, code was already correct
+3. **Issue #3 (Page 7 Navigation)**: Added "Continue" button to page 7 - WRONG fix, didn't address the actual broken navigation
+
+**What Agent #36 Got Wrong**:
+- Never reproduced the actual user issues step-by-step
+- Made assumptions based on code reading instead of behavior testing
+- Focused on surface-level code issues instead of user experience problems
+- Deployed "fixes" without testing them on live site
+- Claimed success without user verification
+
+**Files Modified**: `app/onboarding/page.tsx`
+**Commits**: `2484371` - "Agent #36: Fix onboarding issues - data persistence on refresh, page 7 navigation, and popup logic" (FAILED)
+**Deployment**: https://helfi-rk9sx6qlq-louie-veleskis-projects.vercel.app (STILL BROKEN)
+
+**Root Cause of Failure**: Agent #36 failed to understand that the issues are user experience problems, not code structure problems. The actual issues need proper investigation and reproduction, not assumptions.
+
+**Critical Instructions for Next Agent**:
+1. **REPRODUCE EACH ISSUE EXACTLY** - Follow the user's exact steps to see the problems
+2. **TEST LOCALLY FIRST** - Don't deploy until issues are actually fixed locally
+3. **INVESTIGATE ROOT CAUSES** - Don't assume what the problems are
+4. **VERIFY FIXES WORK** - Test on live site before claiming success
+
+**User Feedback**: "You have literally fixed nothing and the same problem persists. You've been an absolute disappointment to say the least."

@@ -109,6 +109,30 @@ Agent #35 was assigned to fix the onboarding interaction analysis issues that Ag
 
 ---
 
+## **🚨 AGENT #36 UPDATE - JANUARY 3RD, 2025**
+
+**Status**: ❌ **FAILED TO FIX ISSUES** - All original problems persist
+
+**What Agent #36 Attempted**:
+1. **Issue #1**: Added `useEffect` hooks to SupplementsStep and MedicationsStep - DIDN'T WORK
+2. **Issue #2**: Tried to fix conditional logic that was already correct - DIDN'T WORK  
+3. **Issue #3**: Added "Continue" button to page 7 - DIDN'T FIX THE ACTUAL PROBLEM
+
+**Current Status**: ❌ **ALL ISSUES STILL BROKEN**
+- Page 6 supplements still disappear on refresh
+- No popup appears when adding supplements via image or manual upload
+- Page 7 navigation still gets stuck when clicking "Analyse for interactions"
+
+**Root Cause**: Agent #36 made assumptions without reproducing the actual user issues. The problems are user experience issues that need proper investigation, not code structure fixes.
+
+**Critical for Next Agent**: 
+1. **REPRODUCE THE EXACT USER FLOW** - Don't assume what the issues are
+2. **TEST LOCALLY FIRST** - Fix issues locally before deploying
+3. **INVESTIGATE ROOT CAUSES** - These are UX problems, not simple code fixes
+4. **VERIFY FIXES ACTUALLY WORK** - Test on live site before claiming success
+
+**User Extremely Frustrated**: Multiple agents have failed to fix these basic onboarding issues. The next agent MUST actually reproduce and fix the real problems.
+
 ## **📝 PRODUCTION STATUS**
 
 **Current Live URL**: https://helfi-3k1878jkl-louie-veleskis-projects.vercel.app  
