@@ -3038,17 +3038,8 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
   const [expandedInteractions, setExpandedInteractions] = useState<Set<number>>(new Set());
 
   useEffect(() => {
-    // Load previous analyses first, then automatically perform new analysis when landing on page 8
-    loadPreviousAnalyses().then(() => {
-      // Auto-trigger analysis when coming from page 7 (medications page)
-      const currentSupplements = initial?.supplements || [];
-      const currentMedications = initial?.medications || [];
-      
-      if ((currentSupplements.length > 0 || currentMedications.length > 0) && !analysisResult) {
-        // Automatically perform analysis when landing on this page
-        performAnalysis();
-      }
-    });
+    // Load previous analyses and show the last one (no auto-analysis)
+    loadPreviousAnalyses();
   }, []);
 
   // Check if supplements/medications have changed since last analysis
@@ -3065,6 +3056,10 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
         setIsAnalysisOutdated(true);
         // Show re-analysis prompt if user has made changes
         setShowReanalysisPrompt(true);
+        console.log('🔄 Supplements/medications changed - showing update prompt');
+      } else {
+        setIsAnalysisOutdated(false);
+        setShowReanalysisPrompt(false);
       }
     }
   }, [initial?.supplements, initial?.medications, analysisResult, lastAnalyzedData]);
@@ -3077,7 +3072,19 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
         const analyses = data.analyses || [];
         setPreviousAnalyses(analyses);
         
-        // DON'T auto-load previous analysis - we want fresh analysis each time
+        // Load the most recent analysis to display on page 8
+        if (analyses.length > 0) {
+          const mostRecentAnalysis = analyses[0]; // Assuming newest first
+          setAnalysisResult(mostRecentAnalysis.analysisData);
+          setLastAnalyzedData({
+            supplements: mostRecentAnalysis.supplementsAnalyzed || [],
+            medications: mostRecentAnalysis.medicationsAnalyzed || []
+          });
+          console.log('✅ Loaded most recent analysis for display');
+        } else {
+          console.log('ℹ️ No previous analyses found');
+        }
+        
         setIsLoadingHistory(false);
       } else {
         setIsLoadingHistory(false);
@@ -3210,7 +3217,7 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
 
   const handleReanalysisPromptDecline = () => {
     setShowReanalysisPrompt(false);
-    // Keep the outdated flag so we show the warning banner
+    setIsAnalysisOutdated(false);
   };
 
   const getRiskColor = (risk: string) => {
@@ -3385,28 +3392,36 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
           </div>
         </div>
 
-        {/* Outdated Analysis Warning */}
-        {isAnalysisOutdated && (
-          <div className="mb-6 p-4 bg-yellow-50 border-l-4 border-yellow-400">
+        {/* Update Analysis Prompt - Only show when changes detected */}
+        {showReanalysisPrompt && (
+          <div className="mb-6 p-4 bg-blue-50 border-l-4 border-blue-400">
             <div className="flex items-center justify-between">
               <div className="flex items-start">
                 <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-yellow-400 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                  <svg className="h-5 w-5 text-blue-400 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                   </svg>
                 </div>
                 <div className="ml-3">
-                  <p className="text-sm text-yellow-700">
+                  <p className="text-sm text-blue-700">
                     <strong>Would you like to update your supplement and medication interaction analysis?</strong> You've made changes to your supplements or medications.
                   </p>
                 </div>
               </div>
-              <button
-                onClick={handleReanalysisPromptAccept}
-                className="ml-4 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors flex-shrink-0"
-              >
-                Update Analysis
-              </button>
+              <div className="flex space-x-2 ml-4">
+                <button
+                  onClick={handleReanalysisPromptDecline}
+                  className="px-3 py-1 text-sm border border-gray-300 text-gray-700 rounded hover:bg-gray-50 transition-colors"
+                >
+                  Not Now
+                </button>
+                <button
+                  onClick={handleReanalysisPromptAccept}
+                  className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors flex-shrink-0"
+                >
+                  Update Analysis
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -3585,44 +3600,7 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
         />
       )}
 
-      {/* Re-analysis Prompt Modal */}
-      {showReanalysisPrompt && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full">
-            <div className="text-center mb-6">
-              <div className="text-4xl mb-4">🔄</div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Update Your Analysis?</h3>
-              <p className="text-gray-600">
-                Would you like to update your supplement and medication interaction analysis? You've made changes to your supplements or medications.
-              </p>
-            </div>
-            
-            {/* Check if user is on trial and show subscription prompt */}
-            {userSubscriptionStatus === 'FREE' && (
-              <div className="mb-4 p-3 bg-blue-50 rounded-lg">
-                <p className="text-sm text-blue-700">
-                  💡 <strong>Upgrade to Premium</strong> for unlimited analysis updates and advanced features!
-                </p>
-              </div>
-            )}
-            
-            <div className="flex space-x-3">
-              <button
-                onClick={handleReanalysisPromptDecline}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
-              >
-                Not Now
-              </button>
-              <button
-                onClick={handleReanalysisPromptAccept}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
-                Update Analysis
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+
     </div>
   );
 }
