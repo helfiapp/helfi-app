@@ -46,10 +46,6 @@ function InteractionAnalysisUpdatePopup({ isOpen, onClose, onUpdate, onNavigateT
           <button
             onClick={() => {
               onUpdate();
-              onClose();
-              if (onNavigateToAnalysis) {
-                onNavigateToAnalysis();
-              }
             }}
             className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
@@ -1275,13 +1271,15 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
       
       clearForm();
       
-      // Fix popup timing - show popup first, save data only when user confirms
+      // Store data for potential popup action, but don't save immediately
       const updatedSupplements = editingIndex !== null 
         ? supplements.map((item: any, index: number) => 
             index === editingIndex ? supplementData : item
           )
         : [...supplements, supplementData];
       setSupplementsToSave(updatedSupplements);
+      
+      // Show popup and wait for user decision - no automatic actions
       setShowUpdatePopup(true);
     } else if (uploadMethod === 'photo' && frontImage && photoDosage && photoTiming.length > 0) {
       // Combine timing and individual dosages with units for photos
@@ -1320,13 +1318,15 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
       
       clearPhotoForm();
       
-      // Fix popup timing - show popup first, save data only when user confirms
+      // Store data for potential popup action, but don't save immediately
       const updatedSupplements = editingIndex !== null 
         ? supplements.map((item: any, index: number) => 
             index === editingIndex ? supplementData : item
           )
         : [...supplements, supplementData];
       setSupplementsToSave(updatedSupplements);
+      
+      // Show popup and wait for user decision - no automatic actions
       setShowUpdatePopup(true);
     }
   };
@@ -1936,11 +1936,12 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
             if (response.ok) {
               console.log('✅ Cleared existing analysis - will navigate to page 8 for fresh analysis');
             }
-            // Navigate directly to analysis page without advancing step
+            // Close popup first, then navigate with delay to prevent state corruption
+            setShowUpdatePopup(false);
             if (onNavigateToAnalysis) {
               setTimeout(() => {
                 onNavigateToAnalysis();
-              }, 100);
+              }, 300);
             }
           } catch (error) {
             console.error('Error clearing analysis:', error);
@@ -2101,13 +2102,15 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
       
       clearMedForm();
       
-      // Fix popup timing - show popup first, save data only when user confirms
+      // Store data for potential popup action, but don't save immediately
       const updatedMedications = editingIndex !== null 
         ? medications.map((item: any, index: number) => 
             index === editingIndex ? medicationData : item
           )
         : [...medications, medicationData];
       setMedicationsToSave(updatedMedications);
+      
+      // Show popup and wait for user decision - no automatic actions
       setShowUpdatePopup(true);
     } else if (uploadMethod === 'photo' && frontImage && photoDosage && photoTiming.length > 0) {
       // Combine timing and individual dosages with units for photos
@@ -2146,13 +2149,15 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
       
       clearMedPhotoForm();
       
-      // Fix popup timing - show popup first, save data only when user confirms
+      // Store data for potential popup action, but don't save immediately
       const updatedMedications = editingIndex !== null 
         ? medications.map((item: any, index: number) => 
             index === editingIndex ? medicationData : item
           )
         : [...medications, medicationData];
       setMedicationsToSave(updatedMedications);
+      
+      // Show popup and wait for user decision - no automatic actions
       setShowUpdatePopup(true);
     }
   };
@@ -2752,11 +2757,12 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
             if (response.ok) {
               console.log('✅ Cleared existing analysis - will navigate to page 8 for fresh analysis');
             }
-            // Navigate directly to analysis page without advancing step
+            // Close popup first, then navigate with delay to prevent state corruption
+            setShowUpdatePopup(false);
             if (onNavigateToAnalysis) {
               setTimeout(() => {
                 onNavigateToAnalysis();
-              }, 100);
+              }, 300);
             }
           } catch (error) {
             console.error('Error clearing analysis:', error);
@@ -3247,6 +3253,7 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
   const [expandedInteractions, setExpandedInteractions] = useState<Set<number>>(new Set());
   const [expandedHistoryItems, setExpandedHistoryItems] = useState<Set<number>>(new Set());
   const [showAnalysisHistory, setShowAnalysisHistory] = useState(false);
+  const [showRecommendations, setShowRecommendations] = useState(false);
 
   useEffect(() => {
     // Load previous analyses and show the last one (no auto-analysis)
@@ -3733,42 +3740,46 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
 
 
 
-        {/* Recommendations */}
+        {/* Recommendations - Collapsible Dropdown */}
         {analysisResult.generalRecommendations && analysisResult.generalRecommendations.length > 0 && (
           <div className="mb-6">
-            <h3 className="text-lg font-semibold mb-4">Recommendations</h3>
-            <div className="space-y-2">
-              {analysisResult.generalRecommendations.map((rec: string, index: number) => (
-                <div key={index} className="flex items-start space-x-2">
-                  <div className="text-green-600 mt-1">✓</div>
-                  <div className="text-gray-700">{rec}</div>
-                </div>
-              ))}
-            </div>
+            <button
+              onClick={() => setShowRecommendations(!showRecommendations)}
+              className="flex items-center justify-between w-full text-left mb-3 p-3 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors"
+            >
+              <h3 className="text-lg font-semibold text-green-900">Recommendations</h3>
+              <svg 
+                className={`w-5 h-5 text-green-600 transition-transform ${showRecommendations ? 'rotate-180' : ''}`}
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            
+            {showRecommendations && (
+              <div className="space-y-2">
+                {analysisResult.generalRecommendations.map((rec: string, index: number) => (
+                  <div key={index} className="flex items-start space-x-2">
+                    <div className="text-green-600 mt-1">✓</div>
+                    <div className="text-gray-700">{rec}</div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
-        {/* Disclaimer */}
-        <div className="mb-6 p-4 bg-yellow-50 border-l-4 border-yellow-400">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <p className="text-sm text-yellow-700">
-                <strong>Important:</strong> {analysisResult.disclaimer}
-              </p>
-            </div>
-          </div>
-        </div>
 
-        {/* Analysis History Section */}
+
+        {/* Analysis History Section - Fixed Layout */}
         {previousAnalyses.length > 0 && (
           <div className="mb-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">Previous Analysis History</h3>
+            {/* Previous Analysis History heading on separate line */}
+            <div className="mb-4">
+              <h3 className="text-lg font-semibold mb-3">Previous Analysis History</h3>
+              {/* Show History dropdown on separate line */}
               <button
                 onClick={() => setShowAnalysisHistory(!showAnalysisHistory)}
                 className="flex items-center space-x-2 text-sm text-blue-600 hover:text-blue-800 transition-colors"
@@ -3892,20 +3903,36 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
           </div>
         )}
 
-        {/* Navigation */}
-        <div className="flex justify-between">
+        {/* Navigation - Fixed Layout: Separate lines for each button */}
+        <div className="space-y-3">
           <button
             onClick={onBack}
-            className="px-8 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-base font-medium"
+            className="w-full px-8 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-base font-medium"
           >
             Back to Medications
           </button>
           <button
             onClick={handleNext}
-            className="px-8 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-base font-medium"
+            className="w-full px-8 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-base font-medium"
           >
             Continue
           </button>
+        </div>
+
+        {/* Important Disclaimer - Moved to bottom as requested */}
+        <div className="mt-6 p-4 bg-yellow-50 border-l-4 border-yellow-400">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-yellow-700">
+                <strong>Important:</strong> {analysisResult.disclaimer}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 
