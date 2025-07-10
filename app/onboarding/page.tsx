@@ -3082,7 +3082,20 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
           });
           console.log('✅ Loaded most recent analysis for display');
         } else {
-          console.log('ℹ️ No previous analyses found');
+          console.log('ℹ️ No previous analyses found - showing empty state');
+          // Set a default empty state so page doesn't get stuck
+          setAnalysisResult({
+            overallRisk: 'low',
+            summary: 'No previous interaction analysis found. Add supplements and medications on the previous pages to get started.',
+            interactions: [],
+            timingOptimization: {},
+            generalRecommendations: ['Go back to add your supplements and medications for a comprehensive interaction analysis.'],
+            disclaimer: 'This analysis is for informational purposes only and should not replace professional medical advice.'
+          });
+          setLastAnalyzedData({
+            supplements: [],
+            medications: []
+          });
         }
         
         setIsLoadingHistory(false);

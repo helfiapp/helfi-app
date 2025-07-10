@@ -31,7 +31,9 @@ export async function GET(request: NextRequest) {
         supplementCount: true,
         medicationCount: true,
         createdAt: true,
-        // Don't include the full analysisData for the list view
+        analysisData: true, // Include the full analysis data
+        supplementsAnalyzed: true,
+        medicationsAnalyzed: true,
       }
     });
 
