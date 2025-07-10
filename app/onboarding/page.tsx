@@ -1936,6 +1936,10 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
             if (response.ok) {
               console.log('✅ Cleared existing analysis - will navigate to page 8 for fresh analysis');
             }
+            // Navigate to analysis page after saving data
+            if (onNavigateToAnalysis) {
+              onNavigateToAnalysis();
+            }
           } catch (error) {
             console.error('Error clearing analysis:', error);
           }
@@ -2745,6 +2749,10 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
             });
             if (response.ok) {
               console.log('✅ Cleared existing analysis - will navigate to page 8 for fresh analysis');
+            }
+            // Navigate to analysis page after saving data
+            if (onNavigateToAnalysis) {
+              onNavigateToAnalysis();
             }
           } catch (error) {
             console.error('Error clearing analysis:', error);
