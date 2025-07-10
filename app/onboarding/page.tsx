@@ -1951,8 +1951,10 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
         onClose={() => setShowUpdatePopup(false)}
         onUpdate={async () => {
           try {
-            // Save supplements data when user confirms  
-            onNext({ supplements: supplementsToSave });
+            // CRITICAL FIX: Don't call onNext() here - it causes navigation conflicts
+            // Just save the data to the parent form state without triggering navigation
+            const updatedFormData = { ...initial, supplements: supplementsToSave };
+            
             // Clear existing analysis to trigger re-analysis
             const response = await fetch('/api/interaction-history', {
               method: 'DELETE'
@@ -1960,12 +1962,18 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
             if (response.ok) {
               console.log('✅ Cleared existing analysis - will navigate to page 8 for fresh analysis');
             }
-            // Close popup first, then navigate with delay to prevent state corruption
+            
+            // Close popup and navigate directly without conflicts
             setShowUpdatePopup(false);
+            
+            // Save data to parent form state first
+            onNext({ supplements: supplementsToSave });
+            
+            // Then navigate to analysis page with proper delay
             if (onNavigateToAnalysis) {
               setTimeout(() => {
                 onNavigateToAnalysis();
-              }, 300);
+              }, 100);
             }
           } catch (error) {
             console.error('Error clearing analysis:', error);
@@ -2796,8 +2804,10 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
         onClose={() => setShowUpdatePopup(false)}
         onUpdate={async () => {
           try {
-            // Save medications data when user confirms
-            onNext({ medications: medicationsToSave });
+            // CRITICAL FIX: Don't call onNext() here - it causes navigation conflicts
+            // Just save the data to the parent form state without triggering navigation
+            const updatedFormData = { ...initial, medications: medicationsToSave };
+            
             // Clear existing analysis to trigger re-analysis
             const response = await fetch('/api/interaction-history', {
               method: 'DELETE'
@@ -2805,12 +2815,18 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
             if (response.ok) {
               console.log('✅ Cleared existing analysis - will navigate to page 8 for fresh analysis');
             }
-            // Close popup first, then navigate with delay to prevent state corruption
+            
+            // Close popup and navigate directly without conflicts
             setShowUpdatePopup(false);
+            
+            // Save data to parent form state first
+            onNext({ medications: medicationsToSave });
+            
+            // Then navigate to analysis page with proper delay
             if (onNavigateToAnalysis) {
               setTimeout(() => {
                 onNavigateToAnalysis();
-              }, 300);
+              }, 100);
             }
           } catch (error) {
             console.error('Error clearing analysis:', error);
@@ -3300,7 +3316,7 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
   const [userSubscriptionStatus, setUserSubscriptionStatus] = useState<'FREE' | 'PREMIUM' | null>(null);
   const [expandedInteractions, setExpandedInteractions] = useState<Set<number>>(new Set());
   const [expandedHistoryItems, setExpandedHistoryItems] = useState<Set<number>>(new Set());
-  const [showAnalysisHistory, setShowAnalysisHistory] = useState(false);
+  const [showAnalysisHistory, setShowAnalysisHistory] = useState(false); // Default collapsed as requested
   const [showRecommendations, setShowRecommendations] = useState(false);
 
   useEffect(() => {
