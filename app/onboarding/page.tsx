@@ -1097,7 +1097,7 @@ function HealthSituationsStep({ onNext, onBack, initial }: { onNext: (data: any)
   );
 }
 
-function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { onNext: (data: any) => void, onBack: () => void, initial?: any, onNavigateToAnalysis?: () => void }) {
+function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { onNext: (data: any) => void, onBack: () => void, initial?: any, onNavigateToAnalysis?: (data?: any) => void }) {
   const [supplements, setSupplements] = useState(initial?.supplements || []);
   
   // Fix data loading race condition - update supplements when initial data loads
@@ -1951,10 +1951,6 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
         onClose={() => setShowUpdatePopup(false)}
         onUpdate={async () => {
           try {
-            // CRITICAL FIX: Don't call onNext() here - it causes navigation conflicts
-            // Just save the data to the parent form state without triggering navigation
-            const updatedFormData = { ...initial, supplements: supplementsToSave };
-            
             // Clear existing analysis to trigger re-analysis
             const response = await fetch('/api/interaction-history', {
               method: 'DELETE'
@@ -1963,17 +1959,12 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
               console.log('✅ Cleared existing analysis - will navigate to page 8 for fresh analysis');
             }
             
-            // Close popup and navigate directly without conflicts
+            // Close popup first
             setShowUpdatePopup(false);
             
-            // Save data to parent form state first
-            onNext({ supplements: supplementsToSave });
-            
-            // Then navigate to analysis page with proper delay
+            // CRITICAL FIX: Pass data to navigation function
             if (onNavigateToAnalysis) {
-              setTimeout(() => {
-                onNavigateToAnalysis();
-              }, 100);
+              onNavigateToAnalysis({ supplements: supplementsToSave });
             }
           } catch (error) {
             console.error('Error clearing analysis:', error);
@@ -1985,7 +1976,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
   );
 }
 
-function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { onNext: (data: any) => void, onBack: () => void, initial?: any, onNavigateToAnalysis?: () => void }) {
+function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { onNext: (data: any) => void, onBack: () => void, initial?: any, onNavigateToAnalysis?: (data?: any) => void }) {
   const [medications, setMedications] = useState(initial?.medications || []);
   
   // Fix data loading race condition - update medications when initial data loads
@@ -2804,10 +2795,6 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
         onClose={() => setShowUpdatePopup(false)}
         onUpdate={async () => {
           try {
-            // CRITICAL FIX: Don't call onNext() here - it causes navigation conflicts
-            // Just save the data to the parent form state without triggering navigation
-            const updatedFormData = { ...initial, medications: medicationsToSave };
-            
             // Clear existing analysis to trigger re-analysis
             const response = await fetch('/api/interaction-history', {
               method: 'DELETE'
@@ -2816,17 +2803,12 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
               console.log('✅ Cleared existing analysis - will navigate to page 8 for fresh analysis');
             }
             
-            // Close popup and navigate directly without conflicts
+            // Close popup first
             setShowUpdatePopup(false);
             
-            // Save data to parent form state first
-            onNext({ medications: medicationsToSave });
-            
-            // Then navigate to analysis page with proper delay
+            // CRITICAL FIX: Pass data to navigation function
             if (onNavigateToAnalysis) {
-              setTimeout(() => {
-                onNavigateToAnalysis();
-              }, 100);
+              onNavigateToAnalysis({ medications: medicationsToSave });
             }
           } catch (error) {
             console.error('Error clearing analysis:', error);
@@ -4513,8 +4495,20 @@ export default function Onboarding() {
           {step === 2 && <ExerciseStep onNext={handleNext} onBack={handleBack} initial={form} />}
           {step === 3 && <HealthGoalsStep onNext={handleNext} onBack={handleBack} initial={form} />}
           {step === 4 && <HealthSituationsStep onNext={handleNext} onBack={handleBack} initial={form} />}
-          {step === 5 && <SupplementsStep onNext={handleNext} onBack={handleBack} initial={form} onNavigateToAnalysis={() => goToStep(7)} />}
-          {step === 6 && <MedicationsStep onNext={handleNext} onBack={handleBack} initial={form} onNavigateToAnalysis={() => goToStep(7)} />}
+          {step === 5 && <SupplementsStep onNext={handleNext} onBack={handleBack} initial={form} onNavigateToAnalysis={(data?: any) => {
+            // Save data if provided, then navigate
+            if (data) {
+              setForm((prevForm: any) => ({ ...prevForm, ...data }));
+            }
+            goToStep(7);
+          }} />}
+          {step === 6 && <MedicationsStep onNext={handleNext} onBack={handleBack} initial={form} onNavigateToAnalysis={(data?: any) => {
+            // Save data if provided, then navigate
+            if (data) {
+              setForm((prevForm: any) => ({ ...prevForm, ...data }));
+            }
+            goToStep(7);
+          }} />}
           {step === 7 && <InteractionAnalysisStep onNext={handleNext} onBack={handleBack} initial={form} />}
           {step === 8 && <BloodResultsStep onNext={handleNext} onBack={handleBack} initial={form} />}
           {step === 9 && <AIInsightsStep onNext={handleNext} onBack={handleBack} initial={form} />}
