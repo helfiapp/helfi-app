@@ -1233,7 +1233,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
     }
   };
 
-  const addSupplement = () => {
+  const addSupplement = async () => {
     const currentDate = new Date().toISOString();
     
     if (uploadMethod === 'manual' && name && dosage && timing.length > 0) {
@@ -1293,12 +1293,36 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
       
       const scheduleInfo = photoDosageSchedule === 'daily' ? 'Daily' : photoSelectedDays.join(', ');
       
+      // CRITICAL FIX: Analyze image to extract supplement name instead of using filename
+      let supplementName = 'Analyzing...';
+      try {
+        // Create FormData for image analysis
+        const formData = new FormData();
+        formData.append('image', frontImage);
+        
+        // Call vision API to extract supplement name
+        const visionResponse = await fetch('/api/analyze-supplement-image', {
+          method: 'POST',
+          body: formData
+        });
+        
+        if (visionResponse.ok) {
+          const visionResult = await visionResponse.json();
+          supplementName = visionResult.supplementName || 'Unknown Supplement';
+        } else {
+          supplementName = 'Image Analysis Failed';
+        }
+      } catch (error) {
+        console.error('Error analyzing supplement image:', error);
+        supplementName = 'Analysis Error';
+      }
+
       const supplementData = { 
         id: Date.now().toString(), // Unique ID for editing
         frontImage: frontImage.name, 
         backImage: backImage?.name, 
         method: 'photo',
-        name: frontImage.name.split('.')[0], // Use filename as temporary name
+        name: supplementName, // Use AI-extracted name instead of filename
         dosage: `${photoDosage} ${photoDosageUnit}`,
         timing: timingWithDosages,
         scheduleInfo: scheduleInfo,
@@ -2064,7 +2088,7 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
     }
   };
 
-  const addMedication = () => {
+  const addMedication = async () => {
     const currentDate = new Date().toISOString();
     
     if (uploadMethod === 'manual' && name && dosage && timing.length > 0) {
@@ -2124,12 +2148,36 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
       
       const scheduleInfo = photoDosageSchedule === 'daily' ? 'Daily' : photoSelectedDays.join(', ');
       
+      // CRITICAL FIX: Analyze image to extract medication name instead of using filename
+      let medicationName = 'Analyzing...';
+      try {
+        // Create FormData for image analysis
+        const formData = new FormData();
+        formData.append('image', frontImage);
+        
+        // Call vision API to extract medication name
+        const visionResponse = await fetch('/api/analyze-supplement-image', {
+          method: 'POST',
+          body: formData
+        });
+        
+        if (visionResponse.ok) {
+          const visionResult = await visionResponse.json();
+          medicationName = visionResult.supplementName || 'Unknown Medication';
+        } else {
+          medicationName = 'Image Analysis Failed';
+        }
+      } catch (error) {
+        console.error('Error analyzing medication image:', error);
+        medicationName = 'Analysis Error';
+      }
+
       const medicationData = { 
         id: Date.now().toString(), // Unique ID for editing
         frontImage: frontImage.name, 
         backImage: backImage?.name, 
         method: 'photo',
-        name: frontImage.name.split('.')[0], // Use filename as temporary name
+        name: medicationName, // Use AI-extracted name instead of filename
         dosage: `${photoDosage} ${photoDosageUnit}`,
         timing: timingWithDosages,
         scheduleInfo: scheduleInfo,
@@ -3395,6 +3443,8 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
       // Handle the API response structure - it returns { success: true, analysis: {...} }
       if (result.success && result.analysis) {
         setAnalysisResult(result.analysis);
+        // CRITICAL FIX: Reload previous analyses after new analysis to show history
+        loadPreviousAnalyses();
       } else {
         throw new Error('Invalid API response structure');
       }
@@ -3642,8 +3692,26 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
         <div className="mb-6 p-4 bg-blue-50 rounded-lg">
           <h3 className="font-semibold text-blue-900 mb-2">Summary</h3>
           <p className="text-blue-800">
-            {analysisResult.summary || 
-             `Analysis completed for ${analysisResult.supplementCount || 0} supplement${(analysisResult.supplementCount || 0) !== 1 ? 's' : ''} and ${analysisResult.medicationCount || 0} medication${(analysisResult.medicationCount || 0) !== 1 ? 's' : ''}. Overall risk level: ${analysisResult.overallRisk || 'unknown'}.`}
+            {analysisResult.summary || (() => {
+              // Generate summary with actual supplement and medication names
+              const currentSupplements = initial?.supplements || [];
+              const currentMedications = initial?.medications || [];
+              const supplementNames = currentSupplements.map((s: any) => s.name).join(', ');
+              const medicationNames = currentMedications.map((m: any) => m.name).join(', ');
+              
+              let summaryText = 'Analysis completed for ';
+              if (supplementNames && medicationNames) {
+                summaryText += `${supplementNames} and ${medicationNames}`;
+              } else if (supplementNames) {
+                summaryText += supplementNames;
+              } else if (medicationNames) {
+                summaryText += medicationNames;
+              } else {
+                summaryText += 'no supplements or medications';
+              }
+              summaryText += `. Overall risk level: ${analysisResult.overallRisk || 'unknown'}.`;
+              return summaryText;
+            })()}
           </p>
         </div>
 

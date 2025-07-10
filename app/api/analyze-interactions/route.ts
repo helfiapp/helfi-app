@@ -73,6 +73,8 @@ ${supplementList.map(s => `- ${s.name}: ${s.dosage}, taken ${s.timing}, schedule
 MEDICATIONS:
 ${medicationList.map(m => `- ${m.name}: ${m.dosage}, taken ${m.timing}, schedule: ${m.schedule}`).join('\n')}
 
+CRITICAL REQUIREMENT: In your summary, you MUST list ALL supplements and medications by their actual names (e.g., "Analysis completed for Vitamin E, Magnesium, and Ibuprofen. Overall risk level: medium.") - do NOT use generic counts like "5 supplements and 2 medications".
+
 Please provide a comprehensive interaction analysis in the following JSON format:
 {
   "overallRisk": "low|medium|high",
