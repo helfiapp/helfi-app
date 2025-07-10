@@ -1269,6 +1269,13 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
       
       // Show popup if there's an existing analysis
       if (hasExistingAnalysis) {
+        // Save supplements data to form state before showing popup
+        const updatedSupplements = editingIndex !== null 
+          ? supplements.map((item: any, index: number) => 
+              index === editingIndex ? supplementData : item
+            )
+          : [...supplements, supplementData];
+        onNext({ supplements: updatedSupplements });
         setShowUpdatePopup(true);
       }
     } else if (uploadMethod === 'photo' && frontImage && photoDosage && photoTiming.length > 0) {
@@ -1310,6 +1317,13 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
       
       // Show popup if there's an existing analysis
       if (hasExistingAnalysis) {
+        // Save supplements data to form state before showing popup
+        const updatedSupplements = editingIndex !== null 
+          ? supplements.map((item: any, index: number) => 
+              index === editingIndex ? supplementData : item
+            )
+          : [...supplements, supplementData];
+        onNext({ supplements: updatedSupplements });
         setShowUpdatePopup(true);
       }
     }
@@ -1911,9 +1925,6 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
         onClose={() => setShowUpdatePopup(false)}
         onUpdate={async () => {
           try {
-            // First, save current supplements data to form
-            onNext({ supplements });
-            
             // Clear existing analysis to trigger re-analysis
             const response = await fetch('/api/interaction-history', {
               method: 'DELETE'
@@ -2074,6 +2085,13 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
       
       // Show popup if there's an existing analysis
       if (hasExistingAnalysis) {
+        // Save medications data to form state before showing popup
+        const updatedMedications = editingIndex !== null 
+          ? medications.map((item: any, index: number) => 
+              index === editingIndex ? medicationData : item
+            )
+          : [...medications, medicationData];
+        onNext({ medications: updatedMedications });
         setShowUpdatePopup(true);
       }
     } else if (uploadMethod === 'photo' && frontImage && photoDosage && photoTiming.length > 0) {
@@ -2115,6 +2133,13 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
       
       // Show popup if there's an existing analysis
       if (hasExistingAnalysis) {
+        // Save medications data to form state before showing popup
+        const updatedMedications = editingIndex !== null 
+          ? medications.map((item: any, index: number) => 
+              index === editingIndex ? medicationData : item
+            )
+          : [...medications, medicationData];
+        onNext({ medications: updatedMedications });
         setShowUpdatePopup(true);
       }
     }
@@ -2706,9 +2731,6 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
         onClose={() => setShowUpdatePopup(false)}
         onUpdate={async () => {
           try {
-            // First, save current medications data to form
-            onNext({ medications });
-            
             // Clear existing analysis to trigger re-analysis
             const response = await fetch('/api/interaction-history', {
               method: 'DELETE'
