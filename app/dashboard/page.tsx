@@ -74,6 +74,16 @@ export default function Dashboard() {
               dataSize: JSON.stringify(result.data).length + ' characters'
             });
             
+            // Check if user needs onboarding (only for truly new users)
+            const hasBasicProfile = result.data.gender && result.data.weight && result.data.height;
+            const hasHealthGoals = result.data.goals && result.data.goals.length > 0;
+            
+            if (!hasBasicProfile || !hasHealthGoals) {
+              console.log('🎯 New user detected - redirecting to onboarding');
+              window.location.href = '/onboarding';
+              return;
+            }
+            
             setOnboardingData(result.data);
             // Load profile image from database and cache it
             if (result.data.profileImage) {
@@ -83,10 +93,16 @@ export default function Dashboard() {
                 localStorage.setItem(`cachedProfileImage_${session.user.id}`, result.data.profileImage);
               }
             }
+          } else {
+            // No data at all - definitely a new user
+            console.log('🎯 No user data found - redirecting new user to onboarding');
+            window.location.href = '/onboarding';
+            return;
           }
         } else if (response.status === 404) {
-          console.log('ℹ️ No existing data found for user in database');
-          setOnboardingData(null);
+          console.log('ℹ️ No existing data found for user in database - redirecting to onboarding');
+          window.location.href = '/onboarding';
+          return;
         } else if (response.status === 401) {
           console.log('⚠️ User not authenticated - redirecting to login');
           // Don't use localStorage fallback, force proper authentication

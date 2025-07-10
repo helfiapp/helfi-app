@@ -339,9 +339,9 @@ export const authOptions: NextAuthOptions = {
         console.log('⚠️ URL parsing failed, using default redirect')
       }
       
-      // Default: redirect to onboarding with correct base URL
-      const defaultRedirect = actualBaseUrl + '/onboarding'
-      console.log('🎯 Default redirect to onboarding:', defaultRedirect)
+      // Default: redirect to dashboard (onboarding redirect will be handled client-side for new users only)
+      const defaultRedirect = actualBaseUrl + '/dashboard'
+      console.log('🎯 Default redirect to dashboard:', defaultRedirect)
       return defaultRedirect
     },
     async session({ session, token }) {

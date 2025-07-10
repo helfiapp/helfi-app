@@ -3637,7 +3637,6 @@ export default function Onboarding() {
   const [isLoading, setIsLoading] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
   const [profileImage, setProfileImage] = useState<string>('');
-  const [onboardingComplete, setOnboardingComplete] = useState(false);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const stepNames = [
@@ -3654,47 +3653,9 @@ export default function Onboarding() {
     'Review'
   ];
 
-  // Check if onboarding is complete and redirect to dashboard if so
-  useEffect(() => {
-    const checkOnboardingCompletion = async () => {
-      if (status === 'authenticated' && session?.user?.id) {
-        try {
-          const response = await fetch('/api/user-data');
-          if (response.ok) {
-            const userData = await response.json();
-            const data = userData.data;
-            
-            // Check if user has completed onboarding
-            const hasBasicProfile = data.gender && data.weight && data.height;
-            const hasHealthGoals = data.goals && data.goals.length > 0;
-            
-            if (hasBasicProfile && hasHealthGoals) {
-              console.log('🎯 User has completed onboarding, redirecting to dashboard');
-              setOnboardingComplete(true);
-              window.location.href = '/dashboard';
-              return;
-            }
-          }
-        } catch (error) {
-          console.error('Error checking onboarding completion:', error);
-        }
-      }
-    };
+  // Removed automatic redirect - users should always be able to access intake/onboarding to edit their information
 
-    checkOnboardingCompletion();
-  }, [status, session]);
-
-  // Don't render onboarding if user has completed it
-  if (onboardingComplete) {
-    return (
-      <div className="fixed inset-0 bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mx-auto mb-4"></div>
-          <p className="text-gray-600">Redirecting to dashboard...</p>
-        </div>
-      </div>
-    );
-  }
+  // Removed blocking render - users should always be able to access intake to edit information
 
   // Profile data - using consistent green avatar
   const defaultAvatar = 'data:image/svg+xml;base64,' + btoa(`
