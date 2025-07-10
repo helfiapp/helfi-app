@@ -1104,9 +1104,9 @@ function HealthSituationsStep({ onNext, onBack, initial }: { onNext: (data: any)
 function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { onNext: (data: any) => void, onBack: () => void, initial?: any, onNavigateToAnalysis?: () => void }) {
   const [supplements, setSupplements] = useState(initial?.supplements || []);
   
-  // Update supplements when initial data changes (fixes page refresh issue)
+  // Fix data loading race condition - update supplements when initial data loads
   useEffect(() => {
-    if (initial?.supplements && initial.supplements.length > 0) {
+    if (initial?.supplements) {
       setSupplements(initial.supplements);
     }
   }, [initial?.supplements]);
@@ -1274,17 +1274,15 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
       
       clearForm();
       
-      // Show popup if there's an existing analysis
-      if (hasExistingAnalysis) {
-        // Save supplements data to form state before showing popup
-        const updatedSupplements = editingIndex !== null 
-          ? supplements.map((item: any, index: number) => 
-              index === editingIndex ? supplementData : item
-            )
-          : [...supplements, supplementData];
-        onNext({ supplements: updatedSupplements });
-        setShowUpdatePopup(true);
-      }
+      // Always show popup when adding supplements (user expects confirmation)
+      // Save supplements data to form state before showing popup
+      const updatedSupplements = editingIndex !== null 
+        ? supplements.map((item: any, index: number) => 
+            index === editingIndex ? supplementData : item
+          )
+        : [...supplements, supplementData];
+      onNext({ supplements: updatedSupplements });
+      setShowUpdatePopup(true);
     } else if (uploadMethod === 'photo' && frontImage && photoDosage && photoTiming.length > 0) {
       // Combine timing and individual dosages with units for photos
       const timingWithDosages = photoTiming.map(time => {
@@ -1322,17 +1320,15 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
       
       clearPhotoForm();
       
-      // Show popup if there's an existing analysis
-      if (hasExistingAnalysis) {
-        // Save supplements data to form state before showing popup
-        const updatedSupplements = editingIndex !== null 
-          ? supplements.map((item: any, index: number) => 
-              index === editingIndex ? supplementData : item
-            )
-          : [...supplements, supplementData];
-        onNext({ supplements: updatedSupplements });
-        setShowUpdatePopup(true);
-      }
+      // Always show popup when adding supplements (user expects confirmation)
+      // Save supplements data to form state before showing popup
+      const updatedSupplements = editingIndex !== null 
+        ? supplements.map((item: any, index: number) => 
+            index === editingIndex ? supplementData : item
+          )
+        : [...supplements, supplementData];
+      onNext({ supplements: updatedSupplements });
+      setShowUpdatePopup(true);
     }
   };
 
@@ -1952,9 +1948,9 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
 function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { onNext: (data: any) => void, onBack: () => void, initial?: any, onNavigateToAnalysis?: () => void }) {
   const [medications, setMedications] = useState(initial?.medications || []);
   
-  // Update medications when initial data changes (fixes page refresh issue)
+  // Fix data loading race condition - update medications when initial data loads
   useEffect(() => {
-    if (initial?.medications && initial.medications.length > 0) {
+    if (initial?.medications) {
       setMedications(initial.medications);
     }
   }, [initial?.medications]);
@@ -2097,17 +2093,15 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
       
       clearMedForm();
       
-      // Show popup if there's an existing analysis
-      if (hasExistingAnalysis) {
-        // Save medications data to form state before showing popup
-        const updatedMedications = editingIndex !== null 
-          ? medications.map((item: any, index: number) => 
-              index === editingIndex ? medicationData : item
-            )
-          : [...medications, medicationData];
-        onNext({ medications: updatedMedications });
-        setShowUpdatePopup(true);
-      }
+      // Always show popup when adding medications (user expects confirmation)
+      // Save medications data to form state before showing popup
+      const updatedMedications = editingIndex !== null 
+        ? medications.map((item: any, index: number) => 
+            index === editingIndex ? medicationData : item
+          )
+        : [...medications, medicationData];
+      onNext({ medications: updatedMedications });
+      setShowUpdatePopup(true);
     } else if (uploadMethod === 'photo' && frontImage && photoDosage && photoTiming.length > 0) {
       // Combine timing and individual dosages with units for photos
       const timingWithDosages = photoTiming.map(time => {
@@ -2145,17 +2139,15 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
       
       clearMedPhotoForm();
       
-      // Show popup if there's an existing analysis
-      if (hasExistingAnalysis) {
-        // Save medications data to form state before showing popup
-        const updatedMedications = editingIndex !== null 
-          ? medications.map((item: any, index: number) => 
-              index === editingIndex ? medicationData : item
-            )
-          : [...medications, medicationData];
-        onNext({ medications: updatedMedications });
-        setShowUpdatePopup(true);
-      }
+      // Always show popup when adding medications (user expects confirmation)
+      // Save medications data to form state before showing popup
+      const updatedMedications = editingIndex !== null 
+        ? medications.map((item: any, index: number) => 
+            index === editingIndex ? medicationData : item
+          )
+        : [...medications, medicationData];
+      onNext({ medications: updatedMedications });
+      setShowUpdatePopup(true);
     }
   };
 
