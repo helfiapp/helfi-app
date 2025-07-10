@@ -1131,6 +1131,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
   // Interaction analysis update popup state
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
   const [hasExistingAnalysis, setHasExistingAnalysis] = useState(false);
+  const [supplementsToSave, setSupplementsToSave] = useState<any[]>([]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -1274,14 +1275,13 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
       
       clearForm();
       
-      // Always show popup when adding supplements (user expects confirmation)
-      // Save supplements data to form state before showing popup
+      // Fix popup timing - show popup first, save data only when user confirms
       const updatedSupplements = editingIndex !== null 
         ? supplements.map((item: any, index: number) => 
             index === editingIndex ? supplementData : item
           )
         : [...supplements, supplementData];
-      onNext({ supplements: updatedSupplements });
+      setSupplementsToSave(updatedSupplements);
       setShowUpdatePopup(true);
     } else if (uploadMethod === 'photo' && frontImage && photoDosage && photoTiming.length > 0) {
       // Combine timing and individual dosages with units for photos
@@ -1320,14 +1320,13 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
       
       clearPhotoForm();
       
-      // Always show popup when adding supplements (user expects confirmation)
-      // Save supplements data to form state before showing popup
+      // Fix popup timing - show popup first, save data only when user confirms
       const updatedSupplements = editingIndex !== null 
         ? supplements.map((item: any, index: number) => 
             index === editingIndex ? supplementData : item
           )
         : [...supplements, supplementData];
-      onNext({ supplements: updatedSupplements });
+      setSupplementsToSave(updatedSupplements);
       setShowUpdatePopup(true);
     }
   };
@@ -1928,6 +1927,8 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
         onClose={() => setShowUpdatePopup(false)}
         onUpdate={async () => {
           try {
+            // Save supplements data when user confirms
+            onNext({ supplements: supplementsToSave });
             // Clear existing analysis to trigger re-analysis
             const response = await fetch('/api/interaction-history', {
               method: 'DELETE'
@@ -1984,6 +1985,7 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
   // Interaction analysis update popup state
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
   const [hasExistingAnalysis, setHasExistingAnalysis] = useState(false);
+  const [medicationsToSave, setMedicationsToSave] = useState<any[]>([]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -2093,14 +2095,13 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
       
       clearMedForm();
       
-      // Always show popup when adding medications (user expects confirmation)
-      // Save medications data to form state before showing popup
+      // Fix popup timing - show popup first, save data only when user confirms
       const updatedMedications = editingIndex !== null 
         ? medications.map((item: any, index: number) => 
             index === editingIndex ? medicationData : item
           )
         : [...medications, medicationData];
-      onNext({ medications: updatedMedications });
+      setMedicationsToSave(updatedMedications);
       setShowUpdatePopup(true);
     } else if (uploadMethod === 'photo' && frontImage && photoDosage && photoTiming.length > 0) {
       // Combine timing and individual dosages with units for photos
@@ -2139,14 +2140,13 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
       
       clearMedPhotoForm();
       
-      // Always show popup when adding medications (user expects confirmation)
-      // Save medications data to form state before showing popup
+      // Fix popup timing - show popup first, save data only when user confirms
       const updatedMedications = editingIndex !== null 
         ? medications.map((item: any, index: number) => 
             index === editingIndex ? medicationData : item
           )
         : [...medications, medicationData];
-      onNext({ medications: updatedMedications });
+      setMedicationsToSave(updatedMedications);
       setShowUpdatePopup(true);
     }
   };
@@ -2737,6 +2737,8 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
         onClose={() => setShowUpdatePopup(false)}
         onUpdate={async () => {
           try {
+            // Save medications data when user confirms
+            onNext({ medications: medicationsToSave });
             // Clear existing analysis to trigger re-analysis
             const response = await fetch('/api/interaction-history', {
               method: 'DELETE'
