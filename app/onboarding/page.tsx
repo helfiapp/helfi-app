@@ -1103,6 +1103,13 @@ function HealthSituationsStep({ onNext, onBack, initial }: { onNext: (data: any)
 
 function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { onNext: (data: any) => void, onBack: () => void, initial?: any, onNavigateToAnalysis?: () => void }) {
   const [supplements, setSupplements] = useState(initial?.supplements || []);
+  
+  // Update supplements when initial data changes (fixes page refresh issue)
+  useEffect(() => {
+    if (initial?.supplements && initial.supplements.length > 0) {
+      setSupplements(initial.supplements);
+    }
+  }, [initial?.supplements]);
   const [name, setName] = useState('');
   const [dosage, setDosage] = useState('');
   const [dosageUnit, setDosageUnit] = useState('mg');
@@ -1944,6 +1951,13 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
 
 function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { onNext: (data: any) => void, onBack: () => void, initial?: any, onNavigateToAnalysis?: () => void }) {
   const [medications, setMedications] = useState(initial?.medications || []);
+  
+  // Update medications when initial data changes (fixes page refresh issue)
+  useEffect(() => {
+    if (initial?.medications && initial.medications.length > 0) {
+      setMedications(initial.medications);
+    }
+  }, [initial?.medications]);
   const [name, setName] = useState('');
   const [dosage, setDosage] = useState('');
   const [dosageUnit, setDosageUnit] = useState('mg');
@@ -3880,13 +3894,19 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
           </div>
         )}
 
-        {/* Navigation - Only Back to Medications button as specified */}
-        <div className="flex justify-center">
+        {/* Navigation */}
+        <div className="flex justify-between">
           <button
             onClick={onBack}
             className="px-8 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-base font-medium"
           >
             Back to Medications
+          </button>
+          <button
+            onClick={handleNext}
+            className="px-8 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-base font-medium"
+          >
+            Continue
           </button>
         </div>
       </div>
