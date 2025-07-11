@@ -3361,8 +3361,8 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
   const [showCreditModal, setShowCreditModal] = useState(false);
   const [creditInfo, setCreditInfo] = useState<any>(null);
   const [userSubscriptionStatus, setUserSubscriptionStatus] = useState<'FREE' | 'PREMIUM' | null>(null);
-  const [expandedInteractions, setExpandedInteractions] = useState<Set<number>>(new Set());
-  const [expandedHistoryItems, setExpandedHistoryItems] = useState<Set<number>>(new Set());
+  const [expandedInteractions, setExpandedInteractions] = useState<Set<string>>(new Set());
+  const [expandedHistoryItems, setExpandedHistoryItems] = useState<Set<string>>(new Set());
   const [showAnalysisHistory, setShowAnalysisHistory] = useState(false); // Default collapsed as requested
   const [showRecommendations, setShowRecommendations] = useState(false);
 
@@ -3542,12 +3542,12 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
     onNext({ interactionAnalysis: analysisResult });
   };
 
-  const toggleInteractionExpansion = (index: number) => {
+  const toggleInteractionExpansion = (id: string) => {
     const newExpanded = new Set(expandedInteractions);
-    if (newExpanded.has(index)) {
-      newExpanded.delete(index);
+    if (newExpanded.has(id)) {
+      newExpanded.delete(id);
     } else {
-      newExpanded.add(index);
+      newExpanded.add(id);
     }
     setExpandedInteractions(newExpanded);
   };
@@ -3570,12 +3570,12 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
     }
   };
 
-  const toggleHistoryExpansion = (index: number) => {
+  const toggleHistoryExpansion = (id: string) => {
     const newExpanded = new Set(expandedHistoryItems);
-    if (newExpanded.has(index)) {
-      newExpanded.delete(index);
+    if (newExpanded.has(id)) {
+      newExpanded.delete(id);
     } else {
-      newExpanded.add(index);
+      newExpanded.add(id);
     }
     setExpandedHistoryItems(newExpanded);
   };
@@ -3804,16 +3804,15 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
                 <h3 className="text-lg font-semibold mb-4">Potential Interactions</h3>
                 <div className="space-y-2">
                   {dangerousInteractions.map((interaction: any, index: number) => {
-                    const isExpanded = expandedInteractions.has(index);
+                    const id = `${interaction.substance1}-${interaction.substance2}`.toLowerCase();
+                    const isExpanded = expandedInteractions.has(id);
                     const severityIcon = interaction.severity === 'high' ? '🚨' : '⚠️';
-                    // Create stable key using interaction content to prevent React confusion
-                    const stableKey = `${interaction.substance1}-${interaction.substance2}-${index}`;
                     
                     return (
-                      <div key={stableKey} className="border border-gray-200 rounded-lg overflow-hidden">
+                      <div key={id} className="border border-gray-200 rounded-lg overflow-hidden">
                         {/* Accordion Header */}
                         <button
-                          onClick={() => toggleInteractionExpansion(index)}
+                          onClick={() => toggleInteractionExpansion(id)}
                           className="w-full px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors flex items-center justify-between text-left"
                         >
                           <div className="flex items-center space-x-3 flex-1">
@@ -3945,16 +3944,17 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
             
             {showAnalysisHistory && (
               <div className="space-y-3">
-                {previousAnalyses.map((analysis, index) => {
-                  const isExpanded = expandedHistoryItems.has(index);
+                {previousAnalyses.map((analysis) => {
+                  const id = analysis.id;
+                  const isExpanded = expandedHistoryItems.has(id);
                   const analysisData = analysis.analysisData || {};
                   
                   return (
-                    <div key={analysis.id || index} className="border border-gray-200 rounded-lg overflow-hidden">
+                    <div key={id} className="border border-gray-200 rounded-lg overflow-hidden">
                       {/* History Item Header */}
                       <div className="bg-gray-50 px-4 py-3 flex items-center justify-between">
                         <button
-                          onClick={() => toggleHistoryExpansion(index)}
+                          onClick={() => toggleHistoryExpansion(id)}
                           className="flex items-center space-x-3 flex-1 text-left hover:bg-gray-100 transition-colors rounded p-1 -m-1"
                         >
                           <div className="flex items-center space-x-2">
