@@ -1420,8 +1420,26 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
     }
   };
 
-  const removeSupplement = (index: number) => {
-    setSupplements((prev: any[]) => prev.filter((_: any, i: number) => i !== index));
+  const removeSupplement = async (index: number) => {
+    const updatedSupplements = supplements.filter((_: any, i: number) => i !== index);
+    setSupplements(updatedSupplements);
+    
+    // CRITICAL FIX: Save to database immediately when deleting
+    try {
+      const response = await fetch('/api/user-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ supplements: updatedSupplements })
+      });
+      
+      if (response.ok) {
+        console.log('✅ Supplement deleted and saved to database');
+      } else {
+        console.error('❌ Failed to save supplement deletion:', response.status);
+      }
+    } catch (error) {
+      console.error('❌ Error saving supplement deletion:', error);
+    }
   };
 
   return (
@@ -2286,8 +2304,26 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
     }
   };
 
-  const removeMedication = (index: number) => {
-    setMedications((prev: any[]) => prev.filter((_: any, i: number) => i !== index));
+  const removeMedication = async (index: number) => {
+    const updatedMedications = medications.filter((_: any, i: number) => i !== index);
+    setMedications(updatedMedications);
+    
+    // CRITICAL FIX: Save to database immediately when deleting
+    try {
+      const response = await fetch('/api/user-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ medications: updatedMedications })
+      });
+      
+      if (response.ok) {
+        console.log('✅ Medication deleted and saved to database');
+      } else {
+        console.error('❌ Failed to save medication deletion:', response.status);
+      }
+    } catch (error) {
+      console.error('❌ Error saving medication deletion:', error);
+    }
   };
 
   return (
