@@ -3379,6 +3379,12 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
     setShowRecommendations(false);
   }, [initial?.supplements, initial?.medications]);
 
+  // CRITICAL FIX: Reset interaction accordion state when analysisResult changes
+  useEffect(() => {
+    setExpandedInteractions(new Set());
+    setShowRecommendations(false);
+  }, [analysisResult]);
+
   // Reset navigation state when analysis completes to prevent freeze
   useEffect(() => {
     if (analysisResult && !isAnalyzing) {
@@ -3800,9 +3806,11 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
                   {dangerousInteractions.map((interaction: any, index: number) => {
                     const isExpanded = expandedInteractions.has(index);
                     const severityIcon = interaction.severity === 'high' ? '🚨' : '⚠️';
+                    // Create stable key using interaction content to prevent React confusion
+                    const stableKey = `${interaction.substance1}-${interaction.substance2}-${index}`;
                     
                     return (
-                      <div key={index} className="border border-gray-200 rounded-lg overflow-hidden">
+                      <div key={stableKey} className="border border-gray-200 rounded-lg overflow-hidden">
                         {/* Accordion Header */}
                         <button
                           onClick={() => toggleInteractionExpansion(index)}
