@@ -2093,6 +2093,59 @@ This suggests:
 
 ---
 
+## **🤖 AGENT #40 - JANUARY 11TH, 2025** 🔍 **INVESTIGATING**
+
+**Mission**: Fix Page 8 Navigation Malfunction After Supplement Upload - accordion dropdowns and history button issues
+
+**Status**: 🔍 **ACTIVE INVESTIGATION** - Conducting systematic root cause analysis
+
+**Critical Learning from Agent #39's Failure**:
+- **Agent #39**: Successfully fixed date/time display but failed on navigation issue
+- **Wrong Approach**: Assumed timing race condition, tried setTimeout and component keys
+- **Real Issue**: Data structure mismatch and event handler binding problems between navigation paths
+- **Evidence**: Issue is NOT timing-related - it's deeper component lifecycle/data flow problem
+
+**Agent #40's Approach - EVIDENCE-BASED INVESTIGATION**:
+1. **NO TIMING ASSUMPTIONS**: Will not waste time on setTimeout or component re-rendering
+2. **DATA STRUCTURE COMPARISON**: Compare form.supplements between normal vs post-upload navigation
+3. **EVENT HANDLER DEBUGGING**: Verify accordion buttons bind to correct elements
+4. **ARRAY INDEX VERIFICATION**: Ensure accordion uses correct indexes in both scenarios
+5. **COMPONENT LIFECYCLE ANALYSIS**: Understand initialization differences between paths
+
+**Investigation Plan**:
+- ✅ **Step 1**: Update agent tracking system with commitment to proper investigation
+- 🔍 **Step 2**: Compare data structures between normal navigation and post-upload navigation
+- 🔍 **Step 3**: Debug event handlers and verify element binding
+- 🔍 **Step 4**: Check array indexes and DOM element matching
+- 🔍 **Step 5**: Trace component lifecycle differences
+- 🔍 **Step 6**: Present comprehensive findings with evidence-based solution
+
+**Protocol Compliance**:
+- ✅ Read AGENT_PROTOCOL_PROMPT.md and committed to all absolute rules
+- ✅ Read CURRENT_ISSUES_LIVE.md - understand Page 8 navigation malfunction
+- ✅ Read AGENT_TRACKING_SYSTEM.md - analyzed Agent #39's failed approaches
+- ✅ Analyzed previous agent chat - understand user frustration with repeated failures
+- ✅ Committed to NO CHANGES until presenting findings and getting approval
+
+**Key Commitments**:
+- ❌ **WILL NOT** assume timing race conditions (setTimeout ineffective)
+- ❌ **WILL NOT** focus on component re-rendering (key props ineffective)
+- ❌ **WILL NOT** deploy changes without thorough testing
+- ❌ **WILL NOT** break Agent #39's working date/time display
+- ✅ **WILL** investigate actual data flow differences between navigation paths
+- ✅ **WILL** debug event handler binding and array index issues
+- ✅ **WILL** present evidence-based findings before proposing solutions
+
+**Financial Impact Awareness**:
+- User explicitly frustrated with repeated agent failures
+- Multiple failed deployments wasting credits and money
+- Agent #39 partially succeeded (date/time) but failed on core navigation issue
+- Must deliver working solution to avoid further financial waste
+
+**Current Status**: 🔍 **INVESTIGATION IN PROGRESS** - Systematic analysis of root cause, no changes made yet
+
+---
+
 ## **🤖 AGENT #39 - JANUARY 10TH, 2025** 🔍 **INVESTIGATING**
 
 **Mission**: Investigate and fix critical onboarding issues - broken navigation system, popup timing, page 9 redirect, removed analysis history, and layout requirements

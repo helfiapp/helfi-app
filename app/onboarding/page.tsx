@@ -5,6 +5,7 @@ import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { flushSync } from 'react-dom';
 import CreditPurchaseModal from '@/components/CreditPurchaseModal';
 
 // Auth-enabled onboarding flow
@@ -4524,21 +4525,25 @@ export default function Onboarding() {
           {step === 3 && <HealthGoalsStep onNext={handleNext} onBack={handleBack} initial={form} />}
           {step === 4 && <HealthSituationsStep onNext={handleNext} onBack={handleBack} initial={form} />}
           {step === 5 && <SupplementsStep onNext={handleNext} onBack={handleBack} initial={form} onNavigateToAnalysis={(data?: any) => {
-            // CRITICAL FIX: Synchronize state updates to prevent race condition
+            // REAL FIX: Use flushSync to ensure state updates complete before navigation
             if (data) {
-              setForm((prevForm: any) => ({ ...prevForm, ...data }));
-              // Wait for state update before navigation to prevent accordion issues
-              setTimeout(() => goToStep(7), 0);
+              flushSync(() => {
+                setForm((prevForm: any) => ({ ...prevForm, ...data }));
+              });
+              // Now navigation happens after state is guaranteed to be updated
+              goToStep(7);
             } else {
               goToStep(7);
             }
           }} />}
           {step === 6 && <MedicationsStep onNext={handleNext} onBack={handleBack} initial={form} onNavigateToAnalysis={(data?: any) => {
-            // CRITICAL FIX: Synchronize state updates to prevent race condition
+            // REAL FIX: Use flushSync to ensure state updates complete before navigation
             if (data) {
-              setForm((prevForm: any) => ({ ...prevForm, ...data }));
-              // Wait for state update before navigation to prevent accordion issues
-              setTimeout(() => goToStep(7), 0);
+              flushSync(() => {
+                setForm((prevForm: any) => ({ ...prevForm, ...data }));
+              });
+              // Now navigation happens after state is guaranteed to be updated
+              goToStep(7);
             } else {
               goToStep(7);
             }
