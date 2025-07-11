@@ -1834,7 +1834,9 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
           <div className="mb-6">
             <h3 className="text-lg font-semibold mb-3">Added Supplements ({supplements.length})</h3>
             <div className="space-y-2">
-              {supplements.map((s: any, i: number) => (
+              {supplements
+                .sort((a: any, b: any) => new Date(b.dateAdded || 0).getTime() - new Date(a.dateAdded || 0).getTime())
+                .map((s: any, i: number) => (
                 <div key={i} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                   <div className="flex-1">
                     {s.method === 'photo' ? (
@@ -1846,8 +1848,14 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
                         <div className="text-sm text-gray-600">{s.dosage} - {Array.isArray(s.timing) ? s.timing.join(', ') : s.timing}</div>
                         <div className="text-xs text-gray-500">Schedule: {s.scheduleInfo}</div>
                         {s.dateAdded && (
-                          <div className="text-xs text-gray-400">
-                            Added: {new Date(s.dateAdded).toLocaleDateString()}
+                          <div className="text-xs text-blue-600 font-medium">
+                            Added: {new Date(s.dateAdded).toLocaleDateString('en-US', { 
+                              year: 'numeric', 
+                              month: 'short', 
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
                           </div>
                         )}
                       </div>
@@ -1857,8 +1865,14 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
                         <div className="text-sm text-gray-600">{s.dosage} - {Array.isArray(s.timing) ? s.timing.join(', ') : s.timing}</div>
                         <div className="text-xs text-gray-500">Schedule: {s.scheduleInfo}</div>
                         {s.dateAdded && (
-                          <div className="text-xs text-gray-400">
-                            Added: {new Date(s.dateAdded).toLocaleDateString()}
+                          <div className="text-xs text-blue-600 font-medium">
+                            Added: {new Date(s.dateAdded).toLocaleDateString('en-US', { 
+                              year: 'numeric', 
+                              month: 'short', 
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
                           </div>
                         )}
                       </div>
@@ -2677,7 +2691,9 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
           <div className="mb-6">
             <h3 className="text-lg font-semibold mb-3">Added Medications ({medications.length})</h3>
             <div className="space-y-2">
-              {medications.map((m: any, i: number) => (
+              {medications
+                .sort((a: any, b: any) => new Date(b.dateAdded || 0).getTime() - new Date(a.dateAdded || 0).getTime())
+                .map((m: any, i: number) => (
                 <div key={i} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                   <div className="flex-1">
                     {m.method === 'photo' ? (
@@ -2689,8 +2705,14 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
                         <div className="text-sm text-gray-600">{m.dosage} - {Array.isArray(m.timing) ? m.timing.join(', ') : m.timing}</div>
                         <div className="text-xs text-gray-500">Schedule: {m.scheduleInfo}</div>
                         {m.dateAdded && (
-                          <div className="text-xs text-gray-400">
-                            Added: {new Date(m.dateAdded).toLocaleDateString()}
+                          <div className="text-xs text-blue-600 font-medium">
+                            Added: {new Date(m.dateAdded).toLocaleDateString('en-US', { 
+                              year: 'numeric', 
+                              month: 'short', 
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
                           </div>
                         )}
                       </div>
@@ -2700,8 +2722,14 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
                         <div className="text-sm text-gray-600">{m.dosage} - {Array.isArray(m.timing) ? m.timing.join(', ') : m.timing}</div>
                         <div className="text-xs text-gray-500">Schedule: {m.scheduleInfo}</div>
                         {m.dateAdded && (
-                          <div className="text-xs text-gray-400">
-                            Added: {new Date(m.dateAdded).toLocaleDateString()}
+                          <div className="text-xs text-blue-600 font-medium">
+                            Added: {new Date(m.dateAdded).toLocaleDateString('en-US', { 
+                              year: 'numeric', 
+                              month: 'short', 
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
                           </div>
                         )}
                       </div>
@@ -4496,20 +4524,31 @@ export default function Onboarding() {
           {step === 3 && <HealthGoalsStep onNext={handleNext} onBack={handleBack} initial={form} />}
           {step === 4 && <HealthSituationsStep onNext={handleNext} onBack={handleBack} initial={form} />}
           {step === 5 && <SupplementsStep onNext={handleNext} onBack={handleBack} initial={form} onNavigateToAnalysis={(data?: any) => {
-            // Save data if provided, then navigate
+            // CRITICAL FIX: Synchronize state updates to prevent race condition
             if (data) {
               setForm((prevForm: any) => ({ ...prevForm, ...data }));
+              // Wait for state update before navigation to prevent accordion issues
+              setTimeout(() => goToStep(7), 0);
+            } else {
+              goToStep(7);
             }
-            goToStep(7);
           }} />}
           {step === 6 && <MedicationsStep onNext={handleNext} onBack={handleBack} initial={form} onNavigateToAnalysis={(data?: any) => {
-            // Save data if provided, then navigate
+            // CRITICAL FIX: Synchronize state updates to prevent race condition
             if (data) {
               setForm((prevForm: any) => ({ ...prevForm, ...data }));
+              // Wait for state update before navigation to prevent accordion issues
+              setTimeout(() => goToStep(7), 0);
+            } else {
+              goToStep(7);
             }
-            goToStep(7);
           }} />}
-          {step === 7 && <InteractionAnalysisStep onNext={handleNext} onBack={handleBack} initial={form} />}
+          {step === 7 && <InteractionAnalysisStep 
+            key={`analysis-${JSON.stringify(form.supplements || [])}-${JSON.stringify(form.medications || [])}`}
+            onNext={handleNext} 
+            onBack={handleBack} 
+            initial={form} 
+          />}
           {step === 8 && <BloodResultsStep onNext={handleNext} onBack={handleBack} initial={form} />}
           {step === 9 && <AIInsightsStep onNext={handleNext} onBack={handleBack} initial={form} />}
           {step === 10 && <ReviewStep onBack={handleBack} data={form} />}
