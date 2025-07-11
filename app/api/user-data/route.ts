@@ -166,12 +166,18 @@ export async function GET(request: NextRequest) {
       supplements: user.supplements.map((supp: any) => ({
         name: supp.name,
         dosage: supp.dosage,
-        timing: supp.timing
+        timing: supp.timing,
+        dateAdded: supp.dateAdded || supp.createdAt || new Date().toISOString(),
+        method: supp.method || 'manual',
+        scheduleInfo: supp.scheduleInfo || 'Daily'
       })),
       medications: user.medications.map((med: any) => ({
         name: med.name,
         dosage: med.dosage,
-        timing: med.timing
+        timing: med.timing,
+        dateAdded: med.dateAdded || med.createdAt || new Date().toISOString(),
+        method: med.method || 'manual',
+        scheduleInfo: med.scheduleInfo || 'Daily'
       })),
       profileImage: user.image || null,
       todaysFoods: todaysFoods,
