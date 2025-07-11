@@ -3538,6 +3538,11 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
   };
 
   const handleNext = () => {
+    // Prevent navigation when viewing history
+    if (showAnalysisHistory) {
+      setShowAnalysisHistory(false);
+      return;
+    }
     // Save analysis result and proceed
     onNext({ interactionAnalysis: analysisResult });
   };
