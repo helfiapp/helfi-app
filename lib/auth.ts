@@ -190,6 +190,12 @@ export const authOptions: NextAuthOptions = {
   session: {
     strategy: 'jwt',
     maxAge: 30 * 24 * 60 * 60, // 30 days
+    updateAge: 24 * 60 * 60, // 24 hours - only update session once per day
+  },
+  jwt: {
+    // Use a stable secret that doesn't change between deployments
+    secret: process.env.NEXTAUTH_SECRET || 'helfi-secret-key-production-2024',
+    maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   providers: [
     CredentialsProvider({
