@@ -3335,6 +3335,14 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
     loadPreviousAnalyses();
   }, []);
 
+  // Reset accordion state when initial data changes to prevent stale state issues
+  useEffect(() => {
+    setExpandedInteractions(new Set());
+    setExpandedHistoryItems(new Set());
+    setShowAnalysisHistory(false);
+    setShowRecommendations(false);
+  }, [initial?.supplements, initial?.medications]);
+
   // Reset navigation state when analysis completes to prevent freeze
   useEffect(() => {
     if (analysisResult && !isAnalyzing) {
@@ -4549,7 +4557,6 @@ export default function Onboarding() {
             }
           }} />}
           {step === 7 && <InteractionAnalysisStep 
-            key={`analysis-${JSON.stringify(form.supplements || [])}-${JSON.stringify(form.medications || [])}`}
             onNext={handleNext} 
             onBack={handleBack} 
             initial={form} 
