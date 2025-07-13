@@ -2465,3 +2465,93 @@ Ensure API response and database data have consistent structure before rendering
 4. **Test thoroughly** before deployment - verify both scenarios work
 
 **URGENT**: Agent #44 provided exact solution with high confidence. Next agent should implement the specific fixes documented in exit verification.
+
+## **🤖 AGENT #46 - JANUARY 10TH, 2025** ❌ **INVESTIGATION FAILED**
+
+**Mission**: Fix Page 8 accordion dropdown misalignment after supplement upload + investigate supplement saving issue
+
+**Status**: ❌ **FAILED** - Multiple failed attempts, caused additional issues, investigation incomplete
+
+**Critical Discovery Made**:
+- **BREAKTHROUGH**: User confirmed accordions work perfectly on **DESKTOP** but fail on **MOBILE** (iPhone)
+- **This changes everything**: Issue is NOT data structure related - it's **mobile-specific UI/touch event problem**
+- **All previous agents missed this**: They focused on backend data flow, not mobile frontend behavior
+
+**What Agent #46 Attempted**:
+
+### **🎯 ACCORDION INVESTIGATION**
+**Initial Theory**: Mobile touch event handling issues with iOS Safari
+**Fix Attempted**: Added mobile touch optimizations:
+- `onTouchStart` handlers
+- `touch-manipulation` CSS
+- `WebkitTapHighlightColor: transparent`
+- Event prevention for touch events
+
+**Result**: ❌ **FAILED** - User confirmed fix didn't work, accordion issue persists
+
+### **🎯 SUPPLEMENT SAVING INVESTIGATION**
+**New Issue Discovered**: After Agent #46's changes, supplement saving stopped working
+**Root Cause Identified**: React state update race condition in `addSupplement` function
+- `onNext({ supplements })` called before `setSupplements()` state update completes
+- Backend deletes all supplements and replaces with stale list
+- Newly added supplement gets lost
+
+**Fix Attempted**: Added `flushSync` to force synchronous state updates
+**Result**: ❌ **FAILED** - User stopped the work, changes reverted
+
+### **🚨 CRITICAL FAILURES**
+1. **❌ Mobile touch fix didn't work** - Accordion issue persists on mobile
+2. **❌ Broke supplement saving** - Created new critical data loss issue
+3. **❌ Poor investigation approach** - Made assumptions without proper testing
+4. **❌ User frustration** - User had to stop agent multiple times
+
+### **💡 KEY INSIGHTS FOR NEXT AGENT**
+
+**MOST IMPORTANT DISCOVERY**:
+**The accordion issue is MOBILE-SPECIFIC** - works on desktop, fails on iPhone
+- This eliminates ALL previous theories about data structure mismatches
+- Focus should be on mobile Safari touch event handling
+- NOT a backend or React state issue
+
+**SUPPLEMENT SAVING ISSUE**:
+- Race condition between `setSupplements()` and `onNext()` call
+- Backend API uses "delete all + recreate" strategy which is dangerous
+- Need either: fix the race condition OR change API to be additive
+
+**DEBUGGING APPROACH NEEDED**:
+1. **Test on actual mobile device** - desktop testing is insufficient
+2. **Focus on touch events** - not click events
+3. **Check CSS touch-action properties**
+4. **Investigate iOS Safari specific behaviors**
+
+### **📊 CURRENT STATE AFTER AGENT #46**
+- ✅ **Reverted all changes** - No code modifications remain
+- ❌ **Accordion issue unsolved** - Still broken on mobile, works on desktop
+- ❌ **Supplement saving** - May still have race condition issue
+- 🔍 **New insight** - Mobile-specific nature of accordion problem identified
+
+### **🎯 EXACT NEXT STEPS FOR NEXT AGENT**
+1. **DO NOT repeat mobile touch event approach** - Agent #46 already tried this
+2. **Test accordion behavior on actual iPhone** - not desktop browser dev tools
+3. **Investigate iOS Safari CSS/touch behavior** - may need different approach
+4. **Fix supplement saving race condition** - critical data loss issue
+5. **Consider accordion implementation alternatives** - current approach may be fundamentally flawed on mobile
+
+### **⚠️ WARNINGS FOR NEXT AGENT**
+- **DO NOT assume desktop testing is sufficient** - mobile behavior is completely different
+- **DO NOT use touch event handlers** - Agent #46 already tried this approach
+- **DO NOT break supplement saving** - user will terminate agent immediately
+- **TEST THOROUGHLY** before deploying any changes
+
+**Git Commits Made**:
+- `c8206d5` - "Agent #46: Fix mobile touch events..." (❌ FAILED - reverted)
+- All changes reverted to commit `898b44c`
+
+**For Next Agent - CRITICAL REQUIREMENTS**:
+1. **Focus on mobile-specific solutions** - desktop works fine
+2. **Test on actual iPhone device** - not browser dev tools
+3. **Investigate CSS touch-action, webkit properties** for mobile Safari
+4. **Fix supplement saving race condition** as separate task
+5. **DO NOT repeat Agent #46's failed approaches**
+
+**URGENT PRIORITY**: The accordion issue is costing user money and causing frustration. Next agent must approach this completely differently than all previous agents.
