@@ -3575,6 +3575,16 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
     }
   };
 
+  // Helper to create a safe, predictable slug from names for unique/stable IDs
+  const toSlug = (value: string | undefined) => {
+    if (!value) return 'unknown';
+    return value
+      .toString()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+  };
+
   const toggleHistoryExpansion = (id: string) => {
     const newExpanded = new Set(expandedHistoryItems);
     if (newExpanded.has(id)) {
@@ -3809,7 +3819,9 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
                 <h3 className="text-lg font-semibold mb-4">Potential Interactions</h3>
                 <div className="space-y-2">
                   {dangerousInteractions.map((interaction: any, index: number) => {
-                    const id = `${interaction.substance1}-${interaction.substance2}`.toLowerCase();
+                    const slug1 = toSlug(interaction.substance1);
+                    const slug2 = toSlug(interaction.substance2);
+                    const id = `ix-${index}-${slug1}-${slug2}`;
                     const isExpanded = expandedInteractions.has(id);
                     const severityIcon = interaction.severity === 'high' ? '🚨' : '⚠️';
                     
@@ -3817,7 +3829,8 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
                       <div key={id} className="border border-gray-200 rounded-lg overflow-hidden">
                         {/* Accordion Header */}
                         <button
-                          onClick={() => toggleInteractionExpansion(id)}
+                          type="button"
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleInteractionExpansion(id); }}
                           className="w-full px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors flex items-center justify-between text-left"
                         >
                           <div className="flex items-center space-x-3 flex-1">
@@ -3932,7 +3945,8 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
               <h3 className="text-lg font-semibold mb-3">Previous Analysis History</h3>
               {/* Show History dropdown on separate line */}
               <button
-                onClick={() => setShowAnalysisHistory(!showAnalysisHistory)}
+                type="button"
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowAnalysisHistory(!showAnalysisHistory); }}
                 className="flex items-center space-x-2 text-sm text-blue-600 hover:text-blue-800 transition-colors"
               >
                 <span>{showAnalysisHistory ? 'Hide' : 'Show'} History</span>
