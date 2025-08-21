@@ -4402,7 +4402,7 @@ export default function Onboarding() {
   const mobileProgress = getMobileProgressWindow();
 
   return (
-    <div className="fixed inset-0 bg-gray-50 overflow-y-auto overflow-x-hidden" id="onboarding-container">
+    <div className="relative min-h-screen bg-gray-50 overflow-y-auto overflow-x-hidden" id="onboarding-container">
       <div className="min-h-full flex flex-col max-w-full">
         {/* Sophisticated Progress with Numbered Steps */}
         <div className={`sticky top-0 bg-white border-b border-gray-200 px-8 py-3 safe-area-inset-top z-50 ${suppressBars ? 'pointer-events-none' : ''}`}>
