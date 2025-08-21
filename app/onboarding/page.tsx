@@ -3367,6 +3367,7 @@ function InteractionAnalysisStep({ onNext, onBack, initial, onAnalysisSettled }:
   const [expandedHistoryItems, setExpandedHistoryItems] = useState<Set<string>>(new Set());
   const [showAnalysisHistory, setShowAnalysisHistory] = useState(false); // Default collapsed as requested
   const [showRecommendations, setShowRecommendations] = useState(false);
+  const [didFreshAnalysis, setDidFreshAnalysis] = useState(false);
 
   useEffect(() => {
     // Load previous analyses and show the last one (no auto-analysis)
@@ -3387,18 +3388,18 @@ function InteractionAnalysisStep({ onNext, onBack, initial, onAnalysisSettled }:
     setShowRecommendations(false);
   }, [analysisResult]);
 
-  // Reset navigation state when analysis completes to prevent freeze
+  // Reset navigation state only when a FRESH analysis finishes (avoid loops when loading history)
   useEffect(() => {
-    if (analysisResult && !isAnalyzing) {
-      // Inform parent directly, and also via postMessage as a fallback
+    if (analysisResult && !isAnalyzing && didFreshAnalysis) {
       try { onAnalysisSettled && onAnalysisSettled(); } catch {}
+      setDidFreshAnalysis(false);
       setTimeout(() => {
         if (window.parent) {
           window.parent.postMessage({ type: 'RESET_NAVIGATION_STATE' }, '*');
         }
       }, 100);
     }
-  }, [analysisResult, isAnalyzing, onAnalysisSettled]);
+  }, [analysisResult, isAnalyzing, didFreshAnalysis, onAnalysisSettled]);
 
   const loadPreviousAnalyses = async () => {
     try {
@@ -3425,6 +3426,7 @@ function InteractionAnalysisStep({ onNext, onBack, initial, onAnalysisSettled }:
         if (analyses.length > 0) {
           const mostRecentAnalysis = analyses[0]; // Assuming newest first
           setAnalysisResult(mostRecentAnalysis.analysisData);
+          setDidFreshAnalysis(false); // came from history
           console.log('✅ Loaded most recent analysis for display');
         } else {
           console.log('ℹ️ No previous analyses found - showing empty state');
@@ -3522,6 +3524,7 @@ function InteractionAnalysisStep({ onNext, onBack, initial, onAnalysisSettled }:
       // Handle the API response structure - it returns { success: true, analysis: {...} }
       if (result.success && result.analysis) {
         setAnalysisResult(result.analysis);
+        setDidFreshAnalysis(true);
         // CRITICAL FIX: Reload previous analyses after new analysis to show history
         loadPreviousAnalyses();
       } else {
@@ -4127,7 +4130,7 @@ export default function Onboarding() {
   
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<any>({});
-  const [analysisVersion, setAnalysisVersion] = useState(0);
+  // Removed forced remount to avoid infinite loops
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -4673,14 +4676,12 @@ export default function Onboarding() {
             }
           }} />}
           {step === 7 && <InteractionAnalysisStep 
-            key={analysisVersion}
             onNext={handleNext} 
             onBack={handleBack} 
             initial={form} 
             onAnalysisSettled={() => { 
               setIsNavigating(false); 
               setIsLoading(false);
-              setAnalysisVersion((v) => v + 1); // Force fresh mount like a refresh
             }}
           />}
           {step === 8 && <BloodResultsStep onNext={handleNext} onBack={handleBack} initial={form} />}
