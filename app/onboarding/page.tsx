@@ -4270,6 +4270,18 @@ export default function Onboarding() {
     return () => clearTimeout(timer);
   }, [step]);
 
+  // Listen for child step notifications (e.g., after re-analysis) to clear any navigation locks
+  useEffect(() => {
+    const handler = (event: MessageEvent) => {
+      if (event?.data?.type === 'RESET_NAVIGATION_STATE') {
+        setIsNavigating(false);
+        setIsLoading(false);
+      }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, []);
+
   const handleNext = async (data: any) => {
     // Prevent double-clicks
     if (isNavigating) return;
@@ -4608,6 +4620,23 @@ export default function Onboarding() {
               flushSync(() => {
                 setForm((prevForm: any) => ({ ...prevForm, ...data }));
               });
+              // Save immediately (not debounced) so newly added supplements persist across refresh
+              try {
+                const updated = { ...form, ...data };
+                (async () => {
+                  try {
+                    await fetch('/api/user-data', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify(updated)
+                    });
+                  } catch (e) {
+                    console.warn('Supplements immediate save failed:', e);
+                  }
+                })();
+              } catch (e) {
+                console.warn('Supplements immediate save scheduling failed:', e);
+              }
               // Now navigation happens after state is guaranteed to be updated
               goToStep(7);
             } else {
@@ -4620,6 +4649,23 @@ export default function Onboarding() {
               flushSync(() => {
                 setForm((prevForm: any) => ({ ...prevForm, ...data }));
               });
+              // Save immediately (not debounced) so newly added medications persist across refresh
+              try {
+                const updated = { ...form, ...data };
+                (async () => {
+                  try {
+                    await fetch('/api/user-data', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify(updated)
+                    });
+                  } catch (e) {
+                    console.warn('Medications immediate save failed:', e);
+                  }
+                })();
+              } catch (e) {
+                console.warn('Medications immediate save scheduling failed:', e);
+              }
               // Now navigation happens after state is guaranteed to be updated
               goToStep(7);
             } else {
