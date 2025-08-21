@@ -3352,7 +3352,7 @@ function ReviewStep({ onBack, data }: { onBack: () => void, data: any }) {
   );
 }
 
-function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: any) => void, onBack: () => void, initial?: any }) {
+function InteractionAnalysisStep({ onNext, onBack, initial, onAnalysisSettled }: { onNext: (data: any) => void, onBack: () => void, initial?: any, onAnalysisSettled?: () => void }) {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
@@ -3361,7 +3361,7 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
   const [showCreditModal, setShowCreditModal] = useState(false);
   const [creditInfo, setCreditInfo] = useState<any>(null);
   const [userSubscriptionStatus, setUserSubscriptionStatus] = useState<'FREE' | 'PREMIUM' | null>(null);
-  const [expandedInteractions, setExpandedInteractions] = useState<Set<number>>(new Set());
+  const [expandedInteractions, setExpandedInteractions] = useState<Set<string>>(new Set());
   const [expandedHistoryItems, setExpandedHistoryItems] = useState<Set<string>>(new Set());
   const [showAnalysisHistory, setShowAnalysisHistory] = useState(false); // Default collapsed as requested
   const [showRecommendations, setShowRecommendations] = useState(false);
@@ -3373,7 +3373,7 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
 
   // Reset accordion state when initial data changes to prevent stale state issues
   useEffect(() => {
-    setExpandedInteractions(new Set<number>());
+    setExpandedInteractions(new Set<string>());
     setExpandedHistoryItems(new Set());
     setShowAnalysisHistory(false);
     setShowRecommendations(false);
@@ -3381,22 +3381,22 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
 
   // CRITICAL FIX: Reset interaction accordion state when analysisResult changes
   useEffect(() => {
-    setExpandedInteractions(new Set<number>());
+    setExpandedInteractions(new Set<string>());
     setShowRecommendations(false);
   }, [analysisResult]);
 
   // Reset navigation state when analysis completes to prevent freeze
   useEffect(() => {
     if (analysisResult && !isAnalyzing) {
-      // Ensure navigation is not stuck after analysis
+      // Inform parent directly, and also via postMessage as a fallback
+      try { onAnalysisSettled && onAnalysisSettled(); } catch {}
       setTimeout(() => {
-        // This will be handled by parent component
-        if (window.parent && window.parent !== window) {
+        if (window.parent) {
           window.parent.postMessage({ type: 'RESET_NAVIGATION_STATE' }, '*');
         }
-      }, 500);
+      }, 100);
     }
-  }, [analysisResult, isAnalyzing]);
+  }, [analysisResult, isAnalyzing, onAnalysisSettled]);
 
   const loadPreviousAnalyses = async () => {
     try {
@@ -3547,12 +3547,12 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
     onNext({ interactionAnalysis: analysisResult });
   };
 
-  const toggleInteractionExpansion = (idx: number) => {
+  const toggleInteractionExpansion = (id: string) => {
     const newExpanded = new Set(expandedInteractions);
-    if (newExpanded.has(idx)) {
-      newExpanded.delete(idx);
+    if (newExpanded.has(id)) {
+      newExpanded.delete(id);
     } else {
-      newExpanded.add(idx);
+      newExpanded.add(id);
     }
     setExpandedInteractions(newExpanded);
   };
@@ -3822,7 +3822,7 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
                     const slug1 = toSlug(interaction.substance1);
                     const slug2 = toSlug(interaction.substance2);
                     const id = `ix-${index}-${slug1}-${slug2}`;
-                    const isExpanded = expandedInteractions.has(index);
+                    const isExpanded = expandedInteractions.has(id);
                     const severityIcon = interaction.severity === 'high' ? '🚨' : '⚠️';
                     
                     return (
@@ -3830,13 +3830,10 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
                         {/* Accordion Header */}
                         <button
                           type="button"
-                          data-index={index}
                           onClick={(e) => { 
                             e.preventDefault(); 
                             e.stopPropagation(); 
-                            const t = e.currentTarget as HTMLButtonElement;
-                            const ix = Number(t.dataset.index || index);
-                            toggleInteractionExpansion(ix); 
+                            toggleInteractionExpansion(id); 
                           }}
                           className="w-full px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors flex items-center justify-between text-left"
                         >
@@ -4676,6 +4673,7 @@ export default function Onboarding() {
             onNext={handleNext} 
             onBack={handleBack} 
             initial={form} 
+            onAnalysisSettled={() => { setIsNavigating(false); setIsLoading(false); }}
           />}
           {step === 8 && <BloodResultsStep onNext={handleNext} onBack={handleBack} initial={form} />}
           {step === 9 && <AIInsightsStep onNext={handleNext} onBack={handleBack} initial={form} />}
