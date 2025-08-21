@@ -37,10 +37,11 @@ function InteractionAnalysisUpdatePopup({ isOpen, onClose, onUpdate, onNavigateT
           </p>
         </div>
         
-        <div className="flex space-x-3">
+        <div className="flex flex-col space-y-3">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+            className="w-full px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+            type="button"
           >
             Not Now
           </button>
@@ -48,7 +49,8 @@ function InteractionAnalysisUpdatePopup({ isOpen, onClose, onUpdate, onNavigateT
             onClick={() => {
               onUpdate();
             }}
-            className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            type="button"
           >
             Run Fresh Analysis
           </button>
