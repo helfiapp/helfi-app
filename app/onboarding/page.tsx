@@ -1971,7 +1971,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
           </button>
           <button 
             className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors" 
-            onClick={() => onNext({ supplements })}
+            onClick={() => onNext({ supplements: (supplementsToSave && supplementsToSave.length ? supplementsToSave : supplements) })}
           >
             Next
           </button>
@@ -2840,7 +2840,7 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
         <div className="space-y-3">
           <button 
             className="w-full bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-300" 
-            onClick={() => onNext({ medications })}
+            onClick={() => onNext({ medications: (medicationsToSave && medicationsToSave.length ? medicationsToSave : medications) })}
             disabled={medications.length === 0}
           >
             Analyze for Interactions & Contradictions
