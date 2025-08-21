@@ -3354,7 +3354,7 @@ function ReviewStep({ onBack, data }: { onBack: () => void, data: any }) {
   );
 }
 
-function InteractionAnalysisStep({ onNext, onBack, initial, onAnalysisSettled, onSuppressBars }: { onNext: (data: any) => void, onBack: () => void, initial?: any, onAnalysisSettled?: () => void, onSuppressBars?: (suppress: boolean) => void }) {
+function InteractionAnalysisStep({ onNext, onBack, initial, onAnalysisSettled }: { onNext: (data: any) => void, onBack: () => void, initial?: any, onAnalysisSettled?: () => void }) {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
@@ -3392,7 +3392,6 @@ function InteractionAnalysisStep({ onNext, onBack, initial, onAnalysisSettled, o
   useEffect(() => {
     if (analysisResult && !isAnalyzing && didFreshAnalysis) {
       try { onAnalysisSettled && onAnalysisSettled(); } catch {}
-      try { onSuppressBars && onSuppressBars(true); } catch {}
       setDidFreshAnalysis(false);
       setTimeout(() => {
         if (window.parent) {
@@ -3428,7 +3427,6 @@ function InteractionAnalysisStep({ onNext, onBack, initial, onAnalysisSettled, o
           const mostRecentAnalysis = analyses[0]; // Assuming newest first
           setAnalysisResult(mostRecentAnalysis.analysisData);
           setDidFreshAnalysis(false); // came from history
-          try { onSuppressBars && onSuppressBars(true); } catch {}
           console.log('✅ Loaded most recent analysis for display');
         } else {
           console.log('ℹ️ No previous analyses found - showing empty state');
@@ -4139,7 +4137,6 @@ export default function Onboarding() {
   const [isNavigating, setIsNavigating] = useState(false);
   const [profileImage, setProfileImage] = useState<string>('');
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const [suppressBars, setSuppressBars] = useState(false);
 
   const stepNames = [
     'Gender',
@@ -4405,7 +4402,7 @@ export default function Onboarding() {
     <div className="relative min-h-screen bg-gray-50 overflow-y-auto overflow-x-hidden" id="onboarding-container">
       <div className="min-h-full flex flex-col max-w-full">
         {/* Sophisticated Progress with Numbered Steps */}
-        <div className={`sticky top-0 bg-white border-b border-gray-200 px-8 py-3 safe-area-inset-top z-50 ${suppressBars ? 'pointer-events-none' : ''}`}>
+        <div className="sticky top-0 bg-white border-b border-gray-200 px-8 py-3 safe-area-inset-top z-50">
           <div className="flex items-center justify-between mb-4 max-w-4xl mx-auto">
             {/* Back Button */}
             <button 
@@ -4686,7 +4683,6 @@ export default function Onboarding() {
               setIsNavigating(false); 
               setIsLoading(false);
             }}
-            onSuppressBars={(s) => setSuppressBars(s)}
           />}
           {step === 8 && <BloodResultsStep onNext={handleNext} onBack={handleBack} initial={form} />}
           {step === 9 && <AIInsightsStep onNext={handleNext} onBack={handleBack} initial={form} />}
@@ -4694,7 +4690,7 @@ export default function Onboarding() {
         </div>
 
         {/* Mobile Bottom Navigation */}
-        <nav className={`md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-2 z-40 ${suppressBars ? 'pointer-events-none' : ''}`}>
+        <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-2 z-40">
           <div className="flex items-center justify-around">
             
             {/* Dashboard */}
