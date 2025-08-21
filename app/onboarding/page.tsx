@@ -3361,7 +3361,7 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
   const [showCreditModal, setShowCreditModal] = useState(false);
   const [creditInfo, setCreditInfo] = useState<any>(null);
   const [userSubscriptionStatus, setUserSubscriptionStatus] = useState<'FREE' | 'PREMIUM' | null>(null);
-  const [expandedInteractions, setExpandedInteractions] = useState<Set<string>>(new Set());
+  const [expandedInteractions, setExpandedInteractions] = useState<Set<number>>(new Set());
   const [expandedHistoryItems, setExpandedHistoryItems] = useState<Set<string>>(new Set());
   const [showAnalysisHistory, setShowAnalysisHistory] = useState(false); // Default collapsed as requested
   const [showRecommendations, setShowRecommendations] = useState(false);
@@ -3373,7 +3373,7 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
 
   // Reset accordion state when initial data changes to prevent stale state issues
   useEffect(() => {
-    setExpandedInteractions(new Set());
+    setExpandedInteractions(new Set<number>());
     setExpandedHistoryItems(new Set());
     setShowAnalysisHistory(false);
     setShowRecommendations(false);
@@ -3381,7 +3381,7 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
 
   // CRITICAL FIX: Reset interaction accordion state when analysisResult changes
   useEffect(() => {
-    setExpandedInteractions(new Set());
+    setExpandedInteractions(new Set<number>());
     setShowRecommendations(false);
   }, [analysisResult]);
 
@@ -3547,12 +3547,12 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
     onNext({ interactionAnalysis: analysisResult });
   };
 
-  const toggleInteractionExpansion = (id: string) => {
+  const toggleInteractionExpansion = (idx: number) => {
     const newExpanded = new Set(expandedInteractions);
-    if (newExpanded.has(id)) {
-      newExpanded.delete(id);
+    if (newExpanded.has(idx)) {
+      newExpanded.delete(idx);
     } else {
-      newExpanded.add(id);
+      newExpanded.add(idx);
     }
     setExpandedInteractions(newExpanded);
   };
@@ -3822,7 +3822,7 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
                     const slug1 = toSlug(interaction.substance1);
                     const slug2 = toSlug(interaction.substance2);
                     const id = `ix-${index}-${slug1}-${slug2}`;
-                    const isExpanded = expandedInteractions.has(id);
+                    const isExpanded = expandedInteractions.has(index);
                     const severityIcon = interaction.severity === 'high' ? '🚨' : '⚠️';
                     
                     return (
@@ -3830,7 +3830,14 @@ function InteractionAnalysisStep({ onNext, onBack, initial }: { onNext: (data: a
                         {/* Accordion Header */}
                         <button
                           type="button"
-                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleInteractionExpansion(id); }}
+                          data-index={index}
+                          onClick={(e) => { 
+                            e.preventDefault(); 
+                            e.stopPropagation(); 
+                            const t = e.currentTarget as HTMLButtonElement;
+                            const ix = Number(t.dataset.index || index);
+                            toggleInteractionExpansion(ix); 
+                          }}
                           className="w-full px-4 py-3 bg-gray-50 hover:bg-gray-100 transition-colors flex items-center justify-between text-left"
                         >
                           <div className="flex items-center space-x-3 flex-1">
