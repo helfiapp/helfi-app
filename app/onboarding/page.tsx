@@ -4127,6 +4127,7 @@ export default function Onboarding() {
   
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<any>({});
+  const [analysisVersion, setAnalysisVersion] = useState(0);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -4672,10 +4673,15 @@ export default function Onboarding() {
             }
           }} />}
           {step === 7 && <InteractionAnalysisStep 
+            key={analysisVersion}
             onNext={handleNext} 
             onBack={handleBack} 
             initial={form} 
-            onAnalysisSettled={() => { setIsNavigating(false); setIsLoading(false); }}
+            onAnalysisSettled={() => { 
+              setIsNavigating(false); 
+              setIsLoading(false);
+              setAnalysisVersion((v) => v + 1); // Force fresh mount like a refresh
+            }}
           />}
           {step === 8 && <BloodResultsStep onNext={handleNext} onBack={handleBack} initial={form} />}
           {step === 9 && <AIInsightsStep onNext={handleNext} onBack={handleBack} initial={form} />}
