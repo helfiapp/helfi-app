@@ -79,9 +79,14 @@ export default function Dashboard() {
             const hasHealthGoals = result.data.goals && result.data.goals.length > 0;
             
             if (!hasBasicProfile || !hasHealthGoals) {
-              console.log('🎯 New user detected - redirecting to onboarding');
-              window.location.href = '/onboarding';
-              return;
+              const deferred = typeof window !== 'undefined' && sessionStorage.getItem('onboardingDeferredThisSession') === '1';
+              if (!deferred) {
+                console.log('🎯 New user detected - redirecting to onboarding');
+                window.location.href = '/onboarding';
+                return;
+              } else {
+                console.log('⏳ Onboarding deferred this session — staying on dashboard');
+              }
             }
             
             setOnboardingData(result.data);
@@ -95,9 +100,14 @@ export default function Dashboard() {
             }
           } else {
             // No data at all - definitely a new user
-            console.log('🎯 No user data found - redirecting new user to onboarding');
-            window.location.href = '/onboarding';
-            return;
+            const deferred = typeof window !== 'undefined' && sessionStorage.getItem('onboardingDeferredThisSession') === '1';
+            if (!deferred) {
+              console.log('🎯 No user data found - redirecting new user to onboarding');
+              window.location.href = '/onboarding';
+              return;
+            } else {
+              console.log('⏳ Onboarding deferred with no data — staying on dashboard');
+            }
           }
         } else if (response.status === 404) {
           console.log('ℹ️ No existing data found for user in database - redirecting to onboarding');

@@ -4240,6 +4240,20 @@ export default function Onboarding() {
     }
   };
 
+  // If arriving without ?first=1 but user is clearly new, show the modal (unless deferred this session)
+  useEffect(() => {
+    if (status !== 'authenticated') return;
+    try {
+      const hasBasic = form && form.gender && form.weight && form.height;
+      const hasGoals = Array.isArray(form?.goals) && form.goals.length > 0;
+      const isFirstParam = new URLSearchParams(window.location.search).get('first') === '1';
+      const deferred = sessionStorage.getItem('onboardingDeferredThisSession') === '1';
+      if (!showFirstTimeModal && !isFirstParam && !deferred && (!hasBasic || !hasGoals)) {
+        setShowFirstTimeModal(true);
+      }
+    } catch {}
+  }, [status, form, showFirstTimeModal]);
+
   // Optimized debounced save function
   const debouncedSave = useCallback(async (data: any) => {
     // Clear existing timeout
