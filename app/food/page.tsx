@@ -1,4 +1,11 @@
 'use client'
+/**
+ * WARNING FOR FUTURE EDITS
+ * This page expects AI responses to include ONE nutrition line exactly like:
+ *   Calories: N, Protein: Ng, Carbs: Ng, Fat: Ng
+ * The API enforces this and also has a fallback extractor.
+ * If you change regexes or presentation, TEST that all four values still render.
+ */
 
 import React, { useState, useEffect } from 'react'
 import { useSession, signOut } from 'next-auth/react'

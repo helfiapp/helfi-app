@@ -1,4 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
+/**
+ * IMPORTANT – DO NOT CHANGE OUTPUT FORMAT WITHOUT UPDATING UI PARSER
+ * The Food Diary UI in `app/food/page.tsx` extracts nutrition via regex from a single line:
+ *   Calories: <number>, Protein: <g>, Carbs: <g>, Fat: <g>
+ * If you modify prompts or response shapes, ensure this exact line remains present.
+ * A server-side fallback below appends this line when missing.
+ */
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';

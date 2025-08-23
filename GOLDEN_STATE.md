@@ -1,3 +1,12 @@
+# Golden State
+
+Latest known-good deployment snapshot.
+
+- Commit: 3ad36b381befef1556dc93194d0fed2b149c2021
+- Date: 2025-08-23 17:25:03 +1000
+- Title: Food AI: enforce exact nutrition line in responses; server-side fallback to append missing Calories/Protein/Carbs/Fat line
+- Reason: Restores Food Diary nutrition cards; adds guard and warnings to prevent regressions.
+
 # GOLDEN STATE
 
 This file marks the current known-good version of the app.
