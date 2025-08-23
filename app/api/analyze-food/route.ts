@@ -84,10 +84,11 @@ export async function POST(req: NextRequest) {
       messages = [
         {
           role: "user",
-          content: `Analyze this food description and provide accurate nutrition information based on the EXACT portion size specified. Be precise about size differences:
+          content: `Analyze this food description and provide accurate nutrition information based on the EXACT portion size specified. Be precise about size differences. Keep your explanation concise (1-2 sentences) and ALWAYS include a single nutrition line at the end in this exact format:
+
+Calories: [number], Protein: [g], Carbs: [g], Fat: [g]
 
 [Food name] ([portion size])
-Calories: [estimate], Protein: [g], Carbs: [g], Fat: [g]
 
 Food description: ${textDescription}
 Food type: ${foodType}
@@ -107,7 +108,7 @@ Calories: 70, Protein: 6g, Carbs: 1g, Fat: 5g"
 "Medium egg (1 whole)
 Calories: 55, Protein: 5g, Carbs: 1g, Fat: 4g"
 
-Pay close attention to portion size words like small, medium, large, or specific measurements. Calculate nutrition accordingly.`
+Pay close attention to portion size words like small, medium, large, or specific measurements. Calculate nutrition accordingly. End your response with the nutrition line exactly once as shown.`
         }
       ];
     } else {
@@ -150,10 +151,11 @@ Pay close attention to portion size words like small, medium, large, or specific
           content: [
             {
               type: "text",
-              text: `Analyze this food image and provide accurate nutrition information based on the visible portion size. Be precise about size differences:
+              text: `Analyze this food image and provide accurate nutrition information based on the visible portion size. Be precise about size differences. Keep your explanation concise (1-2 sentences) and ALWAYS include a single nutrition line at the end in this exact format:
+
+Calories: [number], Protein: [g], Carbs: [g], Fat: [g]
 
 [Food name] ([portion size])
-Calories: [estimate], Protein: [g], Carbs: [g], Fat: [g]
 
 IMPORTANT: Different sizes have different nutrition values:
 - Large egg: ~70 calories, 6g protein
@@ -170,7 +172,7 @@ Calories: 70, Protein: 6g, Carbs: 1g, Fat: 5g"
 "Medium egg (1 whole)
 Calories: 55, Protein: 5g, Carbs: 1g, Fat: 4g"
 
-Estimate portion size carefully from the image and calculate nutrition accordingly.`
+Estimate portion size carefully from the image and calculate nutrition accordingly. End your response with the nutrition line exactly once as shown.`
             },
             {
               type: "image_url",
@@ -215,7 +217,7 @@ Estimate portion size carefully from the image and calculate nutrition according
       hasContent: !!response.choices?.[0]?.message?.content
     });
 
-    const analysis = response.choices[0]?.message?.content;
+    let analysis = response.choices[0]?.message?.content;
 
     if (!analysis) {
       console.log('❌ No analysis received from OpenAI');
@@ -226,6 +228,36 @@ Estimate portion size carefully from the image and calculate nutrition according
     }
 
     console.log('✅ Analysis received:', analysis.substring(0, 100) + '...');
+
+    // Server-side safeguard: ensure nutrition line is present so frontend cards render reliably
+    const hasCalories = /calories\s*[:\-]?\s*\d+/i.test(analysis);
+    const hasProtein = /protein\s*[:\-]?\s*\d+(?:\.\d+)?\s*g/i.test(analysis);
+    const hasCarbs = /carb(?:ohydrate)?s?\s*[:\-]?\s*\d+(?:\.\d+)?\s*g/i.test(analysis);
+    const hasFat = /fat\s*[:\-]?\s*\d+(?:\.\d+)?\s*g/i.test(analysis);
+
+    if (!(hasCalories && hasProtein && hasCarbs && hasFat)) {
+      try {
+        console.log('ℹ️ Nutrition line missing; running compact extractor');
+        const extractResponse = await openai.chat.completions.create({
+          model: "gpt-4o",
+          messages: [
+            {
+              role: "user",
+              content: `From the following text, extract ONLY a single line in this exact format: \n\nCalories: [number], Protein: [g], Carbs: [g], Fat: [g]\n\nIf you cannot infer a value, write 'unknown' for that field. No extra words.\n\nText:\n${analysis}`
+            }
+          ],
+          max_tokens: 60,
+          temperature: 0
+        });
+        const extracted = extractResponse.choices?.[0]?.message?.content?.trim();
+        if (extracted && /calories/i.test(extracted)) {
+          analysis = `${analysis}\n${extracted}`;
+          console.log('✅ Appended nutrition line:', extracted);
+        }
+      } catch (exErr) {
+        console.warn('Nutrition extraction fallback failed:', exErr);
+      }
+    }
     
     // Consume credits after successful analysis
     await creditManager.consumeCredits('FOOD_ANALYSIS');
