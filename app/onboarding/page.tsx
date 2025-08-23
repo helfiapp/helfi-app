@@ -4137,6 +4137,7 @@ export default function Onboarding() {
   const [isNavigating, setIsNavigating] = useState(false);
   const [profileImage, setProfileImage] = useState<string>('');
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [showFirstTimeModal, setShowFirstTimeModal] = useState(false);
 
   const stepNames = [
     'Gender',
@@ -4190,6 +4191,14 @@ export default function Onboarding() {
       window.removeEventListener('message', handleMessage);
     };
   }, [dropdownOpen]);
+
+  // Show first-time modal only when arriving with ?first=1
+  useEffect(() => {
+    try {
+      const isFirst = new URLSearchParams(window.location.search).get('first') === '1';
+      if (isFirst) setShowFirstTimeModal(true);
+    } catch {}
+  }, []);
 
   // Basic session validation without aggressive checks
   useEffect(() => {
@@ -4398,22 +4407,41 @@ export default function Onboarding() {
 
   const mobileProgress = getMobileProgressWindow();
 
+  const handleDeferFirstTime = () => {
+    try { sessionStorage.setItem('onboardingDeferredThisSession', '1'); } catch {}
+    window.location.replace('/dashboard?deferred=1');
+  };
+
+  const handleContinueFirstTime = () => setShowFirstTimeModal(false);
+
   return (
     <div className="relative min-h-screen bg-gray-50 overflow-y-auto overflow-x-hidden" id="onboarding-container">
+      {showFirstTimeModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-md rounded-xl bg-white shadow-xl p-6">
+            <h2 className="text-lg font-semibold text-gray-900">Complete your health setup</h2>
+            <p className="mt-2 text-sm text-gray-600">In order for Helfi to track your health you must complete the health setup.</p>
+            <div className="mt-6 space-y-3">
+              <button type="button" onClick={handleContinueFirstTime} className="w-full inline-flex items-center justify-center rounded-md bg-helfi-green text-white px-4 py-2 font-medium hover:opacity-90">Continue</button>
+              <button type="button" onClick={handleDeferFirstTime} className="w-full inline-flex items-center justify-center rounded-md border border-gray-300 bg-white text-gray-800 px-4 py-2 font-medium hover:bg-gray-50">I'll do it later</button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="min-h-full flex flex-col max-w-full">
         {/* Sophisticated Progress with Numbered Steps */}
         <div className="sticky top-0 bg-white border-b border-gray-200 px-8 py-3 safe-area-inset-top z-50">
           <div className="flex items-center justify-between mb-4 max-w-4xl mx-auto">
             {/* Back Button */}
-            <button 
-              onClick={() => window.history.back()} 
+            <a 
+              href="/dashboard"
               className="flex items-center text-gray-600 hover:text-gray-900"
               title="back button to Dashboard"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
-            </button>
+            </a>
             
             <h1 className="text-lg font-semibold text-gray-900">
               Edit Health Info
