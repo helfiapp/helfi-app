@@ -40,24 +40,28 @@ export async function POST(request: NextRequest) {
     // Trial/Premium gating: allow 1 trial, or 30/month if premium
     const isPremium = user.subscription?.plan === 'PREMIUM';
     const now = new Date();
-    const lastMonthlyReset = user.lastMonthlyResetDate as Date | null;
+    // Use optional chaining to avoid type errors if field not present in client types
+    const lastMonthlyReset = (user as any).lastMonthlyResetDate as Date | null;
     const monthChanged = !lastMonthlyReset || lastMonthlyReset.getUTCFullYear() !== now.getUTCFullYear() || lastMonthlyReset.getUTCMonth() !== now.getUTCMonth();
     if (monthChanged) {
       await prisma.user.update({
         where: { id: user.id },
-        data: { monthlyInteractionAnalysisUsed: 0, lastMonthlyResetDate: now }
+        data: { 
+          // Cast to any to support add-only schema push in staging
+          ...( { monthlyInteractionAnalysisUsed: 0, lastMonthlyResetDate: now } as any )
+        }
       });
-      user.monthlyInteractionAnalysisUsed = 0 as any;
+      (user as any).monthlyInteractionAnalysisUsed = 0 as any;
     }
 
-    if (!isPremium && user.trialActive) {
-      if ((user.trialInteractionRemaining || 0) <= 0) {
+    if (!isPremium && (user as any).trialActive) {
+      if (((user as any).trialInteractionRemaining || 0) <= 0) {
         return NextResponse.json({ error: "You've reached your trial limit. Subscribe to unlock full access." }, { status: 402 });
       }
-    } else if (!isPremium && !user.trialActive) {
+    } else if (!isPremium && !(user as any).trialActive) {
       return NextResponse.json({ error: "You've reached your trial limit. Subscribe to unlock full access." }, { status: 402 });
     } else if (isPremium) {
-      if ((user.monthlyInteractionAnalysisUsed || 0) >= 30) {
+      if (((user as any).monthlyInteractionAnalysisUsed || 0) >= 30) {
         return NextResponse.json({ error: 'Monthly interaction analysis limit reached.' }, { status: 429 });
       }
     }
@@ -221,21 +225,21 @@ Be thorough but not alarmist. Provide actionable recommendations.`;
     });
 
     // Update counters after successful analysis
-    if (!isPremium && user.trialActive) {
+    if (!isPremium && (user as any).trialActive) {
       await prisma.user.update({
         where: { id: user.id },
-        data: {
-          trialInteractionRemaining: Math.max(0, (user.trialInteractionRemaining || 0) - 1),
-          trialActive: (user.trialFoodRemaining || 0) > 0 || ((user.trialInteractionRemaining || 0) - 1) > 0
-        }
+        data: ( {
+          trialInteractionRemaining: Math.max(0, ((user as any).trialInteractionRemaining || 0) - 1),
+          trialActive: ((user as any).trialFoodRemaining || 0) > 0 || (((user as any).trialInteractionRemaining || 0) - 1) > 0
+        } as any )
       });
     } else if (isPremium) {
       await prisma.user.update({
         where: { id: user.id },
-        data: {
+        data: ( {
           monthlyInteractionAnalysisUsed: { increment: 1 },
           totalAnalysisCount: { increment: 1 },
-        }
+        } as any )
       });
     }
 

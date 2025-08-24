@@ -75,10 +75,12 @@ export async function POST(req: NextRequest) {
     console.log('📝 Content-Type:', contentType);
     let messages: any[] = [];
 
+    let isReanalysis = false;
     if (contentType?.includes('application/json')) {
       // Handle text-based food analysis
       const body = await req.json();
-      const { textDescription, foodType } = body;
+      const { textDescription, foodType, isReanalysis: reFlag } = body as any;
+      isReanalysis = !!reFlag;
       console.log('📝 Text analysis mode:', { textDescription, foodType });
 
       if (!textDescription) {
@@ -193,6 +195,54 @@ Estimate portion size carefully from the image and calculate nutrition according
       ];
     }
 
+    // TRIAL/PREMIUM GATING
+    const currentUser = await prisma.user.findUnique({
+      where: { email: session.user.email },
+      include: { subscription: true }
+    });
+    if (!currentUser) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    const isPremium = currentUser.subscription?.plan === 'PREMIUM';
+    const now = new Date();
+    const lastReset = currentUser.lastAnalysisResetDate;
+    const shouldReset = !lastReset || (now.getTime() - lastReset.getTime()) > 24*60*60*1000;
+    if (shouldReset) {
+      await prisma.user.update({
+        where: { id: currentUser.id },
+        data: ( {
+          dailyAnalysisUsed: 0,
+          dailyFoodAnalysisUsed: 0,
+          dailyFoodReanalysisUsed: 0,
+          lastAnalysisResetDate: now,
+        } as any )
+      });
+      (currentUser as any).dailyFoodAnalysisUsed = 0 as any;
+      (currentUser as any).dailyFoodReanalysisUsed = 0 as any;
+    }
+
+    if (!isPremium && (currentUser as any).trialActive) {
+      // Use trial buckets
+      if (isReanalysis) {
+        // Trial has no reanalysis allocation – block
+        return NextResponse.json({ error: "You've reached your trial limit. Subscribe to unlock full access." }, { status: 402 });
+      }
+      if (((currentUser as any).trialFoodRemaining || 0) <= 0) {
+        return NextResponse.json({ error: "You've reached your trial limit. Subscribe to unlock full access." }, { status: 402 });
+      }
+    } else if (!isPremium && !(currentUser as any).trialActive) {
+      // Free but no trial
+      return NextResponse.json({ error: "You've reached your trial limit. Subscribe to unlock full access." }, { status: 402 });
+    } else if (isPremium) {
+      // Premium daily limits
+      const limit = isReanalysis ? 10 : 30;
+      const used = isReanalysis ? (((currentUser as any).dailyFoodReanalysisUsed || 0)) : (((currentUser as any).dailyFoodAnalysisUsed || 0));
+      if (used >= limit) {
+        return NextResponse.json({ error: 'Daily limit reached. Try again tomorrow.' }, { status: 429 });
+      }
+    }
+
     // Get OpenAI client
     const openai = getOpenAIClient();
     if (!openai) {
@@ -266,8 +316,28 @@ Estimate portion size carefully from the image and calculate nutrition according
       }
     }
     
-    // Consume credits after successful analysis
-    await creditManager.consumeCredits('FOOD_ANALYSIS');
+    // Update counters after successful analysis
+    if (!isPremium && (currentUser as any).trialActive) {
+      await prisma.user.update({
+        where: { id: currentUser.id },
+        data: ( {
+          trialFoodRemaining: Math.max(0, (((currentUser as any).trialFoodRemaining || 0) - (isReanalysis ? 0 : 1))),
+          trialActive: (((currentUser as any).trialFoodRemaining || 0) - (isReanalysis ? 0 : 1)) > 0 || (((currentUser as any).trialInteractionRemaining || 0) > 0)
+        } as any )
+      });
+    } else if (isPremium) {
+      await prisma.user.update({
+        where: { id: currentUser.id },
+        data: ( isReanalysis ? {
+          dailyFoodReanalysisUsed: { increment: 1 },
+          totalAnalysisCount: { increment: 1 },
+        } : {
+          dailyFoodAnalysisUsed: { increment: 1 },
+          totalFoodAnalysisCount: { increment: 1 },
+          totalAnalysisCount: { increment: 1 },
+        } ) as any
+      });
+    }
     
     console.log('=== FOOD ANALYZER DEBUG END ===');
 
