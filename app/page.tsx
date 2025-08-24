@@ -43,9 +43,27 @@ function BackToTopButton() {
 }
 
 export default function SplashPage() {
+  const [showPreviewLink, setShowPreviewLink] = React.useState(false)
+  React.useEffect(() => {
+    try {
+      const host = window.location.hostname
+      // Show helper link only on Vercel preview domains
+      if (host.includes('vercel.app')) {
+        setShowPreviewLink(true)
+      }
+    } catch {}
+  }, [])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-helfi-green/5 via-white to-blue-50">
+      {showPreviewLink && (
+        <a
+          href="/staging-signin"
+          className="fixed top-2 right-2 z-[1000] rounded-md bg-emerald-600 text-white px-3 py-1 text-xs shadow hover:bg-emerald-700"
+        >
+          Preview: Staging Sign‑in
+        </a>
+      )}
       {/* Medical Disclaimer Banner */}
       <div className="bg-blue-50 border-l-4 border-blue-400 p-4">
         <div className="max-w-6xl mx-auto">
