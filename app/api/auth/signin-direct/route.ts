@@ -23,13 +23,17 @@ export async function POST(request: NextRequest) {
         data: {
           email: email.toLowerCase(),
           name: email.split('@')[0],
-          emailVerified: new Date(),
-          // Initialize trial quotas for new users
-          trialActive: true,
-          trialFoodRemaining: 3,
-          trialInteractionRemaining: 1
+          emailVerified: new Date()
         }
       })
+      // Best-effort: initialize trial quotas if columns exist (ignore if not)
+      try {
+        await prisma.$executeRawUnsafe(
+          `UPDATE "User" SET "trialActive" = true, "trialFoodRemaining" = 3, "trialInteractionRemaining" = 1 WHERE id = '${user.id}'`
+        )
+      } catch (e) {
+        console.warn('Trial columns not present; skipping trial init')
+      }
     } else if (!user.emailVerified) {
       // Auto-verify existing user to avoid email flow for staging
       await prisma.user.update({
