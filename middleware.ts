@@ -6,7 +6,8 @@ export async function middleware(request: NextRequest) {
   // Skip middleware for static files and API routes that don't need auth
   if (
     request.nextUrl.pathname.startsWith('/_next') ||
-    request.nextUrl.pathname.startsWith('/api/auth') ||
+    request.nextUrl.pathname.startsWith('/api') ||
+    request.nextUrl.pathname.startsWith('/staging-signin') ||
     request.nextUrl.pathname.includes('.')
   ) {
     return NextResponse.next()
