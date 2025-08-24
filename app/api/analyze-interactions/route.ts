@@ -5,9 +5,13 @@ import { prisma } from '@/lib/prisma';
 import { CreditManager, CREDIT_COSTS } from '@/lib/credit-system';
 import OpenAI from 'openai';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Lazily initialize OpenAI to avoid build-time env requirements
+function getOpenAIClient() {
+  if (!process.env.OPENAI_API_KEY) {
+    return null;
+  }
+  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -33,21 +37,29 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    // Check credit availability using new credit system
-    const creditManager = new CreditManager(user.id);
-    const creditStatus = await creditManager.checkCredits('INTERACTION_ANALYSIS');
-    
-    if (!creditStatus.hasCredits) {
-      return NextResponse.json({ 
-        error: 'Insufficient credits',
-        creditsRemaining: creditStatus.totalCreditsRemaining,
-        dailyCreditsRemaining: creditStatus.dailyCreditsRemaining,
-        additionalCredits: creditStatus.additionalCreditsRemaining,
-        creditCost: CREDIT_COSTS.INTERACTION_ANALYSIS,
-        featureUsageToday: creditStatus.featureUsageToday,
-        dailyLimits: creditStatus.dailyLimits,
-        plan: user.subscription?.plan || 'FREE'
-      }, { status: 402 }); // Payment Required
+    // Trial/Premium gating: allow 1 trial, or 30/month if premium
+    const isPremium = user.subscription?.plan === 'PREMIUM';
+    const now = new Date();
+    const lastMonthlyReset = user.lastMonthlyResetDate as Date | null;
+    const monthChanged = !lastMonthlyReset || lastMonthlyReset.getUTCFullYear() !== now.getUTCFullYear() || lastMonthlyReset.getUTCMonth() !== now.getUTCMonth();
+    if (monthChanged) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { monthlyInteractionAnalysisUsed: 0, lastMonthlyResetDate: now }
+      });
+      user.monthlyInteractionAnalysisUsed = 0 as any;
+    }
+
+    if (!isPremium && user.trialActive) {
+      if ((user.trialInteractionRemaining || 0) <= 0) {
+        return NextResponse.json({ error: "You've reached your trial limit. Subscribe to unlock full access." }, { status: 402 });
+      }
+    } else if (!isPremium && !user.trialActive) {
+      return NextResponse.json({ error: "You've reached your trial limit. Subscribe to unlock full access." }, { status: 402 });
+    } else if (isPremium) {
+      if ((user.monthlyInteractionAnalysisUsed || 0) >= 30) {
+        return NextResponse.json({ error: 'Monthly interaction analysis limit reached.' }, { status: 429 });
+      }
     }
 
     // Prepare the data for OpenAI analysis
@@ -115,6 +127,11 @@ Focus on:
 6. Any contraindications
 
 Be thorough but not alarmist. Provide actionable recommendations.`;
+
+    const openai = getOpenAIClient();
+    if (!openai) {
+      return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 });
+    }
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4",
@@ -203,8 +220,24 @@ Be thorough but not alarmist. Provide actionable recommendations.`;
       }
     });
 
-    // Consume credits after successful analysis
-    await creditManager.consumeCredits('INTERACTION_ANALYSIS');
+    // Update counters after successful analysis
+    if (!isPremium && user.trialActive) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          trialInteractionRemaining: Math.max(0, (user.trialInteractionRemaining || 0) - 1),
+          trialActive: (user.trialFoodRemaining || 0) > 0 || ((user.trialInteractionRemaining || 0) - 1) > 0
+        }
+      });
+    } else if (isPremium) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          monthlyInteractionAnalysisUsed: { increment: 1 },
+          totalAnalysisCount: { increment: 1 },
+        }
+      });
+    }
 
     return NextResponse.json({ 
       success: true, 
