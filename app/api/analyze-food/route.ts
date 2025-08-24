@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Find user and check credit quota
+    // Find user
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
       include: { subscription: true }
@@ -43,22 +43,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    // Check credit availability using new credit system
-    const creditManager = new CreditManager(user.id);
-    const creditStatus = await creditManager.checkCredits('FOOD_ANALYSIS');
-    
-    if (!creditStatus.hasCredits) {
-      return NextResponse.json({ 
-        error: 'Insufficient credits',
-        creditsRemaining: creditStatus.totalCreditsRemaining,
-        dailyCreditsRemaining: creditStatus.dailyCreditsRemaining,
-        additionalCredits: creditStatus.additionalCreditsRemaining,
-        creditCost: CREDIT_COSTS.FOOD_ANALYSIS,
-        featureUsageToday: creditStatus.featureUsageToday,
-        dailyLimits: creditStatus.dailyLimits,
-        plan: user.subscription?.plan || 'FREE'
-      }, { status: 402 }); // Payment Required
-    }
+    // We'll perform trial gating first; if not allowed via trial, then check credits
+    let allowViaTrial = false;
+    let creditManager: CreditManager | null = null;
     
     // Check if API key is configured
     if (!process.env.OPENAI_API_KEY) {
@@ -223,23 +210,39 @@ Estimate portion size carefully from the image and calculate nutrition according
     }
 
     if (!isPremium && (currentUser as any).trialActive) {
-      // Use trial buckets
       if (isReanalysis) {
-        // Trial has no reanalysis allocation – block
         return NextResponse.json({ error: "You've reached your trial limit. Subscribe to unlock full access." }, { status: 402 });
       }
-      if (((currentUser as any).trialFoodRemaining || 0) <= 0) {
-        return NextResponse.json({ error: "You've reached your trial limit. Subscribe to unlock full access." }, { status: 402 });
+      const remaining = ((currentUser as any).trialFoodRemaining || 0);
+      if (remaining > 0) {
+        allowViaTrial = true; // allow without checking credits
+      } else {
+        // trial active but no remaining – fall through to credits check below
       }
-    } else if (!isPremium && !(currentUser as any).trialActive) {
-      // Free but no trial
-      return NextResponse.json({ error: "You've reached your trial limit. Subscribe to unlock full access." }, { status: 402 });
-    } else if (isPremium) {
+    }
+
+    if (isPremium) {
       // Premium daily limits
       const limit = isReanalysis ? 10 : 30;
       const used = isReanalysis ? (((currentUser as any).dailyFoodReanalysisUsed || 0)) : (((currentUser as any).dailyFoodAnalysisUsed || 0));
       if (used >= limit) {
         return NextResponse.json({ error: 'Daily limit reached. Try again tomorrow.' }, { status: 429 });
+      }
+    } else if (!allowViaTrial) {
+      // Not premium and not allowed via trial → check credit system
+      creditManager = new CreditManager(user.id);
+      const creditStatus = await creditManager.checkCredits('FOOD_ANALYSIS');
+      if (!creditStatus.hasCredits) {
+        return NextResponse.json({
+          error: 'Insufficient credits',
+          creditsRemaining: creditStatus.totalCreditsRemaining,
+          dailyCreditsRemaining: creditStatus.dailyCreditsRemaining,
+          additionalCredits: creditStatus.additionalCreditsRemaining,
+          creditCost: CREDIT_COSTS.FOOD_ANALYSIS,
+          featureUsageToday: creditStatus.featureUsageToday,
+          dailyLimits: creditStatus.dailyLimits,
+          plan: user.subscription?.plan || 'FREE'
+        }, { status: 402 });
       }
     }
 
@@ -317,7 +320,7 @@ Estimate portion size carefully from the image and calculate nutrition according
     }
     
     // Update counters after successful analysis
-    if (!isPremium && (currentUser as any).trialActive) {
+    if (allowViaTrial) {
       await prisma.user.update({
         where: { id: currentUser.id },
         data: ( {
@@ -337,6 +340,15 @@ Estimate portion size carefully from the image and calculate nutrition according
           totalAnalysisCount: { increment: 1 },
         } ) as any
       });
+    } else {
+      // Non-premium using credits
+      try {
+        if (creditManager) {
+          await creditManager.consumeCredits('FOOD_ANALYSIS');
+        }
+      } catch (e) {
+        console.warn('Credit consume failed:', e);
+      }
     }
     
     console.log('=== FOOD ANALYZER DEBUG END ===');

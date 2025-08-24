@@ -89,6 +89,15 @@ export async function POST(request: NextRequest) {
     })
 
     console.log('✅ Direct signin successful with NextAuth-compatible session created')
+
+    // Best-effort: initialize daily credits so credit gate can't block a fresh user
+    try {
+      await prisma.$executeRawUnsafe(
+        `UPDATE "User" SET "dailyAnalysisCredits" = COALESCE("dailyAnalysisCredits",3), "dailyAnalysisUsed" = 0, "lastAnalysisResetDate" = now() WHERE email = '${user.email}'`
+      )
+    } catch (e) {
+      console.warn('Daily credit init skipped:', e)
+    }
     
     return response
 
