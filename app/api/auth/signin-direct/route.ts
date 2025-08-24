@@ -12,14 +12,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Email and password are required' }, { status: 400 })
     }
 
-    // Find user in database
-    const user = await prisma.user.findUnique({
+    // Find or create user in database (staging/test helper)
+    let user = await prisma.user.findUnique({
       where: { email: email.toLowerCase() }
     })
 
     if (!user) {
-      console.log('❌ User not found:', email)
-      return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 })
+      console.log('👤 Creating test user via signin-direct:', email)
+      user = await prisma.user.create({
+        data: {
+          email: email.toLowerCase(),
+          name: email.split('@')[0],
+          emailVerified: new Date()
+        }
+      })
+    } else if (!user.emailVerified) {
+      // Auto-verify existing user to avoid email flow for staging
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { emailVerified: new Date() }
+      })
     }
 
     // For now, just check if user exists (like the working commit did)
