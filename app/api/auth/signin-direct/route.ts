@@ -23,7 +23,11 @@ export async function POST(request: NextRequest) {
         data: {
           email: email.toLowerCase(),
           name: email.split('@')[0],
-          emailVerified: new Date()
+          emailVerified: new Date(),
+          // Initialize trial quotas for new users
+          trialActive: true,
+          trialFoodRemaining: 3,
+          trialInteractionRemaining: 1
         }
       })
     } else if (!user.emailVerified) {
