@@ -1,12 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+function getOpenAIClient() {
+  if (!process.env.OPENAI_API_KEY) {
+    return null;
+  }
+  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+}
 
 export async function POST(req: NextRequest) {
   try {
+    // Medical image analysis is PREMIUM only
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email },
+      include: { subscription: true }
+    });
+    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    const isPremium = user.subscription?.plan === 'PREMIUM';
+    if (!isPremium) {
+      return NextResponse.json({ error: 'This is a premium feature. Subscribe now to unlock medical analysis.' }, { status: 402 });
+    }
+
     const formData = await req.formData();
     const imageFile = formData.get('image') as File;
 
@@ -26,6 +47,10 @@ export async function POST(req: NextRequest) {
     });
 
     // Test with simple image analysis
+    const openai = getOpenAIClient();
+    if (!openai) {
+      return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 });
+    }
     const response = await openai.chat.completions.create({
       model: "gpt-4o",
       messages: [
