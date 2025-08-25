@@ -6,7 +6,8 @@ const prisma = new PrismaClient();
 export const CREDIT_COSTS = {
   FOOD_ANALYSIS: 1,
   INTERACTION_ANALYSIS: 3,
-  MEDICAL_IMAGE_ANALYSIS: 2, // Future feature
+  MEDICAL_IMAGE_ANALYSIS: 2,
+  FOOD_REANALYSIS: 1,
 } as const;
 
 export type FeatureType = keyof typeof CREDIT_COSTS;
@@ -47,7 +48,7 @@ export class CreditManager {
       throw new Error('User not found');
     }
 
-    // Reset daily usage if needed
+    // Reset daily/monthly usage if needed
     const now = new Date();
     const lastReset = user.lastAnalysisResetDate;
     const shouldReset = !lastReset || 
@@ -57,7 +58,24 @@ export class CreditManager {
       await this.resetDailyUsage();
       user.dailyAnalysisUsed = 0;
       user.dailyFoodAnalysisUsed = 0;
+      user.dailyFoodReanalysisUsed = 0;
+      user.dailyMedicalAnalysisUsed = 0;
       user.dailyInteractionAnalysisUsed = 0;
+    }
+
+    const lastMonthlyReset = user.lastMonthlyResetDate;
+    const monthChanged = !lastMonthlyReset ||
+      (lastMonthlyReset.getUTCFullYear() !== now.getUTCFullYear() ||
+       lastMonthlyReset.getUTCMonth() !== now.getUTCMonth());
+    if (monthChanged) {
+      await prisma.user.update({
+        where: { id: this.userId },
+        data: {
+          monthlyInteractionAnalysisUsed: 0,
+          lastMonthlyResetDate: now,
+        }
+      });
+      user.monthlyInteractionAnalysisUsed = 0;
     }
 
     const creditCost = CREDIT_COSTS[featureType];
@@ -67,7 +85,10 @@ export class CreditManager {
 
     // Calculate daily limits based on plan
     const isPremium = user.subscription?.plan === 'PREMIUM';
-    const dailyLimit = isPremium ? 30 : 3;
+    const dailyFoodLimit = isPremium ? 30 : 3;
+    const dailyMedicalLimit = isPremium ? 15 : 0;
+    const monthlyInteractionLimit = isPremium ? 30 : 0;
+    const dailyFoodReanalysisLimit = isPremium ? 10 : 0;
 
     return {
       hasCredits,
@@ -79,9 +100,9 @@ export class CreditManager {
         interactionAnalysis: user.dailyInteractionAnalysisUsed || 0,
       },
       dailyLimits: {
-        total: dailyLimit,
-        foodAnalysis: dailyLimit, // Can use all credits for food analysis
-        interactionAnalysis: Math.floor(dailyLimit / CREDIT_COSTS.INTERACTION_ANALYSIS), // Limited by cost
+        total: dailyFoodLimit,
+        foodAnalysis: dailyFoodLimit,
+        interactionAnalysis: Math.floor(dailyFoodLimit / CREDIT_COSTS.INTERACTION_ANALYSIS),
       },
     };
   }
@@ -145,6 +166,8 @@ export class CreditManager {
       data: {
         dailyAnalysisUsed: 0,
         dailyFoodAnalysisUsed: 0,
+        dailyFoodReanalysisUsed: 0,
+        dailyMedicalAnalysisUsed: 0,
         dailyInteractionAnalysisUsed: 0,
         lastAnalysisResetDate: new Date(),
       },

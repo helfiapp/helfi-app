@@ -203,8 +203,11 @@ export default function Dashboard() {
             </Link>
           </div>
           
-          {/* Profile Avatar & Dropdown on the right */}
-          <div className="relative dropdown-container" id="profile-dropdown">
+          {/* Right actions: Upgrade + Profile */}
+          <div className="flex items-center gap-3">
+            <Link href="/billing" className="hidden sm:inline-flex items-center bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors font-medium">Upgrade</Link>
+            {/* Profile Avatar & Dropdown */}
+            <div className="relative dropdown-container" id="profile-dropdown">
             <button
               onClick={() => setDropdownOpen((v) => !v)}
               className="focus:outline-none"
@@ -250,6 +253,7 @@ export default function Dashboard() {
               </button>
               </div>
             )}
+          </div>
           </div>
         </div>
       </nav>

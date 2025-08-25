@@ -23,14 +23,23 @@ model User {
   dailyAnalysisCredits     Int @default(3)  // Free: 3, Premium: 30
   additionalCredits        Int @default(0)  // Purchased credits that don't expire
   lastAnalysisResetDate    DateTime?        // Track daily reset
+  lastMonthlyResetDate     DateTime?        // Track monthly reset for monthly quotas
   totalAnalysisCount       Int @default(0)  // Lifetime usage counter
   dailyAnalysisUsed        Int @default(0)  // Used today
   
   // Feature-specific credit tracking
   dailyFoodAnalysisUsed      Int @default(0)  // Food analysis credits used today
+  dailyFoodReanalysisUsed    Int @default(0)  // Food re-analysis used today
+  dailyMedicalAnalysisUsed   Int @default(0)  // Medical image analyses used today
   dailyInteractionAnalysisUsed Int @default(0)  // Interaction analysis credits used today
   totalFoodAnalysisCount     Int @default(0)  // Lifetime food analysis count
   totalInteractionAnalysisCount Int @default(0)  // Lifetime interaction analysis count
+  monthlyInteractionAnalysisUsed Int @default(0) // Monthly interactions used (premium)
+
+  // Trial fields
+  trialActive                 Boolean @default(true)
+  trialFoodRemaining          Int     @default(3)  // 3 food photos total
+  trialInteractionRemaining   Int     @default(1)  // 1 interaction total
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
   accounts      Account[]

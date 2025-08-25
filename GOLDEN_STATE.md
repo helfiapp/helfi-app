@@ -2,10 +2,10 @@
 
 Latest known-good deployment snapshot.
 
-- Commit: 3ad36b381befef1556dc93194d0fed2b149c2021
-- Date: 2025-08-23 17:25:03 +1000
-- Title: Food AI: enforce exact nutrition line in responses; server-side fallback to append missing Calories/Protein/Carbs/Fat line
-- Reason: Restores Food Diary nutrition cards; adds guard and warnings to prevent regressions.
+- Commit: 97ddb1351a... (master)
+- Date: 2025-08-25
+- Title: Trials fixed (trial-first gating), daily credits initialized on direct sign-in, upgrade CTA and manual-entry notes added
+- Reason: Free-trial flow now works as expected; clear upsell path when credits/trial are exhausted.
 
 # GOLDEN STATE
 
