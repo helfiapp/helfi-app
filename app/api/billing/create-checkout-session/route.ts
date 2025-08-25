@@ -37,7 +37,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid plan or price not configured' }, { status: 400 })
     }
 
-    const isCredits = requestedPlan.startsWith('credits_')
+    const isCredits = (requestedPlan ?? '').startsWith('credits_')
 
     // Get user email from session if available
     const session = await getServerSession(authOptions)
