@@ -264,7 +264,7 @@ Estimate portion size carefully from the image and calculate nutrition according
 
     // Call OpenAI API
     const response = await openai.chat.completions.create({
-      model: "gpt-4o", // Use the more accurate model for food analysis
+      model: isReanalysis ? "gpt-4o-mini" : "gpt-4o", // Cheaper model for re-analysis
       messages,
       max_tokens: 500,
       temperature: 0.3, // Lower temperature for more consistent food analysis

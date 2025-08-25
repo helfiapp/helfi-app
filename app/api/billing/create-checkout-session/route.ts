@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import crypto from 'crypto'
 
 // POST /api/billing/create-checkout-session
 export async function POST(request: Request) {
@@ -39,6 +40,27 @@ export async function POST(request: Request) {
 
     const isCredits = (requestedPlan ?? '').startsWith('credits_')
 
+    // Hash requester IP to deter free-trial abuse (one trial per IP per 30 days)
+    const rawIp = (request.headers.get('x-forwarded-for') || '').split(',')[0].trim() ||
+                  (request as any).ip || 'unknown'
+    const trialIpHash = crypto.createHash('sha256').update(rawIp).digest('hex')
+
+    // If user is requesting a trial (subscription) check if this IP had a trial recently
+    if (!isCredits) {
+      try {
+        // Use Stripe Customer Search if available; fall back gracefully
+        const thirtyDaysAgo = Math.floor((Date.now() - 30 * 24 * 60 * 60 * 1000) / 1000)
+        const query = `metadata['trial_ip_hash']:'${trialIpHash}' AND created>${thirtyDaysAgo}`
+        // @ts-ignore - search may not be enabled in some accounts
+        const search = await (stripe.customers as any).search?.({ query })
+        if (search?.data?.length) {
+          return NextResponse.json({ error: 'A recent trial was already started from this network. Please subscribe to continue.' }, { status: 429 })
+        }
+      } catch {
+        // Ignore search errors; proceed without blocking
+      }
+    }
+
     // Get user email from session if available
     const session = await getServerSession(authOptions)
     const customerEmail = session?.user?.email || undefined
@@ -55,6 +77,14 @@ export async function POST(request: Request) {
       cancel_url: `${origin}/billing?checkout=cancelled`,
       customer_email: customerEmail,
       allow_promotion_codes: true,
+      payment_method_collection: 'always',
+      subscription_data: isCredits ? undefined : {
+        trial_period_days: 7,
+        metadata: {
+          trial_ip_hash: trialIpHash,
+          trial_used: 'true'
+        }
+      }
     })
 
     return NextResponse.json({ url: checkoutSession.url })
