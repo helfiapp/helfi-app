@@ -969,14 +969,17 @@ Please add nutritional information manually if needed.`);
                     </div>
                     {aiDescription && /(Insufficient credits|trial limit)/i.test(aiDescription) && (
                       <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-                        <div className="flex items-center justify-between gap-3 flex-col sm:flex-row">
+                        <div className="flex flex-col gap-3">
                           <div>
                             <div className="font-semibold text-amber-800">You're out of free analyses</div>
-                            <div className="text-sm text-amber-700">Upgrade to Premium to unlock 30 photo analyses/day, medical image analysis, and interaction checks.</div>
+                            <div className="text-sm text-amber-700">Upgrade to Premium to unlock 30 photo analyses/day, medical image analysis, supplements and prescription drugs interaction checks.</div>
                           </div>
-                          <Link href="/billing" className="mt-3 sm:mt-0 inline-flex items-center px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium">Upgrade to Premium</Link>
+                          <Link href="/billing" className="inline-flex items-center justify-center px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium w-full sm:w-auto">Upgrade to Premium</Link>
                         </div>
                       </div>
+                    )}
+                    {aiDescription && /(Failed to analyze|describe your food manually)/i.test(aiDescription) && (
+                      <div className="mt-2 text-xs text-gray-600">Calorie modals are not available on the free plan when you manually input the information.</div>
                     )}
                   </div>
                   
