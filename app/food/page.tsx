@@ -469,7 +469,8 @@ Please add nutritional information manually if needed.`);
         },
         body: JSON.stringify({
           textDescription: description,
-          foodType: 'single'
+          foodType: 'single',
+          isReanalysis: true
         }),
       });
 
@@ -966,6 +967,17 @@ Please add nutritional information manually if needed.`);
                         })()}
                       </div>
                     </div>
+                    {aiDescription && /(Insufficient credits|trial limit)/i.test(aiDescription) && (
+                      <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                        <div className="flex items-center justify-between gap-3 flex-col sm:flex-row">
+                          <div>
+                            <div className="font-semibold text-amber-800">You're out of free analyses</div>
+                            <div className="text-sm text-amber-700">Upgrade to Premium to unlock 30 photo analyses/day, medical image analysis, and interaction checks.</div>
+                          </div>
+                          <Link href="/billing" className="mt-3 sm:mt-0 inline-flex items-center px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium">Upgrade to Premium</Link>
+                        </div>
+                      </div>
+                    )}
                   </div>
                   
                   {/* Action Buttons */}
@@ -1212,7 +1224,8 @@ Please add nutritional information manually if needed.`);
                             },
                             body: JSON.stringify({
                               textDescription: editedDescription,
-                              foodType: 'single'
+                              foodType: 'single',
+                              isReanalysis: true
                             }),
                           });
 
