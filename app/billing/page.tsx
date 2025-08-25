@@ -258,7 +258,7 @@ export default function BillingPage() {
                     console.error('Checkout error', e)
                   }
                 }}
-                className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors whitespace-nowrap"
+                className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors"
               >
                 {billingCycle === 'monthly' ? 'Upgrade to Premium – $20/mo' : 'Upgrade to Premium – $216/yr'}
               </button>
@@ -294,7 +294,7 @@ export default function BillingPage() {
                     console.error('Checkout error', e)
                   }
                 }}
-                className="w-full bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors whitespace-nowrap"
+                className="w-full bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors"
               >
                 {billingCycle === 'monthly' ? 'Upgrade to Premium Plus – $30/mo' : 'Upgrade to Premium Plus – $312/yr'}
               </button>

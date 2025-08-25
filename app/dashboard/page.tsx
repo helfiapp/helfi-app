@@ -187,11 +187,11 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Navigation Header - First Row */}
-      <nav className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
+      <nav className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-3 sm:px-4 py-3">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           {/* Logo on the left */}
           <div className="flex items-center">
-            <Link href="/" className="w-16 h-16 md:w-20 md:h-20 cursor-pointer hover:opacity-80 transition-opacity">
+            <Link href="/" className="w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20 cursor-pointer hover:opacity-80 transition-opacity">
               <Image
                 src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/HELFI_TRANSPARENT_rmssry.png"
                 alt="Helfi Logo"
@@ -259,7 +259,7 @@ export default function Dashboard() {
       </nav>
 
       {/* Second Row - Page Title Centered */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-4">
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-3 sm:px-4 py-4">
         <div className="max-w-7xl mx-auto text-center">
           <h1 className="text-lg md:text-xl font-semibold text-gray-900">Dashboard</h1>
           <p className="text-sm text-gray-500 hidden sm:block">Welcome back, {userName}</p>
@@ -268,7 +268,7 @@ export default function Dashboard() {
 
       {/* Main Content - Add padding bottom for mobile nav */}
       <main className="flex-1 pb-24 md:pb-8">
-        <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 py-6 md:py-8">
           <div className="bg-white rounded-lg shadow-sm p-8">
             <div className="text-center mb-8">
               <h1 className="text-3xl font-bold text-helfi-black mb-4">
@@ -279,7 +279,7 @@ export default function Dashboard() {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-8">
               <div className="bg-helfi-green/5 p-6 rounded-lg border-2 border-helfi-green/20">
                 <h3 className="font-semibold text-helfi-black mb-2">🎯 Health Tracking</h3>
                 <p className="text-sm text-gray-600">Track your daily metrics and progress</p>

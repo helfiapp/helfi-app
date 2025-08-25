@@ -130,7 +130,7 @@ export default function SplashPage() {
       </nav>
 
       {/* Hero Section */}
-      <section className="px-6 py-20">
+      <section className="px-4 sm:px-6 lg:px-10 xl:px-16 py-16 lg:py-20">
         <div className="max-w-6xl mx-auto text-center">
           <div className="max-w-4xl mx-auto">
             <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold text-helfi-black mb-6 leading-tight">
@@ -161,7 +161,7 @@ export default function SplashPage() {
       </section>
 
       {/* Features Section */}
-      <section id="features" className="px-6 py-20 bg-white">
+      <section id="features" className="px-4 sm:px-6 lg:px-10 xl:px-16 py-16 lg:py-20 bg-white">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-helfi-black mb-4">
@@ -172,7 +172,7 @@ export default function SplashPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
             <div className="text-center p-8">
               <div className="w-16 h-16 bg-helfi-green/10 rounded-full flex items-center justify-center mx-auto mb-6">
                 <svg className="w-8 h-8 text-helfi-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -323,7 +323,7 @@ export default function SplashPage() {
       </section>
 
       {/* Health Intelligence Benefits Section */}
-      <section className="px-4 py-20 bg-white">
+      <section className="px-4 sm:px-6 lg:px-10 xl:px-16 py-16 lg:py-20 bg-white">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-helfi-black mb-6">
@@ -334,7 +334,7 @@ export default function SplashPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
             <div className="text-center p-6 bg-gradient-to-br from-green-50 to-blue-50 rounded-2xl">
               <div className="w-16 h-16 bg-helfi-green/10 rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg className="w-8 h-8 text-helfi-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -387,7 +387,7 @@ export default function SplashPage() {
       </section>
 
       {/* Voice AI Section */}
-      <section className="px-6 py-20 bg-gradient-to-r from-purple-50 to-blue-50">
+      <section className="px-4 sm:px-6 lg:px-10 xl:px-16 py-16 lg:py-20 bg-gradient-to-r from-purple-50 to-blue-50">
         <div className="max-w-6xl mx-auto">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div>
@@ -459,7 +459,7 @@ export default function SplashPage() {
       </section>
 
       {/* Pricing Section */}
-      <section id="pricing" className="px-6 py-20 bg-gray-50">
+      <section id="pricing" className="px-4 sm:px-6 lg:px-10 xl:px-16 py-16 lg:py-20 bg-gray-50">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-helfi-black mb-4">
@@ -477,7 +477,7 @@ export default function SplashPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 lg:gap-8 max-w-6xl mx-auto">
             {/* Free Trial */}
             <div className="bg-white rounded-2xl p-8 border-2 border-gray-200">
               <div className="text-center">
@@ -821,7 +821,7 @@ export default function SplashPage() {
       </section>
 
       {/* Benefits for Health Optimization Section */}
-      <section className="px-4 py-20 bg-gradient-to-br from-helfi-green/5 to-blue-50">
+      <section className="px-4 sm:px-6 lg:px-10 xl:px-16 py-16 lg:py-20 bg-gradient-to-br from-helfi-green/5 to-blue-50">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-helfi-black mb-6">
@@ -833,7 +833,7 @@ export default function SplashPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
             <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
               <div className="text-4xl mb-4">📈</div>
               <h3 className="text-xl font-bold text-helfi-black mb-4">Prevent Chronic Disease</h3>
