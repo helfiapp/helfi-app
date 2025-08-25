@@ -10,6 +10,7 @@ export default function BillingPage() {
   const { data: session } = useSession()
   const [loading, setLoading] = useState(true)
   const [currentPlan, setCurrentPlan] = useState('free')
+  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly')
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [profileImage, setProfileImage] = useState<string>('')
   const router = useRouter()
@@ -192,143 +193,163 @@ export default function BillingPage() {
 
         {/* Available Plans */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">Available Plans</h2>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-gray-900">Plans</h2>
+            <div className="flex items-center gap-2 text-sm">
+              <span className={billingCycle === 'monthly' ? 'font-semibold text-gray-900' : 'text-gray-500'}>Monthly</span>
+              <button
+                onClick={() => setBillingCycle((v) => (v === 'monthly' ? 'yearly' : 'monthly'))}
+                className="relative inline-flex h-6 w-11 items-center rounded-full bg-gray-200"
+                aria-label="Toggle yearly billing"
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition ${billingCycle === 'yearly' ? 'translate-x-6' : 'translate-x-1'}`}
+                />
+              </button>
+              <span className={billingCycle === 'yearly' ? 'font-semibold text-gray-900' : 'text-gray-500'}>Yearly</span>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Free Plan */}
             <div className="border border-gray-200 rounded-lg p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Free</h3>
               <p className="text-3xl font-bold text-gray-900 mb-4">$0<span className="text-sm font-normal">/month</span></p>
-              <ul className="space-y-2 mb-6">
-                <li className="flex items-center text-sm text-gray-600">
-                  <svg className="w-4 h-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Basic health tracking
-                </li>
-                <li className="flex items-center text-sm text-gray-600">
-                  <svg className="w-4 h-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Weekly insights
-                </li>
-                <li className="flex items-center text-sm text-gray-600">
-                  <svg className="w-4 h-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Basic reports
-                </li>
+              <ul className="space-y-2 mb-6 text-sm text-gray-600">
+                <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Basic health tracking</li>
+                <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Weekly insights</li>
+                <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Basic reports</li>
+                <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Trial: 3 food photos/day + 1 interaction/day</li>
               </ul>
-              <button className="w-full bg-gray-100 text-gray-400 px-4 py-2 rounded-lg cursor-not-allowed">
-                Current Plan
-              </button>
+              <button className="w-full bg-gray-100 text-gray-400 px-4 py-2 rounded-lg cursor-not-allowed">Current Plan</button>
             </div>
 
-            {/* Pro Plan */}
+            {/* Premium */}
             <div className="border-2 border-helfi-green rounded-lg p-6 relative">
               <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                <span className="bg-helfi-green text-white px-3 py-1 rounded-full text-sm font-medium">
-                  Most Popular
-                </span>
+                <span className="bg-helfi-green text-white px-3 py-1 rounded-full text-sm font-medium">Most Popular</span>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Pro</h3>
-              <p className="text-3xl font-bold text-gray-900 mb-4">$9.99<span className="text-sm font-normal">/month</span></p>
-              <ul className="space-y-2 mb-6">
-                <li className="flex items-center text-sm text-gray-600">
-                  <svg className="w-4 h-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Advanced health tracking
-                </li>
-                <li className="flex items-center text-sm text-gray-600">
-                  <svg className="w-4 h-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Daily AI insights
-                </li>
-                <li className="flex items-center text-sm text-gray-600">
-                  <svg className="w-4 h-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Detailed analytics
-                </li>
-                <li className="flex items-center text-sm text-gray-600">
-                  <svg className="w-4 h-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Device integrations
-                </li>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Premium</h3>
+              <p className="text-3xl font-bold text-gray-900 mb-1">
+                {billingCycle === 'monthly' ? '$20' : '$216'}
+                <span className="text-sm font-normal">/{billingCycle === 'monthly' ? 'month' : 'year'}</span>
+              </p>
+              {billingCycle === 'yearly' && (
+                <p className="text-xs text-gray-500 mb-4">$18/month billed yearly</p>
+              )}
+              <ul className="space-y-2 mb-6 text-sm text-gray-600">
+                <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> 30 food photo analyses/day</li>
+                <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> 30 re‑analyses/day</li>
+                <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> 30 medical image analyses/day</li>
               </ul>
               <button
                 onClick={async () => {
+                  const plan = billingCycle === 'monthly' ? 'premium_monthly' : 'premium_yearly'
                   try {
                     const res = await fetch('/api/billing/create-checkout-session', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ plan: 'premium_monthly' })
+                      body: JSON.stringify({ plan })
                     })
                     const data = await res.json()
-                    if (data?.url) {
-                      window.location.href = data.url
-                    }
+                    if (data?.url) window.location.href = data.url
                   } catch (e) {
                     console.error('Checkout error', e)
                   }
                 }}
                 className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors"
               >
-                Upgrade to Pro
+                {billingCycle === 'monthly' ? 'Upgrade to Premium – $20/mo' : 'Upgrade to Premium – $216/yr'}
               </button>
             </div>
 
-            {/* Premium Plan */}
+            {/* Premium Plus */}
             <div className="border border-gray-200 rounded-lg p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Premium</h3>
-              <p className="text-3xl font-bold text-gray-900 mb-4">$12.99<span className="text-sm font-normal">/month</span></p>
-              <ul className="space-y-2 mb-6">
-                <li className="flex items-center text-sm text-gray-600">
-                  <svg className="w-4 h-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Everything in Pro
-                </li>
-                <li className="flex items-center text-sm text-gray-600">
-                  <svg className="w-4 h-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Personal health coach
-                </li>
-                <li className="flex items-center text-sm text-gray-600">
-                  <svg className="w-4 h-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Priority support
-                </li>
-                <li className="flex items-center text-sm text-gray-600">
-                  <svg className="w-4 h-4 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Custom meal plans
-                </li>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Premium Plus</h3>
+              <p className="text-3xl font-bold text-gray-900 mb-1">
+                {billingCycle === 'monthly' ? '$30' : '$312'}
+                <span className="text-sm font-normal">/{billingCycle === 'monthly' ? 'month' : 'year'}</span>
+              </p>
+              {billingCycle === 'yearly' && (
+                <p className="text-xs text-gray-500 mb-4">$26/month billed yearly</p>
+              )}
+              <ul className="space-y-2 mb-6 text-sm text-gray-600">
+                <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Everything in Premium</li>
+                <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Higher usage limits (set in app)</li>
+                <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Priority support</li>
               </ul>
               <button
                 onClick={async () => {
+                  const plan = billingCycle === 'monthly' ? 'premium_plus_monthly' : 'premium_plus_yearly'
                   try {
                     const res = await fetch('/api/billing/create-checkout-session', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ plan: 'premium_plus_monthly' })
+                      body: JSON.stringify({ plan })
                     })
                     const data = await res.json()
-                    if (data?.url) {
-                      window.location.href = data.url
-                    }
+                    if (data?.url) window.location.href = data.url
                   } catch (e) {
                     console.error('Checkout error', e)
                   }
                 }}
                 className="w-full bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors"
               >
-                Upgrade to Premium
+                {billingCycle === 'monthly' ? 'Upgrade to Premium Plus – $30/mo' : 'Upgrade to Premium Plus – $312/yr'}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Credits */}
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
+          <h2 className="text-2xl font-bold text-gray-900 mb-6">Buy Extra Credits</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div className="border border-gray-200 rounded-lg p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">100 Credits</h3>
+              <p className="text-2xl font-bold text-gray-900 mb-4">$5</p>
+              <p className="text-sm text-gray-600 mb-6">Use for additional AI analyses. Credits never expire.</p>
+              <button
+                onClick={async () => {
+                  try {
+                    const res = await fetch('/api/billing/create-checkout-session', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ plan: 'credits_100' })
+                    })
+                    const data = await res.json()
+                    if (data?.url) window.location.href = data.url
+                  } catch (e) {
+                    console.error('Checkout error', e)
+                  }
+                }}
+                className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors"
+              >
+                Buy 100 Credits – $5
+              </button>
+            </div>
+
+            <div className="border border-gray-200 rounded-lg p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">150 Credits</h3>
+              <p className="text-2xl font-bold text-gray-900 mb-4">$10</p>
+              <p className="text-sm text-gray-600 mb-6">Best value pack. Credits never expire.</p>
+              <button
+                onClick={async () => {
+                  try {
+                    const res = await fetch('/api/billing/create-checkout-session', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ plan: 'credits_150' })
+                    })
+                    const data = await res.json()
+                    if (data?.url) window.location.href = data.url
+                  } catch (e) {
+                    console.error('Checkout error', e)
+                  }
+                }}
+                className="w-full bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors"
+              >
+                Buy 150 Credits – $10
               </button>
             </div>
           </div>
