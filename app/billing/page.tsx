@@ -212,7 +212,7 @@ export default function BillingPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Free Plan */}
-            <div className="border border-gray-200 rounded-lg p-6">
+            <div className="border border-gray-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow bg-white">
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Free 7‑Day Trial</h3>
               <p className="text-3xl font-bold text-gray-900 mb-4">$0<span className="text-sm font-normal">/month</span></p>
               <ul className="space-y-2 mb-6 text-sm text-gray-600">
@@ -226,7 +226,7 @@ export default function BillingPage() {
             </div>
 
             {/* Premium */}
-            <div className="border-2 border-helfi-green rounded-lg p-6 relative">
+            <div className="border-2 border-helfi-green rounded-2xl p-6 relative shadow-sm hover:shadow-lg transition-shadow bg-white">
               <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
                 <span className="bg-helfi-green text-white px-3 py-1 rounded-full text-sm font-medium">Most Popular</span>
               </div>
@@ -265,7 +265,7 @@ export default function BillingPage() {
             </div>
 
             {/* Premium Plus */}
-            <div className="border border-gray-200 rounded-lg p-6">
+            <div className="border border-gray-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow bg-white">
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Premium Plus</h3>
               <p className="text-3xl font-bold text-gray-900 mb-1">
                 {billingCycle === 'monthly' ? '$30' : '$312'}
@@ -327,30 +327,6 @@ export default function BillingPage() {
                 className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors"
               >
                 Buy 100 Credits – $5
-              </button>
-            </div>
-
-            <div className="border border-gray-200 rounded-lg p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">150 Credits</h3>
-              <p className="text-2xl font-bold text-gray-900 mb-4">$10</p>
-              <p className="text-sm text-gray-600 mb-6">Best value pack. Credits never expire.</p>
-              <button
-                onClick={async () => {
-                  try {
-                    const res = await fetch('/api/billing/create-checkout-session', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ plan: 'credits_150' })
-                    })
-                    const data = await res.json()
-                    if (data?.url) window.location.href = data.url
-                  } catch (e) {
-                    console.error('Checkout error', e)
-                  }
-                }}
-                className="w-full bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors"
-              >
-                Buy 150 Credits – $10
               </button>
             </div>
           </div>

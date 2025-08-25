@@ -471,20 +471,20 @@ export default function SplashPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
-            {/* Free Plan */}
+            {/* Free Trial */}
             <div className="bg-white rounded-2xl p-8 border-2 border-gray-200">
               <div className="text-center">
-                <h3 className="text-2xl font-bold text-helfi-black mb-2">Health Basics</h3>
+                <h3 className="text-2xl font-bold text-helfi-black mb-2">Free 7‑Day Trial</h3>
                 <div className="mb-6">
-                  <span className="text-4xl font-bold text-helfi-black">Free</span>
-                  <div className="text-sm text-gray-500 mt-1">Forever</div>
+                  <span className="text-4xl font-bold text-helfi-black">$0</span>
+                  <div className="text-sm text-gray-500 mt-1">7 days</div>
                 </div>
                 <ul className="space-y-3 text-left mb-8">
                   <li className="flex items-center">
                     <svg className="w-5 h-5 text-helfi-green mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
-                    Complete onboarding & profile setup
+                    All core features for 7 days
                   </li>
                   <li className="flex items-center">
                     <svg className="w-5 h-5 text-helfi-green mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -496,19 +496,13 @@ export default function SplashPage() {
                     <svg className="w-5 h-5 text-helfi-green mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
-                    1 reanalysis per food item
+                    1 re‑analysis per food item
                   </li>
                   <li className="flex items-center">
                     <svg className="w-5 h-5 text-helfi-green mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
-                    Basic health goal tracking
-                  </li>
-                  <li className="flex items-center">
-                    <svg className="w-5 h-5 text-helfi-green mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    Weekly health summary emails
+                    1 interaction check per day
                   </li>
                   <li className="flex items-center text-gray-400">
                     <svg className="w-5 h-5 text-gray-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -523,12 +517,9 @@ export default function SplashPage() {
                     No medical image analysis
                   </li>
                 </ul>
-                <button 
-                  onClick={() => document.getElementById('waitlist-signup')?.scrollIntoView({ behavior: 'smooth' })}
-                  className="btn-secondary w-full"
-                >
-                  Get Started Free
-                </button>
+                <Link href="/billing" className="btn-secondary w-full text-center block">
+                  Start Free Trial
+                </Link>
               </div>
             </div>
 
@@ -544,7 +535,7 @@ export default function SplashPage() {
                 <div className="mb-6">
                   <span className="text-4xl font-bold text-helfi-black">$20</span>
                   <span className="text-gray-600">/month</span>
-                  <div className="text-sm text-gray-500 mt-1">$210/year (save 12.5%)</div>
+                  <div className="text-sm text-gray-500 mt-1">$216/year (save 10%)</div>
                 </div>
                 
                 {/* Feature Categories */}
@@ -627,17 +618,12 @@ export default function SplashPage() {
                 
                 <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-lg p-4 mb-6">
                   <div className="text-sm text-gray-700">
-                    <strong>Need more credits?</strong><br/>
-                    $5 for 100 credits • $10 for 150 credits (Credits don't expire)
+                    <strong>Need more credits?</strong> $5 for 100 credits (never expire)
                   </div>
                 </div>
-                
-                <button 
-                  onClick={() => document.getElementById('waitlist-signup')?.scrollIntoView({ behavior: 'smooth' })}
-                  className="btn-primary w-full"
-                >
-                  Start 14-Day Free Trial
-                </button>
+                <Link href="/billing" className="btn-primary w-full text-center block">
+                  Start 7‑Day Free Trial
+                </Link>
               </div>
             </div>
           </div>
