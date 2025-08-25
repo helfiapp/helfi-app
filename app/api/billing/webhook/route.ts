@@ -23,7 +23,19 @@ export async function POST(request: NextRequest) {
       case 'customer.subscription.created':
       case 'customer.subscription.updated': {
         const sub = event.data.object as Stripe.Subscription
-        const email = (sub.customer_email as string) || (sub as any).customer_details?.email
+        // Get customer email via customer ID
+        const customerId = typeof sub.customer === 'string' ? sub.customer : sub.customer?.id
+        let email: string | undefined
+        if (customerId) {
+          try {
+            const customer = await stripe.customers.retrieve(customerId)
+            if ((customer as Stripe.Customer).email) {
+              email = (customer as Stripe.Customer).email as string
+            }
+          } catch {
+            // ignore customer fetch errors
+          }
+        }
         if (!email) break
 
         // Set plan and trial flags
@@ -42,7 +54,16 @@ export async function POST(request: NextRequest) {
       }
       case 'customer.subscription.trial_will_end': {
         const sub = event.data.object as Stripe.Subscription
-        const email = (sub.customer_email as string) || (sub as any).customer_details?.email
+        const customerId = typeof sub.customer === 'string' ? sub.customer : sub.customer?.id
+        let email: string | undefined
+        if (customerId) {
+          try {
+            const customer = await stripe.customers.retrieve(customerId)
+            if ((customer as Stripe.Customer).email) {
+              email = (customer as Stripe.Customer).email as string
+            }
+          } catch {}
+        }
         if (email && resend) {
           await resend.emails.send({
             from: 'Helfi Team <support@helfi.ai>',
@@ -55,7 +76,16 @@ export async function POST(request: NextRequest) {
       }
       case 'customer.subscription.deleted': {
         const sub = event.data.object as Stripe.Subscription
-        const email = (sub.customer_email as string) || (sub as any).customer_details?.email
+        const customerId = typeof sub.customer === 'string' ? sub.customer : sub.customer?.id
+        let email: string | undefined
+        if (customerId) {
+          try {
+            const customer = await stripe.customers.retrieve(customerId)
+            if ((customer as Stripe.Customer).email) {
+              email = (customer as Stripe.Customer).email as string
+            }
+          } catch {}
+        }
         if (email) {
           await prisma.user.update({
             where: { email: email.toLowerCase() },
