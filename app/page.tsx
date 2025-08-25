@@ -470,7 +470,7 @@ export default function SplashPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
             {/* Free Trial */}
             <div className="bg-white rounded-2xl p-8 border-2 border-gray-200">
               <div className="text-center">
@@ -626,16 +626,47 @@ export default function SplashPage() {
                 </Link>
               </div>
             </div>
+
+            {/* Premium Plus */}
+            <div className="bg-white rounded-2xl p-8 border-2 border-gray-200">
+              <div className="text-center">
+                <h3 className="text-2xl font-bold text-helfi-black mb-2">Premium Plus</h3>
+                <div className="mb-6">
+                  <span className="text-4xl font-bold text-helfi-black">$30</span>
+                  <span className="text-gray-600">/month</span>
+                  <div className="text-sm text-gray-500 mt-1">$312/year (save 13%)</div>
+                </div>
+                <ul className="space-y-3 text-left mb-8">
+                  <li className="flex items-center">
+                    <svg className="w-5 h-5 text-helfi-green mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    Everything in Premium
+                  </li>
+                  <li className="flex items-center">
+                    <svg className="w-5 h-5 text-helfi-green mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    Higher usage limits (set in app)
+                  </li>
+                  <li className="flex items-center">
+                    <svg className="w-5 h-5 text-helfi-green mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    Priority support
+                  </li>
+                </ul>
+                <Link href="/billing" className="btn-secondary w-full text-center block">
+                  Upgrade to Premium Plus
+                </Link>
+              </div>
+            </div>
           </div>
 
           {/* Enhanced Trial Benefits Section */}
           <div className="text-center mt-16">
             <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 border border-blue-200 rounded-2xl p-8 max-w-5xl mx-auto shadow-lg">
-              <div className="mb-6">
-                <div className="inline-flex items-center bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-2 rounded-full text-sm font-semibold shadow-md">
-                  🎯 14-Day Free Trial includes everything!
-                </div>
-              </div>
+              <div className="mb-6"></div>
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                 <div className="bg-white rounded-xl p-6 shadow-sm border border-green-100 hover:shadow-md transition-shadow">

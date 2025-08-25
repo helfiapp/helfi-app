@@ -173,7 +173,7 @@ export default function BillingPage() {
       </div>
 
       {/* Main Content */}
-              <div className="max-w-4xl mx-auto px-4 py-8 pb-24 md:pb-8">
+              <div className="max-w-6xl mx-auto px-6 py-8 pb-24 md:pb-8">
         {/* Current Plan */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
           <h2 className="text-2xl font-bold text-gray-900 mb-6">Current Plan</h2>
@@ -210,9 +210,9 @@ export default function BillingPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Free Plan */}
-            <div className="border border-gray-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow bg-white">
+            <div className="border border-gray-200 rounded-2xl p-8 shadow-sm hover:shadow-md transition-shadow bg-white">
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Free 7‑Day Trial</h3>
               <p className="text-3xl font-bold text-gray-900 mb-4">$0<span className="text-sm font-normal">/month</span></p>
               <ul className="space-y-2 mb-6 text-sm text-gray-600">
@@ -226,7 +226,7 @@ export default function BillingPage() {
             </div>
 
             {/* Premium */}
-            <div className="border-2 border-helfi-green rounded-2xl p-6 relative shadow-sm hover:shadow-lg transition-shadow bg-white">
+            <div className="border-2 border-helfi-green rounded-2xl p-8 relative shadow-sm hover:shadow-lg transition-shadow bg-white">
               <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
                 <span className="bg-helfi-green text-white px-3 py-1 rounded-full text-sm font-medium">Most Popular</span>
               </div>
@@ -265,7 +265,7 @@ export default function BillingPage() {
             </div>
 
             {/* Premium Plus */}
-            <div className="border border-gray-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow bg-white">
+            <div className="border border-gray-200 rounded-2xl p-8 shadow-sm hover:shadow-md transition-shadow bg-white">
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Premium Plus</h3>
               <p className="text-3xl font-bold text-gray-900 mb-1">
                 {billingCycle === 'monthly' ? '$30' : '$312'}
