@@ -180,8 +180,8 @@ export default function BillingPage() {
           <div className="bg-helfi-green/10 border border-helfi-green/20 rounded-lg p-6">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-xl font-semibold text-helfi-green">Free Plan</h3>
-                <p className="text-gray-600 mt-2">Basic health tracking and insights</p>
+                <h3 className="text-xl font-semibold text-helfi-green">Free 7‑Day Trial</h3>
+                <p className="text-gray-600 mt-2">Trial caps: 3 food photos/day, 1 re‑analysis/photo, 1 interaction/day</p>
               </div>
               <div className="text-right">
                 <p className="text-3xl font-bold text-helfi-green">$0</p>
@@ -213,13 +213,14 @@ export default function BillingPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Free Plan */}
             <div className="border border-gray-200 rounded-lg p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Free</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Free 7‑Day Trial</h3>
               <p className="text-3xl font-bold text-gray-900 mb-4">$0<span className="text-sm font-normal">/month</span></p>
               <ul className="space-y-2 mb-6 text-sm text-gray-600">
-                <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Basic health tracking</li>
-                <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Weekly insights</li>
-                <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Basic reports</li>
-                <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Trial: 3 food photos/day + 1 interaction/day</li>
+                <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> All core features for 7 days</li>
+                <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> 3 food photos/day</li>
+                <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> 1 re‑analysis per photo</li>
+                <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> 1 interaction check/day</li>
+                <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Medical image analysis not included</li>
               </ul>
               <button className="w-full bg-gray-100 text-gray-400 px-4 py-2 rounded-lg cursor-not-allowed">Current Plan</button>
             </div>
