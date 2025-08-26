@@ -43,7 +43,12 @@ function BackToTopButton() {
 }
 
 export default function SplashPage() {
+  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly')
 
+  const handleWaitlistCta = () => {
+    alert("We are currently in the process of building this amazing application. If you would like to be notified the moment we go live, please sign up below.")
+    document.getElementById('waitlist-signup')?.scrollIntoView({ behavior: 'smooth' })
+  }
   return (
     <div className="min-h-screen bg-gradient-to-br from-helfi-green/5 via-white to-blue-50">
       {/* Medical Disclaimer Banner */}
@@ -469,11 +474,15 @@ export default function SplashPage() {
               Choose the plan that fits your health journey
             </p>
             <div className="mt-6 flex items-center justify-center gap-3 text-sm">
-              <span className="text-gray-500">Monthly</span>
-              <span className="inline-flex h-6 w-11 items-center rounded-full bg-gray-200">
-                <span className="inline-block h-4 w-4 transform rounded-full bg-white shadow translate-x-1" />
-              </span>
-              <span className="font-semibold text-gray-900">Yearly</span>
+              <span className={billingCycle === 'monthly' ? 'font-semibold text-gray-900' : 'text-gray-500'}>Monthly</span>
+              <button
+                onClick={() => setBillingCycle((v) => (v === 'monthly' ? 'yearly' : 'monthly'))}
+                className="relative inline-flex h-6 w-11 items-center rounded-full bg-gray-200"
+                aria-label="Toggle yearly billing"
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition ${billingCycle === 'yearly' ? 'translate-x-6' : 'translate-x-1'}`} />
+              </button>
+              <span className={billingCycle === 'yearly' ? 'font-semibold text-gray-900' : 'text-gray-500'}>Yearly</span>
             </div>
           </div>
 
@@ -524,9 +533,9 @@ export default function SplashPage() {
                     No medical image analysis
                   </li>
                 </ul>
-                <Link href="/billing" className="btn-secondary w-full text-center block">
+                <button onClick={handleWaitlistCta} className="btn-secondary w-full text-center block" type="button">
                   Start Free Trial
-                </Link>
+                </button>
               </div>
             </div>
 
@@ -540,9 +549,11 @@ export default function SplashPage() {
               <div className="text-center">
                 <h3 className="text-2xl font-bold text-helfi-black mb-2">AI Health Coach</h3>
                 <div className="mb-6">
-                  <span className="text-4xl font-bold text-helfi-black">$20</span>
-                  <span className="text-gray-600">/month</span>
-                  <div className="text-sm text-gray-500 mt-1">$216/year (save 10%)</div>
+                  <span className="text-4xl font-bold text-helfi-black">{billingCycle === 'monthly' ? '$20' : '$216'}</span>
+                  <span className="text-gray-600">/{billingCycle === 'monthly' ? 'month' : 'year'}</span>
+                  {billingCycle === 'yearly' && (
+                    <div className="text-sm text-gray-500 mt-1">$18/month (save 10%)</div>
+                  )}
                 </div>
                 
                 {/* Feature Categories */}
@@ -628,9 +639,9 @@ export default function SplashPage() {
                     <strong>Need more credits?</strong> $5 for 100 credits (never expire)
                   </div>
                 </div>
-                <Link href="/billing" className="btn-primary w-full text-center block">
+                <button onClick={handleWaitlistCta} className="btn-primary w-full text-center block" type="button">
                   Start 7‑Day Free Trial
-                </Link>
+                </button>
               </div>
             </div>
 
@@ -639,9 +650,11 @@ export default function SplashPage() {
               <div className="text-center">
                 <h3 className="text-2xl font-bold text-helfi-black mb-2">Premium Plus</h3>
                 <div className="mb-6">
-                  <span className="text-4xl font-bold text-helfi-black">$30</span>
-                  <span className="text-gray-600">/month</span>
-                  <div className="text-sm text-gray-500 mt-1">$312/year (save 13%)</div>
+                  <span className="text-4xl font-bold text-helfi-black">{billingCycle === 'monthly' ? '$30' : '$312'}</span>
+                  <span className="text-gray-600">/{billingCycle === 'monthly' ? 'month' : 'year'}</span>
+                  {billingCycle === 'yearly' && (
+                    <div className="text-sm text-gray-500 mt-1">$26/month (save 13%)</div>
+                  )}
                 </div>
                 <ul className="space-y-3 text-left mb-8">
                   <li className="flex items-center">
@@ -663,9 +676,9 @@ export default function SplashPage() {
                     Priority support
                   </li>
                 </ul>
-                <Link href="/billing" className="btn-secondary w-full text-center block">
+                <button onClick={handleWaitlistCta} className="btn-secondary w-full text-center block" type="button">
                   Upgrade to Premium Plus
-                </Link>
+                </button>
               </div>
             </div>
           </div>

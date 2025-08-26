@@ -244,23 +244,13 @@ export default function BillingPage() {
                 <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> 30 medical image analyses/day</li>
               </ul>
               <button
-                onClick={async () => {
-                  const plan = billingCycle === 'monthly' ? 'premium_monthly' : 'premium_yearly'
-                  try {
-                    const res = await fetch('/api/billing/create-checkout-session', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ plan })
-                    })
-                    const data = await res.json()
-                    if (data?.url) window.location.href = data.url
-                  } catch (e) {
-                    console.error('Checkout error', e)
-                  }
+                onClick={() => {
+                  alert('We are currently in the process of building this amazing application. If you would like to be notified the moment we go live, please sign up below on the homepage.')
+                  window.location.href = '/#waitlist-signup'
                 }}
                 className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors"
               >
-                {billingCycle === 'monthly' ? 'Upgrade to Premium – $20/mo' : 'Upgrade to Premium – $216/yr'}
+                {billingCycle === 'monthly' ? 'Start 7‑Day Free Trial' : 'Start 7‑Day Free Trial'}
               </button>
             </div>
 
@@ -280,23 +270,13 @@ export default function BillingPage() {
                 <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Priority support</li>
               </ul>
               <button
-                onClick={async () => {
-                  const plan = billingCycle === 'monthly' ? 'premium_plus_monthly' : 'premium_plus_yearly'
-                  try {
-                    const res = await fetch('/api/billing/create-checkout-session', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ plan })
-                    })
-                    const data = await res.json()
-                    if (data?.url) window.location.href = data.url
-                  } catch (e) {
-                    console.error('Checkout error', e)
-                  }
+                onClick={() => {
+                  alert('We are currently in the process of building this amazing application. If you would like to be notified the moment we go live, please sign up below on the homepage.')
+                  window.location.href = '/#waitlist-signup'
                 }}
                 className="w-full bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors"
               >
-                {billingCycle === 'monthly' ? 'Upgrade to Premium Plus – $30/mo' : 'Upgrade to Premium Plus – $312/yr'}
+                {billingCycle === 'monthly' ? 'Upgrade to Premium Plus' : 'Upgrade to Premium Plus'}
               </button>
             </div>
           </div>
@@ -311,18 +291,9 @@ export default function BillingPage() {
               <p className="text-2xl font-bold text-gray-900 mb-4">$5</p>
               <p className="text-sm text-gray-600 mb-6">Use for additional AI analyses. Credits never expire.</p>
               <button
-                onClick={async () => {
-                  try {
-                    const res = await fetch('/api/billing/create-checkout-session', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ plan: 'credits_100' })
-                    })
-                    const data = await res.json()
-                    if (data?.url) window.location.href = data.url
-                  } catch (e) {
-                    console.error('Checkout error', e)
-                  }
+                onClick={() => {
+                  alert('We are currently in the process of building this amazing application. If you would like to be notified the moment we go live, please sign up below on the homepage.')
+                  window.location.href = '/#waitlist-signup'
                 }}
                 className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors"
               >
