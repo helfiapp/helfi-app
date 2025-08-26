@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 
 const LABELS = [
   'Really bad',
@@ -22,7 +22,19 @@ const exampleIssues: UserIssue[] = [
 
 export default function CheckInPage() {
   const [ratings, setRatings] = useState<Record<string, number>>({})
-  const issues = useMemo(() => exampleIssues, [])
+  const [issues, setIssues] = useState<UserIssue[]>(exampleIssues)
+
+  useEffect(() => {
+    // Load actual issues if API is available
+    fetch('/api/checkins/today').then(r => r.json()).then((data) => {
+      if (Array.isArray(data?.issues)) setIssues(data.issues)
+      if (Array.isArray(data?.ratings)) {
+        const map: Record<string, number> = {}
+        for (const r of data.ratings) map[r.issueId] = r.value
+        setRatings(map)
+      }
+    }).catch(() => {})
+  }, [])
 
   const setRating = (issueId: string, value: number) => {
     setRatings((r) => ({ ...r, [issueId]: value }))
@@ -30,8 +42,10 @@ export default function CheckInPage() {
 
   const handleSave = async () => {
     try {
-      // TODO: POST to /api/checkins/today with ratings
-      alert('Saved today\'s ratings. (Scaffold)')
+      const payload = Object.entries(ratings).map(([issueId, value]) => ({ issueId, value }))
+      const res = await fetch('/api/checkins/today', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ratings: payload }) })
+      if (!res.ok) throw new Error('save failed')
+      alert('Saved today\'s ratings.')
     } catch (e) {
       alert('Failed to save. Please try again.')
     }
