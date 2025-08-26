@@ -29,7 +29,6 @@ export async function POST(request: Request) {
       premium_plus_monthly: process.env.STRIPE_PRICE_PREMIUM_PLUS_MONTHLY,
       premium_plus_yearly: process.env.STRIPE_PRICE_PREMIUM_PLUS_YEARLY,
       credits_100: process.env.STRIPE_PRICE_CREDITS_100,
-      credits_150: process.env.STRIPE_PRICE_CREDITS_150,
     }
 
     const priceId = requestedPlan ? PLAN_TO_PRICE[requestedPlan] : undefined
