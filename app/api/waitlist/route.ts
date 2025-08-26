@@ -5,8 +5,10 @@ import { extractAdminFromHeaders } from '@/lib/admin-auth'
 export async function POST(request: NextRequest) {
   try {
     const { email, name } = await request.json()
+    const normalizedEmail = (email || '').trim().toLowerCase()
+    const normalizedName = (name || '').trim()
 
-    if (!email || !name) {
+    if (!normalizedEmail || !normalizedName) {
       return NextResponse.json(
         { error: 'Name and email are required' },
         { status: 400 }
@@ -15,21 +17,22 @@ export async function POST(request: NextRequest) {
 
     // Check if email already exists
     const existingEntry = await prisma.waitlist.findUnique({
-      where: { email }
+      where: { email: normalizedEmail }
     })
 
     if (existingEntry) {
-      return NextResponse.json(
-        { error: 'Email already registered for waitlist' },
-        { status: 409 }
-      )
+      // Return a friendly success message to avoid alarming users
+      return NextResponse.json({
+        success: true,
+        message: 'You\'re already on the waitlist. We\'ll notify you when we go live.'
+      })
     }
 
     // Add to waitlist
     const waitlistEntry = await prisma.waitlist.create({
       data: {
-        email,
-        name
+        email: normalizedEmail,
+        name: normalizedName
       }
     })
 

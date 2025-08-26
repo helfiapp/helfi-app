@@ -919,17 +919,24 @@ export default function SplashPage() {
             <form className="space-y-4" onSubmit={(e) => {
               e.preventDefault();
               const formData = new FormData(e.currentTarget);
-              const email = formData.get('email') as string;
-              const name = formData.get('name') as string;
-              
-              // Send to your email collection endpoint
+              const email = String(formData.get('email') || '').trim().toLowerCase();
+              const name = String(formData.get('name') || '').trim();
+
               fetch('/api/waitlist', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, name })
-              }).then(() => {
-                alert('Thanks for joining our waitlist! We\'ll be in touch soon.');
-                (e.target as HTMLFormElement).reset();
+              }).then(async (res) => {
+                const data = await res.json().catch(() => ({}));
+                if (res.ok && data?.success) {
+                  alert(data.message || 'Thanks for joining our waitlist! We\'ll be in touch soon.');
+                  (e.target as HTMLFormElement).reset();
+                } else if (res.status === 409) {
+                  // Fallback in case older deployments still return 409
+                  alert('You\'re already on the waitlist. We\'ll notify you when we go live.');
+                } else {
+                  alert(data?.error || 'Something went wrong. Please try again.');
+                }
               }).catch(() => {
                 alert('Something went wrong. Please try again.');
               });
