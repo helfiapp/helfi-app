@@ -72,6 +72,15 @@ function DesktopSidebar() {
           
           <div className="border-t border-gray-200 mt-6 pt-6">
             <a
+              href="/check-in/history"
+              className="text-gray-700 hover:text-helfi-green hover:bg-gray-50 group flex items-center px-2 py-2 text-sm font-medium rounded-md"
+            >
+              <svg className="text-gray-400 group-hover:text-helfi-green mr-3 h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3M5 11h14M5 19h14M7 11v8m10-8v8" />
+              </svg>
+              Rating History
+            </a>
+            <a
               href="/settings"
               className="text-gray-700 hover:text-helfi-green hover:bg-gray-50 group flex items-center px-2 py-2 text-sm font-medium rounded-md"
             >
