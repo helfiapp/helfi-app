@@ -2,10 +2,10 @@
 
 Latest known-good deployment snapshot.
 
-- Commit: 90020f946d8dada940d33688a8c230f7f704354c (master)
+- Commit: e16ce4c (master)
 - Date: 2025-08-26
-- Title: Responsive updates (homepage, dashboard), billing fixes, pricing alignment
-- Reason: Live site verified responsive across devices; homepage/billing match Stripe plans; minor UI polish.
+- Title: Homepage/billing sandbox CTAs, pricing toggle, waitlist duplicate guard, disclaimer restyle
+- Reason: UI stable; billing sandbox safe; waitlist dedup prevents email spam; ready as current baseline.
 
 How to use
 - When a new version is verified “golden”, update this file with the new commit hash, date, and a brief reason.
