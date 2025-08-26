@@ -64,14 +64,17 @@ export default function CheckInPage() {
   return (
     <div className="min-h-screen bg-gray-50 px-4 py-8">
       <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-sm p-6">
-        <h1 className="text-2xl font-bold mb-2">Today\'s check‑in</h1>
+        <div className="flex items-center justify-between gap-4 mb-2">
+          <h1 className="text-2xl font-bold">Today's check‑in</h1>
+          <a href="/check-in/history" className="text-sm text-helfi-green hover:underline">View history</a>
+        </div>
         <p className="text-sm text-gray-600 mb-6">Rate how you went today. One tap per item, then Save.</p>
 
         <div className="space-y-6">
           {issues.map((issue) => {
             const question = issue.polarity === 'negative'
               ? `How were your ${issue.name} levels today?`
-              : `How were your ${issue.name} today?`
+              : `How was your ${issue.name} today?`
             const selected = ratings[issue.id]
             return (
               <div key={issue.id} className="border border-gray-200 rounded-xl p-4">
@@ -93,7 +96,7 @@ export default function CheckInPage() {
         </div>
 
         <div className="mt-6 flex justify-end">
-          <button onClick={handleSave} className="bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90">Save today\'s ratings</button>
+          <button onClick={handleSave} className="bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90">Save today's ratings</button>
         </div>
       </div>
     </div>
