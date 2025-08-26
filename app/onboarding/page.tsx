@@ -770,8 +770,47 @@ function HealthGoalsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
     }
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
+    // Proceed with existing onboarding flow first
     onNext({ goals, customGoals });
+
+    // If check-ins feature is enabled, save issues and offer opt-in immediately
+    try {
+      if (process.env.NEXT_PUBLIC_CHECKINS_ENABLED === 'true') {
+        const allIssues = [...goals, ...customGoals].map((name: string) => ({ name }));
+        if (allIssues.length) {
+          // Fire and forget; no need to block navigation
+          fetch('/api/checkins/issues', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ issues: allIssues })
+          }).catch(() => {});
+        }
+
+        // Simple, non-intrusive opt-in prompt (will be replaced with a modal later)
+        setTimeout(() => {
+          const enable = window.confirm(
+            'Daily Check‑ins\n\nTrack how you are going 3 times a day. This helps AI understand your progress and improves future reports.\n\nEnable now? (You can change this later in Settings)'
+          );
+          if (enable) {
+            const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            const t1 = window.prompt('Lunch reminder time (HH:MM)', '12:30') || '12:30';
+            const t2 = window.prompt('Evening reminder time (HH:MM)', '18:30') || '18:30';
+            const t3 = window.prompt('Bedtime reminder time (HH:MM)', '21:30') || '21:30';
+            fetch('/api/checkins/settings', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ time1: t1, time2: t2, time3: t3, timezone: tz })
+            }).finally(() => {
+              window.location.assign('/check-in');
+            });
+          }
+        }, 0);
+      }
+    } catch (e) {
+      // Silently ignore; onboarding should not break
+      console.warn('check-ins prompt error', e);
+    }
   };
 
   return (
