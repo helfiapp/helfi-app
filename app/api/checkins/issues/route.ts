@@ -32,7 +32,8 @@ export async function POST(req: NextRequest) {
         id TEXT PRIMARY KEY,
         userId TEXT NOT NULL,
         name TEXT NOT NULL,
-        polarity TEXT NOT NULL
+        polarity TEXT NOT NULL,
+        UNIQUE (userId, name)
       )
     `)
 
@@ -42,7 +43,8 @@ export async function POST(req: NextRequest) {
       const polarity = (item.polarity === 'negative' || /pain|ache|anxiety|depress|fatigue|nausea|bloat|insomnia|brain fog|headache|migraine|cramp|stress|itch|rash|acne|diarrh|constipat|gas|heartburn/i.test(name)) ? 'negative' : 'positive'
       const id = crypto.randomUUID()
       await prisma.$executeRawUnsafe(
-        `INSERT INTO CheckinIssues (id, userId, name, polarity) VALUES ($1,$2,$3,$4)`,
+        `INSERT INTO CheckinIssues (id, userId, name, polarity) VALUES ($1,$2,$3,$4)
+         ON CONFLICT (userId, name) DO UPDATE SET polarity=EXCLUDED.polarity`,
         id, user.id, name, polarity
       )
     }

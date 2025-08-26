@@ -27,7 +27,15 @@ export default function CheckInPage() {
   useEffect(() => {
     // Load actual issues if API is available
     fetch('/api/checkins/today').then(r => r.json()).then((data) => {
-      if (Array.isArray(data?.issues)) setIssues(data.issues)
+      if (Array.isArray(data?.issues)) {
+        const seen = new Set<string>()
+        const unique = [] as UserIssue[]
+        for (const it of data.issues as UserIssue[]) {
+          const key = (it.name || '').toLowerCase().trim()
+          if (!seen.has(key)) { seen.add(key); unique.push(it) }
+        }
+        setIssues(unique)
+      }
       if (Array.isArray(data?.ratings)) {
         const map: Record<string, number> = {}
         for (const r of data.ratings) map[r.issueId] = r.value
