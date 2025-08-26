@@ -40,6 +40,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
+        <link rel="manifest" href="/manifest.webmanifest" />
         <script
           dangerouslySetInnerHTML={{
             __html: `
@@ -69,6 +70,16 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html: `
+              // Register service worker if check-ins enabled
+              (function(){
+                try {
+                  var enabled = (process.env.NEXT_PUBLIC_CHECKINS_ENABLED === 'true');
+                  if ('serviceWorker' in navigator && enabled) {
+                    navigator.serviceWorker.register('/sw.js');
+                  }
+                } catch (e) {}
+              })();
+
               // Global dark mode toggle function
               window.toggleDarkMode = function(enabled) {
                 try {

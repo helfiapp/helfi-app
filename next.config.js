@@ -44,6 +44,7 @@ module.exports = {
     CLOUDINARY_API_KEY: process.env.CLOUDINARY_API_KEY,
     CLOUDINARY_API_SECRET: process.env.CLOUDINARY_API_SECRET,
     CLOUDINARY_URL: process.env.CLOUDINARY_URL,
+    NEXT_PUBLIC_CHECKINS_ENABLED: process.env.NEXT_PUBLIC_CHECKINS_ENABLED || 'false',
   },
   // Add headers to improve session stability
   async headers() {
