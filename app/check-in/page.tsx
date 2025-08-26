@@ -45,6 +45,16 @@ export default function CheckInPage() {
       const payload = Object.entries(ratings).map(([issueId, value]) => ({ issueId, value }))
       const res = await fetch('/api/checkins/today', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ratings: payload }) })
       if (!res.ok) throw new Error('save failed')
+      // Navigate back to where the user came from, if provided
+      try {
+        const search = typeof window !== 'undefined' ? window.location.search : ''
+        const params = new URLSearchParams(search)
+        const back = params.get('return') || (document.referrer && !document.referrer.includes('/check-in') ? document.referrer : '')
+        if (back) {
+          window.location.assign(back)
+          return
+        }
+      } catch {}
       alert('Saved today\'s ratings.')
     } catch (e) {
       alert('Failed to save. Please try again.')
