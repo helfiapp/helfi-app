@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
       )
     `)
     await prisma.$executeRawUnsafe(
-      `INSERT INTO PushSubscriptions (userId, subscription) VALUES ($1, $2)
+      `INSERT INTO PushSubscriptions (userId, subscription) VALUES ($1, $2::jsonb)
        ON CONFLICT (userId) DO UPDATE SET subscription=EXCLUDED.subscription`,
       user.id, JSON.stringify(subscription)
     )
