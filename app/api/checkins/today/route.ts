@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
         PRIMARY KEY (userId, issueId, date)
       )
     `)
-    for (const r of ratings as Array<{ issueId: string, value: number }>) {
+    for (const r of ratings as Array<{ issueId: string, value?: number | null, note?: string, isNa?: boolean }>) {
       const clamped = (r.value === null || r.value === undefined) ? null : Math.max(0, Math.min(6, Number(r.value)))
       await prisma.$executeRawUnsafe(
         `INSERT INTO CheckinRatings (userId, issueId, date, value, note, isNa) VALUES ($1,$2,$3,$4,$5,$6)
