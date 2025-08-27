@@ -794,27 +794,26 @@ function HealthGoalsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
   };
 
   const handleNext = async () => {
-    // Proceed with existing onboarding flow first
-    onNext({ goals, customGoals });
-
-    // If check-ins feature is enabled, save issues and offer opt-in immediately
+    // If check-ins feature is enabled, handle check-ins first to avoid step-5 flash
     try {
       if (process.env.NEXT_PUBLIC_CHECKINS_ENABLED === 'true') {
         const allIssues = [...goals, ...customGoals].map((name: string) => ({ name }));
-        // Load previously saved names to detect newly added ones
-        let previousNames: string[] = []
-        try {
-          const prevRes = await fetch('/api/checkins/issues', { cache: 'no-store' as any })
-          if (prevRes.ok) {
-            const prevJson = await prevRes.json()
-            previousNames = Array.isArray(prevJson?.issues)
-              ? prevJson.issues.map((i: any) => String(i.name || '').trim()).filter(Boolean)
-              : []
-          }
-        } catch {}
+        // Kick off previous list load in parallel to minimize latency
+        const previousPromise = (async () => {
+          try {
+            const prevRes = await fetch('/api/checkins/issues', { cache: 'no-store' as any })
+            if (prevRes.ok) {
+              const prevJson = await prevRes.json()
+              return Array.isArray(prevJson?.issues)
+                ? prevJson.issues.map((i: any) => String(i.name || '').trim()).filter(Boolean)
+                : []
+            }
+          } catch {}
+          return [] as string[]
+        })()
 
         if (allIssues.length) {
-          // Ensure issues are saved before we potentially navigate
+          // Save current issues; only await this (single request) then navigate
           await fetch('/api/checkins/issues', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -832,6 +831,8 @@ function HealthGoalsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
         } catch {}
 
         if (!hasSettings) {
+          // First-time onboarding: progress the local step state too
+          onNext({ goals, customGoals });
           // Only ask once when not configured
           const enable = window.confirm(
             'Daily Check‑ins\n\nTrack how you are going 1–3 times a day. This helps AI understand your progress and improves future reports.\n\nEnable now? (You can change this later in Settings)'
@@ -847,19 +848,23 @@ function HealthGoalsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
               body: JSON.stringify({ time1: t1, time2: t2, time3: t3, timezone: tz, frequency: 3 })
             }).catch(() => {});
           }
-        }
+        } // else: returning user, do not advance step here
         // Compute newly added names compared to previous selection
         const currentNames = allIssues.map(i => i.name.trim())
-        const prevSet = new Set(previousNames.map(n => n.toLowerCase()))
+        const previousNames = await previousPromise
+        const prevSet = new Set(previousNames.map((n: string) => n.toLowerCase()))
         const newlyAdded = currentNames.filter(n => !prevSet.has(n.toLowerCase()))
         const query = newlyAdded.length ? ('?new=' + encodeURIComponent(newlyAdded.join('|'))) : ''
         // Navigate instantly; avoid intermediate step-5 flash by replacing instead of normal navigation
         window.location.replace('/check-in' + query);
+        return
       }
     } catch (e) {
       // Silently ignore; onboarding should not break
       console.warn('check-ins prompt error', e);
     }
+    // Fallback if feature is disabled or an error occurred
+    onNext({ goals, customGoals });
   };
 
   return (
