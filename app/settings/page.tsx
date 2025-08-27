@@ -81,6 +81,23 @@ export default function Settings() {
     // TODO: Send to backend API to update user preferences
   }, [pushNotifications])
 
+  // Detect existing subscription on load and reflect in UI
+  useEffect(() => {
+    (async () => {
+      try {
+        if ('serviceWorker' in navigator) {
+          const reg = await navigator.serviceWorker.getRegistration()
+          if (reg) {
+            const sub = await reg.pushManager.getSubscription()
+            if (sub && Notification.permission === 'granted') {
+              setPushNotifications(true)
+            }
+          }
+        }
+      } catch {}
+    })()
+  }, [])
+
   // Auto-save profile visibility
   useEffect(() => {
     localStorage.setItem('profileVisibility', profileVisibility)
@@ -161,8 +178,8 @@ export default function Settings() {
     
     setPushNotifications(enabled)
     
-    // Request actual push notification permission for non-iOS devices
-    if (enabled && !isIOS && 'Notification' in window) {
+    // Request permission and subscribe (works for Android, Desktop, and iOS PWA 16.4+)
+    if (enabled && 'Notification' in window) {
       const permission = await Notification.requestPermission()
       if (permission !== 'granted') {
         setPushNotifications(false)
@@ -171,7 +188,8 @@ export default function Settings() {
       }
       // Register service worker and subscribe
       try {
-        const reg = await navigator.serviceWorker.register('/sw.js')
+        // Ensure service worker is registered
+        const reg = (await navigator.serviceWorker.getRegistration()) || (await navigator.serviceWorker.register('/sw.js'))
         const vapid = await fetch('/api/push/vapid').then(r=>r.json()).catch(()=>({ publicKey: '' }))
         if (!vapid.publicKey) {
           alert('Notifications are not yet fully enabled by the server. Please try again later.')
@@ -179,7 +197,7 @@ export default function Settings() {
         }
         const sub = await reg.pushManager.subscribe({
           userVisibleOnly: true,
-          applicationServerKey: (window as any).Uint8Array ? urlBase64ToUint8Array(vapid.publicKey) : vapid.publicKey
+          applicationServerKey: urlBase64ToUint8Array(vapid.publicKey)
         })
         await fetch('/api/push/subscribe', {
           method: 'POST',
