@@ -20,6 +20,12 @@ export async function GET() {
         UNIQUE (userId, name)
       )
     `)
+    // Remove historical duplicates before creating unique index
+    await prisma.$executeRawUnsafe(`
+      DELETE FROM CheckinIssues a
+      USING CheckinIssues b
+      WHERE a.id > b.id AND a.userId = b.userId AND a.name = b.name
+    `)
     // Ensure composite unique index exists even if table was created earlier without it
     await prisma.$executeRawUnsafe(`
       CREATE UNIQUE INDEX IF NOT EXISTS checkinissues_user_name_idx ON CheckinIssues (userId, name)
@@ -48,6 +54,12 @@ export async function POST(req: NextRequest) {
         polarity TEXT NOT NULL,
         UNIQUE (userId, name)
       )
+    `)
+    // Remove duplicates across all users to allow unique index
+    await prisma.$executeRawUnsafe(`
+      DELETE FROM CheckinIssues a
+      USING CheckinIssues b
+      WHERE a.id > b.id AND a.userId = b.userId AND a.name = b.name
     `)
     // Backfill unique composite index for existing tables
     await prisma.$executeRawUnsafe(`
