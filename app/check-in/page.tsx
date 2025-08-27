@@ -21,7 +21,9 @@ const exampleIssues: UserIssue[] = [
 ]
 
 export default function CheckInPage() {
-  const [ratings, setRatings] = useState<Record<string, number>>({})
+  const [ratings, setRatings] = useState<Record<string, number | null>>({})
+  const [notes, setNotes] = useState<Record<string, string>>({})
+  const [na, setNa] = useState<Record<string, boolean>>({})
   const [issues, setIssues] = useState<UserIssue[]>(exampleIssues)
 
   useEffect(() => {
@@ -46,11 +48,17 @@ export default function CheckInPage() {
 
   const setRating = (issueId: string, value: number) => {
     setRatings((r) => ({ ...r, [issueId]: value }))
+    setNa((n) => ({ ...n, [issueId]: false }))
   }
 
   const handleSave = async () => {
     try {
-      const payload = Object.entries(ratings).map(([issueId, value]) => ({ issueId, value }))
+      const payload = issues.map((it) => ({
+        issueId: it.id,
+        value: na[it.id] ? null : (ratings[it.id] ?? null),
+        note: notes[it.id] || '',
+        isNa: !!na[it.id],
+      }))
       const res = await fetch('/api/checkins/today', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ratings: payload }) })
       if (!res.ok) throw new Error('save failed')
       // Navigate back to where the user came from, if provided
@@ -92,11 +100,28 @@ export default function CheckInPage() {
                     <button
                       key={idx}
                       onClick={() => setRating(issue.id, idx)}
-                      className={`text-xs px-2 py-2 rounded-lg border transition-colors ${selected === idx ? 'bg-helfi-green text-white border-helfi-green' : 'bg-white text-gray-700 border-gray-200 hover:border-helfi-green'}`}
+                      className={`text-xs px-2 py-2 rounded-lg border transition-colors ${selected === idx && !na[issue.id] ? 'bg-helfi-green text-white border-helfi-green' : 'bg-white text-gray-700 border-gray-200 hover:border-helfi-green'}`}
                     >
                       {label}
                     </button>
                   ))}
+                </div>
+                {/* Optional details accordion */}
+                <details className="mt-3">
+                  <summary className="text-sm text-gray-600 cursor-pointer select-none">Add details (optional)</summary>
+                  <textarea
+                    value={notes[issue.id] || ''}
+                    onChange={(e)=>setNotes((m)=>({ ...m, [issue.id]: e.target.value }))}
+                    rows={3}
+                    placeholder="Anything notable today?"
+                    className="mt-2 w-full border rounded-lg p-2 text-sm"
+                  />
+                </details>
+                <div className="mt-3">
+                  <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+                    <input type="checkbox" checked={!!na[issue.id]} onChange={(e)=> setNa((m)=>({ ...m, [issue.id]: e.target.checked }))} />
+                    Not applicable for this time
+                  </label>
                 </div>
               </div>
             )

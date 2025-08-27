@@ -25,7 +25,9 @@ export async function GET() {
         userId TEXT NOT NULL,
         issueId TEXT NOT NULL,
         date TEXT NOT NULL,
-        value INTEGER NOT NULL,
+        value INTEGER,
+        note TEXT,
+        isNa BOOLEAN DEFAULT false,
         PRIMARY KEY (userId, issueId, date)
       )
     `)
@@ -57,10 +59,11 @@ export async function POST(req: NextRequest) {
       )
     `)
     for (const r of ratings as Array<{ issueId: string, value: number }>) {
+      const clamped = (r.value === null || r.value === undefined) ? null : Math.max(0, Math.min(6, Number(r.value)))
       await prisma.$executeRawUnsafe(
-        `INSERT INTO CheckinRatings (userId, issueId, date, value) VALUES ($1,$2,$3,$4)
-         ON CONFLICT (userId, issueId, date) DO UPDATE SET value=EXCLUDED.value`,
-        user.id, r.issueId, today, Math.max(0, Math.min(6, Number(r.value)))
+        `INSERT INTO CheckinRatings (userId, issueId, date, value, note, isNa) VALUES ($1,$2,$3,$4,$5,$6)
+         ON CONFLICT (userId, issueId, date) DO UPDATE SET value=EXCLUDED.value, note=EXCLUDED.note, isNa=EXCLUDED.isNa`,
+        user.id, r.issueId, today, clamped, String(r.note || ''), !!r.isNa
       )
     }
     return NextResponse.json({ success: true })
