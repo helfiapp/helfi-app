@@ -55,15 +55,20 @@ export default function CheckInPage() {
       }))
       const res = await fetch('/api/checkins/today', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ratings: payload }) })
       if (!res.ok) throw new Error('save failed')
-      // Navigate back to where the user came from, if provided
+      // Navigate after save
       try {
         const search = typeof window !== 'undefined' ? window.location.search : ''
         const params = new URLSearchParams(search)
-        const back = params.get('return') || (document.referrer && !document.referrer.includes('/check-in') ? document.referrer : '')
-        if (back) {
-          window.location.assign(back)
+        const ret = params.get('return') || ''
+        const ref = document.referrer || ''
+        const cameFromOnboarding = ret.includes('/onboarding') || ref.includes('/onboarding')
+        if (cameFromOnboarding) {
+          window.location.assign('/onboarding?step=5')
           return
         }
+        // Default: go to dashboard after adding an entry from anywhere else
+        window.location.assign('/dashboard')
+        return
       } catch {}
       alert('Saved today\'s ratings.')
     } catch (e) {
