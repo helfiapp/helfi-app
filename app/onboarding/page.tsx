@@ -687,7 +687,7 @@ function HealthGoalsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
     try {
       const already = Array.isArray(initial?.goals) && initial!.goals.length > 0
       if (already) return
-      fetch('/api/checkins/issues')
+      fetch('/api/checkins/issues', { cache: 'no-store' as any })
         .then((r) => r.ok ? r.json() : null)
         .then((data) => {
           const names: string[] = Array.isArray(data?.issues) ? data.issues.map((i: any) => String(i.name || '')) : []

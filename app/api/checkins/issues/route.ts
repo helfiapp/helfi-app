@@ -11,6 +11,15 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
   try {
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS CheckinIssues (
+        id TEXT PRIMARY KEY,
+        userId TEXT NOT NULL,
+        name TEXT NOT NULL,
+        polarity TEXT NOT NULL,
+        UNIQUE (userId, name)
+      )
+    `)
     const rows: any[] = await prisma.$queryRawUnsafe(`SELECT id, name, polarity FROM CheckinIssues WHERE userId = $1`, user.id)
     return NextResponse.json({ issues: rows })
   } catch {

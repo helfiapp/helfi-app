@@ -36,7 +36,7 @@ export default function CheckInPage() {
           const key = (it.name || '').toLowerCase().trim()
           if (!seen.has(key)) { seen.add(key); unique.push(it) }
         }
-        setIssues(unique)
+        if (unique.length > 0) setIssues(unique)
       }
       if (Array.isArray(data?.ratings)) {
         const map: Record<string, number> = {}
@@ -87,6 +87,11 @@ export default function CheckInPage() {
         <p className="text-sm text-gray-600 mb-6">Rate how you went today. One tap per item, then Save.</p>
 
         <div className="space-y-6">
+          {issues.length === 0 && (
+            <div className="border border-yellow-200 bg-yellow-50 text-yellow-800 rounded-xl p-4 text-sm">
+              No issues selected yet. Go to <a className="underline" href="/onboarding?step=4">Health Setup</a> to choose what you want to track.
+            </div>
+          )}
           {issues.map((issue) => {
             const question = issue.polarity === 'negative'
               ? `How were your ${issue.name} levels today?`
