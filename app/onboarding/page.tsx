@@ -809,23 +809,35 @@ function HealthGoalsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
             body: JSON.stringify({ issues: allIssues })
           }).catch(() => {});
         }
+        // If settings already exist, skip prompts entirely
+        let hasSettings = false
+        try {
+          const s = await fetch('/api/checkins/settings', { cache: 'no-store' as any })
+          if (s.ok) {
+            const j = await s.json()
+            if (j && (j.time1 || j.frequency)) hasSettings = true
+          }
+        } catch {}
 
-        // Simple, non-intrusive opt-in prompt (will be replaced with a modal later)
-        const enable = window.confirm(
-          'Daily Check‑ins\n\nTrack how you are going 1–3 times a day. This helps AI understand your progress and improves future reports.\n\nEnable now? (You can change this later in Settings)'
-        );
-        if (enable) {
-          const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-          const t1 = window.prompt('Lunch reminder time (HH:MM)', '12:30') || '12:30';
-          const t2 = window.prompt('Evening reminder time (HH:MM)', '18:30') || '18:30';
-          const t3 = window.prompt('Bedtime reminder time (HH:MM)', '21:30') || '21:30';
-          await fetch('/api/checkins/settings', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ time1: t1, time2: t2, time3: t3, timezone: tz, frequency: 3 })
-          }).catch(() => {});
-          window.location.assign('/check-in?return=' + encodeURIComponent(window.location.pathname));
+        if (!hasSettings) {
+          // Only ask once when not configured
+          const enable = window.confirm(
+            'Daily Check‑ins\n\nTrack how you are going 1–3 times a day. This helps AI understand your progress and improves future reports.\n\nEnable now? (You can change this later in Settings)'
+          );
+          if (enable) {
+            const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            const t1 = window.prompt('Lunch reminder time (HH:MM)', '12:30') || '12:30';
+            const t2 = window.prompt('Evening reminder time (HH:MM)', '18:30') || '18:30';
+            const t3 = window.prompt('Bedtime reminder time (HH:MM)', '21:30') || '21:30';
+            await fetch('/api/checkins/settings', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ time1: t1, time2: t2, time3: t3, timezone: tz, frequency: 3 })
+            }).catch(() => {});
+          }
         }
+        // Navigate to unrated-only view
+        window.location.assign('/check-in');
       }
     } catch (e) {
       // Silently ignore; onboarding should not break
