@@ -20,6 +20,10 @@ export async function GET() {
         UNIQUE (userId, name)
       )
     `)
+    // Ensure composite unique index exists even if table was created earlier without it
+    await prisma.$executeRawUnsafe(`
+      CREATE UNIQUE INDEX IF NOT EXISTS checkinissues_user_name_idx ON CheckinIssues (userId, name)
+    `)
     const rows: any[] = await prisma.$queryRawUnsafe(`SELECT id, name, polarity FROM CheckinIssues WHERE userId = $1`, user.id)
     return NextResponse.json({ issues: rows })
   } catch {
@@ -44,6 +48,10 @@ export async function POST(req: NextRequest) {
         polarity TEXT NOT NULL,
         UNIQUE (userId, name)
       )
+    `)
+    // Backfill unique composite index for existing tables
+    await prisma.$executeRawUnsafe(`
+      CREATE UNIQUE INDEX IF NOT EXISTS checkinissues_user_name_idx ON CheckinIssues (userId, name)
     `)
 
     for (const item of issues) {
