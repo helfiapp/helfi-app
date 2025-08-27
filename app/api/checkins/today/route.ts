@@ -31,6 +31,25 @@ export async function GET() {
         PRIMARY KEY (userId, issueId, date)
       )
     `)
+    // Ensure columns exist for older tables
+    await prisma.$executeRawUnsafe(`
+      ALTER TABLE CheckinRatings ALTER COLUMN value DROP NOT NULL;
+    `).catch(()=>{})
+    await prisma.$executeRawUnsafe(`
+      ALTER TABLE CheckinRatings ADD COLUMN IF NOT EXISTS note TEXT;
+    `).catch(()=>{})
+    await prisma.$executeRawUnsafe(`
+      ALTER TABLE CheckinRatings ADD COLUMN IF NOT EXISTS isNa BOOLEAN DEFAULT false;
+    `).catch(()=>{})
+    // Migrate earlier schema variants to current shape
+    // 1) Ensure note column exists
+    await prisma.$executeRawUnsafe(`ALTER TABLE CheckinRatings ADD COLUMN IF NOT EXISTS note TEXT`)
+    // 2) Ensure isNa column exists
+    await prisma.$executeRawUnsafe(`ALTER TABLE CheckinRatings ADD COLUMN IF NOT EXISTS isNa BOOLEAN DEFAULT false`)
+    // 3) Ensure value column is nullable (some earlier tables had NOT NULL)
+    try {
+      await prisma.$executeRawUnsafe(`ALTER TABLE CheckinRatings ALTER COLUMN value DROP NOT NULL`)
+    } catch { /* ignore if already nullable */ }
   } catch {}
 
   const issues: any[] = await prisma.$queryRawUnsafe(`SELECT id, name, polarity FROM CheckinIssues WHERE userId = $1`, user.id)
@@ -54,10 +73,16 @@ export async function POST(req: NextRequest) {
         userId TEXT NOT NULL,
         issueId TEXT NOT NULL,
         date TEXT NOT NULL,
-        value INTEGER NOT NULL,
+        value INTEGER,
+        note TEXT,
+        isNa BOOLEAN DEFAULT false,
         PRIMARY KEY (userId, issueId, date)
       )
     `)
+    // Ensure columns/nullability exist for older tables
+    try { await prisma.$executeRawUnsafe(`ALTER TABLE CheckinRatings ADD COLUMN IF NOT EXISTS note TEXT`) } catch(_) {}
+    try { await prisma.$executeRawUnsafe(`ALTER TABLE CheckinRatings ADD COLUMN IF NOT EXISTS isNa BOOLEAN DEFAULT false`) } catch(_) {}
+    try { await prisma.$executeRawUnsafe(`ALTER TABLE CheckinRatings ALTER COLUMN value DROP NOT NULL`) } catch(_) {}
     for (const r of ratings as Array<{ issueId: string, value?: number | null, note?: string, isNa?: boolean }>) {
       const clamped = (r.value === null || r.value === undefined) ? null : Math.max(0, Math.min(6, Number(r.value)))
       await prisma.$executeRawUnsafe(
