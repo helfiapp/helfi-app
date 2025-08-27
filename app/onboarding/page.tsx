@@ -853,7 +853,8 @@ function HealthGoalsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
         const prevSet = new Set(previousNames.map(n => n.toLowerCase()))
         const newlyAdded = currentNames.filter(n => !prevSet.has(n.toLowerCase()))
         const query = newlyAdded.length ? ('?new=' + encodeURIComponent(newlyAdded.join('|'))) : ''
-        window.location.assign('/check-in' + query);
+        // Navigate instantly; avoid intermediate step-5 flash by replacing instead of normal navigation
+        window.location.replace('/check-in' + query);
       }
     } catch (e) {
       // Silently ignore; onboarding should not break

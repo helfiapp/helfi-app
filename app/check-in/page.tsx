@@ -107,9 +107,17 @@ export default function CheckInPage() {
               return ratings[it.id] === undefined || ratings[it.id] === null
             })
             .map((issue) => {
+            const isPlural = () => {
+              const n = (issue.name || '').trim()
+              // Simple plural detection with common exceptions
+              // Treat words like "Bowel Movements", "Movements", "Allergies" as plural
+              if (/\b(movements|allergies|bowels|bowel movements)\b/i.test(n)) return true
+              // Ends with 's' and not 'ss' → likely plural (e.g., "Headaches", "Rashes")
+              return /[^s]s$/i.test(n)
+            }
             const question = issue.polarity === 'negative'
               ? `How were your ${issue.name} levels today?`
-              : `How was your ${issue.name} today?`
+              : (isPlural() ? `How were your ${issue.name} today?` : `How was your ${issue.name} today?`)
             const selected = ratings[issue.id]
             return (
               <div key={issue.id} className="border border-gray-200 rounded-xl p-4">
