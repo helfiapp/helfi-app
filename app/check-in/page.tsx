@@ -61,12 +61,19 @@ export default function CheckInPage() {
         const params = new URLSearchParams(search)
         const ret = params.get('return') || ''
         const ref = document.referrer || ''
+        const isEditMode = !!params.get('new')
         const cameFromOnboarding = ret.includes('/onboarding') || ref.includes('/onboarding')
+        if (isEditMode) {
+          // When adding issues after onboarding, go straight to dashboard
+          window.location.assign('/dashboard')
+          return
+        }
         if (cameFromOnboarding) {
+          // First-time onboarding flow
           window.location.assign('/onboarding?step=5')
           return
         }
-        // Default: go to dashboard after adding an entry from anywhere else
+        // Default
         window.location.assign('/dashboard')
         return
       } catch {}
