@@ -91,7 +91,16 @@ export default function CheckInPage() {
               No issues selected yet. Go to <a className="underline" href="/onboarding?step=4">Health Setup</a> to choose what you want to track.
             </div>
           )}
-          {issues.map((issue) => {
+          {issues
+            // By default, show only issues not yet rated today. Use ?show=all to display everything.
+            .filter((it) => {
+              try {
+                const params = new URLSearchParams(window.location.search || '')
+                if (params.get('show') === 'all') return true
+              } catch {}
+              return ratings[it.id] === undefined || ratings[it.id] === null
+            })
+            .map((issue) => {
             const question = issue.polarity === 'negative'
               ? `How were your ${issue.name} levels today?`
               : `How was your ${issue.name} today?`
