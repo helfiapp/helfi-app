@@ -96,6 +96,12 @@ export default function CheckInPage() {
             .filter((it) => {
               try {
                 const params = new URLSearchParams(window.location.search || '')
+                // If ?new= is present, show only those newly added issues
+                const onlyNew = params.get('new')
+                if (onlyNew) {
+                  const set = new Set(onlyNew.split('|').map(s => s.toLowerCase()))
+                  return set.has((it.name || '').toLowerCase())
+                }
                 if (params.get('show') === 'all') return true
               } catch {}
               return ratings[it.id] === undefined || ratings[it.id] === null

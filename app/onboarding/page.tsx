@@ -801,6 +801,18 @@ function HealthGoalsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
     try {
       if (process.env.NEXT_PUBLIC_CHECKINS_ENABLED === 'true') {
         const allIssues = [...goals, ...customGoals].map((name: string) => ({ name }));
+        // Load previously saved names to detect newly added ones
+        let previousNames: string[] = []
+        try {
+          const prevRes = await fetch('/api/checkins/issues', { cache: 'no-store' as any })
+          if (prevRes.ok) {
+            const prevJson = await prevRes.json()
+            previousNames = Array.isArray(prevJson?.issues)
+              ? prevJson.issues.map((i: any) => String(i.name || '').trim()).filter(Boolean)
+              : []
+          }
+        } catch {}
+
         if (allIssues.length) {
           // Ensure issues are saved before we potentially navigate
           await fetch('/api/checkins/issues', {
@@ -836,8 +848,12 @@ function HealthGoalsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
             }).catch(() => {});
           }
         }
-        // Navigate to unrated-only view
-        window.location.assign('/check-in');
+        // Compute newly added names compared to previous selection
+        const currentNames = allIssues.map(i => i.name.trim())
+        const prevSet = new Set(previousNames.map(n => n.toLowerCase()))
+        const newlyAdded = currentNames.filter(n => !prevSet.has(n.toLowerCase()))
+        const query = newlyAdded.length ? ('?new=' + encodeURIComponent(newlyAdded.join('|'))) : ''
+        window.location.assign('/check-in' + query);
       }
     } catch (e) {
       // Silently ignore; onboarding should not break
