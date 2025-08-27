@@ -51,7 +51,8 @@ export async function POST(req: NextRequest) {
       if (!name) continue
       const polarity = (item.polarity === 'negative' || /pain|ache|anxiety|depress|fatigue|nausea|bloat|insomnia|brain fog|headache|migraine|cramp|stress|itch|rash|acne|diarrh|constipat|gas|heartburn/i.test(name)) ? 'negative' : 'positive'
       const id = crypto.randomUUID()
-      await prisma.$executeRawUnsafe(
+      // Use queryRawUnsafe for broad compatibility; ON CONFLICT upserts by (userId,name)
+      await prisma.$queryRawUnsafe(
         `INSERT INTO CheckinIssues (id, userId, name, polarity) VALUES ($1,$2,$3,$4)
          ON CONFLICT (userId, name) DO UPDATE SET polarity=EXCLUDED.polarity`,
         id, user.id, name, polarity
@@ -60,7 +61,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true })
   } catch (e) {
     console.error('checkins issues save error', e)
-    return NextResponse.json({ error: 'Failed to save issues' }, { status: 500 })
+    return NextResponse.json({ error: (e as any)?.message || 'Failed to save issues' }, { status: 500 })
   }
 }
 
