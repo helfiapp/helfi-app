@@ -14,21 +14,15 @@ const LABELS = [
 
 type UserIssue = { id: string; name: string; polarity: 'positive' | 'negative' }
 
-// Placeholder issues until backend wiring; will be replaced by API data
-const exampleIssues: UserIssue[] = [
-  { id: '1', name: 'Energy', polarity: 'positive' },
-  { id: '2', name: 'Anxiety', polarity: 'negative' },
-]
-
 export default function CheckInPage() {
   const [ratings, setRatings] = useState<Record<string, number | null>>({})
   const [notes, setNotes] = useState<Record<string, string>>({})
   const [na, setNa] = useState<Record<string, boolean>>({})
-  const [issues, setIssues] = useState<UserIssue[]>(exampleIssues)
+  const [issues, setIssues] = useState<UserIssue[]>([])
 
   useEffect(() => {
     // Load actual issues if API is available
-    fetch('/api/checkins/today').then(r => r.json()).then((data) => {
+    fetch('/api/checkins/today', { cache: 'no-store' as any }).then(r => r.json()).then((data) => {
       if (Array.isArray(data?.issues)) {
         const seen = new Set<string>()
         const unique = [] as UserIssue[]
