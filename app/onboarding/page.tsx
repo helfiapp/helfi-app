@@ -725,6 +725,16 @@ function HealthGoalsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
     setSelectedSuggestionIndex(-1);
   };
 
+  const loadSaved = () => {
+    fetch('/api/checkins/issues', { cache: 'no-store' as any, credentials: 'same-origin' as any })
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        const names: string[] = Array.isArray(data?.issues) ? data.issues.map((i: any) => String(i.name || '')) : []
+        const unique = Array.from(new Set(names.filter(Boolean)))
+        if (unique.length) setGoals(unique)
+      }).catch(() => {})
+  }
+
   const handleSearchFocus = () => {
     setShowSuggestions(true);
   };
@@ -842,6 +852,9 @@ function HealthGoalsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
         <p className="mb-6 text-gray-600">
           Search and select the areas you'd like to focus on. You can add custom concerns too! 🎯
         </p>
+        <div className="mb-4">
+          <button onClick={loadSaved} className="text-sm text-helfi-green underline">Load saved choices</button>
+        </div>
         
         {/* Selected Goals as Chips */}
         {goals.length > 0 && (
