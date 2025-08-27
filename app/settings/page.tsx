@@ -148,7 +148,7 @@ export default function Settings() {
   }
 
   // Handle push notifications toggle with iOS detection
-  const handlePushNotificationToggle = (enabled: boolean) => {
+  const handlePushNotificationToggle = async (enabled: boolean) => {
     if (isIOS && enabled) {
       alert('Push notifications are not available on iOS Safari. This is an Apple limitation to encourage native app downloads. Push notifications work great on Android and desktop browsers!')
       return
@@ -158,13 +158,52 @@ export default function Settings() {
     
     // Request actual push notification permission for non-iOS devices
     if (enabled && !isIOS && 'Notification' in window) {
-      Notification.requestPermission().then(permission => {
-        if (permission !== 'granted') {
-          setPushNotifications(false)
-          alert('Push notifications were denied. Please enable them in your browser settings.')
+      const permission = await Notification.requestPermission()
+      if (permission !== 'granted') {
+        setPushNotifications(false)
+        alert('Push notifications were denied. Please enable them in your browser settings.')
+        return
+      }
+      // Register service worker and subscribe
+      try {
+        const reg = await navigator.serviceWorker.register('/sw.js')
+        const vapid = await fetch('/api/push/vapid').then(r=>r.json()).catch(()=>({ publicKey: '' }))
+        if (!vapid.publicKey) {
+          alert('Notifications are not yet fully enabled by the server. Please try again later.')
+          return
         }
-      })
+        const sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: (window as any).Uint8Array ? urlBase64ToUint8Array(vapid.publicKey) : vapid.publicKey
+        })
+        await fetch('/api/push/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ subscription: sub })
+        })
+        alert('Notifications enabled')
+      } catch (e) {
+        console.error('push enable error', e)
+        alert('Could not enable notifications on this device.')
+      }
     }
+    if (!enabled) {
+      try {
+        await fetch('/api/push/unsubscribe', { method: 'POST' })
+      } catch {}
+    }
+  }
+
+  // Helper for VAPID key format
+  function urlBase64ToUint8Array(base64String: string) {
+    const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
+    const rawData = window.atob(base64)
+    const outputArray = new Uint8Array(rawData.length)
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i)
+    }
+    return outputArray
   }
 
   // Profile data - using consistent green avatar from UserDataProvider
