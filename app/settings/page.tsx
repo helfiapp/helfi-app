@@ -27,6 +27,7 @@ export default function Settings() {
   
   // iOS detection for push notifications
   const [isIOS, setIsIOS] = useState(false)
+  const [isInstalled, setIsInstalled] = useState(false)
 
   // Initialize settings from localStorage
   useEffect(() => {
@@ -46,6 +47,10 @@ export default function Settings() {
     const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
                        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
     setIsIOS(isIOSDevice)
+    // Detect installed PWA/standalone
+    const standalone = (window.navigator as any).standalone === true || 
+      (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
+    setIsInstalled(standalone)
     
     // Listen for dark mode changes from other sources
     const handleDarkModeChange = (e: CustomEvent) => {
@@ -149,8 +154,8 @@ export default function Settings() {
 
   // Handle push notifications toggle with iOS detection
   const handlePushNotificationToggle = async (enabled: boolean) => {
-    if (isIOS && enabled) {
-      alert('Push notifications are not available on iOS Safari. This is an Apple limitation to encourage native app downloads. Push notifications work great on Android and desktop browsers!')
+    if (isIOS && !isInstalled && enabled) {
+      alert('To enable notifications on iPhone, first Add to Home Screen, then open the Helfi app icon and enable here.')
       return
     }
     
@@ -357,23 +362,27 @@ export default function Settings() {
                 <div>
                   <h3 className="font-medium text-gray-900 dark:text-white">Push Notifications</h3>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
-                    {isIOS 
-                      ? 'Not available on iOS Safari (Apple limitation)' 
-                      : 'Get push notifications on your device'
-                    }
+                    {isIOS && !isInstalled
+                      ? 'On iPhone: Add to Home Screen, then open the app to enable'
+                      : 'Get daily check‑in reminders on this device'}
                   </p>
                 </div>
-                <label className={`relative inline-flex items-center ${isIOS ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                <label className={`relative inline-flex items-center ${(isIOS && !isInstalled) ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
                   <input 
                     type="checkbox" 
                     className="sr-only peer" 
                     checked={pushNotifications}
-                    disabled={isIOS}
+                    disabled={isIOS && !isInstalled}
                     onChange={(e) => handlePushNotificationToggle(e.target.checked)}
                   />
-                  <div className={`w-11 h-6 ${isIOS ? 'bg-gray-100 dark:bg-gray-600' : 'bg-gray-200'} peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-helfi-green/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all ${isIOS ? '' : 'peer-checked:bg-helfi-green'} ${isIOS ? 'opacity-50' : ''}`}></div>
+                  <div className={`w-11 h-6 ${(isIOS && !isInstalled) ? 'bg-gray-100 dark:bg-gray-600' : 'bg-gray-200'} peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-helfi-green/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all ${(isIOS && !isInstalled) ? '' : 'peer-checked:bg-helfi-green'} ${(isIOS && !isInstalled) ? 'opacity-50' : ''}`}></div>
                 </label>
               </div>
+              {isIOS && !isInstalled && (
+                <div className="mt-2 text-xs text-gray-600 dark:text-gray-400">
+                  Tip: In Safari, tap the share icon → “Add to Home Screen”, then open the Helfi app icon and enable here.
+                </div>
+              )}
             </div>
           </div>
 
