@@ -66,6 +66,18 @@ export async function POST(req: NextRequest) {
       CREATE UNIQUE INDEX IF NOT EXISTS checkinissues_user_name_idx ON CheckinIssues (userId, name)
     `)
 
+    // Replace saved list with exactly what client sent
+    const names = issues.map(i => String(i.name || '').trim()).filter(Boolean)
+    if (names.length === 0) {
+      await prisma.$executeRawUnsafe(`DELETE FROM CheckinIssues WHERE userId = $1`, user.id)
+    } else {
+      const placeholders = names.map((_, idx) => `$${idx + 2}`).join(',')
+      await prisma.$executeRawUnsafe(
+        `DELETE FROM CheckinIssues WHERE userId = $1 AND name NOT IN (${placeholders})`,
+        user.id, ...names
+      )
+    }
+
     for (const item of issues) {
       const name = String(item.name || '').trim()
       if (!name) continue
