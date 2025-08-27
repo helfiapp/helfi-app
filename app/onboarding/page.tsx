@@ -685,16 +685,12 @@ function HealthGoalsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
   // If user has previously saved issues, prefill selections from server
   React.useEffect(() => {
     try {
-      const already = Array.isArray(initial?.goals) && initial!.goals.length > 0
-      if (already) return
-      fetch('/api/checkins/issues', { cache: 'no-store' as any })
+      fetch('/api/checkins/issues', { cache: 'no-store' as any, credentials: 'same-origin' as any })
         .then((r) => r.ok ? r.json() : null)
         .then((data) => {
           const names: string[] = Array.isArray(data?.issues) ? data.issues.map((i: any) => String(i.name || '')) : []
           const unique = Array.from(new Set(names.filter(Boolean)))
-          if (unique.length) {
-            setGoals((prev: string[]) => (prev && prev.length ? prev : unique))
-          }
+          if (unique.length) setGoals(unique)
         }).catch(() => {})
     } catch {}
   }, [])
