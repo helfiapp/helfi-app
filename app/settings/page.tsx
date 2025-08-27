@@ -378,6 +378,28 @@ export default function Settings() {
                   <div className={`w-11 h-6 ${(isIOS && !isInstalled) ? 'bg-gray-100 dark:bg-gray-600' : 'bg-gray-200'} peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-helfi-green/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all ${(isIOS && !isInstalled) ? '' : 'peer-checked:bg-helfi-green'} ${(isIOS && !isInstalled) ? 'opacity-50' : ''}`}></div>
                 </label>
               </div>
+              {pushNotifications && (
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-medium text-gray-900 dark:text-white">Test Notification</h4>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">Send yourself a test push now</p>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      try {
+                        const res = await fetch('/api/push/test', { method: 'POST' })
+                        if (!res.ok) throw new Error('Failed')
+                        alert('Test notification sent')
+                      } catch (e) {
+                        alert('Could not send test. Make sure notifications are enabled for this device.')
+                      }
+                    }}
+                    className="px-3 py-1.5 rounded-md bg-helfi-green text-white text-sm font-medium hover:opacity-90"
+                  >
+                    Send test
+                  </button>
+                </div>
+              )}
               {isIOS && !isInstalled && (
                 <div className="mt-2 text-xs text-gray-600 dark:text-gray-400">
                   Tip: In Safari, tap the share icon → “Add to Home Screen”, then open the Helfi app icon and enable here.

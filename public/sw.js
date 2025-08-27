@@ -31,7 +31,7 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const url = '/check-in';
+  const url = (event.notification && event.notification.data && event.notification.data.url) || '/check-in';
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientsArr) => {
       const hadWindow = clientsArr.some((w) => w.url.includes(url) && 'focus' in w ? (w.focus(), true) : false);

@@ -16,9 +16,10 @@ Priority 3 — Nice to have / quality improvements
    - Scenario: Photo of a supermarket product
    - Goal: Identify product, read label when possible, output 1-portion calories, protein, carbs, fat (and fiber/sugar if seen)
 
-10) Add PWA notifications (Android + iOS 16.4+ web push)
-   - Implement service worker + manifest, request permission flow
-   - Use VAPID keys with a push service; enqueue health reminders (3/day)
+10) Add PWA notifications (Android + iOS 16.4+ web push) — In progress
+   - Baseline live: manifest + service worker, opt‑in toggle, VAPID endpoint, subscribe/unsubscribe APIs
+   - Test push endpoint live: /api/push/test
+   - Scheduler endpoint live: /api/push/scheduler (trigger via cron every 5 min; Bearer SCHEDULER_SECRET)
    - Fallback for iOS pre‑16.4 and Safari Mac: email reminders
    - Ensure opt‑in UX and settings to pause/disable per reminder type
 
