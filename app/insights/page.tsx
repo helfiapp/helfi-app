@@ -72,6 +72,8 @@ export default function Insights() {
 
   const [insights, setInsights] = useState<any[]>([])
   const [loadingPreview, setLoadingPreview] = useState<boolean>(false)
+  const [refreshing, setRefreshing] = useState<boolean>(false)
+  const [lastUpdated, setLastUpdated] = useState<string>('')
 
   useEffect(() => {
     // Show visual preview without enabling the real feature
@@ -91,6 +93,23 @@ export default function Insights() {
     }
     loadPreview()
   }, [])
+
+  async function handleRefresh() {
+    try {
+      setRefreshing(true)
+      await fetch('/api/insights/generate?preview=1', { method: 'POST' })
+      const res = await fetch('/api/insights/list?preview=1', { cache: 'no-cache' })
+      const data = await res.json().catch(() => ({}))
+      if (data?.items && Array.isArray(data.items)) {
+        setInsights(data.items)
+        setLastUpdated(new Date().toLocaleTimeString())
+      }
+    } catch (e) {
+      // ignore
+    } finally {
+      setRefreshing(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -171,7 +190,15 @@ export default function Insights() {
       {/* Main Content */}
       <div className="max-w-4xl mx-auto px-4 py-8 pb-24 md:pb-8">
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">Your AI Health Insights</h2>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-gray-900">Your AI Health Insights</h2>
+            <button onClick={handleRefresh} disabled={refreshing} className="px-3 py-2 bg-helfi-green text-white rounded-md text-sm disabled:opacity-50">
+              {refreshing ? 'Refreshing…' : 'Refresh'}
+            </button>
+          </div>
+          {lastUpdated && (
+            <div className="text-xs text-gray-500 mb-2">Last updated: {lastUpdated}</div>
+          )}
           
           {/* Insights Grid - Preview mode */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

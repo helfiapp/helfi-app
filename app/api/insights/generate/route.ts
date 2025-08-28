@@ -75,8 +75,8 @@ export async function POST(request: Request) {
     return items
   }
 
-  // Real AI generation (only if not preview and key exists)
-  if (!preview) {
+  // Real AI generation (also allowed in preview to bypass flag safely)
+  {
     try {
       const openai = getOpenAI()
       if (openai && profile) {

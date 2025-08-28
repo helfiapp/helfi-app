@@ -243,6 +243,8 @@ Be thorough but not alarmist. Provide actionable recommendations.`;
       });
     }
 
+    // Fire-and-forget: update insights preview based on new interaction results
+    try { fetch('/api/insights/generate?preview=1', { method: 'POST' }).catch(()=>{}) } catch {}
     return NextResponse.json({ 
       success: true, 
       analysis,

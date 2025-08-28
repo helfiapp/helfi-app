@@ -392,6 +392,10 @@ After your explanation and the one-line totals above, also include a compact JSO
         console.warn('ITEMS_JSON parse failed');
       }
     }
+    // Fire-and-forget: generate updated insights in preview mode
+    try {
+      fetch('/api/insights/generate?preview=1', { method: 'POST' }).catch(() => {})
+    } catch {}
     return NextResponse.json(resp);
 
   } catch (error) {
