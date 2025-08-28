@@ -70,6 +70,28 @@ export default function Insights() {
     }
   }, [session]);
 
+  const [insights, setInsights] = useState<any[]>([])
+  const [loadingPreview, setLoadingPreview] = useState<boolean>(false)
+
+  useEffect(() => {
+    // Show visual preview without enabling the real feature
+    async function loadPreview() {
+      try {
+        setLoadingPreview(true)
+        const res = await fetch('/api/insights/list?preview=1', { cache: 'no-cache' })
+        const data = await res.json().catch(() => ({}))
+        if (data?.items && Array.isArray(data.items)) {
+          setInsights(data.items)
+        }
+      } catch (e) {
+        // ignore preview errors
+      } finally {
+        setLoadingPreview(false)
+      }
+    }
+    loadPreview()
+  }, [])
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Navigation Header - First Row */}
@@ -151,43 +173,23 @@ export default function Insights() {
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <h2 className="text-2xl font-bold text-gray-900 mb-6">Your AI Health Insights</h2>
           
-          {/* Insights Grid */}
+          {/* Insights Grid - Preview mode */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <div className="flex items-center mb-3">
-                <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center mr-3">
-                  <span className="text-white text-sm">💧</span>
+            {insights.length > 0 ? (
+              insights.map((it) => (
+                <div key={it.id} className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-center mb-2">
+                    <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center mr-3">
+                      <span className="text-white text-sm">🤖</span>
+                    </div>
+                    <h3 className="font-semibold text-blue-900">{it.title}</h3>
+                  </div>
+                  <p className="text-blue-800 text-sm">{it.summary}</p>
                 </div>
-                <h3 className="font-semibold text-blue-900">Hydration</h3>
-              </div>
-              <p className="text-blue-800 text-sm">
-                Consider increasing your daily water intake to 8-10 glasses for optimal health.
-              </p>
-            </div>
-
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-              <div className="flex items-center mb-3">
-                <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center mr-3">
-                  <span className="text-white text-sm">🏃</span>
-                </div>
-                <h3 className="font-semibold text-green-900">Exercise</h3>
-              </div>
-              <p className="text-green-800 text-sm">
-                Your current exercise routine is excellent! Keep up the great work.
-              </p>
-            </div>
-
-            <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-              <div className="flex items-center mb-3">
-                <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center mr-3">
-                  <span className="text-white text-sm">😴</span>
-                </div>
-                <h3 className="font-semibold text-orange-900">Sleep</h3>
-              </div>
-              <p className="text-orange-800 text-sm">
-                Try to maintain a consistent sleep schedule for better recovery.
-              </p>
-            </div>
+              ))
+            ) : (
+              <div className="text-sm text-gray-600">{loadingPreview ? 'Loading preview…' : 'No insights yet.'}</div>
+            )}
           </div>
         </div>
 
@@ -203,7 +205,7 @@ export default function Insights() {
             </p>
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-md mx-auto">
               <p className="text-blue-800 text-sm">
-                Complete your onboarding to get personalized AI recommendations!
+                Preview mode is active. Real insights will appear here automatically once enabled.
               </p>
             </div>
           </div>

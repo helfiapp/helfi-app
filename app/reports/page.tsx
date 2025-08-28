@@ -37,6 +37,27 @@ export default function Reports() {
     }
   }, [dropdownOpen]);
 
+  const [reports, setReports] = useState<any[]>([])
+  const [loadingPreview, setLoadingPreview] = useState<boolean>(false)
+
+  useEffect(() => {
+    async function loadPreview() {
+      try {
+        setLoadingPreview(true)
+        const res = await fetch('/api/reports/weekly/list?preview=1', { cache: 'no-cache' })
+        const data = await res.json().catch(() => ({}))
+        if (data?.reports && Array.isArray(data.reports)) {
+          setReports(data.reports)
+        }
+      } catch (e) {
+        // ignore preview errors
+      } finally {
+        setLoadingPreview(false)
+      }
+    }
+    loadPreview()
+  }, [])
+
   // Profile image now loaded from UserDataProvider cache - no API call needed!
 
   return (
@@ -128,53 +149,17 @@ export default function Reports() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div className="bg-purple-50 p-6 rounded-lg border-2 border-purple-200">
-              <h3 className="font-semibold text-helfi-black mb-2">📊 Weekly Summary</h3>
-              <p className="text-sm text-gray-600 mb-4">Get a comprehensive overview of your weekly health data</p>
-              <div className="mt-4 text-center">
-                <span className="text-xl font-bold text-purple-600">Coming Soon</span>
-              </div>
-            </div>
-
-            <div className="bg-blue-50 p-6 rounded-lg border-2 border-blue-200">
-              <h3 className="font-semibold text-helfi-black mb-2">📈 Progress Tracking</h3>
-              <p className="text-sm text-gray-600 mb-4">Monitor your progress toward health goals</p>
-              <div className="mt-4 text-center">
-                <span className="text-xl font-bold text-blue-600">Coming Soon</span>
-              </div>
-            </div>
-
-            <div className="bg-green-50 p-6 rounded-lg border-2 border-green-200">
-              <h3 className="font-semibold text-helfi-black mb-2">📋 Detailed Analysis</h3>
-              <p className="text-sm text-gray-600 mb-4">In-depth analysis of health patterns and trends</p>
-              <div className="mt-4 text-center">
-                <span className="text-xl font-bold text-green-600">Coming Soon</span>
-              </div>
-            </div>
-
-            <div className="bg-orange-50 p-6 rounded-lg border-2 border-orange-200">
-              <h3 className="font-semibold text-helfi-black mb-2">🎯 Goal Assessment</h3>
-              <p className="text-sm text-gray-600 mb-4">Evaluate progress toward your health objectives</p>
-              <div className="mt-4 text-center">
-                <span className="text-xl font-bold text-orange-600">Coming Soon</span>
-              </div>
-            </div>
-
-            <div className="bg-red-50 p-6 rounded-lg border-2 border-red-200">
-              <h3 className="font-semibold text-helfi-black mb-2">⚡ Insights Dashboard</h3>
-              <p className="text-sm text-gray-600 mb-4">Key insights and recommendations from your data</p>
-              <div className="mt-4 text-center">
-                <span className="text-xl font-bold text-red-600">Coming Soon</span>
-              </div>
-            </div>
-
-            <div className="bg-yellow-50 p-6 rounded-lg border-2 border-yellow-200">
-              <h3 className="font-semibold text-helfi-black mb-2">📅 Monthly Report</h3>
-              <p className="text-sm text-gray-600 mb-4">Comprehensive monthly health summary and trends</p>
-              <div className="mt-4 text-center">
-                <span className="text-xl font-bold text-yellow-600">Coming Soon</span>
-              </div>
-            </div>
+            {reports.length > 0 ? (
+              reports.map((r) => (
+                <div key={r.id} className="bg-purple-50 p-6 rounded-lg border-2 border-purple-200">
+                  <h3 className="font-semibold text-helfi-black mb-1">📊 Weekly Summary</h3>
+                  <p className="text-sm text-gray-600 mb-2">Week starting {r.weekStart}</p>
+                  <div className="text-sm text-purple-800">{r.summary}</div>
+                </div>
+              ))
+            ) : (
+              <div className="text-sm text-gray-600">{loadingPreview ? 'Loading preview…' : 'No reports yet.'}</div>
+            )}
           </div>
         </div>
       </div>

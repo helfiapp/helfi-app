@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
 
-export async function GET() {
+export async function GET(request: Request) {
+  const url = new URL(request.url)
+  const preview = url.searchParams.get('preview') === '1'
   const enabled = process.env.NEXT_PUBLIC_INSIGHTS_ENABLED === 'true'
-  if (!enabled) {
+  if (!enabled && !preview) {
     return NextResponse.json({ enabled: false, items: [] }, { status: 200 })
   }
 
@@ -13,7 +15,7 @@ export async function GET() {
     { id: 'i3', title: 'Sodium and BP', summary: 'Watch sodium if BP is elevated; prefer low‑sodium options.', tags: ['nutrition','bp'], confidence: 0.65, createdAt: new Date().toISOString() },
   ]
 
-  return NextResponse.json({ enabled: true, items }, { status: 200 })
+  return NextResponse.json({ enabled: true, items, preview }, { status: 200 })
 }
 
 
