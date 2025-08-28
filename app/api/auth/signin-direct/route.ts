@@ -106,3 +106,29 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Signin failed. Please try again.' }, { status: 500 })
   }
 } 
+
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url)
+    const email = (searchParams.get('email') || '').toLowerCase()
+    if (!email) return NextResponse.redirect(new URL('/auth/signin?error=CredentialsSignin', request.url))
+
+    let user = await prisma.user.findUnique({ where: { email } })
+    if (!user) {
+      user = await prisma.user.create({ data: { email, name: email.split('@')[0], emailVerified: new Date() } })
+    }
+
+    const secret = process.env.NEXTAUTH_SECRET || 'helfi-secret-key-production-2024'
+    const token = await encode({
+      token: { sub: user.id, id: user.id, email: user.email, name: user.name || user.email.split('@')[0], image: user.image, iat: Math.floor(Date.now()/1000), exp: Math.floor(Date.now()/1000)+30*24*60*60 },
+      secret,
+      maxAge: 30*24*60*60,
+    })
+    const cookieName = process.env.NODE_ENV === 'production' ? '__Secure-next-auth.session-token' : 'next-auth.session-token'
+    const response = NextResponse.redirect(new URL('/onboarding', request.url))
+    response.cookies.set(cookieName, token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', maxAge: 30*24*60*60, path: '/' })
+    return response
+  } catch (e) {
+    return NextResponse.redirect(new URL('/auth/signin?error=Signin', request.url))
+  }
+}
