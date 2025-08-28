@@ -47,12 +47,15 @@ export async function GET(request: NextRequest) {
     }
 
     // Get users with pagination
-    let users = [] as any[]
-    try {
-      users = await prisma.user.findMany({
+    const users = await prisma.user.findMany({
       where,
-      include: {
-        subscription: true,
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        createdAt: true,
+        gender: true,
+        subscription: { select: { plan: true } },
         _count: {
           select: {
             healthGoals: true,
@@ -67,10 +70,6 @@ export async function GET(request: NextRequest) {
       skip: (page - 1) * limit,
       take: limit
     })
-    } catch (e) {
-      console.error('User list failed, returning empty array:', e)
-      users = []
-    }
 
     return NextResponse.json({
       users,
