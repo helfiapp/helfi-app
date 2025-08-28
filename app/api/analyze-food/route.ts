@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
     let messages: any[] = [];
     // Backward-compatible enhancement flags
     let wantStructured = false; // when true, we also return items[] and totals
-    let preferMultiDetect = false; // when true, we nudge model to detect multiple foods
+    let preferMultiDetect = true; // default ON: detect multiple foods without changing output line
 
     let isReanalysis = false;
     if (contentType?.includes('application/json')) {
@@ -385,6 +385,8 @@ After your explanation and the one-line totals above, also include a compact JSO
             resp.items = Array.isArray(parsed.items) ? parsed.items : [];
             resp.total = parsed.total || null;
           }
+          // Strip the ITEMS_JSON block from analysis text to avoid UI artifacts
+          resp.analysis = resp.analysis.replace(m[0], '').trim();
         }
       } catch (e) {
         console.warn('ITEMS_JSON parse failed');
