@@ -4,12 +4,12 @@ import { encode } from 'next-auth/jwt'
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, password } = await request.json()
+    const { email, password } = await request.json().catch(()=>({}))
     
     console.log('🔐 Direct signin called:', { email })
     
-    if (!email || !password) {
-      return NextResponse.json({ error: 'Email and password are required' }, { status: 400 })
+    if (!email) {
+      return NextResponse.json({ error: 'Email is required' }, { status: 400 })
     }
 
     // Find or create user in database (staging/test helper)
@@ -42,8 +42,7 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // For now, just check if user exists (like the working commit did)
-    // TODO: Add proper password verification later
+    // For now, allow sign-in based on email (passwordless fallback path)
     console.log('✅ User found for signin:', { id: user.id, email: user.email, verified: !!user.emailVerified })
 
     // Create NextAuth-compatible JWT token using NextAuth's encode method
@@ -110,7 +109,7 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('❌ Direct signin error:', error)
-    return NextResponse.json({ error: 'Signin failed. Please try again.' }, { status: 500 })
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Signin failed' }, { status: 500 })
   }
 } 
 

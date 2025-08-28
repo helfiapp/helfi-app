@@ -206,49 +206,48 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         console.log('🔐 Credentials authorize called:', { email: credentials?.email })
-        
         if (!credentials?.email || !credentials?.password) {
           console.log('❌ Missing credentials')
           return null
         }
 
-        try {
-          // Find existing user in database
-          let user = await prisma.user.findUnique({
-            where: { email: credentials.email.toLowerCase() }
-          })
-
-          if (!user) {
-            console.log('👤 Credentials user not found, creating:', credentials.email)
-            user = await prisma.user.create({
-              data: {
-                email: credentials.email.toLowerCase(),
-                name: credentials.email.split('@')[0],
-                emailVerified: new Date(),
-              }
-            })
-          }
-
-          // Temporarily allow unverified emails to preserve existing login flow
-          // if (!user.emailVerified) {
-          //   console.log('🚫 Email not verified, blocking signin:', user.email)
-          //   throw new Error('Please verify your email address before signing in. Check your inbox for a verification link.')
-          // }
-
-          // For now, allow signin for existing users (passwordless until hashing added)
-          // TODO: Implement proper password verification and re-enable verification gate
-          console.log('✅ Allowing credentials signin for user:', user.email)
-          
-          // Return user object for session creation
-          return {
-            id: user.id,
-            email: user.email,
-            name: user.name || user.email.split('@')[0],
-            image: user.image
-          }
-        } catch (error) {
-          console.error('❌ Database error in authorize:', error)
+        const email = credentials.email.toLowerCase()
+        // Find or create user deterministically; do not return null on transient DB issues
+        let user = await prisma.user.findUnique({ where: { email } }).catch((e) => {
+          console.error('⚠️ prisma.user.findUnique failed:', e)
           return null
+        })
+
+        if (!user) {
+          user = await prisma.user
+            .create({
+              data: {
+                email,
+                name: email.split('@')[0],
+                emailVerified: new Date(),
+              },
+            })
+            .catch(async (e) => {
+              console.error('⚠️ prisma.user.create failed (race or constraint). Retrying read:', e)
+              // In case of a race/unique constraint, try to read again
+              return await prisma.user.findUnique({ where: { email } }).catch((err) => {
+                console.error('❌ Second read failed:', err)
+                return null
+              })
+            })
+        }
+
+        if (!user) {
+          console.error('❌ Could not get or create user; returning CredentialsSignin')
+          return null
+        }
+
+        console.log('✅ Allowing credentials signin for user:', user.email)
+        return {
+          id: user.id,
+          email: user.email,
+          name: user.name || user.email.split('@')[0],
+          image: user.image,
         }
       }
     }),
