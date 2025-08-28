@@ -212,6 +212,12 @@ export const authOptions: NextAuthOptions = {
         }
 
         const email = credentials.email.toLowerCase()
+        // Ensure DB has new columns used by the app (forward-compatible, no-op if exists)
+        try {
+          await prisma.$executeRawUnsafe('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "termsAccepted" BOOLEAN DEFAULT false')
+        } catch (e) {
+          console.warn('termsAccepted column ensure failed (safe to ignore if already exists):', e)
+        }
         // Find or create user deterministically; do not return null on transient DB issues
         let user = await prisma.user.findUnique({ where: { email } }).catch((e) => {
           console.error('⚠️ prisma.user.findUnique failed:', e)
