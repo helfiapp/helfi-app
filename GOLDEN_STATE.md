@@ -2,10 +2,10 @@
 
 Latest known-good deployment snapshot.
 
-- Commit: 71c15ae (master)
+- Commit: 1e6fef0 (master)
 - Date: 2025-08-28
-- Title: Login stabilized; page 8 delete no re-analysis; faster re-analysis gate
-- Reason: Credentials login fixed with DB forward-compat checks; admin users visible; page 8 deletion safe; re-analysis performance improved.
+- Title: Docs + wire dashboard tiles to live pages (no backend changes)
+- Reason: Verified tiles navigate correctly; zero behavior changes elsewhere. Safe baseline before insights feature flags.
 
 How to use
 - When a new version is verified “golden”, update this file with the new commit hash, date, and a brief reason.
