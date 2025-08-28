@@ -67,7 +67,7 @@ export default function AccountPage() {
       localStorage.removeItem(`profileImage_${session.user.id}`);
       localStorage.removeItem(`cachedProfileImage_${session.user.id}`);
     }
-    await signOut({ callbackUrl: '/' })
+    await signOut({ callbackUrl: '/auth/signin' })
   }
 
   // Load saved data on mount
@@ -175,7 +175,7 @@ export default function AccountPage() {
                 <Link href="/billing" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Subscription & Billing</Link>
                 <Link href="/help" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
                 <button
-                  onClick={() => signOut()}
+                  onClick={() => signOut({ callbackUrl: '/auth/signin' })}
                   className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50 font-semibold"
                 >
                   Logout

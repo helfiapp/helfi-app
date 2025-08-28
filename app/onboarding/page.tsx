@@ -96,7 +96,7 @@ function LogoutButton() {
   const { data: session } = useSession();
   
   const handleLogout = () => {
-    signOut({ callbackUrl: '/' });
+    signOut({ callbackUrl: '/auth/signin' });
   };
 
   if (!session) return null;

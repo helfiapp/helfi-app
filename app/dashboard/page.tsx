@@ -181,7 +181,7 @@ export default function Dashboard() {
       localStorage.removeItem(`profileImage_${session.user.id}`);
       localStorage.removeItem(`cachedProfileImage_${session.user.id}`);
     }
-    await signOut({ callbackUrl: '/' })
+    await signOut({ callbackUrl: '/auth/signin' })
   }
 
   return (

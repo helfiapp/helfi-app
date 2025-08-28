@@ -74,7 +74,7 @@ export default function BillingPage() {
       localStorage.removeItem(`profileImage_${session.user.id}`);
       localStorage.removeItem(`cachedProfileImage_${session.user.id}`);
     }
-    await signOut({ callbackUrl: '/' })
+    await signOut({ callbackUrl: '/auth/signin' })
   }
 
   return (
@@ -153,7 +153,7 @@ export default function BillingPage() {
                 <Link href="/billing" className="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 bg-gray-50 dark:bg-gray-700 font-medium">Subscription & Billing</Link>
                 <Link href="/help" className="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">Help & Support</Link>
                 <button
-                  onClick={() => signOut()}
+                  onClick={() => signOut({ callbackUrl: '/auth/signin' })}
                   className="block w-full text-left px-4 py-2 text-red-600 dark:text-red-400 hover:bg-gray-50 dark:hover:bg-gray-700 font-semibold"
                 >
                   Logout

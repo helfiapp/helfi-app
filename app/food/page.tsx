@@ -672,7 +672,7 @@ Please add nutritional information manually if needed.`);
                 <Link href="/help" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
                 <div className="border-t border-gray-100 my-2"></div>
                 <Link href="/reports" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Reports</Link>
-                <button onClick={() => signOut()} className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50 font-semibold">Logout</button>
+                <button onClick={() => signOut({ callbackUrl: '/auth/signin' })} className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50 font-semibold">Logout</button>
               </div>
             )}
           </div>

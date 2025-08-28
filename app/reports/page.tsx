@@ -96,7 +96,7 @@ export default function Reports() {
                 <Link href="/privacy" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Privacy Settings</Link>
                 <Link href="/help" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
                 <button
-                  onClick={() => signOut()}
+                  onClick={() => signOut({ callbackUrl: '/auth/signin' })}
                   className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50 font-semibold"
                 >
                   Logout
