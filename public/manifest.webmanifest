@@ -1,12 +1,26 @@
 {
   "name": "Helfi",
   "short_name": "Helfi",
-  "start_url": "/",
+  "start_url": "/staging-signin",
   "scope": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#10B981",
   "description": "Your AI health intelligence platform.",
+  "shortcuts": [
+    {
+      "name": "Sign in",
+      "short_name": "Sign in",
+      "url": "/staging-signin",
+      "icons": [
+        {
+          "src": "/logo.svg",
+          "sizes": "96x96",
+          "type": "image/svg+xml"
+        }
+      ]
+    }
+  ],
   "icons": [
     {
       "src": "/logo.svg",
