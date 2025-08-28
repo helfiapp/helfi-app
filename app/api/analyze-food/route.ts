@@ -61,13 +61,18 @@ export async function POST(req: NextRequest) {
     const contentType = req.headers.get('content-type');
     console.log('📝 Content-Type:', contentType);
     let messages: any[] = [];
+    // Backward-compatible enhancement flags
+    let wantStructured = false; // when true, we also return items[] and totals
+    let preferMultiDetect = false; // when true, we nudge model to detect multiple foods
 
     let isReanalysis = false;
     if (contentType?.includes('application/json')) {
       // Handle text-based food analysis
       const body = await req.json();
-      const { textDescription, foodType, isReanalysis: reFlag } = body as any;
+      const { textDescription, foodType, isReanalysis: reFlag, returnItems, multi } = body as any;
       isReanalysis = !!reFlag;
+      wantStructured = !!returnItems;
+      preferMultiDetect = !!multi;
       console.log('📝 Text analysis mode:', { textDescription, foodType });
 
       if (!textDescription) {
@@ -89,6 +94,9 @@ Calories: [number], Protein: [g], Carbs: [g], Fat: [g]
 Food description: ${textDescription}
 Food type: ${foodType}
 
+${preferMultiDetect ? `If multiple distinct foods or components are mentioned (e.g., salads/soups/stews/plate with sides), describe them briefly.
+` : ''}
+
 IMPORTANT: Different sizes have different nutrition values:
 - Large egg: ~70 calories, 6g protein
 - Medium egg: ~55 calories, 5g protein  
@@ -104,7 +112,11 @@ Calories: 70, Protein: 6g, Carbs: 1g, Fat: 5g"
 "Medium egg (1 whole)
 Calories: 55, Protein: 5g, Carbs: 1g, Fat: 4g"
 
-Pay close attention to portion size words like small, medium, large, or specific measurements. Calculate nutrition accordingly. End your response with the nutrition line exactly once as shown.`
+Pay close attention to portion size words like small, medium, large, or specific measurements. Calculate nutrition accordingly. End your response with the nutrition line exactly once as shown.
+${wantStructured ? `
+After your explanation and the one-line totals above, also include a compact JSON block between <ITEMS_JSON> and </ITEMS_JSON> with this exact shape for any detected foods (use an empty array if only one item):
+<ITEMS_JSON>{"items":[{"name":"string","portion":"string","calories":0,"protein_g":0,"carbs_g":0,"fat_g":0}],"total":{"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0}}</ITEMS_JSON>
+` : ''}`
         }
       ];
     } else {
@@ -153,6 +165,9 @@ Calories: [number], Protein: [g], Carbs: [g], Fat: [g]
 
 [Food name] ([portion size])
 
+${preferMultiDetect ? `If the image contains multiple distinct foods or components (e.g., salads/soups/stews/plate with sides), describe them briefly.
+` : ''}
+
 IMPORTANT: Different sizes have different nutrition values:
 - Large egg: ~70 calories, 6g protein
 - Medium egg: ~55 calories, 5g protein  
@@ -168,7 +183,11 @@ Calories: 70, Protein: 6g, Carbs: 1g, Fat: 5g"
 "Medium egg (1 whole)
 Calories: 55, Protein: 5g, Carbs: 1g, Fat: 4g"
 
-Estimate portion size carefully from the image and calculate nutrition accordingly. End your response with the nutrition line exactly once as shown.`
+Estimate portion size carefully from the image and calculate nutrition accordingly. End your response with the nutrition line exactly once as shown.
+${wantStructured ? `
+After your explanation and the one-line totals above, also include a compact JSON block between <ITEMS_JSON> and </ITEMS_JSON> with this exact shape for any detected foods (use an empty array if only one item):
+<ITEMS_JSON>{"items":[{"name":"string","portion":"string","calories":0,"protein_g":0,"carbs_g":0,"fat_g":0}],"total":{"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0}}</ITEMS_JSON>
+` : ''}`
             },
             {
               type: "image_url",
@@ -353,10 +372,25 @@ Estimate portion size carefully from the image and calculate nutrition according
     
     console.log('=== FOOD ANALYZER DEBUG END ===');
 
-    return NextResponse.json({
+    const resp: any = {
       success: true,
-      analysis: analysis.trim()
-    });
+      analysis: analysis.trim(),
+    };
+    if (wantStructured) {
+      try {
+        const m = analysis.match(/<ITEMS_JSON>([\s\S]*?)<\/ITEMS_JSON>/i);
+        if (m && m[1]) {
+          const parsed = JSON.parse(m[1]);
+          if (parsed && typeof parsed === 'object') {
+            resp.items = Array.isArray(parsed.items) ? parsed.items : [];
+            resp.total = parsed.total || null;
+          }
+        }
+      } catch (e) {
+        console.warn('ITEMS_JSON parse failed');
+      }
+    }
+    return NextResponse.json(resp);
 
   } catch (error) {
     console.error('💥 OpenAI API Error:', error);
