@@ -3307,6 +3307,11 @@ function ReviewStep({ onBack, data }: { onBack: () => void, data: any }) {
         // Brief moment to show completion
         await new Promise(resolve => setTimeout(resolve, 800));
         
+        // Fire-and-forget: generate initial insights in background (safe preview)
+        try {
+          fetch('/api/insights/generate?preview=1', { method: 'POST' }).catch(() => {})
+        } catch {}
+
         const redirectStart = Date.now();
         window.location.href = '/dashboard';
         
