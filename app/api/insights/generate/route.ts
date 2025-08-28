@@ -25,6 +25,8 @@ export async function POST(request: Request) {
 
   // Personalize from current user's data when available
   let profile: any = null
+  let recentFood: any[] = []
+  let recentHealthLogs: any[] = []
   try {
     const session = await getServerSession(authOptions)
     if (session?.user?.id) {
@@ -34,8 +36,19 @@ export async function POST(request: Request) {
           healthGoals: true,
           supplements: true,
           medications: true,
+          foodLogs: {
+            orderBy: { createdAt: 'desc' },
+            take: 5,
+          },
+          healthLogs: {
+            orderBy: { createdAt: 'desc' },
+            take: 10,
+            include: { goal: true }
+          },
         },
       })
+      recentFood = (profile?.foodLogs || []).map((f: any) => ({ name: f.name, createdAt: f.createdAt }))
+      recentHealthLogs = (profile?.healthLogs || []).map((h: any) => ({ goal: h.goal?.name, rating: h.rating, createdAt: h.createdAt }))
     }
   } catch {
     // non-blocking
@@ -87,9 +100,26 @@ export async function POST(request: Request) {
           goals: (profile.healthGoals || []).map((g: any) => g.name),
           supplements: (profile.supplements || []).map((s: any) => ({ name: s.name, timing: s.timing })),
           medications: (profile.medications || []).map((m: any) => ({ name: m.name, timing: m.timing })),
+          recentFood,
+          recentHealthLogs,
         })
 
-        const prompt = `You are a careful health coach. Based ONLY on this JSON profile, produce 3 short insights in JSON with fields: id, title, summary, tags (array), confidence (0-1). Keep plain, safe, non-medical-advice wording. Profile: ${profileText}`
+        const prompt = `You are a careful, data-driven health coach. Based ONLY on the JSON profile below, generate 6 concise, high-value insights that a user would gladly pay for. Avoid generic advice. Personalize to the user's goals, supplements, medications, and recent logs.
+
+Return a JSON array of items where each item has: 
+  id (string),
+  title (string),
+  summary (string, 1–2 sentences, actionable),
+  tags (array of strings like ['goals','supplement','medication','nutrition','timing','safety','energy','sleep']),
+  confidence (0–1).
+
+Content guidance:
+- Cross-link data (e.g., a supplement timing that supports a goal; a nutrition tweak to help a symptom trend from health logs).
+- Flag potential medication–supplement concerns as "check with your clinician" without diagnosing.
+- Give clear next steps ("move magnesium to evening", "add protein to breakfast", "separate iron and calcium by 2h").
+- Keep each card independent and skimmable.
+
+Profile: ${profileText}`
         const resp = await openai.chat.completions.create({
           model: 'gpt-4o-mini',
           messages: [{ role: 'user', content: prompt }],
