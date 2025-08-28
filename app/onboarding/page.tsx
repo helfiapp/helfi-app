@@ -3710,8 +3710,8 @@ function InteractionAnalysisStep({ onNext, onBack, initial, onAnalysisSettled }:
       });
       
       if (response.ok) {
-        // Refresh the analyses list
-        loadPreviousAnalyses();
+        // Refresh the analyses list only; do not trigger re-analysis
+        await loadPreviousAnalyses();
         console.log('✅ Analysis deleted successfully');
       } else {
         console.error('Failed to delete analysis');

@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { supplements, medications, analysisName } = await request.json();
+    const { supplements, medications, analysisName, reanalysis } = await request.json();
 
     if (!supplements || !medications) {
       return NextResponse.json({ error: 'Missing supplements or medications data' }, { status: 400 });
@@ -138,7 +138,7 @@ Be thorough but not alarmist. Provide actionable recommendations.`;
     }
 
     const completion = await openai.chat.completions.create({
-      model: "gpt-4",
+      model: reanalysis ? "gpt-4o-mini" : "gpt-4",
       messages: [
         {
           role: "system",
