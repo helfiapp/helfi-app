@@ -16,11 +16,6 @@ Priority 3 — Nice to have / quality improvements
    - Scenario: Photo of a supermarket product
    - Goal: Identify product, read label when possible, output 1-portion calories, protein, carbs, fat (and fiber/sugar if seen)
 
-10) Add PWA notifications (Android + iOS 16.4+ web push) — Done
-   - Live in production on Chrome/Android and Safari iOS (via Add to Home Screen)
-   - Test push works; scheduler endpoint ready for cron
-   - PWA start opens staging sign‑in for easy login
-
 Notes
 - We’ll keep this list short and plain-English
 - When we fix an item, we’ll mark it “Done” here and move on to the next
