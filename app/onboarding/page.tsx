@@ -123,7 +123,7 @@ function OnboardingNav() {
   );
 }
 
-function GenderStep({ onNext, initial }: { onNext: (data: any) => void, initial?: string }) {
+function GenderStep({ onNext, initial, initialAgreed }: { onNext: (data: any) => void, initial?: string, initialAgreed?: boolean }) {
   const [gender, setGender] = useState('');
   const [agreed, setAgreed] = useState(false);
   
@@ -134,13 +134,20 @@ function GenderStep({ onNext, initial }: { onNext: (data: any) => void, initial?
     }
   }, [initial]);
   
-  // Load Terms & Conditions agreement from localStorage
+  // Initialize Terms & Conditions from DB (with localStorage fallback for legacy users)
   useEffect(() => {
-    const savedAgreement = localStorage.getItem('helfi-terms-agreed');
-    if (savedAgreement === 'true') {
+    if (initialAgreed === true) {
       setAgreed(true);
+      try { localStorage.setItem('helfi-terms-agreed', 'true'); } catch {}
+      return;
     }
-  }, []);
+    try {
+      const savedAgreement = localStorage.getItem('helfi-terms-agreed');
+      if (savedAgreement === 'true') {
+        setAgreed(true);
+      }
+    } catch {}
+  }, [initialAgreed]);
   
   // Save Terms & Conditions agreement to localStorage when changed
   const handleAgreedChange = (checked: boolean) => {
@@ -4310,9 +4317,10 @@ export default function Onboarding() {
     }
   }, [status, stepNames.length]);
 
+  const [dataLoaded, setDataLoaded] = useState(false);
   useEffect(() => {
     if (status === 'authenticated') {
-      loadUserData();
+      loadUserData().finally(() => setDataLoaded(true));
     }
   }, [status]);
 
@@ -4338,7 +4346,7 @@ export default function Onboarding() {
 
   // If arriving without ?first=1 but user is clearly new, show the modal (unless deferred this session)
   useEffect(() => {
-    if (status !== 'authenticated') return;
+    if (status !== 'authenticated' || !dataLoaded) return;
     try {
       const hasBasic = form && form.gender && form.weight && form.height;
       const hasGoals = Array.isArray(form?.goals) && form.goals.length > 0;
@@ -4346,9 +4354,12 @@ export default function Onboarding() {
       const deferred = sessionStorage.getItem('onboardingDeferredThisSession') === '1';
       if (!showFirstTimeModal && !isFirstParam && !deferred && (!hasBasic || !hasGoals)) {
         setShowFirstTimeModal(true);
+      } else if (showFirstTimeModal && hasBasic && hasGoals) {
+        // Auto-hide if data arrived and user is complete
+        setShowFirstTimeModal(false);
       }
     } catch {}
-  }, [status, form, showFirstTimeModal]);
+  }, [status, form, showFirstTimeModal, dataLoaded]);
 
   // Optimized debounced save function
   const debouncedSave = useCallback(async (data: any) => {
@@ -4750,7 +4761,7 @@ export default function Onboarding() {
 
         {/* Content */}
         <div className="flex-1 px-4 py-2 pb-20">
-          {step === 0 && <GenderStep onNext={handleNext} initial={form.gender} />}
+          {step === 0 && <GenderStep onNext={handleNext} initial={form.gender} initialAgreed={form.termsAccepted} />}
           {step === 1 && <PhysicalStep onNext={handleNext} onBack={handleBack} initial={form} />}
           {step === 2 && <ExerciseStep onNext={handleNext} onBack={handleBack} initial={form} />}
           {step === 3 && <HealthGoalsStep onNext={handleNext} onBack={handleBack} initial={form} />}

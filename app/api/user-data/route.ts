@@ -181,7 +181,8 @@ export async function GET(request: NextRequest) {
       })),
       profileImage: user.image || null,
       todaysFoods: todaysFoods,
-      profileInfo: profileInfoData
+      profileInfo: profileInfoData,
+      termsAccepted: (user as any).termsAccepted === true
     }
 
     console.log('GET /api/user-data - Returning onboarding data for user')
@@ -286,6 +287,9 @@ export async function POST(request: NextRequest) {
       
       if (data.gender) {
         updateData.gender = data.gender.toUpperCase() === 'MALE' ? 'MALE' : 'FEMALE'
+      }
+      if (data.termsAccepted === true) {
+        updateData.termsAccepted = true
       }
       if (data.weight !== undefined && data.weight !== null && data.weight !== '') {
         const weightNum = parseFloat(data.weight.toString())

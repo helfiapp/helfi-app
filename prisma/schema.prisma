@@ -19,6 +19,7 @@ model User {
   bodyType          BodyType?
   exerciseFrequency String?
   exerciseTypes     String[]
+  termsAccepted     Boolean   @default(false)
   // Credit system fields
   dailyAnalysisCredits     Int @default(3)  // Free: 3, Premium: 30
   additionalCredits        Int @default(0)  // Purchased credits that don't expire
