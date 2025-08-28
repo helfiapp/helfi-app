@@ -2,10 +2,10 @@
 
 Latest known-good deployment snapshot.
 
-- Commit: 52cf52f (master)
+- Commit: 71c15ae (master)
 - Date: 2025-08-28
-- Title: PWA start at staging-signin; push notifications working on iOS/Chrome; Google sign-in on staging
-- Reason: Verified notifications on iPhone (Safari + Chrome via PWA), stable sign-in path for testers, safe to use as baseline.
+- Title: Login stabilized; page 8 delete no re-analysis; faster re-analysis gate
+- Reason: Credentials login fixed with DB forward-compat checks; admin users visible; page 8 deletion safe; re-analysis performance improved.
 
 How to use
 - When a new version is verified “golden”, update this file with the new commit hash, date, and a brief reason.

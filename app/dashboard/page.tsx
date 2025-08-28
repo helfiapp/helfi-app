@@ -280,29 +280,35 @@ export default function Dashboard() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-8">
-              <div className="bg-helfi-green/5 p-6 rounded-lg border-2 border-helfi-green/20">
+              <Link href="/health-tracking" className="block">
+              <div className="bg-helfi-green/5 p-6 rounded-lg border-2 border-helfi-green/20 hover:border-helfi-green/40 transition-colors cursor-pointer">
                 <h3 className="font-semibold text-helfi-black mb-2">🎯 Health Tracking</h3>
                 <p className="text-sm text-gray-600">Track your daily metrics and progress</p>
                 <div className="mt-4 text-center">
                   <span className="text-2xl font-bold text-helfi-green">Coming Soon</span>
                 </div>
               </div>
+              </Link>
 
-              <div className="bg-blue-50 p-6 rounded-lg border-2 border-blue-200">
+              <Link href="/insights" className="block">
+              <div className="bg-blue-50 p-6 rounded-lg border-2 border-blue-200 hover:border-blue-300 transition-colors cursor-pointer">
                 <h3 className="font-semibold text-helfi-black mb-2">🤖 AI Insights</h3>
                 <p className="text-sm text-gray-600">Personalized health recommendations</p>
                 <div className="mt-4 text-center">
                   <span className="text-2xl font-bold text-blue-600">Coming Soon</span>
                 </div>
               </div>
+              </Link>
 
-              <div className="bg-purple-50 p-6 rounded-lg border-2 border-purple-200">
+              <Link href="/reports" className="block">
+              <div className="bg-purple-50 p-6 rounded-lg border-2 border-purple-200 hover:border-purple-300 transition-colors cursor-pointer">
                 <h3 className="font-semibold text-helfi-black mb-2">📊 Reports</h3>
                 <p className="text-sm text-gray-600">Weekly health analysis and trends</p>
                 <div className="mt-4 text-center">
                   <span className="text-2xl font-bold text-purple-600">Coming Soon</span>
                 </div>
               </div>
+              </Link>
             </div>
 
             {/* Device Integration Section */}
