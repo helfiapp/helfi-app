@@ -38,10 +38,18 @@ export async function GET(request: NextRequest) {
     }
 
     // Get total count for pagination
-    const totalUsers = await prisma.user.count({ where })
+    let totalUsers = 0
+    try {
+      totalUsers = await prisma.user.count({ where })
+    } catch (e) {
+      console.error('User count failed, returning 0:', e)
+      totalUsers = 0
+    }
 
     // Get users with pagination
-    const users = await prisma.user.findMany({
+    let users = [] as any[]
+    try {
+      users = await prisma.user.findMany({
       where,
       include: {
         subscription: true,
@@ -59,6 +67,10 @@ export async function GET(request: NextRequest) {
       skip: (page - 1) * limit,
       take: limit
     })
+    } catch (e) {
+      console.error('User list failed, returning empty array:', e)
+      users = []
+    }
 
     return NextResponse.json({
       users,

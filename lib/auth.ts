@@ -214,13 +214,19 @@ export const authOptions: NextAuthOptions = {
 
         try {
           // Find existing user in database
-          const user = await prisma.user.findUnique({
+          let user = await prisma.user.findUnique({
             where: { email: credentials.email.toLowerCase() }
           })
 
           if (!user) {
-            console.log('❌ User not found:', credentials.email)
-            return null
+            console.log('👤 Credentials user not found, creating:', credentials.email)
+            user = await prisma.user.create({
+              data: {
+                email: credentials.email.toLowerCase(),
+                name: credentials.email.split('@')[0],
+                emailVerified: new Date(),
+              }
+            })
           }
 
           // Temporarily allow unverified emails to preserve existing login flow

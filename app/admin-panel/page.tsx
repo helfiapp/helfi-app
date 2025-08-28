@@ -198,11 +198,15 @@ export default function AdminPanel() {
         setAnalyticsData(dataResult.data || [])
       }
 
-      // Load summary
-      const summaryResponse = await fetch('/api/analytics?action=summary')
-      if (summaryResponse.ok) {
-        const summaryResult = await summaryResponse.json()
-        setAnalyticsSummary(summaryResult.summary)
+      // Load summary (non-blocking)
+      try {
+        const summaryResponse = await fetch('/api/analytics?action=summary')
+        if (summaryResponse.ok) {
+          const summaryResult = await summaryResponse.json()
+          setAnalyticsSummary(summaryResult.summary)
+        }
+      } catch (e) {
+        console.warn('Summary load failed')
       }
     } catch (error) {
       console.error('Error loading analytics:', error)
@@ -241,6 +245,9 @@ export default function AdminPanel() {
       if (response.ok) {
         const result = await response.json()
         setUserStats(result)
+      } else {
+        // Fallback: try to populate the table via management endpoint even if stats failed
+        loadUserManagement(userSearch, userFilter, currentPage)
       }
     } catch (error) {
       console.error('Error loading user stats:', error)
