@@ -76,15 +76,22 @@ export async function POST(request: NextRequest) {
     })
 
     // Set NextAuth session cookie with proper format
-    const cookieName = process.env.NODE_ENV === 'production' 
-      ? '__Secure-next-auth.session-token' 
-      : 'next-auth.session-token'
+    const secureCookie = '__Secure-next-auth.session-token'
+    const legacyCookie = 'next-auth.session-token'
 
-    response.cookies.set(cookieName, token, {
+    response.cookies.set(secureCookie, token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       maxAge: 30 * 24 * 60 * 60, // 30 days
+      path: '/'
+    })
+    // Also set legacy cookie name for compatibility
+    response.cookies.set(legacyCookie, token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 30 * 24 * 60 * 60,
       path: '/'
     })
 
@@ -124,9 +131,9 @@ export async function GET(request: NextRequest) {
       secret,
       maxAge: 30*24*60*60,
     })
-    const cookieName = process.env.NODE_ENV === 'production' ? '__Secure-next-auth.session-token' : 'next-auth.session-token'
     const response = NextResponse.redirect(new URL('/onboarding', request.url))
-    response.cookies.set(cookieName, token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', maxAge: 30*24*60*60, path: '/' })
+    response.cookies.set('__Secure-next-auth.session-token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', maxAge: 30*24*60*60, path: '/' })
+    response.cookies.set('next-auth.session-token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', maxAge: 30*24*60*60, path: '/' })
     return response
   } catch (e) {
     return NextResponse.redirect(new URL('/auth/signin?error=Signin', request.url))
