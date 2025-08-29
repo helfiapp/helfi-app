@@ -159,6 +159,17 @@ Profile: ${profileText}`
         // Try to extract JSON array
         const jsonMatch = text.match(/\[([\s\S]*?)\]/)
         const items = jsonMatch ? JSON.parse(jsonMatch[0]) : fallback()
+        try {
+          // Save to cache for faster subsequent loads
+          await prisma.$executeRawUnsafe(
+            'CREATE TABLE IF NOT EXISTS "InsightsCache" ("userId" TEXT PRIMARY KEY, "items" JSONB NOT NULL, "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW())'
+          )
+          await prisma.$executeRawUnsafe(
+            'INSERT INTO "InsightsCache" ("userId", "items", "updatedAt") VALUES ($1, $2::jsonb, NOW())\n             ON CONFLICT ("userId") DO UPDATE SET "items" = EXCLUDED."items", "updatedAt" = NOW()',
+            profile.id,
+            JSON.stringify(items)
+          )
+        } catch {}
         return NextResponse.json({ enabled: true, items, ai: true }, { status: 200 })
       }
     } catch (e) {

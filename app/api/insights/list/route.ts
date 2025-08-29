@@ -1,4 +1,7 @@
 import { NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
 
 export async function GET(request: Request) {
   const url = new URL(request.url)
@@ -7,6 +10,30 @@ export async function GET(request: Request) {
   if (!enabled && !preview) {
     return NextResponse.json({ enabled: false, items: [] }, { status: 200 })
   }
+
+  // Try fast path: serve from cache if available and fresh
+  try {
+    const session = await getServerSession(authOptions)
+    const userId = session?.user?.id
+    if (userId) {
+      // Ensure cache table exists
+      await prisma.$executeRawUnsafe(
+        'CREATE TABLE IF NOT EXISTS "InsightsCache" ("userId" TEXT PRIMARY KEY, "items" JSONB NOT NULL, "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW())'
+      )
+      const rows: any[] = await prisma.$queryRawUnsafe(
+        'SELECT "items", "updatedAt" FROM "InsightsCache" WHERE "userId" = $1',
+        userId
+      )
+      if (rows && rows[0]) {
+        const updatedAt = new Date(rows[0].updatedAt)
+        const ageMs = Date.now() - updatedAt.getTime()
+        const freshMs = 6 * 60 * 60 * 1000 // 6 hours
+        if (ageMs < freshMs) {
+          return NextResponse.json({ enabled: true, items: rows[0].items, cached: true }, { status: 200 })
+        }
+      }
+    }
+  } catch {}
 
   // For preview or when enabled, ask the generator for real items (personalized if possible)
   try {
