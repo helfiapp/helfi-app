@@ -7,6 +7,14 @@ export default function NutritionInsights() {
   const [items, setItems] = useState<any[]>([])
 
   async function load() {
+    try {
+      const ud = await fetch('/api/user-data', { cache: 'no-cache' }).then(r=>r.json())
+      const goals: string[] = Array.isArray(ud?.data?.goals) ? ud.data.goals : []
+      if (goals.length) {
+        setItems(goals.map((g) => ({ id: `nutrition:${g}`, title: g, summary: 'Open nutrition details', tags: ['nutrition'] })))
+        return
+      }
+    } catch {}
     const res = await fetch('/api/insights/list?preview=1', { cache: 'no-cache' })
     const data = await res.json().catch(() => ({}))
     const all: any[] = data?.items || []
@@ -28,7 +36,7 @@ export default function NutritionInsights() {
           <button onClick={async()=>{ fetch('/api/insights/generate?preview=1', { method: 'POST' }).catch(()=>{}); await load() }} className="px-3 py-2 bg-helfi-green text-white rounded-md text-sm">Refresh</button>
         </div>
         {items.map((it) => (
-          <Link href={`/insights/${encodeURIComponent(it.id)}`} key={it.id} className="bg-white border border-gray-200 rounded-lg p-4 block">
+          <Link href={String(it.id).startsWith('nutrition:') ? `/insights/issue/${encodeURIComponent(it.title)}?tab=nutrition` : `/insights/${encodeURIComponent(it.id)}`} key={it.id} className="bg-white border border-gray-200 rounded-lg p-4 block">
             <div className="font-semibold text-gray-900 mb-1">{it.title}</div>
             <div className="text-sm text-gray-700">{it.summary}</div>
           </Link>
