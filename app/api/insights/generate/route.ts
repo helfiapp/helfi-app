@@ -75,10 +75,10 @@ export async function POST(request: Request) {
       },
       {
         id: 'pf2',
-        title: hasMagnesium ? 'Move magnesium to evening' : 'Start with simple sleep support',
-        summary: hasMagnesium ? 'Magnesium often works best 1–2 hours before bed; avoid pairing with high‑fiber meals.' : 'If appropriate, consider evening magnesium to support sleep quality.',
+        title: hasMagnesium ? 'Optimize magnesium timing' : 'Start with simple sleep support',
+        summary: hasMagnesium ? 'You already take magnesium — try 1–2 hours before bed and avoid pairing with high‑fiber meals for absorption.' : 'If appropriate, consider evening magnesium to support sleep quality.',
         tags: ['supplement','timing','sleep'],
-        confidence: 0.7,
+        confidence: 0.72,
         createdAt: new Date().toISOString(),
       },
       {

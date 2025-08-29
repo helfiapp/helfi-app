@@ -11,8 +11,14 @@ export async function GET(request: Request) {
   // For preview or when enabled, ask the generator for real items (personalized if possible)
   try {
     const origin = new URL(request.url).origin
-    // Cache-bust to avoid any intermediate caching layers
-    const res = await fetch(`${origin}/api/insights/generate?preview=1&t=${Date.now()}`, { method: 'POST', cache: 'no-cache' })
+    // Cache-bust and forward cookies so the generator can personalize for the signed-in user
+    const res = await fetch(`${origin}/api/insights/generate?preview=1&t=${Date.now()}`, {
+      method: 'POST',
+      cache: 'no-cache',
+      headers: {
+        cookie: request.headers.get('cookie') || '',
+      },
+    })
     const data = await res.json().catch(() => ({}))
     if (data?.items && Array.isArray(data.items)) {
       return NextResponse.json({ enabled: true, items: data.items, preview: true }, { status: 200 })
@@ -22,7 +28,10 @@ export async function GET(request: Request) {
   // Secondary fallback: derive personalized preview from stored onboarding data
   try {
     const origin = new URL(request.url).origin
-    const ud = await fetch(`${origin}/api/user-data?t=${Date.now()}`, { cache: 'no-cache' }).then(r => r.json()).catch(() => null)
+    const ud = await fetch(`${origin}/api/user-data?t=${Date.now()}`, {
+      cache: 'no-cache',
+      headers: { cookie: request.headers.get('cookie') || '' },
+    }).then(r => r.json()).catch(() => null)
     const d = ud?.data || {}
     const goals: string[] = Array.isArray(d.goals) ? d.goals : []
     const supplements: any[] = Array.isArray(d.supplements) ? d.supplements : []
