@@ -10,9 +10,18 @@ export default function GoalsInsights() {
   async function load() {
     try {
       setLoading(true)
-      const ud = await fetch('/api/user-data', { cache: 'no-cache' }).then(r=>r.json())
-      const goals: string[] = Array.isArray(ud?.data?.goals) ? ud.data.goals : []
-      setItems(goals.map((g) => ({ id: `goal:${g}`, title: g, summary: 'Open details', tags: ['goals'] })))
+      // Primary source: user's selected health issues (step 4)
+      const issuesRes = await fetch('/api/checkins/issues', { cache: 'no-cache' })
+      const issuesData = await issuesRes.json().catch(()=>({}))
+      const issueNames: string[] = Array.isArray(issuesData?.issues) ? issuesData.issues.map((i:any)=>i.name).filter(Boolean) : []
+      if (issueNames.length) {
+        setItems(issueNames.map((g) => ({ id: `goal:${g}`, title: g, summary: 'Open details', tags: ['goals'] })))
+      } else {
+        // Fallback: legacy goals from profile if issues are empty
+        const ud = await fetch('/api/user-data', { cache: 'no-cache' }).then(r=>r.json())
+        const goals: string[] = Array.isArray(ud?.data?.goals) ? ud.data.goals : []
+        setItems(goals.map((g) => ({ id: `goal:${g}`, title: g, summary: 'Open details', tags: ['goals'] })))
+      }
     } catch {
       setItems([])
     } finally { setLoading(false) }

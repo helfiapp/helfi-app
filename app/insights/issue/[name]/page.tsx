@@ -9,18 +9,23 @@ export default function IssueDetail() {
   const search = useSearchParams()
   const tab = search.get('tab') || 'overview'
   const [item, setItem] = useState<any | null>(null)
+  const [loading, setLoading] = useState<boolean>(true)
 
   useEffect(() => {
     async function load() {
-      // Use the generic insights list as seed; later this can call a dedicated API
-      const res = await fetch('/api/insights/list?preview=1', { cache: 'no-cache' })
-      const data = await res.json().catch(() => ({}))
-      const fallback = {
-        id: `issue:${name}`,
-        title: String(name || '').replace(/%20/g,' '),
-        summary: tab === 'nutrition' ? 'Nutrition guidance for this issue.' : 'Recommendations for this issue.'
-      }
-      setItem(fallback)
+      try {
+        setLoading(true)
+        const res = await fetch(`/api/insights/detail?issue=${encodeURIComponent(String(name||''))}`, { cache: 'no-cache' })
+        const js = await res.json().catch(()=>({}))
+        const d = js?.data || {}
+        setItem({
+          id: `issue:${name}`,
+          title: d.title || String(name || '').replace(/%20/g,' '),
+          summary: d.what || (tab === 'nutrition' ? 'Nutrition guidance for this issue.' : 'Recommendations for this issue.'),
+          reason: d.reason,
+          actions: Array.isArray(d.actions) ? d.actions : []
+        })
+      } finally { setLoading(false) }
     }
     load()
   }, [name, tab])
@@ -36,16 +41,26 @@ export default function IssueDetail() {
         </div>
       </div>
       <div className="max-w-4xl mx-auto px-4 py-6 space-y-4">
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <div className="text-sm text-gray-700">{item.summary}</div>
-        </div>
-        <div className="bg-white border border-gray-200 rounded-lg p-4">
-          <div className="font-semibold mb-2">Actions</div>
-          <ul className="list-disc pl-5 space-y-2 text-sm text-gray-800">
-            <li>Personalized actions will appear here based on your data.</li>
-            <li>We’ll add timing and safety notes next.</li>
-          </ul>
-        </div>
+        {loading && (
+          <div className="flex items-center gap-2 text-gray-500 text-sm">
+            <span className="h-4 w-4 border-2 border-gray-300 border-t-transparent rounded-full animate-spin"></span>
+            Loading…
+          </div>
+        )}
+        {!loading && (
+          <>
+            <div className="bg-white border border-gray-200 rounded-lg p-4">
+              <div className="text-sm text-gray-700">{item.summary}</div>
+              {item.reason && <div className="text-xs text-gray-500 mt-2">Why: {item.reason}</div>}
+            </div>
+            <div className="bg-white border border-gray-200 rounded-lg p-4">
+              <div className="font-semibold mb-2">Actions</div>
+              <ul className="list-disc pl-5 space-y-2 text-sm text-gray-800">
+                {item.actions?.length ? item.actions.map((a:string, i:number)=>(<li key={i}>{a}</li>)) : <li>No actions yet.</li>}
+              </ul>
+            </div>
+          </>
+        )}
       </div>
     </div>
   )

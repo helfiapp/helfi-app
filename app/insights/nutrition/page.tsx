@@ -10,12 +10,15 @@ export default function NutritionInsights() {
   async function load() {
     try {
       setLoading(true)
-      const ud = await fetch('/api/user-data', { cache: 'no-cache' }).then(r=>r.json())
-      const goals: string[] = Array.isArray(ud?.data?.goals) ? ud.data.goals : []
-      if (goals.length) {
-        setItems(goals.map((g) => ({ id: `nutrition:${g}`, title: g, summary: 'Open nutrition details', tags: ['nutrition'] })))
+      const issuesRes = await fetch('/api/checkins/issues', { cache: 'no-cache' })
+      const issuesData = await issuesRes.json().catch(()=>({}))
+      const issueNames: string[] = Array.isArray(issuesData?.issues) ? issuesData.issues.map((i:any)=>i.name).filter(Boolean) : []
+      if (issueNames.length) {
+        setItems(issueNames.map((g) => ({ id: `nutrition:${g}`, title: g, summary: 'Open nutrition details', tags: ['nutrition'] })))
       } else {
-        setItems([])
+        const ud = await fetch('/api/user-data', { cache: 'no-cache' }).then(r=>r.json())
+        const goals: string[] = Array.isArray(ud?.data?.goals) ? ud.data.goals : []
+        setItems(goals.map((g) => ({ id: `nutrition:${g}`, title: g, summary: 'Open nutrition details', tags: ['nutrition'] })))
       }
     } catch { setItems([]) }
     finally { setLoading(false) }
