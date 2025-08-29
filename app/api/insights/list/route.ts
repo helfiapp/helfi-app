@@ -12,7 +12,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ enabled: false, items: [] }, { status: 200 })
   }
 
-  // Try fast path: serve from cache if available and fresh
+  // Try fast path: serve from cache if available and fresh, and respect user pin/dismiss
   try {
     const session = await getServerSession(authOptions)
     const userId = session?.user?.id
@@ -21,16 +21,30 @@ export async function GET(request: Request) {
       await prisma.$executeRawUnsafe(
         'CREATE TABLE IF NOT EXISTS "InsightsCache" ("userId" TEXT PRIMARY KEY, "items" JSONB NOT NULL, "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW())'
       )
+      await prisma.$executeRawUnsafe(
+        'CREATE TABLE IF NOT EXISTS "InsightsUserState" ("userId" TEXT PRIMARY KEY, "pinned" JSONB NOT NULL DEFAULT \"[]\", "dismissed" JSONB NOT NULL DEFAULT \"[]\", "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW())'
+      )
       const rows: any[] = await prisma.$queryRawUnsafe(
         'SELECT "items", "updatedAt" FROM "InsightsCache" WHERE "userId" = $1',
         userId
       )
+      const stateRows: any[] = await prisma.$queryRawUnsafe(
+        'SELECT "pinned", "dismissed" FROM "InsightsUserState" WHERE "userId" = $1',
+        userId
+      )
+      const pinned: string[] = stateRows?.[0]?.pinned || []
+      const dismissed: string[] = stateRows?.[0]?.dismissed || []
       if (rows && rows[0]) {
         const updatedAt = new Date(rows[0].updatedAt)
         const ageMs = Date.now() - updatedAt.getTime()
         const freshMs = 6 * 60 * 60 * 1000 // 6 hours
         if (ageMs < freshMs) {
-          return NextResponse.json({ enabled: true, items: rows[0].items, cached: true }, { status: 200 })
+          // Apply pin/dismiss ordering
+          const items = Array.isArray(rows[0].items) ? rows[0].items : []
+          const filtered = items.filter((it: any) => !dismissed.includes(it.id))
+          const pinnedItems = filtered.filter((it: any) => pinned.includes(it.id))
+          const rest = filtered.filter((it: any) => !pinned.includes(it.id))
+          return NextResponse.json({ enabled: true, items: [...pinnedItems, ...rest], cached: true }, { status: 200 })
         }
       }
     }

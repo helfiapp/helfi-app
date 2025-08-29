@@ -456,6 +456,20 @@ export default function Insights() {
             {explain(selected) && (
               <div className="text-xs text-gray-600 mb-3">Why you’re seeing this: {explain(selected)}</div>
             )}
+            {/* Actions: Pin / Dismiss */}
+            <div className="flex gap-3 mt-3">
+              <button onClick={async () => {
+                await fetch('/api/insights/state', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'pin', id: selected.id }) })
+                setSelected(null)
+                // refresh list quickly
+                handleRefresh()
+              }} className="flex-1 py-2 rounded-md bg-helfi-green text-white font-medium">Pin</button>
+              <button onClick={async () => {
+                await fetch('/api/insights/state', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'dismiss', id: selected.id }) })
+                setSelected(null)
+                handleRefresh()
+              }} className="flex-1 py-2 rounded-md bg-gray-100 text-gray-800 font-medium">Dismiss</button>
+            </div>
           </div>
         </div>
       )}
