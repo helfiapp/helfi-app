@@ -6,15 +6,14 @@ import Link from 'next/link'
 export default function SafetyInsights() {
   const [items, setItems] = useState<any[]>([])
 
-  useEffect(() => {
-    async function load() {
-      const res = await fetch('/api/insights/list?preview=1', { cache: 'no-cache' })
-      const data = await res.json().catch(() => ({}))
-      const by = (data?.items || []).filter((it: any) => (it.tags || []).includes('safety') || (it.tags || []).includes('medication'))
-      setItems(by)
-    }
-    load()
-  }, [])
+  async function load() {
+    const res = await fetch('/api/insights/list?preview=1', { cache: 'no-cache' })
+    const data = await res.json().catch(() => ({}))
+    const all: any[] = data?.items || []
+    const by = all.filter((it: any) => (it.tags || []).includes('safety') || (it.tags || []).includes('medication'))
+    setItems(by.length ? by : all)
+  }
+  useEffect(() => { load() }, [])
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -25,6 +24,9 @@ export default function SafetyInsights() {
         </div>
       </div>
       <div className="max-w-4xl mx-auto px-4 py-6 space-y-4">
+        <div className="flex justify-end mb-2">
+          <button onClick={async()=>{ fetch('/api/insights/generate?preview=1', { method: 'POST' }).catch(()=>{}); await load() }} className="px-3 py-2 bg-helfi-green text-white rounded-md text-sm">Refresh</button>
+        </div>
         {items.map((it) => (
           <Link href={`/insights/${encodeURIComponent(it.id)}`} key={it.id} className="bg-white border border-gray-200 rounded-lg p-4 block">
             <div className="font-semibold text-gray-900 mb-1">{it.title}</div>
