@@ -97,7 +97,8 @@ export default function Insights() {
   async function handleRefresh() {
     try {
       setRefreshing(true)
-      await fetch('/api/insights/generate?preview=1', { method: 'POST' })
+      // Non-blocking regenerate in the background; fetch list immediately
+      fetch('/api/insights/generate?preview=1', { method: 'POST' }).catch(() => {})
       const res = await fetch('/api/insights/list?preview=1', { cache: 'no-cache' })
       const data = await res.json().catch(() => ({}))
       if (data?.items && Array.isArray(data.items)) {

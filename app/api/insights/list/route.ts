@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma'
 export async function GET(request: Request) {
   const url = new URL(request.url)
   const preview = url.searchParams.get('preview') === '1'
+  const regen = url.searchParams.get('regen') === '1'
   const enabled = process.env.NEXT_PUBLIC_INSIGHTS_ENABLED === 'true'
   if (!enabled && !preview) {
     return NextResponse.json({ enabled: false, items: [] }, { status: 200 })
@@ -35,21 +36,14 @@ export async function GET(request: Request) {
     }
   } catch {}
 
-  // For preview or when enabled, ask the generator for real items (personalized if possible)
+  // Kick off background regeneration without blocking the response
   try {
     const origin = new URL(request.url).origin
-    // Cache-bust and forward cookies so the generator can personalize for the signed-in user
-    const res = await fetch(`${origin}/api/insights/generate?preview=1&t=${Date.now()}`, {
+    fetch(`${origin}/api/insights/generate?preview=1&t=${Date.now()}`, {
       method: 'POST',
       cache: 'no-cache',
-      headers: {
-        cookie: request.headers.get('cookie') || '',
-      },
-    })
-    const data = await res.json().catch(() => ({}))
-    if (data?.items && Array.isArray(data.items)) {
-      return NextResponse.json({ enabled: true, items: data.items, preview: true }, { status: 200 })
-    }
+      headers: { cookie: request.headers.get('cookie') || '' },
+    }).catch(() => {})
   } catch {}
 
   // Secondary fallback: derive personalized preview from stored onboarding data
@@ -120,7 +114,7 @@ export async function GET(request: Request) {
         createdAt: new Date().toISOString(),
       },
     ]
-    return NextResponse.json({ enabled: true, items, preview: true }, { status: 200 })
+    return NextResponse.json({ enabled: true, items, preview: true, regenerating: true }, { status: 200 })
   } catch {}
 
   // Final static fallback
