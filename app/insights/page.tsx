@@ -287,6 +287,17 @@ export default function Insights() {
             <div className="text-xs text-gray-500 mb-2">Last updated: {lastUpdated}</div>
           )}
           
+          {/* Mobile hub tiles */}
+          <div className="md:hidden grid grid-cols-2 gap-3 mb-6">
+            {[{ key:'goals', label:'Goals', icon:'🎯' }, { key:'nutrition', label:'Nutrition', icon:'🥗' }, { key:'sleep', label:'Sleep', icon:'🌙' }, { key:'safety', label:'Safety', icon:'⚠️' }].map((t) => (
+              <button key={t.key} onClick={() => setExpandedSections(s => ({ ...s, [t.key]: true }))} className="bg-white border border-gray-200 rounded-xl p-4 text-left active:bg-gray-50">
+                <div className="text-2xl mb-2">{t.icon}</div>
+                <div className="font-semibold text-gray-900">{t.label}</div>
+                <div className="text-xs text-gray-500">Open {t.label.toLowerCase()}</div>
+              </button>
+            ))}
+          </div>
+
           {/* Mobile sectioned list */}
           <div className="md:hidden space-y-6">
             {Object.keys(grouped).length > 0 ? (
