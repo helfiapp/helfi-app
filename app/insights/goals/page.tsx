@@ -7,21 +7,13 @@ export default function GoalsInsights() {
   const [items, setItems] = useState<any[]>([])
 
   async function load() {
-    // First try to list issues from the user's profile
     try {
       const ud = await fetch('/api/user-data', { cache: 'no-cache' }).then(r=>r.json())
       const goals: string[] = Array.isArray(ud?.data?.goals) ? ud.data.goals : []
-      if (goals.length) {
-        setItems(goals.map((g) => ({ id: `goal:${g}`, title: g, summary: 'Open details', tags: ['goals'] })))
-        return
-      }
-    } catch {}
-    // Fallback to existing AI items if no explicit goals
-    const res = await fetch('/api/insights/list?preview=1', { cache: 'no-cache' })
-    const data = await res.json().catch(() => ({}))
-    const all: any[] = data?.items || []
-    const by = all.filter((it: any) => (it.tags || []).includes('goals'))
-    setItems(by.length ? by : all)
+      setItems(goals.map((g) => ({ id: `goal:${g}`, title: g, summary: 'Open details', tags: ['goals'] })))
+    } catch {
+      setItems([])
+    }
   }
 
   useEffect(() => { load() }, [])
@@ -35,7 +27,8 @@ export default function GoalsInsights() {
         </div>
       </div>
       <div className="max-w-4xl mx-auto px-4 py-6 space-y-4">
-        <div className="flex justify-end mb-2">
+        <div className="flex items-center justify-between mb-2">
+          <Link href="/insights" className="text-helfi-green text-lg">← Back</Link>
           <button onClick={async()=>{ fetch('/api/insights/generate?preview=1', { method: 'POST' }).catch(()=>{}); await load() }} className="px-3 py-2 bg-helfi-green text-white rounded-md text-sm">Refresh</button>
         </div>
         {items.map((it) => (
@@ -45,7 +38,7 @@ export default function GoalsInsights() {
           </Link>
         ))}
         {items.length === 0 && (
-          <div className="text-sm text-gray-600">No goal insights yet.</div>
+          <div className="text-sm text-gray-600">No goals found in your profile yet.</div>
         )}
       </div>
     </div>

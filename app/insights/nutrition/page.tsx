@@ -32,7 +32,8 @@ export default function NutritionInsights() {
         </div>
       </div>
       <div className="max-w-4xl mx-auto px-4 py-6 space-y-4">
-        <div className="flex justify-end mb-2">
+        <div className="flex items-center justify-between mb-2">
+          <Link href="/insights" className="text-helfi-green text-lg">← Back</Link>
           <button onClick={async()=>{ fetch('/api/insights/generate?preview=1', { method: 'POST' }).catch(()=>{}); await load() }} className="px-3 py-2 bg-helfi-green text-white rounded-md text-sm">Refresh</button>
         </div>
         {items.map((it) => (
@@ -42,7 +43,7 @@ export default function NutritionInsights() {
           </Link>
         ))}
         {items.length === 0 && (
-          <div className="text-sm text-gray-600">No nutrition insights yet.</div>
+          <div className="text-sm text-gray-600">No goals found in your profile yet.</div>
         )}
       </div>
     </div>

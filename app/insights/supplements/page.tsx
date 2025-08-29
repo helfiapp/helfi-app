@@ -25,6 +25,9 @@ export default function SupplementsInsights() {
         </div>
       </div>
       <div className="max-w-4xl mx-auto px-4 py-6 space-y-4">
+        <div className="flex items-center justify-between mb-2">
+          <Link href="/insights" className="text-helfi-green text-lg">← Back</Link>
+        </div>
         {supps.map((s, idx) => (
           <Link href={`/insights/supplements/${encodeURIComponent(s.name || 'supp_'+idx)}`} key={idx} className="bg-white border border-gray-200 rounded-lg p-4 block">
             <div className="font-semibold text-gray-900 mb-1">{s.name || 'Supplement'}</div>

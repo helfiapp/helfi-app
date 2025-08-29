@@ -24,7 +24,7 @@ export default function SupplementDetail() {
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white border-b border-gray-200 px-4 py-4">
         <div className="max-w-4xl mx-auto flex items-center gap-3">
-          <Link href="/insights/supplements" className="text-helfi-green">‹ Back</Link>
+          <Link href="/insights/supplements" className="text-helfi-green">← Back</Link>
           <h1 className="text-lg font-semibold">{data.name}</h1>
         </div>
       </div>
