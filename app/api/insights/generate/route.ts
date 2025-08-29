@@ -54,33 +54,62 @@ export async function POST(request: Request) {
     // non-blocking
   }
 
-  // Simple personalized fallback insights (used for preview and for safety)
+  // Simple personalized fallback insights (used when AI call not available)
   const fallback = () => {
     const goals = profile?.healthGoals?.filter((g: any) => !g.name?.startsWith('__')) || []
     const supplements = profile?.supplements || []
     const meds = profile?.medications || []
+    const hasMagnesium = supplements.some((s: any) => /magnesium/i.test(s?.name || ''))
+    const hasIron = supplements.some((s: any) => /iron/i.test(s?.name || ''))
+    const hasCalcium = supplements.some((s: any) => /calcium/i.test(s?.name || ''))
+    const hasOmega3 = supplements.some((s: any) => /(omega|fish\s*oil)/i.test(s?.name || ''))
+
     const items = [
       {
-        id: 'p1',
-        title: goals.length ? `Focus: ${goals[0].name}` : 'Set a clear weekly focus',
-        summary: goals.length ? `We will prioritize progress on “${goals[0].name}”.` : 'Choose 1–2 goals to focus on this week.',
+        id: 'pf1',
+        title: goals.length ? `Weekly focus: ${goals[0].name}` : 'Set a clear weekly focus',
+        summary: goals.length ? `Prioritize “${goals[0].name}”. Define one measurable action for this week.` : 'Choose 1–2 goals to focus on and define one measurable action.',
         tags: ['goals'],
         confidence: 0.7,
         createdAt: new Date().toISOString(),
       },
       {
-        id: 'p2',
-        title: supplements.length ? 'Supplement timing check' : 'Start with a simple supplement plan',
-        summary: supplements.length ? 'Consider evening magnesium for sleep quality.' : 'If appropriate, consider magnesium at night for relaxation.',
-        tags: ['supplement'],
-        confidence: 0.6,
+        id: 'pf2',
+        title: hasMagnesium ? 'Move magnesium to evening' : 'Start with simple sleep support',
+        summary: hasMagnesium ? 'Magnesium often works best 1–2 hours before bed; avoid pairing with high‑fiber meals.' : 'If appropriate, consider evening magnesium to support sleep quality.',
+        tags: ['supplement','timing','sleep'],
+        confidence: 0.7,
         createdAt: new Date().toISOString(),
       },
       {
-        id: 'p3',
-        title: meds.length ? 'Medication interactions watch' : 'Nutrition focus for energy',
-        summary: meds.length ? 'Avoid high‑sodium meals if on BP‑related meds.' : 'Try balanced meals with protein + fiber to steady energy.',
-        tags: ['safety','nutrition'],
+        id: 'pf3',
+        title: hasIron && hasCalcium ? 'Separate iron and calcium' : 'Medication/supplement spacing check',
+        summary: hasIron && hasCalcium ? 'Take iron and calcium at least 2 hours apart for absorption (check with your clinician).' : 'Review timing to avoid conflicts; spacing doses by ~2 hours can help (check with your clinician).',
+        tags: ['safety','timing'],
+        confidence: 0.66,
+        createdAt: new Date().toISOString(),
+      },
+      {
+        id: 'pf4',
+        title: 'Protein‑forward breakfast',
+        summary: 'Aim for 25–35g protein at breakfast to stabilize morning energy and appetite.',
+        tags: ['nutrition','energy'],
+        confidence: 0.64,
+        createdAt: new Date().toISOString(),
+      },
+      {
+        id: 'pf5',
+        title: hasOmega3 ? 'Keep omega‑3 consistent' : 'Consider omega‑3 intake',
+        summary: hasOmega3 ? 'Take omega‑3 with a meal containing fat for better absorption.' : 'Consider omega‑3 rich foods or a supplement (discuss with your clinician).',
+        tags: ['supplement','nutrition'],
+        confidence: 0.61,
+        createdAt: new Date().toISOString(),
+      },
+      {
+        id: 'pf6',
+        title: 'Hydration + fiber baseline',
+        summary: 'Target ~2–3L fluids daily and include fiber at each meal for digestion.',
+        tags: ['hydration','nutrition'],
         confidence: 0.6,
         createdAt: new Date().toISOString(),
       },
