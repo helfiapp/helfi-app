@@ -5,21 +5,20 @@ import Link from 'next/link'
 
 export default function NutritionInsights() {
   const [items, setItems] = useState<any[]>([])
+  const [loading, setLoading] = useState<boolean>(true)
 
   async function load() {
     try {
+      setLoading(true)
       const ud = await fetch('/api/user-data', { cache: 'no-cache' }).then(r=>r.json())
       const goals: string[] = Array.isArray(ud?.data?.goals) ? ud.data.goals : []
       if (goals.length) {
         setItems(goals.map((g) => ({ id: `nutrition:${g}`, title: g, summary: 'Open nutrition details', tags: ['nutrition'] })))
-        return
+      } else {
+        setItems([])
       }
-    } catch {}
-    const res = await fetch('/api/insights/list?preview=1', { cache: 'no-cache' })
-    const data = await res.json().catch(() => ({}))
-    const all: any[] = data?.items || []
-    const by = all.filter((it: any) => (it.tags || []).includes('nutrition'))
-    setItems(by.length ? by : all)
+    } catch { setItems([]) }
+    finally { setLoading(false) }
   }
   useEffect(() => { load() }, [])
 
@@ -36,13 +35,19 @@ export default function NutritionInsights() {
           <Link href="/insights" className="text-helfi-green text-lg">← Back</Link>
           <button onClick={async()=>{ fetch('/api/insights/generate?preview=1', { method: 'POST' }).catch(()=>{}); await load() }} className="px-3 py-2 bg-helfi-green text-white rounded-md text-sm">Refresh</button>
         </div>
-        {items.map((it) => (
+        {loading && (
+          <div className="flex items-center gap-2 text-gray-500 text-sm">
+            <span className="h-4 w-4 border-2 border-gray-300 border-t-transparent rounded-full animate-spin"></span>
+            Loading…
+          </div>
+        )}
+        {!loading && items.map((it) => (
           <Link href={String(it.id).startsWith('nutrition:') ? `/insights/issue/${encodeURIComponent(it.title)}?tab=nutrition` : `/insights/${encodeURIComponent(it.id)}`} key={it.id} className="bg-white border border-gray-200 rounded-lg p-4 block">
             <div className="font-semibold text-gray-900 mb-1">{it.title}</div>
             <div className="text-sm text-gray-700">{it.summary}</div>
           </Link>
         ))}
-        {items.length === 0 && (
+        {!loading && items.length === 0 && (
           <div className="text-sm text-gray-600">No goals found in your profile yet.</div>
         )}
       </div>
