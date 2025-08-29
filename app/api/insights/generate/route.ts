@@ -140,7 +140,9 @@ Return a JSON array of items where each item has:
   title (string),
   summary (string, 1–2 sentences, actionable),
   tags (array of strings like ['goals','supplement','medication','nutrition','timing','safety','energy','sleep']),
-  confidence (0–1).
+  confidence (0–1),
+  reason (string),
+  actions (array of 3–5 concise steps).
 
 Content guidance:
 - Cross-link data (e.g., a supplement timing that supports a goal; a nutrition tweak to help a symptom trend from health logs).

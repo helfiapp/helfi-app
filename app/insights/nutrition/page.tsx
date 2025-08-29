@@ -26,10 +26,10 @@ export default function NutritionInsights() {
       </div>
       <div className="max-w-4xl mx-auto px-4 py-6 space-y-4">
         {items.map((it) => (
-          <div key={it.id} className="bg-white border border-gray-200 rounded-lg p-4">
+          <Link href={`/insights/${encodeURIComponent(it.id)}`} key={it.id} className="bg-white border border-gray-200 rounded-lg p-4 block">
             <div className="font-semibold text-gray-900 mb-1">{it.title}</div>
             <div className="text-sm text-gray-700">{it.summary}</div>
-          </div>
+          </Link>
         ))}
         {items.length === 0 && (
           <div className="text-sm text-gray-600">No nutrition insights yet.</div>
