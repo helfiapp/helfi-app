@@ -81,6 +81,8 @@ export default function Insights() {
   const [refreshing, setRefreshing] = useState<boolean>(false)
   const [lastUpdated, setLastUpdated] = useState<string>('')
   const userCtx = useMemo(() => (typeof window !== 'undefined' ? (window as any).__insightsUserCtx || { goals: [], supplements: [], medications: [], todaysFoods: [] } : { goals: [], supplements: [], medications: [], todaysFoods: [] }), [])
+  const [selected, setSelected] = useState<any | null>(null)
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     // Show visual preview without enabling the real feature
@@ -160,6 +162,40 @@ export default function Insights() {
       return 'Based on your recent foods logged'
     }
     return null
+  }
+
+  // Mobile hierarchical grouping
+  const categoryPriority = ['goals','timing','nutrition','safety','supplement','medication','sleep','energy']
+  const categoryIcon: Record<string, string> = {
+    goals: '🎯',
+    timing: '⏱️',
+    nutrition: '🥗',
+    safety: '⚠️',
+    supplement: '💊',
+    medication: '💉',
+    sleep: '🌙',
+    energy: '🔋',
+  }
+  function pickCategory(tags: string[] = []) {
+    const lower = tags.map(t => String(t).toLowerCase())
+    for (const c of categoryPriority) if (lower.includes(c)) return c
+    if (lower.includes('bp')) return 'safety'
+    return lower[0] || 'goals'
+  }
+  const grouped = useMemo(() => {
+    const by: Record<string, any[]> = {}
+    for (const it of insights) {
+      const cat = pickCategory(it.tags)
+      by[cat] = by[cat] || []
+      by[cat].push(it)
+    }
+    // sort items stable
+    for (const k of Object.keys(by)) by[k] = by[k].slice(0)
+    return by
+  }, [insights])
+
+  function toggleSection(cat: string) {
+    setExpandedSections(s => ({ ...s, [cat]: !s[cat] }))
   }
 
   return (
@@ -251,8 +287,56 @@ export default function Insights() {
             <div className="text-xs text-gray-500 mb-2">Last updated: {lastUpdated}</div>
           )}
           
-          {/* Insights Grid - Preview mode */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* Mobile sectioned list */}
+          <div className="md:hidden space-y-6">
+            {Object.keys(grouped).length > 0 ? (
+              categoryPriority
+                .filter(cat => grouped[cat]?.length)
+                .map((cat) => {
+                  const list = grouped[cat]
+                  const showAll = expandedSections[cat]
+                  const visible = showAll ? list : list.slice(0, 2)
+                  return (
+                    <div key={cat} className="bg-white border border-gray-200 rounded-lg">
+                      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">{categoryIcon[cat] || '🤖'}</span>
+                          <h3 className="font-semibold capitalize">{cat}</h3>
+                        </div>
+                        <button className="text-sm text-helfi-green" onClick={() => toggleSection(cat)}>
+                          {showAll ? 'Show less' : 'See all'}
+                        </button>
+                      </div>
+                      <div className="divide-y divide-gray-100">
+                        {visible.map((it) => (
+                          <button key={it.id} onClick={() => setSelected(it)} className="w-full text-left px-4 py-3 active:bg-gray-50">
+                            {renderBadges(it.tags)}
+                            <div className="flex items-start gap-3">
+                              <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center mt-0.5">
+                                <span className="text-white text-sm">🤖</span>
+                              </div>
+                              <div className="flex-1">
+                                <div className="font-semibold text-gray-900">{it.title}</div>
+                                <div className="text-sm text-gray-700 line-clamp-2">{it.summary}</div>
+                                {explain(it) && (
+                                  <div className="text-xs text-gray-500 mt-1">Why: {explain(it)}</div>
+                                )}
+                              </div>
+                              <div className="text-gray-400">›</div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })
+            ) : (
+              <div className="text-sm text-gray-600">{loadingPreview ? 'Loading preview…' : 'No insights yet.'}</div>
+            )}
+          </div>
+
+          {/* Desktop grid remains */}
+          <div className="hidden md:grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {insights.length > 0 ? (
               insights.map((it) => (
                 <div key={it.id} className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -353,6 +437,28 @@ export default function Insights() {
 
         </div>
       </nav>
+
+      {/* Mobile detail sheet */}
+      {selected && (
+        <div className="md:hidden fixed inset-0 z-50">
+          <div className="absolute inset-0 bg-black/30" onClick={() => setSelected(null)} />
+          <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-lg p-4 max-h-[80vh] overflow-auto">
+            <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto mb-3" />
+            {renderBadges(selected.tags)}
+            <div className="flex items-center mb-2">
+              <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center mr-3">
+                <span className="text-white text-sm">🤖</span>
+              </div>
+              <h3 className="font-semibold text-gray-900 text-lg flex-1">{selected.title}</h3>
+              <button className="text-sm text-gray-500" onClick={() => setSelected(null)}>Close</button>
+            </div>
+            <p className="text-gray-800 text-sm mb-2">{selected.summary}</p>
+            {explain(selected) && (
+              <div className="text-xs text-gray-600 mb-3">Why you’re seeing this: {explain(selected)}</div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 } 
