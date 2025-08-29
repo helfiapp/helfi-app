@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -57,6 +57,12 @@ export default function Insights() {
           } else {
             console.log('Insights page - No profile image found in database response');
           }
+          // Minimal context for explanations
+          const goals = Array.isArray(result.data?.goals) ? result.data.goals : []
+          const supplements = Array.isArray(result.data?.supplements) ? result.data.supplements.map((s: any) => s.name).filter(Boolean) : []
+          const medications = Array.isArray(result.data?.medications) ? result.data.medications.map((m: any) => m.name).filter(Boolean) : []
+          const todaysFoods = Array.isArray(result.data?.todaysFoods) ? result.data.todaysFoods : []
+          ;(window as any).__insightsUserCtx = { goals, supplements, medications, todaysFoods }
         } else {
           console.error('Insights page - API call failed:', response.status, response.statusText);
         }
@@ -74,6 +80,7 @@ export default function Insights() {
   const [loadingPreview, setLoadingPreview] = useState<boolean>(false)
   const [refreshing, setRefreshing] = useState<boolean>(false)
   const [lastUpdated, setLastUpdated] = useState<string>('')
+  const userCtx = useMemo(() => (typeof window !== 'undefined' ? (window as any).__insightsUserCtx || { goals: [], supplements: [], medications: [], todaysFoods: [] } : { goals: [], supplements: [], medications: [], todaysFoods: [] }), [])
 
   useEffect(() => {
     // Show visual preview without enabling the real feature
@@ -110,6 +117,49 @@ export default function Insights() {
     } finally {
       setRefreshing(false)
     }
+  }
+
+  // Helpers for UX badges and explanations
+  const tagStyles: Record<string, string> = useMemo(() => ({
+    goals: 'bg-green-100 text-green-800 border-green-200',
+    supplement: 'bg-purple-100 text-purple-800 border-purple-200',
+    medication: 'bg-rose-100 text-rose-800 border-rose-200',
+    nutrition: 'bg-amber-100 text-amber-800 border-amber-200',
+    timing: 'bg-blue-100 text-blue-800 border-blue-200',
+    safety: 'bg-red-100 text-red-700 border-red-200',
+    energy: 'bg-cyan-100 text-cyan-800 border-cyan-200',
+    sleep: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+  }), [])
+
+  function renderBadges(tags: string[] = []) {
+    return (
+      <div className="flex flex-wrap gap-2 mb-2">
+        {tags.slice(0, 4).map((t) => (
+          <span key={t} className={`px-2 py-0.5 rounded-md text-xs border ${tagStyles[t] || 'bg-gray-100 text-gray-700 border-gray-200'}`}>{t}</span>
+        ))}
+      </div>
+    )
+  }
+
+  function explain(it: any): string | null {
+    const title = String(it?.title || '').toLowerCase()
+    const tags: string[] = Array.isArray(it?.tags) ? it.tags : []
+
+    if (tags.includes('supplement')) {
+      const mag = userCtx.supplements?.find((s: string) => /magnesium/i.test(s))
+      if (mag && /magnesium/.test(title)) return 'Because you already take magnesium'
+      if (userCtx.supplements?.length) return `Based on your supplements: ${userCtx.supplements.slice(0,2).join(', ')}`
+    }
+    if (tags.includes('medication') && userCtx.medications?.length) {
+      return `Based on your medications: ${userCtx.medications.slice(0,1).join(', ')}`
+    }
+    if (tags.includes('goals') && userCtx.goals?.length) {
+      return `You set a goal: ${userCtx.goals[0]}`
+    }
+    if (tags.includes('nutrition') && userCtx.todaysFoods?.length) {
+      return 'Based on your recent foods logged'
+    }
+    return null
   }
 
   return (
@@ -206,13 +256,19 @@ export default function Insights() {
             {insights.length > 0 ? (
               insights.map((it) => (
                 <div key={it.id} className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  {renderBadges(it.tags)}
                   <div className="flex items-center mb-2">
                     <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center mr-3">
                       <span className="text-white text-sm">🤖</span>
                     </div>
                     <h3 className="font-semibold text-blue-900">{it.title}</h3>
                   </div>
-                  <p className="text-blue-800 text-sm">{it.summary}</p>
+                  <p className="text-blue-800 text-sm mb-2">{it.summary}</p>
+                  {explain(it) && (
+                    <div className="text-xs text-blue-900/80">
+                      <span className="font-medium">Why you’re seeing this:</span> {explain(it)}
+                    </div>
+                  )}
                 </div>
               ))
             ) : (
