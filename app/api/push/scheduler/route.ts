@@ -8,7 +8,8 @@ import webpush from 'web-push'
 export async function POST(req: NextRequest) {
   const authHeader = req.headers.get('authorization') || ''
   const expected = process.env.SCHEDULER_SECRET || ''
-  if (!expected || authHeader !== `Bearer ${expected}`) {
+  const isVercelCron = (req.headers.get('x-vercel-cron') || '').toString() === '1'
+  if (!(isVercelCron || (expected && authHeader === `Bearer ${expected}`))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
