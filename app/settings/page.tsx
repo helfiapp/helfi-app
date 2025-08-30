@@ -217,6 +217,24 @@ export default function Settings() {
     }
   }
 
+  // One-click save/re-save subscription
+  const saveSubscription = async () => {
+    try {
+      const reg = (await navigator.serviceWorker.getRegistration()) || (await navigator.serviceWorker.register('/sw.js'))
+      const vapid = await fetch('/api/push/vapid').then(r=>r.json()).catch(()=>({ publicKey: '' }))
+      if (!vapid.publicKey) { alert('Server VAPID key not available yet.'); return }
+      let sub = await reg.pushManager.getSubscription()
+      if (!sub) {
+        const permission = await Notification.requestPermission()
+        if (permission !== 'granted') { alert('Notifications permission not granted.'); return }
+        sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(vapid.publicKey) })
+      }
+      const res = await fetch('/api/push/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscription: sub }) })
+      if (res.ok) alert('Device subscription saved.')
+      else alert('Could not save subscription. Please try again.')
+    } catch (e) { alert('Subscription error. Please try again.') }
+  }
+
   // Helper for VAPID key format
   function urlBase64ToUint8Array(base64String: string) {
     const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
@@ -416,6 +434,15 @@ export default function Settings() {
                   >
                     Send test
                   </button>
+                </div>
+              )}
+              {pushNotifications && (
+                <div className="flex items-center justify-between mt-3">
+                  <div>
+                    <h4 className="font-medium text-gray-900 dark:text-white">Save Subscription</h4>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">Re-save this device to the server</p>
+                  </div>
+                  <button onClick={saveSubscription} className="px-3 py-1.5 rounded-md bg-gray-100 text-gray-800 text-sm font-medium hover:opacity-90">Save</button>
                 </div>
               )}
               {isIOS && !isInstalled && (
