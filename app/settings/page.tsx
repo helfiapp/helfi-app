@@ -24,6 +24,13 @@ export default function Settings() {
   const [pushNotifications, setPushNotifications] = useState(false)
   const [profileVisibility, setProfileVisibility] = useState('private')
   const [dataAnalytics, setDataAnalytics] = useState(true)
+  // Reminder settings
+  const [time1, setTime1] = useState('12:30')
+  const [time2, setTime2] = useState('18:30')
+  const [time3, setTime3] = useState('21:30')
+  const [tz, setTz] = useState('')
+  const [freq, setFreq] = useState(3)
+  const [savingTimes, setSavingTimes] = useState(false)
   
   // iOS detection for push notifications
   const [isIOS, setIsIOS] = useState(false)
@@ -95,6 +102,27 @@ export default function Settings() {
           }
         }
       } catch {}
+    })()
+  }, [])
+
+  // Load reminder settings
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/api/checkins/settings', { cache: 'no-cache' })
+        if (res.ok) {
+          const s = await res.json()
+          setTime1(s.time1 || '12:30')
+          setTime2(s.time2 || '18:30')
+          setTime3(s.time3 || '21:30')
+          setTz(s.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone)
+          setFreq(Number(s.frequency || 3))
+        } else {
+          setTz(Intl.DateTimeFormat().resolvedOptions().timeZone)
+        }
+      } catch {
+        setTz(Intl.DateTimeFormat().resolvedOptions().timeZone)
+      }
     })()
   }, [])
 
@@ -563,6 +591,47 @@ export default function Settings() {
           </div>
 
 
+        </div>
+
+        {/* Reminder Times */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Reminder Times</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Time 1</label>
+              <input type="time" value={time1} onChange={(e)=>setTime1(e.target.value)} className="w-full border rounded px-3 py-2 dark:bg-gray-700 dark:text-white" />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Time 2</label>
+              <input type="time" value={time2} onChange={(e)=>setTime2(e.target.value)} className="w-full border rounded px-3 py-2 dark:bg-gray-700 dark:text-white" />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Time 3</label>
+              <input type="time" value={time3} onChange={(e)=>setTime3(e.target.value)} className="w-full border rounded px-3 py-2 dark:bg-gray-700 dark:text-white" />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Timezone</label>
+              <input type="text" value={tz} onChange={(e)=>setTz(e.target.value)} className="w-full border rounded px-3 py-2 dark:bg-gray-700 dark:text-white" />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Frequency (1–3)</label>
+              <select value={freq} onChange={(e)=>setFreq(Number(e.target.value))} className="w-full border rounded px-3 py-2 dark:bg-gray-700 dark:text-white">
+                <option value={1}>1</option>
+                <option value={2}>2</option>
+                <option value={3}>3</option>
+              </select>
+            </div>
+          </div>
+          <div className="flex justify-end mt-4">
+            <button disabled={savingTimes} onClick={async()=>{
+              try {
+                setSavingTimes(true)
+                const res = await fetch('/api/checkins/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ time1, time2, time3, timezone: tz, frequency: freq }) })
+                if (!res.ok) throw new Error('save failed')
+                alert('Reminder times saved')
+              } catch { alert('Could not save times. Please try again.') } finally { setSavingTimes(false) }
+            }} className="px-3 py-1.5 rounded-md bg-helfi-green text-white text-sm font-medium disabled:opacity-60">{savingTimes ? 'Saving…' : 'Save times'}</button>
+          </div>
         </div>
       </div>
 
