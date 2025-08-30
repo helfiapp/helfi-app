@@ -539,24 +539,7 @@ export default function Settings() {
                   </button>
                 </div>
               )}
-              {pushNotifications && (
-                <div className="flex items-center justify-between mt-3">
-                  <div>
-                    <h4 className="font-medium text-gray-900 dark:text-white">Save Subscription</h4>
-                    <p className="text-xs text-gray-600 dark:text-gray-400">Re-save this device to the server</p>
-                  </div>
-                  <button onClick={saveSubscription} className="px-3 py-1.5 rounded-md bg-gray-100 text-gray-800 text-sm font-medium hover:opacity-90">Save</button>
-                </div>
-              )}
-              {pushNotifications && (
-                <div className="flex items-center justify-between mt-3">
-                  <div>
-                    <h4 className="font-medium text-gray-900 dark:text-white">Reset Subscription</h4>
-                    <p className="text-xs text-gray-600 dark:text-gray-400">Unsubscribe this device and subscribe fresh</p>
-                  </div>
-                  <button onClick={resetSubscription} className="px-3 py-1.5 rounded-md bg-gray-100 text-gray-800 text-sm font-medium hover:opacity-90">Reset</button>
-                </div>
-              )}
+              {/* Removed Save/Reset subscription actions after successful wiring */}
               {isIOS && !isInstalled && (
                 <div className="mt-2 text-xs text-gray-600 dark:text-gray-400">
                   Tip: In Safari, tap the share icon → “Add to Home Screen”, then open the Helfi app icon and enable here.
