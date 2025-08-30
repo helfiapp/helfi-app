@@ -2,8 +2,7 @@
   "crons": [
     {
       "path": "/api/push/scheduler",
-      "schedule": "0 18 * * *",
-      "method": "POST"
+      "schedule": "0 18 * * *"
     }
   ]
 }
