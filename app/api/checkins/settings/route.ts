@@ -28,10 +28,43 @@ export async function POST(req: NextRequest) {
   const user = await prisma.user.findUnique({ where: { email: session.user.email } })
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
-  const { time1, time2, time3, timezone, frequency } = await req.json()
+  const body = await req.json().catch(() => ({}))
+  let { time1, time2, time3, timezone, frequency } = body as any
+
+  // Normalize times on the server to avoid client formatting issues
+  const normalizeTime = (input?: string): string => {
+    if (!input) return '00:00'
+    const s = String(input).trim().toLowerCase()
+    const m24 = s.match(/^([01]?\d|2[0-3]):([0-5]\d)$/)
+    if (m24) return `${m24[1].padStart(2,'0')}:${m24[2]}`
+    const m12 = s.match(/^([0-1]?\d):([0-5]\d)\s*(am|pm)$/)
+    if (m12) {
+      let h = parseInt(m12[1], 10)
+      const mm = m12[2]
+      const ap = m12[3]
+      if (ap === 'pm' && h !== 12) h += 12
+      if (ap === 'am' && h === 12) h = 0
+      return `${String(h).padStart(2,'0')}:${mm}`
+    }
+    // Fallback: digits HHMM
+    const digits = s.replace(/[^0-9]/g, '')
+    if (digits.length >= 3) {
+      const h = parseInt(digits.slice(0, digits.length - 2), 10)
+      const mm = parseInt(digits.slice(-2), 10)
+      return `${String(Math.max(0, Math.min(23, h))).padStart(2,'0')}:${String(Math.max(0, Math.min(59, mm))).padStart(2,'0')}`
+    }
+    return '00:00'
+  }
+
+  time1 = normalizeTime(time1)
+  time2 = normalizeTime(time2)
+  time3 = normalizeTime(time3)
+  timezone = (timezone && String(timezone).trim()) || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+  frequency = Math.min(3, Math.max(1, Number(frequency || 3)))
 
   // Auto-create table if missing (safe add-only)
   try {
+    console.log('Saving CheckinSettings for', user.id, { time1, time2, time3, timezone, frequency })
     await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS CheckinSettings (
         userId TEXT PRIMARY KEY,
@@ -46,12 +79,13 @@ export async function POST(req: NextRequest) {
       `INSERT INTO CheckinSettings (userId, time1, time2, time3, timezone, frequency)
        VALUES ($1,$2,$3,$4,$5,$6)
        ON CONFLICT (userId) DO UPDATE SET time1=EXCLUDED.time1, time2=EXCLUDED.time2, time3=EXCLUDED.time3, timezone=EXCLUDED.timezone, frequency=EXCLUDED.frequency`,
-      user.id, time1, time2, time3, timezone, Math.min(3, Math.max(1, Number(frequency || 3)))
+      user.id, time1, time2, time3, timezone, frequency
     )
     return NextResponse.json({ success: true })
   } catch (e) {
     console.error('checkins settings save error', e)
-    return NextResponse.json({ error: 'Failed to save settings' }, { status: 500 })
+    const message = e instanceof Error ? e.message : 'Unknown error'
+    return NextResponse.json({ error: 'Failed to save settings', detail: message }, { status: 500 })
   }
 }
 
