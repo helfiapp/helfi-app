@@ -658,10 +658,11 @@ export default function Settings() {
                 const res = await fetch('/api/checkins/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
                 if (!res.ok) {
                   const txt = await res.text().catch(()=> '')
-                  throw new Error(txt || 'save failed')
+                  alert(`Save failed (${res.status}). ${txt || ''}`.trim())
+                  return
                 }
                 alert('Reminder times saved')
-              } catch { alert('Could not save times. Please try again.') } finally { setSavingTimes(false) }
+              } catch (e:any) { alert(`Could not save times. ${e?.message || ''}`.trim()) } finally { setSavingTimes(false) }
             }} className="px-3 py-1.5 rounded-md bg-helfi-green text-white text-sm font-medium disabled:opacity-60">{savingTimes ? 'Saving…' : 'Save times'}</button>
           </div>
         </div>
