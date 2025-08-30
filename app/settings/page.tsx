@@ -31,6 +31,13 @@ export default function Settings() {
   const [tz, setTz] = useState('')
   const [freq, setFreq] = useState(3)
   const [savingTimes, setSavingTimes] = useState(false)
+  // Curated timezone list (IANA names)
+  const baseTimezones = [
+    'UTC','Europe/London','Europe/Paris','Europe/Berlin','Europe/Madrid','Europe/Rome','Europe/Amsterdam','Europe/Zurich','Europe/Stockholm','Europe/Athens',
+    'Africa/Johannesburg','Asia/Dubai','Asia/Kolkata','Asia/Bangkok','Asia/Singapore','Asia/Kuala_Lumpur','Asia/Hong_Kong','Asia/Tokyo','Asia/Seoul','Asia/Shanghai',
+    'Australia/Perth','Australia/Adelaide','Australia/Melbourne','Australia/Sydney','Pacific/Auckland',
+    'America/New_York','America/Chicago','America/Denver','America/Los_Angeles','America/Toronto','America/Vancouver','America/Mexico_City','America/Bogota','America/Sao_Paulo'
+  ]
 
   function normalizeTime(input: string): string {
     if (!input) return '00:00'
@@ -639,7 +646,13 @@ export default function Settings() {
             </div>
             <div>
               <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Timezone</label>
-              <input type="text" value={tz} onChange={(e)=>setTz(e.target.value)} className="w-full border rounded px-3 py-2 dark:bg-gray-700 dark:text-white" />
+              <select value={tz} onChange={(e)=>setTz(e.target.value)} className="w-full border rounded px-3 py-2 dark:bg-gray-700 dark:text-white">
+                {(() => {
+                  const current = tz || Intl.DateTimeFormat().resolvedOptions().timeZone
+                  const list = baseTimezones.includes(current) ? baseTimezones : [current, ...baseTimezones]
+                  return list.map(z => (<option key={z} value={z}>{z}</option>))
+                })()}
+              </select>
             </div>
             <div>
               <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Frequency (1–3)</label>
