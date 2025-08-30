@@ -235,6 +235,24 @@ export default function Settings() {
     } catch (e) { alert('Subscription error. Please try again.') }
   }
 
+  const resetSubscription = async () => {
+    try {
+      const reg = (await navigator.serviceWorker.getRegistration()) || (await navigator.serviceWorker.register('/sw.js'))
+      // Unsubscribe existing
+      const existing = await reg.pushManager.getSubscription()
+      if (existing) { try { await existing.unsubscribe() } catch {} }
+      // Fresh subscribe with current VAPID
+      const vapid = await fetch('/api/push/vapid').then(r=>r.json()).catch(()=>({ publicKey: '' }))
+      if (!vapid.publicKey) { alert('Server VAPID key not available yet.'); return }
+      const permission = await Notification.requestPermission()
+      if (permission !== 'granted') { alert('Notifications permission not granted.'); return }
+      const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(vapid.publicKey) })
+      const res = await fetch('/api/push/subscribe', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscription: sub }) })
+      if (res.ok) alert('Subscription reset and saved.')
+      else alert('Could not reset subscription. Please try again.')
+    } catch (e) { alert('Reset error. Please try again.') }
+  }
+
   // Helper for VAPID key format
   function urlBase64ToUint8Array(base64String: string) {
     const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
@@ -443,6 +461,15 @@ export default function Settings() {
                     <p className="text-xs text-gray-600 dark:text-gray-400">Re-save this device to the server</p>
                   </div>
                   <button onClick={saveSubscription} className="px-3 py-1.5 rounded-md bg-gray-100 text-gray-800 text-sm font-medium hover:opacity-90">Save</button>
+                </div>
+              )}
+              {pushNotifications && (
+                <div className="flex items-center justify-between mt-3">
+                  <div>
+                    <h4 className="font-medium text-gray-900 dark:text-white">Reset Subscription</h4>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">Unsubscribe this device and subscribe fresh</p>
+                  </div>
+                  <button onClick={resetSubscription} className="px-3 py-1.5 rounded-md bg-gray-100 text-gray-800 text-sm font-medium hover:opacity-90">Reset</button>
                 </div>
               )}
               {isIOS && !isInstalled && (
