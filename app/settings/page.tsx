@@ -520,6 +520,28 @@ export default function Settings() {
               {pushNotifications && (
                 <div className="flex items-center justify-between mt-3">
                   <div>
+                    <h4 className="font-medium text-gray-900 dark:text-white">Send reminder now</h4>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">Triggers the same path as the scheduler</p>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      try {
+                        const res = await fetch('/api/push/send-reminder-now', { method: 'POST' })
+                        if (!res.ok) throw new Error('Failed')
+                        alert('Reminder sent')
+                      } catch (e) {
+                        alert('Could not send reminder now.')
+                      }
+                    }}
+                    className="px-3 py-1.5 rounded-md bg-helfi-green text-white text-sm font-medium hover:opacity-90"
+                  >
+                    Send
+                  </button>
+                </div>
+              )}
+              {pushNotifications && (
+                <div className="flex items-center justify-between mt-3">
+                  <div>
                     <h4 className="font-medium text-gray-900 dark:text-white">Save Subscription</h4>
                     <p className="text-xs text-gray-600 dark:text-gray-400">Re-save this device to the server</p>
                   </div>
