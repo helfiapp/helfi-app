@@ -75,6 +75,9 @@ export async function POST(req: NextRequest) {
         frequency INTEGER NOT NULL DEFAULT 3
       )
     `)
+    // Forward-compatible: add missing columns if table pre-existed without them
+    await prisma.$executeRawUnsafe(`ALTER TABLE CheckinSettings ADD COLUMN IF NOT EXISTS frequency INTEGER NOT NULL DEFAULT 3`)
+    await prisma.$executeRawUnsafe(`ALTER TABLE CheckinSettings ADD COLUMN IF NOT EXISTS timezone TEXT NOT NULL DEFAULT 'UTC'`)
     await prisma.$executeRawUnsafe(
       `INSERT INTO CheckinSettings (userId, time1, time2, time3, timezone, frequency)
        VALUES ($1,$2,$3,$4,$5,$6)
