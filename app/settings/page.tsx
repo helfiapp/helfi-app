@@ -31,6 +31,34 @@ export default function Settings() {
   const [tz, setTz] = useState('')
   const [freq, setFreq] = useState(3)
   const [savingTimes, setSavingTimes] = useState(false)
+
+  function normalizeTime(input: string): string {
+    if (!input) return '00:00'
+    const s = input.trim().toLowerCase()
+    // Already 24h HH:MM
+    const m24 = s.match(/^([01]?\d|2[0-3]):([0-5]\d)$/)
+    if (m24) return `${m24[1].padStart(2,'0')}:${m24[2]}`
+    // 12h like 12:30 pm or 7:05am
+    const m12 = s.match(/^([0-1]?\d):([0-5]\d)\s*(am|pm)$/)
+    if (m12) {
+      let h = parseInt(m12[1], 10)
+      const mm = m12[2]
+      const ap = m12[3]
+      if (ap === 'pm' && h !== 12) h += 12
+      if (ap === 'am' && h === 12) h = 0
+      return `${String(h).padStart(2,'0')}:${mm}`
+    }
+    // Fallback: strip non-digits and try first 4 digits
+    const digits = s.replace(/[^0-9]/g, '')
+    if (digits.length >= 3) {
+      const h = digits.slice(0, digits.length - 2)
+      const mm = digits.slice(-2)
+      const hh = Math.max(0, Math.min(23, parseInt(h, 10)))
+      const m = Math.max(0, Math.min(59, parseInt(mm, 10)))
+      return `${String(hh).padStart(2,'0')}:${String(m).padStart(2,'0')}`
+    }
+    return '00:00'
+  }
   
   // iOS detection for push notifications
   const [isIOS, setIsIOS] = useState(false)
@@ -626,8 +654,12 @@ export default function Settings() {
             <button disabled={savingTimes} onClick={async()=>{
               try {
                 setSavingTimes(true)
-                const res = await fetch('/api/checkins/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ time1, time2, time3, timezone: tz, frequency: freq }) })
-                if (!res.ok) throw new Error('save failed')
+                const payload = { time1: normalizeTime(time1), time2: normalizeTime(time2), time3: normalizeTime(time3), timezone: tz || Intl.DateTimeFormat().resolvedOptions().timeZone, frequency: freq }
+                const res = await fetch('/api/checkins/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+                if (!res.ok) {
+                  const txt = await res.text().catch(()=> '')
+                  throw new Error(txt || 'save failed')
+                }
                 alert('Reminder times saved')
               } catch { alert('Could not save times. Please try again.') } finally { setSavingTimes(false) }
             }} className="px-3 py-1.5 rounded-md bg-helfi-green text-white text-sm font-medium disabled:opacity-60">{savingTimes ? 'Saving…' : 'Save times'}</button>
