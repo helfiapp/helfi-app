@@ -1,7 +1,7 @@
 {
   "name": "Helfi",
   "short_name": "Helfi",
-  "start_url": "/staging-signin",
+  "start_url": "/healthapp",
   "scope": "/",
   "display": "standalone",
   "background_color": "#ffffff",
@@ -11,7 +11,7 @@
     {
       "name": "Sign in",
       "short_name": "Sign in",
-      "url": "/staging-signin",
+      "url": "/healthapp",
       "icons": [
         {
           "src": "/logo.svg",
