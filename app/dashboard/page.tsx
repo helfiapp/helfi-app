@@ -5,10 +5,12 @@ import { useSession, signOut } from 'next-auth/react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useUserData } from '@/components/providers/UserDataProvider'
 
 export default function Dashboard() {
   const { data: session } = useSession()
   const pathname = usePathname()
+  const { profileImage: providerProfileImage } = useUserData()
   const [onboardingData, setOnboardingData] = useState<any>(null)
   const [showResetConfirm, setShowResetConfirm] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
@@ -22,7 +24,7 @@ export default function Dashboard() {
       <path d="M64 76c-13.33 0-24 5.34-24 12v16c0 8.84 7.16 16 16 16h16c8.84 0 16-7.16 16-16V88c0-6.66-10.67-12-24-12z" fill="white"/>
     </svg>
   `);
-  const userImage = profileImage || session?.user?.image || defaultAvatar;
+  const userImage = providerProfileImage || profileImage || session?.user?.image || defaultAvatar;
   const userName = session?.user?.name || 'User';
 
   // Close dropdown on outside click
