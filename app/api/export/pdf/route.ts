@@ -2,13 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-
-// Lazy import puppeteer only when needed to keep cold starts smaller
-async function getPuppeteer() {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const puppeteer = require('puppeteer') as typeof import('puppeteer')
-  return puppeteer
-}
+import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
 
 export async function GET(request: NextRequest) {
   try {
@@ -43,111 +37,71 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // Build simple branded HTML for PDF
+    // Build PDF in-memory using pdf-lib (serverless friendly)
     const fmt = (d?: Date | string | null) => (d ? new Date(d).toLocaleString() : '')
     const dateRangeText = hasRange
       ? `${dateFilter.gte ? fmt(dateFilter.gte) : '…'} → ${dateFilter.lte ? fmt(dateFilter.lte) : '…'}`
       : 'All time'
 
-    const dailyMetrics = (user.healthLogs || []).map((h: any) => `
-      <tr>
-        <td>${fmt(h.createdAt)}</td>
-        <td>${h.rating}</td>
-        <td>${h.notes || ''}</td>
-      </tr>
-    `).join('')
+    const doc = await PDFDocument.create()
+    const page = doc.addPage([595.28, 841.89]) // A4 in points
+    const font = await doc.embedFont(StandardFonts.Helvetica)
+    const fontBold = await doc.embedFont(StandardFonts.HelveticaBold)
+    const margin = 40
+    let cursorY = page.getHeight() - margin
 
-    const foodRows = (user.foodLogs || []).map((f: any) => `
-      <tr>
-        <td>${fmt(f.createdAt)}</td>
-        <td>${f.name || ''}</td>
-        <td>${(f.nutrients && (f.nutrients.calories ?? '')) || ''}</td>
-      </tr>
-    `).join('')
+    const drawText = (text: string, size = 12, bold = false, color = rgb(0.07, 0.09, 0.15)) => {
+      const lines = wrapText(text, bold ? fontBold : font, size, page.getWidth() - margin * 2)
+      lines.forEach((line) => {
+        if (cursorY < margin + 20) { cursorY = page.getHeight() - margin; doc.addPage(page); }
+        page.drawText(line, { x: margin, y: cursorY, size, font: bold ? fontBold : font, color })
+        cursorY -= size + 4
+      })
+    }
 
-    const exerciseRows = (user.exerciseLogs || []).map((e: any) => `
-      <tr>
-        <td>${fmt(e.createdAt)}</td>
-        <td>${e.type}</td>
-        <td>${e.duration} min</td>
-      </tr>
-    `).join('')
+    const h1 = (t: string) => { drawText(t, 18, true, rgb(0.02, 0.59, 0.41)); cursorY -= 4 }
+    const h2 = (t: string) => { cursorY -= 6; drawText(t, 14, true, rgb(0.04, 0.37, 0.28)); cursorY -= 2 }
 
-    const html = `
-<!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <title>Helfi Health Summary</title>
-    <style>
-      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; margin: 24px; color: #111827; }
-      h1 { color: #059669; margin: 0 0 4px; }
-      h2 { color: #065f46; margin-top: 24px; border-bottom: 1px solid #e5e7eb; padding-bottom: 6px; }
-      table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-      th, td { border: 1px solid #e5e7eb; padding: 6px 8px; font-size: 12px; }
-      th { background: #f0fdf4; text-align: left; }
-      .meta { color: #6b7280; font-size: 12px; margin-bottom: 16px; }
-      .grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 8px; }
-      .box { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px; font-size: 12px; }
-    </style>
-  </head>
-  <body>
-    <h1>Helfi — Your Health Summary</h1>
-    <div class="meta">Generated for ${user.email} • Range: ${dateRangeText}</div>
+    const wrapText = (text: string, f: any, size: number, maxWidth: number): string[] => {
+      const words = String(text || '').split(/\s+/)
+      const lines: string[] = []
+      let line = ''
+      words.forEach(w => {
+        const test = line ? line + ' ' + w : w
+        const width = f.widthOfTextAtSize(test, size)
+        if (width > maxWidth && line) { lines.push(line); line = w } else { line = test }
+      })
+      if (line) lines.push(line)
+      return lines
+    }
 
-    <h2>Profile</h2>
-    <div class="grid">
-      <div class="box"><strong>Name</strong><br/>${user.name || ''}</div>
-      <div class="box"><strong>Gender</strong><br/>${user.gender || ''}</div>
-      <div class="box"><strong>Height</strong><br/>${user.height ?? ''}</div>
-      <div class="box"><strong>Weight</strong><br/>${user.weight ?? ''}</div>
-      <div class="box"><strong>Body Type</strong><br/>${user.bodyType || ''}</div>
-    </div>
+    h1('Helfi — Your Health Summary')
+    drawText(`Generated for ${user.email} • Range: ${dateRangeText}`, 10, false, rgb(0.45,0.47,0.50))
 
-    <h2>Goals</h2>
-    <table>
-      <thead><tr><th>Name</th><th>Category</th><th>Current Rating</th></tr></thead>
-      <tbody>
-        ${(user.healthGoals || []).map((g:any)=>`<tr><td>${g.name}</td><td>${g.category}</td><td>${g.currentRating}</td></tr>`).join('')}
-      </tbody>
-    </table>
+    h2('Profile')
+    drawText(`Name: ${user.name || ''}`)
+    drawText(`Gender: ${user.gender || ''}`)
+    drawText(`Height: ${user.height ?? ''}`)
+    drawText(`Weight: ${user.weight ?? ''}`)
+    drawText(`Body Type: ${user.bodyType || ''}`)
 
-    <h2>Medications & Supplements</h2>
-    <table>
-      <thead><tr><th>Type</th><th>Name</th><th>Dosage</th><th>Timing</th></tr></thead>
-      <tbody>
-        ${(user.medications || []).map((m:any)=>`<tr><td>Medication</td><td>${m.name}</td><td>${m.dosage||''}</td><td>${(m.timing||[]).join(', ')}</td></tr>`).join('')}
-        ${(user.supplements || []).map((s:any)=>`<tr><td>Supplement</td><td>${s.name}</td><td>${s.dosage||''}</td><td>${(s.timing||[]).join(', ')}</td></tr>`).join('')}
-      </tbody>
-    </table>
+    h2('Goals')
+    ;(user.healthGoals || []).forEach((g:any)=> drawText(`• ${g.name} (${g.category}) — rating ${g.currentRating}`))
 
-    <h2>Daily Metrics (Health Logs)</h2>
-    <table>
-      <thead><tr><th>Date</th><th>Rating</th><th>Notes</th></tr></thead>
-      <tbody>${dailyMetrics}</tbody>
-    </table>
+    h2('Medications & Supplements')
+    ;(user.medications || []).forEach((m:any)=> drawText(`• Medication: ${m.name} — ${m.dosage||''} — ${(m.timing||[]).join(', ')}`))
+    ;(user.supplements || []).forEach((s:any)=> drawText(`• Supplement: ${s.name} — ${s.dosage||''} — ${(s.timing||[]).join(', ')}`))
 
-    <h2>Food Diary (Highlights)</h2>
-    <table>
-      <thead><tr><th>Date</th><th>Item</th><th>Calories</th></tr></thead>
-      <tbody>${foodRows}</tbody>
-    </table>
+    h2('Daily Metrics (Health Logs)')
+    ;(user.healthLogs || []).forEach((h:any)=> drawText(`${fmt(h.createdAt)} — rating ${h.rating}${h.notes?` — ${h.notes}`:''}`))
 
-    <h2>Activity</h2>
-    <table>
-      <thead><tr><th>Date</th><th>Type</th><th>Duration</th></tr></thead>
-      <tbody>${exerciseRows}</tbody>
-    </table>
-  </body>
- </html>
-    `
+    h2('Food Diary (Highlights)')
+    ;(user.foodLogs || []).forEach((f:any)=> drawText(`${fmt(f.createdAt)} — ${f.name || ''}${f.nutrients && f.nutrients.calories?` — ${f.nutrients.calories} kcal`:''}`))
 
-    const puppeteer = await getPuppeteer()
-    const browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] })
-    const page = await browser.newPage()
-    await page.setContent(html, { waitUntil: 'networkidle0' })
-    const pdfBuffer = await page.pdf({ format: 'A4', printBackground: true, margin: { top: '12mm', bottom: '16mm', left: '12mm', right: '12mm' } })
-    await browser.close()
+    h2('Activity')
+    ;(user.exerciseLogs || []).forEach((e:any)=> drawText(`${fmt(e.createdAt)} — ${e.type} — ${e.duration} min`))
+
+    const pdfBuffer = await doc.save()
 
     return new NextResponse(pdfBuffer, {
       status: 200,

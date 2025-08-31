@@ -584,7 +584,7 @@ export default function Settings() {
             <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Privacy Settings</h2>
             
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="space-y-2">
                 <div>
                   <h3 className="font-medium text-gray-900 dark:text-white">Download my data (PDF)</h3>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Get a nicely formatted health summary</p>
@@ -600,7 +600,7 @@ export default function Settings() {
                       alert('Could not start export.')
                     }
                   }}
-                  className="px-3 py-1.5 rounded-md bg-helfi-green text-white text-sm font-medium hover:opacity-90"
+                  className="inline-flex px-3 py-2 rounded-md bg-helfi-green text-white text-sm font-medium hover:opacity-90"
                 >
                   Download PDF
                 </button>
