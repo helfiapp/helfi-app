@@ -44,16 +44,21 @@ export async function GET(request: NextRequest) {
       : 'All time'
 
     const doc = await PDFDocument.create()
-    const page = doc.addPage([595.28, 841.89]) // A4 in points
+    let page = doc.addPage([595.28, 841.89]) // A4 in points
     const font = await doc.embedFont(StandardFonts.Helvetica)
     const fontBold = await doc.embedFont(StandardFonts.HelveticaBold)
     const margin = 40
     let cursorY = page.getHeight() - margin
 
+    const newPage = () => {
+      page = doc.addPage([595.28, 841.89])
+      cursorY = page.getHeight() - margin
+    }
+
     const drawText = (text: string, size = 12, bold = false, color = rgb(0.07, 0.09, 0.15)) => {
       const lines = wrapText(text, bold ? fontBold : font, size, page.getWidth() - margin * 2)
       lines.forEach((line) => {
-        if (cursorY < margin + 20) { cursorY = page.getHeight() - margin; doc.addPage(page); }
+        if (cursorY < margin + 20) { newPage() }
         page.drawText(line, { x: margin, y: cursorY, size, font: bold ? fontBold : font, color })
         cursorY -= size + 4
       })
@@ -86,20 +91,35 @@ export async function GET(request: NextRequest) {
     drawText(`Body Type: ${user.bodyType || ''}`)
 
     h2('Goals')
-    ;(user.healthGoals || []).forEach((g:any)=> drawText(`• ${g.name} (${g.category}) — rating ${g.currentRating}`))
+    ;(user.healthGoals || [])
+      .filter((g:any)=> typeof g.name === 'string' && !g.name.startsWith('__'))
+      .slice(0, 12)
+      .forEach((g:any)=> drawText(`• ${g.name}${g.category?` (${g.category})`:''}${Number.isFinite(g.currentRating)?` — rating ${g.currentRating}`:''}`))
 
     h2('Medications & Supplements')
-    ;(user.medications || []).forEach((m:any)=> drawText(`• Medication: ${m.name} — ${m.dosage||''} — ${(m.timing||[]).join(', ')}`))
-    ;(user.supplements || []).forEach((s:any)=> drawText(`• Supplement: ${s.name} — ${s.dosage||''} — ${(s.timing||[]).join(', ')}`))
+    ;(user.medications || []).slice(0, 12).forEach((m:any)=> drawText(`• Medication: ${m.name || ''}${m.dosage?` — ${m.dosage}`:''}${(m.timing&&m.timing.length)?` — ${(m.timing||[]).join(', ')}`:''}`))
+    ;(user.supplements || []).slice(0, 12).forEach((s:any)=> drawText(`• Supplement: ${s.name || ''}${s.dosage?` — ${s.dosage}`:''}${(s.timing&&s.timing.length)?` — ${(s.timing||[]).join(', ')}`:''}`))
 
     h2('Daily Metrics (Health Logs)')
-    ;(user.healthLogs || []).forEach((h:any)=> drawText(`${fmt(h.createdAt)} — rating ${h.rating}${h.notes?` — ${h.notes}`:''}`))
+    ;(user.healthLogs || [])
+      .sort((a:any,b:any)=> new Date(b.createdAt).getTime()-new Date(a.createdAt).getTime())
+      .slice(0, 15)
+      .forEach((h:any)=> drawText(`${fmt(h.createdAt)} — rating ${h.rating}${(h.notes && typeof h.notes==='string' && h.notes.length<120)?` — ${h.notes}`:''}`))
 
     h2('Food Diary (Highlights)')
-    ;(user.foodLogs || []).forEach((f:any)=> drawText(`${fmt(f.createdAt)} — ${f.name || ''}${f.nutrients && f.nutrients.calories?` — ${f.nutrients.calories} kcal`:''}`))
+    ;(user.foodLogs || [])
+      .sort((a:any,b:any)=> new Date(b.createdAt).getTime()-new Date(a.createdAt).getTime())
+      .slice(0, 15)
+      .forEach((f:any)=> {
+        const cal = f?.nutrients && (f.nutrients as any).calories
+        drawText(`${fmt(f.createdAt)} — ${f.name || 'Food'}${Number.isFinite(cal)?` — ${cal} kcal`:''}`)
+      })
 
     h2('Activity')
-    ;(user.exerciseLogs || []).forEach((e:any)=> drawText(`${fmt(e.createdAt)} — ${e.type} — ${e.duration} min`))
+    ;(user.exerciseLogs || [])
+      .sort((a:any,b:any)=> new Date(b.createdAt).getTime()-new Date(a.createdAt).getTime())
+      .slice(0, 15)
+      .forEach((e:any)=> drawText(`${fmt(e.createdAt)} — ${e.type} — ${e.duration} min${e.intensity?` — ${e.intensity}`:''}`))
 
     const pdfBuffer = await doc.save()
 

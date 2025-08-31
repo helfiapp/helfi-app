@@ -592,10 +592,13 @@ export default function Settings() {
                 <button
                   onClick={async () => {
                     try {
-                      const from = ''
-                      const to = ''
-                      const url = `/api/export/pdf${from||to?`?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`:''}`
-                      window.location.href = url
+                      const url = `/api/export/pdf`
+                      const a = document.createElement('a')
+                      a.href = url
+                      a.download = 'helfi-health-summary.pdf'
+                      document.body.appendChild(a)
+                      a.click()
+                      a.remove()
                     } catch (e) {
                       alert('Could not start export.')
                     }
