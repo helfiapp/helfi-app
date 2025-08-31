@@ -440,7 +440,7 @@ Please add nutritional information manually if needed.`);
       nutrition: nutrition || analyzedNutrition
     };
     
-    const updatedFoods = [...todaysFoods, newEntry];
+    const updatedFoods = [newEntry, ...todaysFoods];
     setTodaysFoods(updatedFoods);
     
     // Save to database
@@ -1568,7 +1568,10 @@ Please add nutritional information manually if needed.`);
             </div>
           ) : (
             <div className="space-y-3">
-              {todaysFoods.map((food) => (
+              {todaysFoods
+                .slice()
+                .sort((a: any, b: any) => (b?.id || 0) - (a?.id || 0))
+                .map((food) => (
                 <div key={food.id} className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-visible">
                   {/* Mobile-Optimized Layout */}
                   <div className="p-4 hover:bg-gray-50 transition-colors">
