@@ -586,6 +586,28 @@ export default function Settings() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
+                  <h3 className="font-medium text-gray-900 dark:text-white">Download my data (PDF)</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400">Get a nicely formatted health summary</p>
+                </div>
+                <button
+                  onClick={async () => {
+                    try {
+                      const from = ''
+                      const to = ''
+                      const url = `/api/export/pdf${from||to?`?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`:''}`
+                      window.location.href = url
+                    } catch (e) {
+                      alert('Could not start export.')
+                    }
+                  }}
+                  className="px-3 py-1.5 rounded-md bg-helfi-green text-white text-sm font-medium hover:opacity-90"
+                >
+                  Download PDF
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div>
                   <h3 className="font-medium text-gray-900 dark:text-white">Profile Visibility</h3>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Make your profile visible to others</p>
                 </div>
