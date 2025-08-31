@@ -7,7 +7,6 @@ export async function middleware(request: NextRequest) {
   if (
     request.nextUrl.pathname.startsWith('/_next') ||
     request.nextUrl.pathname.startsWith('/api') ||
-    request.nextUrl.pathname.startsWith('/staging-signin') ||
     request.nextUrl.pathname.includes('.')
   ) {
     return NextResponse.next()
