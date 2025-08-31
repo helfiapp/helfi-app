@@ -37,7 +37,7 @@ export default function SafetyInsights() {
       </div>
       <div className="max-w-4xl mx-auto px-4 py-6 space-y-4">
         <div className="flex justify-end mb-2">
-          <button onClick={async()=>{ fetch('/api/insights/generate?preview=1', { method: 'POST' }).catch(()=>{}); await load() }} className="px-3 py-2 bg-helfi-green text-white rounded-md text-sm">Refresh</button>
+          <button onClick={async()=>{ await load() }} className="px-3 py-2 bg-helfi-green text-white rounded-md text-sm">Refresh</button>
         </div>
         {items.map((it) => (
           <div key={it.id} className="bg-white border border-gray-200 rounded-lg p-4">

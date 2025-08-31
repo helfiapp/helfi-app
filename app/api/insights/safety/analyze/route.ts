@@ -117,6 +117,23 @@ export async function GET() {
       }
     }
 
+    // Rule: Tadalafil + ginger → potential additive BP lowering (informational)
+    if ((has(meds, /tadalafil|cialis/i)) && (has(supps, /ginger|zingiber/i) || foods.some(f => /ginger/i.test(f.name)))) {
+      items.push({
+        id: 'interaction-tadalafil-ginger',
+        title: 'Possible additive blood pressure lowering (tadalafil + ginger)',
+        summary: 'Both tadalafil and ginger may lower blood pressure. Together they could increase the effect in some people.',
+        reason: 'You logged tadalafil and ginger (supplement or food).',
+        actions: [
+          'Avoid taking ginger around the time you use tadalafil if you notice dizziness or light‑headedness.',
+          'Stand up slowly; hydrate well on those days.',
+          'Discuss with your clinician if you experience symptoms.',
+        ],
+        tags: ['safety','interaction','bp'],
+        confidence: 0.55,
+      })
+    }
+
     return NextResponse.json({ items }, { status: 200 })
   } catch (e) {
     return NextResponse.json({ items: [] }, { status: 200 })
