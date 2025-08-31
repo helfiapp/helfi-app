@@ -40,7 +40,13 @@ export async function middleware(request: NextRequest) {
 
   // Gate sign-in routes behind /healthapp admin check
   const pathname = request.nextUrl.pathname
-  const needsAdminGate = pathname === '/staging-signin' || pathname === '/auth/signin'
+  // Never allow direct access to the temporary staging sign-in page
+  if (pathname === '/staging-signin') {
+    const url = request.nextUrl.clone()
+    url.pathname = '/healthapp'
+    return NextResponse.redirect(url)
+  }
+  const needsAdminGate = pathname === '/auth/signin'
   const hasPassedGate = request.cookies.get('passed_admin_gate')?.value === '1'
   if (needsAdminGate && !hasPassedGate) {
     const url = request.nextUrl.clone()
