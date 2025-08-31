@@ -10,7 +10,6 @@ How to use
 ## Ordered Roadmap — Easiest → Hardest
 
 1) Mobile Nav — Active States Consistency
-// previously item 2; item 1 (Profile — Instant Avatar Consistency) has been completed and removed per user instruction
 
 2) Mobile Nav — Active States Consistency
 - Where: Mobile bottom nav across `dashboard`, `insights`, `food`, `onboarding`, `settings`
