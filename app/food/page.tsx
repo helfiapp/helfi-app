@@ -1531,22 +1531,25 @@ Please add nutritional information manually if needed.`);
                   return acc;
                 }, { calories: 0, protein: 0, carbs: 0, fat: 0 });
                 return (
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
-                      <div className="text-xs text-orange-500 mb-1">Calories</div>
-                      <div className="text-lg font-semibold text-orange-600">{totals.calories}</div>
-                    </div>
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                      <div className="text-xs text-blue-500 mb-1">Protein</div>
-                      <div className="text-lg font-semibold text-blue-600">{totals.protein}g</div>
-                    </div>
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                      <div className="text-xs text-green-500 mb-1">Carbs</div>
-                      <div className="text-lg font-semibold text-green-600">{totals.carbs}g</div>
-                    </div>
-                    <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
-                      <div className="text-xs text-purple-500 mb-1">Fat</div>
-                      <div className="text-lg font-semibold text-purple-600">{totals.fat}g</div>
+                  <div>
+                    <div className="text-sm text-gray-600 font-medium mb-2">Today's Totals</div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
+                        <div className="text-xs text-orange-500 mb-1">Calories</div>
+                        <div className="text-lg font-semibold text-orange-600">{totals.calories}</div>
+                      </div>
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                        <div className="text-xs text-blue-500 mb-1">Protein</div>
+                        <div className="text-lg font-semibold text-blue-600">{totals.protein}g</div>
+                      </div>
+                      <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                        <div className="text-xs text-green-500 mb-1">Carbs</div>
+                        <div className="text-lg font-semibold text-green-600">{totals.carbs}g</div>
+                      </div>
+                      <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
+                        <div className="text-xs text-purple-500 mb-1">Fat</div>
+                        <div className="text-lg font-semibold text-purple-600">{totals.fat}g</div>
+                      </div>
                     </div>
                   </div>
                 );
