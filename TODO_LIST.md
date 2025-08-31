@@ -44,15 +44,10 @@ Priority 1 — AI Health Insights MVP
    - Keep Apple Watch / Fitbit / Garmin cards visible as “Connect (coming soon)”
    - Store the user’s interest so we can invite testers later
 
-10) Data & Privacy
-   - Allow CSV export of personal data and full data delete
-   - Add a short privacy note on each tracking page
-   - Done: Branded PDF export with in‑app viewer (db016c4)
-
-11) Navigation & Empty States
+10) Navigation & Empty States
    - Friendly empty states with a short “how this works” blurb
 
-12) Admin basics
+11) Admin basics
    - Simple usage counts and error logs for these features
    - Toggle to enable/disable modules if needed
 
