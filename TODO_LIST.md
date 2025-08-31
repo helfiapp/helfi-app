@@ -1,6 +1,6 @@
 # TODO_LIST
 
-Last updated: 2025-08-28
+Last updated: 2025-08-31
 
 How to use
 - Keep this as the single source of truth for what to fix next
@@ -47,6 +47,7 @@ Priority 1 — AI Health Insights MVP
 10) Data & Privacy
    - Allow CSV export of personal data and full data delete
    - Add a short privacy note on each tracking page
+   - Done: Branded PDF export with in‑app viewer (db016c4)
 
 11) Navigation & Empty States
    - Friendly empty states with a short “how this works” blurb
