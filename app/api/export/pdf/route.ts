@@ -116,10 +116,14 @@ export async function GET(request: NextRequest) {
       })
 
     h2('Activity')
-    ;(user.exerciseLogs || [])
+    const ex = (user.exerciseLogs || [])
       .sort((a:any,b:any)=> new Date(b.createdAt).getTime()-new Date(a.createdAt).getTime())
       .slice(0, 15)
-      .forEach((e:any)=> drawText(`${fmt(e.createdAt)} — ${e.type} — ${e.duration} min${e.intensity?` — ${e.intensity}`:''}`))
+    if (ex.length === 0) {
+      drawText('No activity logged in this period.')
+    } else {
+      ex.forEach((e:any)=> drawText(`${fmt(e.createdAt)} — ${e.type || 'Activity'}${Number.isFinite(e.duration)?` — ${e.duration} min`:''}${e.intensity?` — ${e.intensity}`:''}`))
+    }
 
     const pdfBuffer = await doc.save()
 

@@ -593,12 +593,7 @@ export default function Settings() {
                   onClick={async () => {
                     try {
                       const url = `/api/export/pdf`
-                      const a = document.createElement('a')
-                      a.href = url
-                      a.download = 'helfi-health-summary.pdf'
-                      document.body.appendChild(a)
-                      a.click()
-                      a.remove()
+                      window.open(url, '_blank')
                     } catch (e) {
                       alert('Could not start export.')
                     }
@@ -607,6 +602,7 @@ export default function Settings() {
                 >
                   Download PDF
                 </button>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Opens in a new tab so you can return to the app.</p>
               </div>
 
               <div className="flex items-center justify-between">
