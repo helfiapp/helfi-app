@@ -39,6 +39,16 @@ export async function middleware(request: NextRequest) {
     // Continue without session preservation if there's an error
   }
 
+  // Gate sign-in routes behind /healthapp admin check
+  const pathname = request.nextUrl.pathname
+  const needsAdminGate = pathname === '/staging-signin' || pathname === '/auth/signin'
+  const hasPassedGate = request.cookies.get('passed_admin_gate')?.value === '1'
+  if (needsAdminGate && !hasPassedGate) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/healthapp'
+    return NextResponse.redirect(url)
+  }
+
   return NextResponse.next()
 }
 

@@ -18,7 +18,9 @@ export default function HealthApp() {
     setError('')
 
     if (password === 'HealthBeta2024!') {
-      // Correct password - redirect to signin page with email/Google options
+      // Mark that admin gate was passed for this device (session cookie)
+      document.cookie = 'passed_admin_gate=1; path=/; max-age=1800; SameSite=Lax'
+      // Redirect to sign-in page
       router.push('/auth/signin')
     } else {
       setError('Incorrect password. Please try again.')
