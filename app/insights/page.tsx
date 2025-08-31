@@ -291,8 +291,8 @@ export default function Insights() {
             <div className="text-xs text-gray-500 mb-2">Last updated: {lastUpdated}</div>
           )}
           
-          {/* Mobile hub tiles */}
-          <div className="md:hidden grid grid-cols-2 gap-3 mb-6">
+          {/* Hub tiles: show on mobile and desktop for uniform navigation */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
             {[{ key:'goals', label:'Goals', icon:'🎯' }, { key:'nutrition', label:'Nutrition', icon:'🥗' }, { key:'supplements', label:'Supplements', icon:'💊' }, { key:'safety', label:'Safety', icon:'⚠️' }].map((t) => (
               <Link key={t.key} href={`/insights/${t.key}`} className="bg-white border border-gray-200 rounded-xl p-4 text-left active:bg-gray-50">
                 <div className="text-2xl mb-2">{t.icon}</div>
@@ -302,10 +302,9 @@ export default function Insights() {
             ))}
           </div>
 
-          {/* Removed mobile duplicate list below tiles for a cleaner hub-only home */}
+          {/* Hide the older desktop list for now to keep a clean, uniform hub */}
 
-          {/* Desktop grid remains */}
-          <div className="hidden md:grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="hidden">
             {insights.length > 0 ? (
               insights.map((it) => (
                 <div key={it.id} className="bg-blue-50 border border-blue-200 rounded-lg p-4">
