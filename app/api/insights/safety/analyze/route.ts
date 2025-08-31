@@ -35,8 +35,8 @@ export async function GET() {
     const meds = (user.medications || []).map((m: any) => ({ name: String(m.name || ''), timing: m.timing || [], dosage: m.dosage || '' }))
     const foods = (user.foodLogs || []).map((f: any) => ({ name: String(f.name || ''), nutrients: f.nutrients || {} }))
 
-    const has = (list: { name: string }[], re: RegExp) => list.some(i => re.test(i.name))
-    const find = (list: { name: string }[], re: RegExp) => list.filter(i => re.test(i.name))
+    const has = <T extends { name: string }>(list: T[], re: RegExp) => list.some(i => re.test(i.name))
+    const find = <T extends { name: string }>(list: T[], re: RegExp): T[] => list.filter(i => re.test(i.name))
 
     const items: InsightCard[] = []
 
@@ -61,8 +61,8 @@ export async function GET() {
 
     // Rule: Magnesium timing towards evening
     if (has(supps, /magnesium/i)) {
-      const mag = find(supps, /magnesium/i)
-      const hasMorning = mag.some(m => (m.timing || []).some((t: string) => /am|morn/i.test(t)))
+      const mag = find(supps, /magnesium/i) as Array<{ name: string; timing?: string[] }>
+      const hasMorning = mag.some(m => Array.isArray(m.timing) && m.timing.some((t: string) => /am|morn/i.test(t)))
       items.push({
         id: 'safety-magnesium-evening',
         title: 'Consider magnesium in the evening',
