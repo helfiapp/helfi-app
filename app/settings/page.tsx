@@ -27,6 +27,9 @@ export default function Settings() {
   const [profileVisibility, setProfileVisibility] = useState('private')
   const [dataAnalytics, setDataAnalytics] = useState(true)
   const [hapticsEnabled, setHapticsEnabled] = useState(true)
+  const [showPdf, setShowPdf] = useState(false)
+  const [pdfUrl, setPdfUrl] = useState<string>('')
+  const [exporting, setExporting] = useState(false)
   // Reminder settings
   const [time1, setTime1] = useState('12:30')
   const [time2, setTime2] = useState('18:30')
@@ -592,15 +595,23 @@ export default function Settings() {
                 <button
                   onClick={async () => {
                     try {
-                      const url = `/api/export/pdf`
-                      window.open(url, '_blank')
+                      setExporting(true)
+                      const res = await fetch('/api/export/pdf')
+                      if (!res.ok) throw new Error('Export failed')
+                      const blob = await res.blob()
+                      const url = URL.createObjectURL(blob)
+                      setPdfUrl(url)
+                      setShowPdf(true)
                     } catch (e) {
                       alert('Could not start export.')
+                    } finally {
+                      setExporting(false)
                     }
                   }}
-                  className="inline-flex px-3 py-2 rounded-md bg-helfi-green text-white text-sm font-medium hover:opacity-90"
+                  className="inline-flex px-3 py-2 rounded-md bg-helfi-green text-white text-sm font-medium hover:opacity-90 disabled:opacity-60"
+                  disabled={exporting}
                 >
-                  Download PDF
+                  {exporting ? 'Preparing…' : 'Download PDF'}
                 </button>
                 <p className="text-xs text-gray-500 dark:text-gray-400">Opens in a new tab so you can return to the app.</p>
               </div>
@@ -795,6 +806,19 @@ export default function Settings() {
 
         </div>
       </nav>
+
+      {/* In-app PDF viewer with back button (mobile safe) */}
+      {showPdf && (
+        <div className="fixed inset-0 bg-white z-[999] flex flex-col">
+          <div className="p-3 border-b flex items-center justify-between">
+            <button onClick={()=>{ setShowPdf(false); if (pdfUrl) { URL.revokeObjectURL(pdfUrl); setPdfUrl('') } }} className="px-3 py-2 rounded-md bg-gray-200 text-gray-800 text-sm font-medium">Back</button>
+            <a href={pdfUrl} download="helfi-health-summary.pdf" className="px-3 py-2 rounded-md bg-helfi-green text-white text-sm font-medium">Download</a>
+          </div>
+          <div className="flex-1 overflow-hidden">
+            <iframe src={pdfUrl} className="w-full h-full" title="Helfi PDF" />
+          </div>
+        </div>
+      )}
     </div>
   )
 } 
