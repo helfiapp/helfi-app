@@ -2,10 +2,10 @@
 
 Latest known-good deployment snapshot.
 
-- Commit: 0fa10a3 (master)
-- Date: 2025-08-31 17:34:20 +1000
-- Title: Avatar instant update on Intake + Help; provider-first image sourcing
-- Reason: Profile photo now updates immediately across all pages including Intake (Onboarding) and Help via `UserDataProvider.profileImage`; no API/logic changes.
+- Commit: de65502 (master)
+- Date: 2025-09-01 01:36:59 +1000
+- Title: Food diary UX polish — Saved toast, daily totals, and "Today's Totals" label
+- Reason: Optional visual improvements only; add-only changes to the Food Diary page. No backend, auth, or data-flow changes. Verified build and deployed via GitHub auto‑deploy to Vercel.
 
 How to use
 - When a new version is verified “golden”, update this file with the new commit hash, date, and a brief reason.
