@@ -2,10 +2,10 @@
 
 Latest known-good deployment snapshot.
 
-- Commit: 1e6fef0 (master)
-- Date: 2025-08-28
-- Title: Docs + wire dashboard tiles to live pages (no backend changes)
-- Reason: Verified tiles navigate correctly; zero behavior changes elsewhere. Safe baseline before insights feature flags.
+- Commit: 677bb59 (master)
+- Date: 2025-08-31
+- Title: Notifications: daily cron + scheduler hardening; Settings adds reminders + timezone; Insights mobile IA
+- Reason: End-to-end push works (test + manual send); daily cron registered; settings save fixed; safe baseline for reminders and insights UX.
 
 How to use
 - When a new version is verified “golden”, update this file with the new commit hash, date, and a brief reason.

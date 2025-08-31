@@ -49,7 +49,6 @@ Priority 1 — AI Health Insights MVP
    - Add a short privacy note on each tracking page
 
 11) Navigation & Empty States
-   - Wire dashboard tiles to real pages (no “Coming Soon”)
    - Friendly empty states with a short “how this works” blurb
 
 12) Admin basics

@@ -30,3 +30,44 @@
     @apply bg-white rounded-xl shadow-md p-6;
   }
 } 
+
+/* Mobile tap feedback helpers */
+@layer components {
+  .pressable {
+    @apply relative overflow-hidden select-none transition-transform duration-75 active:scale-[0.97];
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+  .pressable .icon, .pressable .label {
+    @apply transition-opacity duration-75;
+  }
+  .pressable:active .icon, .pressable:active .label {
+    @apply opacity-80;
+  }
+
+  .ripple {
+    position: relative;
+    overflow: hidden;
+  }
+  .ripple::after {
+    content: '';
+    position: absolute;
+    border-radius: 9999px;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    opacity: 0;
+  }
+  .ripple:active::after {
+    width: 160px;
+    height: 160px;
+    left: 50%;
+    top: 50%;
+    background: rgba(16, 185, 129, 0.14);
+    animation: helfi-ripple 300ms ease-out forwards;
+  }
+}
+
+@keyframes helfi-ripple {
+  from { opacity: 0.35; transform: translate(-50%, -50%) scale(0.2); }
+  to { opacity: 0; transform: translate(-50%, -50%) scale(1); }
+}
