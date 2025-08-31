@@ -9,12 +9,8 @@ How to use
 
 ## Ordered Roadmap — Easiest → Hardest
 
-1) Profile — Instant Avatar Consistency
-- Where: `app/profile/page.tsx`, `app/profile/image/page.tsx`, `components/providers/UserDataProvider.tsx`
-- What: Ensure avatar updates everywhere instantly by updating the provider when a new image URL is returned.
-- Why: Removes flicker/mismatch after upload.
-- Done when:
-  - After uploading on `profile/image`, the avatar updates immediately on Profile/Dashboard without refresh
+1) Mobile Nav — Active States Consistency
+// previously item 2; item 1 (Profile — Instant Avatar Consistency) has been completed and removed per user instruction
 
 2) Mobile Nav — Active States Consistency
 - Where: Mobile bottom nav across `dashboard`, `insights`, `food`, `onboarding`, `settings`
