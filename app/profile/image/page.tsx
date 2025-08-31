@@ -4,9 +4,11 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { useUserData } from '@/components/providers/UserDataProvider'
 
 export default function ProfileImage() {
   const { data: session } = useSession()
+  const { updateProfileImage } = useUserData()
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
   const [selectedImage, setSelectedImage] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
@@ -106,10 +108,20 @@ export default function ProfileImage() {
           
           // Set the Cloudinary URL as the profile image
           setCurrentProfileImage(result.imageUrl);
+          // Broadcast to shared data provider so other pages update instantly
+          try {
+            updateProfileImage(result.imageUrl)
+          } catch (e) {
+            console.warn('Could not update shared profile image provider:', e)
+          }
           
           // Clear localStorage (no longer needed with Cloudinary)
           if (session?.user?.id) {
             localStorage.removeItem(`profileImage_${session.user.id}`);
+            // Also set the cached key used by Dashboard for instant display
+            try {
+              localStorage.setItem(`cachedProfileImage_${session.user.id}`, result.imageUrl)
+            } catch {}
           }
           
           setSaveStatus('saved');
@@ -258,6 +270,13 @@ export default function ProfileImage() {
           setCurrentProfileImage(null);
           setSelectedImage(null);
           setImagePreview(null);
+          // Broadcast removal to shared provider and clear dashboard cache
+          try {
+            updateProfileImage('')
+          } catch {}
+          if (session?.user?.id) {
+            try { localStorage.removeItem(`cachedProfileImage_${session.user.id}`) } catch {}
+          }
           setSaveStatus('saved');
           setTimeout(() => setSaveStatus('idle'), 2000);
         } else {
