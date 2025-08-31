@@ -7,7 +7,7 @@
  * If you change regexes or presentation, TEST that all four values still render.
  */
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -44,6 +44,7 @@ export default function FoodDiary() {
   const [foodImagesLoading, setFoodImagesLoading] = useState<{[key: string]: boolean}>({})
   const [expandedEntries, setExpandedEntries] = useState<{[key: string]: boolean}>({})
   const [fullSizeImage, setFullSizeImage] = useState<string | null>(null)
+  const [showSavedToast, setShowSavedToast] = useState<boolean>(false)
 
   // Profile data - using consistent green avatar
   const defaultAvatar = 'data:image/svg+xml;base64,' + btoa(`
@@ -124,6 +125,11 @@ export default function FoodDiary() {
       }).catch(error => {
         console.error('Background save error:', error);
       });
+      // Show a brief visual confirmation
+      try {
+        setShowSavedToast(true);
+        setTimeout(() => setShowSavedToast(false), 1500);
+      } catch {}
     } catch (error) {
       console.error('Error in saveFoodEntries:', error);
     }
@@ -617,6 +623,14 @@ Please add nutritional information manually if needed.`);
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-gray-50">
+      {/* Saved Toast (brief confirmation) */}
+      {showSavedToast && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[10000]">
+          <div className="px-4 py-2 bg-emerald-600 text-white rounded-full shadow-lg text-sm">
+            Saved
+          </div>
+        </div>
+      )}
       {/* Navigation Header */}
       <nav className="bg-white border-b border-gray-200 px-4 py-3">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
@@ -1504,6 +1518,41 @@ Please add nutritional information manually if needed.`);
         {/* Today's Food Entries - Hide during editing */}
         {!editingEntry && !isEditingDescription && (
         <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 overflow-visible">
+          {/* Daily Totals Row */}
+          {todaysFoods && todaysFoods.length > 0 && (
+            <div className="mb-4">
+              {(() => {
+                const totals = todaysFoods.reduce((acc: any, item: any) => {
+                  const n = item?.nutrition || {};
+                  acc.calories += Number.isFinite(n.calories) ? n.calories : 0;
+                  acc.protein += Number.isFinite(n.protein) ? n.protein : 0;
+                  acc.carbs += Number.isFinite(n.carbs) ? n.carbs : 0;
+                  acc.fat += Number.isFinite(n.fat) ? n.fat : 0;
+                  return acc;
+                }, { calories: 0, protein: 0, carbs: 0, fat: 0 });
+                return (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
+                      <div className="text-xs text-orange-500 mb-1">Calories</div>
+                      <div className="text-lg font-semibold text-orange-600">{totals.calories}</div>
+                    </div>
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                      <div className="text-xs text-blue-500 mb-1">Protein</div>
+                      <div className="text-lg font-semibold text-blue-600">{totals.protein}g</div>
+                    </div>
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                      <div className="text-xs text-green-500 mb-1">Carbs</div>
+                      <div className="text-lg font-semibold text-green-600">{totals.carbs}g</div>
+                    </div>
+                    <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
+                      <div className="text-xs text-purple-500 mb-1">Fat</div>
+                      <div className="text-lg font-semibold text-purple-600">{totals.fat}g</div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
           <h3 className="text-lg font-semibold mb-4">Today's Meals</h3>
           
           {todaysFoods.length === 0 ? (
