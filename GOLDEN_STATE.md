@@ -2,10 +2,10 @@
 
 Latest known-good deployment snapshot.
 
-- Commit: 677bb59 (master)
-- Date: 2025-08-31
-- Title: Notifications: daily cron + scheduler hardening; Settings adds reminders + timezone; Insights mobile IA
-- Reason: End-to-end push works (test + manual send); daily cron registered; settings save fixed; safe baseline for reminders and insights UX.
+- Commit: dc76282 (master)
+- Date: 2025-08-31 12:55:03 +1000
+- Title: UI: hide haptic toggle on iOS; keep for Android only
+- Reason: Admin-gated entry enforced; PWA launches at /healthapp; bottom nav UX improved; settings cleaned for iOS. Verified on production.
 
 How to use
 - When a new version is verified “golden”, update this file with the new commit hash, date, and a brief reason.
