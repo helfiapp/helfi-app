@@ -10,6 +10,15 @@ export default function SafetyInsights() {
   const [asking, setAsking] = useState(false)
 
   async function load() {
+    // Prefer real analyzer results; fall back to preview list
+    try {
+      const res = await fetch('/api/insights/safety/analyze', { cache: 'no-cache' })
+      const data = await res.json().catch(() => ({}))
+      if (Array.isArray(data?.items) && data.items.length) {
+        setItems(data.items)
+        return
+      }
+    } catch {}
     const res = await fetch('/api/insights/list?preview=1', { cache: 'no-cache' })
     const data = await res.json().catch(() => ({}))
     const all: any[] = data?.items || []
@@ -31,10 +40,16 @@ export default function SafetyInsights() {
           <button onClick={async()=>{ fetch('/api/insights/generate?preview=1', { method: 'POST' }).catch(()=>{}); await load() }} className="px-3 py-2 bg-helfi-green text-white rounded-md text-sm">Refresh</button>
         </div>
         {items.map((it) => (
-          <Link href={`/insights/${encodeURIComponent(it.id)}`} key={it.id} className="bg-white border border-gray-200 rounded-lg p-4 block">
+          <div key={it.id} className="bg-white border border-gray-200 rounded-lg p-4">
             <div className="font-semibold text-gray-900 mb-1">{it.title}</div>
-            <div className="text-sm text-gray-700">{it.summary}</div>
-          </Link>
+            <div className="text-sm text-gray-700 mb-2">{it.summary}</div>
+            {it.reason && (<div className="text-xs text-gray-500 mb-2">Why: {it.reason}</div>)}
+            {Array.isArray(it.actions) && it.actions.length > 0 && (
+              <ul className="list-disc pl-5 text-sm text-gray-800 space-y-1">
+                {it.actions.map((a: string, idx: number) => (<li key={idx}>{a}</li>))}
+              </ul>
+            )}
+          </div>
         ))}
         {items.length === 0 && (
           <div className="text-sm text-gray-600">No safety insights yet.</div>
