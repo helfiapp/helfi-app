@@ -5,6 +5,9 @@ import Link from 'next/link'
 
 export default function SafetyInsights() {
   const [items, setItems] = useState<any[]>([])
+  const [question, setQuestion] = useState('')
+  const [answer, setAnswer] = useState<string>('')
+  const [asking, setAsking] = useState(false)
 
   async function load() {
     const res = await fetch('/api/insights/list?preview=1', { cache: 'no-cache' })
@@ -36,6 +39,36 @@ export default function SafetyInsights() {
         {items.length === 0 && (
           <div className="text-sm text-gray-600">No safety insights yet.</div>
         )}
+
+        {/* Ask AI about Safety */}
+        <div className="bg-white border border-gray-200 rounded-lg p-4">
+          <div className="font-semibold text-gray-900 mb-2">Ask AI about Safety</div>
+          <div className="text-xs text-gray-500 mb-3">We’ll use only your relevant recent data (medications, supplements, recent ratings) to answer.</div>
+          <div className="flex gap-2">
+            <input
+              value={question}
+              onChange={(e)=>setQuestion(e.target.value)}
+              placeholder="e.g., How should I time my supplements for best absorption?"
+              className="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm"
+            />
+            <button
+              onClick={async()=>{
+                if (!question.trim()) return
+                setAsking(true)
+                try {
+                  const res = await fetch('/api/insights/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ section: 'safety', question }) })
+                  const data = await res.json().catch(()=>({}))
+                  setAnswer(data?.answer || 'No answer available right now.')
+                } finally { setAsking(false) }
+              }}
+              disabled={asking || !question.trim()}
+              className="px-3 py-2 bg-blue-600 text-white rounded-md text-sm disabled:opacity-50"
+            >{asking ? 'Thinking…' : 'Ask'}</button>
+          </div>
+          {answer && (
+            <div className="mt-3 text-sm text-gray-800 whitespace-pre-wrap">{answer}</div>
+          )}
+        </div>
       </div>
     </div>
   )
