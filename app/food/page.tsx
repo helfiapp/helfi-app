@@ -773,7 +773,6 @@ Please add nutritional information manually if needed.`);
       <div className="bg-white border-b border-gray-200 px-4 py-4">
         <div className="max-w-7xl mx-auto text-center">
           <h1 className="text-xl md:text-2xl font-light text-gray-800 tracking-wide">Food Diary</h1>
-          <p className="text-sm text-gray-500 font-normal mt-1">{selectedFriendly}</p>
           {/* Date selector */}
           <div className="mt-3 flex items-center justify-center gap-3">
             <button
