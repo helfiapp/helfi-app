@@ -807,20 +807,7 @@ Please add nutritional information manually if needed.`);
             >
               Next ▶︎
             </button>
-            {!isViewingToday && (
-              <button
-                onClick={() => {
-                  const d = new Date();
-                  const y = d.getFullYear();
-                  const m = String(d.getMonth() + 1).padStart(2, '0');
-                  const day = String(d.getDate()).padStart(2, '0');
-                  setSelectedDate(`${y}-${m}-${day}`);
-                }}
-                className="px-3 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-sm"
-              >
-                Today
-              </button>
-            )}
+            {/* Removed Today button to avoid mixed date cues */}
           </div>
         </div>
       </div>
