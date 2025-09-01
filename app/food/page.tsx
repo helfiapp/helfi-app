@@ -45,6 +45,15 @@ export default function FoodDiary() {
   const [expandedEntries, setExpandedEntries] = useState<{[key: string]: boolean}>({})
   const [fullSizeImage, setFullSizeImage] = useState<string | null>(null)
   const [showSavedToast, setShowSavedToast] = useState<boolean>(false)
+  const [selectedDate, setSelectedDate] = useState<string>(() => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  })
+  const [historyFoods, setHistoryFoods] = useState<any[] | null>(null)
+  const [isLoadingHistory, setIsLoadingHistory] = useState<boolean>(false)
 
   // Profile data - using consistent green avatar
   const defaultAvatar = 'data:image/svg+xml;base64,' + btoa(`
@@ -64,6 +73,14 @@ export default function FoodDiary() {
     month: 'long', 
     day: 'numeric' 
   });
+
+  const isViewingToday = (() => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return selectedDate === `${y}-${m}-${day}`;
+  })();
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -94,11 +111,45 @@ export default function FoodDiary() {
 
   // Load today's foods from context data (no API calls needed!)
   useEffect(() => {
-    if (userData?.todaysFoods) {
+    if (isViewingToday && userData?.todaysFoods) {
       console.log('🚀 PERFORMANCE: Using cached foods from context - instant load!');
       setTodaysFoods(userData.todaysFoods);
     }
-  }, [userData]);
+  }, [userData, isViewingToday]);
+
+  // Load history for non-today dates
+  useEffect(() => {
+    const loadHistory = async () => {
+      if (isViewingToday) {
+        setHistoryFoods(null);
+        return;
+      }
+      try {
+        setIsLoadingHistory(true);
+        const res = await fetch(`/api/food-log?date=${selectedDate}`);
+        if (res.ok) {
+          const json = await res.json();
+          const logs = Array.isArray(json.logs) ? json.logs : [];
+          const mapped = logs.map((l: any) => ({
+            id: new Date(l.createdAt).getTime(),
+            description: l.description || l.name,
+            time: new Date(l.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            method: l.imageUrl ? 'photo' : 'text',
+            photo: l.imageUrl || null,
+            nutrition: l.nutrients || null,
+          }));
+          setHistoryFoods(mapped);
+        } else {
+          setHistoryFoods([]);
+        }
+      } catch (e) {
+        setHistoryFoods([]);
+      } finally {
+        setIsLoadingHistory(false);
+      }
+    };
+    loadHistory();
+  }, [selectedDate, isViewingToday]);
 
   // Save food entries to database and update context (OPTIMIZED)
   const saveFoodEntries = async (updatedFoods: any[]) => {
@@ -129,6 +180,17 @@ export default function FoodDiary() {
       try {
         setShowSavedToast(true);
         setTimeout(() => setShowSavedToast(false), 1500);
+      } catch {}
+      // Fire-and-forget history append
+      try {
+        const last = updatedFoods[0];
+        if (last) {
+          fetch('/api/food-log', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ description: last.description, nutrition: last.nutrition, imageUrl: last.photo || null })
+          }).catch(() => {});
+        }
       } catch {}
     } catch (error) {
       console.error('Error in saveFoodEntries:', error);
@@ -700,6 +762,55 @@ Please add nutritional information manually if needed.`);
         <div className="max-w-7xl mx-auto text-center">
           <h1 className="text-xl md:text-2xl font-light text-gray-800 tracking-wide">Food Diary</h1>
           <p className="text-sm text-gray-500 font-normal mt-1">{today}</p>
+          {/* Date selector */}
+          <div className="mt-3 flex items-center justify-center gap-3">
+            <button
+              onClick={() => {
+                const d = new Date(selectedDate);
+                d.setDate(d.getDate() - 1);
+                const y = d.getFullYear();
+                const m = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                setSelectedDate(`${y}-${m}-${day}`);
+              }}
+              className="px-3 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm"
+            >
+              ◀︎ Previous
+            </button>
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="text-sm border border-gray-200 rounded-lg px-3 py-1"
+            />
+            <button
+              onClick={() => {
+                const d = new Date(selectedDate);
+                d.setDate(d.getDate() + 1);
+                const y = d.getFullYear();
+                const m = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                setSelectedDate(`${y}-${m}-${day}`);
+              }}
+              className="px-3 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm"
+            >
+              Next ▶︎
+            </button>
+            {!isViewingToday && (
+              <button
+                onClick={() => {
+                  const d = new Date();
+                  const y = d.getFullYear();
+                  const m = String(d.getMonth() + 1).padStart(2, '0');
+                  const day = String(d.getDate()).padStart(2, '0');
+                  setSelectedDate(`${y}-${m}-${day}`);
+                }}
+                className="px-3 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-sm"
+              >
+                Today
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -1519,10 +1630,11 @@ Please add nutritional information manually if needed.`);
         {!editingEntry && !isEditingDescription && (
         <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 overflow-visible">
           {/* Daily Totals Row */}
-          {todaysFoods && todaysFoods.length > 0 && (
+          {(isViewingToday ? todaysFoods : (historyFoods || [])).length > 0 && (
             <div className="mb-4">
               {(() => {
-                const totals = todaysFoods.reduce((acc: any, item: any) => {
+                const source = isViewingToday ? todaysFoods : (historyFoods || [])
+                const totals = source.reduce((acc: any, item: any) => {
                   const n = item?.nutrition || {};
                   acc.calories += Number.isFinite(n.calories) ? n.calories : 0;
                   acc.protein += Number.isFinite(n.protein) ? n.protein : 0;
@@ -1558,17 +1670,17 @@ Please add nutritional information manually if needed.`);
           )}
           <h3 className="text-lg font-semibold mb-4">Today's Meals</h3>
           
-          {todaysFoods.length === 0 ? (
+          {(isViewingToday ? todaysFoods : (historyFoods || [])).length === 0 ? (
             <div className="text-center py-8">
               <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
               </svg>
-              <p className="text-gray-500">No food entries yet today</p>
-              <p className="text-gray-400 text-sm">Add your first meal to start tracking!</p>
+              <p className="text-gray-500">No food entries yet {isViewingToday ? 'today' : 'for this date'}</p>
+              <p className="text-gray-400 text-sm">{isViewingToday ? 'Add your first meal to start tracking!' : 'Pick another day or return to Today.'}</p>
             </div>
           ) : (
             <div className="space-y-3">
-              {todaysFoods
+              {(isViewingToday ? todaysFoods : (historyFoods || []))
                 .slice()
                 .sort((a: any, b: any) => (b?.id || 0) - (a?.id || 0))
                 .map((food) => (
