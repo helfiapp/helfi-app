@@ -82,6 +82,18 @@ export default function FoodDiary() {
     return selectedDate === `${y}-${m}-${day}`;
   })();
 
+  // Friendly label for selected date (local time)
+  const selectedFriendly = (() => {
+    const [y, m, d] = selectedDate.split('-').map((v) => parseInt(v, 10));
+    const local = new Date(y, (m || 1) - 1, d || 1);
+    return local.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+  })();
+
   // Close dropdowns on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -761,7 +773,7 @@ Please add nutritional information manually if needed.`);
       <div className="bg-white border-b border-gray-200 px-4 py-4">
         <div className="max-w-7xl mx-auto text-center">
           <h1 className="text-xl md:text-2xl font-light text-gray-800 tracking-wide">Food Diary</h1>
-          <p className="text-sm text-gray-500 font-normal mt-1">{today}</p>
+          <p className="text-sm text-gray-500 font-normal mt-1">{selectedFriendly}</p>
           {/* Date selector */}
           <div className="mt-3 flex items-center justify-center gap-3">
             <button
@@ -1644,7 +1656,7 @@ Please add nutritional information manually if needed.`);
                 }, { calories: 0, protein: 0, carbs: 0, fat: 0 });
                 return (
                   <div>
-                    <div className="text-sm text-gray-600 font-medium mb-2">Today's Totals</div>
+                    <div className="text-sm text-gray-600 font-medium mb-2">{isViewingToday ? "Today's Totals" : 'Totals'}</div>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                       <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
                         <div className="text-xs text-orange-500 mb-1">Calories</div>
@@ -1668,7 +1680,7 @@ Please add nutritional information manually if needed.`);
               })()}
             </div>
           )}
-          <h3 className="text-lg font-semibold mb-4">Today's Meals</h3>
+          <h3 className="text-lg font-semibold mb-4">{isViewingToday ? "Today's Meals" : 'Meals'}</h3>
           
           {(isViewingToday ? todaysFoods : (historyFoods || [])).length === 0 ? (
             <div className="text-center py-8">
