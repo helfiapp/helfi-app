@@ -9,21 +9,7 @@ How to use
 
 ## Ordered Roadmap — Easiest → Hardest
 
-1) Mobile Nav — Active States Consistency
 
-2) Mobile Nav — Active States Consistency
-- Where: Mobile bottom nav across `dashboard`, `insights`, `food`, `onboarding`, `settings`
-- What: Make active label/icon state consistent and easily visible.
-- Why: Clear orientation while navigating.
-- Done when:
-  - The correct tab is highlighted on each page and haptic/vibration calls are guarded by feature detection
-
-3) Food Diary — Edit Flow Tightening
-- Where: `app/food/page.tsx`
-- What: Keep the current re‑analyze/edit flow but add a small “Saved” toast when entries update.
-- Why: Confirms to users that changes stuck.
-- Done when:
-  - Updating an entry shows a brief confirmation and persists
 
 4) Navigation & Empty States
 - Where: `app/dashboard/page.tsx`, `app/health-tracking/page.tsx`, `app/insights/page.tsx`, `app/reports/page.tsx`
@@ -41,12 +27,7 @@ How to use
   - UI shows selected state on reload
 
 6) Food Diary → Nutrition Totals
-- Where: `app/food/page.tsx` (Food Diary) and `app/health-tracking/page.tsx` → card “Nutrition”
-- What: Sum today’s Calories/Protein/Carbs/Fat from saved entries and show daily totals + simple targets (e.g., Protein 120g target). Use existing `todaysFoods` stored via `POST /api/user-data`.
-- Why: Connects AI analysis to clear daily numbers.
-- Done when:
-  - Food Diary saves each entry’s nutrition as it already does
-  - Health Tracking “Nutrition” shows totals (Cals/Prot/Carb/Fat) for today and simple targets
+– Moved to DONE (implemented daily totals at top of Food diary)
 
 7) Activity — Steps & Workouts
 - Where: `app/health-tracking/page.tsx` → card “Activity”
