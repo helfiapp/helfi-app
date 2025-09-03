@@ -125,9 +125,22 @@ export default function FoodDiary() {
   useEffect(() => {
     if (isViewingToday && userData?.todaysFoods) {
       console.log('🚀 PERFORMANCE: Using cached foods from context - instant load!');
-      setTodaysFoods(userData.todaysFoods);
+      // Filter to only entries created on the selected (today) date using the entry timestamp id
+      const onlySelectedDate = userData.todaysFoods.filter((item: any) => {
+        try {
+          const d = new Date(typeof item.id === 'number' ? item.id : Number(item.id));
+          const y = d.getFullYear();
+          const m = String(d.getMonth() + 1).padStart(2, '0');
+          const day = String(d.getDate()).padStart(2, '0');
+          const itemDate = `${y}-${m}-${day}`;
+          return itemDate === selectedDate;
+        } catch {
+          return false;
+        }
+      });
+      setTodaysFoods(onlySelectedDate);
     }
-  }, [userData, isViewingToday]);
+  }, [userData, isViewingToday, selectedDate]);
 
   // Load history for non-today dates
   useEffect(() => {
