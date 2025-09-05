@@ -11,13 +11,6 @@ How to use
 
 
 
-4) Navigation & Empty States
-- Where: `app/dashboard/page.tsx`, `app/health-tracking/page.tsx`, `app/insights/page.tsx`, `app/reports/page.tsx`
-- What: Add short “how this works” blurbs where a card says “Coming Soon” or when a list is empty.
-- Why: Guides new users and reduces confusion.
-- Done when:
-  - Each major card/page shows a one‑sentence blurb when empty
-
 5) Device Connections (Placeholder with Interest)
 - Where: `app/dashboard/page.tsx` → “Connect Your Devices” section
 - What: Keep Apple/ FitBit/ Garmin/ Other cards but let users tap “I’m interested”, storing their interest.
@@ -25,17 +18,6 @@ How to use
 - Done when:
   - Tapping a card toggles interest and saves via `POST /api/user-data` (e.g., `deviceInterest: { appleWatch: true }`)
   - UI shows selected state on reload
-
-6) Food Diary → Nutrition Totals
-– Moved to DONE (implemented daily totals at top of Food diary)
-
-7) Activity — Steps & Workouts
-- Where: `app/health-tracking/page.tsx` → card “Activity”
-- What: Manual logging for steps (number) and workouts (text + minutes). Show daily/weekly totals.
-- Why: Baseline activity tracking prior to device integrations.
-- Done when:
-  - Inputs save/load via `POST /api/user-data` under a simple `activity` object
-  - Weekly total displays on the card
 
 8) Health Tracking — Weekly Summary Panel
 - Where: `app/health-tracking/page.tsx` top section
