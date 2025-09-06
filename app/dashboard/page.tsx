@@ -357,7 +357,13 @@ export default function Dashboard() {
             {onboardingData && (
               <div className="mb-8 bg-gradient-to-r from-blue-50 to-green-50 rounded-lg p-4 md:p-6 border border-blue-200">
                 <div className="mb-3 md:mb-4">
-                  <div className="flex items-center justify-between">
+                  {/* Mobile: centered heading and badge */}
+                  <div className="md:hidden text-center">
+                    <h3 className="text-[17px] font-semibold text-helfi-black">📱 Connect Your Devices</h3>
+                    <div className="text-[12px] text-green-600 font-medium mt-1">Enhanced Analytics</div>
+                  </div>
+                  {/* Desktop: left title, right badge */}
+                  <div className="hidden md:flex items-center justify-between">
                     <h3 className="text-[17px] font-semibold text-helfi-black">📱 Connect Your Devices</h3>
                     <span className="text-[12px] md:text-sm text-green-600 font-medium whitespace-nowrap">Enhanced Analytics</span>
                   </div>
