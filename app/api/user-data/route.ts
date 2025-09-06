@@ -606,15 +606,13 @@ export async function POST(request: NextRequest) {
 
     // Save device interest if present (hidden goal record)
     try {
-      const bodyText = await request.text()
-      const body = bodyText ? JSON.parse(bodyText) : {}
-      if (body && body.deviceInterest && typeof body.deviceInterest === 'object') {
-        // Upsert hidden record __DEVICE_INTEREST__ in HealthGoal as we do for other hidden payloads
+      if (data && (data as any).deviceInterest && typeof (data as any).deviceInterest === 'object') {
+        const deviceInterest = (data as any).deviceInterest
         const existing = await prisma.healthGoal.findFirst({ where: { userId: user.id, name: '__DEVICE_INTEREST__' } })
         if (existing) {
-          await prisma.healthGoal.update({ where: { id: existing.id }, data: { category: JSON.stringify(body.deviceInterest) } })
+          await prisma.healthGoal.update({ where: { id: existing.id }, data: { category: JSON.stringify(deviceInterest) } })
         } else {
-          await prisma.healthGoal.create({ data: { userId: user.id, name: '__DEVICE_INTEREST__', category: JSON.stringify(body.deviceInterest), currentRating: 0, goal: { } as any } as any })
+          await prisma.healthGoal.create({ data: { userId: user.id, name: '__DEVICE_INTEREST__', category: JSON.stringify(deviceInterest), currentRating: 0 } })
         }
       }
     } catch (e) {

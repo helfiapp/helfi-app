@@ -193,6 +193,14 @@ export default function Dashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ deviceInterest: next })
       })
+      // Reload from server to ensure persistence and UI stays selected
+      try {
+        const res = await fetch('/api/user-data', { cache: 'no-cache' })
+        if (res.ok) {
+          const json = await res.json()
+          if (json?.data?.deviceInterest) setDeviceInterest(json.data.deviceInterest)
+        }
+      } catch {}
     } catch (e) {
       console.error('Failed to save device interest', e)
     } finally {
