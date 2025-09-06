@@ -366,7 +366,7 @@ export default function Dashboard() {
                   </div>
                 </div>
                 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-4 mb-4">
                   {/* Apple Watch */}
                   <div className={`bg-white p-4 rounded-2xl border ${deviceInterest.appleWatch ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-gray-100'} shadow-sm transition-colors`}> 
                     <div className="text-center">
