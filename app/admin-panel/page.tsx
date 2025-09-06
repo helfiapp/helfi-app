@@ -1774,8 +1774,20 @@ The Helfi Team`,
                         <span className="font-bold text-emerald-600">{userStats.deviceInterest?.garmin || 0}</span>
                       </div>
                       <div className="flex items-center justify-between bg-gray-50 p-2 rounded">
-                        <span>Other</span>
-                        <span className="font-bold text-emerald-600">{userStats.deviceInterest?.other || 0}</span>
+                        <span>Samsung Health</span>
+                        <span className="font-bold text-emerald-600">{userStats.deviceInterest?.samsung || 0}</span>
+                      </div>
+                      <div className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                        <span>Google Fit</span>
+                        <span className="font-bold text-emerald-600">{userStats.deviceInterest?.googleFit || 0}</span>
+                      </div>
+                      <div className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                        <span>Oura Ring</span>
+                        <span className="font-bold text-emerald-600">{userStats.deviceInterest?.oura || 0}</span>
+                      </div>
+                      <div className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                        <span>Polar</span>
+                        <span className="font-bold text-emerald-600">{userStats.deviceInterest?.polar || 0}</span>
                       </div>
                     </div>
                   </div>

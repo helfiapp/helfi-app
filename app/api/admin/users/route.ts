@@ -112,7 +112,10 @@ export async function GET(request: NextRequest) {
     const deviceApple = await prisma.healthGoal.count({ where: { name: '__DEVICE_INTEREST__', category: { contains: '"appleWatch":true' } } })
     const deviceFitbit = await prisma.healthGoal.count({ where: { name: '__DEVICE_INTEREST__', category: { contains: '"fitbit":true' } } })
     const deviceGarmin = await prisma.healthGoal.count({ where: { name: '__DEVICE_INTEREST__', category: { contains: '"garmin":true' } } })
-    const deviceOther = await prisma.healthGoal.count({ where: { name: '__DEVICE_INTEREST__', category: { contains: '"other":true' } } })
+    const deviceSamsung = await prisma.healthGoal.count({ where: { name: '__DEVICE_INTEREST__', category: { contains: '"samsung":true' } } })
+    const deviceGoogleFit = await prisma.healthGoal.count({ where: { name: '__DEVICE_INTEREST__', category: { contains: '"googleFit":true' } } })
+    const deviceOura = await prisma.healthGoal.count({ where: { name: '__DEVICE_INTEREST__', category: { contains: '"oura":true' } } })
+    const devicePolar = await prisma.healthGoal.count({ where: { name: '__DEVICE_INTEREST__', category: { contains: '"polar":true' } } })
 
     const stats = {
       totalUsers,
@@ -129,7 +132,10 @@ export async function GET(request: NextRequest) {
         appleWatch: deviceApple,
         fitbit: deviceFitbit,
         garmin: deviceGarmin,
-        other: deviceOther
+        samsung: deviceSamsung,
+        googleFit: deviceGoogleFit,
+        oura: deviceOura,
+        polar: devicePolar
       }
     }
 

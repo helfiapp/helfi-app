@@ -15,7 +15,7 @@ export default function Dashboard() {
   const [showResetConfirm, setShowResetConfirm] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [profileImage, setProfileImage] = useState<string | null>(null)
-  const [deviceInterest, setDeviceInterest] = useState<{ appleWatch?: boolean; fitbit?: boolean; garmin?: boolean; other?: boolean }>({})
+  const [deviceInterest, setDeviceInterest] = useState<{ appleWatch?: boolean; fitbit?: boolean; garmin?: boolean; samsung?: boolean; googleFit?: boolean; oura?: boolean; polar?: boolean }>({})
   const [savingInterest, setSavingInterest] = useState<string | null>(null)
 
   // Profile data - using consistent green avatar
@@ -208,7 +208,7 @@ export default function Dashboard() {
     }
   }
 
-  const toggleInterest = (key: 'appleWatch' | 'fitbit' | 'garmin' | 'other') => {
+  const toggleInterest = (key: 'appleWatch' | 'fitbit' | 'garmin' | 'samsung' | 'googleFit' | 'oura' | 'polar') => {
     setDeviceInterest((prev) => {
       const next = { ...prev, [key]: !prev?.[key] }
       // Fire-and-forget save; keep UI responsive even if request is slow
@@ -400,13 +400,46 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  {/* Other */}
-                  <div className={`bg-white p-3 rounded-lg border ${deviceInterest.other ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-gray-200'} transition-colors`}>
+                  {/* Samsung Health */}
+                  <div className={`bg-white p-3 rounded-lg border ${deviceInterest.samsung ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-gray-200'} transition-colors`}>
                     <div className="text-center">
-                      <div className="text-2xl mb-1">📊</div>
-                      <div className="text-xs font-medium text-gray-700 mb-2">Other</div>
-                      <button onClick={() => toggleInterest('other')} className={`text-xs px-3 py-1 rounded-full ${deviceInterest.other ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>
-                        {deviceInterest.other ? 'Interested ✓' : "I'm interested"}
+                      <div className="text-2xl mb-1">📱</div>
+                      <div className="text-xs font-medium text-gray-700 mb-2">Samsung Health</div>
+                      <button onClick={() => toggleInterest('samsung')} className={`text-xs px-3 py-1 rounded-full ${deviceInterest.samsung ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>
+                        {deviceInterest.samsung ? 'Interested ✓' : "I'm interested"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Google Fit */}
+                  <div className={`bg-white p-3 rounded-lg border ${deviceInterest.googleFit ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-gray-200'} transition-colors`}>
+                    <div className="text-center">
+                      <div className="text-2xl mb-1">🤖</div>
+                      <div className="text-xs font-medium text-gray-700 mb-2">Google Fit</div>
+                      <button onClick={() => toggleInterest('googleFit')} className={`text-xs px-3 py-1 rounded-full ${deviceInterest.googleFit ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>
+                        {deviceInterest.googleFit ? 'Interested ✓' : "I'm interested"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Oura Ring */}
+                  <div className={`bg-white p-3 rounded-lg border ${deviceInterest.oura ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-gray-200'} transition-colors`}>
+                    <div className="text-center">
+                      <div className="text-2xl mb-1">💍</div>
+                      <div className="text-xs font-medium text-gray-700 mb-2">Oura Ring</div>
+                      <button onClick={() => toggleInterest('oura')} className={`text-xs px-3 py-1 rounded-full ${deviceInterest.oura ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>
+                        {deviceInterest.oura ? 'Interested ✓' : "I'm interested"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Polar */}
+                  <div className={`bg-white p-3 rounded-lg border ${deviceInterest.polar ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-gray-200'} transition-colors`}>
+                    <div className="text-center">
+                      <div className="text-2xl mb-1">🧭</div>
+                      <div className="text-xs font-medium text-gray-700 mb-2">Polar</div>
+                      <button onClick={() => toggleInterest('polar')} className={`text-xs px-3 py-1 rounded-full ${deviceInterest.polar ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>
+                        {deviceInterest.polar ? 'Interested ✓' : "I'm interested"}
                       </button>
                     </div>
                   </div>
