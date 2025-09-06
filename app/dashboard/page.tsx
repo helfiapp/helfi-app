@@ -15,6 +15,8 @@ export default function Dashboard() {
   const [showResetConfirm, setShowResetConfirm] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [profileImage, setProfileImage] = useState<string | null>(null)
+  const [deviceInterest, setDeviceInterest] = useState<{ appleWatch?: boolean; fitbit?: boolean; garmin?: boolean; other?: boolean }>({})
+  const [savingInterest, setSavingInterest] = useState<string | null>(null)
 
   // Profile data - using consistent green avatar
   const defaultAvatar = 'data:image/svg+xml;base64,' + btoa(`
@@ -94,6 +96,10 @@ export default function Dashboard() {
             }
             
             setOnboardingData(result.data);
+            // Load device interest flags if present
+            if (result.data.deviceInterest && typeof result.data.deviceInterest === 'object') {
+              setDeviceInterest(result.data.deviceInterest)
+            }
             // Load profile image from database and cache it
             if (result.data.profileImage) {
               setProfileImage(result.data.profileImage);
@@ -177,6 +183,30 @@ export default function Dashboard() {
       console.error('Error deleting from database:', error);
       alert('Failed to reset data. Please try again.');
     }
+  }
+
+  const saveDeviceInterest = async (next: any) => {
+    try {
+      setSavingInterest('saving')
+      await fetch('/api/user-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deviceInterest: next })
+      })
+    } catch (e) {
+      console.error('Failed to save device interest', e)
+    } finally {
+      setSavingInterest(null)
+    }
+  }
+
+  const toggleInterest = (key: 'appleWatch' | 'fitbit' | 'garmin' | 'other') => {
+    setDeviceInterest((prev) => {
+      const next = { ...prev, [key]: !prev?.[key] }
+      // Fire-and-forget save; keep UI responsive even if request is slow
+      saveDeviceInterest(next)
+      return next
+    })
   }
 
   const handleSignOut = async () => {
@@ -329,35 +359,47 @@ export default function Dashboard() {
                 </div>
                 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                  <div className="bg-white p-3 rounded-lg border border-gray-200 hover:border-blue-300 transition-colors cursor-pointer group">
+                  {/* Apple Watch */}
+                  <div className={`bg-white p-3 rounded-lg border ${deviceInterest.appleWatch ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-gray-200'} transition-colors`}>
                     <div className="text-center">
                       <div className="text-2xl mb-1">⌚</div>
-                      <div className="text-xs font-medium text-gray-700">Apple Watch</div>
-                      <div className="text-xs text-gray-500 mt-1 group-hover:text-blue-600">Connect</div>
+                      <div className="text-xs font-medium text-gray-700 mb-2">Apple Watch</div>
+                      <button onClick={() => toggleInterest('appleWatch')} className={`text-xs px-3 py-1 rounded-full ${deviceInterest.appleWatch ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>
+                        {deviceInterest.appleWatch ? 'Interested ✓' : "I'm interested"}
+                      </button>
                     </div>
                   </div>
-                  
-                  <div className="bg-white p-3 rounded-lg border border-gray-200 hover:border-blue-300 transition-colors cursor-pointer group">
+
+                  {/* Fitbit */}
+                  <div className={`bg-white p-3 rounded-lg border ${deviceInterest.fitbit ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-gray-200'} transition-colors`}>
                     <div className="text-center">
                       <div className="text-2xl mb-1">🏃</div>
-                      <div className="text-xs font-medium text-gray-700">Fitbit</div>
-                      <div className="text-xs text-gray-500 mt-1 group-hover:text-blue-600">Connect</div>
+                      <div className="text-xs font-medium text-gray-700 mb-2">Fitbit</div>
+                      <button onClick={() => toggleInterest('fitbit')} className={`text-xs px-3 py-1 rounded-full ${deviceInterest.fitbit ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>
+                        {deviceInterest.fitbit ? 'Interested ✓' : "I'm interested"}
+                      </button>
                     </div>
                   </div>
-                  
-                  <div className="bg-white p-3 rounded-lg border border-gray-200 hover:border-blue-300 transition-colors cursor-pointer group">
+
+                  {/* Garmin */}
+                  <div className={`bg-white p-3 rounded-lg border ${deviceInterest.garmin ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-gray-200'} transition-colors`}>
                     <div className="text-center">
                       <div className="text-2xl mb-1">💪</div>
-                      <div className="text-xs font-medium text-gray-700">Garmin</div>
-                      <div className="text-xs text-gray-500 mt-1 group-hover:text-blue-600">Connect</div>
+                      <div className="text-xs font-medium text-gray-700 mb-2">Garmin</div>
+                      <button onClick={() => toggleInterest('garmin')} className={`text-xs px-3 py-1 rounded-full ${deviceInterest.garmin ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>
+                        {deviceInterest.garmin ? 'Interested ✓' : "I'm interested"}
+                      </button>
                     </div>
                   </div>
-                  
-                  <div className="bg-white p-3 rounded-lg border border-gray-200 hover:border-blue-300 transition-colors cursor-pointer group">
+
+                  {/* Other */}
+                  <div className={`bg-white p-3 rounded-lg border ${deviceInterest.other ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-gray-200'} transition-colors`}>
                     <div className="text-center">
                       <div className="text-2xl mb-1">📊</div>
-                      <div className="text-xs font-medium text-gray-700">Other</div>
-                      <div className="text-xs text-gray-500 mt-1 group-hover:text-blue-600">Connect</div>
+                      <div className="text-xs font-medium text-gray-700 mb-2">Other</div>
+                      <button onClick={() => toggleInterest('other')} className={`text-xs px-3 py-1 rounded-full ${deviceInterest.other ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>
+                        {deviceInterest.other ? 'Interested ✓' : "I'm interested"}
+                      </button>
                     </div>
                   </div>
                 </div>
