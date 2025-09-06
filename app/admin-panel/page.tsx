@@ -1758,6 +1758,27 @@ The Helfi Team`,
                     </div>
                     <div className="text-sm text-gray-600">Users with Food Logs</div>
                   </div>
+                  <div className="bg-white rounded-lg shadow p-6">
+                    <div className="text-lg font-semibold text-gray-800 mb-2">Device Interest</div>
+                    <div className="grid grid-cols-2 gap-2 text-sm text-gray-700">
+                      <div className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                        <span>Apple Watch</span>
+                        <span className="font-bold text-emerald-600">{userStats.deviceInterest?.appleWatch || 0}</span>
+                      </div>
+                      <div className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                        <span>Fitbit</span>
+                        <span className="font-bold text-emerald-600">{userStats.deviceInterest?.fitbit || 0}</span>
+                      </div>
+                      <div className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                        <span>Garmin</span>
+                        <span className="font-bold text-emerald-600">{userStats.deviceInterest?.garmin || 0}</span>
+                      </div>
+                      <div className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                        <span>Other</span>
+                        <span className="font-bold text-emerald-600">{userStats.deviceInterest?.other || 0}</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Recent Users */}

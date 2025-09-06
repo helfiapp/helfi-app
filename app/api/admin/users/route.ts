@@ -107,6 +107,12 @@ export async function GET(request: NextRequest) {
       }
     })
 
+    // Device interest counts (from user.data JSON field category if present)
+    const deviceApple = await prisma.user.count({ where: { data: { path: ['deviceInterest','appleWatch'], equals: true } as any } as any })
+    const deviceFitbit = await prisma.user.count({ where: { data: { path: ['deviceInterest','fitbit'], equals: true } as any } as any })
+    const deviceGarmin = await prisma.user.count({ where: { data: { path: ['deviceInterest','garmin'], equals: true } as any } as any })
+    const deviceOther = await prisma.user.count({ where: { data: { path: ['deviceInterest','other'], equals: true } as any } as any })
+
     const stats = {
       totalUsers,
       usersWithProfiles,
@@ -117,7 +123,13 @@ export async function GET(request: NextRequest) {
       recentSignups,
       genderStats,
       recentUsers,
-      completionRate: totalUsers > 0 ? Math.round((usersWithProfiles / totalUsers) * 100) : 0
+      completionRate: totalUsers > 0 ? Math.round((usersWithProfiles / totalUsers) * 100) : 0,
+      deviceInterest: {
+        appleWatch: deviceApple,
+        fitbit: deviceFitbit,
+        garmin: deviceGarmin,
+        other: deviceOther
+      }
     }
 
     return NextResponse.json(stats)
