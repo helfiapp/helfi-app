@@ -323,31 +323,31 @@ export default function Dashboard() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-8">
               <Link href="/health-tracking" className="block">
-              <div className="bg-helfi-green/5 p-6 rounded-lg border-2 border-helfi-green/20 hover:border-helfi-green/40 transition-colors cursor-pointer">
-                <h3 className="font-semibold text-helfi-black mb-2">🎯 Health Tracking</h3>
-                <p className="text-sm text-gray-600">Track your daily metrics and progress</p>
-                <div className="mt-4 text-center">
-                  <span className="text-2xl font-bold text-helfi-green">Coming Soon</span>
+              <div className="bg-white md:bg-helfi-green/5 p-5 md:p-6 rounded-2xl border border-gray-100 md:border-2 md:border-helfi-green/20 hover:md:border-helfi-green/40 shadow-sm md:shadow-none transition-colors">
+                <h3 className="text-[17px] font-semibold text-helfi-black mb-1.5">🎯 Health Tracking</h3>
+                <p className="text-[13px] text-gray-600">Track your daily metrics and progress</p>
+                <div className="mt-3">
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-helfi-green/10 text-helfi-green">Coming Soon</span>
                 </div>
               </div>
               </Link>
 
               <Link href="/insights" className="block">
-              <div className="bg-blue-50 p-6 rounded-lg border-2 border-blue-200 hover:border-blue-300 transition-colors cursor-pointer">
-                <h3 className="font-semibold text-helfi-black mb-2">🤖 AI Insights</h3>
-                <p className="text-sm text-gray-600">Personalized health recommendations</p>
-                <div className="mt-4 text-center">
-                  <span className="text-2xl font-bold text-blue-600">Coming Soon</span>
+              <div className="bg-white md:bg-blue-50 p-5 md:p-6 rounded-2xl border border-gray-100 md:border-2 md:border-blue-200 hover:md:border-blue-300 shadow-sm md:shadow-none transition-colors">
+                <h3 className="text-[17px] font-semibold text-helfi-black mb-1.5">🤖 AI Insights</h3>
+                <p className="text-[13px] text-gray-600">Personalized health recommendations</p>
+                <div className="mt-3">
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-blue-100 text-blue-600">Coming Soon</span>
                 </div>
               </div>
               </Link>
 
               <Link href="/reports" className="block">
-              <div className="bg-purple-50 p-6 rounded-lg border-2 border-purple-200 hover:border-purple-300 transition-colors cursor-pointer">
-                <h3 className="font-semibold text-helfi-black mb-2">📊 Reports</h3>
-                <p className="text-sm text-gray-600">Weekly health analysis and trends</p>
-                <div className="mt-4 text-center">
-                  <span className="text-2xl font-bold text-purple-600">Coming Soon</span>
+              <div className="bg-white md:bg-purple-50 p-5 md:p-6 rounded-2xl border border-gray-100 md:border-2 md:border-purple-200 hover:md:border-purple-300 shadow-sm md:shadow-none transition-colors">
+                <h3 className="text-[17px] font-semibold text-helfi-black mb-1.5">📊 Reports</h3>
+                <p className="text-[13px] text-gray-600">Weekly health analysis and trends</p>
+                <div className="mt-3">
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-purple-100 text-purple-600">Coming Soon</span>
                 </div>
               </div>
               </Link>
@@ -366,79 +366,79 @@ export default function Dashboard() {
                   </div>
                 </div>
                 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-4">
                   {/* Apple Watch */}
-                  <div className={`bg-white p-3 rounded-lg border ${deviceInterest.appleWatch ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-gray-200'} transition-colors`}>
+                  <div className={`bg-white p-4 rounded-2xl border ${deviceInterest.appleWatch ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-gray-100'} shadow-sm transition-colors`}> 
                     <div className="text-center">
                       <div className="text-2xl mb-1">⌚</div>
                       <div className="text-xs font-medium text-gray-700 mb-2">Apple Watch</div>
-                      <button onClick={() => toggleInterest('appleWatch')} className={`text-xs px-3 py-1 rounded-full ${deviceInterest.appleWatch ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>
+                      <button onClick={() => toggleInterest('appleWatch')} className={`text-[12px] px-3.5 py-1.5 rounded-full ${deviceInterest.appleWatch ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>
                         {deviceInterest.appleWatch ? 'Interested ✓' : "I'm interested"}
                       </button>
                     </div>
                   </div>
 
                   {/* Fitbit */}
-                  <div className={`bg-white p-3 rounded-lg border ${deviceInterest.fitbit ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-gray-200'} transition-colors`}>
+                  <div className={`bg-white p-4 rounded-2xl border ${deviceInterest.fitbit ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-gray-100'} shadow-sm transition-colors`}>
                     <div className="text-center">
                       <div className="text-2xl mb-1">🏃</div>
                       <div className="text-xs font-medium text-gray-700 mb-2">Fitbit</div>
-                      <button onClick={() => toggleInterest('fitbit')} className={`text-xs px-3 py-1 rounded-full ${deviceInterest.fitbit ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>
+                      <button onClick={() => toggleInterest('fitbit')} className={`text-[12px] px-3.5 py-1.5 rounded-full ${deviceInterest.fitbit ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>
                         {deviceInterest.fitbit ? 'Interested ✓' : "I'm interested"}
                       </button>
                     </div>
                   </div>
 
                   {/* Garmin */}
-                  <div className={`bg-white p-3 rounded-lg border ${deviceInterest.garmin ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-gray-200'} transition-colors`}>
+                  <div className={`bg-white p-4 rounded-2xl border ${deviceInterest.garmin ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-gray-100'} shadow-sm transition-colors`}>
                     <div className="text-center">
                       <div className="text-2xl mb-1">💪</div>
                       <div className="text-xs font-medium text-gray-700 mb-2">Garmin</div>
-                      <button onClick={() => toggleInterest('garmin')} className={`text-xs px-3 py-1 rounded-full ${deviceInterest.garmin ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>
+                      <button onClick={() => toggleInterest('garmin')} className={`text-[12px] px-3.5 py-1.5 rounded-full ${deviceInterest.garmin ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>
                         {deviceInterest.garmin ? 'Interested ✓' : "I'm interested"}
                       </button>
                     </div>
                   </div>
 
                   {/* Samsung Health */}
-                  <div className={`bg-white p-3 rounded-lg border ${deviceInterest.samsung ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-gray-200'} transition-colors`}>
+                  <div className={`bg-white p-4 rounded-2xl border ${deviceInterest.samsung ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-gray-100'} shadow-sm transition-colors`}>
                     <div className="text-center">
                       <div className="text-2xl mb-1">📱</div>
                       <div className="text-xs font-medium text-gray-700 mb-2">Samsung Health</div>
-                      <button onClick={() => toggleInterest('samsung')} className={`text-xs px-3 py-1 rounded-full ${deviceInterest.samsung ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>
+                      <button onClick={() => toggleInterest('samsung')} className={`text-[12px] px-3.5 py-1.5 rounded-full ${deviceInterest.samsung ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>
                         {deviceInterest.samsung ? 'Interested ✓' : "I'm interested"}
                       </button>
                     </div>
                   </div>
 
                   {/* Google Fit */}
-                  <div className={`bg-white p-3 rounded-lg border ${deviceInterest.googleFit ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-gray-200'} transition-colors`}>
+                  <div className={`bg-white p-4 rounded-2xl border ${deviceInterest.googleFit ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-gray-100'} shadow-sm transition-colors`}>
                     <div className="text-center">
                       <div className="text-2xl mb-1">🤖</div>
                       <div className="text-xs font-medium text-gray-700 mb-2">Google Fit</div>
-                      <button onClick={() => toggleInterest('googleFit')} className={`text-xs px-3 py-1 rounded-full ${deviceInterest.googleFit ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>
+                      <button onClick={() => toggleInterest('googleFit')} className={`text-[12px] px-3.5 py-1.5 rounded-full ${deviceInterest.googleFit ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>
                         {deviceInterest.googleFit ? 'Interested ✓' : "I'm interested"}
                       </button>
                     </div>
                   </div>
 
                   {/* Oura Ring */}
-                  <div className={`bg-white p-3 rounded-lg border ${deviceInterest.oura ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-gray-200'} transition-colors`}>
+                  <div className={`bg-white p-4 rounded-2xl border ${deviceInterest.oura ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-gray-100'} shadow-sm transition-colors`}>
                     <div className="text-center">
                       <div className="text-2xl mb-1">💍</div>
                       <div className="text-xs font-medium text-gray-700 mb-2">Oura Ring</div>
-                      <button onClick={() => toggleInterest('oura')} className={`text-xs px-3 py-1 rounded-full ${deviceInterest.oura ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>
+                      <button onClick={() => toggleInterest('oura')} className={`text-[12px] px-3.5 py-1.5 rounded-full ${deviceInterest.oura ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>
                         {deviceInterest.oura ? 'Interested ✓' : "I'm interested"}
                       </button>
                     </div>
                   </div>
 
                   {/* Polar */}
-                  <div className={`bg-white p-3 rounded-lg border ${deviceInterest.polar ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-gray-200'} transition-colors`}>
+                  <div className={`bg-white p-4 rounded-2xl border ${deviceInterest.polar ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-gray-100'} shadow-sm transition-colors`}>
                     <div className="text-center">
                       <div className="text-2xl mb-1">🧭</div>
                       <div className="text-xs font-medium text-gray-700 mb-2">Polar</div>
-                      <button onClick={() => toggleInterest('polar')} className={`text-xs px-3 py-1 rounded-full ${deviceInterest.polar ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>
+                      <button onClick={() => toggleInterest('polar')} className={`text-[12px] px-3.5 py-1.5 rounded-full ${deviceInterest.polar ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>
                         {deviceInterest.polar ? 'Interested ✓' : "I'm interested"}
                       </button>
                     </div>
