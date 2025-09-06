@@ -10,15 +10,6 @@ How to use
 ## Ordered Roadmap — Easiest → Hardest
 
 
-
-5) Device Connections (Placeholder with Interest)
-- Where: `app/dashboard/page.tsx` → “Connect Your Devices” section
-- What: Keep Apple/ FitBit/ Garmin/ Other cards but let users tap “I’m interested”, storing their interest.
-- Why: Capture demand; invite testers later.
-- Done when:
-  - Tapping a card toggles interest and saves via `POST /api/user-data` (e.g., `deviceInterest: { appleWatch: true }`)
-  - UI shows selected state on reload
-
 8) Health Tracking — Weekly Summary Panel
 - Where: `app/health-tracking/page.tsx` top section
 - What: A compact weekly summary (best day, trend arrows) pulled from the same data.

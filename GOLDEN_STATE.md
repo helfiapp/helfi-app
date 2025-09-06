@@ -2,10 +2,10 @@
 
 Latest known-good deployment snapshot.
 
-- Commit: e628a51 (master)
-- Date: 2025-09-01 01:50:09 +1000
-- Title: Food diary — newest entries appear on top (ordering fix)
-- Reason: UX improvement only; add-only/safe changes to list ordering and rendering. No backend or data model changes. Deployed via GitHub auto-deploy to Vercel.
+- Commit: 4e60081 (master)
+- Date: 2025-09-01 11:46:02 +1000
+- Title: Dashboard UI/UX — Mobile + Desktop complete (Apple‑style redesign)
+- Reason: Finalized Dashboard page UI/UX on mobile and desktop: modern cards, grouped device list with full‑width actions, and alignment polish. Production deployment verified.
 
 How to use
 - When a new version is verified “golden”, update this file with the new commit hash, date, and a brief reason.
