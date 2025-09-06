@@ -355,22 +355,20 @@ export default function Dashboard() {
 
             {/* Device Integration Section */}
             {onboardingData && (
-              <div className="mb-8 bg-gradient-to-r from-blue-50 to-green-50 rounded-lg p-6 border border-blue-200">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h3 className="text-lg font-semibold text-helfi-black mb-2">📱 Connect Your Devices</h3>
-                    <p className="text-sm text-gray-600">Sync your smartwatch and fitness devices for better health insights</p>
+              <div className="mb-8 bg-gradient-to-r from-blue-50 to-green-50 rounded-lg p-4 md:p-6 border border-blue-200">
+                <div className="mb-3 md:mb-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-[17px] font-semibold text-helfi-black">📱 Connect Your Devices</h3>
+                    <span className="text-[12px] md:text-sm text-green-600 font-medium whitespace-nowrap">Enhanced Analytics</span>
                   </div>
-                  <div className="text-green-600 text-sm font-medium">
-                    Enhanced Analytics
-                  </div>
+                  <p className="text-[13px] text-gray-600 text-center mt-2">Sync your smartwatch and fitness devices for better health insights</p>
                 </div>
                 
                 {/* Mobile grouped list */}
                 <div className="md:hidden mb-4">
                   <div className="bg-white rounded-2xl border border-gray-100 shadow-sm divide-y divide-gray-100">
                     {/* Apple Watch */}
-                    <div className="flex items-center justify-between px-4 py-3">
+                    <div className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <div className="text-2xl">⌚</div>
                         <div>
@@ -378,10 +376,10 @@ export default function Dashboard() {
                           <div className="text-[12px] text-gray-500">Sync with Apple Health</div>
                         </div>
                       </div>
-                      <button onClick={() => toggleInterest('appleWatch')} className={`text-[12px] px-3.5 py-1.5 rounded-full ${deviceInterest.appleWatch ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>{deviceInterest.appleWatch ? 'Interested ✓' : "I'm interested"}</button>
+                      <button onClick={() => toggleInterest('appleWatch')} className={`mt-3 w-full text-center text-[13px] px-3.5 py-2 rounded-full ${deviceInterest.appleWatch ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>{deviceInterest.appleWatch ? 'Interested ✓' : "I'm interested"}</button>
                     </div>
                     {/* Fitbit */}
-                    <div className="flex items-center justify-between px-4 py-3">
+                    <div className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <div className="text-2xl">🏃</div>
                         <div>
@@ -389,10 +387,10 @@ export default function Dashboard() {
                           <div className="text-[12px] text-gray-500">Activity & sleep</div>
                         </div>
                       </div>
-                      <button onClick={() => toggleInterest('fitbit')} className={`text-[12px] px-3.5 py-1.5 rounded-full ${deviceInterest.fitbit ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>{deviceInterest.fitbit ? 'Interested ✓' : "I'm interested"}</button>
+                      <button onClick={() => toggleInterest('fitbit')} className={`mt-3 w-full text-center text-[13px] px-3.5 py-2 rounded-full ${deviceInterest.fitbit ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>{deviceInterest.fitbit ? 'Interested ✓' : "I'm interested"}</button>
                     </div>
                     {/* Garmin */}
-                    <div className="flex items-center justify-between px-4 py-3">
+                    <div className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <div className="text-2xl">💪</div>
                         <div>
@@ -400,10 +398,10 @@ export default function Dashboard() {
                           <div className="text-[12px] text-gray-500">Training metrics</div>
                         </div>
                       </div>
-                      <button onClick={() => toggleInterest('garmin')} className={`text-[12px] px-3.5 py-1.5 rounded-full ${deviceInterest.garmin ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>{deviceInterest.garmin ? 'Interested ✓' : "I'm interested"}</button>
+                      <button onClick={() => toggleInterest('garmin')} className={`mt-3 w-full text-center text-[13px] px-3.5 py-2 rounded-full ${deviceInterest.garmin ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>{deviceInterest.garmin ? 'Interested ✓' : "I'm interested"}</button>
                     </div>
                     {/* Samsung Health */}
-                    <div className="flex items-center justify-between px-4 py-3">
+                    <div className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <div className="text-2xl">📱</div>
                         <div>
@@ -411,10 +409,10 @@ export default function Dashboard() {
                           <div className="text-[12px] text-gray-500">Android health sync</div>
                         </div>
                       </div>
-                      <button onClick={() => toggleInterest('samsung')} className={`text-[12px] px-3.5 py-1.5 rounded-full ${deviceInterest.samsung ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>{deviceInterest.samsung ? 'Interested ✓' : "I'm interested"}</button>
+                      <button onClick={() => toggleInterest('samsung')} className={`mt-3 w-full text-center text-[13px] px-3.5 py-2 rounded-full ${deviceInterest.samsung ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>{deviceInterest.samsung ? 'Interested ✓' : "I'm interested"}</button>
                     </div>
                     {/* Google Fit */}
-                    <div className="flex items-center justify-between px-4 py-3">
+                    <div className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <div className="text-2xl">🤖</div>
                         <div>
@@ -422,10 +420,10 @@ export default function Dashboard() {
                           <div className="text-[12px] text-gray-500">Android fitness</div>
                         </div>
                       </div>
-                      <button onClick={() => toggleInterest('googleFit')} className={`text-[12px] px-3.5 py-1.5 rounded-full ${deviceInterest.googleFit ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>{deviceInterest.googleFit ? 'Interested ✓' : "I'm interested"}</button>
+                      <button onClick={() => toggleInterest('googleFit')} className={`mt-3 w-full text-center text-[13px] px-3.5 py-2 rounded-full ${deviceInterest.googleFit ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>{deviceInterest.googleFit ? 'Interested ✓' : "I'm interested"}</button>
                     </div>
                     {/* Oura Ring */}
-                    <div className="flex items-center justify-between px-4 py-3">
+                    <div className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <div className="text-2xl">💍</div>
                         <div>
@@ -433,10 +431,10 @@ export default function Dashboard() {
                           <div className="text-[12px] text-gray-500">Recovery & sleep</div>
                         </div>
                       </div>
-                      <button onClick={() => toggleInterest('oura')} className={`text-[12px] px-3.5 py-1.5 rounded-full ${deviceInterest.oura ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>{deviceInterest.oura ? 'Interested ✓' : "I'm interested"}</button>
+                      <button onClick={() => toggleInterest('oura')} className={`mt-3 w-full text-center text-[13px] px-3.5 py-2 rounded-full ${deviceInterest.oura ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>{deviceInterest.oura ? 'Interested ✓' : "I'm interested"}</button>
                     </div>
                     {/* Polar */}
-                    <div className="flex items-center justify-between px-4 py-3">
+                    <div className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <div className="text-2xl">🧭</div>
                         <div>
@@ -444,7 +442,7 @@ export default function Dashboard() {
                           <div className="text-[12px] text-gray-500">Heart rate & sport</div>
                         </div>
                       </div>
-                      <button onClick={() => toggleInterest('polar')} className={`text-[12px] px-3.5 py-1.5 rounded-full ${deviceInterest.polar ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>{deviceInterest.polar ? 'Interested ✓' : "I'm interested"}</button>
+                      <button onClick={() => toggleInterest('polar')} className={`mt-3 w-full text-center text-[13px] px-3.5 py-2 rounded-full ${deviceInterest.polar ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>{deviceInterest.polar ? 'Interested ✓' : "I'm interested"}</button>
                     </div>
                   </div>
                 </div>
