@@ -123,6 +123,18 @@ export async function GET(request: NextRequest) {
       console.log('No todays foods data found in storage');
     }
 
+    // Get device interest (stored in hidden goal record)
+    let deviceInterestData: any = {}
+    try {
+      const storedDeviceInterest = user.healthGoals.find((goal: any) => goal.name === '__DEVICE_INTEREST__');
+      if (storedDeviceInterest && storedDeviceInterest.category) {
+        const parsed = JSON.parse(storedDeviceInterest.category);
+        deviceInterestData = parsed || {}
+      }
+    } catch (e) {
+      console.log('No device interest data found in storage');
+    }
+
     // Get profile info data
     let profileInfoData = { firstName: '', lastName: '', bio: '', dateOfBirth: '', email: user.email || '' };
     try {
@@ -182,6 +194,7 @@ export async function GET(request: NextRequest) {
       profileImage: user.image || null,
       todaysFoods: todaysFoods,
       profileInfo: profileInfoData,
+      deviceInterest: deviceInterestData,
       termsAccepted: (user as any).termsAccepted === true
     }
 
@@ -590,6 +603,23 @@ export async function POST(request: NextRequest) {
       // Continue with other updates
     }
     console.timeEnd('⏱️ Supplements Update')
+
+    // Save device interest if present (hidden goal record)
+    try {
+      const bodyText = await request.text()
+      const body = bodyText ? JSON.parse(bodyText) : {}
+      if (body && body.deviceInterest && typeof body.deviceInterest === 'object') {
+        // Upsert hidden record __DEVICE_INTEREST__ in HealthGoal as we do for other hidden payloads
+        const existing = await prisma.healthGoal.findFirst({ where: { userId: user.id, name: '__DEVICE_INTEREST__' } })
+        if (existing) {
+          await prisma.healthGoal.update({ where: { id: existing.id }, data: { category: JSON.stringify(body.deviceInterest) } })
+        } else {
+          await prisma.healthGoal.create({ data: { userId: user.id, name: '__DEVICE_INTEREST__', category: JSON.stringify(body.deviceInterest), currentRating: 0, goal: { } as any } as any })
+        }
+      }
+    } catch (e) {
+      console.log('Device interest save skipped:', e)
+    }
 
     // 5. Handle medications - safe upsert approach (same as supplements)
     console.time('⏱️ Medications Update')
