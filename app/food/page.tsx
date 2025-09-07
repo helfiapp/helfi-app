@@ -1699,10 +1699,10 @@ Please add nutritional information manually if needed.`);
                 <div key={food.id} className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-visible">
                   {/* Mobile-Optimized Layout */}
                   <div className="p-4 hover:bg-gray-50 transition-colors">
-                    {/* Top Row - Food Name */}
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex items-center gap-3 flex-1">
-                        <h3 className="font-medium text-gray-900 text-sm sm:text-base leading-tight">
+                    {/* Title (up to 2 lines) */}
+                    <div className="mb-1">
+                      <div className="flex items-start gap-3 flex-1">
+                        <h3 className="font-medium text-gray-900 text-sm sm:text-base leading-snug line-clamp-2">
                           {food.description.split('\n')[0].split('Calories:')[0]
                             .replace(/^(I'm unable to see.*?but I can provide a general estimate for|Based on.*?,|This image shows|I can see|The food appears to be|This appears to be)/i, '')
                             .split('.')[0]
@@ -1712,10 +1712,73 @@ Please add nutritional information manually if needed.`);
                       </div>
                     </div>
                     
-                    {/* Middle Row - Time */}
-                    <p className="text-xs sm:text-sm text-gray-500 mb-2">
-                      {formatTimeWithAMPM(food.time)}
-                    </p>
+                    {/* Utility Row: time (left) + actions (right) */}
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-xs sm:text-sm text-gray-500">
+                        {formatTimeWithAMPM(food.time)}
+                      </p>
+                      <div className="flex items-center gap-2">
+                        {/* 3-Dot Options Menu */}
+                        <div className="relative entry-options-dropdown">
+                          <button
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setShowEntryOptions(showEntryOptions === food.id.toString() ? null : food.id.toString());
+                            }}
+                            className="p-1.5 sm:p-2 rounded-lg hover:bg-gray-200 transition-colors"
+                          >
+                            <svg className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
+                            </svg>
+                          </button>
+                          {showEntryOptions === food.id.toString() && (
+                            <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-200 z-[9999]" style={{boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'}}>
+                              <button
+                                onClick={() => editFood(food)}
+                                className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center transition-colors"
+                              >
+                                <svg className="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                </svg>
+                                <div>
+                                  <div className="font-medium">Edit Entry</div>
+                                  <div className="text-xs text-gray-500">Modify description & re-analyze</div>
+                                </div>
+                              </button>
+                              <button
+                                onClick={() => deleteFood(food.id)}
+                                className="w-full px-4 py-3 text-left text-sm text-red-600 hover:bg-red-50 flex items-center border-t border-gray-100 transition-colors"
+                              >
+                                <svg className="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                                <div>
+                                  <div className="font-medium">Delete Entry</div>
+                                  <div className="text-xs text-gray-500">Remove from food diary</div>
+                                </div>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        {/* Expand/Collapse Toggle */}
+                        <button
+                          onClick={() => toggleExpanded(food.id.toString())}
+                          className="p-1.5 sm:p-2 rounded-lg hover:bg-gray-200 transition-colors"
+                        >
+                          <svg 
+                            className={`w-4 h-4 sm:w-5 sm:h-5 text-gray-400 transition-transform duration-200 ${
+                              expandedEntries[food.id.toString()] ? 'rotate-180' : ''
+                            }`} 
+                            fill="none" 
+                            stroke="currentColor" 
+                            viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
                     
                     {/* Nutrition Row removed in collapsed view (still shown in expanded view) */}
                     
