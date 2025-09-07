@@ -151,7 +151,8 @@ export default function FoodDiary() {
       }
       try {
         setIsLoadingHistory(true);
-        const res = await fetch(`/api/food-log?date=${selectedDate}`);
+        const tz = new Date().getTimezoneOffset();
+        const res = await fetch(`/api/food-log?date=${selectedDate}&tz=${tz}`);
         if (res.ok) {
           const json = await res.json();
           const logs = Array.isArray(json.logs) ? json.logs : [];

@@ -12,7 +12,8 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
-    const dateStr = searchParams.get('date') // YYYY-MM-DD
+    const dateStr = searchParams.get('date') // YYYY-MM-DD (local date)
+    const tzOffsetMinRaw = searchParams.get('tz') // minutes: same as new Date().getTimezoneOffset()
     if (!dateStr) {
       return NextResponse.json({ error: 'Missing date' }, { status: 400 })
     }
@@ -22,8 +23,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    const start = new Date(dateStr + 'T00:00:00.000Z')
-    const end = new Date(dateStr + 'T23:59:59.999Z')
+    // Build a UTC window that corresponds to the user's local day
+    // If tz is supplied (minutes difference between UTC and local), shift window by -tz
+    const [y, m, d] = dateStr.split('-').map((v) => parseInt(v, 10))
+    const tzMin = Number.isFinite(parseInt(tzOffsetMinRaw || '')) ? parseInt(tzOffsetMinRaw || '0', 10) : 0
+    const startUtcMs = Date.UTC(y, (m || 1) - 1, d || 1, 0, 0, 0, 0) - tzMin * 60 * 1000
+    const endUtcMs = Date.UTC(y, (m || 1) - 1, d || 1, 23, 59, 59, 999) - tzMin * 60 * 1000
+    const start = new Date(startUtcMs)
+    const end = new Date(endUtcMs)
 
     const logs = await prisma.foodLog.findMany({
       where: {
@@ -71,6 +78,7 @@ export async function POST(request: NextRequest) {
         nutrients: nutrition || null,
       },
     })
+    // No need to return localDate separately; the client can pass tz when querying
 
     return NextResponse.json({ success: true, id: created.id })
   } catch (error) {
