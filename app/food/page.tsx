@@ -1656,7 +1656,7 @@ Please add nutritional information manually if needed.`);
                 }, { calories: 0, protein: 0, carbs: 0, fat: 0 });
                 return (
                   <div>
-                    <div className="text-sm text-gray-600 font-medium mb-2">{isViewingToday ? "Today's Totals" : 'Totals'}</div>
+                    <div className="text-lg font-semibold text-gray-800 mb-2">{isViewingToday ? "Today's Totals" : 'Totals'}</div>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                       <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
                         <div className="text-xs text-orange-500 mb-1">Calories</div>
@@ -1699,7 +1699,7 @@ Please add nutritional information manually if needed.`);
                 <div key={food.id} className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-visible">
                   {/* Mobile-Optimized Layout */}
                   <div className="p-4 hover:bg-gray-50 transition-colors">
-                    {/* Top Row - Food Name & Method Badge */}
+                    {/* Top Row - Food Name */}
                     <div className="flex items-start justify-between mb-2">
                       <div className="flex items-center gap-3 flex-1">
                         <h3 className="font-medium text-gray-900 text-sm sm:text-base leading-tight">
@@ -1709,11 +1709,6 @@ Please add nutritional information manually if needed.`);
                             .trim()
                             .replace(/^./, (match: string) => match.toUpperCase())}
                         </h3>
-                        <span className={`text-xs px-2 py-1 rounded-full flex-shrink-0 ${
-                          food.method === 'photo' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
-                        }`}>
-                          {food.method === 'photo' ? '📸' : '✍️'}
-                        </span>
                       </div>
                     </div>
                     
@@ -1722,35 +1717,7 @@ Please add nutritional information manually if needed.`);
                       {formatTimeWithAMPM(food.time)}
                     </p>
                     
-                    {/* Nutrition Row */}
-                    {food.nutrition && (food.nutrition.calories !== null || food.nutrition.protein !== null || food.nutrition.carbs !== null || food.nutrition.fat !== null) && (
-                      <div className="flex gap-1.5 sm:gap-2 mb-3 flex-wrap">
-                        {food.nutrition.calories !== null && food.nutrition.calories !== undefined && (
-                          <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded px-1.5 sm:px-2 py-0.5 sm:py-1 border border-orange-200">
-                            <span className="text-xs font-bold text-orange-600">{food.nutrition.calories}</span>
-                            <span className="text-xs text-orange-500 ml-1">cal</span>
-                          </div>
-                        )}
-                        {food.nutrition.protein !== null && food.nutrition.protein !== undefined && (
-                          <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded px-1.5 sm:px-2 py-0.5 sm:py-1 border border-blue-200">
-                            <span className="text-xs font-bold text-blue-600">{food.nutrition.protein}g</span>
-                            <span className="text-xs text-blue-500 ml-1">protein</span>
-                          </div>
-                        )}
-                        {food.nutrition.carbs !== null && food.nutrition.carbs !== undefined && (
-                          <div className="bg-gradient-to-br from-green-50 to-green-100 rounded px-1.5 sm:px-2 py-0.5 sm:py-1 border border-green-200">
-                            <span className="text-xs font-bold text-green-600">{food.nutrition.carbs}g</span>
-                            <span className="text-xs text-green-500 ml-1">carbs</span>
-                          </div>
-                        )}
-                        {food.nutrition.fat !== null && food.nutrition.fat !== undefined && (
-                          <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded px-1.5 sm:px-2 py-0.5 sm:py-1 border border-purple-200">
-                            <span className="text-xs font-bold text-purple-600">{food.nutrition.fat}g</span>
-                            <span className="text-xs text-purple-500 ml-1">fat</span>
-                          </div>
-                        )}
-                      </div>
-                    )}
+                    {/* Nutrition Row removed in collapsed view (still shown in expanded view) */}
                     
                     {/* Bottom Row - Action Buttons (Right Aligned) */}
                     <div className="flex justify-end items-center gap-2">
