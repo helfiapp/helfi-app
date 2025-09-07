@@ -2,10 +2,10 @@
 
 Latest known-good deployment snapshot.
 
-- Commit: 57b19c4 (master)
-- Date: 2025-09-01 11:51:22 +1000
-- Title: Food history — Local-day fetch for reliable per‑date entries
-- Reason: Daily history now queries by the user’s local day (tz‑aware) while keeping today’s fast bucket. Prevents “missing” entries when navigating to previous days. Production deployment verified.
+- Commit: 8f3b036 (master)
+- Date: 2025-09-08 02:30:33 +1000
+- Title: Food Diary UI — compact collapsed rows with single actions row
+- Reason: Fixed duplicated controls and tightened collapsed layout: 2-line titles with timestamp left and 3-dots + chevron right directly beneath. Expanded view unchanged. Production verified and approved.
 
 How to use
 - When a new version is verified “golden”, update this file with the new commit hash, date, and a brief reason.
