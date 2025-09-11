@@ -96,4 +96,9 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ success: true, sent: sentTo.length, errors })
 }
 
+// Allow Vercel Cron (GET) to trigger the same logic safely
+export async function GET(req: NextRequest) {
+  return POST(req)
+}
+
 
