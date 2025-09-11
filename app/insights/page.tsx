@@ -81,6 +81,7 @@ export default function Insights() {
   }, [session]);
 
   const [insights, setInsights] = useState<any[]>([])
+  const [issues, setIssues] = useState<string[]>([])
   const [loadingPreview, setLoadingPreview] = useState<boolean>(false)
   const [refreshing, setRefreshing] = useState<boolean>(false)
   const [lastUpdated, setLastUpdated] = useState<string>('')
@@ -105,6 +106,25 @@ export default function Insights() {
       }
     }
     loadPreview()
+  }, [])
+
+  // Load user's tracked health issues to drive the new landing list
+  useEffect(() => {
+    async function loadIssues() {
+      try {
+        // Prefer check-ins issues; fall back to goals in user-data
+        const issuesRes = await fetch('/api/checkins/issues', { cache: 'no-cache' })
+        if (issuesRes.ok) {
+          const issuesData = await issuesRes.json().catch(() => ({}))
+          const names: string[] = Array.isArray(issuesData?.issues) ? issuesData.issues.map((i: any) => i.name).filter(Boolean) : []
+          if (names.length) { setIssues(names); return }
+        }
+        const ud = await fetch('/api/user-data', { cache: 'no-cache' }).then(r => r.json()).catch(() => ({}))
+        const goals: string[] = Array.isArray(ud?.data?.goals) ? ud.data.goals : []
+        setIssues(goals)
+      } catch { setIssues([]) }
+    }
+    loadIssues()
   }, [])
 
   async function handleRefresh() {
@@ -291,15 +311,23 @@ export default function Insights() {
             <div className="text-xs text-gray-500 mb-2">Last updated: {lastUpdated}</div>
           )}
           
-          {/* Hub tiles: show on mobile and desktop for uniform navigation */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-            {[{ key:'goals', label:'Goals', icon:'🎯' }, { key:'nutrition', label:'Nutrition', icon:'🥗' }, { key:'supplements', label:'Supplements', icon:'💊' }, { key:'safety', label:'Safety', icon:'⚠️' }].map((t) => (
-              <Link key={t.key} href={`/insights/${t.key}`} className="bg-white border border-gray-200 rounded-xl p-4 text-left active:bg-gray-50">
-                <div className="text-2xl mb-2">{t.icon}</div>
-                <div className="font-semibold text-gray-900">{t.label}</div>
-                <div className="text-xs text-gray-500">Open {t.label.toLowerCase()}</div>
-              </Link>
-            ))}
+          {/* Your tracked health issues */}
+          <div className="mb-4">
+            <h3 className="text-base font-semibold text-gray-900 mb-2">Your Issues</h3>
+            {issues.length === 0 && (
+              <div className="text-sm text-gray-600">No issues found yet. Add issues during Intake to see reports here.</div>
+            )}
+            <div className="grid grid-cols-1 gap-3">
+              {issues.map((name) => (
+                <Link key={name} href={`/insights/issue/${encodeURIComponent(name)}`} className="bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between">
+                  <div>
+                    <div className="font-semibold text-gray-900">{name}</div>
+                    <div className="text-xs text-gray-500">Open reports (Daily / Weekly / Custom)</div>
+                  </div>
+                  <span className="text-helfi-green">›</span>
+                </Link>
+              ))}
+            </div>
           </div>
 
           {/* Hide the older desktop list for now to keep a clean, uniform hub */}
