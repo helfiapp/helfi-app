@@ -14,6 +14,8 @@ export default function IssueDetail() {
   const [from, setFrom] = useState<string>('')
   const [to, setTo] = useState<string>('')
   const [lastUpdated, setLastUpdated] = useState<string>('')
+  const [items, setItems] = useState<any[]>([])
+  const [generating, setGenerating] = useState<boolean>(false)
 
   useEffect(() => {
     async function load() {
@@ -63,10 +65,20 @@ export default function IssueDetail() {
           )}
           <div className="flex items-center gap-2">
             <button onClick={async()=>{ 
-              // For now, reuse preview generation to avoid enable flags; caches on server
-              fetch('/api/insights/generate?preview=1', { method: 'POST' }).catch(()=>{})
-              setLastUpdated(new Date().toLocaleTimeString())
-            }} className="px-3 py-2 bg-helfi-green text-white rounded-md text-sm">Generate</button>
+              try {
+                setGenerating(true)
+                // Kick off generation (preview uses cached pipeline and avoids cost if disabled)
+                await fetch('/api/insights/generate?preview=1', { method: 'POST' }).catch(()=>{})
+                // Load the latest list immediately after
+                const res = await fetch('/api/insights/list?preview=1', { cache: 'no-cache' })
+                const js = await res.json().catch(()=>({}))
+                const arr: any[] = Array.isArray(js?.items) ? js.items : []
+                setItems(arr)
+                setLastUpdated(new Date().toLocaleTimeString())
+              } finally {
+                setGenerating(false)
+              }
+            }} className="px-3 py-2 bg-helfi-green text-white rounded-md text-sm disabled:opacity-50" disabled={generating}>{generating ? 'Generating…' : 'Generate'}</button>
             {lastUpdated && <div className="text-xs text-gray-500">Last updated: {lastUpdated}</div>}
           </div>
         </div>
@@ -88,6 +100,30 @@ export default function IssueDetail() {
               <ul className="list-disc pl-5 space-y-2 text-sm text-gray-800">
                 {item.actions?.length ? item.actions.map((a:string, i:number)=>(<li key={i}>{a}</li>)) : <li>No actions yet.</li>}
               </ul>
+            </div>
+
+            {/* Render generated insights list */}
+            <div className="bg-white border border-gray-200 rounded-lg p-4">
+              <div className="font-semibold mb-2">Report</div>
+              {items.length === 0 ? (
+                <div className="text-sm text-gray-600">No report yet. Tap Generate above.</div>
+              ) : (
+                <div className="space-y-4">
+                  {items.map((it:any)=> (
+                    <div key={it.id} className="border border-gray-200 rounded-lg p-3">
+                      <div className="text-xs text-gray-500 mb-1">{Array.isArray(it.tags) ? it.tags.slice(0,3).join(' • ') : ''}</div>
+                      <div className="font-semibold text-gray-900 mb-1">{it.title}</div>
+                      <div className="text-sm text-gray-700 mb-2">{it.summary}</div>
+                      {it.reason && <div className="text-xs text-gray-500 mb-2">Why: {it.reason}</div>}
+                      {Array.isArray(it.actions) && it.actions.length > 0 && (
+                        <ul className="list-disc pl-5 space-y-1 text-sm text-gray-800">
+                          {it.actions.slice(0,5).map((a:string, idx:number)=>(<li key={idx}>{a}</li>))}
+                        </ul>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </>
         )}
