@@ -27,6 +27,8 @@ export async function POST(request: Request) {
   let profile: any = null
   let recentFood: any[] = []
   let recentHealthLogs: any[] = []
+  // Aggregated nutrition snapshot for the last 7 days (best-effort, safe fallbacks)
+  let weeklyNutritionSummary: any = null
   try {
     const session = await getServerSession(authOptions)
     if (session?.user?.id) {
@@ -38,7 +40,7 @@ export async function POST(request: Request) {
           medications: true,
           foodLogs: {
             orderBy: { createdAt: 'desc' },
-            take: 5,
+            take: 30,
           },
           healthLogs: {
             orderBy: { createdAt: 'desc' },
@@ -47,11 +49,75 @@ export async function POST(request: Request) {
           },
         },
       })
-      recentFood = (profile?.foodLogs || []).map((f: any) => ({ name: f.name, createdAt: f.createdAt }))
+      // Include nutrients when available so the AI can be specific
+      recentFood = (profile?.foodLogs || []).map((f: any) => ({ name: f.name, nutrients: f.nutrients || null, createdAt: f.createdAt }))
       recentHealthLogs = (profile?.healthLogs || []).map((h: any) => ({ goal: h.goal?.name, rating: h.rating, createdAt: h.createdAt }))
     }
   } catch {
     // non-blocking
+  }
+
+  // Compute a 7-day nutrition summary from recent food logs (best-effort)
+  try {
+    const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000
+    const last7 = recentFood.filter((f: any) => new Date(f.createdAt).getTime() >= cutoff)
+    const sums = {
+      calories: 0,
+      protein_g: 0,
+      carbs_g: 0,
+      fat_g: 0,
+      fiber_g: 0,
+      sugar_g: 0,
+      sodium_mg: 0,
+    }
+    let counted = 0
+    const foodCount: Record<string, number> = {}
+    for (const f of last7) {
+      const n = (f && f.nutrients) || {}
+      // Accept multiple possible keys commonly returned by analyzers
+      const cals = Number(n.calories ?? n.kcal ?? 0) || 0
+      const protein = Number(n.protein_g ?? n.protein ?? 0) || 0
+      const carbs = Number(n.carbs_g ?? n.carbohydrates_g ?? n.carbohydrates ?? 0) || 0
+      const fat = Number(n.fat_g ?? n.total_fat_g ?? 0) || 0
+      const fiber = Number(n.fiber_g ?? n.dietary_fiber_g ?? 0) || 0
+      const sugar = Number(n.sugar_g ?? n.sugars_g ?? 0) || 0
+      const sodium = Number(n.sodium_mg ?? n.salt_mg ?? 0) || 0
+      // Only count entries that have at least one nutrient value
+      if (cals || protein || carbs || fat || fiber || sugar || sodium) {
+        sums.calories += cals
+        sums.protein_g += protein
+        sums.carbs_g += carbs
+        sums.fat_g += fat
+        sums.fiber_g += fiber
+        sums.sugar_g += sugar
+        sums.sodium_mg += sodium
+        counted += 1
+      }
+      const key = String(f.name || '').trim().toLowerCase()
+      if (key) foodCount[key] = (foodCount[key] || 0) + 1
+    }
+    const topFoods = Object.entries(foodCount)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([name, count]) => ({ name, count }))
+
+    weeklyNutritionSummary = {
+      daysAnalyzed: Math.min(7, Math.max(1, Math.ceil((Date.now() - cutoff) / (24 * 60 * 60 * 1000)))),
+      entriesWithNutrients: counted,
+      totals: sums,
+      dailyAverages: {
+        calories: counted ? Math.round(sums.calories / 7) : 0,
+        protein_g: counted ? +(sums.protein_g / 7).toFixed(1) : 0,
+        carbs_g: counted ? +(sums.carbs_g / 7).toFixed(1) : 0,
+        fat_g: counted ? +(sums.fat_g / 7).toFixed(1) : 0,
+        fiber_g: counted ? +(sums.fiber_g / 7).toFixed(1) : 0,
+        sugar_g: counted ? +(sums.sugar_g / 7).toFixed(1) : 0,
+        sodium_mg: counted ? Math.round(sums.sodium_mg / 7) : 0,
+      },
+      topFoods,
+    }
+  } catch {
+    weeklyNutritionSummary = null
   }
 
   // Simple personalized fallback insights (used when AI call not available)
@@ -131,31 +197,36 @@ export async function POST(request: Request) {
           medications: (profile.medications || []).map((m: any) => ({ name: m.name, timing: m.timing })),
           recentFood,
           recentHealthLogs,
+          weeklyNutritionSummary,
         })
 
-        const prompt = `You are a careful, data-driven health coach. Based ONLY on the JSON profile below, generate 6 concise, high-value insights that a user would gladly pay for. Avoid generic advice. Personalize to the user's goals, supplements, medications, and recent logs.
+        const prompt = `You are a careful, data-driven health coach. Based ONLY on the JSON profile below, generate 6 high-value, personalized insights. Avoid generic advice. Use the user's goals, supplements, medications, recent foods (with nutrients), health logs, and the 7-day nutrition summary.
 
-Return a JSON array of items where each item has: 
+Return a JSON array of items where each item has:
   id (string),
   title (string),
-  summary (string, 1–2 sentences, actionable),
+  summary (2–3 sentences, specific, quantified when possible),
   tags (array of strings like ['goals','supplement','medication','nutrition','timing','safety','energy','sleep']),
   confidence (0–1),
-  reason (string),
-  actions (array of 3–5 concise steps).
+  reason (string, explain the "why" using the provided data, cite specific numbers like grams/day or averages if available),
+  actions (array of 3–5 concrete steps tailored to the user; include amounts/timing/examples; where relevant say "check with your clinician").
 
-Content guidance:
-- Cross-link data (e.g., a supplement timing that supports a goal; a nutrition tweak to help a symptom trend from health logs).
-- Flag potential medication–supplement concerns as "check with your clinician" without diagnosing.
-- Give clear next steps ("move magnesium to evening", "add protein to breakfast", "separate iron and calcium by 2h").
-- Keep each card independent and skimmable.
+Nutrition guidance rules:
+- Use weeklyNutritionSummary.dailyAverages to reference protein_g, fiber_g, sugar_g, sodium_mg, calories when available.
+- If protein appears low (< 70 g/day for average adult unless height/weight suggests otherwise), propose specific breakfast/lunch/dinner examples with grams.
+- If fiber is low (< 25 g/day), suggest concrete swaps to reach ~25–35 g/day with food examples.
+- If sugar is high (> 50 g/day) or sodium high (> 2300 mg/day), suggest reductions with practical substitutions.
+- Use recentFood to cite examples (e.g., "based on frequent item: greek yogurt").
+- Cross-link supplements/medications with timing and interactions (advice as "check with your clinician").
+
+Keep each insight skimmable but substantive. Do not return prose outside of the JSON array.
 
 Profile: ${profileText}`
         const resp = await openai.chat.completions.create({
           model: 'gpt-4o-mini',
           messages: [{ role: 'user', content: prompt }],
           temperature: 0.2,
-          max_tokens: 400,
+          max_tokens: 1000,
         })
         const text = resp.choices?.[0]?.message?.content || ''
         // Try to extract JSON array
