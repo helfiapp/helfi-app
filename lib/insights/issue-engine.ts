@@ -396,12 +396,15 @@ async function buildUserInsightContext(userId: string): Promise<UserInsightConte
     }
   }
 
-  const issues = issuesRows.map((row) => ({
-    id: row.id,
-    name: row.name,
-    slug: slugify(row.name),
-    polarity: row.polarity === 'positive' ? 'positive' : 'negative',
-  }))
+  const issues = issuesRows.map((row) => {
+    const normalisedPolarity: 'positive' | 'negative' = row.polarity === 'positive' ? 'positive' : 'negative'
+    return {
+      id: row.id,
+      name: row.name,
+      slug: slugify(row.name),
+      polarity: normalisedPolarity,
+    }
+  })
 
   return {
     userId,
@@ -893,7 +896,13 @@ function buildLabsSection(issue: IssueSummary, context: UserInsightContext): Iss
 
 function buildNutritionSection(issue: IssueSummary, context: UserInsightContext): IssueSectionResult {
   const now = new Date().toISOString()
-  const foods = context.todaysFoods.length ? context.todaysFoods : context.foodLogs.slice(0, 5).map(log => ({ name: log.name, meal: log.description ?? undefined }))
+  const foods: Array<{ name?: string; meal?: string; calories?: number }> = context.todaysFoods.length
+    ? context.todaysFoods
+    : context.foodLogs.slice(0, 5).map((log) => ({
+        name: log.name,
+        meal: log.description ?? undefined,
+        calories: undefined,
+      }))
   const key = pickKnowledgeKey(issue.name.toLowerCase())
   const focus = key ? ISSUE_KNOWLEDGE_BASE[key].nutritionFocus ?? [] : []
   const highlights: SectionHighlight[] = []
