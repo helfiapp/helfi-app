@@ -17,7 +17,7 @@ How to use
 - Done when:
   - The top of the page shows a 1‑line weekly summary once any data exists
 
-9) Insights — Simple Section Pages
+9) Insights — Simple Section Pages ✅ Done
 - Where: `app/insights/[name]/page.tsx` (e.g., goals, nutrition, safety)
 - What: Dedicated pages listing only that category.
 - Why: Easier to focus on one theme.
