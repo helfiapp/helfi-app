@@ -203,6 +203,17 @@ function slugify(value: string) {
     .replace(/^-+|-+$/g, '')
 }
 
+function inferPolarityFromName(name: string): 'positive' | 'negative' {
+  const lowered = name.toLowerCase()
+  if (/(pain|ache|injury|flare|anxiety|depress|stress|insomnia|fatigue|low\s|lack|poor|bloat|nausea|migraine|cramp|brain fog|libido|bp|blood pressure|cholesterol)/i.test(lowered)) {
+    return 'negative'
+  }
+  if (/(gain|build|improve|increase|optimi[sz]e|boost|support|focus|goal|performance|endurance|strength|muscle|energy)/i.test(lowered)) {
+    return 'positive'
+  }
+  return 'negative'
+}
+
 function normaliseRating(rating: number | null | undefined, polarity: 'positive' | 'negative') {
   if (rating === null || rating === undefined) return { score: null, label: 'No rating yet' }
   const scaleMax = RATING_SCALE_DEFAULT
@@ -397,7 +408,10 @@ async function buildUserInsightContext(userId: string): Promise<UserInsightConte
   }
 
   const issues = issuesRows.map((row) => {
-    const normalisedPolarity: 'positive' | 'negative' = row.polarity === 'positive' ? 'positive' : 'negative'
+    const normalisedPolarity: 'positive' | 'negative' =
+      row.polarity === 'positive' || row.polarity === 'negative'
+        ? (row.polarity as 'positive' | 'negative')
+        : inferPolarityFromName(row.name)
     return {
       id: row.id,
       name: row.name,
