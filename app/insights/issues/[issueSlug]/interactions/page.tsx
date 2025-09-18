@@ -19,6 +19,5 @@ export default async function IssueInteractionsPage({ params }: IssueInteraction
     notFound()
   }
 
-  return <SectionRenderer result={result} />
+  return <SectionRenderer issueSlug={params.issueSlug} section="interactions" initialResult={result} />
 }
-

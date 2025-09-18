@@ -19,6 +19,5 @@ export default async function IssueExercisePage({ params }: IssueExercisePagePro
     notFound()
   }
 
-  return <SectionRenderer result={result} />
+  return <SectionRenderer issueSlug={params.issueSlug} section="exercise" initialResult={result} />
 }
-

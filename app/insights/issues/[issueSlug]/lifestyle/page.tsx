@@ -19,6 +19,5 @@ export default async function IssueLifestylePage({ params }: IssueLifestylePageP
     notFound()
   }
 
-  return <SectionRenderer result={result} />
+  return <SectionRenderer issueSlug={params.issueSlug} section="lifestyle" initialResult={result} />
 }
-

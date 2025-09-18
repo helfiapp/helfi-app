@@ -19,6 +19,5 @@ export default async function IssueOverviewPage({ params }: IssueOverviewPagePro
     notFound()
   }
 
-  return <SectionRenderer result={result} />
+  return <SectionRenderer issueSlug={params.issueSlug} section="overview" initialResult={result} />
 }
-

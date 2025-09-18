@@ -1,7 +1,7 @@
 import { getServerSession } from 'next-auth'
 import { redirect } from 'next/navigation'
 import { authOptions } from '@/lib/auth'
-import { getIssueLandingPayload, ISSUE_SECTION_ORDER } from '@/lib/insights/issue-engine'
+import { getIssueLandingPayload } from '@/lib/insights/issue-engine'
 import InsightsLandingClient from './InsightLandingClient'
 
 export default async function InsightsPage() {
@@ -19,10 +19,8 @@ export default async function InsightsPage() {
         email: session.user.email ?? null,
         image: session.user.image ?? null,
       }}
-      initialSections={ISSUE_SECTION_ORDER}
-      initialIssues={payload.issues}
+      issues={payload.issues}
       generatedAt={payload.generatedAt}
     />
   )
 }
-

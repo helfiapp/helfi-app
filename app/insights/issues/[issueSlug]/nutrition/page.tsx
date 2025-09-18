@@ -19,6 +19,5 @@ export default async function IssueNutritionPage({ params }: IssueNutritionPageP
     notFound()
   }
 
-  return <SectionRenderer result={result} />
+  return <SectionRenderer issueSlug={params.issueSlug} section="nutrition" initialResult={result} />
 }
-

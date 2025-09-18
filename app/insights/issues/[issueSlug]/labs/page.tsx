@@ -19,6 +19,5 @@ export default async function IssueLabsPage({ params }: IssueLabsPageProps) {
     notFound()
   }
 
-  return <SectionRenderer result={result} />
+  return <SectionRenderer issueSlug={params.issueSlug} section="labs" initialResult={result} />
 }
-
