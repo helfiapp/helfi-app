@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { ReactNode } from 'react'
 import { getServerSession } from 'next-auth'
 import { notFound, redirect } from 'next/navigation'
@@ -33,7 +34,12 @@ export default async function IssueLayout({ children, params }: IssueLayoutProps
       }} />
 
       <header className="bg-white border-b border-gray-200 px-4 py-6">
-        <div className="max-w-6xl mx-auto space-y-3">
+        <div className="max-w-6xl mx-auto space-y-4">
+          <div className="flex items-center gap-3 text-sm text-gray-500">
+            <Link href="/insights" className="inline-flex items-center gap-2 text-helfi-green font-semibold">
+              <span className="text-lg">←</span> Back to Insights
+            </Link>
+          </div>
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
               <p className="text-xs uppercase tracking-[0.2em] text-helfi-green font-semibold mb-1">Issue workspace</p>
@@ -62,4 +68,3 @@ export default async function IssueLayout({ children, params }: IssueLayoutProps
     </div>
   )
 }
-

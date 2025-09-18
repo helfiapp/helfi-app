@@ -24,8 +24,9 @@ export default function IssueSectionNav({ issueSlug, sections }: IssueSectionNav
   return (
     <div className="flex items-center gap-2 overflow-x-auto pb-2">
       {sections.map((section) => {
-        const href = section === 'overview' ? `/insights/issues/${issueSlug}` : `/insights/issues/${issueSlug}/${section}`
-        const isActive = pathname === href
+        const overviewPath = `/insights/issues/${issueSlug}`
+        const href = section === 'overview' ? `${overviewPath}/overview` : `/insights/issues/${issueSlug}/${section}`
+        const isActive = pathname === href || (section === 'overview' && pathname === overviewPath)
         return (
           <Link
             key={section}
@@ -41,4 +42,3 @@ export default function IssueSectionNav({ issueSlug, sections }: IssueSectionNav
     </div>
   )
 }
-
