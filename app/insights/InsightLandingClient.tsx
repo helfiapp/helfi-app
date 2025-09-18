@@ -14,6 +14,7 @@ interface InsightsLandingClientProps {
   }
   issues: IssueSummary[]
   generatedAt: string
+  onboardingComplete: boolean
 }
 
 function trendBadge(trend: IssueSummary['trend']) {
@@ -42,7 +43,7 @@ function blockerTone(label: string) {
   return 'text-slate-600'
 }
 
-export default function InsightsLandingClient({ sessionUser, issues, generatedAt }: InsightsLandingClientProps) {
+export default function InsightsLandingClient({ sessionUser, issues, generatedAt, onboardingComplete }: InsightsLandingClientProps) {
   const pathname = usePathname()
   const lastLoaded = generatedAt
 
@@ -71,18 +72,28 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
 
       <main className="max-w-6xl mx-auto px-4 py-10 space-y-8">
         {issues.length === 0 ? (
-          <div className="bg-white border border-dashed border-gray-300 rounded-2xl p-10 text-center">
-            <div className="text-5xl mb-4">🔍</div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">No health issues tracked yet</h2>
-            <p className="text-gray-600 mb-4">
-              Add issues through onboarding or Health Tracking so we can generate focused insights for you.
-            </p>
-            <Link href="/onboarding" className="inline-block px-4 py-2 rounded-md bg-helfi-green text-white text-sm font-semibold">
-              Open onboarding
-            </Link>
-          </div>
+          !onboardingComplete ? (
+            <div className="bg-white border border-dashed border-gray-300 rounded-2xl p-10 text-center">
+              <div className="text-5xl mb-4">📝</div>
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">Finish onboarding to unlock insights</h2>
+              <p className="text-gray-600 mb-4">
+                Complete your health intake so Helfi knows which goals and concerns to analyse for you.
+              </p>
+              <Link href="/onboarding" className="inline-block px-4 py-2 rounded-md bg-helfi-green text-white text-sm font-semibold">
+                Resume onboarding
+              </Link>
+            </div>
+          ) : (
+            <div className="bg-white border border-dashed border-gray-300 rounded-2xl p-10 text-center">
+              <div className="text-5xl mb-4">🔍</div>
+              <h2 className="text-xl font-semibold text-gray-900 mb-2">No health issues tracked yet</h2>
+              <p className="text-gray-600 mb-4">
+                Add issues through onboarding or Health Tracking so we can generate focused insights for you.
+              </p>
+            </div>
+          )
         ) : (
-          <div className="grid gap-4">
+          <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
             {issues.map((issue, index) => {
               const trend = trendBadge(issue.trend)
               const severityClass = severityTone(issue.severityLabel)
@@ -91,42 +102,25 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
                 <Link
                   key={issue.id}
                   href={`/insights/issues/${issue.slug}`}
-                  className={`block rounded-2xl border px-5 py-4 shadow-sm transition-all hover:translate-x-1 hover:shadow-md bg-white ${accent}`}
+                  className={`flex items-center justify-between gap-3 px-5 py-4 border-b last:border-b-0 transition-colors hover:bg-gray-50 ${accent.replace(/bg-[^\s]+/g, '').trim()}`}
                 >
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 text-xs uppercase tracking-wide font-semibold">
-                        <span className="text-gray-500">Tracked issue</span>
-                        <span className={`px-2 py-0.5 rounded-full ${trend.className}`}>{trend.label}</span>
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white text-lg">💡</span>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 text-xs uppercase tracking-wide font-semibold text-gray-500">
+                        <span>{trend.label}</span>
+                        {issue.currentRating !== null && (
+                          <span className="text-gray-400">· {issue.currentRating}/{issue.ratingScaleMax ?? 6}</span>
+                        )}
                       </div>
-                      <div className="mt-2 text-xl font-semibold text-gray-900 truncate">{issue.name}</div>
-                      <div className={`mt-1 text-sm font-medium ${severityClass}`}>{issue.severityLabel}</div>
+                      <div className="text-lg font-semibold text-gray-900 truncate">{issue.name}</div>
+                      <div className={`text-sm font-medium ${severityClass}`}>{issue.severityLabel}</div>
                       {issue.highlight && (
-                        <p className="mt-2 text-sm text-gray-700 leading-relaxed line-clamp-2">{issue.highlight}</p>
+                        <p className="mt-1 text-sm text-gray-600 truncate">{issue.highlight}</p>
                       )}
-                      {issue.blockers.length > 0 && (
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {issue.blockers.slice(0, 2).map((blocker) => (
-                          <span key={blocker} className={`px-3 py-1 rounded-full bg-white/70 text-xs font-semibold ${blockerTone(blocker)}`}>
-                            {blocker}
-                          </span>
-                        ))}
-                          {issue.blockers.length > 2 && (
-                            <span className="px-3 py-1 rounded-full bg-white/70 text-xs font-semibold text-gray-500">+ more</span>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex flex-col items-end">
-                      {issue.currentRating !== null && (
-                        <div className="text-right">
-                          <div className="text-xs uppercase text-gray-500">Current rating</div>
-                          <div className="text-lg font-semibold text-gray-900">{issue.currentRating}/{issue.ratingScaleMax ?? 6}</div>
-                        </div>
-                      )}
-                      <div className="mt-auto text-2xl text-gray-400">›</div>
                     </div>
                   </div>
+                  <div className="text-2xl text-gray-400">›</div>
                 </Link>
               )
             })}

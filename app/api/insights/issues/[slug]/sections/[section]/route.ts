@@ -44,11 +44,15 @@ export async function POST(
       return NextResponse.json({ error: 'Invalid section' }, { status: 400 })
     }
 
+    let body: any = {}
+    try {
+      body = await _request.json()
+    } catch {}
     const result = await getIssueSection(session.user.id, context.params.slug, sectionParam)
     if (!result) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 })
     }
-    return NextResponse.json(result, { status: 200 })
+    return NextResponse.json({ ...result, request: { mode: body?.mode ?? 'latest', range: body?.range ?? null } }, { status: 200 })
   } catch (error) {
     console.error('POST /api/insights/issues/[slug]/sections/[section] error', error)
     return NextResponse.json({ error: 'Failed to generate section' }, { status: 500 })

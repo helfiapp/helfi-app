@@ -13,8 +13,11 @@ export default function SectionRenderer({ issueSlug, section, initialResult }: S
   const [result, setResult] = useState<IssueSectionResult>(initialResult)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [customOpen, setCustomOpen] = useState(false)
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
 
-  async function handleGenerate() {
+  async function handleGenerate(mode: 'daily' | 'weekly' | 'custom', range?: { from?: string; to?: string }) {
     try {
       setLoading(true)
       setError(null)
@@ -23,6 +26,7 @@ export default function SectionRenderer({ issueSlug, section, initialResult }: S
         headers: {
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({ mode, range }),
       })
       if (!response.ok) {
         throw new Error('Unable to generate report right now.')
@@ -49,14 +53,68 @@ export default function SectionRenderer({ issueSlug, section, initialResult }: S
               Generated {new Date(result.generatedAt).toLocaleString()} • Confidence {(result.confidence * 100).toFixed(0)}%
             </p>
           </div>
-          <div className="shrink-0 flex flex-col items-start md:items-end gap-2">
-            <button
-              onClick={handleGenerate}
-              disabled={loading}
-              className="inline-flex items-center gap-2 rounded-lg bg-helfi-green px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-            >
-              {loading ? 'Generating…' : 'Generate latest report'}
-            </button>
+          <div className="shrink-0 flex flex-col items-start md:items-end gap-2 w-full md:w-auto">
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => handleGenerate('daily')}
+                disabled={loading}
+                className="inline-flex items-center gap-2 rounded-lg bg-helfi-green px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+              >
+                {loading ? 'Generating…' : 'Daily report'}
+              </button>
+              <button
+                onClick={() => handleGenerate('weekly')}
+                disabled={loading}
+                className="inline-flex items-center gap-2 rounded-lg border border-helfi-green/40 px-4 py-2 text-sm font-semibold text-helfi-green disabled:opacity-60"
+              >
+                Weekly report
+              </button>
+              <button
+                onClick={() => setCustomOpen((prev) => !prev)}
+                className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700"
+              >
+                Custom range
+              </button>
+            </div>
+            {customOpen && (
+              <form
+                className="flex flex-col md:flex-row md:items-center gap-2 mt-2"
+                onSubmit={async (event) => {
+                  event.preventDefault()
+                  if (!customFrom || !customTo) {
+                    setError('Select both start and end dates for a custom report.')
+                    return
+                  }
+                  await handleGenerate('custom', { from: customFrom, to: customTo })
+                }}
+              >
+                <label className="text-xs uppercase text-gray-500 tracking-wide">
+                  From
+                  <input
+                    type="date"
+                    value={customFrom}
+                    onChange={(e) => setCustomFrom(e.target.value)}
+                    className="mt-1 block w-full rounded-md border border-gray-300 px-2 py-1 text-sm"
+                  />
+                </label>
+                <label className="text-xs uppercase text-gray-500 tracking-wide">
+                  To
+                  <input
+                    type="date"
+                    value={customTo}
+                    onChange={(e) => setCustomTo(e.target.value)}
+                    className="mt-1 block w-full rounded-md border border-gray-300 px-2 py-1 text-sm"
+                  />
+                </label>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                >
+                  Generate
+                </button>
+              </form>
+            )}
             {error && <p className="text-xs text-rose-600 max-w-xs">{error}</p>}
           </div>
         </div>

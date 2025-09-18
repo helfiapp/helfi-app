@@ -69,6 +69,7 @@ interface UserInsightContext {
     bodyType?: string | null
     exerciseFrequency?: string | null
   }
+  onboardingComplete: boolean
 }
 
 interface HealthGoalWithLogs {
@@ -307,11 +308,12 @@ export async function getIssueSection(userId: string, slug: string, section: Iss
 }
 
 export async function getIssueLandingPayload(userId: string) {
-  const summaries = await getIssueSummaries(userId)
+  const context = await buildUserInsightContext(userId)
+  const summaries = context.issues.map((issue) => enrichIssueSummary(issue, context))
   return {
     issues: summaries,
-    sections: ISSUE_SECTION_ORDER,
     generatedAt: new Date().toISOString(),
+    onboardingComplete: context.onboardingComplete,
   }
 }
 
@@ -357,10 +359,12 @@ async function buildUserInsightContext(userId: string): Promise<UserInsightConte
       todaysFoods: [],
       bloodResults: null,
       profile: {},
+      onboardingComplete: false,
     }
   }
 
   const healthGoals: Record<string, HealthGoalWithLogs> = {}
+  const visibleGoals: HealthGoalWithLogs[] = []
   const todaysFoods: Array<{ name?: string; meal?: string; calories?: number }> = []
   let bloodResults: BloodResultsData | null = null
 
@@ -405,9 +409,10 @@ async function buildUserInsightContext(userId: string): Promise<UserInsightConte
         createdAt: log.createdAt,
       })),
     }
+    visibleGoals.push(healthGoals[goal.name.toLowerCase()])
   }
 
-  const issues = issuesRows.map((row) => {
+  let issues = issuesRows.map((row) => {
     const normalisedPolarity: 'positive' | 'negative' =
       row.polarity === 'positive' || row.polarity === 'negative'
         ? (row.polarity as 'positive' | 'negative')
@@ -419,6 +424,17 @@ async function buildUserInsightContext(userId: string): Promise<UserInsightConte
       polarity: normalisedPolarity,
     }
   })
+
+  if (issues.length === 0) {
+    issues = visibleGoals.map((goal) => ({
+      id: goal.id,
+      name: goal.name,
+      slug: slugify(goal.name),
+      polarity: inferPolarityFromName(goal.name),
+    }))
+  }
+
+  const onboardingComplete = visibleGoals.length > 0
 
   return {
     userId,
@@ -454,6 +470,7 @@ async function buildUserInsightContext(userId: string): Promise<UserInsightConte
       bodyType: user.bodyType ?? null,
       exerciseFrequency: user.exerciseFrequency ?? null,
     },
+    onboardingComplete,
   }
 }
 
