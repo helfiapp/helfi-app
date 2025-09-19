@@ -304,7 +304,8 @@ export async function getIssueSection(
 }
 
 export async function getIssueLandingPayload(userId: string) {
-  const context = await buildUserInsightContext(userId)
+  // Use a lightweight context for landing to reduce DB work and latency.
+  const context = await loadUserLandingContext(userId)
   const summaries = context.issues.map((issue) => enrichIssueSummary(issue, context))
   return {
     issues: summaries,
@@ -508,6 +509,105 @@ const loadUserInsightContext = cache(async (userId: string): Promise<UserInsight
       bodyType: user.bodyType ?? null,
       exerciseFrequency: user.exerciseFrequency ?? null,
     },
+    onboardingComplete,
+  }
+})
+
+// Lighter loader for the Insights landing page: fetch only what we need to build summaries
+// and skip heavy joins (supplements, medications, logs not required for landing).
+const loadUserLandingContext = cache(async (userId: string): Promise<UserInsightContext> => {
+  const [issuesRows, user] = await Promise.all([
+    prisma.$queryRawUnsafe<Array<{ id: string; name: string; polarity: string }>>(
+      'SELECT id, name, polarity FROM "CheckinIssues" WHERE "userId" = $1',
+      userId
+    ).catch(() => []),
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        healthGoals: {
+          select: {
+            id: true,
+            name: true,
+            currentRating: true,
+            createdAt: true,
+            updatedAt: true,
+            healthLogs: {
+              select: { rating: true, createdAt: true },
+              orderBy: { createdAt: 'desc' },
+              take: 12,
+            },
+          },
+        },
+      },
+    }),
+  ])
+
+  if (!user) {
+    return {
+      userId,
+      issues: [],
+      healthGoals: {},
+      supplements: [],
+      medications: [],
+      exerciseLogs: [],
+      foodLogs: [],
+      todaysFoods: [],
+      bloodResults: null,
+      profile: {},
+      onboardingComplete: false,
+    }
+  }
+
+  const healthGoals: Record<string, HealthGoalWithLogs> = {}
+  const visibleGoals: HealthGoalWithLogs[] = []
+  for (const goal of user.healthGoals) {
+    const logsAsc = (goal.healthLogs || []).slice().reverse()
+    healthGoals[goal.name.toLowerCase()] = {
+      id: goal.id,
+      name: goal.name,
+      currentRating: goal.currentRating,
+      createdAt: goal.createdAt,
+      updatedAt: goal.updatedAt,
+      healthLogs: logsAsc.map(log => ({ rating: log.rating, notes: null, createdAt: log.createdAt })),
+    }
+    visibleGoals.push(healthGoals[goal.name.toLowerCase()])
+  }
+
+  let issues = issuesRows.map((row) => {
+    const normalisedPolarity: 'positive' | 'negative' =
+      row.polarity === 'positive' || row.polarity === 'negative'
+        ? (row.polarity as 'positive' | 'negative')
+        : inferPolarityFromName(row.name)
+    return {
+      id: row.id,
+      name: row.name,
+      slug: slugify(row.name),
+      polarity: normalisedPolarity,
+    }
+  })
+
+  if (issues.length === 0) {
+    issues = visibleGoals.map((goal) => ({
+      id: goal.id,
+      name: goal.name,
+      slug: slugify(goal.name),
+      polarity: inferPolarityFromName(goal.name),
+    }))
+  }
+
+  const onboardingComplete = visibleGoals.length > 0
+
+  return {
+    userId,
+    issues,
+    healthGoals,
+    supplements: [],
+    medications: [],
+    exerciseLogs: [],
+    foodLogs: [],
+    todaysFoods: [],
+    bloodResults: null,
+    profile: {},
     onboardingComplete,
   }
 })
