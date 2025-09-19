@@ -5,7 +5,7 @@ import { notFound, redirect } from 'next/navigation'
 import { authOptions } from '@/lib/auth'
 import { getIssueSummaries, ISSUE_SECTION_ORDER, type IssueSummary } from '@/lib/insights/issue-engine'
 import InsightsTopNav from '../../InsightsTopNav'
-import InsightsMobileNav from '../../InsightsMobileNav'
+import InsightsBottomNav from '../../InsightsBottomNav'
 import IssueSectionNav from './IssueSectionNav'
 
 interface IssueLayoutProps {
@@ -64,7 +64,7 @@ export default async function IssueLayout({ children, params }: IssueLayoutProps
         {children}
       </main>
 
-      <InsightsMobileNav activePath={`/insights/issues/${params.issueSlug}`} />
+      <InsightsBottomNav />
     </div>
   )
 }

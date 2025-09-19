@@ -33,7 +33,10 @@ export default function SectionRenderer({ issueSlug, section, initialResult }: S
         throw new Error('Unable to generate report right now.')
       }
       const data = await response.json()
-      setResult(data)
+      setResult(data?.result ?? data)
+      if (mode === 'custom') {
+        setCustomOpen(false)
+      }
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -50,7 +53,11 @@ export default function SectionRenderer({ issueSlug, section, initialResult }: S
               {section === 'overview' ? 'Section summary' : `${section} insights`}
             </h2>
             <p className="text-sm text-gray-700 leading-relaxed">{result.summary}</p>
-            <p className="text-xs text-gray-500 mt-4">
+            <p className="text-xs text-gray-500 mt-3">
+              Mode: {formatReportMode(result.mode)}
+              {result.range?.from || result.range?.to ? ` • ${formatRange(result.range)}` : ''}
+            </p>
+            <p className="text-xs text-gray-500 mt-1">
               Generated {new Date(result.generatedAt).toLocaleString()} • Confidence {(result.confidence * 100).toFixed(0)}%
             </p>
           </div>
@@ -199,4 +206,27 @@ function priorityBadgeColor(priority: 'now' | 'soon' | 'monitor') {
     default:
       return 'text-emerald-600'
   }
+}
+
+function formatReportMode(mode?: IssueSectionResult['mode']) {
+  switch (mode) {
+    case 'daily':
+      return 'Daily snapshot'
+    case 'weekly':
+      return 'Weekly roll-up'
+    case 'custom':
+      return 'Custom range'
+    default:
+      return 'Latest available data'
+  }
+}
+
+function formatRange(range?: { from?: string; to?: string }) {
+  if (!range) return ''
+  const fromLabel = range.from ? new Date(range.from).toLocaleDateString() : null
+  const toLabel = range.to ? new Date(range.to).toLocaleDateString() : null
+  if (fromLabel && toLabel) return `${fromLabel} → ${toLabel}`
+  if (fromLabel) return `since ${fromLabel}`
+  if (toLabel) return `through ${toLabel}`
+  return ''
 }

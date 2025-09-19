@@ -23,6 +23,8 @@ export interface IssueSummary {
   blockers: string[]
 }
 
+export type ReportMode = 'latest' | 'daily' | 'weekly' | 'custom'
+
 export interface IssueSectionResult {
   issue: IssueSummary
   section: IssueSectionKey
@@ -32,7 +34,13 @@ export interface IssueSectionResult {
   highlights: SectionHighlight[]
   dataPoints: SectionDatum[]
   recommendations: SectionRecommendation[]
+  mode: ReportMode
+  range?: { from?: string; to?: string }
 }
+
+// Base shape that individual section builders return. The final IssueSectionResult
+// is assembled by attaching mode/range in buildIssueSectionWithContext.
+type BaseSectionResult = Omit<IssueSectionResult, 'mode' | 'range'>
 
 export interface SectionHighlight {
   title: string
@@ -273,39 +281,26 @@ export async function getIssueSummaries(userId: string): Promise<IssueSummary[]>
   return context.issues.map((issue) => enrichIssueSummary(issue, context))
 }
 
-export async function getIssueSection(userId: string, slug: string, section: IssueSectionKey): Promise<IssueSectionResult | null> {
-  const context = await buildUserInsightContext(userId)
-  const issueRecord = context.issues.find(issue => issue.slug === slug)
-  if (!issueRecord) return null
-  const summary = enrichIssueSummary(issueRecord, context)
-  const now = new Date().toISOString()
-  switch (section) {
-    case 'overview':
-      return {
-        issue: summary,
-        section,
-        generatedAt: now,
-        confidence: 0.72,
-        summary: buildOverviewSummary(summary),
-        highlights: buildOverviewHighlights(summary, context),
-        dataPoints: buildOverviewDataPoints(summary, context),
-        recommendations: buildOverviewRecommendations(summary, context),
-      }
-    case 'exercise':
-      return buildExerciseSection(summary, context)
-    case 'supplements':
-      return buildSupplementsSection(summary, context)
-    case 'interactions':
-      return buildInteractionsSection(summary, context)
-    case 'labs':
-      return buildLabsSection(summary, context)
-    case 'nutrition':
-      return buildNutritionSection(summary, context)
-    case 'lifestyle':
-      return buildLifestyleSection(summary, context)
-    default:
-      return null
+type SectionOptions = {
+  mode: ReportMode
+  range?: { from?: string; to?: string }
+}
+
+export async function getIssueSection(
+  userId: string,
+  slug: string,
+  section: IssueSectionKey,
+  options: Partial<SectionOptions> & { force?: boolean } = {}
+): Promise<IssueSectionResult | null> {
+  const mode = options.mode ?? 'latest'
+  const rangeKey = encodeRange(options.range)
+
+  if (options.force) {
+    const context = await loadUserInsightContext(userId)
+    return buildIssueSectionWithContext(context, slug, section, { mode, range: options.range })
   }
+
+  return computeIssueSection(userId, slug, section, mode, rangeKey)
 }
 
 export async function getIssueLandingPayload(userId: string) {
@@ -521,6 +516,68 @@ async function buildUserInsightContext(userId: string): Promise<UserInsightConte
   return loadUserInsightContext(userId)
 }
 
+// Encodes an optional date range to a simple cache key
+function encodeRange(range?: { from?: string; to?: string }) {
+  if (!range) return ''
+  const from = range.from ? new Date(range.from).toISOString().slice(0, 10) : ''
+  const to = range.to ? new Date(range.to).toISOString().slice(0, 10) : ''
+  if (!from && !to) return ''
+  return `${from}..${to}`
+}
+
+// Builds a section with an already loaded context and attaches mode/range
+async function buildIssueSectionWithContext(
+  context: UserInsightContext,
+  slug: string,
+  section: IssueSectionKey,
+  options: { mode: ReportMode; range?: { from?: string; to?: string } }
+): Promise<IssueSectionResult | null> {
+  const issueRecord = context.issues.find(issue => issue.slug === slug)
+  if (!issueRecord) return null
+  const summary = enrichIssueSummary(issueRecord, context)
+
+  let base: BaseSectionResult | null = null
+  switch (section) {
+    case 'overview':
+      base = buildOverviewSection(summary, context)
+      break
+    case 'exercise':
+      base = buildExerciseSection(summary, context)
+      break
+    case 'supplements':
+      base = buildSupplementsSection(summary, context)
+      break
+    case 'interactions':
+      base = buildInteractionsSection(summary, context)
+      break
+    case 'labs':
+      base = buildLabsSection(summary, context)
+      break
+    case 'nutrition':
+      base = buildNutritionSection(summary, context)
+      break
+    case 'lifestyle':
+      base = buildLifestyleSection(summary, context)
+      break
+    default:
+      base = null
+  }
+  if (!base) return null
+  return { ...base, mode: options.mode, range: options.range }
+}
+
+// Placeholder that can be upgraded to add caching based on (mode, rangeKey)
+async function computeIssueSection(
+  userId: string,
+  slug: string,
+  section: IssueSectionKey,
+  mode: ReportMode,
+  _rangeKey: string
+): Promise<IssueSectionResult | null> {
+  const context = await loadUserInsightContext(userId)
+  return buildIssueSectionWithContext(context, slug, section, { mode, range: undefined })
+}
+
 function enrichIssueSummary(issue: { id: string; name: string; polarity: 'positive' | 'negative'; slug: string }, context: UserInsightContext): IssueSummary {
   const goal = context.healthGoals[issue.name.toLowerCase()]
   const normalised = normaliseRating(goal?.currentRating ?? null, issue.polarity)
@@ -679,6 +736,20 @@ function buildOverviewRecommendations(issue: IssueSummary, context: UserInsightC
   return recs
 }
 
+function buildOverviewSection(issue: IssueSummary, context: UserInsightContext): BaseSectionResult {
+  const now = new Date().toISOString()
+  return {
+    issue,
+    section: 'overview',
+    generatedAt: now,
+    confidence: 0.72,
+    summary: buildOverviewSummary(issue),
+    highlights: buildOverviewHighlights(issue, context),
+    dataPoints: buildOverviewDataPoints(issue, context),
+    recommendations: buildOverviewRecommendations(issue, context),
+  }
+}
+
 function summariseExerciseFrequency(exerciseLogs: UserInsightContext['exerciseLogs']) {
   if (!exerciseLogs.length) return { sessionsPerWeek: 0, summary: 'No exercise logs captured yet.' }
   const now = Date.now()
@@ -695,7 +766,7 @@ function summariseExerciseFrequency(exerciseLogs: UserInsightContext['exerciseLo
   return { sessionsPerWeek: Math.round(avg * 10) / 10, summary }
 }
 
-function buildExerciseSection(issue: IssueSummary, context: UserInsightContext): IssueSectionResult {
+function buildExerciseSection(issue: IssueSummary, context: UserInsightContext): BaseSectionResult {
   const now = new Date().toISOString()
   const knowledgeKey = pickKnowledgeKey(issue.name.toLowerCase())
   const supportive = knowledgeKey ? ISSUE_KNOWLEDGE_BASE[knowledgeKey].supportiveExercises ?? [] : []
@@ -763,7 +834,7 @@ function buildExerciseSection(issue: IssueSummary, context: UserInsightContext):
   }
 }
 
-function buildSupplementsSection(issue: IssueSummary, context: UserInsightContext): IssueSectionResult {
+function buildSupplementsSection(issue: IssueSummary, context: UserInsightContext): BaseSectionResult {
   const now = new Date().toISOString()
   const supplements = context.supplements
   const key = pickKnowledgeKey(issue.name.toLowerCase())
@@ -835,7 +906,7 @@ function buildSupplementsSection(issue: IssueSummary, context: UserInsightContex
   }
 }
 
-function buildInteractionsSection(issue: IssueSummary, context: UserInsightContext): IssueSectionResult {
+function buildInteractionsSection(issue: IssueSummary, context: UserInsightContext): BaseSectionResult {
   const now = new Date().toISOString()
   const supplementNames = context.supplements.map((supp) => supp.name)
   const medicationNames = context.medications.map((med) => med.name)
@@ -904,7 +975,7 @@ function buildInteractionsSection(issue: IssueSummary, context: UserInsightConte
   }
 }
 
-function buildLabsSection(issue: IssueSummary, context: UserInsightContext): IssueSectionResult {
+function buildLabsSection(issue: IssueSummary, context: UserInsightContext): BaseSectionResult {
   const now = new Date().toISOString()
   const key = pickKnowledgeKey(issue.name.toLowerCase())
   const labs = key ? ISSUE_KNOWLEDGE_BASE[key].keyLabs ?? [] : []
@@ -972,7 +1043,7 @@ function buildLabsSection(issue: IssueSummary, context: UserInsightContext): Iss
   }
 }
 
-function buildNutritionSection(issue: IssueSummary, context: UserInsightContext): IssueSectionResult {
+function buildNutritionSection(issue: IssueSummary, context: UserInsightContext): BaseSectionResult {
   const now = new Date().toISOString()
   const foods: Array<{ name?: string; meal?: string; calories?: number }> = context.todaysFoods.length
     ? context.todaysFoods
@@ -1034,7 +1105,7 @@ function buildNutritionSection(issue: IssueSummary, context: UserInsightContext)
   }
 }
 
-function buildLifestyleSection(issue: IssueSummary, context: UserInsightContext): IssueSectionResult {
+function buildLifestyleSection(issue: IssueSummary, context: UserInsightContext): BaseSectionResult {
   const now = new Date().toISOString()
   const key = pickKnowledgeKey(issue.name.toLowerCase())
   const focus = key ? ISSUE_KNOWLEDGE_BASE[key].lifestyleFocus ?? [] : []
