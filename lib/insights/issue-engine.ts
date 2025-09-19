@@ -213,6 +213,15 @@ function slugify(value: string) {
     .replace(/^-+|-+$/g, '')
 }
 
+function unslugify(value: string) {
+  const words = value.replace(/[-_]+/g, ' ').trim()
+  if (!words) return 'Issue'
+  return words
+    .split(' ')
+    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
+}
+
 function inferPolarityFromName(name: string): 'positive' | 'negative' {
   const lowered = name.toLowerCase()
   if (/(pain|ache|injury|flare|anxiety|depress|stress|insomnia|fatigue|low\s|lack|poor|bloat|nausea|migraine|cramp|brain fog|libido|bp|blood pressure|cholesterol)/i.test(lowered)) {
@@ -632,8 +641,12 @@ async function buildIssueSectionWithContext(
   section: IssueSectionKey,
   options: { mode: ReportMode; range?: { from?: string; to?: string } }
 ): Promise<IssueSectionResult | null> {
-  const issueRecord = context.issues.find(issue => issue.slug === slug)
-  if (!issueRecord) return null
+  const issueRecord = context.issues.find(issue => issue.slug === slug) || {
+    id: `temp:${slug}`,
+    name: unslugify(slug),
+    slug,
+    polarity: inferPolarityFromName(unslugify(slug)),
+  }
   const summary = enrichIssueSummary(issueRecord, context)
 
   let base: BaseSectionResult | null = null
