@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { ReactNode } from 'react'
 import { getServerSession } from 'next-auth'
-import { notFound, redirect } from 'next/navigation'
+import { redirect } from 'next/navigation'
 import { authOptions } from '@/lib/auth'
 import { getIssueSummaries, ISSUE_SECTION_ORDER, type IssueSummary } from '@/lib/insights/issue-engine'
 import InsightsTopNav from '../../InsightsTopNav'
@@ -20,9 +20,28 @@ export default async function IssueLayout({ children, params }: IssueLayoutProps
   }
 
   const summaries = await getIssueSummaries(session.user.id)
-  const issue = summaries.find((item) => item.slug === params.issueSlug)
+  let issue = summaries.find((item) => item.slug === params.issueSlug)
   if (!issue) {
-    notFound()
+    const name = params.issueSlug
+      .replace(/[-_]+/g, ' ')
+      .split(' ')
+      .map((p) => (p ? p[0].toUpperCase() + p.slice(1) : p))
+      .join(' ')
+    issue = {
+      id: `temp:${params.issueSlug}`,
+      slug: params.issueSlug,
+      name,
+      polarity: 'negative',
+      severityLabel: 'Needs data',
+      severityScore: null,
+      currentRating: null,
+      ratingScaleMax: 6,
+      trend: 'inconclusive',
+      trendDelta: null,
+      lastUpdated: null,
+      highlight: 'Add logs to unlock personalised insights.',
+      blockers: [],
+    } as IssueSummary
   }
 
   return (
