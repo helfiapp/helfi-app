@@ -1,11 +1,37 @@
 import Link from 'next/link'
 import { getServerSession } from 'next-auth'
-import { redirect, notFound } from 'next/navigation'
+import { redirect } from 'next/navigation'
 import { authOptions } from '@/lib/auth'
 import { getIssueSummaries, ISSUE_SECTION_ORDER } from '@/lib/insights/issue-engine'
+import type { IssueSummary } from '@/lib/insights/issue-engine'
 
 interface IssueOverviewPageProps {
   params: { issueSlug: string }
+}
+
+function fallbackIssue(slug: string): IssueSummary {
+  const readable = slug
+    .replace(/[-_]+/g, ' ')
+    .trim()
+    .split(' ')
+    .filter(Boolean)
+    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
+  return {
+    id: `temp:${slug}`,
+    slug,
+    name: readable || 'Insight',
+    polarity: 'negative',
+    severityLabel: 'Needs data',
+    severityScore: null,
+    currentRating: null,
+    ratingScaleMax: 6,
+    trend: 'inconclusive',
+    trendDelta: null,
+    lastUpdated: null,
+    highlight: 'Needs more data before we can generate trends.',
+    blockers: ['Log more recent data so we can generate this report.'],
+  }
 }
 
 export default async function IssueOverviewPage({ params }: IssueOverviewPageProps) {
@@ -15,10 +41,7 @@ export default async function IssueOverviewPage({ params }: IssueOverviewPagePro
   }
 
   const summaries = await getIssueSummaries(session.user.id)
-  const issue = summaries.find((item) => item.slug === params.issueSlug)
-  if (!issue) {
-    notFound()
-  }
+  const issue = summaries.find((item) => item.slug === params.issueSlug) ?? fallbackIssue(params.issueSlug)
 
   const sectionDescriptions: Record<string, string> = {
     overview: 'Snapshot of recent trends, blockers, and next actions for this issue.',
