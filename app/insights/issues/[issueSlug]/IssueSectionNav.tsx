@@ -34,6 +34,18 @@ export default function IssueSectionNav({ issueSlug, sections }: IssueSectionNav
             className={`px-4 py-2 rounded-full border text-sm font-semibold whitespace-nowrap transition-colors ${
               isActive ? 'bg-helfi-green text-white border-helfi-green shadow-sm' : 'bg-white text-gray-700 border-gray-200 hover:border-helfi-green hover:text-helfi-green'
             }`}
+            onClick={() => {
+              try {
+                const reduced = window.matchMedia('(prefers-reduced-motion: reduce)')?.matches
+                const pref = localStorage.getItem('hapticsEnabled')
+                const enabled = pref === null ? true : pref === 'true'
+                if (!reduced && enabled && 'vibrate' in navigator) {
+                  navigator.vibrate(8)
+                }
+              } catch {
+                // ignore haptic errors
+              }
+            }}
           >
             {LABELS[section] ?? section}
           </Link>

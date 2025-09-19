@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import type { IssueSectionKey, IssueSectionResult } from '@/lib/insights/issue-engine'
+import SectionChat from './SectionChat'
 
 interface SectionRendererProps {
   issueSlug: string
@@ -183,6 +184,8 @@ export default function SectionRenderer({ issueSlug, section, initialResult }: S
           </div>
         </section>
       )}
+
+      <SectionChat issueSlug={issueSlug} section={section} issueName={result.issue.name} />
     </div>
   )
 }

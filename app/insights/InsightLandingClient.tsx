@@ -57,6 +57,19 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
     []
   )
 
+  function triggerHaptic() {
+    try {
+      const reduced = window.matchMedia('(prefers-reduced-motion: reduce)')?.matches
+      const pref = localStorage.getItem('hapticsEnabled')
+      const enabled = pref === null ? true : pref === 'true'
+      if (!reduced && enabled && 'vibrate' in navigator) {
+        navigator.vibrate(10)
+      }
+    } catch {
+      // ignore haptic errors
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <InsightsTopNav sessionUser={sessionUser} />
@@ -103,6 +116,7 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
                   key={issue.id}
                   href={`/insights/issues/${issue.slug}`}
                   className={`flex items-center justify-between gap-3 px-5 py-4 border-b last:border-b-0 transition-colors hover:bg-gray-50 ${accent.replace(/bg-[^\s]+/g, '').trim()}`}
+                  onClick={triggerHaptic}
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white text-lg">💡</span>

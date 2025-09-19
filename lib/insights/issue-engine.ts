@@ -1,3 +1,4 @@
+import { cache } from 'react'
 import { prisma } from '@/lib/prisma'
 import { authOptions } from '@/lib/auth'
 import { getServerSession } from 'next-auth'
@@ -317,7 +318,7 @@ export async function getIssueLandingPayload(userId: string) {
   }
 }
 
-async function buildUserInsightContext(userId: string): Promise<UserInsightContext> {
+const loadUserInsightContext = cache(async (userId: string): Promise<UserInsightContext> => {
   const [issuesRows, user] = await Promise.all([
     prisma.$queryRawUnsafe<Array<{ id: string; name: string; polarity: string }>>(
       'SELECT id, name, polarity FROM "CheckinIssues" WHERE "userId" = $1',
@@ -337,11 +338,11 @@ async function buildUserInsightContext(userId: string): Promise<UserInsightConte
         medications: true,
         exerciseLogs: {
           orderBy: { createdAt: 'desc' },
-          take: 30,
+          take: 20,
         },
         foodLogs: {
           orderBy: { createdAt: 'desc' },
-          take: 30,
+          take: 20,
         },
       },
     }),
@@ -472,6 +473,10 @@ async function buildUserInsightContext(userId: string): Promise<UserInsightConte
     },
     onboardingComplete,
   }
+})
+
+async function buildUserInsightContext(userId: string): Promise<UserInsightContext> {
+  return loadUserInsightContext(userId)
 }
 
 function enrichIssueSummary(issue: { id: string; name: string; polarity: 'positive' | 'negative'; slug: string }, context: UserInsightContext): IssueSummary {
