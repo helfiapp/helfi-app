@@ -326,23 +326,63 @@ const loadUserInsightContext = cache(async (userId: string): Promise<UserInsight
     ).catch(() => []),
     prisma.user.findUnique({
       where: { id: userId },
-      include: {
+      select: {
+        gender: true,
+        height: true,
+        weight: true,
+        bodyType: true,
+        exerciseFrequency: true,
         healthGoals: {
-          include: {
+          select: {
+            id: true,
+            name: true,
+            category: true,
+            currentRating: true,
+            createdAt: true,
+            updatedAt: true,
             healthLogs: {
-              orderBy: { createdAt: 'asc' },
+              select: {
+                rating: true,
+                notes: true,
+                createdAt: true,
+              },
+              orderBy: { createdAt: 'desc' },
+              take: 12,
             },
           },
         },
-        supplements: true,
-        medications: true,
+        supplements: {
+          select: {
+            name: true,
+            dosage: true,
+            timing: true,
+          },
+        },
+        medications: {
+          select: {
+            name: true,
+            dosage: true,
+            timing: true,
+          },
+        },
         exerciseLogs: {
+          select: {
+            type: true,
+            duration: true,
+            intensity: true,
+            createdAt: true,
+          },
           orderBy: { createdAt: 'desc' },
-          take: 20,
+          take: 16,
         },
         foodLogs: {
+          select: {
+            name: true,
+            description: true,
+            createdAt: true,
+          },
           orderBy: { createdAt: 'desc' },
-          take: 20,
+          take: 16,
         },
       },
     }),
@@ -398,13 +438,15 @@ const loadUserInsightContext = cache(async (userId: string): Promise<UserInsight
       }
       continue
     }
+
+    const logsAsc = (goal.healthLogs || []).slice().reverse()
     healthGoals[goal.name.toLowerCase()] = {
       id: goal.id,
       name: goal.name,
       currentRating: goal.currentRating,
       createdAt: goal.createdAt,
       updatedAt: goal.updatedAt,
-      healthLogs: goal.healthLogs.map(log => ({
+      healthLogs: logsAsc.map(log => ({
         rating: log.rating,
         notes: log.notes,
         createdAt: log.createdAt,
