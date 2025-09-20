@@ -131,6 +131,8 @@ const ISSUE_KNOWLEDGE_BASE: Record<string, {
       { pattern: /ashwagandha/i, why: 'may improve sexual performance and stress resilience' },
       { pattern: /tongkat|longjack/i, why: 'can support testosterone and libido metrics' },
       { pattern: /tribulus/i, why: 'traditionally used for libido and androgen support' },
+      { pattern: /cistanche/i, why: 'Tonifies yang and may enhance libido and stamina' },
+      { pattern: /muira|muira\s?puama|ptychopetalum/i, why: 'Often used for arousal and nitric oxide support' },
       { pattern: /zinc/i, why: 'supports hormonal balance when levels are low' },
       { pattern: /l[-\s]?arginine/i, why: 'can aid nitric oxide availability for circulation' },
     ],
@@ -1132,35 +1134,19 @@ function buildSupplementsSection(issue: IssueSummary, context: UserInsightContex
   const supplements = context.supplements
   const key = pickKnowledgeKey(issue.name.toLowerCase())
   const helpfulPatterns = key ? ISSUE_KNOWLEDGE_BASE[key].helpfulSupplements ?? [] : []
-  const helpful: SectionHighlight[] = []
-  const neutral: SectionHighlight[] = []
 
-  if (!supplements.length) {
-    neutral.push({
-      title: 'No supplements logged',
-      detail: 'Add current regimen to evaluate effectiveness and gaps.',
-      tone: 'warning',
-    })
-  }
-
-  supplements.forEach((supp) => {
+  const supportive = supplements.filter((supp) => helpfulPatterns.some(pattern => pattern.pattern.test(supp.name)))
+  const supportiveSummary = supportive.map(supp => {
     const match = helpfulPatterns.find(pattern => pattern.pattern.test(supp.name))
-    if (match) {
-      helpful.push({
-        title: supp.name,
-        detail: match.why,
-        tone: 'positive',
-      })
-    } else {
-      neutral.push({
-        title: supp.name,
-        detail: supp.dosage ? `Dose: ${supp.dosage}` : 'Logged without dosage details',
-        tone: 'neutral',
-      })
-    }
+    return match ? `${supp.name} — ${match.why}` : supp.name
   })
 
+  const missingDose = supplements.filter(supp => !supp.dosage)
+  const missingTiming = supplements.filter(supp => !supp.timing || supp.timing.length === 0)
+
   const recommendations: SectionRecommendation[] = []
+  const nextGaps: string[] = []
+
   if (key && ISSUE_KNOWLEDGE_BASE[key].gapSupplements) {
     ISSUE_KNOWLEDGE_BASE[key].gapSupplements!.forEach((gap) => {
       const alreadyCovered = supplements.some(supp => gap.suggested && new RegExp(gap.suggested.split(' ')[0], 'i').test(supp.name))
@@ -1168,33 +1154,81 @@ function buildSupplementsSection(issue: IssueSummary, context: UserInsightContex
         recommendations.push({
           title: gap.title,
           description: gap.why,
-          actions: gap.suggested ? [`Discuss ${gap.suggested} with clinician`, 'Log response after 4–6 weeks'] : ['Review options with clinician'],
+          actions: gap.suggested ? [`Ask your practitioner about ${gap.suggested}`, 'Log how you feel after 4–6 weeks'] : ['Review options with your practitioner'],
           priority: 'soon',
         })
       }
     })
   }
+
+  if (!supplements.length) {
+    nextGaps.push('Add the supplements you take so we can spot wins and gaps.')
+  }
+  if (missingDose.length) {
+    nextGaps.push(`Add dose details for ${missingDose.map(s => s.name).slice(0, 2).join(', ')}${missingDose.length > 2 ? '…' : ''}`)
+  }
+  if (missingTiming.length) {
+    nextGaps.push('Log timing for each supplement so we can flag spacing issues.')
+  }
+  if (!supportive.length && supplements.length) {
+    nextGaps.push('Nothing in your stack matches common libido-supportive nutrients yet.')
+  }
+
   if (!recommendations.length) {
     recommendations.push({
-      title: 'Review dosing and timing',
-      description: 'Confirm current regimen matches clinical guidance and is spaced from medications.',
-      actions: ['Double-check dosing with practitioner', 'Log perceived effect weekly'],
+      title: 'Stay consistent and review effects',
+      description: 'You have a supportive stack logged. Track energy or libido once a week to see what helps most.',
+      actions: ['Add a quick check-in each week', 'Note any changes before adjusting doses'],
       priority: 'monitor',
     })
   }
+
+  const highlights: SectionHighlight[] = [
+    {
+      title: "What's working",
+      detail: supportiveSummary.length
+        ? supportiveSummary.join('; ')
+        : supplements.length
+        ? 'Supplements logged, but none align with common support nutrients yet.'
+        : 'No supplements listed yet.',
+      tone: supportiveSummary.length ? 'positive' : supplements.length ? 'neutral' : 'warning',
+    },
+    {
+      title: 'What needs attention',
+      detail: nextGaps.length ? nextGaps[0] : 'No major issues flagged right now.',
+      tone: nextGaps.length ? 'warning' : 'neutral',
+    },
+    {
+      title: 'Next step',
+      detail: recommendations[0].actions[0] || 'Review your regimen with your practitioner.',
+      tone: 'neutral',
+    },
+  ]
+
+  const summary = (() => {
+    if (!supplements.length) {
+      return 'No supplements logged yet—add what you take so we can tailor guidance.'
+    }
+    if (supportive.length) {
+      return `You have ${supportive.length} libido-supportive supplement${supportive.length === 1 ? '' : 's'} logged. Keep tracking consistency and effect.`
+    }
+    return `Tracking ${supplements.length} supplement${supplements.length === 1 ? '' : 's'}. Add supportive nutrients or dosage details to refine guidance.`
+  })()
+
+  const dataPoints = supplements.slice(0, 6).map((supp) => ({
+    label: supp.name,
+    value: supp.dosage || 'Dose not set',
+    context: supp.timing?.length ? `Timing: ${supp.timing.join(', ')}` : 'Add timing details',
+  }))
 
   return {
     issue,
     section: 'supplements',
     generatedAt: now,
-    confidence: 0.7,
-    summary: supplements.length ? `Tracking ${supplements.length} supplements.` : 'No supplements logged yet.',
-    highlights: [...helpful, ...neutral].slice(0, 6),
-    dataPoints: supplements.map((supp) => ({
-      label: supp.name,
-      value: supp.dosage || 'Dose not set',
-      context: supp.timing?.length ? supp.timing.join(', ') : 'Timing not logged',
-    })),
+    confidence: 0.75,
+    summary,
+    highlights,
+    dataPoints,
     recommendations,
   }
 }
