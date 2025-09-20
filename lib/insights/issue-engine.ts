@@ -7,6 +7,19 @@ export type IssueSectionKey = 'overview' | 'exercise' | 'supplements' | 'interac
 
 export const ISSUE_SECTION_ORDER: IssueSectionKey[] = ['overview', 'exercise', 'supplements', 'interactions', 'labs', 'nutrition', 'lifestyle']
 
+export type DataNeedStatus = 'missing' | 'in-progress' | 'complete'
+
+export interface InsightDataNeed {
+  key: string
+  title: string
+  description: string
+  actionLabel: string
+  href: string
+  status: DataNeedStatus
+}
+
+export type IssueStatus = 'needs-data' | 'focus' | 'monitor' | 'on-track'
+
 export interface IssueSummary {
   id: string
   slug: string
@@ -21,6 +34,7 @@ export interface IssueSummary {
   lastUpdated: string | null
   highlight: string
   blockers: string[]
+  status: IssueStatus
 }
 
 export type ReportMode = 'latest' | 'daily' | 'weekly' | 'custom'
@@ -71,6 +85,7 @@ interface UserInsightContext {
   foodLogs: Array<{ name: string; description: string | null; createdAt: Date }>
   todaysFoods: Array<{ name?: string; meal?: string; calories?: number }>
   bloodResults: BloodResultsData | null
+  dataNeeds: InsightDataNeed[]
   profile: {
     gender?: string | null
     weight?: number | null
@@ -222,6 +237,127 @@ function unslugify(value: string) {
     .join(' ')
 }
 
+function hasStructuredData(value: unknown) {
+  if (!value) return false
+  if (Array.isArray(value)) return value.length > 0
+  if (typeof value === 'object') return Object.keys(value as Record<string, unknown>).length > 0
+  return !!value
+}
+
+function buildDataNeed(goalName: string, category: string | null | undefined): InsightDataNeed | null {
+  let parsed: any = null
+  if (category) {
+    try {
+      parsed = JSON.parse(category)
+    } catch {
+      parsed = null
+    }
+  }
+
+  switch (goalName) {
+    case '__TODAYS_FOODS_DATA__': {
+      const foods = Array.isArray(parsed?.foods) ? parsed.foods : []
+      return {
+        key: 'todays-foods',
+        title: "Log today's meals",
+        description: foods.length ? 'Meals saved for today — keep logging to stay on track.' : 'Log what you ate today to unlock nutrition insights.',
+        actionLabel: foods.length ? 'Review food log' : 'Log food',
+        href: '/food',
+        status: foods.length ? 'in-progress' : 'missing',
+      }
+    }
+    case '__BLOOD_RESULTS_DATA__': {
+      const documents = Array.isArray(parsed?.documents) ? parsed.documents : []
+      const images = Array.isArray(parsed?.images) ? parsed.images : []
+      const markers = Array.isArray(parsed?.markers) ? parsed.markers : []
+      const skipped = Boolean(parsed?.skipped)
+      const hasData = documents.length > 0 || images.length > 0 || markers.length > 0
+      return {
+        key: 'blood-results',
+        title: 'Upload recent labs',
+        description: hasData
+          ? 'Lab files saved. Add markers or new results when ready.'
+          : skipped
+          ? 'You can skip for now, but labs unlock deeper tracking.'
+          : 'Add your latest bloodwork to personalise lab insights.',
+        actionLabel: hasData ? 'Update labs' : 'Add labs',
+        href: '/insights/issues/labs',
+        status: hasData ? 'in-progress' : skipped ? 'in-progress' : 'missing',
+      }
+    }
+    case '__HEALTH_SITUATIONS_DATA__': {
+      const situations = Array.isArray(parsed) ? parsed : parsed?.situations
+      const hasData = hasStructuredData(situations)
+      return {
+        key: 'health-situations',
+        title: 'Log current health situations',
+        description: hasData
+          ? 'Situations recorded. Update if something changes.'
+          : 'Tell us about recent diagnoses or treatments to tailor insights.',
+        actionLabel: hasData ? 'Review details' : 'Add situations',
+        href: '/onboarding?step=health-situations',
+        status: hasData ? 'in-progress' : 'missing',
+      }
+    }
+    case '__SUPPLEMENTS_BACKUP_DATA__': {
+      const supplements = Array.isArray(parsed?.supplements) ? parsed.supplements : []
+      const hasData = supplements.length > 0
+      return {
+        key: 'supplements-backup',
+        title: 'Confirm supplement list',
+        description: hasData
+          ? 'Supplement backup saved. Keep it updated for quick restores.'
+          : 'Save a master list of supplements so we can track changes easily.',
+        actionLabel: hasData ? 'Update list' : 'Add supplements',
+        href: '/insights/issues/supplements',
+        status: hasData ? 'in-progress' : 'missing',
+      }
+    }
+    case '__SUPPLEMENTS_EMERGENCY_BACKUP__': {
+      const hasData = hasStructuredData(parsed)
+      return {
+        key: 'supplements-emergency',
+        title: 'Set an emergency supplement plan',
+        description: hasData
+          ? 'Emergency protocol saved. Revisit to keep it current.'
+          : 'Outline a go-to plan for missed doses or travel days.',
+        actionLabel: hasData ? 'Review plan' : 'Create plan',
+        href: '/insights/issues/supplements',
+        status: hasData ? 'in-progress' : 'missing',
+      }
+    }
+    case '__DEVICE_INTEREST__': {
+      const selections = parsed && typeof parsed === 'object' ? Object.values(parsed).filter(Boolean) : []
+      const hasData = selections.length > 0
+      return {
+        key: 'device-sync',
+        title: 'Connect wearables',
+        description: hasData
+          ? 'Device preferences saved. Sync data when ready.'
+          : 'Tell us which devices you use so we can pull in activity and sleep.',
+        actionLabel: hasData ? 'Update devices' : 'Add device',
+        href: '/settings?section=devices',
+        status: hasData ? 'in-progress' : 'missing',
+      }
+    }
+    case '__PROFILE_INFO_DATA__': {
+      const hasData = hasStructuredData(parsed)
+      return {
+        key: 'profile-info',
+        title: 'Complete your profile',
+        description: hasData
+          ? 'Profile saved. Update it if your basics change.'
+          : 'Add basic details so recommendations can be personalised.',
+        actionLabel: hasData ? 'Edit profile' : 'Add profile info',
+        href: '/settings',
+        status: hasData ? 'in-progress' : 'missing',
+      }
+    }
+    default:
+      return null
+  }
+}
+
 function inferPolarityFromName(name: string): 'positive' | 'negative' {
   const lowered = name.toLowerCase()
   if (/(pain|ache|injury|flare|anxiety|depress|stress|insomnia|fatigue|low\s|lack|poor|bloat|nausea|migraine|cramp|brain fog|libido|bp|blood pressure|cholesterol)/i.test(lowered)) {
@@ -233,21 +369,27 @@ function inferPolarityFromName(name: string): 'positive' | 'negative' {
   return 'negative'
 }
 
-function normaliseRating(rating: number | null | undefined, polarity: 'positive' | 'negative') {
-  if (rating === null || rating === undefined) return { score: null, label: 'No rating yet' }
+function normaliseRating(
+  rating: number | null | undefined,
+  polarity: 'positive' | 'negative',
+  hasLogs: boolean
+) : { score: number | null; label: string; status: IssueStatus } {
+  if (!hasLogs || rating === null || rating === undefined) {
+    return { score: null, label: 'Needs data', status: 'needs-data' }
+  }
   const scaleMax = RATING_SCALE_DEFAULT
   const bounded = Math.max(0, Math.min(scaleMax, rating))
   const percentage = (bounded / scaleMax) * 100
   if (polarity === 'negative') {
-    if (percentage >= 70) return { score: percentage, label: 'Severe' }
-    if (percentage >= 40) return { score: percentage, label: 'Moderate' }
-    if (percentage > 0) return { score: percentage, label: 'Mild' }
-    return { score: percentage, label: 'Resolved' }
+    if (percentage >= 70) return { score: percentage, label: 'High impact', status: 'focus' }
+    if (percentage >= 40) return { score: percentage, label: 'Moderate impact', status: 'monitor' }
+    if (percentage > 0) return { score: percentage, label: 'Mild impact', status: 'monitor' }
+    return { score: percentage, label: 'On track', status: 'on-track' }
   }
-  if (percentage >= 80) return { score: percentage, label: 'Excellent progress' }
-  if (percentage >= 55) return { score: percentage, label: 'On track' }
-  if (percentage >= 30) return { score: percentage, label: 'Needs support' }
-  return { score: percentage, label: 'Off track' }
+  if (percentage >= 80) return { score: percentage, label: 'Excellent progress', status: 'on-track' }
+  if (percentage >= 55) return { score: percentage, label: 'On track', status: 'monitor' }
+  if (percentage >= 30) return { score: percentage, label: 'Needs support', status: 'focus' }
+  return { score: percentage, label: 'Off track', status: 'focus' }
 }
 
 function calculateTrend(logs: Array<{ rating: number; createdAt: Date }>, polarity: 'positive' | 'negative') {
@@ -320,6 +462,7 @@ export async function getIssueLandingPayload(userId: string) {
     issues: summaries,
     generatedAt: new Date().toISOString(),
     onboardingComplete: context.onboardingComplete,
+    dataNeeds: context.dataNeeds,
   }
 }
 
@@ -404,6 +547,7 @@ const loadUserInsightContext = cache(async (userId: string): Promise<UserInsight
       foodLogs: [],
       todaysFoods: [],
       bloodResults: null,
+      dataNeeds: [],
       profile: {},
       onboardingComplete: false,
     }
@@ -413,9 +557,16 @@ const loadUserInsightContext = cache(async (userId: string): Promise<UserInsight
   const visibleGoals: HealthGoalWithLogs[] = []
   const todaysFoods: Array<{ name?: string; meal?: string; calories?: number }> = []
   let bloodResults: BloodResultsData | null = null
+  const dataNeeds: InsightDataNeed[] = []
+  const seenNeeds = new Set<string>()
 
   for (const goal of user.healthGoals) {
     if (goal.name.startsWith('__')) {
+      const dataNeed = buildDataNeed(goal.name, goal.category)
+      if (dataNeed && !seenNeeds.has(dataNeed.key)) {
+        seenNeeds.add(dataNeed.key)
+        dataNeeds.push(dataNeed)
+      }
       if (goal.name === '__BLOOD_RESULTS_DATA__') {
         try {
           const parsed = JSON.parse(goal.category ?? '{}')
@@ -511,6 +662,7 @@ const loadUserInsightContext = cache(async (userId: string): Promise<UserInsight
     })),
     todaysFoods,
     bloodResults,
+    dataNeeds,
     profile: {
       gender: user.gender ?? null,
       weight: user.weight ?? null,
@@ -537,6 +689,7 @@ const loadUserLandingContext = cache(async (userId: string): Promise<UserInsight
           select: {
             id: true,
             name: true,
+            category: true,
             currentRating: true,
             createdAt: true,
             updatedAt: true,
@@ -562,6 +715,7 @@ const loadUserLandingContext = cache(async (userId: string): Promise<UserInsight
       foodLogs: [],
       todaysFoods: [],
       bloodResults: null,
+      dataNeeds: [],
       profile: {},
       onboardingComplete: false,
     }
@@ -569,7 +723,18 @@ const loadUserLandingContext = cache(async (userId: string): Promise<UserInsight
 
   const healthGoals: Record<string, HealthGoalWithLogs> = {}
   const visibleGoals: HealthGoalWithLogs[] = []
+  const dataNeeds: InsightDataNeed[] = []
+  const seenNeeds = new Set<string>()
   for (const goal of user.healthGoals) {
+    if (goal.name.startsWith('__')) {
+      const dataNeed = buildDataNeed(goal.name, goal.category)
+      if (dataNeed && !seenNeeds.has(dataNeed.key)) {
+        seenNeeds.add(dataNeed.key)
+        dataNeeds.push(dataNeed)
+      }
+      continue
+    }
+
     const logsAsc = (goal.healthLogs || []).slice().reverse()
     healthGoals[goal.name.toLowerCase()] = {
       id: goal.id,
@@ -616,6 +781,7 @@ const loadUserLandingContext = cache(async (userId: string): Promise<UserInsight
     foodLogs: [],
     todaysFoods: [],
     bloodResults: null,
+    dataNeeds,
     profile: {},
     onboardingComplete,
   }
@@ -693,11 +859,12 @@ async function computeIssueSection(
 
 function enrichIssueSummary(issue: { id: string; name: string; polarity: 'positive' | 'negative'; slug: string }, context: UserInsightContext): IssueSummary {
   const goal = context.healthGoals[issue.name.toLowerCase()]
-  const normalised = normaliseRating(goal?.currentRating ?? null, issue.polarity)
+  const hasLogs = (goal?.healthLogs?.length ?? 0) > 0
+  const normalised = normaliseRating(goal?.currentRating ?? null, issue.polarity, hasLogs)
   const { trend, delta } = calculateTrend(goal?.healthLogs ?? [], issue.polarity)
   const lastLog = goal?.healthLogs?.slice(-1)[0]
-  const highlight = buildIssueHighlight(issue, normalised.label, trend)
-  const blockers = buildIssueBlockers(issue, context)
+  const highlight = buildIssueHighlight(issue, normalised.label, trend, normalised.status)
+  const blockers = buildIssueBlockers(issue, context, normalised.status)
 
   return {
     id: issue.id,
@@ -713,19 +880,32 @@ function enrichIssueSummary(issue: { id: string; name: string; polarity: 'positi
     lastUpdated: lastLog ? lastLog.createdAt.toISOString() : goal?.updatedAt?.toISOString() ?? null,
     highlight,
     blockers,
+    status: normalised.status,
   }
 }
 
-function buildIssueHighlight(issue: { name: string; polarity: 'positive' | 'negative' }, severity: string, trend: IssueSummary['trend']) {
+function buildIssueHighlight(
+  issue: { name: string; polarity: 'positive' | 'negative' },
+  severity: string,
+  trend: IssueSummary['trend'],
+  status: IssueStatus
+) {
   const trendText =
     trend === 'improving' ? 'Improvements logged recently' : trend === 'declining' ? 'Recent data shows regression' : trend === 'stable' ? 'Holding steady' : 'Needs more data'
-  if (issue.polarity === 'negative') {
-    return `${severity} concern • ${trendText}`
+  if (status === 'needs-data') {
+    return 'Log a fresh check-in to unlock personalised guidance.'
   }
-  return `${severity} goal • ${trendText}`
+  if (issue.polarity === 'negative') {
+    return `${severity} • ${trendText}`
+  }
+  return `${severity} • ${trendText}`
 }
 
-function buildIssueBlockers(issue: { name: string; polarity: 'positive' | 'negative' }, context: UserInsightContext) {
+function buildIssueBlockers(
+  issue: { name: string; polarity: 'positive' | 'negative' },
+  context: UserInsightContext,
+  status: IssueStatus
+) {
   const blockers: string[] = []
   const key = pickKnowledgeKey(issue.name.toLowerCase())
   if (key === 'libido') {
@@ -739,7 +919,7 @@ function buildIssueBlockers(issue: { name: string; polarity: 'positive' | 'negat
       blockers.push('Latest testosterone labs missing')
     }
   }
-  if (!context.foodLogs.length && !context.todaysFoods.length) {
+  if (status !== 'needs-data' && !context.foodLogs.length && !context.todaysFoods.length) {
     blockers.push('No recent food logs to analyse')
   }
   return blockers.slice(0, 3)

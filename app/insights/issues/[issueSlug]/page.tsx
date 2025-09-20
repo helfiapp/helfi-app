@@ -31,6 +31,7 @@ function fallbackIssue(slug: string): IssueSummary {
     lastUpdated: null,
     highlight: 'Needs more data before we can generate trends.',
     blockers: ['Log more recent data so we can generate this report.'],
+    status: 'needs-data',
   }
 }
 

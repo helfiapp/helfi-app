@@ -22,6 +22,7 @@ export default async function InsightsPage() {
       issues={payload.issues}
       generatedAt={payload.generatedAt}
       onboardingComplete={payload.onboardingComplete}
+      dataNeeds={payload.dataNeeds}
     />
   )
 }

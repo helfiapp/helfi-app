@@ -41,6 +41,7 @@ export default async function IssueLayout({ children, params }: IssueLayoutProps
       lastUpdated: null,
       highlight: 'Add logs to unlock personalised insights.',
       blockers: [],
+      status: 'needs-data',
     } as IssueSummary
   }
 
