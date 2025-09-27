@@ -54,24 +54,28 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
           onChange={(event) => setQuestion(event.target.value)}
           placeholder={`Ask a follow-up question about ${issueName} (${section}).`}
           rows={3}
-          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-helfi-green focus:outline-none focus:ring-2 focus:ring-helfi-green/40"
+          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-base leading-6 focus:border-helfi-green focus:outline-none focus:ring-2 focus:ring-helfi-green/40 resize-none"
         />
         <div className="flex items-center gap-3">
           <button
             type="submit"
             disabled={loading}
-            className="inline-flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+            className="inline-flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-[10px] text-base font-semibold text-white disabled:opacity-60"
           >
             {loading ? 'Sending…' : 'Ask AI'}
           </button>
           {error && <span className="text-xs text-rose-600">{error}</span>}
         </div>
       </form>
-      {answer && (
-        <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-800 whitespace-pre-wrap">
-          {answer}
-        </div>
-      )}
+      <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-800 whitespace-pre-wrap min-h-[160px] transition-colors">
+        {loading ? (
+          <span className="text-gray-500">Generating answer…</span>
+        ) : answer ? (
+          answer
+        ) : (
+          <span className="text-gray-400">Your AI guidance will appear here after you ask a question.</span>
+        )}
+      </div>
     </section>
   )
 }

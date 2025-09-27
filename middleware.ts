@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 
+const ADMIN_GATE_COOKIE_MAX_AGE = 30 * 24 * 60 * 60 // 30 days
+
 export async function middleware(request: NextRequest) {
   // Skip middleware for static files and API routes that don't need auth
   if (
@@ -26,6 +28,15 @@ export async function middleware(request: NextRequest) {
     // If we have a valid token, preserve it by adding stability headers
     if (token) {
       const response = NextResponse.next()
+
+      // Refresh admin gate cookie so testers aren't booted back to the gate page
+      response.cookies.set('passed_admin_gate', '1', {
+        httpOnly: false,
+        maxAge: ADMIN_GATE_COOKIE_MAX_AGE,
+        path: '/',
+        sameSite: 'lax',
+        secure: request.nextUrl.protocol === 'https:'
+      })
       
       // Add headers to prevent session invalidation during deployments
       response.headers.set('X-Session-Preserved', 'true')
@@ -68,4 +79,4 @@ export const config = {
      */
     '/((?!api|_next/static|_next/image|favicon.ico).*)',
   ],
-} 
+}

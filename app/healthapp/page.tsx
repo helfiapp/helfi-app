@@ -1,9 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
+
+const ADMIN_GATE_COOKIE_MAX_AGE = 30 * 24 * 60 * 60 // 30 days
 
 export default function HealthApp() {
   const [password, setPassword] = useState('')
@@ -12,20 +14,49 @@ export default function HealthApp() {
   const [showPassword, setShowPassword] = useState(false)
   const router = useRouter()
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const hasCookie = document.cookie.includes('passed_admin_gate=1')
+    let hasLocalFlag = false
+
+    try {
+      hasLocalFlag = window.localStorage.getItem('helfi:admin_gate') === '1'
+    } catch (error) {
+      console.warn('Admin gate localStorage read skipped:', error)
+    }
+
+    if (hasCookie || hasLocalFlag) {
+      const secureFlag = window.location.protocol === 'https:' ? '; Secure' : ''
+      document.cookie = `passed_admin_gate=1; path=/; max-age=${ADMIN_GATE_COOKIE_MAX_AGE}; SameSite=Lax${secureFlag}`
+      try {
+        window.localStorage.setItem('helfi:admin_gate', '1')
+      } catch (error) {
+        console.warn('Admin gate localStorage write skipped:', error)
+      }
+      router.replace('/auth/signin')
+    }
+  }, [router])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError('')
 
     if (password === 'HealthBeta2024!') {
-      // Mark that admin gate was passed for this device (session cookie)
-      document.cookie = 'passed_admin_gate=1; path=/; max-age=1800; SameSite=Lax'
+      const secureFlag = window.location.protocol === 'https:' ? '; Secure' : ''
+      document.cookie = `passed_admin_gate=1; path=/; max-age=${ADMIN_GATE_COOKIE_MAX_AGE}; SameSite=Lax${secureFlag}`
+      try {
+        window.localStorage.setItem('helfi:admin_gate', '1')
+      } catch (error) {
+        console.warn('Admin gate localStorage write skipped:', error)
+      }
       // Redirect to sign-in page
-      router.push('/auth/signin')
+      router.replace('/auth/signin')
     } else {
       setError('Incorrect password. Please try again.')
     }
-    
+
     setLoading(false)
   }
 
@@ -115,4 +146,4 @@ export default function HealthApp() {
       </div>
     </div>
   )
-} 
+}
