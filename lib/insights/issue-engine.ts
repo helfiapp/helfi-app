@@ -151,7 +151,7 @@ const ISSUE_KNOWLEDGE_BASE: Record<string, {
   keyLabs?: Array<{ marker: string; optimal: string; cadence: string; note?: string }>
 }> = {
   libido: {
-    aliases: ['low libido', 'sexual health', 'erectile function'],
+    aliases: ['low libido', 'sexual health', 'erectile function', 'erection quality'],
     helpfulSupplements: [
       { pattern: /ashwagandha/i, why: 'may improve sexual performance and stress resilience' },
       { pattern: /tongkat|longjack/i, why: 'can support testosterone and libido metrics' },
@@ -170,7 +170,10 @@ const ISSUE_KNOWLEDGE_BASE: Record<string, {
       { pattern: /pseudoephedrine|decongestant/i, why: 'These constrict blood vessels and can undermine erectile blood flow.' },
     ],
     helpfulMedications: [
-      { pattern: /tadalafil|sildenafil/i, why: 'Supports blood flow when vascular tone is limiting libido.' },
+      {
+        pattern: /tadalafil|cialis|sildenafil|viagra|avanafil|stendra|vardenafil|levitra/i,
+        why: 'PDE5 inhibitors directly improve erection quality by enhancing blood flow.',
+      },
     ],
     gapMedications: [
       { title: 'Discuss PDE5 support', why: 'Low erections or arousal could benefit from as-needed PDE5 inhibitors.', suggested: 'Tadalafil 5mg once daily' },
@@ -1335,7 +1338,7 @@ async function buildSupplementsSection(issue: IssueSummary, context: UserInsight
       return fallback ?? []
     }
 
-    const supportiveDetails = llmResult.working.map((item) => {
+    let supportiveDetails = llmResult.working.map((item) => {
       const match = supplementMap.get(canonical(item.name))
       return {
         name: item.name,
@@ -1345,6 +1348,20 @@ async function buildSupplementsSection(issue: IssueSummary, context: UserInsight
       }
     })
 
+    if (!supportiveDetails.length) {
+      supportiveDetails = normalizedSupplements
+        .filter((supp) => helpfulPatterns.some((pattern) => pattern.pattern.test(supp.name)))
+        .map((supp) => {
+          const match = helpfulPatterns.find((pattern) => pattern.pattern.test(supp.name))
+          return {
+            name: supp.name,
+            reason: match?.why || 'Matches nutrients often used for this issue.',
+            dosage: supp.dosage || null,
+            timing: supp.timing ?? [],
+          }
+        })
+    }
+
     const suggestedAdditions = llmResult.suggested.map((item) => ({
       title: item.name,
       reason: item.reason,
@@ -1352,7 +1369,7 @@ async function buildSupplementsSection(issue: IssueSummary, context: UserInsight
       alreadyCovered: supplementMap.has(canonical(item.name)),
     }))
 
-    const avoidList = llmResult.avoid.map((item) => {
+    let avoidList = llmResult.avoid.map((item) => {
       const match = supplementMap.get(canonical(item.name))
       return {
         name: item.name,
@@ -1361,6 +1378,20 @@ async function buildSupplementsSection(issue: IssueSummary, context: UserInsight
         timing: match?.timing ?? [],
       }
     })
+
+    if (!avoidList.length) {
+      avoidList = normalizedSupplements
+        .filter((supp) => avoidPatterns.some((pattern) => pattern.pattern.test(supp.name)))
+        .map((supp) => {
+          const match = avoidPatterns.find((pattern) => pattern.pattern.test(supp.name))
+          return {
+            name: supp.name,
+            reason: match?.why || 'May not align with your current focus—review with your practitioner.',
+            dosage: supp.dosage ?? null,
+            timing: supp.timing ?? [],
+          }
+        })
+    }
 
     const summary = llmResult.summary?.trim().length
       ? llmResult.summary
@@ -1616,7 +1647,7 @@ async function buildMedicationsSection(issue: IssueSummary, context: UserInsight
       return fallback ?? []
     }
 
-    const supportiveDetails = llmResult.working.map((item) => {
+    let supportiveDetails = llmResult.working.map((item) => {
       const match = medMap.get(canonical(item.name))
       return {
         name: item.name,
@@ -1626,6 +1657,20 @@ async function buildMedicationsSection(issue: IssueSummary, context: UserInsight
       }
     })
 
+    if (!supportiveDetails.length) {
+      supportiveDetails = normalizedMeds
+        .filter((med) => helpfulPatterns.some((pattern) => pattern.pattern.test(med.name)))
+        .map((med) => {
+          const match = helpfulPatterns.find((pattern) => pattern.pattern.test(med.name))
+          return {
+            name: med.name,
+            reason: match?.why || 'Commonly used to support this issue.',
+            dosage: med.dosage || null,
+            timing: med.timing ?? [],
+          }
+        })
+    }
+
     const suggestedAdditions = llmResult.suggested.map((item) => ({
       title: item.name,
       reason: item.reason,
@@ -1633,7 +1678,7 @@ async function buildMedicationsSection(issue: IssueSummary, context: UserInsight
       alreadyCovered: medMap.has(canonical(item.name)),
     }))
 
-    const avoidList = llmResult.avoid.map((item) => {
+    let avoidList = llmResult.avoid.map((item) => {
       const match = medMap.get(canonical(item.name))
       return {
         name: item.name,
@@ -1642,6 +1687,20 @@ async function buildMedicationsSection(issue: IssueSummary, context: UserInsight
         timing: match?.timing ?? [],
       }
     })
+
+    if (!avoidList.length) {
+      avoidList = normalizedMeds
+        .filter((med) => avoidPatterns.some((pattern) => pattern.pattern.test(med.name)))
+        .map((med) => {
+          const match = avoidPatterns.find((pattern) => pattern.pattern.test(med.name))
+          return {
+            name: med.name,
+            reason: match?.why || 'Potentially counterproductive—review with your clinician.',
+            dosage: med.dosage ?? null,
+            timing: med.timing ?? [],
+          }
+        })
+    }
 
     const summary = llmResult.summary?.trim().length
       ? llmResult.summary
