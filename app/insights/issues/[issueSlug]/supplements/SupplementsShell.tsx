@@ -185,13 +185,15 @@ export default function SupplementsShell({ children, initialResult, issueSlug }:
           )}
         </section>
 
-        <nav className="bg-white border border-gray-200 rounded-2xl shadow-sm p-2 flex gap-2">
+        <nav className="space-y-2">
           {tabs.map((tab) => (
             <Link
               key={tab.key}
               href={tab.href}
-              className={`flex-1 text-center rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
-                tab.key === activeTab ? 'bg-helfi-green text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              className={`block rounded-xl border px-4 py-3 text-left text-sm font-semibold transition-colors ${
+                tab.key === activeTab
+                  ? 'border-helfi-green bg-helfi-green text-white shadow-sm'
+                  : 'border-gray-200 bg-white text-gray-700 hover:border-helfi-green/70 hover:bg-gray-50'
               }`}
             >
               {tab.label}
