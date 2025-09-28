@@ -2,6 +2,7 @@ import { cache } from 'react'
 import { prisma } from '@/lib/prisma'
 import { authOptions } from '@/lib/auth'
 import { getServerSession } from 'next-auth'
+import { generateSectionInsightsFromLLM } from './llm'
 
 export type IssueSectionKey =
   | 'overview'
@@ -937,28 +938,28 @@ async function buildIssueSectionWithContext(
   let base: BaseSectionResult | null = null
   switch (section) {
     case 'overview':
-      base = buildOverviewSection(summary, context)
+      base = await buildOverviewSection(summary, context)
       break
     case 'exercise':
-      base = buildExerciseSection(summary, context)
+      base = await buildExerciseSection(summary, context)
       break
     case 'supplements':
-      base = buildSupplementsSection(summary, context)
+      base = await buildSupplementsSection(summary, context)
       break
     case 'medications':
-      base = buildMedicationsSection(summary, context)
+      base = await buildMedicationsSection(summary, context)
       break
     case 'interactions':
-      base = buildInteractionsSection(summary, context)
+      base = await buildInteractionsSection(summary, context)
       break
     case 'labs':
-      base = buildLabsSection(summary, context)
+      base = await buildLabsSection(summary, context)
       break
     case 'nutrition':
-      base = buildNutritionSection(summary, context)
+      base = await buildNutritionSection(summary, context)
       break
     case 'lifestyle':
-      base = buildLifestyleSection(summary, context)
+      base = await buildLifestyleSection(summary, context)
       break
     default:
       base = null
@@ -1151,7 +1152,7 @@ function buildOverviewRecommendations(issue: IssueSummary, context: UserInsightC
   return recs
 }
 
-function buildOverviewSection(issue: IssueSummary, context: UserInsightContext): BaseSectionResult {
+async function buildOverviewSection(issue: IssueSummary, context: UserInsightContext): Promise<BaseSectionResult> {
   const now = new Date().toISOString()
   return {
     issue,
@@ -1181,7 +1182,7 @@ function summariseExerciseFrequency(exerciseLogs: UserInsightContext['exerciseLo
   return { sessionsPerWeek: Math.round(avg * 10) / 10, summary }
 }
 
-function buildExerciseSection(issue: IssueSummary, context: UserInsightContext): BaseSectionResult {
+async function buildExerciseSection(issue: IssueSummary, context: UserInsightContext): Promise<BaseSectionResult> {
   const now = new Date().toISOString()
   const knowledgeKey = pickKnowledgeKey(issue.name.toLowerCase())
   const supportiveTemplates = knowledgeKey ? ISSUE_KNOWLEDGE_BASE[knowledgeKey].supportiveExercises ?? [] : []
@@ -1280,13 +1281,158 @@ function buildExerciseSection(issue: IssueSummary, context: UserInsightContext):
   }
 }
 
-function buildSupplementsSection(issue: IssueSummary, context: UserInsightContext): BaseSectionResult {
+async function buildSupplementsSection(issue: IssueSummary, context: UserInsightContext): Promise<BaseSectionResult> {
   const now = new Date().toISOString()
   const supplements = context.supplements
   const key = pickKnowledgeKey(issue.name.toLowerCase())
-  const helpfulPatterns = key ? ISSUE_KNOWLEDGE_BASE[key].helpfulSupplements ?? [] : []
-  const gapSuggestions = key ? ISSUE_KNOWLEDGE_BASE[key].gapSupplements ?? [] : []
-  const avoidPatterns = key ? ISSUE_KNOWLEDGE_BASE[key].avoidSupplements ?? [] : []
+  const knowledge = key ? ISSUE_KNOWLEDGE_BASE[key] : undefined
+  const helpfulPatterns = knowledge?.helpfulSupplements ?? []
+  const gapSuggestions = knowledge?.gapSupplements ?? []
+  const avoidPatterns = knowledge?.avoidSupplements ?? []
+
+  const normalizedSupplements = supplements.map((supp) => ({
+    name: supp.name,
+    dosage: supp.dosage ?? null,
+    timing: Array.isArray(supp.timing) ? supp.timing : [],
+  }))
+
+  const knowledgeNotes = knowledge
+    ? [
+        ...(knowledge.helpfulSupplements ?? []).map(
+          (item) => `Helpful pattern: /${item.pattern.source}/ — ${item.why}`
+        ),
+        ...(knowledge.gapSupplements ?? []).map(
+          (item) => `Suggested addition: ${item.title} — ${item.why}${item.suggested ? ` (example: ${item.suggested})` : ''}`
+        ),
+        ...(knowledge.avoidSupplements ?? []).map(
+          (item) => `Avoid pattern: /${item.pattern.source}/ — ${item.why}`
+        ),
+      ]
+    : undefined
+
+  const llmResult = await generateSectionInsightsFromLLM({
+    issueName: issue.name,
+    issueSummary: issue.highlight,
+    items: normalizedSupplements,
+    otherItems: context.medications.map((med) => ({ name: med.name, dosage: med.dosage ?? null })),
+    knowledgeNotes,
+    mode: 'supplements',
+  })
+
+  if (llmResult) {
+    const canonical = (value: string) => value.trim().toLowerCase()
+    const supplementMap = new Map(
+      normalizedSupplements.map((supp) => [canonical(supp.name), supp])
+    )
+
+    const parseTiming = (timing?: string | null, fallback?: string[]) => {
+      if (timing && timing.trim().length) {
+        return timing
+          .split(/[,;]+/)
+          .map((t) => t.trim())
+          .filter(Boolean)
+      }
+      return fallback ?? []
+    }
+
+    const supportiveDetails = llmResult.working.map((item) => {
+      const match = supplementMap.get(canonical(item.name))
+      return {
+        name: item.name,
+        reason: item.reason,
+        dosage: item.dosage ?? match?.dosage ?? null,
+        timing: parseTiming(item.timing, match?.timing ?? []),
+      }
+    })
+
+    const suggestedAdditions = llmResult.suggested.map((item) => ({
+      title: item.name,
+      reason: item.reason,
+      suggestion: item.protocol ?? null,
+      alreadyCovered: supplementMap.has(canonical(item.name)),
+    }))
+
+    const avoidList = llmResult.avoid.map((item) => {
+      const match = supplementMap.get(canonical(item.name))
+      return {
+        name: item.name,
+        reason: item.reason,
+        dosage: match?.dosage ?? null,
+        timing: match?.timing ?? [],
+      }
+    })
+
+    const summary = llmResult.summary?.trim().length
+      ? llmResult.summary
+      : supportiveDetails.length
+      ? `You have ${supportiveDetails.length} supplement${supportiveDetails.length === 1 ? '' : 's'} supporting ${issue.name}.`
+      : supplements.length
+      ? 'Supplements logged, but none clearly align with this issue yet.'
+      : 'No supplements logged yet.'
+
+    const recommendations: SectionRecommendation[] = (llmResult.recommendations.length
+      ? llmResult.recommendations
+      : [
+          {
+            title: 'Review supplement plan with your clinician',
+            description: 'Discuss current regimen and adjust based on response and labs.',
+            actions: ['Bring this summary to your next consult', 'Track symptom response weekly'],
+            priority: 'soon' as const,
+          },
+        ]
+    ).map((rec) => ({
+      title: rec.title,
+      description: rec.description,
+      actions: rec.actions.length ? rec.actions : ['Discuss with your clinician'],
+      priority: rec.priority,
+    }))
+
+    const highlights: SectionHighlight[] = [
+      {
+        title: "What's working",
+        detail: supportiveDetails.length
+          ? supportiveDetails.map((item) => `${item.name}: ${item.reason}`).join('; ')
+          : 'No supplements clearly supporting this issue yet.',
+        tone: supportiveDetails.length ? 'positive' : supplements.length ? 'neutral' : 'warning',
+      },
+      {
+        title: 'Opportunities',
+        detail: suggestedAdditions.length
+          ? suggestedAdditions[0].reason
+          : 'Stay consistent and keep logging responses.',
+        tone: suggestedAdditions.length ? 'neutral' : 'positive',
+      },
+      {
+        title: 'Cautions',
+        detail: avoidList.length ? avoidList.map((item) => `${item.name}: ${item.reason}`).join('; ') : 'No red flags identified.',
+        tone: avoidList.length ? 'warning' : 'positive',
+      },
+    ]
+
+    return {
+      issue,
+      section: 'supplements',
+      generatedAt: now,
+      confidence: 0.82,
+      summary,
+      highlights,
+      dataPoints: supplements.slice(0, 6).map((supp) => ({
+        label: supp.name,
+        value: supp.dosage || 'Dose not set',
+        context: supp.timing?.length ? `Timing: ${supp.timing.join(', ')}` : 'Add timing details',
+      })),
+      recommendations,
+      extras: {
+        supportiveDetails,
+        suggestedAdditions,
+        avoidList,
+        missingDose: supplements.filter((supp) => !supp.dosage).map((supp) => supp.name),
+        missingTiming: supplements.filter((supp) => !supp.timing || !supp.timing.length).map((supp) => supp.name),
+        totalLogged: supplements.length,
+        source: 'llm',
+      } as Record<string, unknown>,
+    }
+  }
 
   const supportive = supplements.filter((supp) => helpfulPatterns.some(pattern => pattern.pattern.test(supp.name)))
   const supportiveSummary = supportive.map(supp => {
@@ -1413,17 +1559,161 @@ function buildSupplementsSection(issue: IssueSummary, context: UserInsightContex
       missingDose: missingDose.map(s => s.name),
       missingTiming: missingTiming.map(s => s.name),
       totalLogged: supplements.length,
+      source: 'rules',
     },
   }
 }
 
-function buildMedicationsSection(issue: IssueSummary, context: UserInsightContext): BaseSectionResult {
+async function buildMedicationsSection(issue: IssueSummary, context: UserInsightContext): Promise<BaseSectionResult> {
   const now = new Date().toISOString()
   const medications = context.medications
   const key = pickKnowledgeKey(issue.name.toLowerCase())
-  const helpfulPatterns = key ? ISSUE_KNOWLEDGE_BASE[key].helpfulMedications ?? [] : []
-  const gapSuggestions = key ? ISSUE_KNOWLEDGE_BASE[key].gapMedications ?? [] : []
-  const avoidPatterns = key ? ISSUE_KNOWLEDGE_BASE[key].avoidMedications ?? [] : []
+  const knowledge = key ? ISSUE_KNOWLEDGE_BASE[key] : undefined
+  const helpfulPatterns = knowledge?.helpfulMedications ?? []
+  const gapSuggestions = knowledge?.gapMedications ?? []
+  const avoidPatterns = knowledge?.avoidMedications ?? []
+
+  const normalizedMeds = medications.map((med) => ({
+    name: med.name,
+    dosage: med.dosage ?? null,
+    timing: Array.isArray(med.timing) ? med.timing : [],
+  }))
+
+  const knowledgeNotes = knowledge
+    ? [
+        ...(knowledge.helpfulMedications ?? []).map(
+          (item) => `Helpful protocol: /${item.pattern.source}/ — ${item.why}`
+        ),
+        ...(knowledge.gapMedications ?? []).map(
+          (item) => `Consider discussing: ${item.title} — ${item.why}${item.suggested ? ` (example: ${item.suggested})` : ''}`
+        ),
+        ...(knowledge.avoidMedications ?? []).map(
+          (item) => `Avoid/monitor: /${item.pattern.source}/ — ${item.why}`
+        ),
+      ]
+    : undefined
+
+  const llmResult = await generateSectionInsightsFromLLM({
+    issueName: issue.name,
+    issueSummary: issue.highlight,
+    items: normalizedMeds,
+    otherItems: context.supplements.map((supp) => ({ name: supp.name, dosage: supp.dosage ?? null })),
+    knowledgeNotes,
+    mode: 'medications',
+  })
+
+  if (llmResult) {
+    const canonical = (value: string) => value.trim().toLowerCase()
+    const medMap = new Map(normalizedMeds.map((med) => [canonical(med.name), med]))
+
+    const parseTiming = (timing?: string | null, fallback?: string[]) => {
+      if (timing && timing.trim().length) {
+        return timing
+          .split(/[,;]+/)
+          .map((t) => t.trim())
+          .filter(Boolean)
+      }
+      return fallback ?? []
+    }
+
+    const supportiveDetails = llmResult.working.map((item) => {
+      const match = medMap.get(canonical(item.name))
+      return {
+        name: item.name,
+        reason: item.reason,
+        dosage: item.dosage ?? match?.dosage ?? null,
+        timing: parseTiming(item.timing, match?.timing ?? []),
+      }
+    })
+
+    const suggestedAdditions = llmResult.suggested.map((item) => ({
+      title: item.name,
+      reason: item.reason,
+      suggestion: item.protocol ?? null,
+      alreadyCovered: medMap.has(canonical(item.name)),
+    }))
+
+    const avoidList = llmResult.avoid.map((item) => {
+      const match = medMap.get(canonical(item.name))
+      return {
+        name: item.name,
+        reason: item.reason,
+        dosage: match?.dosage ?? null,
+        timing: match?.timing ?? [],
+      }
+    })
+
+    const summary = llmResult.summary?.trim().length
+      ? llmResult.summary
+      : supportiveDetails.length
+      ? `You have ${supportiveDetails.length} medication${supportiveDetails.length === 1 ? '' : 's'} aligned with ${issue.name}.`
+      : medications.length
+      ? 'Medications logged, but none clearly align with this issue yet.'
+      : 'No medications logged yet.'
+
+    const recommendations: SectionRecommendation[] = (llmResult.recommendations.length
+      ? llmResult.recommendations
+      : [
+          {
+            title: 'Review therapy plan',
+            description: 'Align dosing and timing with symptom response and labs.',
+            actions: ['Discuss adjustments with your clinician', 'Track response weekly'],
+            priority: 'soon' as const,
+          },
+        ]
+    ).map((rec) => ({
+      title: rec.title,
+      description: rec.description,
+      actions: rec.actions.length ? rec.actions : ['Coordinate changes with your clinician'],
+      priority: rec.priority,
+    }))
+
+    const highlights: SectionHighlight[] = [
+      {
+        title: "What's working",
+        detail: supportiveDetails.length
+          ? supportiveDetails.map((item) => `${item.name}: ${item.reason}`).join('; ')
+          : 'No medications clearly supporting this issue yet.',
+        tone: supportiveDetails.length ? 'positive' : medications.length ? 'neutral' : 'warning',
+      },
+      {
+        title: 'Opportunities',
+        detail: suggestedAdditions.length
+          ? suggestedAdditions[0].reason
+          : 'Stay consistent and continue monitoring symptoms.',
+        tone: suggestedAdditions.length ? 'neutral' : 'positive',
+      },
+      {
+        title: 'Cautions',
+        detail: avoidList.length ? avoidList.map((item) => `${item.name}: ${item.reason}`).join('; ') : 'No contraindications flagged.',
+        tone: avoidList.length ? 'warning' : 'positive',
+      },
+    ]
+
+    return {
+      issue,
+      section: 'medications',
+      generatedAt: now,
+      confidence: 0.82,
+      summary,
+      highlights,
+      dataPoints: medications.slice(0, 6).map((med) => ({
+        label: med.name,
+        value: med.dosage || 'Dose not set',
+        context: med.timing?.length ? `Timing: ${med.timing.join(', ')}` : 'Add timing details',
+      })),
+      recommendations,
+      extras: {
+        supportiveDetails,
+        suggestedAdditions,
+        avoidList,
+        missingDose: medications.filter((med) => !med.dosage).map((med) => med.name),
+        missingTiming: medications.filter((med) => !med.timing || !med.timing.length).map((med) => med.name),
+        totalLogged: medications.length,
+        source: 'llm',
+      } as Record<string, unknown>,
+    }
+  }
 
   const supportive = medications.filter((med) => helpfulPatterns.some((pattern) => pattern.pattern.test(med.name)))
   const supportiveSummary = supportive.map((med) => {
@@ -1556,11 +1846,12 @@ function buildMedicationsSection(issue: IssueSummary, context: UserInsightContex
       missingDose: missingDose.map((m) => m.name),
       missingTiming: missingTiming.map((m) => m.name),
       totalLogged: medications.length,
+      source: 'rules',
     },
   }
 }
 
-function buildInteractionsSection(issue: IssueSummary, context: UserInsightContext): BaseSectionResult {
+async function buildInteractionsSection(issue: IssueSummary, context: UserInsightContext): Promise<BaseSectionResult> {
   const now = new Date().toISOString()
   const supplementNames = context.supplements.map((supp) => supp.name)
   const medicationNames = context.medications.map((med) => med.name)
@@ -1629,7 +1920,7 @@ function buildInteractionsSection(issue: IssueSummary, context: UserInsightConte
   }
 }
 
-function buildLabsSection(issue: IssueSummary, context: UserInsightContext): BaseSectionResult {
+async function buildLabsSection(issue: IssueSummary, context: UserInsightContext): Promise<BaseSectionResult> {
   const now = new Date().toISOString()
   const key = pickKnowledgeKey(issue.name.toLowerCase())
   const labs = key ? ISSUE_KNOWLEDGE_BASE[key].keyLabs ?? [] : []
@@ -1697,7 +1988,7 @@ function buildLabsSection(issue: IssueSummary, context: UserInsightContext): Bas
   }
 }
 
-function buildNutritionSection(issue: IssueSummary, context: UserInsightContext): BaseSectionResult {
+async function buildNutritionSection(issue: IssueSummary, context: UserInsightContext): Promise<BaseSectionResult> {
   const now = new Date().toISOString()
   const foods: Array<{ name?: string; meal?: string; calories?: number }> = context.todaysFoods.length
     ? context.todaysFoods
@@ -1807,7 +2098,7 @@ function buildNutritionSection(issue: IssueSummary, context: UserInsightContext)
   }
 }
 
-function buildLifestyleSection(issue: IssueSummary, context: UserInsightContext): BaseSectionResult {
+async function buildLifestyleSection(issue: IssueSummary, context: UserInsightContext): Promise<BaseSectionResult> {
   const now = new Date().toISOString()
   const key = pickKnowledgeKey(issue.name.toLowerCase())
   const focus = key ? ISSUE_KNOWLEDGE_BASE[key].lifestyleFocus ?? [] : []

@@ -15,6 +15,7 @@ type SupplementsExtras = {
   missingDose?: string[]
   missingTiming?: string[]
   totalLogged?: number
+  source?: 'llm' | 'rules'
 }
 
 interface SupplementsContextValue {
