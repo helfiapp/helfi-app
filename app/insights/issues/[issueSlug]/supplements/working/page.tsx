@@ -1,6 +1,6 @@
 'use client'
 
-import { useSupplementsContext } from '../../SupplementsShell'
+import { useSupplementsContext } from '../SupplementsShell'
 
 export default function SupplementsWorkingPage() {
   const { extras } = useSupplementsContext()
