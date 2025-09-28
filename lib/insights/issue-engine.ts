@@ -1287,11 +1287,6 @@ async function buildExerciseSection(issue: IssueSummary, context: UserInsightCon
 async function buildSupplementsSection(issue: IssueSummary, context: UserInsightContext): Promise<BaseSectionResult> {
   const now = new Date().toISOString()
   const supplements = context.supplements
-  const key = pickKnowledgeKey(issue.name.toLowerCase())
-  const knowledge = key ? ISSUE_KNOWLEDGE_BASE[key] : undefined
-  const helpfulPatterns = knowledge?.helpfulSupplements ?? []
-  const gapSuggestions = knowledge?.gapSupplements ?? []
-  const avoidPatterns = knowledge?.avoidSupplements ?? []
 
   const normalizedSupplements = supplements.map((supp) => ({
     name: supp.name,
@@ -1299,310 +1294,169 @@ async function buildSupplementsSection(issue: IssueSummary, context: UserInsight
     timing: Array.isArray(supp.timing) ? supp.timing : [],
   }))
 
-  const knowledgeNotes = knowledge
-    ? [
-        ...(knowledge.helpfulSupplements ?? []).map(
-          (item) => `Helpful pattern: /${item.pattern.source}/ — ${item.why}`
-        ),
-        ...(knowledge.gapSupplements ?? []).map(
-          (item) => `Suggested addition: ${item.title} — ${item.why}${item.suggested ? ` (example: ${item.suggested})` : ''}`
-        ),
-        ...(knowledge.avoidSupplements ?? []).map(
-          (item) => `Avoid pattern: /${item.pattern.source}/ — ${item.why}`
-        ),
-      ]
-    : undefined
-
   const llmResult = await generateSectionInsightsFromLLM({
     issueName: issue.name,
     issueSummary: issue.highlight,
     items: normalizedSupplements,
     otherItems: context.medications.map((med) => ({ name: med.name, dosage: med.dosage ?? null })),
-    knowledgeNotes,
     mode: 'supplements',
   })
 
-  if (llmResult) {
-    const canonical = (value: string) => value.trim().toLowerCase()
-    const supplementMap = new Map(
-      normalizedSupplements.map((supp) => [canonical(supp.name), supp])
-    )
-
-    const parseTiming = (timing?: string | null, fallback?: string[]) => {
-      if (timing && timing.trim().length) {
-        return timing
-          .split(/[,;]+/)
-          .map((t) => t.trim())
-          .filter(Boolean)
-      }
-      return fallback ?? []
-    }
-
-    let supportiveDetails = llmResult.working.map((item) => {
-      const match = supplementMap.get(canonical(item.name))
-      return {
-        name: item.name,
-        reason: item.reason,
-        dosage: item.dosage ?? match?.dosage ?? null,
-        timing: parseTiming(item.timing, match?.timing ?? []),
-      }
-    })
-
-    if (!supportiveDetails.length) {
-      supportiveDetails = normalizedSupplements
-        .filter((supp) => helpfulPatterns.some((pattern) => pattern.pattern.test(supp.name)))
-        .map((supp) => {
-          const match = helpfulPatterns.find((pattern) => pattern.pattern.test(supp.name))
-          return {
-            name: supp.name,
-            reason: match?.why || 'Matches nutrients often used for this issue.',
-            dosage: supp.dosage || null,
-            timing: supp.timing ?? [],
-          }
-        })
-    }
-
-    const suggestedAdditions = llmResult.suggested.map((item) => ({
-      title: item.name,
-      reason: item.reason,
-      suggestion: item.protocol ?? null,
-      alreadyCovered: supplementMap.has(canonical(item.name)),
-    }))
-
-    let avoidList = llmResult.avoid.map((item) => {
-      const match = supplementMap.get(canonical(item.name))
-      return {
-        name: item.name,
-        reason: item.reason,
-        dosage: match?.dosage ?? null,
-        timing: match?.timing ?? [],
-      }
-    })
-
-    if (!avoidList.length) {
-      avoidList = normalizedSupplements
-        .filter((supp) => avoidPatterns.some((pattern) => pattern.pattern.test(supp.name)))
-        .map((supp) => {
-          const match = avoidPatterns.find((pattern) => pattern.pattern.test(supp.name))
-          return {
-            name: supp.name,
-            reason: match?.why || 'May not align with your current focus—review with your practitioner.',
-            dosage: supp.dosage ?? null,
-            timing: supp.timing ?? [],
-          }
-        })
-    }
-
-    const summary = llmResult.summary?.trim().length
-      ? llmResult.summary
-      : supportiveDetails.length
-      ? `You have ${supportiveDetails.length} supplement${supportiveDetails.length === 1 ? '' : 's'} supporting ${issue.name}.`
-      : supplements.length
-      ? 'Supplements logged, but none clearly align with this issue yet.'
-      : 'No supplements logged yet.'
-
-    const recommendations: SectionRecommendation[] = (llmResult.recommendations.length
-      ? llmResult.recommendations
-      : [
-          {
-            title: 'Review supplement plan with your clinician',
-            description: 'Discuss current regimen and adjust based on response and labs.',
-            actions: ['Bring this summary to your next consult', 'Track symptom response weekly'],
-            priority: 'soon' as const,
-          },
-        ]
-    ).map((rec) => ({
-      title: rec.title,
-      description: rec.description,
-      actions: rec.actions.length ? rec.actions : ['Discuss with your clinician'],
-      priority: rec.priority,
-    }))
-
-    const highlights: SectionHighlight[] = [
-      {
-        title: "What's working",
-        detail: supportiveDetails.length
-          ? supportiveDetails.map((item) => `${item.name}: ${item.reason}`).join('; ')
-          : 'No supplements clearly supporting this issue yet.',
-        tone: supportiveDetails.length ? 'positive' : supplements.length ? 'neutral' : 'warning',
-      },
-      {
-        title: 'Opportunities',
-        detail: suggestedAdditions.length
-          ? suggestedAdditions[0].reason
-          : 'Stay consistent and keep logging responses.',
-        tone: suggestedAdditions.length ? 'neutral' : 'positive',
-      },
-      {
-        title: 'Cautions',
-        detail: avoidList.length ? avoidList.map((item) => `${item.name}: ${item.reason}`).join('; ') : 'No red flags identified.',
-        tone: avoidList.length ? 'warning' : 'positive',
-      },
-    ]
-
+  if (!llmResult) {
     return {
       issue,
       section: 'supplements',
       generatedAt: now,
-      confidence: 0.82,
-      summary,
-      highlights,
-      dataPoints: supplements.slice(0, 6).map((supp) => ({
+      confidence: 0.4,
+      summary: 'We couldn’t generate supplement guidance right now. Please try again shortly or check with support.',
+      highlights: [
+        {
+          title: 'Generation unavailable',
+          detail: 'The AI service did not return supplement suggestions. Retry in a few minutes.',
+          tone: 'warning',
+        },
+      ],
+      dataPoints: normalizedSupplements.map((supp) => ({
         label: supp.name,
         value: supp.dosage || 'Dose not set',
         context: supp.timing?.length ? `Timing: ${supp.timing.join(', ')}` : 'Add timing details',
       })),
-      recommendations,
+      recommendations: [
+        {
+          title: 'Retry insight generation',
+          description: 'Refresh this page or trigger a new report in a few minutes.',
+          actions: ['Tap Daily/Weekly report to regenerate', 'Contact support if the problem persists'],
+          priority: 'soon',
+        },
+      ],
       extras: {
-        supportiveDetails,
-        suggestedAdditions,
-        avoidList,
+        supportiveDetails: [],
+        suggestedAdditions: [],
+        avoidList: [],
         missingDose: supplements.filter((supp) => !supp.dosage).map((supp) => supp.name),
         missingTiming: supplements.filter((supp) => !supp.timing || !supp.timing.length).map((supp) => supp.name),
         totalLogged: supplements.length,
-        source: 'llm',
+        source: 'llm-error',
       } as Record<string, unknown>,
     }
   }
 
-  const supportive = supplements.filter((supp) => helpfulPatterns.some(pattern => pattern.pattern.test(supp.name)))
-  const supportiveSummary = supportive.map(supp => {
-    const match = helpfulPatterns.find(pattern => pattern.pattern.test(supp.name))
-    return match ? `${supp.name} — ${match.why}` : supp.name
+  const canonical = (value: string) => value.trim().toLowerCase()
+  const supplementMap = new Map(
+    normalizedSupplements.map((supp) => [canonical(supp.name), supp])
+  )
+
+  const parseTiming = (timing?: string | null, fallback?: string[]) => {
+    if (timing && timing.trim().length) {
+      return timing
+        .split(/[,;]+/)
+        .map((t) => t.trim())
+        .filter(Boolean)
+    }
+    return fallback ?? []
+  }
+
+  const supportiveDetails = llmResult.working.map((item) => {
+    const match = supplementMap.get(canonical(item.name))
+    return {
+      name: item.name,
+      reason: item.reason,
+      dosage: item.dosage ?? match?.dosage ?? null,
+      timing: parseTiming(item.timing, match?.timing ?? []),
+    }
   })
 
-  const missingDose = supplements.filter(supp => !supp.dosage)
-  const missingTiming = supplements.filter(supp => !supp.timing || supp.timing.length === 0)
+  const suggestedAdditions = llmResult.suggested.map((item) => ({
+    title: item.name,
+    reason: item.reason,
+    suggestion: item.protocol ?? null,
+    alreadyCovered: supplementMap.has(canonical(item.name)),
+  }))
 
-  const recommendations: SectionRecommendation[] = []
-  const nextGaps: string[] = []
+  const avoidList = llmResult.avoid.map((item) => {
+    const match = supplementMap.get(canonical(item.name))
+    return {
+      name: item.name,
+      reason: item.reason,
+      dosage: match?.dosage ?? null,
+      timing: match?.timing ?? [],
+    }
+  })
 
-  if (gapSuggestions.length) {
-    gapSuggestions.forEach((gap) => {
-      const alreadyCovered = supplements.some(supp => gap.suggested && new RegExp(gap.suggested.split(' ')[0], 'i').test(supp.name))
-      if (!alreadyCovered) {
-        recommendations.push({
-          title: gap.title,
-          description: gap.why,
-          actions: gap.suggested ? [`Ask your practitioner about ${gap.suggested}`, 'Log how you feel after 4–6 weeks'] : ['Review options with your practitioner'],
+  const summary = llmResult.summary?.trim().length
+    ? llmResult.summary
+    : supportiveDetails.length
+    ? `You have ${supportiveDetails.length} supplement${supportiveDetails.length === 1 ? '' : 's'} supporting ${issue.name}.`
+    : 'AI-generated guidance ready below.'
+
+  const recommendations: SectionRecommendation[] = llmResult.recommendations.length
+    ? llmResult.recommendations.map((rec) => ({
+        title: rec.title,
+        description: rec.description,
+        actions: rec.actions.length ? rec.actions : ['Discuss with your clinician'],
+        priority: rec.priority,
+      }))
+    : [
+        {
+          title: 'Review supplement plan with your clinician',
+          description: 'Discuss current regimen and adjust based on response and labs.',
+          actions: ['Bring this summary to your next consult', 'Track symptom response weekly'],
           priority: 'soon',
-        })
-      }
-    })
-  }
-
-  if (!supplements.length) {
-    nextGaps.push('Add the supplements you take so we can spot wins and gaps.')
-  }
-  if (missingDose.length) {
-    nextGaps.push(`Add dose details for ${missingDose.map(s => s.name).slice(0, 2).join(', ')}${missingDose.length > 2 ? '…' : ''}`)
-  }
-  if (missingTiming.length) {
-    nextGaps.push('Log timing for each supplement so we can flag spacing issues.')
-  }
-  if (!supportive.length && supplements.length) {
-    nextGaps.push('Nothing in your stack matches common libido-supportive nutrients yet.')
-  }
-
-  if (!recommendations.length) {
-    recommendations.push({
-      title: 'Stay consistent and review effects',
-      description: 'You have a supportive stack logged. Track energy or libido once a week to see what helps most.',
-      actions: ['Add a quick check-in each week', 'Note any changes before adjusting doses'],
-      priority: 'monitor',
-    })
-  }
+        },
+      ]
 
   const highlights: SectionHighlight[] = [
     {
       title: "What's working",
-      detail: supportiveSummary.length
-        ? supportiveSummary.join('; ')
-        : supplements.length
-        ? 'Supplements logged, but none align with common support nutrients yet.'
-        : 'No supplements listed yet.',
-      tone: supportiveSummary.length ? 'positive' : supplements.length ? 'neutral' : 'warning',
+      detail: supportiveDetails.length
+        ? supportiveDetails.map((item) => `${item.name}: ${item.reason}`).join('; ')
+        : 'No supplements clearly supporting this issue yet.',
+      tone: supportiveDetails.length ? 'positive' : 'neutral',
     },
     {
-      title: 'What needs attention',
-      detail: nextGaps.length ? nextGaps[0] : 'No major issues flagged right now.',
-      tone: nextGaps.length ? 'warning' : 'neutral',
+      title: 'Opportunities',
+      detail: suggestedAdditions.length
+        ? suggestedAdditions.map((item) => `${item.title}: ${item.reason}`).join('; ')
+        : 'Leverage the AI suggestions below to discuss next steps.',
+      tone: suggestedAdditions.length ? 'neutral' : 'positive',
     },
     {
-      title: 'Next step',
-      detail: recommendations[0].actions[0] || 'Review your regimen with your practitioner.',
-      tone: 'neutral',
+      title: 'Cautions',
+      detail: avoidList.length
+        ? avoidList.map((item) => `${item.name}: ${item.reason}`).join('; ')
+        : 'No avoid items flagged—review suggestions below for future awareness.',
+      tone: avoidList.length ? 'warning' : 'neutral',
     },
   ]
-
-  const summary = (() => {
-    if (!supplements.length) {
-      return 'No supplements logged yet—add what you take so we can tailor guidance.'
-    }
-    if (supportive.length) {
-      return `You have ${supportive.length} libido-supportive supplement${supportive.length === 1 ? '' : 's'} logged. Keep tracking consistency and effect.`
-    }
-    return `Tracking ${supplements.length} supplement${supplements.length === 1 ? '' : 's'}. Add supportive nutrients or dosage details to refine guidance.`
-  })()
-
-  const dataPoints = supplements.slice(0, 6).map((supp) => ({
-    label: supp.name,
-    value: supp.dosage || 'Dose not set',
-    context: supp.timing?.length ? `Timing: ${supp.timing.join(', ')}` : 'Add timing details',
-  }))
 
   return {
     issue,
     section: 'supplements',
     generatedAt: now,
-    confidence: 0.75,
+    confidence: 0.82,
     summary,
     highlights,
-    dataPoints,
+    dataPoints: supplements.slice(0, 6).map((supp) => ({
+      label: supp.name,
+      value: supp.dosage || 'Dose not set',
+      context: supp.timing?.length ? `Timing: ${supp.timing.join(', ')}` : 'Add timing details',
+    })),
     recommendations,
     extras: {
-      supportiveDetails: supportive.map((supp) => {
-        const match = helpfulPatterns.find(pattern => pattern.pattern.test(supp.name))
-        return {
-          name: supp.name,
-          reason: match?.why || 'Matches nutrients often used for this issue.',
-          dosage: supp.dosage || null,
-          timing: supp.timing?.length ? supp.timing : [],
-        }
-      }),
-      suggestedAdditions: gapSuggestions.map((gap) => ({
-        title: gap.title,
-        reason: gap.why,
-        suggestion: gap.suggested || null,
-        alreadyCovered: supplements.some(supp => gap.suggested && new RegExp(gap.suggested.split(' ')[0], 'i').test(supp.name)),
-      })),
-      avoidList: supplements
-        .filter((supp) => avoidPatterns.some(pattern => pattern.pattern.test(supp.name)))
-        .map((supp) => {
-          const match = avoidPatterns.find(pattern => pattern.pattern.test(supp.name))
-          return {
-            name: supp.name,
-            reason: match?.why || 'May not align with your current focus—review with your practitioner.',
-            dosage: supp.dosage || null,
-            timing: supp.timing?.length ? supp.timing : [],
-          }
-        }),
-      missingDose: missingDose.map(s => s.name),
-      missingTiming: missingTiming.map(s => s.name),
+      supportiveDetails,
+      suggestedAdditions,
+      avoidList,
+      missingDose: supplements.filter((supp) => !supp.dosage).map((supp) => supp.name),
+      missingTiming: supplements.filter((supp) => !supp.timing || !supp.timing.length).map((supp) => supp.name),
       totalLogged: supplements.length,
-      source: 'rules',
-    },
+      source: 'llm',
+    } as Record<string, unknown>,
   }
 }
 
 async function buildMedicationsSection(issue: IssueSummary, context: UserInsightContext): Promise<BaseSectionResult> {
   const now = new Date().toISOString()
   const medications = context.medications
-  const key = pickKnowledgeKey(issue.name.toLowerCase())
-  const knowledge = key ? ISSUE_KNOWLEDGE_BASE[key] : undefined
-  const helpfulPatterns = knowledge?.helpfulMedications ?? []
-  const gapSuggestions = knowledge?.gapMedications ?? []
-  const avoidPatterns = knowledge?.avoidMedications ?? []
 
   const normalizedMeds = medications.map((med) => ({
     name: med.name,
@@ -1610,303 +1464,161 @@ async function buildMedicationsSection(issue: IssueSummary, context: UserInsight
     timing: Array.isArray(med.timing) ? med.timing : [],
   }))
 
-  const knowledgeNotes = knowledge
-    ? [
-        ...(knowledge.helpfulMedications ?? []).map(
-          (item) => `Helpful protocol: /${item.pattern.source}/ — ${item.why}`
-        ),
-        ...(knowledge.gapMedications ?? []).map(
-          (item) => `Consider discussing: ${item.title} — ${item.why}${item.suggested ? ` (example: ${item.suggested})` : ''}`
-        ),
-        ...(knowledge.avoidMedications ?? []).map(
-          (item) => `Avoid/monitor: /${item.pattern.source}/ — ${item.why}`
-        ),
-      ]
-    : undefined
-
   const llmResult = await generateSectionInsightsFromLLM({
     issueName: issue.name,
     issueSummary: issue.highlight,
     items: normalizedMeds,
     otherItems: context.supplements.map((supp) => ({ name: supp.name, dosage: supp.dosage ?? null })),
-    knowledgeNotes,
     mode: 'medications',
   })
 
-  if (llmResult) {
-    const canonical = (value: string) => value.trim().toLowerCase()
-    const medMap = new Map(normalizedMeds.map((med) => [canonical(med.name), med]))
-
-    const parseTiming = (timing?: string | null, fallback?: string[]) => {
-      if (timing && timing.trim().length) {
-        return timing
-          .split(/[,;]+/)
-          .map((t) => t.trim())
-          .filter(Boolean)
-      }
-      return fallback ?? []
-    }
-
-    let supportiveDetails = llmResult.working.map((item) => {
-      const match = medMap.get(canonical(item.name))
-      return {
-        name: item.name,
-        reason: item.reason,
-        dosage: item.dosage ?? match?.dosage ?? null,
-        timing: parseTiming(item.timing, match?.timing ?? []),
-      }
-    })
-
-    if (!supportiveDetails.length) {
-      supportiveDetails = normalizedMeds
-        .filter((med) => helpfulPatterns.some((pattern) => pattern.pattern.test(med.name)))
-        .map((med) => {
-          const match = helpfulPatterns.find((pattern) => pattern.pattern.test(med.name))
-          return {
-            name: med.name,
-            reason: match?.why || 'Commonly used to support this issue.',
-            dosage: med.dosage || null,
-            timing: med.timing ?? [],
-          }
-        })
-    }
-
-    const suggestedAdditions = llmResult.suggested.map((item) => ({
-      title: item.name,
-      reason: item.reason,
-      suggestion: item.protocol ?? null,
-      alreadyCovered: medMap.has(canonical(item.name)),
-    }))
-
-    let avoidList = llmResult.avoid.map((item) => {
-      const match = medMap.get(canonical(item.name))
-      return {
-        name: item.name,
-        reason: item.reason,
-        dosage: match?.dosage ?? null,
-        timing: match?.timing ?? [],
-      }
-    })
-
-    if (!avoidList.length) {
-      avoidList = normalizedMeds
-        .filter((med) => avoidPatterns.some((pattern) => pattern.pattern.test(med.name)))
-        .map((med) => {
-          const match = avoidPatterns.find((pattern) => pattern.pattern.test(med.name))
-          return {
-            name: med.name,
-            reason: match?.why || 'Potentially counterproductive—review with your clinician.',
-            dosage: med.dosage ?? null,
-            timing: med.timing ?? [],
-          }
-        })
-    }
-
-    const summary = llmResult.summary?.trim().length
-      ? llmResult.summary
-      : supportiveDetails.length
-      ? `You have ${supportiveDetails.length} medication${supportiveDetails.length === 1 ? '' : 's'} aligned with ${issue.name}.`
-      : medications.length
-      ? 'Medications logged, but none clearly align with this issue yet.'
-      : 'No medications logged yet.'
-
-    const recommendations: SectionRecommendation[] = (llmResult.recommendations.length
-      ? llmResult.recommendations
-      : [
-          {
-            title: 'Review therapy plan',
-            description: 'Align dosing and timing with symptom response and labs.',
-            actions: ['Discuss adjustments with your clinician', 'Track response weekly'],
-            priority: 'soon' as const,
-          },
-        ]
-    ).map((rec) => ({
-      title: rec.title,
-      description: rec.description,
-      actions: rec.actions.length ? rec.actions : ['Coordinate changes with your clinician'],
-      priority: rec.priority,
-    }))
-
-    const highlights: SectionHighlight[] = [
-      {
-        title: "What's working",
-        detail: supportiveDetails.length
-          ? supportiveDetails.map((item) => `${item.name}: ${item.reason}`).join('; ')
-          : 'No medications clearly supporting this issue yet.',
-        tone: supportiveDetails.length ? 'positive' : medications.length ? 'neutral' : 'warning',
-      },
-      {
-        title: 'Opportunities',
-        detail: suggestedAdditions.length
-          ? suggestedAdditions[0].reason
-          : 'Stay consistent and continue monitoring symptoms.',
-        tone: suggestedAdditions.length ? 'neutral' : 'positive',
-      },
-      {
-        title: 'Cautions',
-        detail: avoidList.length ? avoidList.map((item) => `${item.name}: ${item.reason}`).join('; ') : 'No contraindications flagged.',
-        tone: avoidList.length ? 'warning' : 'positive',
-      },
-    ]
-
+  if (!llmResult) {
     return {
       issue,
       section: 'medications',
       generatedAt: now,
-      confidence: 0.82,
-      summary,
-      highlights,
-      dataPoints: medications.slice(0, 6).map((med) => ({
+      confidence: 0.4,
+      summary: 'We couldn’t generate medication guidance right now. Please try again shortly.',
+      highlights: [
+        {
+          title: 'Generation unavailable',
+          detail: 'The AI service did not return medication suggestions. Retry in a few minutes.',
+          tone: 'warning',
+        },
+      ],
+      dataPoints: normalizedMeds.map((med) => ({
         label: med.name,
         value: med.dosage || 'Dose not set',
         context: med.timing?.length ? `Timing: ${med.timing.join(', ')}` : 'Add timing details',
       })),
-      recommendations,
+      recommendations: [
+        {
+          title: 'Retry insight generation',
+          description: 'Refresh this page or trigger a new report in a few minutes.',
+          actions: ['Tap Daily/Weekly report to regenerate', 'Contact support if the problem persists'],
+          priority: 'soon',
+        },
+      ],
       extras: {
-        supportiveDetails,
-        suggestedAdditions,
-        avoidList,
+        supportiveDetails: [],
+        suggestedAdditions: [],
+        avoidList: [],
         missingDose: medications.filter((med) => !med.dosage).map((med) => med.name),
         missingTiming: medications.filter((med) => !med.timing || !med.timing.length).map((med) => med.name),
         totalLogged: medications.length,
-        source: 'llm',
+        source: 'llm-error',
       } as Record<string, unknown>,
     }
   }
 
-  const supportive = medications.filter((med) => helpfulPatterns.some((pattern) => pattern.pattern.test(med.name)))
-  const supportiveSummary = supportive.map((med) => {
-    const match = helpfulPatterns.find((pattern) => pattern.pattern.test(med.name))
-    return match ? `${med.name} — ${match.why}` : med.name
+  const canonical = (value: string) => value.trim().toLowerCase()
+  const medMap = new Map(normalizedMeds.map((med) => [canonical(med.name), med]))
+
+  const parseTiming = (timing?: string | null, fallback?: string[]) => {
+    if (timing && timing.trim().length) {
+      return timing
+        .split(/[,;]+/)
+        .map((t) => t.trim())
+        .filter(Boolean)
+    }
+    return fallback ?? []
+  }
+
+  const supportiveDetails = llmResult.working.map((item) => {
+    const match = medMap.get(canonical(item.name))
+    return {
+      name: item.name,
+      reason: item.reason,
+      dosage: item.dosage ?? match?.dosage ?? null,
+      timing: parseTiming(item.timing, match?.timing ?? []),
+    }
   })
 
-  const missingDose = medications.filter((med) => !med.dosage)
-  const missingTiming = medications.filter((med) => !med.timing || med.timing.length === 0)
+  const suggestedAdditions = llmResult.suggested.map((item) => ({
+    title: item.name,
+    reason: item.reason,
+    suggestion: item.protocol ?? null,
+    alreadyCovered: medMap.has(canonical(item.name)),
+  }))
 
-  const recommendations: SectionRecommendation[] = []
-  const nextGaps: string[] = []
+  const avoidList = llmResult.avoid.map((item) => {
+    const match = medMap.get(canonical(item.name))
+    return {
+      name: item.name,
+      reason: item.reason,
+      dosage: match?.dosage ?? null,
+      timing: match?.timing ?? [],
+    }
+  })
 
-  if (gapSuggestions.length) {
-    gapSuggestions.forEach((gap) => {
-      const alreadyCovered = medications.some(
-        (med) => gap.suggested && new RegExp(gap.suggested.split(' ')[0], 'i').test(med.name)
-      )
-      if (!alreadyCovered) {
-        recommendations.push({
-          title: gap.title,
-          description: gap.why,
-          actions: gap.suggested
-            ? [`Discuss ${gap.suggested} with your clinician`, 'Track symptom changes weekly']
-            : ['Review options with your prescriber'],
-          priority: supportive.length ? 'soon' : 'now',
-        })
-      }
-    })
-  }
+  const summary = llmResult.summary?.trim().length
+    ? llmResult.summary
+    : supportiveDetails.length
+    ? `You have ${supportiveDetails.length} medication${supportiveDetails.length === 1 ? '' : 's'} aligned with ${issue.name}.`
+    : 'AI-generated guidance ready below.'
 
-  if (!medications.length) {
-    nextGaps.push('Add prescribed or OTC medications so we can track benefits and flags.')
-  }
-  if (missingDose.length) {
-    nextGaps.push(`Add dose details for ${missingDose.map((m) => m.name).slice(0, 2).join(', ')}${missingDose.length > 2 ? '…' : ''}`)
-  }
-  if (missingTiming.length) {
-    nextGaps.push('Log timing so we can spot spacing issues with supplements.')
-  }
-  if (!supportive.length && medications.length) {
-    nextGaps.push('No medications logged match common support therapies yet—review options with your clinician.')
-  }
-
-  if (!recommendations.length) {
-    recommendations.push({
-      title: 'Maintain medication log accuracy',
-      description: 'Ensure doses and timing are up to date so we can model interactions.',
-      actions: ['Review your list this week', 'Update Helfi after any prescription change'],
-      priority: medications.length ? 'monitor' : 'soon',
-    })
-  }
+  const recommendations: SectionRecommendation[] = llmResult.recommendations.length
+    ? llmResult.recommendations.map((rec) => ({
+        title: rec.title,
+        description: rec.description,
+        actions: rec.actions.length ? rec.actions : ['Coordinate changes with your clinician'],
+        priority: rec.priority,
+      }))
+    : [
+        {
+          title: 'Review therapy plan',
+          description: 'Align dosing and timing with symptom response and labs.',
+          actions: ['Discuss adjustments with your clinician', 'Track response weekly'],
+          priority: 'soon',
+        },
+      ]
 
   const highlights: SectionHighlight[] = [
     {
       title: "What's working",
-      detail: supportiveSummary.length
-        ? supportiveSummary.join('; ')
-        : medications.length
-        ? 'Medications logged, but none align with common protocols for this issue yet.'
-        : 'No medications logged yet.',
-      tone: supportiveSummary.length ? 'positive' : medications.length ? 'neutral' : 'warning',
+      detail: supportiveDetails.length
+        ? supportiveDetails.map((item) => `${item.name}: ${item.reason}`).join('; ')
+        : 'No medications clearly supporting this issue yet.',
+      tone: supportiveDetails.length ? 'positive' : 'neutral',
     },
     {
-      title: 'What needs attention',
-      detail: nextGaps.length ? nextGaps[0] : 'No urgent follow-ups flagged.',
-      tone: nextGaps.length ? 'warning' : 'neutral',
+      title: 'Opportunities',
+      detail: suggestedAdditions.length
+        ? suggestedAdditions.map((item) => `${item.title}: ${item.reason}`).join('; ')
+        : 'Leverage the suggestions below for your next clinician discussion.',
+      tone: suggestedAdditions.length ? 'neutral' : 'positive',
     },
     {
-      title: 'Next step',
-      detail: recommendations[0].actions[0] || 'Review regimen with your clinician.',
-      tone: 'neutral',
+      title: 'Cautions',
+      detail: avoidList.length
+        ? avoidList.map((item) => `${item.name}: ${item.reason}`).join('; ')
+        : 'No avoid items flagged—review the AI cautions below for future awareness.',
+      tone: avoidList.length ? 'warning' : 'neutral',
     },
   ]
-
-  const summary = (() => {
-    if (!medications.length) {
-      return 'No medications logged yet—capture current prescriptions to tailor insights.'
-    }
-    if (supportive.length) {
-      return `You have ${supportive.length} medication${supportive.length === 1 ? '' : 's'} aligned with common support protocols. Track how symptoms respond.`
-    }
-    return `Tracking ${medications.length} medication${medications.length === 1 ? '' : 's'}. Add supportive therapies or dosing details to refine guidance.`
-  })()
-
-  const dataPoints = medications.slice(0, 6).map((med) => ({
-    label: med.name,
-    value: med.dosage || 'Dose not set',
-    context: med.timing?.length ? `Timing: ${med.timing.join(', ')}` : 'Add timing details',
-  }))
 
   return {
     issue,
     section: 'medications',
     generatedAt: now,
-    confidence: 0.7,
+    confidence: 0.82,
     summary,
     highlights,
-    dataPoints,
+    dataPoints: medications.slice(0, 6).map((med) => ({
+      label: med.name,
+      value: med.dosage || 'Dose not set',
+      context: med.timing?.length ? `Timing: ${med.timing.join(', ')}` : 'Add timing details',
+    })),
     recommendations,
     extras: {
-      supportiveDetails: supportive.map((med) => {
-        const match = helpfulPatterns.find((pattern) => pattern.pattern.test(med.name))
-        return {
-          name: med.name,
-          reason: match?.why || 'Commonly used to support this issue.',
-          dosage: med.dosage || null,
-          timing: med.timing?.length ? med.timing : [],
-        }
-      }),
-      suggestedAdditions: gapSuggestions.map((gap) => ({
-        title: gap.title,
-        reason: gap.why,
-        suggestion: gap.suggested || null,
-        alreadyCovered: medications.some(
-          (med) => gap.suggested && new RegExp(gap.suggested.split(' ')[0], 'i').test(med.name)
-        ),
-      })),
-      avoidList: medications
-        .filter((med) => avoidPatterns.some((pattern) => pattern.pattern.test(med.name)))
-        .map((med) => {
-          const match = avoidPatterns.find((pattern) => pattern.pattern.test(med.name))
-          return {
-            name: med.name,
-            reason: match?.why || 'Potentially counterproductive—review with your clinician.',
-            dosage: med.dosage || null,
-            timing: med.timing?.length ? med.timing : [],
-          }
-        }),
-      missingDose: missingDose.map((m) => m.name),
-      missingTiming: missingTiming.map((m) => m.name),
+      supportiveDetails,
+      suggestedAdditions,
+      avoidList,
+      missingDose: medications.filter((med) => !med.dosage).map((med) => med.name),
+      missingTiming: medications.filter((med) => !med.timing || !med.timing.length).map((med) => med.name),
       totalLogged: medications.length,
-      source: 'rules',
-    },
+      source: 'llm',
+    } as Record<string, unknown>,
   }
 }
 
