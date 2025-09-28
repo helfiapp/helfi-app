@@ -72,11 +72,11 @@ function buildPrompt({ issueName, issueSummary, userContext, knowledgeNotes, mod
   const header = `You are a clinician-grade health assistant helping evaluate ${focus} usage for the issue "${issueName}".`
 
   const guidance = `
-Provide precise, evidence-aligned guidance. Only use information supplied in the user context. If data is insufficient, explicitly state that.
+Provide precise, evidence-aligned guidance. Only use information supplied in the user context and notes. If data is insufficient, state that explicitly.
 
-Classify the logged ${focus}s into three buckets: working (helpful/supportive), suggested (worth discussing with clinician), avoid (risky or counterproductive). Always provide concise reasons.
+Classify ${focus}s into three buckets: working (helpful/supportive), suggested (worth discussing with clinician), avoid (risky or counterproductive). Always provide concise clinical reasons drawing from the context/notes.
 
-When unsure, leave the bucket empty rather than guessing.
+If the user is not currently taking anything that belongs in "avoid", propose at least one high-priority option from the notes so they know what to steer clear from in the future. Likewise, always offer at least one suggested option that could help the issue, even if it is not currently logged.
 
 Respond strictly as JSON with keys summary, working, suggested, avoid, recommendations.
 Each recommendation must include title, description, actions (array, can be empty), and priority (now|soon|monitor).
