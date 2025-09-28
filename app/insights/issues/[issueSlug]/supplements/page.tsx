@@ -19,5 +19,10 @@ export default async function IssueSupplementsPage({ params }: IssueSupplementsP
     notFound()
   }
 
-  return <SectionRenderer issueSlug={params.issueSlug} section="supplements" initialResult={result} />
+  const tabs = [
+    { label: 'Overview', href: `/insights/issues/${params.issueSlug}/supplements`, active: true },
+    { label: "What's Working", href: `/insights/issues/${params.issueSlug}/supplements/working`, active: false },
+  ]
+
+  return <SectionRenderer issueSlug={params.issueSlug} section="supplements" initialResult={result} tabs={tabs} view="overview" />
 }

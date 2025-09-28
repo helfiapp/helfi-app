@@ -50,6 +50,7 @@ export interface IssueSectionResult {
   recommendations: SectionRecommendation[]
   mode: ReportMode
   range?: { from?: string; to?: string }
+  extras?: Record<string, unknown>
 }
 
 // Base shape that individual section builders return. The final IssueSectionResult
@@ -1230,6 +1231,27 @@ function buildSupplementsSection(issue: IssueSummary, context: UserInsightContex
     highlights,
     dataPoints,
     recommendations,
+    extras: {
+      supportiveDetails: supportive.map((supp) => {
+        const match = helpfulPatterns.find(pattern => pattern.pattern.test(supp.name))
+        return {
+          name: supp.name,
+          reason: match?.why || 'Matches nutrients often used for this issue.',
+          dosage: supp.dosage || null,
+          timing: supp.timing?.length ? supp.timing : [],
+        }
+      }),
+      otherSupplements: supplements
+        .filter((supp) => !supportive.some(s => s.name === supp.name))
+        .map((supp) => ({
+          name: supp.name,
+          dosage: supp.dosage || null,
+          timing: supp.timing?.length ? supp.timing : [],
+        })),
+      missingDose: missingDose.map(s => s.name),
+      missingTiming: missingTiming.map(s => s.name),
+      totalLogged: supplements.length,
+    },
   }
 }
 
