@@ -13,6 +13,7 @@ const LABELS: Record<IssueSectionKey, string> = {
   overview: 'Overview',
   exercise: 'Exercise',
   supplements: 'Supplements',
+  medications: 'Medications',
   interactions: 'Supplements × Meds',
   labs: 'Labs & Bloodwork',
   nutrition: 'Nutrition & Food',
@@ -26,7 +27,9 @@ export default function IssueSectionNav({ issueSlug, sections }: IssueSectionNav
       {sections.map((section) => {
         const overviewPath = `/insights/issues/${issueSlug}`
         const href = section === 'overview' ? `${overviewPath}/overview` : `/insights/issues/${issueSlug}/${section}`
-        const isActive = pathname === href || (section === 'overview' && pathname === overviewPath)
+        const isOverviewActive = section === 'overview' && (pathname === overviewPath || pathname === `${overviewPath}/overview`)
+        const isSectionActive = pathname === href || pathname.startsWith(`${href}/`)
+        const isActive = isOverviewActive || isSectionActive
         return (
           <Link
             key={section}

@@ -3,9 +3,26 @@ import { prisma } from '@/lib/prisma'
 import { authOptions } from '@/lib/auth'
 import { getServerSession } from 'next-auth'
 
-export type IssueSectionKey = 'overview' | 'exercise' | 'supplements' | 'interactions' | 'labs' | 'nutrition' | 'lifestyle'
+export type IssueSectionKey =
+  | 'overview'
+  | 'exercise'
+  | 'supplements'
+  | 'medications'
+  | 'interactions'
+  | 'labs'
+  | 'nutrition'
+  | 'lifestyle'
 
-export const ISSUE_SECTION_ORDER: IssueSectionKey[] = ['overview', 'exercise', 'supplements', 'interactions', 'labs', 'nutrition', 'lifestyle']
+export const ISSUE_SECTION_ORDER: IssueSectionKey[] = [
+  'overview',
+  'exercise',
+  'supplements',
+  'medications',
+  'interactions',
+  'labs',
+  'nutrition',
+  'lifestyle',
+]
 
 export type DataNeedStatus = 'missing' | 'in-progress' | 'complete'
 
@@ -121,8 +138,14 @@ const ISSUE_KNOWLEDGE_BASE: Record<string, {
   aliases?: string[]
   helpfulSupplements?: Array<{ pattern: RegExp; why: string }>
   gapSupplements?: Array<{ title: string; why: string; suggested?: string }>
-  supportiveExercises?: Array<{ title: string; detail: string }>
-  nutritionFocus?: Array<{ title: string; detail: string }>
+  avoidSupplements?: Array<{ pattern: RegExp; why: string }>
+  helpfulMedications?: Array<{ pattern: RegExp; why: string }>
+  gapMedications?: Array<{ title: string; why: string; suggested?: string }>
+  avoidMedications?: Array<{ pattern: RegExp; why: string }>
+  supportiveExercises?: Array<{ title: string; detail: string; keywords?: string[] }>
+  avoidExercises?: Array<{ title: string; detail: string }>
+  nutritionFocus?: Array<{ title: string; detail: string; keywords?: string[] }>
+  avoidFoods?: Array<{ title: string; detail: string; keywords?: string[] }>
   lifestyleFocus?: Array<{ title: string; detail: string }>
   keyLabs?: Array<{ marker: string; optimal: string; cadence: string; note?: string }>
 }> = {
@@ -141,13 +164,60 @@ const ISSUE_KNOWLEDGE_BASE: Record<string, {
       { title: 'Consider adaptogens for stress-linked libido dips', why: 'Chronic stress suppresses libido; ashwagandha or rhodiola can moderate cortisol', suggested: 'Ashwagandha 600mg/day (divided)' },
       { title: 'Evaluate zinc status', why: 'Low zinc impairs testosterone conversion and sexual health', suggested: 'Zinc bisglycinate 15–30mg with food' },
     ],
+    avoidSupplements: [
+      { pattern: /yohim(b|)ine/i, why: 'Can spike blood pressure and anxiety, use only with practitioner oversight.' },
+      { pattern: /pseudoephedrine|decongestant/i, why: 'These constrict blood vessels and can undermine erectile blood flow.' },
+    ],
+    helpfulMedications: [
+      { pattern: /tadalafil|sildenafil/i, why: 'Supports blood flow when vascular tone is limiting libido.' },
+    ],
+    gapMedications: [
+      { title: 'Discuss PDE5 support', why: 'Low erections or arousal could benefit from as-needed PDE5 inhibitors.', suggested: 'Tadalafil 5mg once daily' },
+    ],
+    avoidMedications: [
+      { pattern: /ssri|snri/i, why: 'Some antidepressants can blunt libido—review dosing with your clinician.' },
+    ],
     supportiveExercises: [
-      { title: 'Progressive resistance training 3x/week', detail: 'Supports testosterone, strength, and confidence metrics' },
-      { title: 'Short HIIT blocks', detail: 'Improves endothelial function and nitric oxide availability' },
+      {
+        title: 'Progressive resistance training 3x/week',
+        detail: 'Supports testosterone, strength, and confidence metrics',
+        keywords: ['strength', 'resistance', 'weights'],
+      },
+      {
+        title: 'Short HIIT blocks',
+        detail: 'Improves endothelial function and nitric oxide availability',
+        keywords: ['hiit', 'interval', 'sprint'],
+      },
+    ],
+    avoidExercises: [
+      {
+        title: 'Excessive long slow cardio when energy is low',
+        detail: 'Very long endurance blocks can suppress testosterone—cap steady sessions at 45 minutes until resilience improves.',
+      },
     ],
     nutritionFocus: [
-      { title: 'Prioritise omega-3 rich meals', detail: 'Cardiovascular health underpins libido; aim for 2 oily fish servings/week' },
-      { title: 'Stabilise blood sugar', detail: 'Balanced carbs + protein prevent insulin spikes that can blunt hormone signalling' },
+      {
+        title: 'Prioritise omega-3 rich meals',
+        detail: 'Cardiovascular health underpins libido; aim for 2 oily fish servings/week',
+        keywords: ['salmon', 'sardine', 'mackerel', 'omega'],
+      },
+      {
+        title: 'Stabilise blood sugar',
+        detail: 'Balanced carbs + protein prevent insulin spikes that can blunt hormone signalling',
+        keywords: ['balanced', 'protein', 'fiber', 'low glycemic'],
+      },
+    ],
+    avoidFoods: [
+      {
+        title: 'Ultra-processed sugary foods',
+        detail: 'Rapid glucose swings can disrupt hormones linked to libido.',
+        keywords: ['soda', 'dessert', 'candy', 'pastry', 'cake'],
+      },
+      {
+        title: 'Trans-fat laden takeaways',
+        detail: 'Industrial oils impair vascular tone; swap for home-cooked meals with olive oil.',
+        keywords: ['fried', 'fast food', 'takeaway'],
+      },
     ],
     lifestyleFocus: [
       { title: 'Sleep 7.5–8 h with consistent wake time', detail: 'Testosterone release peaks during deep sleep; maintain routine' },
@@ -170,13 +240,59 @@ const ISSUE_KNOWLEDGE_BASE: Record<string, {
     gapSupplements: [
       { title: 'B-complex for cellular energy', why: 'Supports mitochondrial pathways if intake is low', suggested: 'Methylated B-complex with breakfast' },
     ],
+    avoidSupplements: [
+      { pattern: /mega\s?dose\s?caffeine|excessive\s?caffeine/i, why: 'Very high stimulant loads can worsen crashes and sleep, keeping fatigue high.' },
+    ],
+    helpfulMedications: [
+      { pattern: /thyroid|levothyroxine/i, why: 'Optimised thyroid replacement can lift energy when labs are low.' },
+    ],
+    gapMedications: [
+      { title: 'Review iron status', why: 'Low ferritin sometimes calls for iron therapy—confirm labs first.', suggested: 'Consider iron bisglycinate (practitioner guided)' },
+    ],
+    avoidMedications: [
+      { pattern: /sedative|benzodiazepine/i, why: 'Sedatives can worsen daytime fatigue—check in with your prescriber.' },
+    ],
     supportiveExercises: [
-      { title: 'Zone 2 cardio 2–3x/week', detail: 'Builds mitochondrial density without draining reserves' },
-      { title: 'Mobility days', detail: 'Maintains circulation and reduces stiffness-related fatigue' },
+      {
+        title: 'Zone 2 cardio 2–3x/week',
+        detail: 'Builds mitochondrial density without draining reserves',
+        keywords: ['zone 2', 'steady', 'endurance', 'cardio'],
+      },
+      {
+        title: 'Mobility days',
+        detail: 'Maintains circulation and reduces stiffness-related fatigue',
+        keywords: ['mobility', 'stretch', 'yoga', 'pilates'],
+      },
+    ],
+    avoidExercises: [
+      {
+        title: 'Stacking intense HIIT on consecutive days',
+        detail: 'Back-to-back redline sessions can deepen fatigue; insert recovery between high-intensity blocks.',
+      },
     ],
     nutritionFocus: [
-      { title: 'Anchor each meal with 25g protein', detail: 'Prevents post-prandial crashes and supports recovery' },
-      { title: 'Strategic caffeine window', detail: 'Keep caffeine before 2pm to protect sleep architecture' },
+      {
+        title: 'Anchor each meal with 25g protein',
+        detail: 'Prevents post-prandial crashes and supports recovery',
+        keywords: ['protein', 'eggs', 'chicken', 'beans', 'tofu'],
+      },
+      {
+        title: 'Strategic caffeine window',
+        detail: 'Keep caffeine before 2pm to protect sleep architecture',
+        keywords: ['coffee', 'matcha', 'caffeine'],
+      },
+    ],
+    avoidFoods: [
+      {
+        title: 'Late afternoon caffeine hits',
+        detail: 'Stimulants after 2pm can blunt sleep quality and daytime energy.',
+        keywords: ['energy drink', 'late coffee', 'espresso', 'caffeine'],
+      },
+      {
+        title: 'High-sugar breakfast pastries',
+        detail: 'Spike-and-crash breakfasts keep fatigue high—pair carbs with protein and fiber.',
+        keywords: ['donut', 'croissant', 'muffin', 'pastry'],
+      },
     ],
     lifestyleFocus: [
       { title: 'Light exposure within 30 min of waking', detail: 'Entrains circadian rhythm for daytime energy' },
@@ -829,6 +945,9 @@ async function buildIssueSectionWithContext(
     case 'supplements':
       base = buildSupplementsSection(summary, context)
       break
+    case 'medications':
+      base = buildMedicationsSection(summary, context)
+      break
     case 'interactions':
       base = buildInteractionsSection(summary, context)
       break
@@ -1065,7 +1184,8 @@ function summariseExerciseFrequency(exerciseLogs: UserInsightContext['exerciseLo
 function buildExerciseSection(issue: IssueSummary, context: UserInsightContext): BaseSectionResult {
   const now = new Date().toISOString()
   const knowledgeKey = pickKnowledgeKey(issue.name.toLowerCase())
-  const supportive = knowledgeKey ? ISSUE_KNOWLEDGE_BASE[knowledgeKey].supportiveExercises ?? [] : []
+  const supportiveTemplates = knowledgeKey ? ISSUE_KNOWLEDGE_BASE[knowledgeKey].supportiveExercises ?? [] : []
+  const avoidTemplates = knowledgeKey ? ISSUE_KNOWLEDGE_BASE[knowledgeKey].avoidExercises ?? [] : []
   const frequency = summariseExerciseFrequency(context.exerciseLogs)
   const relevantLogs = context.exerciseLogs.filter((log) => /strength|resistance|weights|cardio|hiit|yoga|pilates/i.test(log.type))
   const highlights: SectionHighlight[] = []
@@ -1089,10 +1209,10 @@ function buildExerciseSection(issue: IssueSummary, context: UserInsightContext):
   })
 
   const recommendations: SectionRecommendation[] = []
-  if (supportive.length) {
+  if (supportiveTemplates.length) {
     recommendations.push({
       title: 'Anchor issue-specific training',
-      description: supportive.map(item => `${item.title}: ${item.detail}`).join(' '),
+      description: supportiveTemplates.map(item => `${item.title}: ${item.detail}`).join(' '),
       actions: ['Plan sessions for next 7 days in calendar', 'Log RPE (1–10) after each workout to track recovery'],
       priority: frequency.sessionsPerWeek >= 2 ? 'soon' : 'now',
     })
@@ -1114,6 +1234,30 @@ function buildExerciseSection(issue: IssueSummary, context: UserInsightContext):
     })
   }
 
+  const workingActivities = supportiveTemplates
+    .map((template) => {
+      const keywords = template.keywords ?? []
+      const matchedLog = keywords.length
+        ? relevantLogs.find((log) => keywords.some((keyword) => new RegExp(keyword, 'i').test(log.type)))
+        : relevantLogs[0]
+      if (!matchedLog) {
+        return null
+      }
+      return {
+        title: template.title,
+        reason: template.detail,
+        summary: `${matchedLog.type} • ${matchedLog.duration} min${matchedLog.intensity ? ` (${matchedLog.intensity})` : ''}`,
+        lastLogged: relativeDays(matchedLog.createdAt),
+      }
+    })
+    .filter(Boolean) as Array<{ title: string; reason: string; summary: string; lastLogged: string }>
+
+  const suggestedActivities = supportiveTemplates
+    .filter((template) => !workingActivities.some((activity) => activity.title === template.title))
+    .map((template) => ({ title: template.title, reason: template.detail }))
+
+  const avoidActivities = avoidTemplates.map((template) => ({ title: template.title, reason: template.detail }))
+
   return {
     issue,
     section: 'exercise',
@@ -1127,6 +1271,12 @@ function buildExerciseSection(issue: IssueSummary, context: UserInsightContext):
       context: relativeDays(log.createdAt),
     })),
     recommendations,
+    extras: {
+      workingActivities,
+      suggestedActivities,
+      avoidActivities,
+      totalLogged: relevantLogs.length,
+    },
   }
 }
 
@@ -1135,6 +1285,8 @@ function buildSupplementsSection(issue: IssueSummary, context: UserInsightContex
   const supplements = context.supplements
   const key = pickKnowledgeKey(issue.name.toLowerCase())
   const helpfulPatterns = key ? ISSUE_KNOWLEDGE_BASE[key].helpfulSupplements ?? [] : []
+  const gapSuggestions = key ? ISSUE_KNOWLEDGE_BASE[key].gapSupplements ?? [] : []
+  const avoidPatterns = key ? ISSUE_KNOWLEDGE_BASE[key].avoidSupplements ?? [] : []
 
   const supportive = supplements.filter((supp) => helpfulPatterns.some(pattern => pattern.pattern.test(supp.name)))
   const supportiveSummary = supportive.map(supp => {
@@ -1148,8 +1300,8 @@ function buildSupplementsSection(issue: IssueSummary, context: UserInsightContex
   const recommendations: SectionRecommendation[] = []
   const nextGaps: string[] = []
 
-  if (key && ISSUE_KNOWLEDGE_BASE[key].gapSupplements) {
-    ISSUE_KNOWLEDGE_BASE[key].gapSupplements!.forEach((gap) => {
+  if (gapSuggestions.length) {
+    gapSuggestions.forEach((gap) => {
       const alreadyCovered = supplements.some(supp => gap.suggested && new RegExp(gap.suggested.split(' ')[0], 'i').test(supp.name))
       if (!alreadyCovered) {
         recommendations.push({
@@ -1241,16 +1393,169 @@ function buildSupplementsSection(issue: IssueSummary, context: UserInsightContex
           timing: supp.timing?.length ? supp.timing : [],
         }
       }),
-      otherSupplements: supplements
-        .filter((supp) => !supportive.some(s => s.name === supp.name))
-        .map((supp) => ({
-          name: supp.name,
-          dosage: supp.dosage || null,
-          timing: supp.timing?.length ? supp.timing : [],
-        })),
+      suggestedAdditions: gapSuggestions.map((gap) => ({
+        title: gap.title,
+        reason: gap.why,
+        suggestion: gap.suggested || null,
+        alreadyCovered: supplements.some(supp => gap.suggested && new RegExp(gap.suggested.split(' ')[0], 'i').test(supp.name)),
+      })),
+      avoidList: supplements
+        .filter((supp) => avoidPatterns.some(pattern => pattern.pattern.test(supp.name)))
+        .map((supp) => {
+          const match = avoidPatterns.find(pattern => pattern.pattern.test(supp.name))
+          return {
+            name: supp.name,
+            reason: match?.why || 'May not align with your current focus—review with your practitioner.',
+            dosage: supp.dosage || null,
+            timing: supp.timing?.length ? supp.timing : [],
+          }
+        }),
       missingDose: missingDose.map(s => s.name),
       missingTiming: missingTiming.map(s => s.name),
       totalLogged: supplements.length,
+    },
+  }
+}
+
+function buildMedicationsSection(issue: IssueSummary, context: UserInsightContext): BaseSectionResult {
+  const now = new Date().toISOString()
+  const medications = context.medications
+  const key = pickKnowledgeKey(issue.name.toLowerCase())
+  const helpfulPatterns = key ? ISSUE_KNOWLEDGE_BASE[key].helpfulMedications ?? [] : []
+  const gapSuggestions = key ? ISSUE_KNOWLEDGE_BASE[key].gapMedications ?? [] : []
+  const avoidPatterns = key ? ISSUE_KNOWLEDGE_BASE[key].avoidMedications ?? [] : []
+
+  const supportive = medications.filter((med) => helpfulPatterns.some((pattern) => pattern.pattern.test(med.name)))
+  const supportiveSummary = supportive.map((med) => {
+    const match = helpfulPatterns.find((pattern) => pattern.pattern.test(med.name))
+    return match ? `${med.name} — ${match.why}` : med.name
+  })
+
+  const missingDose = medications.filter((med) => !med.dosage)
+  const missingTiming = medications.filter((med) => !med.timing || med.timing.length === 0)
+
+  const recommendations: SectionRecommendation[] = []
+  const nextGaps: string[] = []
+
+  if (gapSuggestions.length) {
+    gapSuggestions.forEach((gap) => {
+      const alreadyCovered = medications.some(
+        (med) => gap.suggested && new RegExp(gap.suggested.split(' ')[0], 'i').test(med.name)
+      )
+      if (!alreadyCovered) {
+        recommendations.push({
+          title: gap.title,
+          description: gap.why,
+          actions: gap.suggested
+            ? [`Discuss ${gap.suggested} with your clinician`, 'Track symptom changes weekly']
+            : ['Review options with your prescriber'],
+          priority: supportive.length ? 'soon' : 'now',
+        })
+      }
+    })
+  }
+
+  if (!medications.length) {
+    nextGaps.push('Add prescribed or OTC medications so we can track benefits and flags.')
+  }
+  if (missingDose.length) {
+    nextGaps.push(`Add dose details for ${missingDose.map((m) => m.name).slice(0, 2).join(', ')}${missingDose.length > 2 ? '…' : ''}`)
+  }
+  if (missingTiming.length) {
+    nextGaps.push('Log timing so we can spot spacing issues with supplements.')
+  }
+  if (!supportive.length && medications.length) {
+    nextGaps.push('No medications logged match common support therapies yet—review options with your clinician.')
+  }
+
+  if (!recommendations.length) {
+    recommendations.push({
+      title: 'Maintain medication log accuracy',
+      description: 'Ensure doses and timing are up to date so we can model interactions.',
+      actions: ['Review your list this week', 'Update Helfi after any prescription change'],
+      priority: medications.length ? 'monitor' : 'soon',
+    })
+  }
+
+  const highlights: SectionHighlight[] = [
+    {
+      title: "What's working",
+      detail: supportiveSummary.length
+        ? supportiveSummary.join('; ')
+        : medications.length
+        ? 'Medications logged, but none align with common protocols for this issue yet.'
+        : 'No medications logged yet.',
+      tone: supportiveSummary.length ? 'positive' : medications.length ? 'neutral' : 'warning',
+    },
+    {
+      title: 'What needs attention',
+      detail: nextGaps.length ? nextGaps[0] : 'No urgent follow-ups flagged.',
+      tone: nextGaps.length ? 'warning' : 'neutral',
+    },
+    {
+      title: 'Next step',
+      detail: recommendations[0].actions[0] || 'Review regimen with your clinician.',
+      tone: 'neutral',
+    },
+  ]
+
+  const summary = (() => {
+    if (!medications.length) {
+      return 'No medications logged yet—capture current prescriptions to tailor insights.'
+    }
+    if (supportive.length) {
+      return `You have ${supportive.length} medication${supportive.length === 1 ? '' : 's'} aligned with common support protocols. Track how symptoms respond.`
+    }
+    return `Tracking ${medications.length} medication${medications.length === 1 ? '' : 's'}. Add supportive therapies or dosing details to refine guidance.`
+  })()
+
+  const dataPoints = medications.slice(0, 6).map((med) => ({
+    label: med.name,
+    value: med.dosage || 'Dose not set',
+    context: med.timing?.length ? `Timing: ${med.timing.join(', ')}` : 'Add timing details',
+  }))
+
+  return {
+    issue,
+    section: 'medications',
+    generatedAt: now,
+    confidence: 0.7,
+    summary,
+    highlights,
+    dataPoints,
+    recommendations,
+    extras: {
+      supportiveDetails: supportive.map((med) => {
+        const match = helpfulPatterns.find((pattern) => pattern.pattern.test(med.name))
+        return {
+          name: med.name,
+          reason: match?.why || 'Commonly used to support this issue.',
+          dosage: med.dosage || null,
+          timing: med.timing?.length ? med.timing : [],
+        }
+      }),
+      suggestedAdditions: gapSuggestions.map((gap) => ({
+        title: gap.title,
+        reason: gap.why,
+        suggestion: gap.suggested || null,
+        alreadyCovered: medications.some(
+          (med) => gap.suggested && new RegExp(gap.suggested.split(' ')[0], 'i').test(med.name)
+        ),
+      })),
+      avoidList: medications
+        .filter((med) => avoidPatterns.some((pattern) => pattern.pattern.test(med.name)))
+        .map((med) => {
+          const match = avoidPatterns.find((pattern) => pattern.pattern.test(med.name))
+          return {
+            name: med.name,
+            reason: match?.why || 'Potentially counterproductive—review with your clinician.',
+            dosage: med.dosage || null,
+            timing: med.timing?.length ? med.timing : [],
+          }
+        }),
+      missingDose: missingDose.map((m) => m.name),
+      missingTiming: missingTiming.map((m) => m.name),
+      totalLogged: medications.length,
     },
   }
 }
@@ -1403,6 +1708,7 @@ function buildNutritionSection(issue: IssueSummary, context: UserInsightContext)
       }))
   const key = pickKnowledgeKey(issue.name.toLowerCase())
   const focus = key ? ISSUE_KNOWLEDGE_BASE[key].nutritionFocus ?? [] : []
+  const avoidTemplates = key ? ISSUE_KNOWLEDGE_BASE[key].avoidFoods ?? [] : []
   const highlights: SectionHighlight[] = []
 
   if (foods.length) {
@@ -1438,6 +1744,47 @@ function buildNutritionSection(issue: IssueSummary, context: UserInsightContext)
     })
   }
 
+  const foodStrings = foods.map((item) => `${item.name ?? ''} ${item.meal ?? ''}`.trim().toLowerCase())
+
+  const workingFocus = focus
+    .map((item) => {
+      const keywords = item.keywords ?? []
+      if (!keywords.length) {
+        return null
+      }
+      const matchIndex = foodStrings.findIndex((food) => keywords.some((keyword) => food.includes(keyword.toLowerCase())))
+      if (matchIndex === -1) {
+        return null
+      }
+      const matchedFood = foods[matchIndex]
+      return {
+        title: item.title,
+        reason: item.detail,
+        example: matchedFood.name || matchedFood.meal || 'Logged meal',
+      }
+    })
+    .filter(Boolean) as Array<{ title: string; reason: string; example: string }>
+
+  const suggestedFocus = focus
+    .filter((item) => !workingFocus.some((focusItem) => focusItem.title === item.title))
+    .map((item) => ({ title: item.title, reason: item.detail }))
+
+  const avoidFoods = foods
+    .map((item, index) => {
+      const descriptor = foodStrings[index]
+      if (!descriptor) return null
+      const rule = avoidTemplates.find((template) => {
+        const keywords = template.keywords ?? []
+        return keywords.some((keyword) => descriptor.includes(keyword.toLowerCase()))
+      })
+      if (!rule) return null
+      return {
+        name: item.name || item.meal || 'Logged item',
+        reason: rule.detail,
+      }
+    })
+    .filter(Boolean) as Array<{ name: string; reason: string }>
+
   return {
     issue,
     section: 'nutrition',
@@ -1451,6 +1798,12 @@ function buildNutritionSection(issue: IssueSummary, context: UserInsightContext)
       context: item.calories ? `${item.calories} kcal` : undefined,
     })),
     recommendations,
+    extras: {
+      workingFocus,
+      suggestedFocus,
+      avoidFoods,
+      totalLogged: foods.length,
+    },
   }
 }
 

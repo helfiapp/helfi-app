@@ -7,13 +7,21 @@ environment.
 
 ---
 
+> **Zero tolerance warning**
+>
+> Helfi and EPG-CRM must remain completely isolated. Under no circumstances may
+> anyone create, link, or deploy an `epg-crm` project from this machine or this
+> repository. If the Vercel CLI ever prompts you to create a new project or
+> links to anything other than the Helfi IDs listed below, stop immediately,
+> log out, and fix the link. Document any incident in CURRENT_ISSUES_LIVE.md.
+
 ## 1. Confirm CLI Identity
 - Run `npx vercel whoami`.
 - Expected output: `helfiweb@gmail.com`.
 - If the output is anything else, stop immediately: run `npx vercel logout` and
   then `npx vercel login` using the Helfi email.
 
-## 2. Verify Project Link
+## 2. Verify Project Link (No EPG-CRM Allowed)
 - Ensure `.vercel/project.json` exists in the repo.
 - Run `cat .vercel/project.json`.
 - Confirm both values:
@@ -21,6 +29,9 @@ environment.
   - `orgId`: `team_pPRY3znvYPSvqemdfOEf3vAT` (Louie Veleski's projects team).
 - If the file is missing or IDs differ, re-link with `npx vercel link` and
   choose **Louie Veleski’s projects → helfi-app**.
+- If the CLI shows a different project/org ID, or offers to create a new
+  project (especially anything labelled `epg-crm`), choose **Cancel**, run
+  `npx vercel logout`, and re-authenticate with the Helfi account.
 - Never run `vercel --prod` while the CLI is prompting to create a new project.
 
 ## 3. (Optional) Quick Link Sanity Check
@@ -46,6 +57,9 @@ environment.
 - Never delete `.vercel/project.json` from this repository.
 - If you clone the repo onto a new machine, run through steps 1–2 before the
   first deployment.
+- If you ever discover an `epg-crm` project in this account or repo, delete the
+  link immediately, notify the team, and append a note to the deployment log so
+  future agents understand the remediation steps.
 
 ---
 
@@ -69,4 +83,3 @@ echo '✅ Ready to deploy'
 ```
 
 Run it before `npx vercel --prod` to enforce the checks automatically.
-
