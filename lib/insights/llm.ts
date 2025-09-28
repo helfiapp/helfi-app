@@ -59,93 +59,168 @@ const llmSectionSchema = z.object({
 
 export type SectionLLMResult = z.infer<typeof llmSectionSchema>
 
-interface CommonPromptInput {
-  issueName: string
-  issueSummary?: string | null
-  userContext: string
-  mode: 'supplements' | 'medications'
-}
-
-function buildPrompt({ issueName, issueSummary, userContext, mode }: CommonPromptInput) {
-  const focus = mode === 'supplements' ? 'supplement' : 'medication'
-  const header = `You are a clinician-grade health assistant helping evaluate ${focus} usage for the issue "${issueName}".`
-
-  const guidance = `
-Provide precise, evidence-aligned guidance. Only use information supplied in the user context and your own generally-accepted medical knowledge. If data is insufficient, state that explicitly.
-
-Classify ${focus}s into three buckets: working (helpful/supportive), suggested (worth discussing with clinician), avoid (risky or counterproductive). Always provide concise clinical reasons grounded in widely accepted best practice.
-
-If the user is not currently taking anything that belongs in "avoid", propose at least one high-priority option so they know what to steer clear from in the future. Likewise, always offer at least one suggested option that could help the issue, even if it is not currently logged.
-
-Respond strictly as JSON with keys summary, working, suggested, avoid, recommendations.
-Each recommendation must include title, description, actions (array, can be empty), and priority (now|soon|monitor).
-  `
-
-  return `${header}\n\nIssue summary: ${issueSummary ?? 'Not supplied.'}\n\nUser context (JSON):\n${userContext}\n\n${guidance}`
-}
+type SectionMode =
+  | 'supplements'
+  | 'medications'
+  | 'exercise'
+  | 'nutrition'
+  | 'lifestyle'
+  | 'labs'
 
 interface LLMInputData {
   issueName: string
   issueSummary?: string | null
-  items: Array<{ name: string; dosage?: string | null; timing?: string[] | null }>
+  items?: Array<{ name: string; dosage?: string | null; timing?: string[] | null }>
   otherItems?: Array<{ name: string; dosage?: string | null }>
-  mode: 'supplements' | 'medications'
+  mode: SectionMode
 }
 
-export async function generateSectionInsightsFromLLM(input: LLMInputData): Promise<SectionLLMResult | null> {
+interface LLMOptions {
+  minWorking?: number
+  minSuggested?: number
+  minAvoid?: number
+  maxRetries?: number
+}
+
+function modeGuidance(mode: SectionMode) {
+  switch (mode) {
+    case 'supplements':
+      return 'Evaluate supplements. Identify which are truly helpful for the issue, which additions to discuss with a clinician, and which supplements people with this issue should avoid or monitor.'
+    case 'medications':
+      return 'Evaluate prescription and OTC therapies. Highlight medications that are supporting the issue, additions to discuss with a prescriber, and medications that warrant caution or avoidance.'
+    case 'exercise':
+      return 'Evaluate exercise and movement patterns. Highlight the training that supports this issue, recommended additions, and activities/protocols to limit or avoid.'
+    case 'nutrition':
+      return 'Evaluate nutrition patterns. Highlight foods/meals that help, additions to include, and foods or dietary approaches to avoid for this issue.'
+    case 'lifestyle':
+      return 'Evaluate lifestyle habits (sleep, stress, routines). Highlight habits that are helping, habits to add, and habits/behaviours to avoid for this issue.'
+    case 'labs':
+      return 'Evaluate labs and biomarker monitoring. Highlight labs already supporting the issue, labs to order or review, and labs/testing patterns that require caution.'
+    default:
+      return ''
+  }
+}
+
+function buildPrompt(
+  {
+    issueName,
+    issueSummary,
+    userContext,
+    mode,
+    minWorking,
+    minSuggested,
+    minAvoid,
+    force,
+  }: {
+    issueName: string
+    issueSummary?: string | null
+    userContext: string
+    mode: SectionMode
+    minWorking: number
+    minSuggested: number
+    minAvoid: number
+    force: boolean
+  }
+) {
+  const guidanceFocus = modeGuidance(mode)
+  const header = `You are a clinician-grade health assistant helping with the issue "${issueName}".`
+
+  const baseGuidance = `
+Provide precise, evidence-aligned guidance. Use the user context plus widely accepted best practice. If data is insufficient, state that but still offer clinician-ready suggestions.
+
+Classify findings into three buckets: working (helpful/supportive today), suggested (worth discussing with clinician to add), avoid (risky or counterproductive). Always provide concise clinical reasons. ${guidanceFocus}
+
+Respond strictly as JSON with keys summary, working, suggested, avoid, recommendations. Each recommendation must include title, description, actions (array, can be empty), and priority (now|soon|monitor).
+  `
+
+  const forceNote = force
+    ? `You must output at least ${minWorking} working item(s), ${minSuggested} suggested item(s), and ${minAvoid} avoid item(s). If logged data is sparse, rely on broadly accepted best-practice guidance for ${issueName}.`
+    : ''
+
+  return `${header}\n\nIssue summary: ${issueSummary ?? 'Not supplied.'}\n\nUser context (JSON):\n${userContext}\n\n${baseGuidance}\n${forceNote}`
+}
+
+export async function generateSectionInsightsFromLLM(
+  input: LLMInputData,
+  options: LLMOptions = {}
+): Promise<SectionLLMResult | null> {
   const openai = getOpenAIClient()
   if (!openai) {
     return null
   }
 
-  if (!input.items.length) {
-    return null
-  }
+  const minWorking = options.minWorking ?? 1
+  const minSuggested = options.minSuggested ?? 2
+  const minAvoid = options.minAvoid ?? 2
+  const maxRetries = options.maxRetries ?? 2
 
   const userContext = JSON.stringify(
     {
-      focusItems: input.items,
+      focusItems: input.items ?? [],
       otherItems: input.otherItems ?? [],
     },
     null,
     2
   )
 
-  const prompt = buildPrompt({
-    issueName: input.issueName,
-    issueSummary: input.issueSummary,
-    userContext,
-    mode: input.mode,
-  })
-
-  try {
-    const response = await openai.chat.completions.create({
-      model: process.env.OPENAI_INSIGHTS_MODEL ?? 'gpt-4o-mini',
-      temperature: 0.1,
-      response_format: { type: 'json_object' },
-      messages: [
-        {
-          role: 'system',
-          content:
-            'You are a careful clinical decision support assistant. Follow instructions precisely and never fabricate data.',
-        },
-        { role: 'user', content: prompt },
-      ],
+  let attempt = 0
+  while (attempt < maxRetries) {
+    const force = attempt > 0
+    const prompt = buildPrompt({
+      issueName: input.issueName,
+      issueSummary: input.issueSummary,
+      userContext,
+      mode: input.mode,
+      minWorking,
+      minSuggested,
+      minAvoid,
+      force,
     })
 
-    const content = response.choices?.[0]?.message?.content
-    if (!content) {
-      return null
-    }
+    try {
+      const response = await openai.chat.completions.create({
+        model: process.env.OPENAI_INSIGHTS_MODEL ?? 'gpt-4o-mini',
+        temperature: 0.1,
+        response_format: { type: 'json_object' },
+        messages: [
+          {
+            role: 'system',
+            content:
+              'You are a careful clinical decision support assistant. Follow instructions precisely, remain evidence-aligned, and never fabricate data.',
+          },
+          { role: 'user', content: prompt },
+        ],
+      })
 
-    const parsed = llmSectionSchema.safeParse(JSON.parse(content))
-    if (!parsed.success) {
-      return null
-    }
+      const content = response.choices?.[0]?.message?.content
+      if (!content) {
+        attempt += 1
+        continue
+      }
 
-    return parsed.data
-  } catch (error) {
-    console.error('[insights.llm] Failed to fetch LLM output', error)
-    return null
+      const parsed = llmSectionSchema.safeParse(JSON.parse(content))
+      if (!parsed.success) {
+        console.warn('[insights.llm] Invalid LLM JSON', parsed.error)
+        attempt += 1
+        continue
+      }
+
+      const data = parsed.data
+      if (
+        data.working.length >= minWorking &&
+        data.suggested.length >= minSuggested &&
+        data.avoid.length >= minAvoid
+      ) {
+        return data
+      }
+
+      attempt += 1
+      continue
+    } catch (error) {
+      console.error('[insights.llm] Failed to fetch LLM output', error)
+      attempt += 1
+    }
   }
+
+  return null
 }

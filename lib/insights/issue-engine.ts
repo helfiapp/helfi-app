@@ -1169,105 +1169,139 @@ async function buildOverviewSection(issue: IssueSummary, context: UserInsightCon
   }
 }
 
-function summariseExerciseFrequency(exerciseLogs: UserInsightContext['exerciseLogs']) {
-  if (!exerciseLogs.length) return { sessionsPerWeek: 0, summary: 'No exercise logs captured yet.' }
-  const now = Date.now()
-  const weeks = new Map<number, number>()
-  for (const log of exerciseLogs) {
-    const diffWeeks = Math.floor((now - log.createdAt.getTime()) / (1000 * 60 * 60 * 24 * 7))
-    const weekKey = diffWeeks
-    weeks.set(weekKey, (weeks.get(weekKey) ?? 0) + 1)
-  }
-  const weeksArray = Array.from(weeks.values())
-  const considered = weeksArray.slice(0, 4)
-  const avg = considered.length ? considered.reduce((sum, count) => sum + count, 0) / considered.length : exerciseLogs.length
-  const summary = avg >= 3 ? 'Consistent training frequency' : avg >= 1.5 ? 'Some activity logged' : 'Training cadence is light'
-  return { sessionsPerWeek: Math.round(avg * 10) / 10, summary }
-}
-
 async function buildExerciseSection(issue: IssueSummary, context: UserInsightContext): Promise<BaseSectionResult> {
   const now = new Date().toISOString()
-  const knowledgeKey = pickKnowledgeKey(issue.name.toLowerCase())
-  const supportiveTemplates = knowledgeKey ? ISSUE_KNOWLEDGE_BASE[knowledgeKey].supportiveExercises ?? [] : []
-  const avoidTemplates = knowledgeKey ? ISSUE_KNOWLEDGE_BASE[knowledgeKey].avoidExercises ?? [] : []
-  const frequency = summariseExerciseFrequency(context.exerciseLogs)
-  const relevantLogs = context.exerciseLogs.filter((log) => /strength|resistance|weights|cardio|hiit|yoga|pilates/i.test(log.type))
-  const highlights: SectionHighlight[] = []
-  if (relevantLogs.length) {
-    highlights.push({
-      title: `Last session • ${relativeDays(relevantLogs[0].createdAt)}`,
-      detail: `${relevantLogs[0].type} ${relevantLogs[0].duration} min` + (relevantLogs[0].intensity ? ` • ${relevantLogs[0].intensity}` : ''),
-      tone: 'positive',
-    })
-  } else {
-    highlights.push({
-      title: 'No structured sessions logged yet',
-      detail: 'Add workouts to see recovery and symptom response trends.',
-      tone: 'neutral',
-    })
+  const normalizedLogs = context.exerciseLogs.map((log) => ({
+    name: log.type,
+    dosage: log.duration ? `${log.duration} min` : null,
+    timing: [
+      log.intensity ? `Intensity: ${log.intensity}` : null,
+      `Logged ${relativeDays(log.createdAt)}`,
+    ].filter(Boolean) as string[],
+  }))
+
+  const llmResult = await generateSectionInsightsFromLLM(
+    {
+      issueName: issue.name,
+      issueSummary: issue.highlight,
+      items: normalizedLogs,
+      otherItems: context.supplements.map((supp) => ({ name: supp.name, dosage: supp.dosage ?? null })),
+      mode: 'exercise',
+    },
+    { minWorking: 1, minSuggested: 2, minAvoid: 2 }
+  )
+
+  if (!llmResult) {
+    return {
+      issue,
+      section: 'exercise',
+      generatedAt: now,
+      confidence: 0.4,
+      summary: 'We couldn’t generate exercise guidance right now. Please try again shortly.',
+      highlights: [
+        {
+          title: 'Generation unavailable',
+          detail: 'The AI service did not return exercise insights. Retry in a few minutes.',
+          tone: 'warning',
+        },
+      ],
+      dataPoints: context.exerciseLogs.slice(0, 5).map((log) => ({
+        label: log.type,
+        value: `${log.duration} min`,
+        context: relativeDays(log.createdAt),
+      })),
+      recommendations: [
+        {
+          title: 'Retry insight generation',
+          description: 'Refresh this page or trigger a new report in a few minutes.',
+          actions: ['Tap Daily/Weekly report to regenerate', 'Contact support if the problem persists'],
+          priority: 'soon',
+        },
+      ],
+      extras: {
+        workingActivities: [],
+        suggestedActivities: [],
+        avoidActivities: [],
+        totalLogged: context.exerciseLogs.length,
+        source: 'llm-error',
+      },
+    }
   }
-  highlights.push({
-    title: 'Weekly cadence',
-    detail: `${frequency.sessionsPerWeek} sessions/week (avg last 4 weeks)`,
-    tone: frequency.sessionsPerWeek >= 3 ? 'positive' : frequency.sessionsPerWeek >= 1.5 ? 'neutral' : 'warning',
+
+  const canonical = (value: string) => value.trim().toLowerCase()
+  const logMap = new Map(normalizedLogs.map((log) => [canonical(log.name), log]))
+
+  const workingActivities = llmResult.working.map((item) => {
+    const match = logMap.get(canonical(item.name))
+    return {
+      title: item.name,
+      reason: item.reason,
+      summary: item.dosage ?? match?.dosage ?? '',
+      lastLogged: item.timing ?? match?.timing?.[0] ?? '',
+    }
   })
 
-  const recommendations: SectionRecommendation[] = []
-  if (supportiveTemplates.length) {
-    recommendations.push({
-      title: 'Anchor issue-specific training',
-      description: supportiveTemplates.map(item => `${item.title}: ${item.detail}`).join(' '),
-      actions: ['Plan sessions for next 7 days in calendar', 'Log RPE (1–10) after each workout to track recovery'],
-      priority: frequency.sessionsPerWeek >= 2 ? 'soon' : 'now',
-    })
-  }
-  if (frequency.sessionsPerWeek < 2) {
-    recommendations.push({
-      title: 'Increase consistency',
-      description: 'Aim for 3 structured sessions weekly to yield noticeable changes.',
-      actions: ['Block 45-minute sessions on Monday, Wednesday, Friday', 'Pair resistance training with mobility finisher'],
-      priority: 'now',
-    })
-  }
-  if (!recommendations.length) {
-    recommendations.push({
-      title: 'Maintain progress',
-      description: 'Keep current training schedule; ensure deload every 6–8 weeks.',
-      actions: ['Review loading patterns monthly', 'Add HRV or readiness tracking if available'],
-      priority: 'monitor',
-    })
-  }
+  const suggestedActivities = llmResult.suggested.map((item) => ({
+    title: item.name,
+    reason: item.reason,
+    detail: item.protocol ?? null,
+  }))
 
-  const workingActivities = supportiveTemplates
-    .map((template) => {
-      const keywords = template.keywords ?? []
-      const matchedLog = keywords.length
-        ? relevantLogs.find((log) => keywords.some((keyword) => new RegExp(keyword, 'i').test(log.type)))
-        : relevantLogs[0]
-      if (!matchedLog) {
-        return null
-      }
-      return {
-        title: template.title,
-        reason: template.detail,
-        summary: `${matchedLog.type} • ${matchedLog.duration} min${matchedLog.intensity ? ` (${matchedLog.intensity})` : ''}`,
-        lastLogged: relativeDays(matchedLog.createdAt),
-      }
-    })
-    .filter(Boolean) as Array<{ title: string; reason: string; summary: string; lastLogged: string }>
+  const avoidActivities = llmResult.avoid.map((item) => ({
+    title: item.name,
+    reason: item.reason,
+  }))
 
-  const suggestedActivities = supportiveTemplates
-    .filter((template) => !workingActivities.some((activity) => activity.title === template.title))
-    .map((template) => ({ title: template.title, reason: template.detail }))
+  const summary = llmResult.summary?.trim().length
+    ? llmResult.summary
+    : 'AI-generated exercise guidance ready below.'
 
-  const avoidActivities = avoidTemplates.map((template) => ({ title: template.title, reason: template.detail }))
+  const highlights: SectionHighlight[] = [
+    {
+      title: 'Training wins',
+      detail: workingActivities.length
+        ? workingActivities.map((activity) => `${activity.title}: ${activity.reason}`).join('; ')
+        : 'No activities flagged as supportive yet.',
+      tone: workingActivities.length ? 'positive' : 'neutral',
+    },
+    {
+      title: 'Next training moves',
+      detail: suggestedActivities.length
+        ? suggestedActivities.map((activity) => `${activity.title}: ${activity.reason}`).join('; ')
+        : 'Follow the suggestions below to expand your plan.',
+      tone: suggestedActivities.length ? 'neutral' : 'positive',
+    },
+    {
+      title: 'Activities to monitor',
+      detail: avoidActivities.length
+        ? avoidActivities.map((activity) => `${activity.title}: ${activity.reason}`).join('; ')
+        : 'No avoid items flagged—review the cautions below for awareness.',
+      tone: avoidActivities.length ? 'warning' : 'neutral',
+    },
+  ]
+
+  const recommendations: SectionRecommendation[] = llmResult.recommendations.length
+    ? llmResult.recommendations.map((rec) => ({
+        title: rec.title,
+        description: rec.description,
+        actions: rec.actions.length ? rec.actions : ['Discuss with your clinician or coach'],
+        priority: rec.priority,
+      }))
+    : [
+        {
+          title: 'Plan next week of training',
+          description: 'Schedule supportive sessions and monitor recovery.',
+          actions: ['Block training slots', 'Log how your body responds'],
+          priority: 'soon',
+        },
+      ]
 
   return {
     issue,
     section: 'exercise',
     generatedAt: now,
-    confidence: 0.68,
-    summary: frequency.summary,
+    confidence: 0.82,
+    summary,
     highlights,
     dataPoints: context.exerciseLogs.slice(0, 5).map((log) => ({
       label: log.type,
@@ -1279,7 +1313,8 @@ async function buildExerciseSection(issue: IssueSummary, context: UserInsightCon
       workingActivities,
       suggestedActivities,
       avoidActivities,
-      totalLogged: relevantLogs.length,
+      totalLogged: context.exerciseLogs.length,
+      source: 'llm',
     },
   }
 }
@@ -1294,13 +1329,16 @@ async function buildSupplementsSection(issue: IssueSummary, context: UserInsight
     timing: Array.isArray(supp.timing) ? supp.timing : [],
   }))
 
-  const llmResult = await generateSectionInsightsFromLLM({
-    issueName: issue.name,
-    issueSummary: issue.highlight,
-    items: normalizedSupplements,
-    otherItems: context.medications.map((med) => ({ name: med.name, dosage: med.dosage ?? null })),
-    mode: 'supplements',
-  })
+  const llmResult = await generateSectionInsightsFromLLM(
+    {
+      issueName: issue.name,
+      issueSummary: issue.highlight,
+      items: normalizedSupplements,
+      otherItems: context.medications.map((med) => ({ name: med.name, dosage: med.dosage ?? null })),
+      mode: 'supplements',
+    },
+    { minWorking: 1, minSuggested: 2, minAvoid: 2 }
+  )
 
   if (!llmResult) {
     return {
@@ -1464,13 +1502,16 @@ async function buildMedicationsSection(issue: IssueSummary, context: UserInsight
     timing: Array.isArray(med.timing) ? med.timing : [],
   }))
 
-  const llmResult = await generateSectionInsightsFromLLM({
-    issueName: issue.name,
-    issueSummary: issue.highlight,
-    items: normalizedMeds,
-    otherItems: context.supplements.map((supp) => ({ name: supp.name, dosage: supp.dosage ?? null })),
-    mode: 'medications',
-  })
+  const llmResult = await generateSectionInsightsFromLLM(
+    {
+      issueName: issue.name,
+      issueSummary: issue.highlight,
+      items: normalizedMeds,
+      otherItems: context.supplements.map((supp) => ({ name: supp.name, dosage: supp.dosage ?? null })),
+      mode: 'medications',
+    },
+    { minWorking: 1, minSuggested: 2, minAvoid: 2 }
+  )
 
   if (!llmResult) {
     return {
@@ -1693,69 +1734,137 @@ async function buildInteractionsSection(issue: IssueSummary, context: UserInsigh
 
 async function buildLabsSection(issue: IssueSummary, context: UserInsightContext): Promise<BaseSectionResult> {
   const now = new Date().toISOString()
-  const key = pickKnowledgeKey(issue.name.toLowerCase())
-  const labs = key ? ISSUE_KNOWLEDGE_BASE[key].keyLabs ?? [] : []
   const blood = context.bloodResults
-  const highlights: SectionHighlight[] = []
 
-  if (blood?.documents?.length) {
-    highlights.push({
-      title: `${blood.documents.length} lab file${blood.documents.length > 1 ? 's' : ''} uploaded`,
-      detail: blood.notes ? `Notes: ${blood.notes}` : 'Add notes to highlight markers of concern.',
-      tone: 'positive',
-    })
-  } else if (blood?.skipped) {
-    highlights.push({
-      title: 'Labs skipped in intake',
-      detail: 'Upload results anytime to unlock personalised ranges.',
-      tone: 'neutral',
-    })
-  } else {
-    highlights.push({
-      title: 'No lab data yet',
-      detail: 'Add bloodwork PDFs or enter key markers to tailor insights.',
-      tone: 'warning',
-    })
+  const labItems = (blood?.markers ?? []).map((marker) => ({
+    name: marker.name,
+    dosage: marker.value !== undefined ? `${marker.value}${marker.unit ? ` ${marker.unit}` : ''}` : null,
+    timing: marker.reference ? [marker.reference] : [],
+  }))
+
+  const llmResult = await generateSectionInsightsFromLLM(
+    {
+      issueName: issue.name,
+      issueSummary: issue.highlight,
+      items: labItems,
+      otherItems: context.supplements.map((supp) => ({ name: supp.name, dosage: supp.dosage ?? null })),
+      mode: 'labs',
+    },
+    { minWorking: 1, minSuggested: 2, minAvoid: 2 }
+  )
+
+  if (!llmResult) {
+    return {
+      issue,
+      section: 'labs',
+      generatedAt: now,
+      confidence: 0.4,
+      summary: 'We couldn’t generate lab guidance right now. Please try again shortly.',
+      highlights: [
+        {
+          title: 'Generation unavailable',
+          detail: 'The AI service did not return lab insights. Retry in a few minutes.',
+          tone: 'warning',
+        },
+      ],
+      dataPoints: labItems.map((item) => ({
+        label: item.name,
+        value: item.dosage ?? 'Value not supplied',
+        context: item.timing?.[0],
+      })),
+      recommendations: [
+        {
+          title: 'Retry insight generation',
+          description: 'Refresh this page or trigger a new report in a few minutes.',
+          actions: ['Tap Daily/Weekly report to regenerate', 'Contact support if the problem persists'],
+          priority: 'soon',
+        },
+      ],
+    }
   }
 
-  const dataPoints: SectionDatum[] = []
-  if (blood?.markers?.length) {
-    blood.markers.forEach(marker => {
-      dataPoints.push({
-        label: marker.name,
-        value: marker.value !== undefined ? `${marker.value}${marker.unit ? ` ${marker.unit}` : ''}` : 'Value not supplied',
-        context: marker.reference || 'Reference range not provided',
-      })
-    })
-  }
+  const workingLabs = llmResult.working.map((item) => ({
+    name: item.name,
+    reason: item.reason,
+    detail: item.dosage ?? item.timing ?? '',
+  }))
 
-  const recommendations: SectionRecommendation[] = []
-  if (labs.length) {
-    recommendations.push({
-      title: 'Key labs to monitor',
-      description: 'Prioritise markers that influence this issue most directly.',
-      actions: labs.map(item => `${item.marker}: ${item.optimal} (${item.cadence})`),
-      priority: blood?.documents?.length ? 'soon' : 'now',
-    })
-  }
-  if (!recommendations.length) {
-    recommendations.push({
-      title: 'Coordinate lab work',
-      description: 'Work with your clinician to identify relevant blood markers.',
-      actions: ['Upload most recent panel', 'Flag markers where you want tighter ranges'],
-      priority: 'soon',
-    })
-  }
+  const suggestedLabs = llmResult.suggested.map((item) => ({
+    name: item.name,
+    reason: item.reason,
+    detail: item.protocol ?? null,
+  }))
+
+  const avoidLabs = llmResult.avoid.map((item) => ({
+    name: item.name,
+    reason: item.reason,
+  }))
+
+  const summary = llmResult.summary?.trim().length
+    ? llmResult.summary
+    : 'AI-generated lab guidance ready below.'
+
+  const highlights: SectionHighlight[] = [
+    {
+      title: 'Labs on track',
+      detail: workingLabs.length
+        ? workingLabs.map((lab) => `${lab.name}: ${lab.reason}`).join('; ')
+        : 'No supportive labs identified yet.',
+      tone: workingLabs.length ? 'positive' : 'neutral',
+    },
+    {
+      title: 'Labs to order or adjust',
+      detail: suggestedLabs.length
+        ? suggestedLabs.map((lab) => `${lab.name}: ${lab.reason}`).join('; ')
+        : 'Review the suggestions below with your clinician.',
+      tone: suggestedLabs.length ? 'neutral' : 'positive',
+    },
+    {
+      title: 'Labs to monitor carefully',
+      detail: avoidLabs.length
+        ? avoidLabs.map((lab) => `${lab.name}: ${lab.reason}`).join('; ')
+        : 'No avoid items flagged—see cautions below for awareness.',
+      tone: avoidLabs.length ? 'warning' : 'neutral',
+    },
+  ]
+
+  const recommendations: SectionRecommendation[] = llmResult.recommendations.length
+    ? llmResult.recommendations.map((rec) => ({
+        title: rec.title,
+        description: rec.description,
+        actions: rec.actions.length ? rec.actions : ['Discuss with your clinician'],
+        priority: rec.priority,
+      }))
+    : [
+        {
+          title: 'Coordinate lab follow-up',
+          description: 'Use the suggested labs to plan your next panel.',
+          actions: ['Schedule tests with your clinician', 'Log results once available'],
+          priority: 'soon',
+        },
+      ]
+
+  const dataPoints: SectionDatum[] = labItems.map((item) => ({
+    label: item.name,
+    value: item.dosage ?? 'Value not supplied',
+    context: item.timing?.[0],
+  }))
 
   return {
     issue,
     section: 'labs',
     generatedAt: now,
-    confidence: 0.6,
-    summary: blood?.documents?.length ? 'Bloodwork on file – review markers below.' : 'No bloodwork uploaded yet.',
+    confidence: 0.8,
+    summary,
     highlights,
     dataPoints,
     recommendations,
+    extras: {
+      workingLabs,
+      suggestedLabs,
+      avoidLabs,
+      source: 'llm',
+    },
   }
 }
 
@@ -1763,96 +1872,133 @@ async function buildNutritionSection(issue: IssueSummary, context: UserInsightCo
   const now = new Date().toISOString()
   const foods: Array<{ name?: string; meal?: string; calories?: number }> = context.todaysFoods.length
     ? context.todaysFoods
-    : context.foodLogs.slice(0, 5).map((log) => ({
+    : context.foodLogs.slice(0, 10).map((log) => ({
         name: log.name,
         meal: log.description ?? undefined,
         calories: undefined,
       }))
-  const key = pickKnowledgeKey(issue.name.toLowerCase())
-  const focus = key ? ISSUE_KNOWLEDGE_BASE[key].nutritionFocus ?? [] : []
-  const avoidTemplates = key ? ISSUE_KNOWLEDGE_BASE[key].avoidFoods ?? [] : []
-  const highlights: SectionHighlight[] = []
 
-  if (foods.length) {
-    const mealsPreview = foods.slice(0, 3).map(item => item.name || item.meal || 'Meal').join(', ')
-    highlights.push({
-      title: 'Recent meals logged',
-      detail: mealsPreview,
-      tone: 'neutral',
-    })
-  } else {
-    highlights.push({
-      title: 'No meals logged',
-      detail: 'Capture meals or upload food photos to unlock macronutrient guidance.',
-      tone: 'warning',
-    })
+  const normalizedFoods = foods.map((food, idx) => ({
+    name: food.name || food.meal || `Entry ${idx + 1}`,
+    dosage: food.calories ? `${food.calories} kcal` : food.meal ?? null,
+    timing: food.meal ? [food.meal] : [],
+  }))
+
+  const llmResult = await generateSectionInsightsFromLLM(
+    {
+      issueName: issue.name,
+      issueSummary: issue.highlight,
+      items: normalizedFoods,
+      otherItems: context.supplements.map((supp) => ({ name: supp.name, dosage: supp.dosage ?? null })),
+      mode: 'nutrition',
+    },
+    { minWorking: 1, minSuggested: 2, minAvoid: 2 }
+  )
+
+  if (!llmResult) {
+    return {
+      issue,
+      section: 'nutrition',
+      generatedAt: now,
+      confidence: 0.4,
+      summary: 'We couldn’t generate nutrition guidance right now. Please try again shortly.',
+      highlights: [
+        {
+          title: 'Generation unavailable',
+          detail: 'The AI service did not return nutrition insights. Retry in a few minutes.',
+          tone: 'warning',
+        },
+      ],
+      dataPoints: foods.map((item, idx) => ({
+        label: item.meal ? `${item.meal}` : `Meal ${idx + 1}`,
+        value: item.name ?? 'Food logged',
+        context: item.calories ? `${item.calories} kcal` : undefined,
+      })),
+      recommendations: [
+        {
+          title: 'Retry insight generation',
+          description: 'Refresh this page or trigger a new report in a few minutes.',
+          actions: ['Tap Daily/Weekly report to regenerate', 'Contact support if the problem persists'],
+          priority: 'soon',
+        },
+      ],
+      extras: {
+        workingFocus: [],
+        suggestedFocus: [],
+        avoidFoods: [],
+        totalLogged: foods.length,
+        source: 'llm-error',
+      },
+    }
   }
 
-  const recommendations: SectionRecommendation[] = []
-  if (focus.length) {
-    recommendations.push({
-      title: 'Nutrition moves for this issue',
-      description: focus.map(item => `${item.title}: ${item.detail}`).join(' '),
-      actions: ['Plan upcoming meals around these anchors', 'Log response (energy, symptoms) after 2 weeks'],
-      priority: foods.length ? 'soon' : 'now',
-    })
-  }
-  if (!recommendations.length) {
-    recommendations.push({
-      title: 'Build consistent logging',
-      description: 'At least two meal logs per day sharpen AI calories and micronutrient hints.',
-      actions: ['Log breakfast and dinner every day for a week', 'Tag meals impacting symptoms'],
-      priority: 'now',
-    })
-  }
+  const workingFocus = llmResult.working.map((item) => ({
+    title: item.name,
+    reason: item.reason,
+    example: item.dosage ?? item.timing ?? '',
+  }))
 
-  const foodStrings = foods.map((item) => `${item.name ?? ''} ${item.meal ?? ''}`.trim().toLowerCase())
+  const suggestedFocus = llmResult.suggested.map((item) => ({
+    title: item.name,
+    reason: item.reason,
+    detail: item.protocol ?? null,
+  }))
 
-  const workingFocus = focus
-    .map((item) => {
-      const keywords = item.keywords ?? []
-      if (!keywords.length) {
-        return null
-      }
-      const matchIndex = foodStrings.findIndex((food) => keywords.some((keyword) => food.includes(keyword.toLowerCase())))
-      if (matchIndex === -1) {
-        return null
-      }
-      const matchedFood = foods[matchIndex]
-      return {
-        title: item.title,
-        reason: item.detail,
-        example: matchedFood.name || matchedFood.meal || 'Logged meal',
-      }
-    })
-    .filter(Boolean) as Array<{ title: string; reason: string; example: string }>
+  const avoidFoods = llmResult.avoid.map((item) => ({
+    name: item.name,
+    reason: item.reason,
+  }))
 
-  const suggestedFocus = focus
-    .filter((item) => !workingFocus.some((focusItem) => focusItem.title === item.title))
-    .map((item) => ({ title: item.title, reason: item.detail }))
+  const summary = llmResult.summary?.trim().length
+    ? llmResult.summary
+    : 'AI-generated nutrition guidance ready below.'
 
-  const avoidFoods = foods
-    .map((item, index) => {
-      const descriptor = foodStrings[index]
-      if (!descriptor) return null
-      const rule = avoidTemplates.find((template) => {
-        const keywords = template.keywords ?? []
-        return keywords.some((keyword) => descriptor.includes(keyword.toLowerCase()))
-      })
-      if (!rule) return null
-      return {
-        name: item.name || item.meal || 'Logged item',
-        reason: rule.detail,
-      }
-    })
-    .filter(Boolean) as Array<{ name: string; reason: string }>
+  const highlights: SectionHighlight[] = [
+    {
+      title: 'Nutrition wins',
+      detail: workingFocus.length
+        ? workingFocus.map((focus) => `${focus.title}: ${focus.reason}`).join('; ')
+        : 'No foods flagged as supportive yet.',
+      tone: workingFocus.length ? 'positive' : 'neutral',
+    },
+    {
+      title: 'Add to your plan',
+      detail: suggestedFocus.length
+        ? suggestedFocus.map((focus) => `${focus.title}: ${focus.reason}`).join('; ')
+        : 'Review suggestions below to expand your plan.',
+      tone: suggestedFocus.length ? 'neutral' : 'positive',
+    },
+    {
+      title: 'Foods to monitor',
+      detail: avoidFoods.length
+        ? avoidFoods.map((food) => `${food.name}: ${food.reason}`).join('; ')
+        : 'No avoid items flagged—see the cautions below for awareness.',
+      tone: avoidFoods.length ? 'warning' : 'neutral',
+    },
+  ]
+
+  const recommendations: SectionRecommendation[] = llmResult.recommendations.length
+    ? llmResult.recommendations.map((rec) => ({
+        title: rec.title,
+        description: rec.description,
+        actions: rec.actions.length ? rec.actions : ['Discuss with your clinician or dietitian'],
+        priority: rec.priority,
+      }))
+    : [
+        {
+          title: 'Plan upcoming meals',
+          description: 'Use the suggested foods to balance your next grocery list.',
+          actions: ['Add suggested foods to your meal plan', 'Track symptom response weekly'],
+          priority: 'soon',
+        },
+      ]
 
   return {
     issue,
     section: 'nutrition',
     generatedAt: now,
-    confidence: 0.63,
-    summary: foods.length ? 'Analysing recent meals – see focus areas below.' : 'Need more food data to personalise guidance.',
+    confidence: 0.82,
+    summary,
     highlights,
     dataPoints: foods.map((item, idx) => ({
       label: item.meal ? `${item.meal}` : `Meal ${idx + 1}`,
@@ -1865,64 +2011,149 @@ async function buildNutritionSection(issue: IssueSummary, context: UserInsightCo
       suggestedFocus,
       avoidFoods,
       totalLogged: foods.length,
+      source: 'llm',
     },
   }
 }
 
 async function buildLifestyleSection(issue: IssueSummary, context: UserInsightContext): Promise<BaseSectionResult> {
   const now = new Date().toISOString()
-  const key = pickKnowledgeKey(issue.name.toLowerCase())
-  const focus = key ? ISSUE_KNOWLEDGE_BASE[key].lifestyleFocus ?? [] : []
-  const highlights: SectionHighlight[] = []
+  const lifestyleItems: Array<{ name: string; dosage?: string | null; timing?: string[] | null }> = []
 
   if (context.profile.exerciseFrequency) {
-    highlights.push({
-      title: 'Reported activity frequency',
-      detail: context.profile.exerciseFrequency,
-      tone: 'neutral',
-    })
+    lifestyleItems.push({ name: 'Exercise frequency', dosage: context.profile.exerciseFrequency, timing: null })
   }
   if (context.profile.bodyType) {
-    highlights.push({
-      title: 'Body type & considerations',
-      detail: context.profile.bodyType,
-      tone: 'neutral',
-    })
+    lifestyleItems.push({ name: 'Body type', dosage: context.profile.bodyType, timing: null })
   }
-  if (!highlights.length) {
-    highlights.push({
-      title: 'Lifestyle data incomplete',
-      detail: 'Add sleep, stress, and daily routine info to refine insights.',
-      tone: 'warning',
-    })
+  if (context.profile.gender) {
+    lifestyleItems.push({ name: 'Gender', dosage: context.profile.gender, timing: null })
+  }
+  if (context.profile.weight) {
+    lifestyleItems.push({ name: 'Weight', dosage: `${context.profile.weight} kg`, timing: null })
+  }
+  if (context.profile.height) {
+    lifestyleItems.push({ name: 'Height', dosage: `${context.profile.height} cm`, timing: null })
   }
 
-  const recommendations: SectionRecommendation[] = []
-  if (focus.length) {
-    recommendations.push({
-      title: 'Daily routines to reinforce progress',
-      description: focus.map(item => `${item.title}: ${item.detail}`).join(' '),
-      actions: ['Schedule habits in calendar', 'Track adherence for 14 days'],
-      priority: 'soon',
-    })
+  const llmResult = await generateSectionInsightsFromLLM(
+    {
+      issueName: issue.name,
+      issueSummary: issue.highlight,
+      items: lifestyleItems,
+      otherItems: context.supplements.map((supp) => ({ name: supp.name, dosage: supp.dosage ?? null })),
+      mode: 'lifestyle',
+    },
+    { minWorking: 1, minSuggested: 2, minAvoid: 2 }
+  )
+
+  if (!llmResult) {
+    return {
+      issue,
+      section: 'lifestyle',
+      generatedAt: now,
+      confidence: 0.4,
+      summary: 'We couldn’t generate lifestyle guidance right now. Please try again shortly.',
+      highlights: [
+        {
+          title: 'Generation unavailable',
+          detail: 'The AI service did not return lifestyle insights. Retry in a few minutes.',
+          tone: 'warning',
+        },
+      ],
+      dataPoints: [],
+      recommendations: [
+        {
+          title: 'Retry insight generation',
+          description: 'Refresh this page or trigger a new report in a few minutes.',
+          actions: ['Tap Daily/Weekly report to regenerate', 'Contact support if the problem persists'],
+          priority: 'soon',
+        },
+      ],
+      extras: {
+        workingHabits: [],
+        suggestedHabits: [],
+        avoidHabits: [],
+        source: 'llm-error',
+      },
+    }
   }
-  if (!recommendations.length) {
-    recommendations.push({
-      title: 'Capture lifestyle metrics',
-      description: 'Log sleep duration, stress ratings, and mood to unlock correlations.',
-      actions: ['Add daily sleep entry in Health Tracking', 'Log stress (0–6) alongside symptoms'],
-      priority: 'now',
-    })
-  }
+
+  const workingHabits = llmResult.working.map((item) => ({
+    title: item.name,
+    reason: item.reason,
+    detail: item.dosage ?? item.timing ?? '',
+  }))
+
+  const suggestedHabits = llmResult.suggested.map((item) => ({
+    title: item.name,
+    reason: item.reason,
+    detail: item.protocol ?? null,
+  }))
+
+  const avoidHabits = llmResult.avoid.map((item) => ({
+    title: item.name,
+    reason: item.reason,
+  }))
+
+  const summary = llmResult.summary?.trim().length
+    ? llmResult.summary
+    : 'AI-generated lifestyle coaching ready below.'
+
+  const highlights: SectionHighlight[] = [
+    {
+      title: 'Lifestyle foundations',
+      detail: workingHabits.length
+        ? workingHabits.map((habit) => `${habit.title}: ${habit.reason}`).join('; ')
+        : 'No lifestyle habits flagged as supportive yet.',
+      tone: workingHabits.length ? 'positive' : 'neutral',
+    },
+    {
+      title: 'Habits to add',
+      detail: suggestedHabits.length
+        ? suggestedHabits.map((habit) => `${habit.title}: ${habit.reason}`).join('; ')
+        : 'Review the suggested habits below to evolve your plan.',
+      tone: suggestedHabits.length ? 'neutral' : 'positive',
+    },
+    {
+      title: 'Habits to avoid',
+      detail: avoidHabits.length
+        ? avoidHabits.map((habit) => `${habit.title}: ${habit.reason}`).join('; ')
+        : 'No avoid items flagged—see cautions below for awareness.',
+      tone: avoidHabits.length ? 'warning' : 'neutral',
+    },
+  ]
+
+  const recommendations: SectionRecommendation[] = llmResult.recommendations.length
+    ? llmResult.recommendations.map((rec) => ({
+        title: rec.title,
+        description: rec.description,
+        actions: rec.actions.length ? rec.actions : ['Discuss with your clinician or coach'],
+        priority: rec.priority,
+      }))
+    : [
+        {
+          title: 'Plan daily routine updates',
+          description: 'Use the suggested habits to refine your schedule.',
+          actions: ['Add habits to your calendar', 'Track adherence for 14 days'],
+          priority: 'soon',
+        },
+      ]
 
   return {
     issue,
     section: 'lifestyle',
     generatedAt: now,
-    confidence: 0.58,
-    summary: 'Lifestyle routines shape recovery – tighten the inputs above.',
+    confidence: 0.8,
+    summary,
     highlights,
     dataPoints: [],
     recommendations,
+    extras: {
+      workingHabits,
+      suggestedHabits,
+      avoidHabits,
+      source: 'llm',
+    },
   }
 }
