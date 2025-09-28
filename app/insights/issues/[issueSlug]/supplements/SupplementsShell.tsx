@@ -80,7 +80,7 @@ export default function SupplementsShell({ children, initialResult, issueSlug }:
     const raw = (result.extras ?? {}) as SupplementsExtras
     return {
       supportiveDetails: raw.supportiveDetails ?? [],
-      suggestedAdditions: (raw.suggestedAdditions ?? []).filter((item) => !item.alreadyCovered),
+      suggestedAdditions: raw.suggestedAdditions ?? [],
       avoidList: raw.avoidList ?? [],
       missingDose: raw.missingDose ?? [],
       missingTiming: raw.missingTiming ?? [],
