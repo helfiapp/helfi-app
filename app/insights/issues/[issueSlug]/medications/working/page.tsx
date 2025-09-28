@@ -27,7 +27,11 @@ export default function MedicationsWorkingPage() {
             </div>
             <div>
               <dt className="text-xs uppercase text-gray-500 tracking-wide">Timing</dt>
-              <dd>{medication.timing.length ? medication.timing.join(', ') : 'Add timing so we can flag spacing tips.'}</dd>
+              <dd>
+                {Array.isArray(medication.timing) && medication.timing.length
+                  ? medication.timing.join(', ')
+                  : 'Add timing so we can flag spacing tips.'}
+              </dd>
             </div>
           </dl>
         </div>

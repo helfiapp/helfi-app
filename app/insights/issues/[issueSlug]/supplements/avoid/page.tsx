@@ -27,7 +27,11 @@ export default function SupplementsAvoidPage() {
             </div>
             <div>
               <dt className="text-xs uppercase tracking-wide">Timing</dt>
-              <dd>{supplement.timing.length ? supplement.timing.join(', ') : 'Timing not logged'}</dd>
+              <dd>
+                {Array.isArray(supplement.timing) && supplement.timing.length
+                  ? supplement.timing.join(', ')
+                  : 'Timing not logged'}
+              </dd>
             </div>
           </dl>
           <p className="text-xs text-rose-700 mt-3">Discuss this with your practitioner before continuing.</p>

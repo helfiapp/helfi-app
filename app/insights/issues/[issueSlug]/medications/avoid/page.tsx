@@ -27,7 +27,11 @@ export default function MedicationsAvoidPage() {
             </div>
             <div>
               <dt className="text-xs uppercase tracking-wide">Timing</dt>
-              <dd>{medication.timing.length ? medication.timing.join(', ') : 'Timing not logged'}</dd>
+              <dd>
+                {Array.isArray(medication.timing) && medication.timing.length
+                  ? medication.timing.join(', ')
+                  : 'Timing not logged'}
+              </dd>
             </div>
           </dl>
           <p className="text-xs text-rose-700 mt-3">Review this with your clinician as soon as possible.</p>

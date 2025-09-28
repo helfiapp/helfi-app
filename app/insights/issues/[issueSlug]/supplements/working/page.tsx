@@ -27,7 +27,11 @@ export default function SupplementsWorkingPage() {
             </div>
             <div>
               <dt className="text-xs uppercase text-gray-500 tracking-wide">Timing</dt>
-              <dd>{supplement.timing.length ? supplement.timing.join(', ') : 'Add timing so we can flag spacing tips.'}</dd>
+              <dd>
+                {Array.isArray(supplement.timing) && supplement.timing.length
+                  ? supplement.timing.join(', ')
+                  : 'Add timing so we can flag spacing tips.'}
+              </dd>
             </div>
           </dl>
         </div>
