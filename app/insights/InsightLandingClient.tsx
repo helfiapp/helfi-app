@@ -1,6 +1,8 @@
 'use client'
 
 import Link from 'next/link'
+import { useEffect, useMemo, useState, useTransition, type MouseEvent } from 'react'
+import { useRouter } from 'next/navigation'
 import type { IssueSummary, InsightDataNeed } from '@/lib/insights/issue-engine'
 import InsightsTopNav from './InsightsTopNav'
 import InsightsBottomNav from './InsightsBottomNav'
@@ -18,11 +20,26 @@ interface InsightsLandingClientProps {
 }
 
 export default function InsightsLandingClient({ sessionUser, issues, generatedAt, onboardingComplete, dataNeeds }: InsightsLandingClientProps) {
+  const router = useRouter()
+  const [pendingSlug, setPendingSlug] = useState<string | null>(null)
+  const [isNavigating, startTransition] = useTransition()
   const lastLoaded = generatedAt
 
   const actionableNeeds = dataNeeds.filter((need) => need.status !== 'complete')
   const completedNeeds = dataNeeds.filter((need) => need.status === 'complete')
   const primaryIssueSlug = issues[0]?.slug
+  const pendingIssueName = useMemo(() => issues.find((issue) => issue.slug === pendingSlug)?.name ?? null, [issues, pendingSlug])
+
+  useEffect(() => {
+    if (issues.length === 0) return
+    issues.slice(0, 3).forEach((issue) => {
+      try {
+        router.prefetch(`/insights/issues/${issue.slug}`)
+      } catch {
+        // prefetch failures are non-blocking
+      }
+    })
+  }, [issues, router])
 
   const deepDiveSections = [
     {
@@ -64,8 +81,18 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
     }
   }
 
+  function handleIssueClick(event: MouseEvent<HTMLAnchorElement>, slug: string) {
+    event.preventDefault()
+    triggerHaptic()
+    const href = `/insights/issues/${slug}`
+    setPendingSlug(slug)
+    startTransition(() => {
+      router.push(href)
+    })
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50" aria-busy={isNavigating}>
       <InsightsTopNav sessionUser={sessionUser} />
 
       <header className="bg-white border-b border-gray-200 px-4 py-6">
@@ -107,12 +134,14 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
               <span className="text-xs uppercase tracking-wide text-gray-500">Tap to open workspace</span>
             </div>
             <div className="bg-white border border-gray-200 rounded-2xl divide-y">
-              {issues.map((issue, index) => (
+              {issues.map((issue) => (
                 <Link
                   key={issue.id}
                   href={`/insights/issues/${issue.slug}`}
-                  className="flex flex-col gap-3 px-5 py-5 transition-colors hover:bg-gray-50 md:flex-row md:items-center md:justify-between"
-                  onClick={triggerHaptic}
+                  className={`flex flex-col gap-3 px-5 py-5 transition-colors md:flex-row md:items-center md:justify-between ${
+                    isNavigating ? 'pointer-events-none opacity-60' : 'hover:bg-gray-50'
+                  }`}
+                  onClick={(event) => handleIssueClick(event, issue.slug)}
                 >
                   <div className="flex items-start gap-3">
                     <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-helfi-green/10 text-lg">💡</span>
@@ -202,7 +231,15 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
         </section>
       </main>
 
-      <InsightsBottomNav />
+        <InsightsBottomNav />
+      {isNavigating && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-white/80 backdrop-blur-sm">
+          <span className="h-10 w-10 animate-spin rounded-full border-4 border-helfi-green border-t-transparent" />
+          <p className="mt-3 text-sm font-semibold text-gray-700">
+            {pendingIssueName ? `Opening ${pendingIssueName} workspace…` : 'Loading workspace…'}
+          </p>
+        </div>
+      )}
     </div>
   )
 }
