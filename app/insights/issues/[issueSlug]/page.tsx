@@ -3,7 +3,9 @@ import { getServerSession } from 'next-auth'
 import { redirect } from 'next/navigation'
 import { authOptions } from '@/lib/auth'
 import { getIssueSummaries, ISSUE_SECTION_ORDER } from '@/lib/insights/issue-engine'
-import type { IssueSummary } from '@/lib/insights/issue-engine'
+import type { IssueSummary, ISSUE_SECTION_ORDER as ORDER } from '@/lib/insights/issue-engine'
+import dynamic from 'next/dynamic'
+const SectionPrefetcher = dynamic(() => import('./SectionPrefetcher'), { ssr: false })
 
 interface IssueOverviewPageProps {
   params: { issueSlug: string }
@@ -59,6 +61,8 @@ export default async function IssueOverviewPage({ params }: IssueOverviewPagePro
 
   return (
     <div className="space-y-6">
+      {/* Prefetch all sections in the background so opening is instant */}
+      <SectionPrefetcher issueSlug={issue.slug} sections={ORDER.filter((s)=>s!=='overview')} />
       <section className="bg-white border border-gray-200 rounded-2xl shadow-sm">
         <Link
           href={`/insights/issues/${issue.slug}/overview`}

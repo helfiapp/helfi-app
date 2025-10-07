@@ -98,8 +98,8 @@ interface UserInsightContext {
   userId: string
   issues: Array<{ id: string; name: string; polarity: 'positive' | 'negative'; slug: string }>
   healthGoals: Record<string, HealthGoalWithLogs>
-  supplements: Array<{ name: string; dosage: string; timing: string[] }>
-  medications: Array<{ name: string; dosage: string; timing: string[] }>
+  supplements: Array<{ name: string; dosage: string; timing: string[]; updatedAt: Date }>
+  medications: Array<{ name: string; dosage: string; timing: string[]; updatedAt: Date }>
   exerciseLogs: Array<{ type: string; duration: number; intensity: string | null; createdAt: Date }>
   foodLogs: Array<{ name: string; description: string | null; createdAt: Date }>
   todaysFoods: Array<{ name?: string; meal?: string; calories?: number }>
@@ -134,6 +134,105 @@ interface BloodResultsData {
 }
 
 const RATING_SCALE_DEFAULT = 6
+
+const RECENT_DATA_WINDOW_MS = 1000 * 60 * 60 * 24
+
+function isRecent(date: Date | null | undefined, windowMs = RECENT_DATA_WINDOW_MS) {
+  if (!date) return false
+  return date.getTime() >= Date.now() - windowMs
+}
+
+const SUPPLEMENT_KEYWORDS = [
+  'supplement',
+  'capsule',
+  'powder',
+  'extract',
+  'herb',
+  'herbal',
+  'oil',
+  'tincture',
+  'tea',
+  'vitamin',
+  'magnesium',
+  'zinc',
+  'omega',
+  'ashwagandha',
+  'turmeric',
+  'probiotic',
+  'adaptogen',
+  'psyllium',
+  'fiber',
+]
+
+const FOOD_KEYWORDS = [
+  'salad',
+  'apple',
+  'banana',
+  'pear',
+  'orange',
+  'citrus',
+  'broccoli',
+  'kale',
+  'spinach',
+  'fruit',
+  'vegetable',
+  'veg',
+  'berry',
+  'grain',
+  'oat',
+  'rice',
+  'bread',
+  'pasta',
+  'bean',
+  'lentil',
+  'fish',
+  'salmon',
+  'tuna',
+  'sardine',
+  'chicken',
+  'turkey',
+  'beef',
+  'egg',
+  'yogurt',
+  'kefir',
+  'smoothie',
+  'soup',
+  'stew',
+  'nut',
+  'seed',
+  'avocado',
+  'leafy',
+]
+
+function canonical(value: string) {
+  return value.trim().toLowerCase()
+}
+
+function looksSupplementLike(value: string) {
+  const lower = value.toLowerCase()
+  return SUPPLEMENT_KEYWORDS.some((keyword) => lower.includes(keyword))
+}
+
+function looksFoodLike(value: string) {
+  const lower = value.toLowerCase()
+  return FOOD_KEYWORDS.some((keyword) => lower.includes(keyword))
+}
+
+function hasRecentSupplementActivity(supplements: UserInsightContext['supplements']) {
+  return supplements.some((supp) => isRecent(supp.updatedAt))
+}
+
+function hasRecentMedicationActivity(medications: UserInsightContext['medications']) {
+  return medications.some((med) => isRecent(med.updatedAt))
+}
+
+function hasRecentExerciseLogs(exerciseLogs: UserInsightContext['exerciseLogs']) {
+  return exerciseLogs.some((log) => isRecent(log.createdAt))
+}
+
+function hasRecentFoodLogs(foodLogs: UserInsightContext['foodLogs']) {
+  return foodLogs.some((log) => isRecent(log.createdAt))
+}
 
 const ISSUE_KNOWLEDGE_BASE: Record<string, {
   aliases?: string[]
@@ -571,7 +670,11 @@ export async function getIssueSection(
 
   if (options.force) {
     const context = await loadUserInsightContext(userId)
-    return buildIssueSectionWithContext(context, slug, section, { mode, range: options.range })
+    return buildIssueSectionWithContext(context, slug, section, {
+      mode,
+      range: options.range,
+      force: true,
+    })
   }
 
   return computeIssueSection(userId, slug, section, mode, rangeKey)
@@ -627,6 +730,7 @@ const loadUserInsightContext = cache(async (userId: string): Promise<UserInsight
             name: true,
             dosage: true,
             timing: true,
+            updatedAt: true,
           },
         },
         medications: {
@@ -634,6 +738,7 @@ const loadUserInsightContext = cache(async (userId: string): Promise<UserInsight
             name: true,
             dosage: true,
             timing: true,
+            updatedAt: true,
           },
         },
         exerciseLogs: {
@@ -766,11 +871,13 @@ const loadUserInsightContext = cache(async (userId: string): Promise<UserInsight
       name: supp.name,
       dosage: supp.dosage,
       timing: supp.timing ?? [],
+      updatedAt: supp.updatedAt,
     })),
     medications: user.medications.map((med) => ({
       name: med.name,
       dosage: med.dosage,
       timing: med.timing ?? [],
+      updatedAt: med.updatedAt,
     })),
     exerciseLogs: user.exerciseLogs.map((log) => ({
       type: log.type,
@@ -928,7 +1035,7 @@ async function buildIssueSectionWithContext(
   context: UserInsightContext,
   slug: string,
   section: IssueSectionKey,
-  options: { mode: ReportMode; range?: { from?: string; to?: string } }
+  options: { mode: ReportMode; range?: { from?: string; to?: string }; force?: boolean }
 ): Promise<IssueSectionResult | null> {
   const issueRecord = context.issues.find(issue => issue.slug === slug) || {
     id: `temp:${slug}`,
@@ -944,25 +1051,25 @@ async function buildIssueSectionWithContext(
       base = await buildOverviewSection(summary, context)
       break
     case 'exercise':
-      base = await buildExerciseSection(summary, context)
+      base = await buildExerciseSection(summary, context, { forceRefresh: options.force ?? false })
       break
     case 'supplements':
-      base = await buildSupplementsSection(summary, context)
+      base = await buildSupplementsSection(summary, context, { forceRefresh: options.force ?? false })
       break
     case 'medications':
-      base = await buildMedicationsSection(summary, context)
+      base = await buildMedicationsSection(summary, context, { forceRefresh: options.force ?? false })
       break
     case 'interactions':
       base = await buildInteractionsSection(summary, context)
       break
     case 'labs':
-      base = await buildLabsSection(summary, context)
+      base = await buildLabsSection(summary, context, { forceRefresh: options.force ?? false })
       break
     case 'nutrition':
-      base = await buildNutritionSection(summary, context)
+      base = await buildNutritionSection(summary, context, { forceRefresh: options.force ?? false })
       break
     case 'lifestyle':
-      base = await buildLifestyleSection(summary, context)
+      base = await buildLifestyleSection(summary, context, { forceRefresh: options.force ?? false })
       break
     default:
       base = null
@@ -980,7 +1087,11 @@ async function computeIssueSection(
   _rangeKey: string
 ): Promise<IssueSectionResult | null> {
   const context = await loadUserInsightContext(userId)
-  return buildIssueSectionWithContext(context, slug, section, { mode, range: undefined })
+  return buildIssueSectionWithContext(context, slug, section, {
+    mode,
+    range: undefined,
+    force: false,
+  })
 }
 
 function enrichIssueSummary(issue: { id: string; name: string; polarity: 'positive' | 'negative'; slug: string }, context: UserInsightContext): IssueSummary {
@@ -1035,9 +1146,6 @@ function buildIssueBlockers(
   const blockers: string[] = []
   const key = pickKnowledgeKey(issue.name.toLowerCase())
   if (key === 'libido') {
-    if (!hasMatch(context.supplements.map(s => s.name), /zinc|ashwagandha|tongkat|tribulus|magnesium/i)) {
-      blockers.push('No libido-supportive supplements logged')
-    }
     if (!context.exerciseLogs.some(log => /strength|resistance|weights/i.test(log.type))) {
       blockers.push('Strength training frequency not captured')
     }
@@ -1169,8 +1277,49 @@ async function buildOverviewSection(issue: IssueSummary, context: UserInsightCon
   }
 }
 
-async function buildExerciseSection(issue: IssueSummary, context: UserInsightContext): Promise<BaseSectionResult> {
+async function buildExerciseSection(
+  issue: IssueSummary,
+  context: UserInsightContext,
+  options: { forceRefresh: boolean }
+): Promise<BaseSectionResult> {
   const now = new Date().toISOString()
+
+  if (options.forceRefresh && !hasRecentExerciseLogs(context.exerciseLogs)) {
+    return {
+      issue,
+      section: 'exercise',
+      generatedAt: now,
+      confidence: 0.2,
+      summary: 'Log a fresh exercise session to generate new guidance for this issue.',
+      highlights: [
+        {
+          title: 'No new exercise data',
+          detail: 'Add a recent workout or adjust your logs before regenerating insights.',
+          tone: 'warning',
+        },
+      ],
+      dataPoints: context.exerciseLogs.slice(0, 5).map((log) => ({
+        label: log.type,
+        value: `${log.duration} min`,
+        context: relativeDays(log.createdAt),
+      })),
+      recommendations: [
+        {
+          title: 'Capture a new workout',
+          description: 'Record today’s activity so the AI can tailor updated recommendations.',
+          actions: ['Open Health Tracking → Exercise', 'Log duration and intensity'],
+          priority: 'now',
+        },
+      ],
+      extras: {
+        workingActivities: [],
+        suggestedActivities: [],
+        avoidActivities: [],
+        totalLogged: context.exerciseLogs.length,
+        source: 'needs-fresh-data',
+      },
+    }
+  }
   const normalizedLogs = context.exerciseLogs.map((log) => ({
     name: log.type,
     dosage: log.duration ? `${log.duration} min` : null,
@@ -1186,9 +1335,10 @@ async function buildExerciseSection(issue: IssueSummary, context: UserInsightCon
       issueSummary: issue.highlight,
       items: normalizedLogs,
       otherItems: context.supplements.map((supp) => ({ name: supp.name, dosage: supp.dosage ?? null })),
+      profile: context.profile,
       mode: 'exercise',
     },
-    { minWorking: 1, minSuggested: 2, minAvoid: 2 }
+    { minWorking: 1, minSuggested: 4, minAvoid: 2 }
   )
 
   if (!llmResult) {
@@ -1228,7 +1378,6 @@ async function buildExerciseSection(issue: IssueSummary, context: UserInsightCon
     }
   }
 
-  const canonical = (value: string) => value.trim().toLowerCase()
   const logMap = new Map(normalizedLogs.map((log) => [canonical(log.name), log]))
 
   const workingActivities = llmResult.working.map((item) => {
@@ -1241,7 +1390,11 @@ async function buildExerciseSection(issue: IssueSummary, context: UserInsightCon
     }
   })
 
-  const suggestedActivities = llmResult.suggested.map((item) => ({
+  const novelSuggestedActivities = llmResult.suggested.filter(
+    (item) => !logMap.has(canonical(item.name))
+  )
+
+  const suggestedActivities = novelSuggestedActivities.map((item) => ({
     title: item.name,
     reason: item.reason,
     detail: item.protocol ?? null,
@@ -1319,9 +1472,52 @@ async function buildExerciseSection(issue: IssueSummary, context: UserInsightCon
   }
 }
 
-async function buildSupplementsSection(issue: IssueSummary, context: UserInsightContext): Promise<BaseSectionResult> {
+async function buildSupplementsSection(
+  issue: IssueSummary,
+  context: UserInsightContext,
+  options: { forceRefresh: boolean }
+): Promise<BaseSectionResult> {
   const now = new Date().toISOString()
   const supplements = context.supplements
+
+  if (options.forceRefresh && !hasRecentSupplementActivity(supplements)) {
+    return {
+      issue,
+      section: 'supplements',
+      generatedAt: now,
+      confidence: 0.2,
+      summary: 'Add or update a supplement entry to unlock a fresh analysis for this issue.',
+      highlights: [
+        {
+          title: 'No recent supplement updates',
+          detail: 'Record dose or timing changes before trying again so the AI has something new to review.',
+          tone: 'warning',
+        },
+      ],
+      dataPoints: supplements.map((supp) => ({
+        label: supp.name,
+        value: supp.dosage || 'Dose not set',
+        context: supp.timing?.length ? `Timing: ${supp.timing.join(', ')}` : 'Add timing details',
+      })),
+      recommendations: [
+        {
+          title: 'Update supplement log',
+          description: 'Capture any new products, dose changes, or timing tweaks.',
+          actions: ['Open Health Setup → Supplements', 'Add the latest regimen details'],
+          priority: 'now',
+        },
+      ],
+      extras: {
+        supportiveDetails: [],
+        suggestedAdditions: [],
+        avoidList: [],
+        missingDose: supplements.filter((supp) => !supp.dosage).map((supp) => supp.name),
+        missingTiming: supplements.filter((supp) => !supp.timing || !supp.timing.length).map((supp) => supp.name),
+        totalLogged: supplements.length,
+        source: 'needs-fresh-data',
+      },
+    }
+  }
 
   const normalizedSupplements = supplements.map((supp) => ({
     name: supp.name,
@@ -1335,9 +1531,10 @@ async function buildSupplementsSection(issue: IssueSummary, context: UserInsight
       issueSummary: issue.highlight,
       items: normalizedSupplements,
       otherItems: context.medications.map((med) => ({ name: med.name, dosage: med.dosage ?? null })),
+      profile: context.profile,
       mode: 'supplements',
     },
-    { minWorking: 1, minSuggested: 2, minAvoid: 2 }
+    { minWorking: 1, minSuggested: 4, minAvoid: 2 }
   )
 
   if (!llmResult) {
@@ -1379,7 +1576,6 @@ async function buildSupplementsSection(issue: IssueSummary, context: UserInsight
     }
   }
 
-  const canonical = (value: string) => value.trim().toLowerCase()
   const supplementMap = new Map(
     normalizedSupplements.map((supp) => [canonical(supp.name), supp])
   )
@@ -1404,11 +1600,15 @@ async function buildSupplementsSection(issue: IssueSummary, context: UserInsight
     }
   })
 
-  const suggestedAdditions = llmResult.suggested.map((item) => ({
+  const novelSuggestions = llmResult.suggested.filter(
+    (item) => !supplementMap.has(canonical(item.name))
+  )
+
+  const suggestedAdditions = novelSuggestions.map((item) => ({
     title: item.name,
     reason: item.reason,
     suggestion: item.protocol ?? null,
-    alreadyCovered: supplementMap.has(canonical(item.name)),
+    alreadyCovered: false,
   }))
 
   const avoidList = llmResult.avoid.map((item) => {
@@ -1420,6 +1620,23 @@ async function buildSupplementsSection(issue: IssueSummary, context: UserInsight
       timing: match?.timing ?? [],
     }
   })
+
+  // Targeted safeguard: if libido report for a male user returns too few avoid items,
+  // include a clinician-aware caution for saw palmetto due to DHT reduction linkage.
+  const lowerIssue = issue.name.toLowerCase()
+  const isMale = (context.profile.gender || '').toLowerCase().startsWith('m')
+  const hasSawPalmetto = normalizedSupplements.some((s) => /saw\s?palmetto/i.test(s.name))
+  if ((lowerIssue.includes('libido') || lowerIssue.includes('erection')) && isMale) {
+    const alreadyIncluded = avoidList.some((x) => /saw\s?palmetto/i.test(x.name))
+    if (!alreadyIncluded && (hasSawPalmetto || avoidList.length < 2)) {
+      avoidList.push({
+        name: 'Saw Palmetto',
+        reason: 'May lower DHT via 5‑alpha‑reductase inhibition and reduce libido in some men; discuss with your clinician.',
+        dosage: null,
+        timing: [],
+      })
+    }
+  }
 
   const summary = llmResult.summary?.trim().length
     ? llmResult.summary
@@ -1492,9 +1709,52 @@ async function buildSupplementsSection(issue: IssueSummary, context: UserInsight
   }
 }
 
-async function buildMedicationsSection(issue: IssueSummary, context: UserInsightContext): Promise<BaseSectionResult> {
+async function buildMedicationsSection(
+  issue: IssueSummary,
+  context: UserInsightContext,
+  options: { forceRefresh: boolean }
+): Promise<BaseSectionResult> {
   const now = new Date().toISOString()
   const medications = context.medications
+
+  if (options.forceRefresh && !hasRecentMedicationActivity(medications)) {
+    return {
+      issue,
+      section: 'medications',
+      generatedAt: now,
+      confidence: 0.2,
+      summary: 'Update your medication list or dosing to generate refreshed insights.',
+      highlights: [
+        {
+          title: 'No recent medication data',
+          detail: 'Log any new prescriptions or adjustments before trying again.',
+          tone: 'warning',
+        },
+      ],
+      dataPoints: medications.map((med) => ({
+        label: med.name,
+        value: med.dosage || 'Dose not set',
+        context: med.timing?.length ? `Timing: ${med.timing.join(', ')}` : 'Add timing details',
+      })),
+      recommendations: [
+        {
+          title: 'Record latest medications',
+          description: 'Capture dose, timing, and new therapies so the AI can analyse meaningful changes.',
+          actions: ['Open Health Setup → Medications', 'Add recent adjustments'],
+          priority: 'now',
+        },
+      ],
+      extras: {
+        supportiveDetails: [],
+        suggestedAdditions: [],
+        avoidList: [],
+        missingDose: medications.filter((med) => !med.dosage).map((med) => med.name),
+        missingTiming: medications.filter((med) => !med.timing || !med.timing.length).map((med) => med.name),
+        totalLogged: medications.length,
+        source: 'needs-fresh-data',
+      },
+    }
+  }
 
   const normalizedMeds = medications.map((med) => ({
     name: med.name,
@@ -1508,9 +1768,10 @@ async function buildMedicationsSection(issue: IssueSummary, context: UserInsight
       issueSummary: issue.highlight,
       items: normalizedMeds,
       otherItems: context.supplements.map((supp) => ({ name: supp.name, dosage: supp.dosage ?? null })),
+      profile: context.profile,
       mode: 'medications',
     },
-    { minWorking: 1, minSuggested: 2, minAvoid: 2 }
+    { minWorking: 1, minSuggested: 4, minAvoid: 2 }
   )
 
   if (!llmResult) {
@@ -1552,8 +1813,10 @@ async function buildMedicationsSection(issue: IssueSummary, context: UserInsight
     }
   }
 
-  const canonical = (value: string) => value.trim().toLowerCase()
   const medMap = new Map(normalizedMeds.map((med) => [canonical(med.name), med]))
+  const supplementNameSet = new Set(
+    context.supplements.map((supp) => canonical(supp.name))
+  )
 
   const parseTiming = (timing?: string | null, fallback?: string[]) => {
     if (timing && timing.trim().length) {
@@ -1565,38 +1828,68 @@ async function buildMedicationsSection(issue: IssueSummary, context: UserInsight
     return fallback ?? []
   }
 
-  const supportiveDetails = llmResult.working.map((item) => {
-    const match = medMap.get(canonical(item.name))
-    return {
-      name: item.name,
-      reason: item.reason,
-      dosage: item.dosage ?? match?.dosage ?? null,
-      timing: parseTiming(item.timing, match?.timing ?? []),
-    }
+  const supportiveDetails = llmResult.working
+    .map((item) => {
+      const nameKey = canonical(item.name)
+      if (supplementNameSet.has(nameKey) || looksSupplementLike(item.name) || looksSupplementLike(item.reason)) {
+        return null
+      }
+      const match = medMap.get(nameKey)
+      if (!match) return null
+      return {
+        name: item.name,
+        reason: item.reason,
+        dosage: item.dosage ?? match?.dosage ?? null,
+        timing: parseTiming(item.timing, match?.timing ?? []),
+      }
+    })
+    .filter(Boolean) as Array<{ name: string; reason: string; dosage: string | null; timing: string[] }>
+
+  const novelSuggestions = llmResult.suggested.filter((item) => {
+    const nameKey = canonical(item.name)
+    if (supplementNameSet.has(nameKey)) return false
+    if (looksSupplementLike(item.name) || looksSupplementLike(item.reason)) return false
+    return !medMap.has(nameKey)
   })
 
-  const suggestedAdditions = llmResult.suggested.map((item) => ({
+  const suggestedAdditions = novelSuggestions.map((item) => ({
     title: item.name,
     reason: item.reason,
     suggestion: item.protocol ?? null,
-    alreadyCovered: medMap.has(canonical(item.name)),
+    alreadyCovered: false,
   }))
 
-  const avoidList = llmResult.avoid.map((item) => {
-    const match = medMap.get(canonical(item.name))
-    return {
-      name: item.name,
-      reason: item.reason,
-      dosage: match?.dosage ?? null,
-      timing: match?.timing ?? [],
-    }
-  })
+  const avoidList = llmResult.avoid
+    .map((item) => {
+      const nameKey = canonical(item.name)
+      if (supplementNameSet.has(nameKey) || looksSupplementLike(item.name) || looksSupplementLike(item.reason)) {
+        return null
+      }
+      const match = medMap.get(nameKey)
+      return {
+        name: item.name,
+        reason: item.reason,
+        dosage: match?.dosage ?? null,
+        timing: match?.timing ?? [],
+      }
+    })
+    .filter(Boolean) as Array<{ name: string; reason: string; dosage: string | null; timing: string[] }>
 
-  const summary = llmResult.summary?.trim().length
-    ? llmResult.summary
-    : supportiveDetails.length
-    ? `You have ${supportiveDetails.length} medication${supportiveDetails.length === 1 ? '' : 's'} aligned with ${issue.name}.`
-    : 'AI-generated guidance ready below.'
+  const hasAnyMedicationGuidance =
+    supportiveDetails.length + suggestedAdditions.length + avoidList.length > 0
+
+  let summary = llmResult.summary?.trim().length ? llmResult.summary : ''
+  if (!summary) {
+    if (!medications.length) {
+      summary = 'No medications in your log appear related to this health issue yet.'
+    } else if (supportiveDetails.length) {
+      summary = `You have ${supportiveDetails.length} medication${supportiveDetails.length === 1 ? '' : 's'} aligned with ${issue.name}.`
+    } else if (!hasAnyMedicationGuidance) {
+      summary = 'No medication-specific guidance is available—log new prescriptions or consult your clinician.'
+    } else {
+      summary = 'AI-generated medication guidance ready below.'
+    }
+  }
 
   const recommendations: SectionRecommendation[] = llmResult.recommendations.length
     ? llmResult.recommendations.map((rec) => ({
@@ -1619,21 +1912,25 @@ async function buildMedicationsSection(issue: IssueSummary, context: UserInsight
       title: "What's working",
       detail: supportiveDetails.length
         ? supportiveDetails.map((item) => `${item.name}: ${item.reason}`).join('; ')
-        : 'No medications clearly supporting this issue yet.',
+        : 'No medications in your log are clearly supporting this issue yet.',
       tone: supportiveDetails.length ? 'positive' : 'neutral',
     },
     {
       title: 'Opportunities',
       detail: suggestedAdditions.length
         ? suggestedAdditions.map((item) => `${item.title}: ${item.reason}`).join('; ')
-        : 'Leverage the suggestions below for your next clinician discussion.',
+        : medications.length
+        ? 'No additional medications to suggest—discuss options with your clinician if symptoms persist.'
+        : 'Add prescribed or OTC medications to your log so the AI can surface targeted options.',
       tone: suggestedAdditions.length ? 'neutral' : 'positive',
     },
     {
       title: 'Cautions',
       detail: avoidList.length
         ? avoidList.map((item) => `${item.name}: ${item.reason}`).join('; ')
-        : 'No avoid items flagged—review the AI cautions below for future awareness.',
+        : medications.length
+        ? 'No medications flagged for caution right now—continue monitoring with your clinician.'
+        : 'Once medications are logged, cautions will show here.',
       tone: avoidList.length ? 'warning' : 'neutral',
     },
   ]
@@ -1732,7 +2029,11 @@ async function buildInteractionsSection(issue: IssueSummary, context: UserInsigh
   }
 }
 
-async function buildLabsSection(issue: IssueSummary, context: UserInsightContext): Promise<BaseSectionResult> {
+async function buildLabsSection(
+  issue: IssueSummary,
+  context: UserInsightContext,
+  _options: { forceRefresh: boolean }
+): Promise<BaseSectionResult> {
   const now = new Date().toISOString()
   const blood = context.bloodResults
 
@@ -1748,9 +2049,10 @@ async function buildLabsSection(issue: IssueSummary, context: UserInsightContext
       issueSummary: issue.highlight,
       items: labItems,
       otherItems: context.supplements.map((supp) => ({ name: supp.name, dosage: supp.dosage ?? null })),
+      profile: context.profile,
       mode: 'labs',
     },
-    { minWorking: 1, minSuggested: 2, minAvoid: 2 }
+    { minWorking: 1, minSuggested: 4, minAvoid: 2 }
   )
 
   if (!llmResult) {
@@ -1868,7 +2170,11 @@ async function buildLabsSection(issue: IssueSummary, context: UserInsightContext
   }
 }
 
-async function buildNutritionSection(issue: IssueSummary, context: UserInsightContext): Promise<BaseSectionResult> {
+async function buildNutritionSection(
+  issue: IssueSummary,
+  context: UserInsightContext,
+  options: { forceRefresh: boolean }
+): Promise<BaseSectionResult> {
   const now = new Date().toISOString()
   const foods: Array<{ name?: string; meal?: string; calories?: number }> = context.todaysFoods.length
     ? context.todaysFoods
@@ -1878,11 +2184,88 @@ async function buildNutritionSection(issue: IssueSummary, context: UserInsightCo
         calories: undefined,
       }))
 
+  if (options.forceRefresh && !hasRecentFoodLogs(context.foodLogs)) {
+    return {
+      issue,
+      section: 'nutrition',
+      generatedAt: now,
+      confidence: 0.2,
+      summary: 'Log what you ate today to unlock fresh nutrition insights for this issue.',
+      highlights: [
+        {
+          title: 'No recent food entries',
+          detail: 'Record meals or snacks before regenerating so the AI can tailor its suggestions.',
+          tone: 'warning',
+        },
+      ],
+      dataPoints: context.foodLogs.slice(0, 5).map((log) => ({
+        label: log.name,
+        value: log.description ?? 'No description logged',
+        context: relativeDays(log.createdAt),
+      })),
+      recommendations: [
+        {
+          title: 'Capture today’s meals',
+          description: 'Add breakfast, lunch, dinner, and snacks so insights focus on your actual intake.',
+          actions: ['Open Food Diary', 'Log each meal with portion details'],
+          priority: 'now',
+        },
+      ],
+      extras: {
+        workingFocus: [],
+        suggestedFocus: [],
+        avoidFoods: [],
+        totalLogged: context.foodLogs.length,
+        source: 'needs-fresh-data',
+      },
+    }
+  }
+
+  if (!foods.length) {
+    return {
+      issue,
+      section: 'nutrition',
+      generatedAt: now,
+      confidence: 0.2,
+      summary: 'No foods are logged yet for this issue—add meals to unlock personalised guidance.',
+      highlights: [
+        {
+          title: 'No food data',
+          detail: 'Record today’s meals or snacks so the AI can analyse nutrition patterns.',
+          tone: 'warning',
+        },
+      ],
+      dataPoints: [],
+      recommendations: [
+        {
+          title: 'Log meals',
+          description: 'Track what you eat today to receive tailored nutrition insights.',
+          actions: ['Open Food Diary', 'Add each meal with portion details'],
+          priority: 'now',
+        },
+      ],
+      extras: {
+        workingFocus: [],
+        suggestedFocus: [],
+        avoidFoods: [],
+        totalLogged: 0,
+        source: 'needs-data',
+      },
+    }
+  }
+
   const normalizedFoods = foods.map((food, idx) => ({
     name: food.name || food.meal || `Entry ${idx + 1}`,
     dosage: food.calories ? `${food.calories} kcal` : food.meal ?? null,
     timing: food.meal ? [food.meal] : [],
   }))
+
+  const nonFoodNameSet = new Set(
+    [
+      ...context.supplements.map((supp) => canonical(supp.name)),
+      ...context.medications.map((med) => canonical(med.name)),
+    ]
+  )
 
   const llmResult = await generateSectionInsightsFromLLM(
     {
@@ -1890,9 +2273,10 @@ async function buildNutritionSection(issue: IssueSummary, context: UserInsightCo
       issueSummary: issue.highlight,
       items: normalizedFoods,
       otherItems: context.supplements.map((supp) => ({ name: supp.name, dosage: supp.dosage ?? null })),
+      profile: context.profile,
       mode: 'nutrition',
     },
-    { minWorking: 1, minSuggested: 2, minAvoid: 2 }
+    { minWorking: 1, minSuggested: 4, minAvoid: 2 }
   )
 
   if (!llmResult) {
@@ -1932,47 +2316,74 @@ async function buildNutritionSection(issue: IssueSummary, context: UserInsightCo
     }
   }
 
-  const workingFocus = llmResult.working.map((item) => ({
-    title: item.name,
-    reason: item.reason,
-    example: item.dosage ?? item.timing ?? '',
-  }))
+  const allowFoodName = (name: string, reason: string) => {
+    const nameKey = canonical(name)
+    if (nonFoodNameSet.has(nameKey)) return false
+    if (looksSupplementLike(name) || looksSupplementLike(reason)) return false
+    if (looksFoodLike(name)) return true
+    return name.split(' ').length >= 1 && !looksSupplementLike(name)
+  }
 
-  const suggestedFocus = llmResult.suggested.map((item) => ({
-    title: item.name,
-    reason: item.reason,
-    detail: item.protocol ?? null,
-  }))
+  const workingFocus = llmResult.working
+    .map((item) => ({
+      title: item.name,
+      reason: item.reason,
+      example: item.dosage ?? item.timing ?? '',
+    }))
+    .filter((item) => allowFoodName(item.title, item.reason))
 
-  const avoidFoods = llmResult.avoid.map((item) => ({
-    name: item.name,
-    reason: item.reason,
-  }))
+  const suggestedFocus = llmResult.suggested
+    .map((item) => ({
+      title: item.name,
+      reason: item.reason,
+      detail: item.protocol ?? null,
+    }))
+    .filter((item) => allowFoodName(item.title, item.reason))
 
-  const summary = llmResult.summary?.trim().length
-    ? llmResult.summary
-    : 'AI-generated nutrition guidance ready below.'
+  const avoidFoods = llmResult.avoid
+    .map((item) => ({
+      name: item.name,
+      reason: item.reason,
+    }))
+    .filter((item) => allowFoodName(item.name, item.reason))
+
+  let summary = llmResult.summary?.trim().length ? llmResult.summary : ''
+  if (!summary) {
+    if (!foods.length) {
+      summary = 'No foods are logged yet for this issue—add meals to unlock personalised nutrition guidance.'
+    } else if (!workingFocus.length && !suggestedFocus.length && !avoidFoods.length) {
+      summary = 'Current food logs do not show clear support for this issue. Consider logging fresh meals for better guidance.'
+    } else {
+      summary = 'AI-generated nutrition guidance ready below.'
+    }
+  }
 
   const highlights: SectionHighlight[] = [
     {
       title: 'Nutrition wins',
       detail: workingFocus.length
         ? workingFocus.map((focus) => `${focus.title}: ${focus.reason}`).join('; ')
-        : 'No foods flagged as supportive yet.',
-      tone: workingFocus.length ? 'positive' : 'neutral',
+        : foods.length
+        ? 'None of the foods you are currently eating are clearly helping this issue.'
+        : 'There are no logged foods supporting this issue yet.',
+      tone: workingFocus.length ? 'positive' : foods.length ? 'neutral' : 'warning',
     },
     {
       title: 'Add to your plan',
       detail: suggestedFocus.length
         ? suggestedFocus.map((focus) => `${focus.title}: ${focus.reason}`).join('; ')
-        : 'Review suggestions below to expand your plan.',
-      tone: suggestedFocus.length ? 'neutral' : 'positive',
+        : foods.length
+        ? 'No new foods to suggest—log additional meals or discuss options with a clinician.'
+        : 'Add meals to your diary so the AI can recommend supportive foods.',
+      tone: suggestedFocus.length ? 'neutral' : foods.length ? 'neutral' : 'warning',
     },
     {
       title: 'Foods to monitor',
       detail: avoidFoods.length
         ? avoidFoods.map((food) => `${food.name}: ${food.reason}`).join('; ')
-        : 'No avoid items flagged—see the cautions below for awareness.',
+        : foods.length
+        ? 'No foods flagged as problematic right now—keep logging meals.'
+        : 'Problem foods will appear here once meals are logged.',
       tone: avoidFoods.length ? 'warning' : 'neutral',
     },
   ]
@@ -2016,7 +2427,11 @@ async function buildNutritionSection(issue: IssueSummary, context: UserInsightCo
   }
 }
 
-async function buildLifestyleSection(issue: IssueSummary, context: UserInsightContext): Promise<BaseSectionResult> {
+async function buildLifestyleSection(
+  issue: IssueSummary,
+  context: UserInsightContext,
+  _options: { forceRefresh: boolean }
+): Promise<BaseSectionResult> {
   const now = new Date().toISOString()
   const lifestyleItems: Array<{ name: string; dosage?: string | null; timing?: string[] | null }> = []
 
@@ -2042,9 +2457,10 @@ async function buildLifestyleSection(issue: IssueSummary, context: UserInsightCo
       issueSummary: issue.highlight,
       items: lifestyleItems,
       otherItems: context.supplements.map((supp) => ({ name: supp.name, dosage: supp.dosage ?? null })),
+      profile: context.profile,
       mode: 'lifestyle',
     },
-    { minWorking: 1, minSuggested: 2, minAvoid: 2 }
+    { minWorking: 1, minSuggested: 4, minAvoid: 2 }
   )
 
   if (!llmResult) {
