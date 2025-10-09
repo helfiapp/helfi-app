@@ -147,6 +147,12 @@ You MUST audit every item in focusItems (the user's logged items). For each:
 - If it warrants caution for this issue, include it in "avoid" with a short clinical rationale.
 - If it is neutral/irrelevant, you may omit it (do not put in suggested).
 
+STRICT RULES:
+- Prioritise logged items: if a focusItem is plausibly supportive for the issue, include it in "working" using the exact name from focusItems and provide rationale.
+- Supplements mode: only include supplements/herbs/nutraceuticals. Never include alcohol, foods, or lifestyle items in any bucket.
+- Nutrition mode: only mark foods as "working" if they appear in focusItems. Use suggested/avoid for novel foods.
+- Reasons must include mechanism + relevance; add dose/timing where appropriate.
+
 Classify findings into three buckets: working (helpful/supportive today), suggested (worth discussing with clinician to add), avoid (risky or counterproductive). Always provide detailed clinical reasons (two sentences: mechanism + relevance to the specific issue). ${guidanceFocus}
 Ensure the suggested array contains at least ${minSuggested} unique entries that are not already in the focusItems list, and avoid duplicating any names from focusItems unless you are recommending a changed protocol. Provide concise but specific reasons (mechanism + relevance) and include dosing/timing where appropriate.
 
@@ -168,8 +174,9 @@ Close every array/object and ensure the JSON is syntactically valid—never trun
 
   // Add targeted domain rules for specific issues
   const loweredIssue = issueName.toLowerCase()
+  const loweredIssue = issueName.toLowerCase()
   const libidoRules = loweredIssue.includes('libido') || loweredIssue.includes('erection')
-    ? `\nIssue-specific rules for libido:\n- Consider sex, age, weight/height, and training frequency when assessing androgen status and arousal.\n- Evaluate mechanisms: testosterone/DHT, nitric oxide/endothelial function, SHBG, stress/cortisol, sleep.\n- For males, flag 5-alpha-reductase inhibitors (e.g., saw palmetto) as potential libido-reducing; explain the DHT rationale and advise clinician discussion.\n- Provide concrete protocols where possible (e.g., dosing ranges/timing windows).\n`
+    ? `\nIssue-specific rules for libido:\n- Consider sex, age, weight/height, and training frequency when assessing androgen status and arousal.\n- Evaluate mechanisms: testosterone/DHT, nitric oxide/endothelial function, SHBG, stress/cortisol, sleep.\n- When focusItems include botanicals commonly discussed for libido (e.g., Tongkat Ali, Cistanche, Muira Puama), assess them and include in "working" if supportive with rationale; otherwise omit without moving them to suggested.\n- For males, flag 5-alpha-reductase inhibitors (e.g., saw palmetto) as potential libido-reducing; explain the DHT rationale and advise clinician discussion.\n- Provide concrete protocols where possible (e.g., dosing ranges/timing windows).\n`
     : ''
 
   return `${header}\n\nIssue summary: ${issueSummary ?? 'Not supplied.'}\n\nUser context (JSON):\n${userContext}\n\n${baseGuidance}\n${libidoRules}${forceNote}`
@@ -237,7 +244,7 @@ export async function generateSectionInsightsFromLLM(
       const response = await openai.chat.completions.create({
         model: process.env.OPENAI_INSIGHTS_MODEL ?? 'gpt-4o-mini',
         temperature: 0.1,
-        max_tokens: 900,
+        max_tokens: 700,
         response_format: { type: 'json_object' },
         messages: [
           {
