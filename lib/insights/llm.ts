@@ -174,7 +174,6 @@ Close every array/object and ensure the JSON is syntactically valid—never trun
 
   // Add targeted domain rules for specific issues
   const loweredIssue = issueName.toLowerCase()
-  const loweredIssue = issueName.toLowerCase()
   const libidoRules = loweredIssue.includes('libido') || loweredIssue.includes('erection')
     ? `\nIssue-specific rules for libido:\n- Consider sex, age, weight/height, and training frequency when assessing androgen status and arousal.\n- Evaluate mechanisms: testosterone/DHT, nitric oxide/endothelial function, SHBG, stress/cortisol, sleep.\n- When focusItems include botanicals commonly discussed for libido (e.g., Tongkat Ali, Cistanche, Muira Puama), assess them and include in "working" if supportive with rationale; otherwise omit without moving them to suggested.\n- For males, flag 5-alpha-reductase inhibitors (e.g., saw palmetto) as potential libido-reducing; explain the DHT rationale and advise clinician discussion.\n- Provide concrete protocols where possible (e.g., dosing ranges/timing windows).\n`
     : ''
