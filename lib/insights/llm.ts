@@ -99,13 +99,13 @@ interface LLMOptions {
 function modeGuidance(mode: SectionMode) {
   switch (mode) {
     case 'supplements':
-      return 'Evaluate supplements. Identify which are truly helpful for the issue, which additions to discuss with a clinician, and which supplements people with this issue should avoid or monitor.'
+      return 'Evaluate supplements only (herbs, vitamins, nutraceuticals). Identify which logged supplements are truly helpful for the issue, which novel additions to discuss with a clinician, and which supplements people with this issue should avoid or monitor. Never include alcohol, foods, or lifestyle items in this section.'
     case 'medications':
       return 'Evaluate prescription and OTC pharmaceutical therapies only (no supplements, herbs, nutraceuticals, or vitamins). Highlight medications that are supporting the issue, medication additions to discuss with a prescriber, and medications that warrant caution or avoidance.'
     case 'exercise':
       return 'Evaluate exercise and movement patterns. Highlight the training that supports this issue, recommended additions, and activities/protocols to limit or avoid.'
     case 'nutrition':
-      return 'Evaluate nutrition patterns using foods, meals, or dietary patterns only. Do not mention supplements or pills. Highlight foods/meals that help, additions to include, and foods or dietary approaches to avoid for this issue.'
+      return 'Evaluate nutrition patterns using foods, meals, or dietary patterns only. Do not mention supplements or pills. Highlight foods/meals that help, additions to include, and foods or dietary approaches to avoid for this issue. Only mark "working" foods that are present in focusItems.'
     case 'lifestyle':
       return 'Evaluate lifestyle habits (sleep, stress, routines). Highlight habits that are helping, habits to add, and habits/behaviours to avoid for this issue.'
     case 'labs':
@@ -148,7 +148,7 @@ You MUST audit every item in focusItems (the user's logged items). For each:
 - If it is neutral/irrelevant, you may omit it (do not put in suggested).
 
 Classify findings into three buckets: working (helpful/supportive today), suggested (worth discussing with clinician to add), avoid (risky or counterproductive). Always provide detailed clinical reasons (two sentences: mechanism + relevance to the specific issue). ${guidanceFocus}
-Ensure the suggested array contains at least ${minSuggested} unique entries that are not already in the focusItems list, and avoid duplicating any names from focusItems unless you are recommending a changed protocol.
+Ensure the suggested array contains at least ${minSuggested} unique entries that are not already in the focusItems list, and avoid duplicating any names from focusItems unless you are recommending a changed protocol. Provide concise but specific reasons (mechanism + relevance) and include dosing/timing where appropriate.
 
 Return JSON exactly matching this schema (no extra keys, no missing keys, do not rename fields):
 {

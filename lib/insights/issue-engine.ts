@@ -1447,15 +1447,18 @@ async function buildExerciseSection(
 
   const logMap = new Map(normalizedLogs.map((log) => [canonical(log.name), log]))
 
-  const workingActivities = llmResult.working.map((item) => {
-    const match = logMap.get(canonical(item.name))
-    return {
-      title: item.name,
-      reason: item.reason,
-      summary: item.dosage ?? match?.dosage ?? '',
-      lastLogged: item.timing ?? match?.timing?.[0] ?? '',
-    }
-  })
+  const workingActivities = llmResult.working
+    .map((item) => {
+      const match = logMap.get(canonical(item.name))
+      if (!match) return null
+      return {
+        title: item.name,
+        reason: item.reason,
+        summary: item.dosage ?? match?.dosage ?? '',
+        lastLogged: item.timing ?? match?.timing?.[0] ?? '',
+      }
+    })
+    .filter(Boolean) as Array<{ title: string; reason: string; summary: string; lastLogged: string }>
 
   const novelSuggestedActivities = llmResult.suggested.filter(
     (item) => !logMap.has(canonical(item.name))
@@ -1657,15 +1660,18 @@ async function buildSupplementsSection(
     return fallback ?? []
   }
 
-  const supportiveDetails = llmResult.working.map((item) => {
-    const match = supplementMap.get(canonical(item.name))
-    return {
-      name: item.name,
-      reason: item.reason,
-      dosage: item.dosage ?? match?.dosage ?? null,
-      timing: parseTiming(item.timing, match?.timing ?? []),
-    }
-  })
+  const supportiveDetails = llmResult.working
+    .map((item) => {
+      const match = supplementMap.get(canonical(item.name))
+      if (!match) return null
+      return {
+        name: item.name,
+        reason: item.reason,
+        dosage: item.dosage ?? match?.dosage ?? null,
+        timing: parseTiming(item.timing, match?.timing ?? []),
+      }
+    })
+    .filter(Boolean) as Array<{ name: string; reason: string; dosage: string | null; timing: string[] }>
 
   const novelSuggestions = llmResult.suggested.filter(
     (item) => !supplementMap.has(canonical(item.name))
@@ -1678,15 +1684,21 @@ async function buildSupplementsSection(
     alreadyCovered: false,
   }))
 
-  const avoidList = llmResult.avoid.map((item) => {
-    const match = supplementMap.get(canonical(item.name))
-    return {
-      name: item.name,
-      reason: item.reason,
-      dosage: match?.dosage ?? null,
-      timing: match?.timing ?? [],
-    }
-  })
+  const avoidList = llmResult.avoid
+    .map((item) => {
+      const match = supplementMap.get(canonical(item.name))
+      return {
+        name: item.name,
+        reason: item.reason,
+        dosage: match?.dosage ?? null,
+        timing: match?.timing ?? [],
+      }
+    })
+    // Keep only true supplements (allow logged or names that look supplement-like).
+    .filter((entry) => {
+      const isLogged = supplementMap.has(canonical(entry.name))
+      return isLogged || looksSupplementLike(entry.name) || looksSupplementLike(entry.reason)
+    })
 
   // Targeted safeguard: if libido report for a male user returns too few avoid items,
   // include a clinician-aware caution for saw palmetto due to DHT reduction linkage.
@@ -2251,6 +2263,46 @@ async function buildNutritionSection(
         calories: undefined,
       }))
 
+  // If there are food logs but none are recent, prefer a clear gating state rather than
+  // hallucinating "working" foods from stale data.
+  if (!hasRecentFoodLogs(context.foodLogs)) {
+    const now = new Date().toISOString()
+    return {
+      issue,
+      section: 'nutrition',
+      generatedAt: now,
+      confidence: 0.2,
+      summary: 'No recent food entries — log today’s meals to unlock accurate nutrition insights for this issue.',
+      highlights: [
+        {
+          title: 'No recent food data',
+          detail: 'Record meals or snacks before regenerating so the AI can tailor its suggestions.',
+          tone: 'warning',
+        },
+      ],
+      dataPoints: context.foodLogs.slice(0, 3).map((log) => ({
+        label: log.name,
+        value: log.description ?? 'No description logged',
+        context: relativeDays(log.createdAt),
+      })),
+      recommendations: [
+        {
+          title: 'Capture today’s meals',
+          description: 'Add breakfast, lunch, dinner, and snacks so insights focus on your actual intake.',
+          actions: ['Open Food Diary', 'Log each meal with portion details'],
+          priority: 'now',
+        },
+      ],
+      extras: {
+        workingFocus: [],
+        suggestedFocus: [],
+        avoidFoods: [],
+        totalLogged: context.foodLogs.length,
+        source: 'needs-fresh-data',
+      },
+    }
+  }
+
   if (options.forceRefresh && !hasRecentFoodLogs(context.foodLogs)) {
     return {
       issue,
@@ -2391,13 +2443,15 @@ async function buildNutritionSection(
     return name.split(' ').length >= 1 && !looksSupplementLike(name)
   }
 
+  const foodNameSet = new Set(normalizedFoods.map((f) => canonical(f.name)))
   const workingFocus = llmResult.working
     .map((item) => ({
       title: item.name,
       reason: item.reason,
       example: item.dosage ?? item.timing ?? '',
     }))
-    .filter((item) => allowFoodName(item.title, item.reason))
+    // Only show foods the user actually logged as "working".
+    .filter((item) => allowFoodName(item.title, item.reason) && foodNameSet.has(canonical(item.title)))
 
   const suggestedFocus = llmResult.suggested
     .map((item) => ({
