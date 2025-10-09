@@ -49,18 +49,6 @@
 5. **Complete Section Coverage**
    - Ensure each section's front-end routes (e.g. `nutrition/suggested/...`) render the new `extras` structure. They currently expect arrays of objects as provided by the helper.
 
-## Removed Files
-- `AGENT_26_EXIT_VERIFICATION.md`
-- `AGENT_30_EXIT_VERIFICATION.md`
-- `AGENT_35_EXIT_VERIFICATION.md`
-- `AGENT_41_EXIT_VERIFICATION.md`
-- `AGENT_44_EXIT_VERIFICATION.md`
-- `AGENT_46_EXIT_VERIFICATION.md`
-- `AGENT_PROTOCOL_PROMPT.md`
-- `AGENT_TRACKING_SYSTEM.md`
-
-(Per request, these legacy agent documents were deleted.)
-
 ---
 If additional detail is required, check Git history around commits `03c415a`, `ceef23b`, `5487117`, and `26d8d24` for exact code changes.
 
@@ -104,18 +92,9 @@ How to revert quickly (safe rollback)
   - `73c82c7` (prompt/libido rules, blocker removal, prefetcher)
 - Or reset to pre‑overhaul state at `26d8d24` (previous deploy referenced in earlier notes), which still produced content albeit generic.
 
-Concrete fixes for next agent (do before re‑enabling strict prompts)
-1) Do not cache failures:
-   - In `getIssueSection` and `computeIssueSection`, write to `InsightsSectionCache` only when the section is built from a successful LLM result (i.e., not the “generation unavailable” branches). Add a simple flag like `extras.source !== 'llm-error'` before persisting.
-2) Restore resiliency temporarily:
-   - Increase `maxRetries` back to 2 (or 3) and `max_tokens` back to ~900.
-   - Keep `response_format: json_object`, but if `safeParse` fails, attempt a second pass: strip markdown fences, extract the first `{ ... }` JSON block, then parse.
-3) Tame prefetch burst:
-   - Either remove `SectionPrefetcher` or serialize the POSTs (Promise.allSettled with a small delay) to avoid thundering herd + failure caching.
-4) Logging:
+Concrete fixes for next agent (open items only)
+1) Logging:
    - Add server logs around `[insights.llm]` to capture content on parse failure in production (ideally redact PHI). This was recommended previously but still needed to diagnose live behavior.
-5) Validation thresholds:
-   - Keep min counts, but if the model returns fewer than required, return the partial result instead of null and let the UI show it (avoid all‑or‑nothing failures).
 
 User‑reported impact
 - “Now I’m getting no results at all.” Libido supplements show generation‑unavailable; Cistanche is not surfaced; Avoid often empty; perceived performance unchanged.
@@ -161,8 +140,7 @@ Top problems (as reported on live)
      - Respect “Working = logged items only” but still provide Suggested/Avoid when logs are missing.
      - Hit minimum counts (Working ≥1 when plausible; Suggested ≥4; Avoid ≥2) unless clearly impossible (e.g., no data and no general guidance)—in that case, say why and how to add data.
 
-7) Deployment confusion: “Production: Staged”
-   - Vercel showed “Staged” because a rollback was active. Undo Rollback was required to make the latest deploy Current. Future agents should call this out when asking the user to verify changes on live.
+
 
 Observed screens (user screenshots)
 - Libido → Supplements → Working: shows some botanicals (e.g., Muira Puama, Zinc) but Cistanche missing despite being logged.
@@ -194,22 +172,12 @@ Engineering causes (suspected) and fixes to implement
    - Add stronger, explicit issue‑specific rules so libido botanicals like Cistanche are evaluated and surfaced when appropriate.
    - Keep strict JSON but allow salvage parsing again if response_format deviates.
 
-2) Do not cache failures/empties
-   - Already implemented: cache only successful results (no llm‑error/needs‑data sources). Confirm this is deployed and working.
-
-3) Prefetch/rate control
-   - Serialize or throttle background prefetch. Avoid thundering herd that caches transient failures.
-
-4) Partial results instead of nulls
-   - When fewer than minimum counts are returned, surface partial results rather than failing the whole section. Keep the min counts as a target and display what we have.
-
-5) Performance tactics
+2) Performance tactics
    - Cap tokens to ~650–750 where safe; reduce temperature; reuse short, issue‑specific prompts.
-   - Introduce short‑TTL in‑memory cache (30m) keyed on user/issue/section/mode/range.
    - Parallelize independent sections on the server but limit concurrency to 2–3 to avoid rate limiting.
    - Add server‑side timing logs per section (DB fetch, LLM call, parse, render).
 
-6) Telemetry
+3) Telemetry
    - Log parse failures with redacted content and the invalid schema issues. Capture counts of empty buckets per section.
 
 Repro steps for current defects
