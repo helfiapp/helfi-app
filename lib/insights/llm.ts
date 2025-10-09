@@ -142,8 +142,13 @@ function buildPrompt(
   const baseGuidance = `
 Provide precise, evidence-aligned guidance. Use the user context plus widely accepted best practice. If data is insufficient, state that but still offer clinician-ready suggestions.
 
+You MUST audit every item in focusItems (the user's logged items). For each:
+- If it supports the issue, include it in "working" with a mechanism-based reason and optional dose/timing.
+- If it warrants caution for this issue, include it in "avoid" with a short clinical rationale.
+- If it is neutral/irrelevant, you may omit it (do not put in suggested).
+
 Classify findings into three buckets: working (helpful/supportive today), suggested (worth discussing with clinician to add), avoid (risky or counterproductive). Always provide detailed clinical reasons (two sentences: mechanism + relevance to the specific issue). ${guidanceFocus}
-Ensure the suggested array contains at least ${minSuggested} unique entries that are not already in the focusItems list.
+Ensure the suggested array contains at least ${minSuggested} unique entries that are not already in the focusItems list, and avoid duplicating any names from focusItems unless you are recommending a changed protocol.
 
 Return JSON exactly matching this schema (no extra keys, no missing keys, do not rename fields):
 {
@@ -182,7 +187,7 @@ export async function generateSectionInsightsFromLLM(
   const minWorking = options.minWorking ?? 1
   const minSuggested = options.minSuggested ?? 4
   const minAvoid = options.minAvoid ?? 2
-  const maxRetries = options.maxRetries ?? 2
+  const maxRetries = options.maxRetries ?? 1
 
   const focusItems = (input.items ?? []).slice(0, 8)
   const otherItems = (input.otherItems ?? []).slice(0, 6)
@@ -232,7 +237,7 @@ export async function generateSectionInsightsFromLLM(
       const response = await openai.chat.completions.create({
         model: process.env.OPENAI_INSIGHTS_MODEL ?? 'gpt-4o-mini',
         temperature: 0.1,
-        max_tokens: 900,
+        max_tokens: 700,
         response_format: { type: 'json_object' },
         messages: [
           {

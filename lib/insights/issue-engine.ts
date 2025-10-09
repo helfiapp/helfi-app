@@ -134,6 +134,7 @@ interface BloodResultsData {
 }
 
 const RATING_SCALE_DEFAULT = 6
+const SECTION_CACHE_TTL_MS = 1000 * 60 * 15
 
 const RECENT_DATA_WINDOW_MS = 1000 * 60 * 60 * 24
 
@@ -670,11 +671,28 @@ export async function getIssueSection(
 
   if (options.force) {
     const context = await loadUserInsightContext(userId)
-    return buildIssueSectionWithContext(context, slug, section, {
+    const built = await buildIssueSectionWithContext(context, slug, section, {
       mode,
       range: options.range,
       force: true,
     })
+    if (built) {
+      try {
+        await prisma.$executeRawUnsafe(
+          'CREATE TABLE IF NOT EXISTS "InsightsSectionCache" ("userId" TEXT NOT NULL, "slug" TEXT NOT NULL, "section" TEXT NOT NULL, "mode" TEXT NOT NULL, "rangeKey" TEXT NOT NULL, "result" JSONB NOT NULL, "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(), PRIMARY KEY ("userId","slug","section","mode","rangeKey"))'
+        )
+        await prisma.$executeRawUnsafe(
+          'INSERT INTO "InsightsSectionCache" ("userId","slug","section","mode","rangeKey","result","updatedAt") VALUES ($1,$2,$3,$4,$5,$6::jsonb,NOW())\n           ON CONFLICT ("userId","slug","section","mode","rangeKey") DO UPDATE SET "result" = EXCLUDED."result", "updatedAt" = NOW()',
+          userId,
+          slug,
+          section,
+          mode,
+          rangeKey,
+          JSON.stringify(built)
+        )
+      } catch {}
+    }
+    return built
   }
 
   return computeIssueSection(userId, slug, section, mode, rangeKey)
@@ -1086,12 +1104,48 @@ async function computeIssueSection(
   mode: ReportMode,
   _rangeKey: string
 ): Promise<IssueSectionResult | null> {
+  const rangeKey = _rangeKey
+  // Fast path: DB cache
+  try {
+    await prisma.$executeRawUnsafe(
+      'CREATE TABLE IF NOT EXISTS "InsightsSectionCache" ("userId" TEXT NOT NULL, "slug" TEXT NOT NULL, "section" TEXT NOT NULL, "mode" TEXT NOT NULL, "rangeKey" TEXT NOT NULL, "result" JSONB NOT NULL, "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(), PRIMARY KEY ("userId","slug","section","mode","rangeKey"))'
+    )
+    const rows: any[] = await prisma.$queryRawUnsafe(
+      'SELECT "result", "updatedAt" FROM "InsightsSectionCache" WHERE "userId" = $1 AND "slug" = $2 AND "section" = $3 AND "mode" = $4 AND "rangeKey" = $5',
+      userId,
+      slug,
+      section,
+      mode,
+      rangeKey
+    )
+    if (rows && rows[0]) {
+      const updatedAt = new Date(rows[0].updatedAt)
+      if (Date.now() - updatedAt.getTime() < SECTION_CACHE_TTL_MS) {
+        return rows[0].result as IssueSectionResult
+      }
+    }
+  } catch {}
+
   const context = await loadUserInsightContext(userId)
-  return buildIssueSectionWithContext(context, slug, section, {
+  const built = await buildIssueSectionWithContext(context, slug, section, {
     mode,
     range: undefined,
     force: false,
   })
+  if (built) {
+    try {
+      await prisma.$executeRawUnsafe(
+        'INSERT INTO "InsightsSectionCache" ("userId","slug","section","mode","rangeKey","result","updatedAt") VALUES ($1,$2,$3,$4,$5,$6::jsonb,NOW())\n         ON CONFLICT ("userId","slug","section","mode","rangeKey") DO UPDATE SET "result" = EXCLUDED."result", "updatedAt" = NOW()',
+        userId,
+        slug,
+        section,
+        mode,
+        rangeKey,
+        JSON.stringify(built)
+      )
+    } catch {}
+  }
+  return built
 }
 
 function enrichIssueSummary(issue: { id: string; name: string; polarity: 'positive' | 'negative'; slug: string }, context: UserInsightContext): IssueSummary {
