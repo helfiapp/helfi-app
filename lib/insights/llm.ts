@@ -187,7 +187,7 @@ export async function generateSectionInsightsFromLLM(
   const minWorking = options.minWorking ?? 1
   const minSuggested = options.minSuggested ?? 4
   const minAvoid = options.minAvoid ?? 2
-  const maxRetries = options.maxRetries ?? 1
+  const maxRetries = options.maxRetries ?? 3
 
   const focusItems = (input.items ?? []).slice(0, 8)
   const otherItems = (input.otherItems ?? []).slice(0, 6)
@@ -237,7 +237,7 @@ export async function generateSectionInsightsFromLLM(
       const response = await openai.chat.completions.create({
         model: process.env.OPENAI_INSIGHTS_MODEL ?? 'gpt-4o-mini',
         temperature: 0.1,
-        max_tokens: 700,
+        max_tokens: 900,
         response_format: { type: 'json_object' },
         messages: [
           {
@@ -259,8 +259,20 @@ export async function generateSectionInsightsFromLLM(
       try {
         json = JSON.parse(content)
       } catch (parseError) {
-        console.warn('[insights.llm] Failed to parse JSON content', { content })
-        throw parseError
+        // Attempt a salvage parse: strip code fences and extract the first JSON object
+        const stripped = content.replace(/```[a-zA-Z]*\n?|```/g, '').trim()
+        const objMatch = stripped.match(/\{[\s\S]*\}/)
+        if (objMatch) {
+          try {
+            json = JSON.parse(objMatch[0])
+          } catch (e) {
+            console.warn('[insights.llm] Salvage parse failed', { content })
+            throw parseError
+          }
+        } else {
+          console.warn('[insights.llm] Failed to parse JSON content', { content })
+          throw parseError
+        }
       }
 
       const parsed = llmSectionSchema.safeParse(json)

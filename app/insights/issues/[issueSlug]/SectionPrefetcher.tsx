@@ -11,19 +11,20 @@ export default function SectionPrefetcher({ issueSlug, sections }: { issueSlug: 
 
     async function prefetch() {
       try {
-        await Promise.all(
-          sections.map(async (section) => {
-            try {
-              // Warm the section by forcing a background POST generation.
-              await fetch(`/api/insights/issues/${issueSlug}/sections/${section}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ mode: 'latest' }),
-                signal,
-              }).catch(() => {})
-            } catch {}
-          })
-        )
+        // Serialize with a small delay to avoid thundering herd and rate spikes.
+        for (const section of sections) {
+          if (cancelled) break
+          try {
+            await fetch(`/api/insights/issues/${issueSlug}/sections/${section}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ mode: 'latest' }),
+              signal,
+            }).catch(() => {})
+          } catch {}
+          // 250ms spacing between requests
+          await new Promise((r) => setTimeout(r, 250))
+        }
       } catch {}
       return () => {
         cancelled = true

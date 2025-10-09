@@ -467,6 +467,19 @@ function hasStructuredData(value: unknown) {
   return !!value
 }
 
+// Only persist successful, useful results in the DB cache. Avoid caching
+// error states or placeholder results that would mask recovery for 15 minutes.
+function shouldCacheSectionResult(result: IssueSectionResult | null): boolean {
+  if (!result) return false
+  // Always cache overview since it has no LLM dependency
+  if (result.section === 'overview') return true
+  const source = String((result.extras as Record<string, unknown> | undefined)?.['source'] ?? '')
+  // Known non-success sources we do not want to cache
+  const badSources = new Set(['llm-error', 'needs-data', 'needs-fresh-data'])
+  if (badSources.has(source)) return false
+  return true
+}
+
 function buildDataNeed(goalName: string, category: string | null | undefined): InsightDataNeed | null {
   let parsed: any = null
   if (category) {
@@ -676,7 +689,7 @@ export async function getIssueSection(
       range: options.range,
       force: true,
     })
-    if (built) {
+    if (shouldCacheSectionResult(built)) {
       try {
         await prisma.$executeRawUnsafe(
           'CREATE TABLE IF NOT EXISTS "InsightsSectionCache" ("userId" TEXT NOT NULL, "slug" TEXT NOT NULL, "section" TEXT NOT NULL, "mode" TEXT NOT NULL, "rangeKey" TEXT NOT NULL, "result" JSONB NOT NULL, "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(), PRIMARY KEY ("userId","slug","section","mode","rangeKey"))'
@@ -1132,7 +1145,7 @@ async function computeIssueSection(
     range: undefined,
     force: false,
   })
-  if (built) {
+  if (shouldCacheSectionResult(built)) {
     try {
       await prisma.$executeRawUnsafe(
         'INSERT INTO "InsightsSectionCache" ("userId","slug","section","mode","rangeKey","result","updatedAt") VALUES ($1,$2,$3,$4,$5,$6::jsonb,NOW())\n         ON CONFLICT ("userId","slug","section","mode","rangeKey") DO UPDATE SET "result" = EXCLUDED."result", "updatedAt" = NOW()',
