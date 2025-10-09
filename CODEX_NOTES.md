@@ -123,3 +123,103 @@ User‑reported impact
 Action for the next agent
 - Please implement “don’t cache failures” first, roll back retries/tokens, and re‑test on live. If necessary, temporarily disable the background prefetcher to reduce error caching while iterating. Then tighten prompts once stable.
 
+
+## 2025-10-10 — Live user complaints and accuracy/UX defects (must-fix brief)
+
+Context
+- User is evaluating Insights on production only (no staging/local). New deploys were initially “staged” due to rollback pin; once unpinned, latest deploys became Current.
+- User’s supplement log includes items specifically for Libido (e.g., Cistanche, Zinc Picolinate, Tongkat Ali/Muira Puama, Vitamin D3). Food logs were not recently updated during testing.
+
+Top problems (as reported on live)
+1) Supplements → What’s Working: Missing logged items
+   - Cistanche (a libido‑specific botanical) does not appear under “What’s Working” even though it’s logged and clinically relevant to libido.
+   - The section sometimes shows fewer items than before the overhaul (e.g., fewer than 3; sometimes 0), which feels like a regression.
+
+2) Supplements → Avoid: Irrelevant items previously included; now often empty
+   - Prior versions incorrectly showed Alcohol as a “supplement to avoid” (not a supplement). This was filtered out, but now Avoid is often empty when there should be plausible avoid/caution items (e.g., 5‑alpha‑reductase inhibitors in male libido contexts).
+   - User requirement: “AI‑only” recommendations. Do not hard‑code content to paper over model gaps. One exception currently in code: a saw‑palmetto caution may be appended when sparse; user prefers avoiding such hard‑coded adds if AI can be improved.
+
+3) Nutrition section logic is contradictory when no recent logs
+   - Header correctly says “No recent food entries — log today’s meals…”, but:
+   - “Suggested Foods” sometimes shows a generic message implying the user already covers the core nutrition moves (wrong when there are no recent logs).
+   - “Foods to Avoid” sometimes shows nothing at all despite the issue context (should still propose general avoid patterns tailored to the issue if logged data is missing).
+   - User expectation: provide at least 4 specific suggested foods for the issue with clear, mechanism‑based “why,” and a non‑empty avoid list when appropriate. If no recent logs, explicitly state that in Working, but Suggested/Avoid should still populate with clinician‑sensible guidance.
+
+4) Output quality: too short, too generic
+   - Suggested and Avoid items need richer rationale: mechanism + relevance to the specific issue, and concrete dose/timing where applicable (for supplements). The user does not want generic, filler statements.
+
+5) Performance: unacceptable load time (up to ~20s)
+   - The user experiences 15–20 second waits for sections to render.
+   - Likely contributors:
+     - Cold starts + serialized OpenAI calls with larger tokens
+     - Prefetch concurrency earlier causing rate limits and cached failures
+     - Returning “null” on schema miss then recomputing again
+     - DB/cache reads per section without effective warm cache policy
+
+6) Consistency across sections
+   - Every section (Supplements, Medications, Exercise, Nutrition, Lifestyle, Labs) should:
+     - Respect “Working = logged items only” but still provide Suggested/Avoid when logs are missing.
+     - Hit minimum counts (Working ≥1 when plausible; Suggested ≥4; Avoid ≥2) unless clearly impossible (e.g., no data and no general guidance)—in that case, say why and how to add data.
+
+7) Deployment confusion: “Production: Staged”
+   - Vercel showed “Staged” because a rollback was active. Undo Rollback was required to make the latest deploy Current. Future agents should call this out when asking the user to verify changes on live.
+
+Observed screens (user screenshots)
+- Libido → Supplements → Working: shows some botanicals (e.g., Muira Puama, Zinc) but Cistanche missing despite being logged.
+- Libido → Supplements → Avoid: previously listed “Alcohol”; now filtered out but often empty.
+- Libido → Nutrition → Working/Suggested/Avoid: shows “No recent food entries,” but Suggested sometimes claims “Your logged meals already cover the core moves,” and Avoid sometimes shows nothing.
+
+Acceptance criteria (what “good” looks like)
+1) Supplements
+   - Working: Includes logged libido‑supportive items (e.g., Cistanche) when clinically plausible. If excluded, provide a brief rationale in summary.
+   - Suggested: ≥4 novel items (not in the user’s log), each with mechanism‑based why and, when appropriate, dosing/timing.
+   - Avoid: ≥2 true supplements or med‑adjacent cautions (no foods/alcohol). If none are clinically sensible, say so explicitly.
+
+2) Nutrition
+   - If no recent logs: Working should be empty with a clear “log meals” gate. Suggested should still provide ≥4 issue‑relevant foods with detailed reasons; Avoid should list ≥2 patterns/foods to limit (e.g., high‑sugar UPFs) with rationale.
+   - If there are logs: Working includes foods actually logged; Suggested and Avoid still target ≥4 and ≥2, respectively.
+
+3) Detail and tone
+   - For every item, include concise mechanism + relevance to the issue; include dose/timing where applicable. Avoid generic filler.
+
+4) Performance
+   - P95 time‑to-first‑render for a section ≤4s after warmup (≤7s cold start). Daily/Weekly regeneration ≤6s P95 after first run.
+
+5) AI‑only policy
+   - No hard‑coded items in outputs. If a guardrail is temporarily needed (e.g., saw palmetto caution), document it and remove once prompting/validation stabilizes.
+
+Engineering causes (suspected) and fixes to implement
+1) Prompt/validation gaps
+   - Require the model to prioritize logged items in Working, and still populate Suggested/Avoid with minimum counts when logs are absent.
+   - Add stronger, explicit issue‑specific rules so libido botanicals like Cistanche are evaluated and surfaced when appropriate.
+   - Keep strict JSON but allow salvage parsing again if response_format deviates.
+
+2) Do not cache failures/empties
+   - Already implemented: cache only successful results (no llm‑error/needs‑data sources). Confirm this is deployed and working.
+
+3) Prefetch/rate control
+   - Serialize or throttle background prefetch. Avoid thundering herd that caches transient failures.
+
+4) Partial results instead of nulls
+   - When fewer than minimum counts are returned, surface partial results rather than failing the whole section. Keep the min counts as a target and display what we have.
+
+5) Performance tactics
+   - Cap tokens to ~650–750 where safe; reduce temperature; reuse short, issue‑specific prompts.
+   - Introduce short‑TTL in‑memory cache (30m) keyed on user/issue/section/mode/range.
+   - Parallelize independent sections on the server but limit concurrency to 2–3 to avoid rate limiting.
+   - Add server‑side timing logs per section (DB fetch, LLM call, parse, render).
+
+6) Telemetry
+   - Log parse failures with redacted content and the invalid schema issues. Capture counts of empty buckets per section.
+
+Repro steps for current defects
+1) Ensure supplements include libido botanicals (e.g., Cistanche) in the user profile.
+2) Visit Libido → Supplements; tap Daily report. Observe Working excludes Cistanche; Avoid may be empty.
+3) Visit Libido → Nutrition with no recent food logs. Observe “No recent food entries” but Suggested says “logged meals cover core moves,” and Avoid may be empty.
+4) Measure load times; user observes up to ~20s.
+
+User non‑negotiables
+1) AI must generate all items. No manual/hidden hard‑coding.
+2) Clear, non‑generic explanations with mechanisms and practical cadence/dose/timing.
+3) At least 4 suggestions in Suggested and ≥2 in Avoid for every section, unless impossible; then say why and how to provide data.
+4) Fast render (<~4–7s per section after warm) and consistent behavior across sections.
