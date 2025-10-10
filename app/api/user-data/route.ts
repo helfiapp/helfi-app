@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { precomputeIssueSectionsForUser } from '@/lib/insights/issue-engine'
 
 export async function GET(request: NextRequest) {
   try {
@@ -776,7 +777,18 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('✅ POST /api/user-data - All updates completed successfully')
-    
+
+    if (user?.id) {
+      console.time('⏱️ Insights Precompute')
+      try {
+        await precomputeIssueSectionsForUser(user.id, { concurrency: 3 })
+        console.log('✅ Prefetched insights after intake completion')
+      } catch (error) {
+        console.warn('⚠️ Failed to precompute insights post-intake', error)
+      }
+      console.timeEnd('⏱️ Insights Precompute')
+    }
+
     // 🔍 FINAL PERFORMANCE MEASUREMENT
     const totalApiTime = Date.now() - apiStartTime
     console.timeEnd('⏱️ Total API Processing Time')

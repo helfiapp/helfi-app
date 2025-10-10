@@ -23,6 +23,8 @@ function getOpenAIClient() {
   return _openai
 }
 
+const DEFAULT_INSIGHTS_MODEL = process.env.OPENAI_INSIGHTS_MODEL ?? 'gpt-4o-mini'
+
 const llmSectionSchema = z.object({
   summary: z.string().optional(),
   working: z
@@ -96,6 +98,225 @@ interface LLMOptions {
   maxRetries?: number
 }
 
+type CanonicalType = 'food' | 'supplement' | 'exercise' | 'medication' | 'other'
+
+interface ClassificationEntry {
+  name: string
+  reason?: string | null
+}
+
+interface ClassifiedItem {
+  name: string
+  canonicalType: CanonicalType
+  inDomain: boolean
+  explanation?: string
+}
+
+export interface GeneratedCandidateItem {
+  name: string
+  candidateType: CanonicalType
+  bucket: 'suggested' | 'avoid'
+  reason: string
+  protocol?: string | null
+}
+
+export async function generateSectionCandidates(params: {
+  issueName: string
+  issueSummary?: string | null
+  profile?: LLMInputData['profile']
+  mode: SectionMode
+  count?: { suggested?: number; avoid?: number }
+}): Promise<GeneratedCandidateItem[] | null> {
+  const openai = getOpenAIClient()
+  if (!openai) return null
+  const suggested = Math.max(4, params.count?.suggested ?? 6)
+  const avoid = Math.max(4, params.count?.avoid ?? 6)
+  const user = `Write SECTION: ${params.mode} for issue "${params.issueName}".
+Generate only two arrays: suggested and avoid. Each item must include: name, candidateType guess ∈ {food,supplement,exercise,medication,other}, reason (two sentences: mechanism + direct relevance), and optional protocol.
+Counts: suggested≥${suggested}, avoid≥${avoid}.
+Profile: ${JSON.stringify(params.profile ?? {}, null, 2)}
+Return strict JSON {"suggested": [...], "avoid": [...]}`
+  try {
+    console.time(`[insights.genCandidates:${params.mode}]`)
+    const response = await openai.chat.completions.create({
+      model: DEFAULT_INSIGHTS_MODEL,
+      temperature: 0.2,
+      max_tokens: 700,
+      response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: 'You propose domain-appropriate items with concise clinical reasons. Output JSON only.' },
+        { role: 'user', content: user },
+      ],
+    })
+    console.timeEnd(`[insights.genCandidates:${params.mode}]`)
+    const content = response.choices?.[0]?.message?.content
+    if (!content) return null
+    let json: any
+    try {
+      json = JSON.parse(content)
+    } catch {
+      const stripped = content.replace(/```[a-zA-Z]*\n?|```/g, '').trim()
+      const objMatch = stripped.match(/\{[\s\S]*\}/)
+      if (!objMatch) return null
+      json = JSON.parse(objMatch[0])
+    }
+    const all: GeneratedCandidateItem[] = []
+    const pushItems = (arr: any[], bucket: 'suggested' | 'avoid') => {
+      for (const it of Array.isArray(arr) ? arr : []) {
+        if (!it || typeof it.name !== 'string' || typeof it.reason !== 'string') continue
+        const ct = typeof it.candidateType === 'string' ? String(it.candidateType).toLowerCase() : 'other'
+        const canonicalType: CanonicalType =
+          ct === 'food' || ct === 'supplement' || ct === 'exercise' || ct === 'medication' ? (ct as CanonicalType) : 'other'
+        all.push({
+          name: it.name,
+          candidateType: canonicalType,
+          bucket,
+          reason: it.reason,
+          protocol: typeof it.protocol === 'string' ? it.protocol : null,
+        })
+      }
+    }
+    pushItems(json?.suggested, 'suggested')
+    pushItems(json?.avoid, 'avoid')
+    return all
+  } catch (error) {
+    console.warn('[insights.llm] generateSectionCandidates error', error)
+    return null
+  }
+}
+
+function allowedCanonicalTypesForMode(mode: SectionMode): Set<CanonicalType> | null {
+  switch (mode) {
+    case 'nutrition':
+      return new Set<CanonicalType>(['food'])
+    case 'exercise':
+      return new Set<CanonicalType>(['exercise'])
+    case 'supplements':
+      return new Set<CanonicalType>(['supplement'])
+    case 'medications':
+      return new Set<CanonicalType>(['medication'])
+    default:
+      return null // no strict filtering for lifestyle/labs
+  }
+}
+
+function meetsMinimums(
+  data: SectionLLMResult,
+  { minWorking, minSuggested, minAvoid }: { minWorking: number; minSuggested: number; minAvoid: number }
+) {
+  const workingOk = minWorking === 0 || data.working.length >= minWorking
+  const suggestedOk = data.suggested.length >= minSuggested
+  const avoidOk = data.avoid.length >= minAvoid
+  return workingOk && suggestedOk && avoidOk
+}
+
+function scoreCandidate(data: SectionLLMResult) {
+  // Weight suggested/avoid slightly higher because they matter most for actionability.
+  return data.working.length * 2 + data.suggested.length * 3 + data.avoid.length * 3 + data.recommendations.length
+}
+
+interface RepairArgs {
+  openai: any
+  mode: SectionMode
+  issueName: string
+  issueSummary?: string | null
+  minWorking: number
+  minSuggested: number
+  minAvoid: number
+  focusItems: Array<{ name: string; dosage?: string | null; timing?: string[] | null }>
+  otherItems: Array<{ name: string; dosage?: string | null }>
+  profile?: LLMInputData['profile']
+  previous: SectionLLMResult
+}
+
+async function repairLLMOutput({
+  openai,
+  mode,
+  issueName,
+  issueSummary,
+  minWorking,
+  minSuggested,
+  minAvoid,
+  focusItems,
+  otherItems,
+  profile,
+  previous,
+}: RepairArgs): Promise<SectionLLMResult | null> {
+  try {
+    const repairPrompt = `
+You produced the following JSON guidance for "${issueName}" but it failed minimum coverage requirements. Revise it so every bucket meets the minimum counts.
+
+Previous JSON:
+${JSON.stringify(previous, null, 2)}
+
+Context (focus items, other items, profile):
+${JSON.stringify({ focusItems, otherItems, profile: profile ?? {} }, null, 2)}
+
+Mode guidance:
+${modeGuidance(mode)}
+
+Issue summary:
+${issueSummary ?? 'Not supplied.'}
+
+Requirements:
+- Suggested must contain at least ${minSuggested} unique items (not in focusItems unless altering protocol).
+- Avoid must contain at least ${minAvoid} items relevant to ${issueName}.
+- ${minWorking === 0 ? 'Working can remain empty if no focusItems support the issue, but explain why in the summary.' : `Working must contain at least ${minWorking} logged items when appropriate.`}
+- Every reason must be two sentences: first sentence = mechanism; second sentence = direct relevance/action (include dose/timing when useful).
+- Keep strictly to the JSON schema used previously (no additional keys).
+- If data is sparse, rely on best-practice clinician guidance for ${issueName}; do not fabricate patient-specific logs.
+`
+
+    const response = await openai.chat.completions.create({
+      model: DEFAULT_INSIGHTS_MODEL,
+      temperature: 0.05,
+      max_tokens: 600,
+      response_format: { type: 'json_object' },
+      messages: [
+        {
+          role: 'system',
+          content:
+            'You are a careful clinical decision support assistant. Adjust prior guidance to meet explicit minimum requirements without omitting important safety details.',
+        },
+        {
+          role: 'user',
+          content: repairPrompt,
+        },
+      ],
+    })
+    const content = response.choices?.[0]?.message?.content
+    if (!content) return null
+
+    let json: unknown
+    try {
+      json = JSON.parse(content)
+    } catch {
+      const stripped = content.replace(/```[a-zA-Z]*\n?|```/g, '').trim()
+      const objMatch = stripped.match(/\{[\s\S]*\}/)
+      if (!objMatch) {
+        console.warn('[insights.llm] Repair pass failed to locate JSON object', { content })
+        return null
+      }
+      try {
+        json = JSON.parse(objMatch[0])
+      } catch (parseError) {
+        console.warn('[insights.llm] Repair pass JSON parse failed', { content })
+        return null
+      }
+    }
+
+    const parsed = llmSectionSchema.safeParse(json)
+    if (!parsed.success) {
+      console.warn('[insights.llm] Repair pass produced invalid JSON', { issues: parsed.error.issues, content })
+      return null
+    }
+    return parsed.data
+  } catch (error) {
+    console.error('[insights.llm] Repair pass failed', error)
+    return null
+  }
+}
+
 function modeGuidance(mode: SectionMode) {
   switch (mode) {
     case 'supplements':
@@ -151,9 +372,11 @@ STRICT RULES:
 - Prioritise logged items: if a focusItem is plausibly supportive for the issue, include it in "working" using the exact name from focusItems and provide rationale.
 - Supplements mode: only include supplements/herbs/nutraceuticals. Never include alcohol, foods, or lifestyle items in any bucket.
 - Nutrition mode: only mark foods as "working" if they appear in focusItems. Use suggested/avoid for novel foods.
-- Reasons must include mechanism + relevance; add dose/timing where appropriate.
+- Reasons must include mechanism + relevance; add dose/timing or execution guidance where appropriate.
+- If focusItems is empty or none are supportive, "working" may be empty, but clearly explain the gap in the summary.
+- Even if user data is sparse, you MUST still populate "suggested" and "avoid" to the minimum counts using widely accepted best practice for ${issueName}. Never respond with "everything covered."
 
-Classify findings into three buckets: working (helpful/supportive today), suggested (worth discussing with clinician to add), avoid (risky or counterproductive). Always provide detailed clinical reasons (two sentences: mechanism + relevance to the specific issue). ${guidanceFocus}
+Classify findings into three buckets: working (helpful/supportive today), suggested (worth discussing with clinician to add), avoid (risky or counterproductive). Always provide detailed clinical reasons (two sentences: mechanism + direct issue relevance/action). ${guidanceFocus}
 Ensure the suggested array contains at least ${minSuggested} unique entries that are not already in the focusItems list, and avoid duplicating any names from focusItems unless you are recommending a changed protocol. Provide concise but specific reasons (mechanism + relevance) and include dosing/timing where appropriate.
 
 Return JSON exactly matching this schema (no extra keys, no missing keys, do not rename fields):
@@ -169,7 +392,7 @@ Close every array/object and ensure the JSON is syntactically valid—never trun
   `
 
   const forceNote = force
-    ? `You must output at least ${minWorking} working item(s), ${minSuggested} suggested item(s), and ${minAvoid} avoid item(s). Suggested items must not duplicate any names already present in focusItems or otherItems. If logged data is sparse, rely on broadly accepted best-practice guidance for ${issueName}.`
+    ? `You must output at least ${minWorking} working item(s)${minWorking === 0 ? ' (it is acceptable for working to stay empty only if no focusItems are supportive)' : ''}, ${minSuggested} suggested item(s), and ${minAvoid} avoid item(s). Suggested items must not duplicate any names already present in focusItems or otherItems. If logged data is sparse, rely on clinician-grade best-practice guidance for ${issueName} rather than saying everything is covered. Keep every reason to exactly two sentences (mechanism + actionable relevance with dose/timing when helpful).`
     : ''
 
   // Add targeted domain rules for specific issues
@@ -181,6 +404,126 @@ Close every array/object and ensure the JSON is syntactically valid—never trun
   return `${header}\n\nIssue summary: ${issueSummary ?? 'Not supplied.'}\n\nUser context (JSON):\n${userContext}\n\n${baseGuidance}\n${libidoRules}${forceNote}`
 }
 
+function uniqueByName<T extends { name: string }>(items: T[]): T[] {
+  const seen = new Set<string>()
+  const out: T[] = []
+  for (const it of items) {
+    const key = it.name.trim().toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(it)
+  }
+  return out
+}
+
+async function classifyCandidatesForSection(params: {
+  openai: any
+  issueName: string
+  mode: SectionMode
+  items: ClassificationEntry[]
+  trace: string
+}): Promise<ClassifiedItem[] | null> {
+  const { openai, issueName, mode, items, trace } = params
+  if (!items.length) return []
+  try {
+    const system = 'You are a precise classifier. For each item, assign a canonicalType and whether it is in-domain for the requested section. Output strict JSON.'
+    const user = `Classify the following items for issue "${issueName}" in SECTION: ${mode}.
+
+Return JSON with an array under key "items"; each element: {"name": string, "canonicalType": one of [food,supplement,exercise,medication,other], "inDomain": boolean, "explanation": string}.
+
+Items:\n${JSON.stringify(items, null, 2)}`
+
+    console.time(`${trace}:classify`)
+    const response = await openai.chat.completions.create({
+      model: DEFAULT_INSIGHTS_MODEL,
+      temperature: 0,
+      max_tokens: 500,
+      response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: user },
+      ],
+    })
+    console.timeEnd(`${trace}:classify`)
+
+    const content = response.choices?.[0]?.message?.content
+    if (!content) return null
+    let json: any
+    try {
+      json = JSON.parse(content)
+    } catch {
+      const stripped = content.replace(/```[a-zA-Z]*\n?|```/g, '').trim()
+      const objMatch = stripped.match(/\{[\s\S]*\}/)
+      if (!objMatch) return null
+      json = JSON.parse(objMatch[0])
+    }
+    const out = Array.isArray(json?.items) ? json.items : []
+    return out
+      .filter((it: any) => it && typeof it.name === 'string')
+      .map((it: any) => ({
+        name: String(it.name),
+        canonicalType: (it.canonicalType as CanonicalType) ?? 'other',
+        inDomain: Boolean(it.inDomain),
+        explanation: typeof it.explanation === 'string' ? it.explanation : undefined,
+      }))
+  } catch (error) {
+    console.warn('[insights.llm] classifyCandidatesForSection error', error)
+    return null
+  }
+}
+
+async function fillMissingItemsForSection(params: {
+  openai: any
+  issueName: string
+  mode: SectionMode
+  bucket: 'suggested' | 'avoid'
+  expectedType: CanonicalType | null
+  needed: number
+  disallowNames: string[]
+  trace: string
+}): Promise<Array<{ name: string; reason: string; protocol?: string | null }> | null> {
+  const { openai, issueName, mode, bucket, expectedType, needed, disallowNames, trace } = params
+  if (needed <= 0) return []
+  const typeText = expectedType ? `that are strictly of type ${expectedType}` : 'that fit the section domain'
+  const prompt = `We need ${needed} more items for SECTION: ${mode}, bucket: ${bucket}, for issue "${issueName}" ${typeText}.
+Return JSON: {"items": Array<{"name": string, "reason": string, "protocol"?: string|null}>}.
+Avoid any of these names (case-insensitive): ${disallowNames.join(', ') || 'None'}.
+Each reason must be two sentences: mechanism + direct relevance/action.`
+
+  try {
+    console.time(`${trace}:fill-${bucket}`)
+    const response = await openai.chat.completions.create({
+      model: DEFAULT_INSIGHTS_MODEL,
+      temperature: 0.2,
+      max_tokens: 500,
+      response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: 'You generate concise, clinically-relevant items. Output strict JSON only.' },
+        { role: 'user', content: prompt },
+      ],
+    })
+    console.timeEnd(`${trace}:fill-${bucket}`)
+    const content = response.choices?.[0]?.message?.content
+    if (!content) return null
+    let json: any
+    try {
+      json = JSON.parse(content)
+    } catch {
+      const stripped = content.replace(/```[a-zA-Z]*\n?|```/g, '').trim()
+      const objMatch = stripped.match(/\{[\s\S]*\}/)
+      if (!objMatch) return null
+      json = JSON.parse(objMatch[0])
+    }
+    const items = Array.isArray(json?.items) ? json.items : []
+    return items
+      .filter((it: any) => it && typeof it.name === 'string' && typeof it.reason === 'string')
+      .map((it: any) => ({ name: it.name, reason: it.reason, protocol: it.protocol ?? null }))
+  } catch (error) {
+    console.warn('[insights.llm] fillMissingItemsForSection error', error)
+    return null
+  }
+}
+
 export async function generateSectionInsightsFromLLM(
   input: LLMInputData,
   options: LLMOptions = {}
@@ -190,13 +533,12 @@ export async function generateSectionInsightsFromLLM(
     return null
   }
 
-  const minWorking = options.minWorking ?? 1
-  const minSuggested = options.minSuggested ?? 4
-  const minAvoid = options.minAvoid ?? 2
-  const maxRetries = options.maxRetries ?? 3
-
   const focusItems = (input.items ?? []).slice(0, 8)
   const otherItems = (input.otherItems ?? []).slice(0, 6)
+  const minWorking = options.minWorking ?? (focusItems.length > 0 ? 1 : 0)
+  const minSuggested = options.minSuggested ?? 4
+  const minAvoid = options.minAvoid ?? 4
+  const maxRetries = options.maxRetries ?? 3
 
   const userContext = JSON.stringify(
     {
@@ -225,7 +567,7 @@ export async function generateSectionInsightsFromLLM(
   }
 
   let attempt = 0
-  let fallbackResult: SectionLLMResult | null = null
+  let bestCandidate: { result: SectionLLMResult; score: number } | null = null
   while (attempt < maxRetries) {
     const force = attempt > 0
     const prompt = buildPrompt({
@@ -240,10 +582,11 @@ export async function generateSectionInsightsFromLLM(
     })
 
     try {
+      console.time(`[insights.gen:${input.mode}]`)
       const response = await openai.chat.completions.create({
-        model: process.env.OPENAI_INSIGHTS_MODEL ?? 'gpt-4o-mini',
-        temperature: 0.1,
-        max_tokens: 700,
+        model: DEFAULT_INSIGHTS_MODEL,
+        temperature: 0.05,
+        max_tokens: 650,
         response_format: { type: 'json_object' },
         messages: [
           {
@@ -254,6 +597,7 @@ export async function generateSectionInsightsFromLLM(
           { role: 'user', content: prompt },
         ],
       })
+      console.timeEnd(`[insights.gen:${input.mode}]`)
 
       const content = response.choices?.[0]?.message?.content
       if (!content) {
@@ -292,26 +636,9 @@ export async function generateSectionInsightsFromLLM(
       }
 
       const data = parsed.data
-      const containsUsefulContent =
-        Boolean(data.summary?.trim()) ||
-        data.working.length > 0 ||
-        data.suggested.length > 0 ||
-        data.avoid.length > 0 ||
-        data.recommendations.length > 0
-
-      if (containsUsefulContent) {
-        fallbackResult = data
-      }
-      if (
-        data.working.length >= minWorking &&
-        data.suggested.length >= minSuggested &&
-        data.avoid.length >= minAvoid
-      ) {
-        insightCache.set(cacheKey, {
-          expiresAt: Date.now() + CACHE_TTL_MS,
-          result: data,
-        })
-        return data
+      const score = scoreCandidate(data)
+      if (!bestCandidate || score > bestCandidate.score) {
+        bestCandidate = { result: data, score }
       }
 
       attempt += 1
@@ -322,14 +649,153 @@ export async function generateSectionInsightsFromLLM(
     }
   }
 
-  if (fallbackResult) {
-    console.warn('[insights.llm] Returning fallback LLM output with reduced coverage')
-    insightCache.set(cacheKey, {
-      expiresAt: Date.now() + CACHE_TTL_MS,
-      result: fallbackResult,
+  // Stage 2: classification + fill-missing over the best candidate (with one repair attempt if needed)
+  const trace = `[insights:${input.mode}:${Math.random().toString(36).slice(2, 8)}]`
+  let base: SectionLLMResult | null = bestCandidate?.result ?? null
+  if (base && !meetsMinimums(base, { minWorking, minSuggested, minAvoid })) {
+    const repaired = await repairLLMOutput({
+      openai,
+      mode: input.mode,
+      issueName: input.issueName,
+      issueSummary: input.issueSummary,
+      minWorking,
+      minSuggested,
+      minAvoid,
+      focusItems,
+      otherItems,
+      profile: input.profile,
+      previous: base,
     })
-    return fallbackResult
+    if (repaired) base = repaired
   }
 
-  return null
+  if (!base) return null
+
+  const allowed = allowedCanonicalTypesForMode(input.mode)
+  let working = base.working.slice()
+  let suggested = base.suggested.slice()
+  let avoid = base.avoid.slice()
+
+  console.log('[insights.llm] pre-classify counts', {
+    mode: input.mode,
+    working: working.length,
+    suggested: suggested.length,
+    avoid: avoid.length,
+  })
+
+  if (allowed) {
+    const itemsForClassification: ClassificationEntry[] = [
+      ...working.map((w) => ({ name: w.name, reason: w.reason })),
+      ...suggested.map((s) => ({ name: s.name, reason: s.reason })),
+      ...avoid.map((a) => ({ name: a.name, reason: a.reason })),
+    ]
+    const classified = await classifyCandidatesForSection({
+      openai,
+      issueName: input.issueName,
+      mode: input.mode,
+      items: itemsForClassification,
+      trace,
+    })
+    const typeMap = new Map<string, CanonicalType>()
+    for (const it of classified ?? []) {
+      typeMap.set(it.name.trim().toLowerCase(), it.canonicalType)
+    }
+
+    const keep = (name: string) => {
+      const key = name.trim().toLowerCase()
+      const t = typeMap.get(key)
+      if (!t) return false
+      return allowed.has(t)
+    }
+
+    working = working.filter((w) => keep(w.name))
+    suggested = suggested.filter((s) => keep(s.name))
+    avoid = avoid.filter((a) => keep(a.name))
+
+    console.log('[insights.llm] post-classify counts', {
+      mode: input.mode,
+      working: working.length,
+      suggested: suggested.length,
+      avoid: avoid.length,
+    })
+
+    // Fill-missing up to 2 retries per bucket
+    for (const bucket of ['suggested', 'avoid'] as const) {
+      let attempts = 0
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const need = bucket === 'suggested' ? Math.max(0, minSuggested - suggested.length) : Math.max(0, minAvoid - avoid.length)
+        if (need <= 0 || attempts >= 2) break
+        const disallow = [
+          ...suggested.map((s) => s.name),
+          ...avoid.map((a) => a.name),
+          ...working.map((w) => w.name),
+        ]
+        const expected: CanonicalType | null = Array.from(allowed)[0] ?? null
+        const more = await fillMissingItemsForSection({
+          openai,
+          issueName: input.issueName,
+          mode: input.mode,
+          bucket,
+          expectedType: expected,
+          needed: need,
+          disallowNames: disallow,
+          trace,
+        })
+        attempts += 1
+        if (!more || !more.length) break
+        // classify the new items
+        const moreClassified = await classifyCandidatesForSection({
+          openai,
+          issueName: input.issueName,
+          mode: input.mode,
+          items: more.map((m) => ({ name: m.name, reason: m.reason })),
+          trace,
+        })
+        const filtered = (moreClassified ?? [])
+          .filter((it) => allowed.has(it.canonicalType))
+          .map((it) => {
+            const src = more.find((m) => m.name.trim().toLowerCase() === it.name.trim().toLowerCase())!
+            return { name: src.name, reason: src.reason, protocol: src.protocol ?? null }
+          })
+        if (bucket === 'suggested') {
+          suggested = uniqueByName([...suggested, ...filtered])
+        } else {
+          avoid = uniqueByName([...avoid, ...filtered])
+        }
+        console.log('[insights.llm] fill-missing iteration', {
+          mode: input.mode,
+          bucket,
+          added: filtered.length,
+          suggested: suggested.length,
+          avoid: avoid.length,
+        })
+      }
+    }
+  }
+
+  const validated = suggested.length >= minSuggested && avoid.length >= minAvoid
+  const final: SectionLLMResult = {
+    summary: base.summary,
+    working,
+    suggested,
+    avoid,
+    recommendations: base.recommendations ?? [],
+  }
+
+  console.log('[insights.llm] final counts', {
+    mode: input.mode,
+    validated,
+    working: final.working.length,
+    suggested: final.suggested.length,
+    avoid: final.avoid.length,
+  })
+
+  if (validated) {
+    insightCache.set(cacheKey, {
+      expiresAt: Date.now() + CACHE_TTL_MS,
+      result: final,
+    })
+  }
+  return final
 }

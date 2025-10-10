@@ -11,7 +11,17 @@ export default function SectionPrefetcher({ issueSlug, sections }: { issueSlug: 
 
     async function prefetch() {
       try {
-        // Serialize with a small delay to avoid thundering herd and rate spikes.
+        const response = await fetch(`/api/insights/issues/${issueSlug}/sections/prefetch`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sections, mode: 'latest', concurrency: 3 }),
+          signal,
+        })
+        if (!response.ok && !cancelled) {
+          throw new Error('Prefetch batch failed')
+        }
+      } catch {
+        // Fallback: serialize individual POSTs if batch prefetch fails (network or legacy environments).
         for (const section of sections) {
           if (cancelled) break
           try {
@@ -22,10 +32,9 @@ export default function SectionPrefetcher({ issueSlug, sections }: { issueSlug: 
               signal,
             }).catch(() => {})
           } catch {}
-          // 250ms spacing between requests
-          await new Promise((r) => setTimeout(r, 250))
+          await new Promise((resolve) => setTimeout(resolve, 200))
         }
-      } catch {}
+      }
       return () => {
         cancelled = true
       }
@@ -40,5 +49,4 @@ export default function SectionPrefetcher({ issueSlug, sections }: { issueSlug: 
 
   return null
 }
-
 
