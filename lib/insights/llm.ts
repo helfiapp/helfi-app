@@ -472,6 +472,64 @@ Items:\n${JSON.stringify(items, null, 2)}`
   }
 }
 
+async function rewriteCandidatesToDomain(params: {
+  openai: any
+  issueName: string
+  mode: SectionMode
+  bucket: 'suggested' | 'avoid'
+  expectedType: CanonicalType | null
+  items: Array<{ name: string; reason: string }>
+  attempts?: number
+  trace: string
+}): Promise<Array<{ name: string; reason: string }> | null> {
+  const { openai, issueName, mode, bucket, expectedType, items, attempts = 2, trace } = params
+  if (!items.length) return []
+  const typeText = expectedType ? `${expectedType}` : 'the section domain'
+  let tries = 0
+  while (tries < attempts) {
+    tries += 1
+    try {
+      console.time(`${trace}:rewrite-${bucket}#${tries}`)
+      const response = await openai.chat.completions.create({
+        model: DEFAULT_INSIGHTS_MODEL,
+        temperature: 0.2,
+        max_tokens: 600,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: 'Rewrite items into the requested domain. Output strict JSON only.' },
+          {
+            role: 'user',
+            content:
+              `For issue "${issueName}", SECTION: ${mode}. Some ${bucket} items are out-of-domain. Rewrite each into domain-conforming items that are strictly of type ${typeText}. Keep mechanisms relevant to ${issueName}. Return JSON {"items": Array<{"name": string, "reason": string}>}.
+
+Items to rewrite:\n${JSON.stringify(items, null, 2)}`,
+          },
+        ],
+      })
+      console.timeEnd(`${trace}:rewrite-${bucket}#${tries}`)
+      const content = response.choices?.[0]?.message?.content
+      if (!content) continue
+      let json: any
+      try {
+        json = JSON.parse(content)
+      } catch {
+        const stripped = content.replace(/```[a-zA-Z]*\n?|```/g, '').trim()
+        const objMatch = stripped.match(/\{[\s\S]*\}/)
+        if (!objMatch) continue
+        json = JSON.parse(objMatch[0])
+      }
+      const out = Array.isArray(json?.items) ? json.items : []
+      const cleaned = out
+        .filter((it: any) => it && typeof it.name === 'string' && typeof it.reason === 'string')
+        .map((it: any) => ({ name: it.name, reason: it.reason }))
+      return cleaned
+    } catch (error) {
+      console.warn('[insights.llm] rewriteCandidatesToDomain error', error)
+    }
+  }
+  return null
+}
+
 async function fillMissingItemsForSection(params: {
   openai: any
   issueName: string
@@ -485,10 +543,24 @@ async function fillMissingItemsForSection(params: {
   const { openai, issueName, mode, bucket, expectedType, needed, disallowNames, trace } = params
   if (needed <= 0) return []
   const typeText = expectedType ? `that are strictly of type ${expectedType}` : 'that fit the section domain'
+  const diversityHint = (() => {
+    switch (mode) {
+      case 'nutrition':
+        return 'Ensure diversity across macro groups (protein sources, high-fiber foods, low-sugar options, low-sodium choices).'
+      case 'exercise':
+        return 'Ensure diversity across modalities (aerobic, strength, mobility/rehab).'
+      case 'supplements':
+      case 'medications':
+        return 'Ensure diversity across compound classes and include appropriate safety considerations.'
+      default:
+        return ''
+    }
+  })()
   const prompt = `We need ${needed} more items for SECTION: ${mode}, bucket: ${bucket}, for issue "${issueName}" ${typeText}.
 Return JSON: {"items": Array<{"name": string, "reason": string, "protocol"?: string|null}>}.
 Avoid any of these names (case-insensitive): ${disallowNames.join(', ') || 'None'}.
-Each reason must be two sentences: mechanism + direct relevance/action.`
+Each reason must be two sentences: mechanism + direct relevance/action.
+${diversityHint}`
 
   try {
     console.time(`${trace}:fill-${bucket}`)
@@ -520,6 +592,143 @@ Each reason must be two sentences: mechanism + direct relevance/action.`
       .map((it: any) => ({ name: it.name, reason: it.reason, protocol: it.protocol ?? null }))
   } catch (error) {
     console.warn('[insights.llm] fillMissingItemsForSection error', error)
+    return null
+  }
+}
+
+export async function generateDegradedSection(
+  input: LLMInputData,
+  options: { minSuggested?: number; minAvoid?: number } = {}
+): Promise<SectionLLMResult | null> {
+  const openai = getOpenAIClient()
+  if (!openai) return null
+  const minSuggested = Math.max(4, options.minSuggested ?? 4)
+  const minAvoid = Math.max(4, options.minAvoid ?? 4)
+  const typeSet = allowedCanonicalTypesForMode(input.mode)
+  const expected: CanonicalType | null = typeSet ? Array.from(typeSet)[0] : null
+  const trace = `[insights:degraded:${input.mode}:${Math.random().toString(36).slice(2, 8)}]`
+  let generateMs = 0
+  let classifyMs = 0
+  let fillMs = 0
+  let rewriteMs = 0
+
+  try {
+    const user = `For issue "${input.issueName}", SECTION: ${input.mode}. Data may be sparse.
+Generate minimally valid guidance with ONLY in-domain items. Output JSON with keys suggested and avoid only; working may be empty. Each item: name, reason (two sentences), optional protocol.
+Counts: suggested≥${minSuggested}, avoid≥${minAvoid}.`
+    const g0 = Date.now()
+    console.time(`${trace}:generate`)
+    const resp = await openai.chat.completions.create({
+      model: DEFAULT_INSIGHTS_MODEL,
+      temperature: 0.2,
+      max_tokens: 700,
+      response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: 'Produce domain-correct, concise items. Output JSON only.' },
+        { role: 'user', content: user },
+      ],
+    })
+    console.timeEnd(`${trace}:generate`)
+    generateMs += Date.now() - g0
+    const content = resp.choices?.[0]?.message?.content
+    if (!content) return null
+    let json: any
+    try {
+      json = JSON.parse(content)
+    } catch {
+      const stripped = content.replace(/```[a-zA-Z]*\n?|```/g, '').trim()
+      const objMatch = stripped.match(/\{[\s\S]*\}/)
+      if (!objMatch) return null
+      json = JSON.parse(objMatch[0])
+    }
+    const base: SectionLLMResult = {
+      summary: 'Initial guidance generated while we prepare a deeper report.',
+      working: [],
+      suggested: Array.isArray(json?.suggested) ? json.suggested : [],
+      avoid: Array.isArray(json?.avoid) ? json.avoid : [],
+      recommendations: [],
+    }
+    // Classify and keep only expected domain
+    const itemsForClassification: ClassificationEntry[] = [
+      ...base.suggested.map((s) => ({ name: s.name, reason: s.reason })),
+      ...base.avoid.map((a) => ({ name: a.name, reason: a.reason })),
+    ]
+    const c0 = Date.now()
+    const classified = await classifyCandidatesForSection({
+      openai,
+      issueName: input.issueName,
+      mode: input.mode,
+      items: itemsForClassification,
+      trace,
+    })
+    classifyMs += Date.now() - c0
+    const typeMap = new Map<string, CanonicalType>()
+    for (const it of classified ?? []) {
+      typeMap.set(it.name.trim().toLowerCase(), it.canonicalType)
+    }
+    const keep = (name: string) => {
+      const t = typeMap.get(name.trim().toLowerCase())
+      return expected ? t === expected : true
+    }
+    let suggested = base.suggested.filter((s) => keep(s.name))
+    let avoid = base.avoid.filter((a) => keep(a.name))
+    // Top up if still short
+    const disallow = [
+      ...suggested.map((s) => s.name),
+      ...avoid.map((a) => a.name),
+    ]
+    const needSuggested = Math.max(0, minSuggested - suggested.length)
+    if (needSuggested > 0) {
+      const f0 = Date.now()
+      const more = await fillMissingItemsForSection({
+        openai,
+        issueName: input.issueName,
+        mode: input.mode,
+        bucket: 'suggested',
+        expectedType: expected,
+        needed: needSuggested,
+        disallowNames: disallow,
+        trace,
+      })
+      fillMs += Date.now() - f0
+      suggested = uniqueByName([...suggested, ...(more ?? [])])
+    }
+    const needAvoid = Math.max(0, minAvoid - avoid.length)
+    if (needAvoid > 0) {
+      const f1 = Date.now()
+      const more = await fillMissingItemsForSection({
+        openai,
+        issueName: input.issueName,
+        mode: input.mode,
+        bucket: 'avoid',
+        expectedType: expected,
+        needed: needAvoid,
+        disallowNames: [
+          ...suggested.map((s) => s.name),
+          ...avoid.map((a) => a.name),
+        ],
+        trace,
+      })
+      fillMs += Date.now() - f1
+      avoid = uniqueByName([...avoid, ...(more ?? [])])
+    }
+    const out: SectionLLMResult = {
+      summary: base.summary,
+      working: [],
+      suggested,
+      avoid,
+      recommendations: [],
+    }
+    ;(out as any)._timings = {
+      generateMs,
+      classifyMs,
+      rewriteMs,
+      fillMs,
+      totalMs: generateMs + classifyMs + rewriteMs + fillMs,
+    }
+    return out
+  } catch (error) {
+    console.warn('[insights.llm] generateDegradedSection error', error)
     return null
   }
 }
@@ -567,6 +776,10 @@ export async function generateSectionInsightsFromLLM(
   }
 
   let attempt = 0
+  let generateMs = 0
+  let classifyMs = 0
+  let rewriteMs = 0
+  let fillMs = 0
   let bestCandidate: { result: SectionLLMResult; score: number } | null = null
   while (attempt < maxRetries) {
     const force = attempt > 0
@@ -582,6 +795,7 @@ export async function generateSectionInsightsFromLLM(
     })
 
     try {
+      const g0 = Date.now()
       console.time(`[insights.gen:${input.mode}]`)
       const response = await openai.chat.completions.create({
         model: DEFAULT_INSIGHTS_MODEL,
@@ -598,6 +812,7 @@ export async function generateSectionInsightsFromLLM(
         ],
       })
       console.timeEnd(`[insights.gen:${input.mode}]`)
+      generateMs += Date.now() - g0
 
       const content = response.choices?.[0]?.message?.content
       if (!content) {
@@ -653,6 +868,7 @@ export async function generateSectionInsightsFromLLM(
   const trace = `[insights:${input.mode}:${Math.random().toString(36).slice(2, 8)}]`
   let base: SectionLLMResult | null = bestCandidate?.result ?? null
   if (base && !meetsMinimums(base, { minWorking, minSuggested, minAvoid })) {
+    const r0 = Date.now()
     const repaired = await repairLLMOutput({
       openai,
       mode: input.mode,
@@ -666,6 +882,7 @@ export async function generateSectionInsightsFromLLM(
       profile: input.profile,
       previous: base,
     })
+    generateMs += Date.now() - r0
     if (repaired) base = repaired
   }
 
@@ -689,6 +906,7 @@ export async function generateSectionInsightsFromLLM(
       ...suggested.map((s) => ({ name: s.name, reason: s.reason })),
       ...avoid.map((a) => ({ name: a.name, reason: a.reason })),
     ]
+    const c0 = Date.now()
     const classified = await classifyCandidatesForSection({
       openai,
       issueName: input.issueName,
@@ -696,6 +914,7 @@ export async function generateSectionInsightsFromLLM(
       items: itemsForClassification,
       trace,
     })
+    classifyMs += Date.now() - c0
     const typeMap = new Map<string, CanonicalType>()
     for (const it of classified ?? []) {
       typeMap.set(it.name.trim().toLowerCase(), it.canonicalType)
@@ -708,6 +927,9 @@ export async function generateSectionInsightsFromLLM(
       return allowed.has(t)
     }
 
+    const droppedWorking = working.filter((w) => !keep(w.name))
+    const droppedSuggested = suggested.filter((s) => !keep(s.name))
+    const droppedAvoid = avoid.filter((a) => !keep(a.name))
     working = working.filter((w) => keep(w.name))
     suggested = suggested.filter((s) => keep(s.name))
     avoid = avoid.filter((a) => keep(a.name))
@@ -719,19 +941,86 @@ export async function generateSectionInsightsFromLLM(
       avoid: avoid.length,
     })
 
-    // Fill-missing up to 2 retries per bucket
+    // Rewrite out-of-domain candidates into the correct domain, then re-classify
+    if (droppedSuggested.length) {
+      const rw0 = Date.now()
+      const rewritten = await rewriteCandidatesToDomain({
+        openai,
+        issueName: input.issueName,
+        mode: input.mode,
+        bucket: 'suggested',
+        expectedType: Array.from(allowed)[0] ?? null,
+        items: droppedSuggested.map((it) => ({ name: it.name, reason: it.reason })),
+        attempts: 2,
+        trace,
+      })
+      rewriteMs += Date.now() - rw0
+      if (rewritten?.length) {
+        const cc0 = Date.now()
+        const reClassified = await classifyCandidatesForSection({
+          openai,
+          issueName: input.issueName,
+          mode: input.mode,
+          items: rewritten.map((m) => ({ name: m.name, reason: m.reason })),
+          trace,
+        })
+        classifyMs += Date.now() - cc0
+        const filtered = (reClassified ?? [])
+          .filter((it) => allowed.has(it.canonicalType))
+          .map((it) => {
+            const src = rewritten.find((m) => m.name.trim().toLowerCase() === it.name.trim().toLowerCase())!
+            return { name: src.name, reason: src.reason, protocol: null as string | null }
+          })
+        suggested = uniqueByName([...suggested, ...filtered])
+      }
+    }
+    if (droppedAvoid.length) {
+      const rw1 = Date.now()
+      const rewritten = await rewriteCandidatesToDomain({
+        openai,
+        issueName: input.issueName,
+        mode: input.mode,
+        bucket: 'avoid',
+        expectedType: Array.from(allowed)[0] ?? null,
+        items: droppedAvoid.map((it) => ({ name: it.name, reason: it.reason })),
+        attempts: 2,
+        trace,
+      })
+      rewriteMs += Date.now() - rw1
+      if (rewritten?.length) {
+        const cc1 = Date.now()
+        const reClassified = await classifyCandidatesForSection({
+          openai,
+          issueName: input.issueName,
+          mode: input.mode,
+          items: rewritten.map((m) => ({ name: m.name, reason: m.reason })),
+          trace,
+        })
+        classifyMs += Date.now() - cc1
+        const filtered = (reClassified ?? [])
+          .filter((it) => allowed.has(it.canonicalType))
+          .map((it) => {
+            const src = rewritten.find((m) => m.name.trim().toLowerCase() === it.name.trim().toLowerCase())!
+            return { name: src.name, reason: src.reason, protocol: null as string | null }
+          })
+        avoid = uniqueByName([...avoid, ...filtered])
+      }
+    }
+
+    // Fill-missing up to 3 retries per bucket
     for (const bucket of ['suggested', 'avoid'] as const) {
       let attempts = 0
       // eslint-disable-next-line no-constant-condition
       while (true) {
         const need = bucket === 'suggested' ? Math.max(0, minSuggested - suggested.length) : Math.max(0, minAvoid - avoid.length)
-        if (need <= 0 || attempts >= 2) break
+        if (need <= 0 || attempts >= 3) break
         const disallow = [
           ...suggested.map((s) => s.name),
           ...avoid.map((a) => a.name),
           ...working.map((w) => w.name),
         ]
         const expected: CanonicalType | null = Array.from(allowed)[0] ?? null
+        const f0 = Date.now()
         const more = await fillMissingItemsForSection({
           openai,
           issueName: input.issueName,
@@ -742,9 +1031,11 @@ export async function generateSectionInsightsFromLLM(
           disallowNames: disallow,
           trace,
         })
+        fillMs += Date.now() - f0
         attempts += 1
         if (!more || !more.length) break
         // classify the new items
+        const c1 = Date.now()
         const moreClassified = await classifyCandidatesForSection({
           openai,
           issueName: input.issueName,
@@ -752,6 +1043,7 @@ export async function generateSectionInsightsFromLLM(
           items: more.map((m) => ({ name: m.name, reason: m.reason })),
           trace,
         })
+        classifyMs += Date.now() - c1
         const filtered = (moreClassified ?? [])
           .filter((it) => allowed.has(it.canonicalType))
           .map((it) => {
@@ -796,6 +1088,14 @@ export async function generateSectionInsightsFromLLM(
       expiresAt: Date.now() + CACHE_TTL_MS,
       result: final,
     })
+  }
+  // Attach timings for observability
+  ;(final as any)._timings = {
+    generateMs,
+    classifyMs,
+    rewriteMs,
+    fillMs,
+    totalMs: generateMs + classifyMs + rewriteMs + fillMs,
   }
   return final
 }

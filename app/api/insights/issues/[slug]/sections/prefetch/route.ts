@@ -15,6 +15,7 @@ interface PrefetchBody {
   mode?: ReportMode
   concurrency?: number
   range?: { from?: string; to?: string }
+  forceAllIssues?: boolean
 }
 
 export async function POST(request: Request, context: { params: { slug: string } }) {
@@ -37,16 +38,17 @@ export async function POST(request: Request, context: { params: { slug: string }
   const mode: ReportMode = body.mode === 'weekly' || body.mode === 'daily' || body.mode === 'custom' ? body.mode : 'latest'
 
   const startedAt = Date.now()
-  const concurrency = body.concurrency ?? 3
-  console.time(`[insights.prefetch] ${context.params.slug}`)
+  const concurrency = body.concurrency ?? 4
+  const forceAll = body.forceAllIssues === true
+  console.time(`[insights.prefetch] ${forceAll ? 'ALL' : context.params.slug}`)
   await precomputeIssueSectionsForUser(session.user.id, {
-    slugs: [context.params.slug],
+    slugs: forceAll ? undefined : [context.params.slug],
     sections: requestedSections,
     mode,
     range: body.range,
     concurrency,
   })
-  console.timeEnd(`[insights.prefetch] ${context.params.slug}`)
+  console.timeEnd(`[insights.prefetch] ${forceAll ? 'ALL' : context.params.slug}`)
   const durationMs = Date.now() - startedAt
 
   return NextResponse.json(
@@ -55,6 +57,7 @@ export async function POST(request: Request, context: { params: { slug: string }
       sections: requestedSections ?? ISSUE_SECTION_ORDER.filter((section) => section !== 'overview'),
       durationMs,
       concurrency,
+      scope: forceAll ? 'all-issues' : 'single-issue',
     },
     { status: 202 }
   )

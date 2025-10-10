@@ -59,9 +59,23 @@ export async function GET(request: NextRequest) {
     const action = url.searchParams.get('action')
     
     if (action === 'insights') {
-      // Generate AI insights from collected data
-      const insights = await generateInsights()
-      return NextResponse.json({ success: true, insights })
+      // Lightweight: return recent timing and cache stats when present (populated by callers)
+      const recent = analyticsData.slice(-50)
+      const timings = recent
+        .filter(e => e?.type === 'insights-timing')
+        .slice(-20)
+        .map(e => ({
+          section: e.section,
+          mode: e.mode,
+          generateMs: e.generateMs,
+          classifyMs: e.classifyMs,
+          rewriteMs: e.rewriteMs,
+          fillMs: e.fillMs,
+          totalMs: e.totalMs,
+          cache: e.cache,
+          at: e.timestamp,
+        }))
+      return NextResponse.json({ success: true, timings })
     }
     
     if (action === 'summary') {

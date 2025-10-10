@@ -2,7 +2,7 @@ import { cache } from 'react'
 import { prisma } from '@/lib/prisma'
 import { authOptions } from '@/lib/auth'
 import { getServerSession } from 'next-auth'
-import { generateSectionInsightsFromLLM } from './llm'
+import { generateSectionInsightsFromLLM, generateDegradedSection } from './llm'
 
 export type IssueSectionKey =
   | 'overview'
@@ -135,6 +135,7 @@ interface BloodResultsData {
 
 const RATING_SCALE_DEFAULT = 6
 const SECTION_CACHE_TTL_MS = 1000 * 60 * 15
+const DEGRADED_CACHE_TTL_MS = 1000 * 60 * 2
 
 const RECENT_DATA_WINDOW_MS = 1000 * 60 * 60 * 24
 
@@ -546,13 +547,15 @@ function shouldCacheSectionResult(result: IssueSectionResult | null): boolean {
   const source = String(extras['source'] ?? '')
   const pipelineVersion = String(extras['pipelineVersion'] ?? '')
   const validated = Boolean(extras['validated'])
+  const degraded = Boolean(extras['degraded'])
   // Known non-success sources we do not want to cache
   const badSources = new Set(['llm-error', 'needs-data', 'needs-fresh-data'])
   if (badSources.has(source)) return false
-  // Only cache validated results from the new pipeline
-  if (!validated) return false
-  if (pipelineVersion !== 'v2') return false
-  return true
+  // Cache validated results from the new pipeline
+  if (validated && pipelineVersion === 'v2') return true
+  // Additionally, cache degraded results with a short TTL to avoid repeated cold waits
+  if (!validated && degraded) return true
+  return false
 }
 
 function buildDataNeed(goalName: string, category: string | null | undefined): InsightDataNeed | null {
@@ -816,7 +819,7 @@ export async function precomputeIssueSectionsForUser(
   const mode = options.mode ?? 'latest'
   const range = options.range
   const rangeKey = encodeRange(range)
-  const concurrency = Math.max(1, options.concurrency ?? 2)
+  const concurrency = Math.max(1, options.concurrency ?? 4)
 
   const tasks = targetSlugs.flatMap((slug) =>
     targetSections.map((section) => ({ slug, section }))
@@ -1254,9 +1257,12 @@ async function computeIssueSection(
   if (cached) {
     const extras = (cached.result.extras as Record<string, unknown> | undefined) ?? {}
     const pipelineVersion = String(extras['pipelineVersion'] ?? '')
-    if (Date.now() - cached.updatedAt.getTime() < SECTION_CACHE_TTL_MS && pipelineVersion === 'v2') {
-      return cached.result
-    }
+    const validated = Boolean(extras['validated'])
+    const degraded = Boolean(extras['degraded'])
+    const ageMs = Date.now() - cached.updatedAt.getTime()
+    const ttl = degraded ? DEGRADED_CACHE_TTL_MS : SECTION_CACHE_TTL_MS
+    const ok = ageMs < ttl && (validated ? pipelineVersion === 'v2' : degraded)
+    if (ok) return cached.result
   }
 
   console.time(`[insights.build] ${slug}/${section}`)
@@ -1267,7 +1273,7 @@ async function computeIssueSection(
     force: false,
   })
   console.timeEnd(`[insights.build] ${slug}/${section}`)
-  if (shouldCacheSectionResult(built)) {
+  if (built && shouldCacheSectionResult(built)) {
     await upsertSectionCache({ userId, slug, section, mode, rangeKey, result: built })
   }
   return built
@@ -1474,7 +1480,7 @@ async function buildExerciseSection(
   }))
 
   console.time(`[insights.llm] exercise:${issue.slug}`)
-  const llmResult = await generateSectionInsightsFromLLM(
+  let llmResult = await generateSectionInsightsFromLLM(
     {
       issueName: issue.name,
       issueSummary: issue.highlight,
@@ -1486,6 +1492,24 @@ async function buildExerciseSection(
     { minWorking: normalizedLogs.length > 0 ? 1 : 0, minSuggested: 4, minAvoid: 4 }
   )
   console.timeEnd(`[insights.llm] exercise:${issue.slug}`)
+
+  if (!llmResult) {
+    // Degraded fallback
+    const degraded = await generateDegradedSection(
+      {
+        issueName: issue.name,
+        issueSummary: issue.highlight,
+        items: normalizedLogs,
+        otherItems: context.supplements.map((supp) => ({ name: supp.name, dosage: supp.dosage ?? null })),
+        profile: context.profile,
+        mode: 'exercise',
+      },
+      { minSuggested: 4, minAvoid: 4 }
+    )
+    if (degraded) {
+      llmResult = degraded
+    }
+  }
 
   if (!llmResult) {
     return {
@@ -1651,6 +1675,7 @@ async function buildExerciseSection(
       source: 'llm',
       pipelineVersion: 'v2',
       validated,
+      degraded: !validated,
     },
   }
 }
@@ -1672,7 +1697,7 @@ async function buildSupplementsSection(
   }))
 
   console.time(`[insights.llm] supplements:${issue.slug}`)
-  const llmResult = await generateSectionInsightsFromLLM(
+  let llmResult = await generateSectionInsightsFromLLM(
     {
       issueName: issue.name,
       issueSummary: issue.highlight,
@@ -1684,6 +1709,21 @@ async function buildSupplementsSection(
     { minWorking: normalizedSupplements.length > 0 ? 1 : 0, minSuggested: 4, minAvoid: 4 }
   )
   console.timeEnd(`[insights.llm] supplements:${issue.slug}`)
+
+  if (!llmResult) {
+    const degraded = await generateDegradedSection(
+      {
+        issueName: issue.name,
+        issueSummary: issue.highlight,
+        items: normalizedSupplements,
+        otherItems: context.medications.map((med) => ({ name: med.name, dosage: med.dosage ?? null })),
+        profile: context.profile,
+        mode: 'supplements',
+      },
+      { minSuggested: 4, minAvoid: 4 }
+    )
+    if (degraded) llmResult = degraded
+  }
 
   if (!llmResult) {
     return {
@@ -1881,6 +1921,7 @@ async function buildSupplementsSection(
       source: 'llm',
       pipelineVersion: 'v2',
       validated,
+      degraded: !validated,
     } as Record<string, unknown>,
   }
 }
@@ -1902,7 +1943,7 @@ async function buildMedicationsSection(
   }))
 
   console.time(`[insights.llm] medications:${issue.slug}`)
-  const llmResult = await generateSectionInsightsFromLLM(
+  let llmResult = await generateSectionInsightsFromLLM(
     {
       issueName: issue.name,
       issueSummary: issue.highlight,
@@ -1914,6 +1955,21 @@ async function buildMedicationsSection(
     { minWorking: normalizedMeds.length > 0 ? 1 : 0, minSuggested: 4, minAvoid: 4 }
   )
   console.timeEnd(`[insights.llm] medications:${issue.slug}`)
+
+  if (!llmResult) {
+    const degraded = await generateDegradedSection(
+      {
+        issueName: issue.name,
+        issueSummary: issue.highlight,
+        items: normalizedMeds,
+        otherItems: context.supplements.map((supp) => ({ name: supp.name, dosage: supp.dosage ?? null })),
+        profile: context.profile,
+        mode: 'medications',
+      },
+      { minSuggested: 4, minAvoid: 4 }
+    )
+    if (degraded) llmResult = degraded
+  }
 
   if (!llmResult) {
     return {
@@ -2114,6 +2170,7 @@ async function buildMedicationsSection(
       source: 'llm',
       pipelineVersion: 'v2',
       validated,
+      degraded: !validated,
     } as Record<string, unknown>,
   }
 }
@@ -2202,7 +2259,7 @@ async function buildLabsSection(
   }))
 
   console.time(`[insights.llm] labs:${issue.slug}`)
-  const llmResult = await generateSectionInsightsFromLLM(
+  let llmResult = await generateSectionInsightsFromLLM(
     {
       issueName: issue.name,
       issueSummary: issue.highlight,
@@ -2214,6 +2271,21 @@ async function buildLabsSection(
     { minWorking: labItems.length > 0 ? 1 : 0, minSuggested: 4, minAvoid: 4 }
   )
   console.timeEnd(`[insights.llm] labs:${issue.slug}`)
+
+  if (!llmResult) {
+    const degraded = await generateDegradedSection(
+      {
+        issueName: issue.name,
+        issueSummary: issue.highlight,
+        items: labItems,
+        otherItems: context.supplements.map((supp) => ({ name: supp.name, dosage: supp.dosage ?? null })),
+        profile: context.profile,
+        mode: 'labs',
+      },
+      { minSuggested: 4, minAvoid: 4 }
+    )
+    if (degraded) llmResult = degraded
+  }
 
   if (!llmResult) {
     return {
@@ -2353,6 +2425,7 @@ async function buildLabsSection(
       source: 'llm',
       pipelineVersion: 'v2',
       validated,
+      degraded: !validated,
     },
   }
 }
@@ -2388,7 +2461,7 @@ async function buildNutritionSection(
   )
 
   console.time(`[insights.llm] nutrition:${issue.slug}`)
-  const llmResult = await generateSectionInsightsFromLLM(
+  let llmResult = await generateSectionInsightsFromLLM(
     {
       issueName: issue.name,
       issueSummary: issue.highlight,
@@ -2400,6 +2473,21 @@ async function buildNutritionSection(
     { minWorking: hasLoggedFoods ? 1 : 0, minSuggested: 4, minAvoid: 4 }
   )
   console.timeEnd(`[insights.llm] nutrition:${issue.slug}`)
+
+  if (!llmResult) {
+    const degraded = await generateDegradedSection(
+      {
+        issueName: issue.name,
+        issueSummary: issue.highlight,
+        items: normalizedFoods,
+        otherItems: context.supplements.map((supp) => ({ name: supp.name, dosage: supp.dosage ?? null })),
+        profile: context.profile,
+        mode: 'nutrition',
+      },
+      { minSuggested: 4, minAvoid: 4 }
+    )
+    if (degraded) llmResult = degraded
+  }
 
   if (!llmResult) {
     return {
@@ -2578,6 +2666,7 @@ async function buildNutritionSection(
       source: 'llm',
       pipelineVersion: 'v2',
       validated,
+      degraded: !validated,
     },
   }
 }
@@ -2609,7 +2698,7 @@ async function buildLifestyleSection(
   const hasLifestyleSignals = lifestyleItems.length > 0
 
   console.time(`[insights.llm] lifestyle:${issue.slug}`)
-  const llmResult = await generateSectionInsightsFromLLM(
+  let llmResult = await generateSectionInsightsFromLLM(
     {
       issueName: issue.name,
       issueSummary: issue.highlight,
@@ -2621,6 +2710,21 @@ async function buildLifestyleSection(
     { minWorking: lifestyleItems.length > 0 ? 1 : 0, minSuggested: 4, minAvoid: 4 }
   )
   console.timeEnd(`[insights.llm] lifestyle:${issue.slug}`)
+
+  if (!llmResult) {
+    const degraded = await generateDegradedSection(
+      {
+        issueName: issue.name,
+        issueSummary: issue.highlight,
+        items: lifestyleItems,
+        otherItems: context.supplements.map((supp) => ({ name: supp.name, dosage: supp.dosage ?? null })),
+        profile: context.profile,
+        mode: 'lifestyle',
+      },
+      { minSuggested: 4, minAvoid: 4 }
+    )
+    if (degraded) llmResult = degraded
+  }
 
   if (!llmResult) {
     return {
@@ -2756,6 +2860,7 @@ async function buildLifestyleSection(
       source: 'llm',
       pipelineVersion: 'v2',
       validated,
+      degraded: !validated,
     },
   }
 }

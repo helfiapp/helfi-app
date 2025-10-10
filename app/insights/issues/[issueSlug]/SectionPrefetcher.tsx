@@ -14,7 +14,7 @@ export default function SectionPrefetcher({ issueSlug, sections }: { issueSlug: 
         const response = await fetch(`/api/insights/issues/${issueSlug}/sections/prefetch`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sections, mode: 'latest', concurrency: 3 }),
+          body: JSON.stringify({ sections, mode: 'latest', concurrency: 4 }),
           signal,
         })
         if (!response.ok && !cancelled) {
