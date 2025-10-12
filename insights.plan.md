@@ -10,6 +10,11 @@
 - User reported 30s+ waits opening insight sections. Target is ≤4s warm / ≤7s cold.
 - For issue “Bowel Movements”, Supplements tab family returned no content; banner showed “couldn’t generate guidance”. This violates “always produce guidance” (≥4 suggested, ≥4 avoid) based on health intake + AI.
 
+## Field report (2025-10-12) – Laptop
+- User reports ~60s load times when opening Supplements, Nutrition, and other sections; unacceptable.
+- Quality: Suggested tab sometimes <4 items and Avoid <4; content is too generic.
+- Action: Treat as P0. Update plan to enforce instant-first render and guaranteed counts.
+
 ## What v2 implemented (this commit series)
 - lib/insights/llm.ts: two-stage pipeline (generate → classify → fill-missing), default Avoid min raised to 4, timing logs, helpers for classification/fill.
 - lib/insights/issue-engine.ts: cache writes only when validated; `pipelineVersion: "v2"`; extras.validated; section builders now compute validated flag and tag results; min Avoid=4 everywhere; timing logs.
@@ -36,6 +41,14 @@
    - Temporarily cache degraded results (TTL ~2 min) to avoid repeated cold retries in one session. A background worker re-runs rewrite/fill to upgrade to validated.
 6) Observability & SLOs
    - Add per-phase timings to `extras` (generateMs, classifyMs, rewriteMs, fillMs, totalMs) and log cacheHit/cacheMiss. Expose a lightweight summary via `GET /api/analytics?action=insights` for production checks.
+
+### Immediate hotfixes (ship before full v3)
+1) UI: never block on LLM – render degraded/cached instantly; show subtle “updating…” while background refresh completes.
+2) Backend: cache degraded-but-valid results for 2 minutes (TTL) to avoid repeat cold hits per session.
+3) Concurrency: raise precompute concurrency to 4; parallelize section fetches.
+4) Counts: harden fill-missing to force ≥4 Suggested and ≥4 Avoid even with empty logs; dedupe names case-insensitively.
+5) Nutrition specificity: include 7‑day averages (protein, fiber, sugar, sodium, calories) and top foods in prompt; require quantified actions.
+6) Guardrails: if classification returns `other`, run rewrite pass (1–2 attempts) before giving up.
 
 ## File-level guidance for next agent
 - lib/insights/llm.ts
