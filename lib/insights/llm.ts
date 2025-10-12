@@ -775,13 +775,13 @@ export async function generateSectionInsightsFromLLM(
     return cached.result
   }
 
-  let attempt = 0
   let generateMs = 0
   let classifyMs = 0
   let rewriteMs = 0
   let fillMs = 0
-  let bestCandidate: { result: SectionLLMResult; score: number } | null = null
-  while (attempt < maxRetries) {
+  let generateAttempts = 0
+  let bestCandidate: { result: SectionLLMResult; score: number; metMinimums: boolean } | null = null
+  for (let attempt = 0; attempt < maxRetries; attempt += 1) {
     const force = attempt > 0
     const prompt = buildPrompt({
       issueName: input.issueName,
@@ -812,11 +812,12 @@ export async function generateSectionInsightsFromLLM(
         ],
       })
       console.timeEnd(`[insights.gen:${input.mode}]`)
-      generateMs += Date.now() - g0
+      const elapsed = Date.now() - g0
+      generateMs += elapsed
+      generateAttempts = attempt + 1
 
       const content = response.choices?.[0]?.message?.content
       if (!content) {
-        attempt += 1
         continue
       }
 
@@ -846,28 +847,27 @@ export async function generateSectionInsightsFromLLM(
           issues: parsed.error.issues,
           content,
         })
-        attempt += 1
         continue
       }
 
       const data = parsed.data
+      const meets = meetsMinimums(data, { minWorking, minSuggested, minAvoid })
       const score = scoreCandidate(data)
       if (!bestCandidate || score > bestCandidate.score) {
-        bestCandidate = { result: data, score }
+        bestCandidate = { result: data, score, metMinimums: meets }
       }
-
-      attempt += 1
-      continue
+      if (meets) {
+        break
+      }
     } catch (error) {
       console.error('[insights.llm] Failed to fetch LLM output', error)
-      attempt += 1
     }
   }
 
   // Stage 2: classification + fill-missing over the best candidate (with one repair attempt if needed)
   const trace = `[insights:${input.mode}:${Math.random().toString(36).slice(2, 8)}]`
   let base: SectionLLMResult | null = bestCandidate?.result ?? null
-  if (base && !meetsMinimums(base, { minWorking, minSuggested, minAvoid })) {
+  if (base && !bestCandidate?.metMinimums) {
     const r0 = Date.now()
     const repaired = await repairLLMOutput({
       openai,
@@ -1096,6 +1096,9 @@ export async function generateSectionInsightsFromLLM(
     rewriteMs,
     fillMs,
     totalMs: generateMs + classifyMs + rewriteMs + fillMs,
+    attempts: {
+      generate: generateAttempts,
+    },
   }
   return final
 }
