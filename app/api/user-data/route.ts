@@ -440,7 +440,7 @@ export async function POST(request: NextRequest) {
       // Continue with other updates
     }
 
-    // 4. Handle supplements - safe upsert approach with enhanced logging
+    // 4. Handle supplements - optimized bulk replace (deleteMany + createMany)
     console.time('⏱️ Supplements Update')
     try {
       console.log('🔍 SUPPLEMENT DEBUG - Raw data.supplements:', JSON.stringify(data.supplements, null, 2))
@@ -468,80 +468,19 @@ export async function POST(request: NextRequest) {
           })
         }
         
-        // Use database transaction for data safety
-        await prisma.$transaction(async (tx) => {
-          // Get existing supplements
-          const existingSupplements = await tx.supplement.findMany({
-            where: { userId: user.id }
+        // Bulk replace for performance: delete all then insert all
+        await prisma.$transaction([
+          prisma.supplement.deleteMany({ where: { userId: user.id } }),
+          prisma.supplement.createMany({
+            data: validSupplements.map((supp: any) => ({
+              userId: user.id,
+              name: supp.name,
+              dosage: supp.dosage || '',
+              timing: Array.isArray(supp.timing) ? supp.timing : [supp.timing || 'morning'],
+            }))
           })
-          
-          console.log('📋 Found', existingSupplements.length, 'existing supplements in database')
-          
-          // Track which supplements to keep
-          const supplementsToKeep = new Set()
-          
-          // Process each valid supplement from the form
-          for (const supp of validSupplements) {
-            console.log('🔄 Processing supplement:', supp.name, 'with dosage:', supp.dosage, 'and timing:', supp.timing)
-            
-            // Try to find existing supplement with same name
-            const existing = existingSupplements.find(
-              (existing) => existing.name.toLowerCase() === supp.name.toLowerCase()
-            )
-            
-            if (existing) {
-              // Update existing supplement
-              const updatedSupplement = await tx.supplement.update({
-                where: { id: existing.id },
-                data: {
-                  name: supp.name,
-                  dosage: supp.dosage || '',
-                  timing: Array.isArray(supp.timing) ? supp.timing : [supp.timing || 'morning'],
-                }
-              })
-              supplementsToKeep.add(existing.id)
-              console.log('📝 Updated existing supplement:', supp.name, '- New data:', updatedSupplement)
-            } else {
-              // Create new supplement
-              const newSupplement = await tx.supplement.create({
-                data: {
-                  userId: user.id,
-                  name: supp.name,
-                  dosage: supp.dosage || '',
-                  timing: Array.isArray(supp.timing) ? supp.timing : [supp.timing || 'morning'],
-                }
-              })
-              supplementsToKeep.add(newSupplement.id)
-              console.log('➕ Created new supplement:', supp.name, '- Full data:', newSupplement)
-            }
-          }
-          
-          // Remove supplements that are no longer in the form
-          const supplementsToDelete = existingSupplements.filter(
-            (existing) => !supplementsToKeep.has(existing.id)
-          )
-          
-          if (supplementsToDelete.length > 0) {
-            console.log('🗑️ About to delete supplements:', supplementsToDelete.map(s => s.name))
-            await tx.supplement.deleteMany({
-              where: {
-                id: { in: supplementsToDelete.map(s => s.id) }
-              }
-            })
-            console.log('🗑️ Removed', supplementsToDelete.length, 'supplements no longer in form')
-          } else {
-            console.log('ℹ️ No supplements to delete')
-          }
-          
-          // Verify final state
-          const finalSupplements = await tx.supplement.findMany({
-            where: { userId: user.id }
-          })
-          console.log('🏁 Final supplement count after transaction:', finalSupplements.length)
-          console.log('🏁 Final supplements:', finalSupplements.map(s => ({ name: s.name, dosage: s.dosage, timing: s.timing })))
-        })
-        
-        console.log('✅ Updated supplements safely with transaction')
+        ])
+        console.log('✅ Replaced supplements via bulk operation:', validSupplements.length)
         
         // BACKUP: Also store supplements as JSON in health goals as failsafe
         try {
@@ -620,74 +559,26 @@ export async function POST(request: NextRequest) {
       console.log('Device interest save skipped:', e)
     }
 
-    // 5. Handle medications - safe upsert approach (same as supplements)
+    // 5. Handle medications - optimized bulk replace (deleteMany + createMany)
     console.time('⏱️ Medications Update')
     try {
       if (data.medications && Array.isArray(data.medications)) {
         console.log('💉 Processing', data.medications.length, 'medications')
         
-        // Use database transaction for data safety
-        await prisma.$transaction(async (tx) => {
-          // Get existing medications
-          const existingMedications = await tx.medication.findMany({
-            where: { userId: user.id }
+        // Bulk replace for performance: delete all then insert all
+        const validMeds = (data.medications || []).filter((m: any) => m && typeof m.name === 'string' && m.name.trim().length > 0)
+        await prisma.$transaction([
+          prisma.medication.deleteMany({ where: { userId: user.id } }),
+          prisma.medication.createMany({
+            data: validMeds.map((med: any) => ({
+              userId: user.id,
+              name: med.name,
+              dosage: med.dosage || '',
+              timing: Array.isArray(med.timing) ? med.timing : [med.timing || 'morning'],
+            }))
           })
-          
-          // Track which medications to keep
-          const medicationsToKeep = new Set()
-          
-          // Process each medication from the form
-          for (const med of data.medications) {
-            if (med.name && typeof med.name === 'string') {
-              // Try to find existing medication with same name
-              const existing = existingMedications.find(
-                (existing) => existing.name.toLowerCase() === med.name.toLowerCase()
-              )
-              
-              if (existing) {
-                // Update existing medication
-                await tx.medication.update({
-                  where: { id: existing.id },
-                  data: {
-                    name: med.name,
-                    dosage: med.dosage || '',
-                    timing: Array.isArray(med.timing) ? med.timing : [med.timing || 'morning'],
-                  }
-                })
-                medicationsToKeep.add(existing.id)
-                console.log('📝 Updated existing medication:', med.name)
-              } else {
-                // Create new medication
-                const newMedication = await tx.medication.create({
-                  data: {
-                    userId: user.id,
-                    name: med.name,
-                    dosage: med.dosage || '',
-                    timing: Array.isArray(med.timing) ? med.timing : [med.timing || 'morning'],
-                  }
-                })
-                medicationsToKeep.add(newMedication.id)
-                console.log('➕ Created new medication:', med.name)
-              }
-            }
-          }
-          
-          // Remove medications that are no longer in the form
-          const medicationsToDelete = existingMedications.filter(
-            (existing) => !medicationsToKeep.has(existing.id)
-          )
-          
-          if (medicationsToDelete.length > 0) {
-            await tx.medication.deleteMany({
-              where: {
-                id: { in: medicationsToDelete.map(m => m.id) }
-              }
-            })
-            console.log('🗑️ Removed', medicationsToDelete.length, 'medications no longer in form')
-          }
-        })
-        
-        console.log('✅ Updated medications safely with transaction')
+        ])
+        console.log('✅ Replaced medications via bulk operation:', validMeds.length)
       } else {
         console.log('ℹ️ No medications to update')
       }
