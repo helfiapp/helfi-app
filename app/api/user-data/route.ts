@@ -779,14 +779,21 @@ export async function POST(request: NextRequest) {
     console.log('✅ POST /api/user-data - All updates completed successfully')
 
     if (user?.id) {
-      console.time('⏱️ Insights Precompute')
+      // Kick off insights precompute in the background so the save response is never blocked
+      // Do not await; errors are logged but non-blocking for onboarding completion
       try {
-        await precomputeIssueSectionsForUser(user.id, { concurrency: 3 })
-        console.log('✅ Prefetched insights after intake completion')
+        const precomputeStartedAt = Date.now()
+        precomputeIssueSectionsForUser(user.id, { concurrency: 3 })
+          .then(() => {
+            const took = Date.now() - precomputeStartedAt
+            console.log('✅ Prefetched insights after intake completion (background)', { tookMs: took })
+          })
+          .catch((error) => {
+            console.warn('⚠️ Failed to precompute insights post-intake (background)', error)
+          })
       } catch (error) {
-        console.warn('⚠️ Failed to precompute insights post-intake', error)
+        console.warn('⚠️ Failed to schedule insights precompute (background)', error)
       }
-      console.timeEnd('⏱️ Insights Precompute')
     }
 
     // 🔍 FINAL PERFORMANCE MEASUREMENT

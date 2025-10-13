@@ -1,4 +1,15 @@
 <!-- a49c4e34-eb45-492f-95eb-c25850b4e02a 17da865a-2c44-4b32-b544-6c5810394ab1 -->
+
+## IMPORTANT: Incident summary (plain English)
+
+- What happened: The Supplements page took about 55 seconds to open on live. This made things worse than before.
+- What you saw: A green banner saying “Initial guidance…” but the lists were empty at first.
+- What changed: I added an extra AI “rewrite” step and more AI calls. This made the first load slower.
+- What to do now: If you want to undo this, revert commit d04c946bf2486789ff0a4e9104fa8d3020c2af0a.
+- Where to read details: Scroll down to “Incident Report — v3 Attempt (2025-10-11)” for the full notes.
+
+---
+
 ### AI-only Insights: Domain-correct, Guaranteed Counts, Instant Loads
 
 ## Summary
@@ -73,4 +84,78 @@
 2) Measure TTFB; confirm warm <1s. Cold open should render instantly (degraded or cached) and upgrade silently.
 3) Check logs for timings (generateMs/classifyMs/rewriteMs/fillMs/totalMs) and cache hits/misses.
 
+
+
+---
+
+## Incident Report — v3 Attempt (2025-10-11) commit d04c946
+
+Purpose: Record exactly what changed in this attempt, how it regressed the live experience (55s open on Supplements), and how to safely undo or take a different path.
+
+### What Changed (by file)
+1) lib/insights/llm.ts
+   - Added rewrite-to-domain stage: `rewriteCandidatesToDomain(...)` with re-classification.
+   - Increased fill-missing attempts 2 → 3; added diversity hints per section.
+   - Introduced `generateDegradedSection(...)` to synthesize 4/4 when the main LLM call fails.
+   - Added timing capture into an internal field `result._timings` (note: not propagated into `extras`).
+
+2) lib/insights/issue-engine.ts
+   - Integrated degraded fallback only when the primary LLM call returns null (not on slow success or low counts).
+   - Marked `extras.degraded = !validated` on section results; left `extras.source = 'llm'` even for degraded.
+   - Allowed caching of degraded results with short TTL (2 minutes) and adjusted cache reads to honor this TTL.
+   - Increased default precompute concurrency to 4.
+
+3) app/api/insights/issues/[slug]/sections/prefetch/route.ts
+   - Default `concurrency=4`; optional `forceAllIssues` flag (no caller uses it yet).
+
+4) app/insights/issues/[issueSlug]/SectionPrefetcher.tsx
+   - Sends `concurrency=4` to prefetch API. No UI change to render degraded immediately on cache miss.
+
+5) app/api/analytics/route.ts
+   - `GET?action=insights` now returns recent timing events from in-memory analytics, but no emitters were added, so it returns empty in practice.
+
+### Observed Regressions (live)
+- Supplements section (e.g., Libido → Supplements) took ~55 seconds to open (user report). Target was ≤7s cold/≤1s warm.
+- Panels displayed “Initial guidance generated while we prepare a deeper report.” but still showed empty lists instead of guaranteed 4/4.
+
+### Why This Likely Happened
+1) Extra LLM hops on the cold path:
+   - New pipeline does: generate → classify → rewrite (per bucket) → re-classify → fill-missing (up to 3) → re-classify.
+   - Worst case adds multiple sequential OpenAI calls, increasing latency per section.
+
+2) Degraded fallback is gated on a hard failure only:
+   - It triggers only when the main LLM response is null. If the LLM responds slowly or returns low/empty counts, the code still waits the full slow path instead of returning a degraded 4/4 immediately.
+
+3) UI still blocks on section generation when cache is cold:
+   - The client `SectionPrefetcher` sends concurrency=4, but it does not render a degraded result immediately on cache miss. Users still wait.
+
+4) Timings not surfaced where expected:
+   - Timings are stored on `result._timings` and never copied into `extras`, so observability goals in this attempt are unmet.
+
+### Guidance for Next Agent (Do NOT repeat these choices)
+1) Do not gate degraded rendering on LLM null. Use a time cap:
+   - If no validated cache within ~1s of opening (or after a background precompute window), render a pre-built degraded 4/4 immediately while the validated job runs in background.
+
+2) Cut down LLM round-trips:
+   - Consider merging rewrite+classify into a single structured step, or skip rewrite on the first attempt and only rewrite the specific deficits.
+
+3) Put timings in `extras` and emit analytics events:
+   - `extras`: { generateMs, classifyMs, rewriteMs, fillMs, totalMs, cacheHit }
+   - Emit to `/api/analytics` so `GET?action=insights` returns real data.
+
+4) UI behavior on cache miss:
+   - Show degraded results instantly when validated cache is missing, and auto-refresh in the background.
+
+5) Cache policy:
+   - It’s acceptable to store degraded with a very short TTL, but prefer serving degraded from an in-memory/session cache while a background task upgrades to validated.
+
+### Rollback Instructions (safe, single-commit)
+Do not deploy from this branch without approval. To restore the prior v2 baseline quickly:
+- `git revert d04c946bf2486789ff0a4e9104fa8d3020c2af0a` (preferred) and push to master to trigger Vercel.
+- If a hard reset is preferred locally: `git reset --hard 50ef11e` then push with `--force-with-lease` (use with caution).
+
+### Commit Reference
+- v3 attempt commit: d04c946bf2486789ff0a4e9104fa8d3020c2af0a
+  - Scope: llm.ts, issue-engine.ts, prefetch route, client prefetcher, analytics route
+  - Effect: slower cold path, no immediate degraded render, timings not visible in `extras`.
 

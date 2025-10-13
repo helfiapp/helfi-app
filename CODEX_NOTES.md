@@ -53,3 +53,53 @@
    - Supplements/Exercise avoid lists contain ≥4 relevant items even with empty logs.
    - Cold path renders immediately (degraded or cached), and background upgrade occurs within 7s.
    - Average response time meets targets.
+
+
+---
+
+## INCIDENT LOG — v3 Attempt (2025-10-11) commit d04c946
+
+This section documents exactly what the last agent changed and why it regressed live performance/UX, so the next agent does not repeat these steps.
+
+### Exact Code Changes
+- `lib/insights/llm.ts`
+  - Added rewrite-to-domain helper and integrated it before fill-missing.
+  - Increased fill-missing attempts (2→3) with diversity prompts.
+  - Implemented `generateDegradedSection` (synthesized 4/4); timings stored in a private `_timings` field.
+
+- `lib/insights/issue-engine.ts`
+  - Calls degraded generator only if the main LLM returns null (not on slow or low-count responses).
+  - Sets `extras.degraded = !validated` and allows caching degraded with short TTL (~2 min).
+  - Precompute default concurrency raised to 4; cache read logic honors degraded TTL vs validated TTL.
+
+- `app/api/insights/issues/[slug]/sections/prefetch/route.ts`
+  - `concurrency` default 4; added `forceAllIssues` support (unused by UI).
+
+- `app/insights/issues/[issueSlug]/SectionPrefetcher.tsx`
+  - Sends `concurrency=4`; does not render degraded immediately on cache miss.
+
+- `app/api/analytics/route.ts`
+  - `GET?action=insights` returns recent timing entries, but no emitters were added so the endpoint is effectively empty.
+
+### Live Regression (User Report)
+- Supplements section took ~55 seconds to open on production (goal: ≤7s); UI showed “Initial guidance generated…” but lists were empty instead of guaranteed 4/4.
+
+### Likely Root Causes
+1) Too many sequential LLM calls: generate → classify → rewrite per bucket → re-classify → fill (up to 3) → re-classify.
+2) Degraded fallback not time-based: only triggers on hard LLM failure, not on slow responses or low counts.
+3) Client does not render degraded instantly on cache miss; still blocks user while server computes.
+4) Timings not exposed in `extras`, reducing observability.
+
+### Do Not Repeat — Alternative Approach
+1) Enforce a strict time cap: if no validated cache by ~1s, immediately render a prebuilt degraded 4/4 and start a background upgrade.
+2) Collapse rewrite/classify steps or apply rewrite selectively to only the deltas that fail domain checks.
+3) Put timings inside `extras` and emit analytics so `GET?action=insights` has real data.
+4) Keep degraded data session-local unless necessary to persist; if persisted, TTL ≤ 2 min and ensure background upgrade job is fired.
+
+### Rollback Guidance
+- Revert commit `d04c946bf2486789ff0a4e9104fa8d3020c2af0a` to return to the instrumented v2 baseline.
+  - `git revert d04c946bf2486789ff0a4e9104fa8d3020c2af0a` and push to master (this repo auto-deploys to Vercel).
+
+### Commit Reference
+- v3 attempt: `d04c946bf2486789ff0a4e9104fa8d3020c2af0a`
+  - Key side-effects: slower cold path, no immediate degraded render, timing data not visible in `extras`.
