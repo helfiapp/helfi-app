@@ -1265,107 +1265,211 @@ async function computeIssueSection(
     if (ok) return cached.result
   }
 
-  // Fast-path: if section is nutrition, attempt a quick degraded generation with a strict 1s budget
-  const shouldQuickPath = section === 'nutrition'
+  // Fast-path: attempt a quick degraded generation for most sections to avoid cold waits.
+  const shouldQuickPath = section !== 'overview' && section !== 'interactions'
   if (shouldQuickPath) {
-    const quickTimeoutMs = 1000
-    const started = Date.now()
-
-    // Build a minimal context quickly: only userId and an inferred issue name
+    // Build a minimal context quickly: inferred issue name only; avoid heavy DB loads.
     const minimalIssueName = unslugify(slug)
-    const quickPromise = (async () => {
-      const quick = await generateDegradedSectionQuick(
-        {
-          issueName: minimalIssueName,
-          issueSummary: null,
-          items: [],
-          otherItems: [],
-          profile: {},
-          mode: 'nutrition',
-        },
-        { minSuggested: 4, minAvoid: 4 }
-      )
-      if (!quick) return null
+    const quick = await generateDegradedSectionQuick(
+      {
+        issueName: minimalIssueName,
+        issueSummary: null,
+        items: [],
+        otherItems: [],
+        profile: {},
+        mode: section as any,
+      },
+      { minSuggested: 4, minAvoid: 4 }
+    )
+    let quickResult: IssueSectionResult | null = null
+    if (quick) {
       const now = new Date().toISOString()
-      const quickResult: IssueSectionResult = {
-        issue: {
-          id: `temp:${slug}`,
-          slug,
-          name: minimalIssueName,
-          polarity: inferPolarityFromName(minimalIssueName),
-          severityLabel: 'Needs data',
-          severityScore: null,
-          currentRating: null,
-          ratingScaleMax: 6,
-          trend: 'inconclusive',
-          trendDelta: null,
-          lastUpdated: null,
-          highlight: 'Initial nutrition guidance available. Logs will refine recommendations.',
-          blockers: [],
-          status: 'needs-data',
-        },
-        section: 'nutrition',
-        generatedAt: now,
-        confidence: 0.6,
-        summary: quick.summary || 'Initial nutrition guidance generated.',
-        highlights: [
-          {
-            title: 'Add to your plan',
-            detail: quick.suggested.map((f) => `${f.name}: ${f.reason}`).slice(0, 4).join('; '),
-            tone: 'neutral',
-          },
-          {
-            title: 'Foods to monitor',
-            detail: quick.avoid.map((f) => `${f.name}: ${f.reason}`).slice(0, 4).join('; '),
-            tone: 'warning',
-          },
-        ],
-        dataPoints: [],
-        recommendations: [],
-        extras: {
-          suggestedFocus: quick.suggested,
-          avoidFoods: quick.avoid,
-          source: 'llm',
-          pipelineVersion: 'v2',
-          validated: quick.suggested.length >= 4 && quick.avoid.length >= 4,
-          degraded: true,
-          degradedUsed: true,
-          cacheHit: false,
-          cold: true,
-        } as Record<string, unknown>,
-        mode,
-        range: undefined,
+      // Map section-specific extras to keep UI stable
+      const baseIssue = {
+        id: `temp:${slug}`,
+        slug,
+        name: minimalIssueName,
+        polarity: inferPolarityFromName(minimalIssueName),
+        severityLabel: 'Needs data',
+        severityScore: null as number | null,
+        currentRating: null as number | null,
+        ratingScaleMax: 6,
+        trend: 'inconclusive' as const,
+        trendDelta: null as number | null,
+        lastUpdated: null as string | null,
+        highlight: 'Initial guidance available. Logs will refine recommendations.',
+        blockers: [] as string[],
+        status: 'needs-data' as IssueStatus,
       }
-      // Cache degraded with short TTL to avoid repeated cold misses
-      await upsertSectionCache({ userId, slug, section, mode, rangeKey, result: quickResult })
-      return quickResult
-    })()
+      const validated = quick.suggested.length >= 4 && quick.avoid.length >= 4
+      const commonExtras = {
+        source: 'llm',
+        pipelineVersion: 'v2',
+        validated,
+        degraded: true,
+        degradedUsed: true,
+        cacheHit: false,
+        cold: true,
+      } as Record<string, unknown>
 
-    // Race quick path against timeout
-    const timeoutPromise = new Promise<IssueSectionResult | null>((resolve) => {
-      setTimeout(() => resolve(null), quickTimeoutMs)
-    })
-    const quickResult = await Promise.race([quickPromise, timeoutPromise])
-    if (quickResult) {
-      // Fire-and-forget full build to upgrade cache in background
-      ;(async () => {
-        console.time(`[insights.build/full] ${slug}/${section}`)
-        const context = await loadUserInsightContext(userId)
-        const built = await buildIssueSectionWithContext(context, slug, section, {
+      if (section === 'nutrition') {
+        quickResult = {
+          issue: baseIssue,
+          section: 'nutrition',
+          generatedAt: now,
+          confidence: 0.6,
+          summary: quick.summary || 'Initial nutrition guidance generated.',
+          highlights: [
+            { title: 'Add to your plan', detail: quick.suggested.map((f) => `${f.name}: ${f.reason}`).slice(0, 4).join('; '), tone: 'neutral' },
+            { title: 'Foods to monitor', detail: quick.avoid.map((f) => `${f.name}: ${f.reason}`).slice(0, 4).join('; '), tone: 'warning' },
+          ],
+          dataPoints: [],
+          recommendations: [],
+          extras: {
+            suggestedFocus: quick.suggested,
+            avoidFoods: quick.avoid,
+            ...commonExtras,
+          },
           mode,
           range: undefined,
-          force: false,
-        })
-        console.timeEnd(`[insights.build/full] ${slug}/${section}`)
-        if (built && shouldCacheSectionResult(built)) {
-          await upsertSectionCache({ userId, slug, section, mode, rangeKey, result: built })
         }
-      })().catch(() => {})
-      return quickResult
+      } else if (section === 'supplements') {
+        quickResult = {
+          issue: baseIssue,
+          section: 'supplements',
+          generatedAt: now,
+          confidence: 0.6,
+          summary: quick.summary || 'Initial supplement guidance generated.',
+          highlights: [
+            { title: 'Suggested additions', detail: quick.suggested.map((f) => `${f.name}: ${f.reason}`).slice(0, 4).join('; '), tone: 'neutral' },
+            { title: 'Cautions', detail: quick.avoid.map((f) => `${f.name}: ${f.reason}`).slice(0, 4).join('; '), tone: 'warning' },
+          ],
+          dataPoints: [],
+          recommendations: [],
+          extras: {
+            supportiveDetails: [],
+            suggestedAdditions: quick.suggested.map((s) => ({ title: s.name, reason: s.reason, suggestion: s.protocol ?? null, alreadyCovered: false })),
+            avoidList: quick.avoid.map((a) => ({ name: a.name, reason: a.reason, dosage: null, timing: [] as string[] })),
+            missingDose: [],
+            missingTiming: [],
+            totalLogged: 0,
+            ...commonExtras,
+          },
+          mode,
+          range: undefined,
+        }
+      } else if (section === 'medications') {
+        quickResult = {
+          issue: baseIssue,
+          section: 'medications',
+          generatedAt: now,
+          confidence: 0.6,
+          summary: quick.summary || 'Initial medication guidance generated.',
+          highlights: [
+            { title: 'Potential options', detail: quick.suggested.map((f) => `${f.name}: ${f.reason}`).slice(0, 4).join('; '), tone: 'neutral' },
+            { title: 'Cautions', detail: quick.avoid.map((f) => `${f.name}: ${f.reason}`).slice(0, 4).join('; '), tone: 'warning' },
+          ],
+          dataPoints: [],
+          recommendations: [],
+          extras: {
+            supportiveDetails: [],
+            suggestedAdditions: quick.suggested.map((s) => ({ title: s.name, reason: s.reason, suggestion: s.protocol ?? null, alreadyCovered: false })),
+            avoidList: quick.avoid.map((a) => ({ name: a.name, reason: a.reason, dosage: null, timing: [] as string[] })),
+            totalLogged: 0,
+            ...commonExtras,
+          },
+          mode,
+          range: undefined,
+        }
+      } else if (section === 'exercise') {
+        quickResult = {
+          issue: baseIssue,
+          section: 'exercise',
+          generatedAt: now,
+          confidence: 0.6,
+          summary: quick.summary || 'Initial exercise guidance generated.',
+          highlights: [
+            { title: 'Next training moves', detail: quick.suggested.map((f) => `${f.name}: ${f.reason}`).slice(0, 4).join('; '), tone: 'neutral' },
+            { title: 'Activities to monitor', detail: quick.avoid.map((f) => `${f.name}: ${f.reason}`).slice(0, 4).join('; '), tone: 'warning' },
+          ],
+          dataPoints: [],
+          recommendations: [],
+          extras: {
+            workingActivities: [],
+            suggestedActivities: quick.suggested.map((s) => ({ title: s.name, reason: s.reason })),
+            avoidActivities: quick.avoid.map((a) => ({ title: a.name, reason: a.reason })),
+            totalLogged: 0,
+            ...commonExtras,
+          },
+          mode,
+          range: undefined,
+        }
+      } else if (section === 'labs') {
+        quickResult = {
+          issue: baseIssue,
+          section: 'labs',
+          generatedAt: now,
+          confidence: 0.6,
+          summary: quick.summary || 'Initial lab guidance generated.',
+          highlights: [
+            { title: 'Labs to order or adjust', detail: quick.suggested.map((f) => `${f.name}: ${f.reason}`).slice(0, 4).join('; '), tone: 'neutral' },
+            { title: 'Labs to monitor', detail: quick.avoid.map((f) => `${f.name}: ${f.reason}`).slice(0, 4).join('; '), tone: 'warning' },
+          ],
+          dataPoints: [],
+          recommendations: [],
+          extras: {
+            workingLabs: [],
+            suggestedLabs: quick.suggested.map((s) => ({ name: s.name, reason: s.reason, detail: s.protocol ?? null })),
+            avoidLabs: quick.avoid.map((a) => ({ name: a.name, reason: a.reason })),
+            hasLoggedLabs: false,
+            ...commonExtras,
+          },
+          mode,
+          range: undefined,
+        }
+      } else if (section === 'lifestyle') {
+        quickResult = {
+          issue: baseIssue,
+          section: 'lifestyle',
+          generatedAt: now,
+          confidence: 0.6,
+          summary: quick.summary || 'Initial lifestyle guidance generated.',
+          highlights: [
+            { title: 'Habits to add', detail: quick.suggested.map((f) => `${f.name}: ${f.reason}`).slice(0, 4).join('; '), tone: 'neutral' },
+            { title: 'Habits to avoid', detail: quick.avoid.map((f) => `${f.name}: ${f.reason}`).slice(0, 4).join('; '), tone: 'warning' },
+          ],
+          dataPoints: [],
+          recommendations: [],
+          extras: {
+            workingHabits: [],
+            suggestedHabits: quick.suggested.map((s) => ({ title: s.name, reason: s.reason, detail: s.protocol ?? null })),
+            avoidHabits: quick.avoid.map((a) => ({ title: a.name, reason: a.reason })),
+            ...commonExtras,
+          },
+          mode,
+          range: undefined,
+        }
+      }
+
+      if (quickResult) {
+        await upsertSectionCache({ userId, slug, section, mode, rangeKey, result: quickResult })
+        // Fire-and-forget full build to upgrade cache in background
+        ;(async () => {
+          console.time(`[insights.build/full] ${slug}/${section}`)
+          const context = await loadUserInsightContext(userId)
+          const built = await buildIssueSectionWithContext(context, slug, section, {
+            mode,
+            range: undefined,
+            force: false,
+          })
+          console.timeEnd(`[insights.build/full] ${slug}/${section}`)
+          if (built && shouldCacheSectionResult(built)) {
+            await upsertSectionCache({ userId, slug, section, mode, rangeKey, result: built })
+          }
+        })().catch(() => {})
+        return quickResult
+      }
     }
-    // If quick path missed the deadline, fall through to full build
-    const elapsed = Date.now() - started
-    console.warn('[insights.compute] quick path timeout', { slug, section, elapsed })
   }
 
   console.time(`[insights.build] ${slug}/${section}`)
