@@ -103,3 +103,38 @@ This section documents exactly what the last agent changed and why it regressed 
 ### Commit Reference
 - v3 attempt: `d04c946bf2486789ff0a4e9104fa8d3020c2af0a`
   - Key side-effects: slower cold path, no immediate degraded render, timing data not visible in `extras`.
+
+---
+
+## SESSION LOG — 2025-10-16 (Agent attempt REVERTED)
+
+Outcome
+- The deployment made in commit `0268398` ("Insights: fast-path + degraded fallback; guaranteed >=4 Suggested/Avoid; chat UX with history; fix Nutrition/Supplements cold load") was rolled back by `git revert`.
+- Reason: User observed sections stalling (skeleton loading) and no improvement in perceived cold time (still ~20–25s). Requested immediate revert to the previous working deployment.
+
+What this agent changed (now reverted)
+1) New fast-path generator in `lib/insights/llm.ts` (`generateSectionInsightsFast`), using one-shot candidate generation with `candidateType` hints plus single top-ups. Attached `_timings`.
+2) Switched section builders (supplements, medications, exercise, nutrition) in `lib/insights/issue-engine.ts` to call the fast path; copied timings into `extras` for UI.
+3) Added quick/degraded paths: `buildSupplementsSectionDegraded()` and later `buildNutritionSectionDegraded()`; `computeIssueSection` raced full vs quick.
+4) “Working” lists built from logs via `ISSUE_KNOWLEDGE_BASE` so obvious helpers appear without LLM.
+5) Chat changed from one-shot to simple threaded: `app/insights/.../SectionChat.tsx` and `app/api/insights/ask/route.ts` now accept message history and section context; local storage keeps per-issue history.
+
+Observed problems
+- Cold loads still ~20–25s for some users; one report showed Nutrition stuck on skeletons.
+- Supplements “Working” sometimes empty in the quick result despite logged items.
+- Quality still inconsistent across sections (≥4 Suggested/Avoid not always visible at first paint).
+
+Suspected causes (do NOT repeat without addressing)
+1) Heavy DB/context load (`loadUserInsightContext`) still runs before quick path; that alone can push first-byte over the target.
+2) The quick path wasn’t used everywhere at first; for some routes the full path still blocked first paint.
+3) Added complexity increased risk of extras shape mismatch between quick/full results.
+
+Rollback
+- Reverted commit: `0268398` with `git revert 0268398` and pushed to `master` (auto-deployed by Vercel).
+- Baseline now matches commit `b5e31a9` (pre-attempt state).
+
+Guidance for next agent (avoid repeating)
+1) Do not add more LLM passes. Focus on time-capping and cache-first.
+2) First-byte must not depend on the heavy context loader. Consider a minimal-context endpoint (just user ID + issue slug) to serve a tiny, prebuilt “starter” insight from KV, then upgrade.
+3) Surface server timings in `extras`: { dbMs, computeMs, cacheHit, cold }. Add logging you can read in Logs tab.
+4) Enforce ≥4/4 at the data layer with deterministic fallbacks rather than retrying the model.
