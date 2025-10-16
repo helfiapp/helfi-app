@@ -138,3 +138,18 @@ Guidance for next agent (avoid repeating)
 2) First-byte must not depend on the heavy context loader. Consider a minimal-context endpoint (just user ID + issue slug) to serve a tiny, prebuilt “starter” insight from KV, then upgrade.
 3) Surface server timings in `extras`: { dbMs, computeMs, cacheHit, cold }. Add logging you can read in Logs tab.
 4) Enforce ≥4/4 at the data layer with deterministic fallbacks rather than retrying the model.
+
+### User-observed issues AFTER rollback (b5e31a9 baseline)
+These reflect the current live experience even before any new changes. Please treat them as the starting point to fix.
+
+1) Cold load remains ~25 seconds across sections
+   - Affects: Supplements, Nutrition, Medications, Exercise (and likely others).
+   - Repro: Open any issue → tap any section on a fresh session; wait time ≈20–25s before content appears.
+   - Implication: Cold latency is not only due to LLM prompt behavior; the data loading and/or compute pipeline before first byte needs aggressive time-capping and cache-first serving.
+
+2) Supplements → “What’s Working” shows nothing despite many logged supplements
+   - User has a populated supplement list in Health Intake.
+   - Section shows “You’re currently not taking any supplements that could help…”
+   - Implication: Current mapping from logged supplements → Working is unreliable (likely name matching vs. model output). The app must anchor Working to logged items with deterministic matching before relying on the LLM.
+
+Please document any structural changes you make and verify both problems above are measurably improved before deploying.
