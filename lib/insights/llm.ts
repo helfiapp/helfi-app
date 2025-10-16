@@ -733,6 +733,54 @@ Counts: suggested≥${minSuggested}, avoid≥${minAvoid}.`
   }
 }
 
+// Quick degraded generator: single-pass candidate generation filtered to the expected domain.
+// Designed for fast first-paint. Uses only one LLM call and avoids repair/classify loops.
+export async function generateDegradedSectionQuick(
+  input: LLMInputData,
+  options: { minSuggested?: number; minAvoid?: number } = {}
+): Promise<SectionLLMResult | null> {
+  const minSuggested = Math.max(4, options.minSuggested ?? 4)
+  const minAvoid = Math.max(4, options.minAvoid ?? 4)
+
+  try {
+    const expectedSet = allowedCanonicalTypesForMode(input.mode)
+    const expected: CanonicalType | null = expectedSet ? Array.from(expectedSet)[0] : null
+    const candidates = await generateSectionCandidates({
+      issueName: input.issueName,
+      issueSummary: input.issueSummary,
+      profile: input.profile,
+      mode: input.mode,
+      count: { suggested: Math.max(6, minSuggested), avoid: Math.max(6, minAvoid) },
+    })
+    if (!candidates) return null
+
+    const keep = (ct: CanonicalType) => (expected ? ct === expected : true)
+    const suggested = candidates
+      .filter((c) => c.bucket === 'suggested' && keep(c.candidateType))
+      .slice(0, Math.max(minSuggested, 6))
+      .map((c) => ({ name: c.name, reason: c.reason, protocol: c.protocol ?? null }))
+    const avoid = candidates
+      .filter((c) => c.bucket === 'avoid' && keep(c.candidateType))
+      .slice(0, Math.max(minAvoid, 6))
+      .map((c) => ({ name: c.name, reason: c.reason }))
+
+    // Ensure minimum counts by truncation fallback (should already meet due to counts above)
+    const finalSuggested = suggested.slice(0, Math.max(minSuggested, 4))
+    const finalAvoid = avoid.slice(0, Math.max(minAvoid, 4))
+
+    return {
+      summary: 'Initial guidance generated while we prepare a deeper report.',
+      working: [],
+      suggested: finalSuggested,
+      avoid: finalAvoid,
+      recommendations: [],
+    }
+  } catch (error) {
+    console.warn('[insights.llm] generateDegradedSectionQuick error', error)
+    return null
+  }
+}
+
 export async function generateSectionInsightsFromLLM(
   input: LLMInputData,
   options: LLMOptions = {}

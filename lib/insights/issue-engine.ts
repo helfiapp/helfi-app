@@ -2,7 +2,7 @@ import { cache } from 'react'
 import { prisma } from '@/lib/prisma'
 import { authOptions } from '@/lib/auth'
 import { getServerSession } from 'next-auth'
-import { generateSectionInsightsFromLLM, generateDegradedSection } from './llm'
+import { generateSectionInsightsFromLLM, generateDegradedSection, generateDegradedSectionQuick } from './llm'
 
 export type IssueSectionKey =
   | 'overview'
@@ -1263,6 +1263,107 @@ async function computeIssueSection(
     const ttl = degraded ? DEGRADED_CACHE_TTL_MS : SECTION_CACHE_TTL_MS
     const ok = ageMs < ttl && (validated ? pipelineVersion === 'v2' : degraded)
     if (ok) return cached.result
+  }
+
+  // Fast-path: if section is nutrition, attempt a quick degraded generation with a strict 1s budget
+  const shouldQuickPath = section === 'nutrition'
+  if (shouldQuickPath) {
+    const quickTimeoutMs = 1000
+    const started = Date.now()
+
+    // Build a minimal context quickly: only userId and an inferred issue name
+    const minimalIssueName = unslugify(slug)
+    const quickPromise = (async () => {
+      const quick = await generateDegradedSectionQuick(
+        {
+          issueName: minimalIssueName,
+          issueSummary: null,
+          items: [],
+          otherItems: [],
+          profile: {},
+          mode: 'nutrition',
+        },
+        { minSuggested: 4, minAvoid: 4 }
+      )
+      if (!quick) return null
+      const now = new Date().toISOString()
+      const quickResult: IssueSectionResult = {
+        issue: {
+          id: `temp:${slug}`,
+          slug,
+          name: minimalIssueName,
+          polarity: inferPolarityFromName(minimalIssueName),
+          severityLabel: 'Needs data',
+          severityScore: null,
+          currentRating: null,
+          ratingScaleMax: 6,
+          trend: 'inconclusive',
+          trendDelta: null,
+          lastUpdated: null,
+          highlight: 'Initial nutrition guidance available. Logs will refine recommendations.',
+          blockers: [],
+          status: 'needs-data',
+        },
+        section: 'nutrition',
+        generatedAt: now,
+        confidence: 0.6,
+        summary: quick.summary || 'Initial nutrition guidance generated.',
+        highlights: [
+          {
+            title: 'Add to your plan',
+            detail: quick.suggested.map((f) => `${f.name}: ${f.reason}`).slice(0, 4).join('; '),
+            tone: 'neutral',
+          },
+          {
+            title: 'Foods to monitor',
+            detail: quick.avoid.map((f) => `${f.name}: ${f.reason}`).slice(0, 4).join('; '),
+            tone: 'warning',
+          },
+        ],
+        dataPoints: [],
+        recommendations: [],
+        extras: {
+          suggestedFocus: quick.suggested,
+          avoidFoods: quick.avoid,
+          source: 'llm',
+          pipelineVersion: 'v2',
+          validated: quick.suggested.length >= 4 && quick.avoid.length >= 4,
+          degraded: true,
+          degradedUsed: true,
+          cacheHit: false,
+          cold: true,
+        } as Record<string, unknown>,
+      }
+      // Cache degraded with short TTL to avoid repeated cold misses
+      await upsertSectionCache({ userId, slug, section, mode, rangeKey, result: quickResult })
+      return quickResult
+    })()
+
+    // Race quick path against timeout
+    const timeoutPromise = new Promise<IssueSectionResult | null>((resolve) => {
+      setTimeout(() => resolve(null), quickTimeoutMs)
+    })
+    const quickResult = await Promise.race([quickPromise, timeoutPromise])
+    if (quickResult) {
+      // Fire-and-forget full build to upgrade cache in background
+      ;(async () => {
+        console.time(`[insights.build/full] ${slug}/${section}`)
+        const context = await loadUserInsightContext(userId)
+        const built = await buildIssueSectionWithContext(context, slug, section, {
+          mode,
+          range: undefined,
+          force: false,
+        })
+        console.timeEnd(`[insights.build/full] ${slug}/${section}`)
+        if (built && shouldCacheSectionResult(built)) {
+          await upsertSectionCache({ userId, slug, section, mode, rangeKey, result: built })
+        }
+      })().catch(() => {})
+      return quickResult
+    }
+    // If quick path missed the deadline, fall through to full build
+    const elapsed = Date.now() - started
+    console.warn('[insights.compute] quick path timeout', { slug, section, elapsed })
   }
 
   console.time(`[insights.build] ${slug}/${section}`)
