@@ -22,9 +22,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'not_authenticated' }, { status: 401 })
     }
 
-    const { section, question, messages, issueName, sectionContext } = await request
-      .json()
-      .catch(() => ({ section: 'safety', question: '', messages: [], sectionContext: null }))
+    const { section, question } = await request.json().catch(() => ({ section: 'safety', question: '' }))
     const sec = String(section || 'safety').toLowerCase()
     const userId = session.user.id
 
@@ -71,42 +69,28 @@ export async function POST(request: NextRequest) {
     const openai = getOpenAI()
     if (!openai) return NextResponse.json(fallback(), { status: 200 })
 
-    // Build a lightweight multi-turn chat with context
-    const system = `You are a careful, non-alarming clinical assistant. Be specific and actionable.
-When challenged, justify recommendations with short mechanism-based reasoning tied to the user's data.
-Explicitly address contradictions (e.g., dual vasodilators) and explain tradeoffs/monitoring.
-Never diagnose; encourage clinician review for changes.`
+    // Section-specific guidance for Safety
+    const prompt = `You are a careful, non-alarming clinical assistant.
+User asked: ${String(question || 'Give me the most useful safety/timing advice for my current regimen.').slice(0, 400)}
 
-    const contextBlob = {
-      section: sec,
-      issueName: String(issueName || ''),
-      profile,
-      sectionContext: sectionContext ?? null,
-    }
-    const contextMsg = `CONTEXT JSON (for grounding):\n${JSON.stringify(contextBlob)}`
+SECTION: ${sec}
+RULES:
+- Never diagnose; avoid certainty; suggest to check with clinician for changes.
+- Use ONLY the JSON profile below. Be specific, short, and actionable.
+- Output:
+  1) summary (1–2 sentences)
+  2) why (1 sentence referencing user data)
+  3) actions (3–5 bullets)
 
-    const history: Array<{ role: 'user' | 'assistant'; content: string }> = Array.isArray(messages)
-      ? messages
-          .slice(-8)
-          .map((m: any) => ({ role: m?.role === 'assistant' ? 'assistant' : 'user', content: String(m?.content || '') }))
-      : []
-
-    const composed = [
-      { role: 'system', content: system },
-      { role: 'user', content: contextMsg },
-      ...history,
-      {
-        role: 'user',
-        content:
-          String(question || '').trim() || 'Give me the most useful safety/timing advice for my current regimen.',
-      },
-    ]
+PROFILE JSON:
+${JSON.stringify(profile)}
+`
 
     const resp = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
-      messages: composed as any,
+      messages: [{ role: 'user', content: prompt }],
       temperature: 0.2,
-      max_tokens: 450,
+      max_tokens: 350,
     })
     const text = resp.choices?.[0]?.message?.content || ''
     return NextResponse.json({ answer: text, preview: false }, { status: 200 })
@@ -114,4 +98,5 @@ Never diagnose; encourage clinician review for changes.`
     return NextResponse.json({ error: 'server_error' }, { status: 500 })
   }
 }
+
 

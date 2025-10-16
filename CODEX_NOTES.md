@@ -57,47 +57,6 @@
 
 ---
 
-## SESSION LOG — 2025-10-13 (live user report: 75s load)
-
-User-confirmed facts (production):
-1. Health intake save previously failed with popup. After fix today, save now succeeds, but Supplements still opens painfully slow (≈75s). 15s UI estimate is misleading.
-2. “What’s Working” under Libido shows only 2 items despite multiple logged supplements that should match (e.g., Zinc, P5P). User requirement remains: at least 4 items for Suggested and 4 for Avoid; Working should reflect logged items accurately.
-3. Reverting to the prior version will not help: the user already tested earlier builds and still saw ~60s+ loads. So a simple rollback will not meet the performance target.
-
-Actions taken in this session (code committed to master; auto‑deploy enabled):
-1. app/api/user-data/route.ts — Made post‑intake insights precompute fire‑and‑forget (no await) so save returns immediately; prevents save timeout popup from blocking onboarding. Commit bbf7c6f.
-2. app/api/user-data/route.ts — Optimized persistence path: replaced row‑by‑row upserts of supplements/medications with bulk replace (deleteMany + createMany) to reduce save latency and DB thrash. Commit b5e31a9.
-   - Net effect: onboarding save is now fast and reliable, but insights cold load remains slow.
-
-What we inspected (but did not change yet):
-1. lib/insights/issue-engine.ts — computeIssueSection still fully computes on cold miss and does not enforce a time‑cap before returning a degraded 4/4. Cache TTL logic accepts degraded, but the server path waits on LLM if cache is cold.
-2. lib/insights/llm.ts — generateSectionInsightsFromLLM chains multiple calls (generate → classify → repair/fill). Degraded generator exists but only used on hard failure, not on slow paths. No time‑cap is enforced before returning.
-3. app/insights/issues/[issueSlug]/SectionPrefetcher.tsx — Prefetch kicks off, but UI does not render degraded immediately on cache miss; the section page still opens cold and waits.
-
-Why performance is still bad despite save fixes:
-1. Core latency is on cold insights compute (sequential LLM phases) not on the intake save. Background precompute after save helps later, but if the user clicks into Supplements before precompute finishes, they still hit the cold path.
-2. No 1‑second degraded‑first guard exists server‑side to force quick first content while the validated cache builds in background.
-3. Minimum counts are requested in prompts, but classification/repair may still underfill and Working mapping misses obvious logged items.
-
-Recommended plan for the next agent (do not deploy piecemeal; make a cohesive change):
-1. Add a strict server‑side time cap in getIssueSection/computeIssueSection for Supplements (and later others): if no valid cache within ~1s, immediately return a degraded 4/4 result and enqueue the full compute in background; write cache when ready. This guarantees first paint within ~1s even on cold.
-2. Ensure degraded generator enforces ≥4 suggested and ≥4 avoid (already designed to), and mark extras: { validated=false, degraded=true, pipelineVersion='v2', timings }.
-3. Working accuracy: overlay an ontology‑backed matcher (see ISSUE_KNOWLEDGE_BASE.libido.helpfulSupplements) to map logged names like “Zinc”, “P5P”, “Cistanche”, “Muira Puama” into Working when AI misses obvious matches; keep AI‑only rationale text, but do not let classification drop clear matches.
-4. Surface timings in extras (generateMs, classifyMs, fillMs, totalMs, cacheHit) and wire a lightweight emitter so GET /api/analytics?action=insights returns real values.
-5. Later (optional): Client‑side degraded render on cache miss for belt‑and‑braces, but server‑side time‑cap should be primary.
-
-Explicitly avoid:
-1. Full rollback as primary fix — user confirms earlier versions also exhibited >60s loads.
-2. Adding debug routes or logging users out.
-3. Touching env vars (OPENAI_API_KEY etc.).
-
-User’s hard requirements to honor:
-1. Cold ≤7s with immediate “good‑enough” content; warm ≤1s.
-2. At least 4 Suggested and 4 Avoid items, every time, for Supplements (and similarly for other sections). Working must reflect logged items like Zinc, P5P, etc.
-3. Edits on master only; Vercel auto‑deploy; keep plain‑English notes here.
-
-Session outcome: Save path stabilized and sped up; root cause of long waits persists on the cold insights path. Next step must be a server‑side 1‑second degraded‑first guard plus Working overlay to lift accuracy.
-
 ## INCIDENT LOG — v3 Attempt (2025-10-11) commit d04c946
 
 This section documents exactly what the last agent changed and why it regressed live performance/UX, so the next agent does not repeat these steps.
