@@ -1333,6 +1333,8 @@ async function computeIssueSection(
           cacheHit: false,
           cold: true,
         } as Record<string, unknown>,
+        mode,
+        range: undefined,
       }
       // Cache degraded with short TTL to avoid repeated cold misses
       await upsertSectionCache({ userId, slug, section, mode, rangeKey, result: quickResult })
