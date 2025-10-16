@@ -204,7 +204,7 @@ export default function SupplementsShell({ children, initialResult, issueSlug }:
 
         <div>{children}</div>
 
-        <SectionChat issueSlug={issueSlug} section="supplements" issueName={result.issue.name} />
+        <SectionChat issueSlug={issueSlug} section="supplements" issueName={result.issue.name} sectionContext={extras} />
       </div>
     </SupplementsContext.Provider>
   )

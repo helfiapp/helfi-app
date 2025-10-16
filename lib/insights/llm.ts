@@ -1102,3 +1102,144 @@ export async function generateSectionInsightsFromLLM(
   }
   return final
 }
+
+// Fast-path generator that minimizes round-trips by:
+// 1) Generating candidates with candidateType hints in a single call
+// 2) Filtering to the section domain using the hinted candidateType (plus simple heuristics)
+// 3) Topping up deficits once per bucket with a single fill call each
+// This typically results in 1–3 LLM calls vs many in the strict pipeline above.
+export async function generateSectionInsightsFast(
+  input: LLMInputData,
+  options: LLMOptions = {}
+): Promise<SectionLLMResult | null> {
+  const openai = getOpenAIClient()
+  if (!openai) return null
+
+  const minSuggested = Math.max(4, options.minSuggested ?? 4)
+  const minAvoid = Math.max(4, options.minAvoid ?? 4)
+  const typeSet = allowedCanonicalTypesForMode(input.mode)
+  const expected: CanonicalType | null = typeSet ? Array.from(typeSet)[0] : null
+  const trace = `[insights.fast:${input.mode}:${Math.random().toString(36).slice(2, 8)}]`
+
+  let generateMs = 0
+  let fillMs = 0
+
+  // Step 1: one-shot candidate generation
+  const g0 = Date.now()
+  const candidates = await generateSectionCandidates({
+    issueName: input.issueName,
+    issueSummary: input.issueSummary,
+    profile: input.profile,
+    mode: input.mode,
+    count: { suggested: minSuggested, avoid: minAvoid },
+  })
+  generateMs += Date.now() - g0
+  if (!candidates) return null
+
+  // Helper: basic heuristics for domain filtering without extra LLM calls
+  const nameKey = (v: string) => v.trim().toLowerCase()
+
+  function inDomain(it: GeneratedCandidateItem): boolean {
+    if (!expected) return true
+    if (it.candidateType === expected) return true
+    // Soft fallback: accept items that obviously match the expected domain from the name
+    // to avoid throwing away useful items due to a mis-typed hint.
+    const n = it.name.toLowerCase()
+    switch (expected) {
+      case 'food':
+        return /(salad|apple|banana|kale|spinach|fruit|vegetable|berry|grain|oat|rice|fish|chicken|beef|egg|yogurt|kefir|soup|nut|seed|avocado)/i.test(n)
+      case 'supplement':
+        return /(supplement|capsule|powder|extract|herb|vitamin|magnesium|zinc|omega|probiotic|adaptogen|ashwagandha|turmeric|cistanche)/i.test(n)
+      case 'exercise':
+        return /(run|cardio|hiit|interval|sprint|walk|strength|resistance|weights|mobility|yoga|pilates)/i.test(n)
+      case 'medication':
+        return /(tablet|prescription|dose|mg|mcg|levothyroxine|tadalafil|sildenafil|statin|metformin|ssri|snri|warfarin|xarelto|eliquis|apixaban|clopidogrel)/i.test(n)
+      default:
+        return true
+    }
+  }
+
+  const dedupe = <T extends { name: string }>(arr: T[]) => {
+    const seen = new Set<string>()
+    const out: T[] = []
+    for (const it of arr) {
+      const k = nameKey(it.name)
+      if (seen.has(k)) continue
+      seen.add(k)
+      out.push(it)
+    }
+    return out
+  }
+
+  // Partition + filter to domain
+  let suggested: { name: string; reason: string; protocol: string | null }[] = candidates
+    .filter((c) => c.bucket === 'suggested' && inDomain(c))
+    .map((c) => ({ name: c.name, reason: c.reason, protocol: (c.protocol ?? null) as string | null }))
+  let avoid = candidates
+    .filter((c) => c.bucket === 'avoid' && inDomain(c))
+    .map((c) => ({ name: c.name, reason: c.reason }))
+
+  suggested = dedupe(suggested)
+  avoid = dedupe(avoid)
+
+  // Step 2: top up if we are under minimum counts (only once per bucket)
+  const disallow = [
+    ...suggested.map((s) => s.name),
+    ...avoid.map((a) => a.name),
+  ]
+
+  const needSuggested = Math.max(0, minSuggested - suggested.length)
+  if (needSuggested > 0) {
+    const f0 = Date.now()
+    const more = await fillMissingItemsForSection({
+      openai,
+      issueName: input.issueName,
+      mode: input.mode,
+      bucket: 'suggested',
+      expectedType: expected,
+      needed: needSuggested,
+      disallowNames: disallow,
+      trace,
+    })
+    fillMs += Date.now() - f0
+    const moreFixed = (more ?? []).map((m) => ({ name: m.name, reason: m.reason, protocol: (m.protocol ?? null) as string | null }))
+    suggested = dedupe([...suggested, ...moreFixed])
+  }
+
+  const needAvoid = Math.max(0, minAvoid - avoid.length)
+  if (needAvoid > 0) {
+    const f1 = Date.now()
+    const more = await fillMissingItemsForSection({
+      openai,
+      issueName: input.issueName,
+      mode: input.mode,
+      bucket: 'avoid',
+      expectedType: expected,
+      needed: needAvoid,
+      disallowNames: [
+        ...disallow,
+        ...suggested.map((s) => s.name),
+      ],
+      trace,
+    })
+    fillMs += Date.now() - f1
+    const cleaned = (more ?? []).map((m) => ({ name: m.name, reason: m.reason }))
+    avoid = dedupe([...avoid, ...cleaned])
+  }
+
+  const out: SectionLLMResult = {
+    summary: 'Initial guidance generated while we prepare a deeper report.',
+    working: [],
+    suggested,
+    avoid,
+    recommendations: [],
+  }
+  ;(out as any)._timings = {
+    generateMs,
+    classifyMs: 0,
+    rewriteMs: 0,
+    fillMs,
+    totalMs: generateMs + fillMs,
+  }
+  return out
+}

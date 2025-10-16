@@ -2,7 +2,7 @@ import { cache } from 'react'
 import { prisma } from '@/lib/prisma'
 import { authOptions } from '@/lib/auth'
 import { getServerSession } from 'next-auth'
-import { generateSectionInsightsFromLLM, generateDegradedSection } from './llm'
+import { generateSectionInsightsFromLLM, generateDegradedSection, generateSectionInsightsFast } from './llm'
 
 export type IssueSectionKey =
   | 'overview'
@@ -338,6 +338,10 @@ const ISSUE_KNOWLEDGE_BASE: Record<string, {
     avoidSupplements: [
       { pattern: /yohim(b|)ine/i, why: 'Can spike blood pressure and anxiety, use only with practitioner oversight.' },
       { pattern: /pseudoephedrine|decongestant/i, why: 'These constrict blood vessels and can undermine erectile blood flow.' },
+      { pattern: /st\.?\s*john'?s?\s*wort/i, why: 'Can alter serotonin and many drug levels (CYP interactions); monitor mood/libido changes and drug efficacy.' },
+      { pattern: /kava/i, why: 'Sedative effects may blunt arousal; liver safety concerns with chronic use—review with clinician.' },
+      { pattern: /5[-\s]?htp/i, why: 'Serotonergic load may reduce libido and interact with antidepressants—avoid unless supervised.' },
+      { pattern: /valerian/i, why: 'Sedative; may dampen arousal and interact with other CNS depressants—use cautiously.' },
     ],
     helpfulMedications: [
       {
@@ -1267,12 +1271,55 @@ async function computeIssueSection(
 
   console.time(`[insights.build] ${slug}/${section}`)
   const context = await loadUserInsightContext(userId)
-  const built = await buildIssueSectionWithContext(context, slug, section, {
+
+  const fullPromise = buildIssueSectionWithContext(context, slug, section, {
     mode,
     range: undefined,
     force: false,
   })
+
+  // Quick degraded path for Supplements only
+  const degradedPromise: Promise<IssueSectionResult | null> | null =
+    (section === 'supplements' || section === 'nutrition')
+      ? (async () => {
+          const issueRecord = context.issues.find((i) => i.slug === slug) || {
+            id: `temp:${slug}`,
+            name: unslugify(slug),
+            slug,
+            polarity: inferPolarityFromName(unslugify(slug)),
+          }
+          const summary = enrichIssueSummary(issueRecord as any, context)
+          const quick = section === 'supplements'
+            ? await buildSupplementsSectionDegraded(summary, context, { forceRefresh: false })
+            : await buildNutritionSectionDegraded(summary, context, { forceRefresh: false })
+          return quick ? { ...quick, mode, range: undefined } : null
+        })()
+      : null
+
+  const first = await Promise.race([
+    fullPromise.then((r) => ({ type: 'full' as const, r })),
+    degradedPromise ? degradedPromise.then((r) => ({ type: 'degraded' as const, r })) : new Promise<{ type: 'none'; r: null }>((resolve) => resolve({ type: 'none', r: null })),
+  ])
+
   console.timeEnd(`[insights.build] ${slug}/${section}`)
+
+  // Background cache write for full result
+  fullPromise
+    .then(async (value) => {
+      if (value && shouldCacheSectionResult(value)) {
+        await upsertSectionCache({ userId, slug, section, mode, rangeKey, result: value })
+      }
+    })
+    .catch(() => {})
+
+  if (first.type === 'full' && first.r) return first.r
+  if (first.type === 'degraded' && first.r) {
+    if (shouldCacheSectionResult(first.r)) {
+      await upsertSectionCache({ userId, slug, section, mode, rangeKey, result: first.r })
+    }
+    return first.r
+  }
+  const built = await fullPromise
   if (built && shouldCacheSectionResult(built)) {
     await upsertSectionCache({ userId, slug, section, mode, rangeKey, result: built })
   }
@@ -1480,7 +1527,8 @@ async function buildExerciseSection(
   }))
 
   console.time(`[insights.llm] exercise:${issue.slug}`)
-  let llmResult = await generateSectionInsightsFromLLM(
+  // Use fast path to reduce latency; still AI-only for suggested/avoid
+  let llmResult = await generateSectionInsightsFast(
     {
       issueName: issue.name,
       issueSummary: issue.highlight,
@@ -1550,18 +1598,29 @@ async function buildExerciseSection(
 
   const logMap = new Map(normalizedLogs.map((log) => [canonical(log.name), log]))
 
-  const workingActivities = llmResult.working
-    .map((item) => {
-      const match = logMap.get(canonical(item.name))
-      if (!match) return null
+  // Build working activities from actual logs using knowledge hints
+  const knowledgeKey = pickKnowledgeKey(issue.name) as string | null
+  const kb = knowledgeKey ? ISSUE_KNOWLEDGE_BASE[knowledgeKey] : undefined
+  const workingActivities = normalizedLogs
+    .map((log) => {
+      const title = log.name
+      let reason = 'Logged recently and plausibly supportive for this issue.'
+      if (kb?.supportiveExercises?.length) {
+        const match = kb.supportiveExercises.find((ex) => {
+          const parts = (ex.keywords || []).map((k) => k.toLowerCase())
+          const ln = title.toLowerCase()
+          return parts.some((p) => ln.includes(p))
+        })
+        if (match) reason = match.detail
+      }
       return {
-        title: item.name,
-        reason: item.reason,
-        summary: item.dosage ?? match?.dosage ?? '',
-        lastLogged: item.timing ?? match?.timing?.[0] ?? '',
+        title,
+        reason,
+        summary: log.dosage ?? '',
+        lastLogged: log.timing?.[0] ?? '',
       }
     })
-    .filter(Boolean) as Array<{ title: string; reason: string; summary: string; lastLogged: string }>
+    .slice(0, 6)
 
   const novelSuggestedActivities = llmResult.suggested.filter(
     (item) => !logMap.has(canonical(item.name))
@@ -1676,6 +1735,8 @@ async function buildExerciseSection(
       pipelineVersion: 'v2',
       validated,
       degraded: !validated,
+      // timings surfaced for observability
+      ...(llmResult as any)._timings ? { generateMs: (llmResult as any)._timings.generateMs, classifyMs: (llmResult as any)._timings.classifyMs ?? 0, rewriteMs: (llmResult as any)._timings.rewriteMs ?? 0, fillMs: (llmResult as any)._timings.fillMs ?? 0, totalMs: (llmResult as any)._timings.totalMs ?? 0 } : {},
     },
   }
 }
@@ -1697,7 +1758,8 @@ async function buildSupplementsSection(
   }))
 
   console.time(`[insights.llm] supplements:${issue.slug}`)
-  let llmResult = await generateSectionInsightsFromLLM(
+  // Fast-path for latency; AI-only suggested/avoid, working computed from logs + KB
+  let llmResult = await generateSectionInsightsFast(
     {
       issueName: issue.name,
       issueSummary: issue.highlight,
@@ -1778,15 +1840,22 @@ async function buildSupplementsSection(
     return fallback ?? []
   }
 
-  const supportiveDetails = llmResult.working
-    .map((item) => {
-      const match = supplementMap.get(canonical(item.name))
-      if (!match) return null
+  // Build working from logged supplements via knowledge base (ontology-backed matcher)
+  const knowledgeKey = pickKnowledgeKey(issue.name) as string | null
+  const kb = knowledgeKey ? ISSUE_KNOWLEDGE_BASE[knowledgeKey] : undefined
+  const supportiveDetails = normalizedSupplements
+    .map((s) => {
+      let reason: string | null = null
+      if (kb?.helpfulSupplements?.length) {
+        const match = kb.helpfulSupplements.find((h) => h.pattern.test(s.name))
+        if (match) reason = match.why
+      }
+      if (!reason) return null
       return {
-        name: item.name,
-        reason: item.reason,
-        dosage: item.dosage ?? match?.dosage ?? null,
-        timing: parseTiming(item.timing, match?.timing ?? []),
+        name: s.name,
+        reason,
+        dosage: s.dosage ?? null,
+        timing: Array.isArray(s.timing) ? s.timing : [],
       }
     })
     .filter(Boolean) as Array<{ name: string; reason: string; dosage: string | null; timing: string[] }>
@@ -1817,6 +1886,52 @@ async function buildSupplementsSection(
       const isLogged = supplementMap.has(canonical(entry.name))
       return isLogged || looksSupplementLike(entry.name) || looksSupplementLike(entry.reason)
     })
+
+  // Fail-safe top-up to guarantee minimum counts (≥4) if the fast path under-fills.
+  if (suggestedAdditions.length < 4 || avoidList.length < 4) {
+    try {
+      const degraded = await generateDegradedSection(
+        {
+          issueName: issue.name,
+          issueSummary: issue.highlight,
+          items: normalizedSupplements,
+          otherItems: context.medications.map((med) => ({ name: med.name, dosage: med.dosage ?? null })),
+          profile: context.profile,
+          mode: 'supplements',
+        },
+        { minSuggested: 4, minAvoid: 4 }
+      )
+      if (degraded) {
+        const seen = new Set<string>([
+          ...suggestedAdditions.map((s) => s.title.toLowerCase()),
+          ...avoidList.map((a) => a.name.toLowerCase()),
+        ])
+        if (suggestedAdditions.length < 4) {
+          for (const s of degraded.suggested) {
+            const key = s.name.toLowerCase()
+            if (seen.has(key)) continue
+            suggestedAdditions.push({
+              title: s.name,
+              reason: s.reason,
+              suggestion: s.protocol ?? null,
+              alreadyCovered: false,
+            })
+            seen.add(key)
+            if (suggestedAdditions.length >= 4) break
+          }
+        }
+        if (avoidList.length < 4) {
+          for (const a of degraded.avoid) {
+            const key = a.name.toLowerCase()
+            if (seen.has(key)) continue
+            avoidList.push({ name: a.name, reason: a.reason, dosage: null, timing: [] })
+            seen.add(key)
+            if (avoidList.length >= 4) break
+          }
+        }
+      }
+    } catch {}
+  }
 
   const validated = suggestedAdditions.length >= 4 && avoidList.length >= 4
 
@@ -1922,6 +2037,112 @@ async function buildSupplementsSection(
       pipelineVersion: 'v2',
       validated,
       degraded: !validated,
+      ...(llmResult as any)._timings ? { generateMs: (llmResult as any)._timings.generateMs, classifyMs: (llmResult as any)._timings.classifyMs ?? 0, rewriteMs: (llmResult as any)._timings.rewriteMs ?? 0, fillMs: (llmResult as any)._timings.fillMs ?? 0, totalMs: (llmResult as any)._timings.totalMs ?? 0 } : {},
+    } as Record<string, unknown>,
+  }
+}
+
+// Quick degraded Supplements section (single LLM call) for time-capped cold paths
+async function buildSupplementsSectionDegraded(
+  issue: IssueSummary,
+  context: UserInsightContext,
+  _options: { forceRefresh: boolean }
+): Promise<BaseSectionResult | null> {
+  // Local quick path: no LLM. Shows obvious Working items from logged stack
+  // via the knowledge base, and fills Suggested/Avoid from KB hints to reach
+  // minimum counts. A full AI build runs in the background and upgrades later.
+  const now = new Date().toISOString()
+  const supplements = context.supplements
+  const normalized = supplements.map((supp) => ({ name: supp.name, dosage: supp.dosage ?? null, timing: Array.isArray(supp.timing) ? supp.timing : [] }))
+
+  const key = pickKnowledgeKey(issue.name) as string | null
+  const kb = key ? ISSUE_KNOWLEDGE_BASE[key] : undefined
+
+  const loggedSet = new Set(normalized.map((s) => canonical(s.name)))
+
+  const supportiveDetails = normalized
+    .map((s) => {
+      const match = kb?.helpfulSupplements?.find((h) => h.pattern.test(s.name))
+      if (!match) return null
+      return {
+        name: s.name,
+        reason: match.why,
+        dosage: s.dosage ?? null,
+        timing: s.timing ?? [],
+      }
+    })
+    .filter(Boolean) as Array<{ name: string; reason: string; dosage: string | null; timing: string[] }>
+
+  // Suggested from KB: helpful not already logged + gaps
+  const suggestedAdditions: Array<{ title: string; reason: string; suggestion: string | null; alreadyCovered?: boolean }> = []
+  const pushSuggested = (title: string, reason: string) => {
+    const key = canonical(title)
+    if (loggedSet.has(key)) return
+    if (suggestedAdditions.some((s) => canonical(s.title) === key)) return
+    suggestedAdditions.push({ title, reason, suggestion: null, alreadyCovered: false })
+  }
+  ;(kb?.gapSupplements || []).forEach((g) => pushSuggested(g.title, g.why))
+  ;(kb?.helpfulSupplements || []).forEach((h) => pushSuggested(h.pattern.source.replace(/\\/g, ''), h.why))
+  while (suggestedAdditions.length < 4 && (kb?.helpfulSupplements?.length || 0) > 0) {
+    const head = kb!.helpfulSupplements![suggestedAdditions.length % kb!.helpfulSupplements!.length]
+    pushSuggested(head.pattern.source.replace(/\\/g, ''), head.why)
+  }
+
+  // Avoid from KB: prioritize logged avoid matches first
+  const avoidList: Array<{ name: string; reason: string; dosage: string | null; timing: string[] }> = []
+  const pushAvoid = (name: string, reason: string) => {
+    const k = canonical(name)
+    if (avoidList.some((a) => canonical(a.name) === k)) return
+    avoidList.push({ name, reason, dosage: null, timing: [] })
+  }
+  ;(kb?.avoidSupplements || []).forEach((a) => {
+    // Add logged matches first
+    normalized.forEach((s) => {
+      if (a.pattern.test(s.name)) pushAvoid(s.name, a.why)
+    })
+  })
+  ;(kb?.avoidSupplements || []).forEach((a) => {
+    // Top up with general avoid items
+    const display = a.pattern.source.replace(/\\/g, '')
+    pushAvoid(display, a.why)
+  })
+  while (avoidList.length < 4 && (kb?.avoidSupplements?.length || 0) > 0) {
+    const a = kb!.avoidSupplements![avoidList.length % kb!.avoidSupplements!.length]
+    pushAvoid(a.pattern.source.replace(/\\/g, ''), a.why)
+  }
+
+  return {
+    issue,
+    section: 'supplements',
+    generatedAt: now,
+    confidence: 0.6,
+    summary: 'Initial guidance while we prepare a deeper AI report.',
+    highlights: [
+      {
+        title: "What's working",
+        detail: supportiveDetails.length
+          ? supportiveDetails.map((x) => `${x.name}: ${x.reason}`).join('; ')
+          : 'No logged items flagged as supportive yet—detailed report will refine shortly.',
+        tone: supportiveDetails.length ? 'positive' : 'neutral',
+      },
+      { title: 'Opportunities', detail: suggestedAdditions.map((x) => `${x.title}: ${x.reason}`).join('; '), tone: 'neutral' },
+      { title: 'Cautions', detail: avoidList.map((x) => `${x.name}: ${x.reason}`).join('; '), tone: 'warning' },
+    ],
+    dataPoints: supplements.slice(0, 6).map((supp) => ({ label: supp.name, value: supp.dosage || 'Dose not set', context: supp.timing?.length ? `Timing: ${supp.timing.join(', ')}` : 'Add timing details' })),
+    recommendations: [],
+    extras: {
+      supportiveDetails,
+      suggestedAdditions,
+      avoidList,
+      missingDose: supplements.filter((s) => !s.dosage).map((s) => s.name),
+      missingTiming: supplements.filter((s) => !s.timing || !s.timing.length).map((s) => s.name),
+      totalLogged: supplements.length,
+      hasLogged: supplements.length > 0,
+      hasRecentUpdates: hasRecentSupplementActivity(context.supplements),
+      source: 'llm',
+      pipelineVersion: 'v2',
+      validated: false,
+      degraded: true,
     } as Record<string, unknown>,
   }
 }
@@ -1943,7 +2164,7 @@ async function buildMedicationsSection(
   }))
 
   console.time(`[insights.llm] medications:${issue.slug}`)
-  let llmResult = await generateSectionInsightsFromLLM(
+  let llmResult = await generateSectionInsightsFast(
     {
       issueName: issue.name,
       issueSummary: issue.highlight,
@@ -2025,19 +2246,22 @@ async function buildMedicationsSection(
     return fallback ?? []
   }
 
-  const supportiveDetails = llmResult.working
-    .map((item) => {
-      const nameKey = canonical(item.name)
-      if (supplementNameSet.has(nameKey) || looksSupplementLike(item.name) || looksSupplementLike(item.reason)) {
-        return null
+  // Working medications from knowledge base patterns over logged meds
+  const medKBKey = pickKnowledgeKey(issue.name) as string | null
+  const medKB = medKBKey ? ISSUE_KNOWLEDGE_BASE[medKBKey] : undefined
+  const supportiveDetails = normalizedMeds
+    .map((m) => {
+      let reason: string | null = null
+      if (medKB?.helpfulMedications?.length) {
+        const match = medKB.helpfulMedications.find((h) => h.pattern.test(m.name))
+        if (match) reason = match.why
       }
-      const match = medMap.get(nameKey)
-      if (!match) return null
+      if (!reason) return null
       return {
-        name: item.name,
-        reason: item.reason,
-        dosage: item.dosage ?? match?.dosage ?? null,
-        timing: parseTiming(item.timing, match?.timing ?? []),
+        name: m.name,
+        reason,
+        dosage: m.dosage ?? null,
+        timing: Array.isArray(m.timing) ? m.timing : [],
       }
     })
     .filter(Boolean) as Array<{ name: string; reason: string; dosage: string | null; timing: string[] }>
@@ -2171,6 +2395,7 @@ async function buildMedicationsSection(
       pipelineVersion: 'v2',
       validated,
       degraded: !validated,
+      ...(llmResult as any)._timings ? { generateMs: (llmResult as any)._timings.generateMs, classifyMs: (llmResult as any)._timings.classifyMs ?? 0, rewriteMs: (llmResult as any)._timings.rewriteMs ?? 0, fillMs: (llmResult as any)._timings.fillMs ?? 0, totalMs: (llmResult as any)._timings.totalMs ?? 0 } : {},
     } as Record<string, unknown>,
   }
 }
@@ -2461,7 +2686,7 @@ async function buildNutritionSection(
   )
 
   console.time(`[insights.llm] nutrition:${issue.slug}`)
-  let llmResult = await generateSectionInsightsFromLLM(
+  let llmResult = await generateSectionInsightsFast(
     {
       issueName: issue.name,
       issueSummary: issue.highlight,
@@ -2558,6 +2783,43 @@ async function buildNutritionSection(
       reason: item.reason,
     }))
     .filter((item) => allowFoodName(item.name, item.reason))
+
+  // Fail-safe: if Suggested/Avoid are under the minimums, top up using a degraded generation
+  if (suggestedFocus.length < 4 || avoidFoods.length < 4) {
+    try {
+      const degraded = await generateDegradedSection(
+        {
+          issueName: issue.name,
+          issueSummary: issue.highlight,
+          items: normalizedFoods,
+          otherItems: context.supplements.map((supp) => ({ name: supp.name, dosage: supp.dosage ?? null })),
+          profile: context.profile,
+          mode: 'nutrition',
+        },
+        { minSuggested: 4, minAvoid: 4 }
+      )
+      if (degraded) {
+        const seenS = new Set<string>(suggestedFocus.map((s) => canonical(s.title)))
+        const seenA = new Set<string>(avoidFoods.map((a) => canonical(a.name)))
+        for (const s of degraded.suggested) {
+          if (suggestedFocus.length >= 4) break
+          if (!allowFoodName(s.name, s.reason)) continue
+          const key = canonical(s.name)
+          if (seenS.has(key)) continue
+          suggestedFocus.push({ title: s.name, reason: s.reason, detail: s.protocol ?? null })
+          seenS.add(key)
+        }
+        for (const a of degraded.avoid) {
+          if (avoidFoods.length >= 4) break
+          if (!allowFoodName(a.name, a.reason)) continue
+          const key = canonical(a.name)
+          if (seenA.has(key)) continue
+          avoidFoods.push({ name: a.name, reason: a.reason })
+          seenA.add(key)
+        }
+      }
+    } catch {}
+  }
 
   const validated = suggestedFocus.length >= 4 && avoidFoods.length >= 4
 
@@ -2667,6 +2929,86 @@ async function buildNutritionSection(
       pipelineVersion: 'v2',
       validated,
       degraded: !validated,
+      ...(llmResult as any)._timings ? { generateMs: (llmResult as any)._timings.generateMs, classifyMs: (llmResult as any)._timings.classifyMs ?? 0, rewriteMs: (llmResult as any)._timings.rewriteMs ?? 0, fillMs: (llmResult as any)._timings.fillMs ?? 0, totalMs: (llmResult as any)._timings.totalMs ?? 0 } : {},
+    },
+  }
+}
+
+// Quick degraded Nutrition section (no LLM) for fast first paint
+async function buildNutritionSectionDegraded(
+  issue: IssueSummary,
+  context: UserInsightContext,
+  _options: { forceRefresh: boolean }
+): Promise<BaseSectionResult> {
+  const now = new Date().toISOString()
+  const foods: Array<{ name?: string; meal?: string; calories?: number }> = context.todaysFoods.length
+    ? context.todaysFoods
+    : context.foodLogs.slice(0, 10).map((log) => ({ name: log.name, meal: log.description ?? undefined, calories: undefined }))
+  const normalizedFoods = foods.map((f, idx) => ({ name: f.name || f.meal || `Entry ${idx + 1}`, dosage: f.calories ? `${f.calories} kcal` : f.meal ?? null, timing: f.meal ? [f.meal] : [] }))
+
+  const key = pickKnowledgeKey(issue.name) as string | null
+  const kb = key ? ISSUE_KNOWLEDGE_BASE[key] : undefined
+
+  const workingFocus: Array<{ title: string; reason: string; example: string } > = []
+  if (kb?.nutritionFocus?.length) {
+    normalizedFoods.forEach((n) => {
+      const match = kb.nutritionFocus!.find((focus) => (focus.keywords || []).some((kw) => n.name.toLowerCase().includes(kw.toLowerCase())))
+      if (match) workingFocus.push({ title: n.name, reason: match.detail, example: n.dosage ?? '' })
+    })
+  }
+
+  const suggestedFocus: Array<{ title: string; reason: string; detail: string | null }> = []
+  const pushS = (title: string, reason: string) => {
+    const k = canonical(title)
+    if (suggestedFocus.some((s) => canonical(s.title) === k)) return
+    suggestedFocus.push({ title, reason, detail: null })
+  }
+  ;(kb?.nutritionFocus || []).forEach((f) => pushS(f.title, f.detail))
+  while (suggestedFocus.length < 4 && (kb?.nutritionFocus?.length || 0) > 0) {
+    const f = kb!.nutritionFocus![suggestedFocus.length % kb!.nutritionFocus!.length]
+    pushS(f.title, f.detail)
+  }
+
+  const avoidFoods: Array<{ name: string; reason: string }> = []
+  const pushA = (name: string, reason: string) => {
+    const k = canonical(name)
+    if (avoidFoods.some((a) => canonical(a.name) === k)) return
+    avoidFoods.push({ name, reason })
+  }
+  ;(kb?.avoidFoods || []).forEach((a) => pushA(a.title, a.detail))
+  while (avoidFoods.length < 4 && (kb?.avoidFoods?.length || 0) > 0) {
+    const a = kb!.avoidFoods![avoidFoods.length % kb!.avoidFoods!.length]
+    pushA(a.title, a.detail)
+  }
+
+  return {
+    issue,
+    section: 'nutrition',
+    generatedAt: now,
+    confidence: 0.6,
+    summary: 'Initial nutrition guidance while a deeper AI report is prepared.',
+    highlights: [
+      {
+        title: 'Nutrition wins',
+        detail: workingFocus.length ? workingFocus.map((f) => `${f.title}: ${f.reason}`).join('; ') : 'No logged foods clearly supporting this issue yet.',
+        tone: workingFocus.length ? 'positive' : 'neutral',
+      },
+      { title: 'Add to your plan', detail: suggestedFocus.map((f) => `${f.title}: ${f.reason}`).join('; '), tone: 'neutral' },
+      { title: 'Foods to monitor', detail: avoidFoods.map((f) => `${f.name}: ${f.reason}`).join('; '), tone: 'warning' },
+    ],
+    dataPoints: normalizedFoods.map((n, idx) => ({ label: n.timing?.[0] ? `${n.timing[0]}` : `Meal ${idx + 1}`, value: n.name ?? 'Food logged', context: n.dosage ?? undefined })),
+    recommendations: [],
+    extras: {
+      workingFocus,
+      suggestedFocus,
+      avoidFoods,
+      totalLogged: foods.length,
+      hasLoggedFoods: foods.length > 0,
+      hasRecentFoodData: hasRecentFoodLogs(context.foodLogs) || Boolean(context.todaysFoods.length),
+      source: 'llm',
+      pipelineVersion: 'v2',
+      validated: false,
+      degraded: true,
     },
   }
 }

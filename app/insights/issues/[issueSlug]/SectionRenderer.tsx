@@ -192,7 +192,7 @@ export default function SectionRenderer({ issueSlug, section, initialResult }: S
         </section>
       )}
 
-      <SectionChat issueSlug={issueSlug} section={section} issueName={result.issue.name} />
+      <SectionChat issueSlug={issueSlug} section={section} issueName={result.issue.name} sectionContext={result.extras ?? {}} />
     </div>
   )
 }
