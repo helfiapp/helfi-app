@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getIssueSection, ISSUE_SECTION_ORDER, type IssueSectionKey } from '@/lib/insights/issue-engine'
+import { checkInsightsStatus, getStatusMessage } from '@/lib/insights/regeneration-service'
 
 export async function GET(
   _request: Request,
@@ -18,11 +19,28 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid section' }, { status: 400 })
     }
 
+    // Check insights status for user-friendly messaging
+    const statusInfo = await checkInsightsStatus(session.user.id, context.params.slug, sectionParam)
+    const statusMessage = getStatusMessage(statusInfo.status, statusInfo.lastGenerated)
+
     const result = await getIssueSection(session.user.id, context.params.slug, sectionParam)
     if (!result) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 })
     }
-    return NextResponse.json(result, { status: 200 })
+
+    // Add status information to the response
+    const enrichedResult = {
+      ...result,
+      _meta: {
+        status: statusInfo.status,
+        lastGenerated: statusInfo.lastGenerated,
+        statusMessage: statusMessage.message,
+        statusTone: statusMessage.tone,
+        needsUpdate: statusInfo.needsUpdate,
+      },
+    }
+
+    return NextResponse.json(enrichedResult, { status: 200 })
   } catch (error) {
     console.error('GET /api/insights/issues/[slug]/sections/[section] error', error)
     return NextResponse.json({ error: 'Failed to load section' }, { status: 500 })

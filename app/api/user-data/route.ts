@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { precomputeIssueSectionsForUser } from '@/lib/insights/issue-engine'
+import { triggerBackgroundRegeneration } from '@/lib/insights/regeneration-service'
 
 export async function GET(request: NextRequest) {
   try {
@@ -670,21 +671,31 @@ export async function POST(request: NextRequest) {
     console.log('✅ POST /api/user-data - All updates completed successfully')
 
     if (user?.id) {
-      // Kick off insights precompute in the background so the save response is never blocked
-      // Do not await; errors are logged but non-blocking for onboarding completion
-      try {
-        const precomputeStartedAt = Date.now()
-        precomputeIssueSectionsForUser(user.id, { concurrency: 3 })
-          .then(() => {
-            const took = Date.now() - precomputeStartedAt
-            console.log('✅ Prefetched insights after intake completion (background)', { tookMs: took })
-          })
-          .catch((error) => {
-            console.warn('⚠️ Failed to precompute insights post-intake (background)', error)
-          })
-      } catch (error) {
-        console.warn('⚠️ Failed to schedule insights precompute (background)', error)
+      // NEW APPROACH: Event-driven regeneration based on what actually changed
+      // Instead of regenerating everything, we trigger regeneration only for affected sections
+      const changedTypes: Array<'supplements' | 'medications' | 'food' | 'exercise' | 'health_goals' | 'profile' | 'blood_results'> = []
+      
+      if (data.supplements) changedTypes.push('supplements')
+      if (data.medications) changedTypes.push('medications')
+      if (data.goals) changedTypes.push('health_goals')
+      if (data.gender || data.weight || data.height || data.bodyType) changedTypes.push('profile')
+      if (data.exerciseFrequency || data.exerciseTypes) changedTypes.push('exercise')
+      if (data.bloodResults) changedTypes.push('blood_results')
+      if (data.todaysFoods) changedTypes.push('food')
+
+      // Trigger background regeneration for each changed data type
+      // This is NON-BLOCKING - user doesn't wait
+      for (const changeType of changedTypes) {
+        triggerBackgroundRegeneration({
+          userId: user.id,
+          changeType,
+          timestamp: new Date(),
+        }).catch((error) => {
+          console.warn(`⚠️ Failed to trigger regeneration for ${changeType}`, error)
+        })
       }
+
+      console.log(`🔄 Triggered background regeneration for: ${changedTypes.join(', ')}`)
     }
 
     // 🔍 FINAL PERFORMANCE MEASUREMENT

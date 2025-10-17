@@ -794,6 +794,7 @@ type PrecomputeOptions = {
   mode?: ReportMode
   range?: { from?: string; to?: string }
   concurrency?: number
+  sectionsFilter?: IssueSectionKey[] // Added for selective regeneration based on data changes
 }
 
 export async function precomputeIssueSectionsForUser(
@@ -810,9 +811,14 @@ export async function precomputeIssueSectionsForUser(
   if (!targetSlugs.length) return
 
   const defaultSections = ISSUE_SECTION_ORDER.filter((section) => section !== 'overview')
-  const targetSections = options.sections && options.sections.length
+  let targetSections = options.sections && options.sections.length
     ? Array.from(new Set(options.sections))
     : defaultSections
+
+  // Apply sectionsFilter if provided (for selective regeneration)
+  if (options.sectionsFilter && options.sectionsFilter.length) {
+    targetSections = targetSections.filter((section) => options.sectionsFilter!.includes(section))
+  }
 
   if (!targetSections.length) return
 

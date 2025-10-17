@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { triggerBackgroundRegeneration } from '@/lib/insights/regeneration-service'
 
 // Fetch logs for a specific date (YYYY-MM-DD)
 export async function GET(request: NextRequest) {
@@ -78,7 +79,18 @@ export async function POST(request: NextRequest) {
         nutrients: nutrition || null,
       },
     })
-    // No need to return localDate separately; the client can pass tz when querying
+
+    // Trigger background regeneration of nutrition insights
+    // This happens asynchronously - user doesn't wait
+    triggerBackgroundRegeneration({
+      userId: user.id,
+      changeType: 'food',
+      timestamp: new Date(),
+    }).catch((error) => {
+      console.warn('⚠️ Failed to trigger nutrition insights regeneration', error)
+    })
+
+    console.log('🔄 Triggered background regeneration for nutrition insights')
 
     return NextResponse.json({ success: true, id: created.id })
   } catch (error) {
