@@ -199,3 +199,141 @@ Commit References
 
 Note
 - The attempted fix failed because first paint still waited for a live LLM call. To truly reduce cold latency, serve cached or pre-generated degraded data immediately, then upgrade asynchronously.
+
+---
+
+## SESSION LOG — 2025-10-17 (Event-Driven Background Regeneration - FAILED)
+
+Outcome
+- Deployed commit `1d413b1` with "event-driven background regeneration system". Result: **COMPLETE FAILURE**. User tested on live site: clicked "Confirm & Begin" on health intake, waited, navigated to Insights → Libido → Supplements. Still took **55 seconds to load**. Zero improvement.
+
+What this agent changed
+- Created entirely new file `lib/insights/regeneration-service.ts` with:
+  - `InsightsMetadata` table to track when insights were last generated and data fingerprints
+  - `triggerBackgroundRegeneration()` function that fires on data changes (supplements, meds, food, etc.)
+  - `checkInsightsStatus()` to detect if insights are stale
+  - Smart change detection using data fingerprints to determine which sections need regen
+  - User-friendly status messages ("Fresh insights", "No changes detected", etc.)
+
+- Modified `app/api/user-data/route.ts`:
+  - Replaced existing `precomputeIssueSectionsForUser` call with event-driven triggers
+  - Detects which data types changed (supplements, medications, goals, profile, etc.)
+  - Calls `triggerBackgroundRegeneration()` for each change type (non-blocking)
+
+- Modified `app/api/food-log/route.ts`:
+  - Added `triggerBackgroundRegeneration()` call after food log creation
+  - Triggers nutrition insights regeneration in background
+
+- Modified `app/api/insights/issues/[slug]/sections/[section]/route.ts`:
+  - Added `checkInsightsStatus()` call to GET endpoint
+  - Returns enriched response with `_meta` containing status, lastGenerated, statusMessage, etc.
+
+- Modified `lib/insights/issue-engine.ts`:
+  - Added `sectionsFilter` parameter to `PrecomputeOptions` type
+  - Logic to filter target sections based on `sectionsFilter` for selective regeneration
+
+The Agent's Theory (Why It Should Have Worked)
+- Agent claimed this was "fundamentally different" from previous agents
+- Theory: Generate insights in background when data changes → user sees instant cached results
+- Mapping: supplements change → only regenerate supplements section (not everything)
+- Expected timeline: 3-4 minutes background processing after intake completion
+- Expected UX: Click section → instant display (<2s) of cached insights with status message
+
+Why It Actually Failed (Confirmed on Live Site)
+1) **Background generation never actually ran or completed successfully**
+   - User waited "a while" after confirming intake
+   - First section (Libido overview) loaded fine
+   - Supplements section still took 55 seconds
+   - This means cache was NOT populated, so it fell back to generating on-demand
+   - The background job either didn't fire, didn't complete, or didn't write results to cache
+
+2) **Critical flaw: Background jobs depend on existing cache infrastructure**
+   - The regeneration service calls `precomputeIssueSectionsForUser()` in background
+   - But if the existing cache infrastructure is broken (which it clearly is), background jobs fail too
+   - Agent didn't fix the underlying cache write/read problems
+   - Just added another layer on top of a broken foundation
+
+3) **No verification that background jobs actually work**
+   - Agent didn't test that background jobs fire correctly
+   - Didn't verify that `triggerBackgroundRegeneration()` actually completes
+   - Didn't check server logs to see if background processing succeeded
+   - Assumed everything would "just work" without testing
+
+4) **The core problem remains unsolved: LLM calls are still slow**
+   - When cache is empty or background job fails, system still calls LLM on-demand
+   - That LLM call still takes 55 seconds
+   - Nothing in this implementation made LLM calls faster
+   - Just tried to hide the problem with background jobs that don't work
+
+5) **Event triggers may not be reliable**
+   - `triggerBackgroundRegeneration()` wraps call in `setImmediate()` and `.catch()`
+   - If it fails silently, no insights are generated
+   - No error logging visible to user or subsequent agents
+   - No retry mechanism if background job fails
+
+What Actually Happened (User's Experience)
+1. User completed health intake
+2. Clicked "Confirm & Begin"
+3. Waited some time (letting background jobs supposedly run)
+4. Navigated to Insights → Libido
+5. Overview loaded okay
+6. Clicked "Supplements"
+7. **WAITED 55 SECONDS** (exact same problem as before)
+8. System clearly generated insights on-demand, not from cache
+
+Root Cause Analysis
+- Agent added complexity (new service, new table, background triggers) without fixing the fundamental issue
+- The existing cache read/write system is broken
+- Background jobs depend on that broken cache system
+- Therefore background jobs also fail
+- Result: No improvement whatsoever
+
+Critical Mistakes This Agent Made
+1. **Didn't test the solution before deploying** - Just assumed background jobs would work
+2. **Added complexity instead of fixing root cause** - Built new layer on broken foundation
+3. **No verification or logging** - Can't even tell if background jobs ran
+4. **Ignored that previous agents tried similar approaches** - Background precompute was already attempted
+5. **Made confident claims without evidence** - Said it would work in 3-4 minutes, provided no proof
+
+What NOT to Do Next
+- Do NOT add more background job infrastructure
+- Do NOT assume caching will "just work"
+- Do NOT add event triggers without testing them
+- Do NOT deploy without verifying on live site
+- Do NOT trust that `precomputeIssueSectionsForUser()` works (it clearly doesn't)
+
+What the REAL Problem Is (Still Unsolved)
+1. Cache writes are failing or not persisting correctly
+2. Cache reads are not returning stored results
+3. LLM calls take 55 seconds and there's no way around that
+4. The ONLY solution is: serve pre-generated content immediately (not LLM on-demand)
+5. Need to verify cache table exists, writes succeed, reads return data, TTLs are reasonable
+
+Rollback Guidance
+- Revert commit `1d413b1fafe9b2c8bd13fb8ed052b3ee4137cf7f`
+- `git revert 1d413b1` and push to master (auto-deploys to Vercel)
+- This will remove the entire regeneration-service and restore previous (equally broken) state
+
+Files to Delete in Rollback
+- `lib/insights/regeneration-service.ts` (entirely new file, can be deleted)
+
+Commit Reference
+- Failed attempt: `1d413b1fafe9b2c8bd13fb8ed052b3ee4137cf7f`
+- Date: 2025-10-17 12:41:20
+- Message: "Event-driven insights: Background regeneration system"
+- Result: **ZERO IMPROVEMENT - COMPLETE FAILURE**
+
+What Next Agent MUST Do Differently
+1. **Test the cache infrastructure FIRST** - Verify InsightsSectionCache table exists and works
+2. **Add logging to see what's actually happening** - Can't fix what you can't see
+3. **Start simple** - Fix cache reads/writes before adding background jobs
+4. **Verify on live site BEFORE claiming success** - This agent never did that
+5. **Accept that LLM calls are slow** - Must serve cached/pre-generated content, not optimize LLM speed
+
+The Harsh Truth
+- Every agent so far has tried variations of the same thing: generate faster, cache better, background jobs
+- NONE of it works because the cache infrastructure is fundamentally broken
+- Until someone actually fixes the cache read/write layer, nothing will improve
+- Stop building elaborate systems on top of a broken foundation
+- Fix the foundation first: make sure ONE insight can be generated, cached, and retrieved successfully
+- Then scale from there
