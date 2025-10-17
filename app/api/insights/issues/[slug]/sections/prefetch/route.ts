@@ -8,11 +8,8 @@ import {
   type IssueSectionKey,
   type ReportMode,
 } from '@/lib/insights/issue-engine'
-import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { cache } from 'react'
 import { generateDegradedSectionQuick } from '@/lib/insights/llm'
-import { notFound } from 'next/navigation'
 
 interface PrefetchBody {
   sections?: IssueSectionKey[]
@@ -65,10 +62,10 @@ export async function POST(request: Request, context: { params: { slug: string }
 
   if (forceAll) {
     // Find all issue slugs quickly for the user
-    const rows: Array<{ name: string }> = await prisma.$queryRawUnsafe(
+    const rows = await prisma.$queryRawUnsafe<Array<{ name: string }>>(
       'SELECT name FROM "CheckinIssues" WHERE "userId" = $1',
       session.user.id
-    ).catch(() => [])
+    ).catch(() => []) as Array<{ name: string }>
     const slugs = rows.map((r) => r.name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''))
     const tasks = slugs.flatMap((slug) => targetSections.map((s) => ({ slug, s })))
     let active = 0
