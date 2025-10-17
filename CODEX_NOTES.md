@@ -138,3 +138,64 @@ Guidance for next agent (avoid repeating)
 2) First-byte must not depend on the heavy context loader. Consider a minimal-context endpoint (just user ID + issue slug) to serve a tiny, prebuilt “starter” insight from KV, then upgrade.
 3) Surface server timings in `extras`: { dbMs, computeMs, cacheHit, cold }. Add logging you can read in Logs tab.
 4) Enforce ≥4/4 at the data layer with deterministic fallbacks rather than retrying the model.
+
+---
+
+## SESSION LOG — 2025-10-17 (Degraded-first quick path attempt)
+
+Outcome
+- Deployed a degraded-first path intended to show guidance immediately and upgrade in the background. Result: user still observed 30–40s waits after tapping sections/tabs; no improvement in perceived first-paint time.
+
+Exact Code Changes
+- `lib/insights/llm.ts`
+  - Added `generateDegradedSectionQuick(input, options)`: single LLM call via `generateSectionCandidates`, domain-filtered, returns ≥4/4 suggested/avoid without repair loops.
+
+- `lib/insights/issue-engine.ts`
+  - Commit `10ee692`: Introduced Nutrition-only quick path with 1s race; returned degraded on slow full build; background upgrade writes cache.
+  - Commit `0cd1336`: Fixed missing `mode`/`range` on quick result to satisfy `IssueSectionResult` type.
+  - Commit `0d468e4`: Expanded quick path to all sections (except `overview`/`interactions`), removed the 1s timeout, always returned degraded-first, mapped degraded output into section-specific `extras`, wrote degraded to cache (short TTL), and kicked off full compute in background.
+
+- `app/api/insights/issues/[slug]/sections/prefetch/route.ts`
+  - Switched from heavy `precomputeIssueSectionsForUser` to a “quick warm” that calls `generateDegradedSectionQuick` for each section; added simple concurrency. Commit `7e8d681` fixed TypeScript generics and removed unused imports.
+
+Observed Problems (Live)
+- Users still saw 30–40s before any content appeared on section/tab open.
+- Prefetch did not noticeably reduce cold waits.
+
+Root Causes (Do not repeat)
+1) Quick path still blocked on an LLM call.
+   - `generateDegradedSectionQuick` invokes OpenAI once per section. When that call is slow in production, first paint still blocks. Degraded-first must not call the LLM before responding.
+
+2) Prefetch didn’t persist usable results for the read path.
+   - The quick prefetch intentionally avoided DB writes; the subsequent read still triggered the same LLM call, so prefetch often doubled load instead of warming reads.
+
+3) Concurrency amplification.
+   - Landing prefetch fanned out multiple quick calls at once, increasing tail latency and contention.
+
+4) No instant, stored fallback.
+   - There was no static or cached degraded payload returned in <1s; everything depended on live LLM latency.
+
+What to try next
+1) Serve from storage first: no LLM on first byte.
+   - Return stored degraded (KV/DB) immediately. If none exists, return a pre-generated generic degraded result per issue/section (AI-generated ahead of time). Mark `degraded=true`; start background upgrade.
+
+2) Write-through caching.
+   - Persist both degraded and validated outputs with TTLs. Prefetch must upsert degraded so GET can read from cache only.
+
+3) Strict time cap and controlled fan-out.
+   - Cap first response to ~1s; limit prefetch concurrency (e.g., ≤2) and defer the rest.
+
+4) Observability.
+   - Add `extras`: { cacheHit, degradedUsed, firstByteMs, computeMs, backgroundUpgradeMs } and emit lightweight analytics entries to confirm SLAs in production.
+
+Rollback Guidance
+- To return to the prior baseline, revert: `0d468e4 10ee692 0cd1336 7e8d681`.
+
+Commit References
+- `10ee692` — Nutrition quick path (1s race) + background upgrade.
+- `0cd1336` — Quick result type fix (`mode`, `range`).
+- `0d468e4` — Degraded-first for all sections, no timeout, extras mapping, prefetch warm.
+- `7e8d681` — Prefetch TypeScript fix and cleanup.
+
+Note
+- The attempted fix failed because first paint still waited for a live LLM call. To truly reduce cold latency, serve cached or pre-generated degraded data immediately, then upgrade asynchronously.
