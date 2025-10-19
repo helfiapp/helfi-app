@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { getIssueSection, ISSUE_SECTION_ORDER, type IssueSectionKey } from '@/lib/insights/issue-engine'
+import { getIssueSection, ISSUE_SECTION_ORDER, type IssueSectionKey, getCachedIssueSection } from '@/lib/insights/issue-engine'
 import { checkInsightsStatus, getStatusMessage } from '@/lib/insights/regeneration-service'
 
 export async function GET(
@@ -69,6 +69,16 @@ export async function POST(
 
     const mode = (body?.mode === 'weekly' || body?.mode === 'daily' || body?.mode === 'custom') ? body.mode : 'latest'
     const range = body?.range && (body.range.from || body.range.to) ? body.range : undefined
+
+    // 1) If there is no new data since last generation, do NOT recompute.
+    const statusInfo = await checkInsightsStatus(session.user.id, context.params.slug, sectionParam)
+    if (!statusInfo.needsUpdate) {
+      const cached = await getCachedIssueSection(session.user.id, context.params.slug, sectionParam, { mode, range })
+      if (cached) {
+        return NextResponse.json({ result: cached, skipped: true, reason: 'no-new-data' }, { status: 200 })
+      }
+      // If no cached copy, fall through to compute once
+    }
 
     const result = await getIssueSection(session.user.id, context.params.slug, sectionParam, {
       mode,

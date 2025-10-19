@@ -182,6 +182,19 @@ async function readSectionCache(
   return null
 }
 
+// Lightweight exported helper: read a cached section without triggering any compute.
+export async function getCachedIssueSection(
+  userId: string,
+  slug: string,
+  section: IssueSectionKey,
+  options: Partial<{ mode: ReportMode; range?: { from?: string; to?: string } }>
+): Promise<IssueSectionResult | null> {
+  const mode = options.mode ?? 'latest'
+  const rangeKey = encodeRange(options.range)
+  const cached = await readSectionCache(userId, slug, section, mode, rangeKey)
+  return cached?.result ?? null
+}
+
 async function upsertSectionCache(params: {
   userId: string
   slug: string

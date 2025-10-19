@@ -29,11 +29,17 @@ export default function SectionRenderer({ issueSlug, section, initialResult }: S
         },
         body: JSON.stringify({ mode, range }),
       })
-      if (!response.ok) {
+      if (response.status === 200) {
+        const data = await response.json()
+        // If server says there is no new data, keep existing result and show a friendly notice.
+        if (data?.skipped && data?.reason === 'no-new-data') {
+          setError("You don't have any new data to generate a report.")
+        } else {
+          setResult(data?.result ?? data)
+        }
+      } else {
         throw new Error('Unable to generate report right now.')
       }
-      const data = await response.json()
-      setResult(data?.result ?? data)
       if (mode === 'custom') {
         setCustomOpen(false)
       }
