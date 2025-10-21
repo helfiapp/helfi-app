@@ -1324,6 +1324,8 @@ async function buildStarterSectionWithContext(
       generatedAt: now,
       confidence: 0.55,
       summary: 'Initial guidance generated while we prepare a deeper report.',
+      mode: options.mode,
+      range: undefined,
       highlights: [
         { title: 'Add to your plan', detail: suggested.map(f => `${f.title}: ${f.reason}`).join('; '), tone: 'neutral' },
         { title: 'Foods to monitor', detail: avoidFoods.map(f => `${f.name}: ${f.reason}`).join('; '), tone: 'warning' },
@@ -1363,6 +1365,8 @@ async function buildStarterSectionWithContext(
       generatedAt: now,
       confidence: 0.55,
       summary: 'Initial guidance generated while we prepare a deeper report.',
+      mode: options.mode,
+      range: undefined,
       highlights: [
         { title: 'Suggested additions', detail: suggestedAdditions.map(f => `${f.title}: ${f.reason}`).join('; '), tone: 'neutral' },
         { title: 'Cautions', detail: avoidList.map(f => `${f.name}: ${f.reason}`).join('; '), tone: 'warning' },
@@ -1395,6 +1399,8 @@ async function buildStarterSectionWithContext(
       generatedAt: now,
       confidence: 0.55,
       summary: 'Initial guidance generated while we prepare a deeper report.',
+      mode: options.mode,
+      range: undefined,
       highlights: [
         { title: 'Habits to add', detail: suggestedHabits.map(f => `${f.title}: ${f.reason}`).join('; '), tone: 'neutral' },
         { title: 'Habits to avoid', detail: avoidHabits.map(f => `${f.title}: ${f.reason}`).join('; '), tone: 'warning' },
