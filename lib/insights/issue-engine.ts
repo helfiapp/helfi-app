@@ -1391,8 +1391,15 @@ async function buildStarterSectionWithContext(
 
   if (section === 'lifestyle') {
     const kbHabits = kbKey ? (ISSUE_KNOWLEDGE_BASE[kbKey].lifestyleFocus ?? []) : []
-    const suggestedHabits = ensureMin(kbHabits.map(h => ({ title: h.title, reason: h.detail, detail: null })), kbHabits.map(h => ({ title: h.title, reason: h.detail, detail: null })))
-    const avoidHabits = ensureMin((ISSUE_KNOWLEDGE_BASE[kbKey]?.avoidExercises ?? []).map(h => ({ title: h.title, reason: h.detail })), (ISSUE_KNOWLEDGE_BASE[kbKey]?.avoidExercises ?? []).map(h => ({ title: h.title, reason: h.detail })))
+    const suggestedHabits = ensureMin(
+      kbHabits.map(h => ({ title: h.title, reason: h.detail, detail: null })),
+      kbHabits.map(h => ({ title: h.title, reason: h.detail, detail: null }))
+    )
+    const kbAvoidHabits = kbKey ? (ISSUE_KNOWLEDGE_BASE[kbKey].avoidExercises ?? []) : []
+    const avoidHabits = ensureMin(
+      kbAvoidHabits.map(h => ({ title: h.title, reason: h.detail })),
+      kbAvoidHabits.map(h => ({ title: h.title, reason: h.detail }))
+    )
     return {
       issue: summary,
       section: 'lifestyle',
