@@ -320,7 +320,7 @@ function hasRecentFoodLogs(foodLogs: UserInsightContext['foodLogs']) {
 
 const ISSUE_KNOWLEDGE_BASE: Record<string, {
   aliases?: string[]
-  helpfulSupplements?: Array<{ pattern: RegExp; why: string }>
+  helpfulSupplements?: Array<{ pattern: RegExp; why: string; suggested?: string }>
   gapSupplements?: Array<{ title: string; why: string; suggested?: string }>
   avoidSupplements?: Array<{ pattern: RegExp; why: string }>
   helpfulMedications?: Array<{ pattern: RegExp; why: string }>
@@ -336,21 +336,23 @@ const ISSUE_KNOWLEDGE_BASE: Record<string, {
   libido: {
     aliases: ['low libido', 'sexual health', 'erectile function', 'erection quality'],
     helpfulSupplements: [
-      { pattern: /ashwagandha/i, why: 'may improve sexual performance and stress resilience' },
-      { pattern: /tongkat|longjack/i, why: 'can support testosterone and libido metrics' },
-      { pattern: /tribulus/i, why: 'traditionally used for libido and androgen support' },
-      { pattern: /cistanche/i, why: 'Tonifies yang and may enhance libido and stamina' },
-      { pattern: /muira|muira\s?puama|ptychopetalum/i, why: 'Often used for arousal and nitric oxide support' },
-      { pattern: /zinc/i, why: 'supports hormonal balance when levels are low' },
-      { pattern: /l[-\s]?arginine/i, why: 'can aid nitric oxide availability for circulation' },
+      { pattern: /ashwagandha/i, why: 'may improve sexual performance and stress resilience', suggested: 'KSM-66 or Sensoril, 300–600mg/day' },
+      { pattern: /tongkat|longjack/i, why: 'can support testosterone and libido metrics', suggested: 'Eurycoma longifolia extract, 200–400mg/day' },
+      { pattern: /tribulus/i, why: 'traditionally used for libido and androgen support', suggested: 'Standardized to protodioscin, 500–750mg/day' },
+      { pattern: /cistanche/i, why: 'Tonifies yang and may enhance libido and stamina', suggested: 'Cistanche tubulosa extract, 300–600mg/day' },
+      { pattern: /muira|muira\s?puama|ptychopetalum/i, why: 'Often used for arousal and nitric oxide support', suggested: 'Muira puama extract, 250–500mg/day' },
+      { pattern: /zinc/i, why: 'supports hormonal balance when levels are low', suggested: 'Zinc bisglycinate 15–30mg with food' },
+      { pattern: /l[-\s]?arginine/i, why: 'can aid nitric oxide availability for circulation', suggested: 'L-arginine 3–6g/day or L-citrulline 2–3g/day' },
     ],
     gapSupplements: [
       { title: 'Consider adaptogens for stress-linked libido dips', why: 'Chronic stress suppresses libido; ashwagandha or rhodiola can moderate cortisol', suggested: 'Ashwagandha 600mg/day (divided)' },
       { title: 'Evaluate zinc status', why: 'Low zinc impairs testosterone conversion and sexual health', suggested: 'Zinc bisglycinate 15–30mg with food' },
     ],
     avoidSupplements: [
-      { pattern: /yohim(b|)ine/i, why: 'Can spike blood pressure and anxiety, use only with practitioner oversight.' },
-      { pattern: /pseudoephedrine|decongestant/i, why: 'These constrict blood vessels and can undermine erectile blood flow.' },
+      { pattern: /yohim(b|)ine/i, why: 'Can spike blood pressure and anxiety; avoid unless supervised by a clinician.' },
+      { pattern: /pseudoephedrine|decongestant/i, why: 'Constriction of blood vessels can undermine erectile blood flow.' },
+      { pattern: /excessive\s?alcohol/i, why: 'Depresses CNS and worsens erection quality and arousal.' },
+      { pattern: /nicotine|smoking/i, why: 'Impairs vascular function and nitric oxide signaling.' },
     ],
     helpfulMedications: [
       {
@@ -393,6 +395,16 @@ const ISSUE_KNOWLEDGE_BASE: Record<string, {
         detail: 'Balanced carbs + protein prevent insulin spikes that can blunt hormone signalling',
         keywords: ['balanced', 'protein', 'fiber', 'low glycemic'],
       },
+      {
+        title: 'Add nitrate-rich greens',
+        detail: 'Beetroot and leafy greens support nitric oxide for blood flow',
+        keywords: ['beet', 'rocket', 'arugula', 'spinach'],
+      },
+      {
+        title: 'Hydration and electrolytes',
+        detail: 'Adequate fluids support performance and vascular tone',
+        keywords: ['water', 'electrolyte', 'salt'],
+      },
     ],
     avoidFoods: [
       {
@@ -404,6 +416,16 @@ const ISSUE_KNOWLEDGE_BASE: Record<string, {
         title: 'Trans-fat laden takeaways',
         detail: 'Industrial oils impair vascular tone; swap for home-cooked meals with olive oil.',
         keywords: ['fried', 'fast food', 'takeaway'],
+      },
+      {
+        title: 'Heavy late-night meals',
+        detail: 'Late, heavy meals impair sleep quality and next-day libido.',
+        keywords: ['late dinner', 'greasy', 'large portions'],
+      },
+      {
+        title: 'High alcohol evenings',
+        detail: 'Alcohol blunts arousal and disrupts sleep architecture.',
+        keywords: ['alcohol', 'wine', 'beer', 'spirits'],
       },
     ],
     lifestyleFocus: [
@@ -1351,8 +1373,18 @@ async function buildStarterSectionWithContext(
     const kbAdd = kbKey ? (ISSUE_KNOWLEDGE_BASE[kbKey].helpfulSupplements ?? []) : []
     const kbAvoid = kbKey ? (ISSUE_KNOWLEDGE_BASE[kbKey].avoidSupplements ?? []) : []
     const suggestedAdditions = ensureMin(
-      kbAdd.map(it => ({ title: it.pattern.source.replace(/^\/(.*)\/$/, '$1'), reason: it.why, suggestion: null, alreadyCovered: logged.some(name => it.pattern.test(name)) })),
-      kbAdd.map(it => ({ title: it.pattern.source.replace(/^\/(.*)\/$/, '$1'), reason: it.why, suggestion: null, alreadyCovered: false }))
+      kbAdd.map(it => ({
+        title: it.pattern.source.replace(/^\/(.*)\/$/, '$1'),
+        reason: it.why,
+        suggestion: it.suggested ?? null,
+        alreadyCovered: logged.some(name => it.pattern.test(name)),
+      })),
+      kbAdd.map(it => ({
+        title: it.pattern.source.replace(/^\/(.*)\/$/, '$1'),
+        reason: it.why,
+        suggestion: it.suggested ?? null,
+        alreadyCovered: false,
+      }))
     )
     const avoidList = ensureMin(
       kbAvoid.map(it => ({ name: it.pattern.source.replace(/^\/(.*)\/$/, '$1'), reason: it.why, dosage: null, timing: [] as string[] })),
@@ -2756,20 +2788,23 @@ async function buildNutritionSection(
     // Only show foods the user actually logged as "working".
     .filter((item) => allowFoodName(item.title, item.reason) && foodNameSet.has(canonical(item.title)))
 
-  const suggestedFocus = llmResult.suggested
-    .map((item) => ({
-      title: item.name,
-      reason: item.reason,
-      detail: item.protocol ?? null,
-    }))
-    .filter((item) => allowFoodName(item.title, item.reason))
-
-  const avoidFoods = llmResult.avoid
-    .map((item) => ({
-      name: item.name,
-      reason: item.reason,
-    }))
-    .filter((item) => allowFoodName(item.name, item.reason))
+  // Ensure at least 4 suggested and avoid items; top up from knowledge base if the LLM returned too few
+  const kbFoods = kbKey ? (ISSUE_KNOWLEDGE_BASE[kbKey].nutritionFocus ?? []) : []
+  const kbAvoidFoods = kbKey ? (ISSUE_KNOWLEDGE_BASE[kbKey].avoidFoods ?? []) : []
+  const suggestedFocus = ensureMin(
+    llmResult.suggested
+      .map((item) => ({ title: item.name, reason: item.reason, detail: item.protocol ?? null }))
+      .filter((item) => allowFoodName(item.title, item.reason)),
+    kbFoods.map((it) => ({ title: it.title, reason: it.detail, detail: null })),
+    4
+  )
+  const avoidFoods = ensureMin(
+    llmResult.avoid
+      .map((item) => ({ name: item.name, reason: item.reason }))
+      .filter((item) => allowFoodName(item.name, item.reason)),
+    kbAvoidFoods.map((it) => ({ name: it.title, reason: it.detail })),
+    4
+  )
 
   const validated = suggestedFocus.length >= 4 && avoidFoods.length >= 4
 
