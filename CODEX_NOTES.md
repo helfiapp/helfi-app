@@ -1,5 +1,34 @@
 # CODEX NOTES
 
+## LIVE USER FEEDBACK — 2025-10-24
+1) Supplements → What’s Working shows “You’re not taking any supplements…” for Libido despite user logging multiple libido-supportive supplements.
+   - Likely cause: the new “starter” path sets `extras.supportiveDetails = []` for supplements, so the Working tab renders empty until the full AI upgrade arrives. This is misleading and looks like “no data”.
+   - Required fix: in `buildStarterSectionWithContext` for `supplements`, map logged supplements that match `ISSUE_KNOWLEDGE_BASE[issue].helpfulSupplements` into `supportiveDetails` with dose/timing. Guarantee at least 1–4 items when logs exist.
+
+2) Bowel Movements → Supplements: “Suggested Supplements” and “Supplements to Avoid” often show nothing.
+   - Likely causes:
+     - No KB entry for this issue (or weak KB), so starter top-ups return empty.
+     - Full AI upgrade is slow or failing, leaving only the empty starter.
+   - Required fix: add a robust KB block for “bowel movements” (aliases: constipation, irregular stools, etc.) with ≥4 `helpfulSupplements` (with suggested protocols) and ≥4 `avoidSupplements`, plus nutrition/lifestyle items. Ensure starter top-ups use KB to hit 4/4.
+
+3) Counts not met: Some sections still render <4 Suggested and <4 Avoid (e.g., Nutrition only 2/2).
+   - Current code added `ensureMin(...)` for nutrition starter, but similar enforcement is missing/weak in other sections or relies on KB that is too sparse.
+   - Required fix: apply consistent 4/4 enforcement for all sections (starter and full), and expand KB where sparse (Libido, Bowel Movements, etc.).
+
+4) Perceived latency improved but UX is still poor when starters are blank/misleading.
+   - When starters don’t include “What’s Working,” users see empty states even though they have data. The “Initial guidance…” banner is not enough to offset this.
+   - Required fix: starters must always be useful: show mapped “What’s Working” from logs and guaranteed 4/4 Suggested/Avoid from KB immediately; then upgrade quietly.
+
+5) Daily/Weekly/Custom: gating works, but users expect richer copy and clear notice when no new data vs. queued refresh.
+   - Consider small toast/badge indicating “No new data to generate” vs “Refreshing in background”.
+
+Actionable next steps (do not deploy until verified on preview):
+1) Supplements starter: populate `supportiveDetails` from logs + KB matches; ensure min 1–4 when logs exist.
+2) Add strong KB for “Bowel Movements”: ≥4 helpful, ≥4 avoid (with protocols/why); also add nutrition and lifestyle focus lists.
+3) Enforce 4/4 everywhere at starter and full outputs; if LLM under-delivers, top up from KB deterministically.
+4) Improve copy for “no new data” and “upgrading…”; keep current report visible.
+5) Verify on preview: Libido and Bowel Movements should render instantly with 4/4 and non-empty Working based on the user’s logs.
+
 ## Current Status (2025-10-10)
 - **Outcome:** Latest deployment still fails key requirements. Keep this as a known-bad-but-instrumented baseline; do not repeat the same approach without implementing remediation below.
 - **User feedback highlights:**
