@@ -565,6 +565,31 @@ function unslugify(value: string) {
     .join(' ')
 }
 
+// Ensure at least `min` items by topping up from a fallback list, de-duplicating by JSON identity.
+function ensureMin<T>(primary: T[], fallback: T[], min = 4): T[] {
+  const seen = new Set<string>()
+  const out: T[] = []
+  for (const item of primary) {
+    const key = JSON.stringify(item)
+    if (!seen.has(key)) {
+      seen.add(key)
+      out.push(item)
+    }
+    if (out.length >= min) break
+  }
+  if (out.length < min) {
+    for (const fb of fallback) {
+      const key = JSON.stringify(fb)
+      if (!seen.has(key)) {
+        seen.add(key)
+        out.push(fb)
+      }
+      if (out.length >= min) break
+    }
+  }
+  return out.slice(0, min)
+}
+
 function hasStructuredData(value: unknown) {
   if (!value) return false
   if (Array.isArray(value)) return value.length > 0
@@ -2779,6 +2804,7 @@ async function buildNutritionSection(
   }
 
   const foodNameSet = new Set(normalizedFoods.map((f) => canonical(f.name)))
+  const kbKeyLocal = pickKnowledgeKey(issue.name.toLowerCase())
   const workingFocus = llmResult.working
     .map((item) => ({
       title: item.name,
@@ -2789,8 +2815,8 @@ async function buildNutritionSection(
     .filter((item) => allowFoodName(item.title, item.reason) && foodNameSet.has(canonical(item.title)))
 
   // Ensure at least 4 suggested and avoid items; top up from knowledge base if the LLM returned too few
-  const kbFoods = kbKey ? (ISSUE_KNOWLEDGE_BASE[kbKey].nutritionFocus ?? []) : []
-  const kbAvoidFoods = kbKey ? (ISSUE_KNOWLEDGE_BASE[kbKey].avoidFoods ?? []) : []
+  const kbFoods = kbKeyLocal ? (ISSUE_KNOWLEDGE_BASE[kbKeyLocal].nutritionFocus ?? []) : []
+  const kbAvoidFoods = kbKeyLocal ? (ISSUE_KNOWLEDGE_BASE[kbKeyLocal].avoidFoods ?? []) : []
   const suggestedFocus = ensureMin(
     llmResult.suggested
       .map((item) => ({ title: item.name, reason: item.reason, detail: item.protocol ?? null }))
