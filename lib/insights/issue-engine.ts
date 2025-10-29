@@ -512,6 +512,69 @@ const ISSUE_KNOWLEDGE_BASE: Record<string, {
       { marker: 'Thyroid Panel', optimal: 'TSH 0.8–2.0 µIU/mL, Free T3 upper half', cadence: '6–12 months' },
     ],
   },
+  'bowel movements': {
+    aliases: ['constipation', 'irregular stools', 'sluggish bowels', 'bowel-movement', 'bowel-movements'],
+    helpfulSupplements: [
+      { pattern: /magnesium\s?(citrate|glycinate|oxide)?/i, why: 'Osmotic effect draws water into stool to ease passage', suggested: 'Magnesium citrate 200–400mg in the evening' },
+      { pattern: /psyllium|husk|fiber/i, why: 'Bulk-forming fiber improves stool consistency and frequency', suggested: 'Psyllium husk 1–2 tsp with 300ml water daily' },
+      { pattern: /probiotic|bifido|lacto/i, why: 'Certain strains improve stool frequency and transit time', suggested: 'Multi‑strain probiotic providing 10–20B CFU daily' },
+      { pattern: /triphala/i, why: 'Ayurvedic blend gently supports motility without harsh stimulation', suggested: '500–1000mg before bed' },
+    ],
+    gapSupplements: [
+      { title: 'Hydration + electrolytes', why: 'Adequate fluids keep fiber effective and stool soft', suggested: 'Aim for 2–2.5L water/day; add electrolytes if training' },
+    ],
+    avoidSupplements: [
+      { pattern: /high[-\s]?dose\s?iron/i, why: 'Frequently constipating; review need and dose with clinician' },
+      { pattern: /calcium(\s?carbonate)?/i, why: 'Carbonate form can slow motility and harden stools' },
+      { pattern: /aluminium|aluminum/i, why: 'Aluminium-containing antacids can cause constipation' },
+      { pattern: /excessive\s?caffeine/i, why: 'Diuretic effect can dehydrate and harden stools for some' },
+    ],
+    helpfulMedications: [
+      { pattern: /polyethylene\s?glycol|peg\s?3350|macrogol/i, why: 'Osmotic laxative softens stool and increases frequency' },
+      { pattern: /lactulose/i, why: 'Osmotic agent that draws water into colon to ease passage' },
+      { pattern: /senna|sennosides/i, why: 'Stimulant laxative that increases motility (short term use)' },
+      { pattern: /docusate|stool\s?softener/i, why: 'Reduces stool surface tension to ease passage' },
+    ],
+    gapMedications: [
+      { title: 'Consider short trial of osmotic support', why: 'If dietary measures fail, short course may help reset rhythm', suggested: 'PEG 3350 as directed by clinician' },
+    ],
+    avoidMedications: [
+      { pattern: /opioid|codeine|oxycodone|morphine/i, why: 'Strongly constipating; requires bowel regimen if continued' },
+      { pattern: /anticholinergic|amitriptyline|oxybutynin/i, why: 'Reduce gut motility and secretions—review necessity' },
+      { pattern: /high[-\s]?dose\s?iron/i, why: 'Common cause of medication‑induced constipation' },
+      { pattern: /calcium\s?channel\s?blocker|verapamil/i, why: 'May slow intestinal transit in some people' },
+    ],
+    supportiveExercises: [
+      { title: '10–15 min brisk walk after meals', detail: 'Post‑meal movement stimulates gastrocolic reflex and motility', keywords: ['walk', 'post-meal', 'brisk'] },
+      { title: 'Deep squat holds 3×30–45s', detail: 'Improves pelvic floor relaxation and defecation posture', keywords: ['squat', 'deep squat', 'mobility'] },
+      { title: 'Abdominal massage clockwise 5 min', detail: 'Mechanical stimulation of colon segments can aid transit', keywords: ['massage', 'abdominal'] },
+      { title: 'Gentle yoga: wind-relieving, twists', detail: 'Twists and knee‑to‑chest postures can mobilize gas/stool', keywords: ['yoga', 'twist', 'pawanmuktasana'] },
+    ],
+    avoidExercises: [
+      { title: 'Heavy straining without breath control', detail: 'Valsalva increases pelvic floor tension and can worsen constipation' },
+      { title: 'Very long sedentary blocks', detail: 'Prolonged sitting reduces colonic motility—insert movement snacks' },
+      { title: 'Dehydrating endurance without fluids', detail: 'Fluid loss hardens stool; match sweat with hydration' },
+      { title: 'Late‑night vigorous training', detail: 'May disturb sleep which impairs morning bowel rhythm' },
+    ],
+    nutritionFocus: [
+      { title: '25–35g fiber with gradual build', detail: 'Mix soluble and insoluble fiber to improve stool form', keywords: ['oats', 'vegetables', 'legumes', 'fruit'] },
+      { title: '2 kiwifruit or a handful of prunes', detail: 'Both show evidence for increasing stool frequency', keywords: ['kiwi', 'prunes'] },
+      { title: 'Daily probiotic/fermented food', detail: 'Supports beneficial bacteria and short‑chain fatty acids', keywords: ['yogurt', 'kefir', 'sauerkraut'] },
+      { title: 'Hydration habit (2–2.5L)', detail: 'Water keeps fiber effective and stool soft', keywords: ['water', 'electrolyte'] },
+    ],
+    avoidFoods: [
+      { title: 'Ultra‑processed low‑fiber snacks', detail: 'Lack of fiber reduces stool bulk and slows transit', keywords: ['chips', 'cookies', 'white bread'] },
+      { title: 'Excess dairy if sensitive', detail: 'For some, high cheese/ice‑cream intake worsens firmness', keywords: ['cheese', 'ice cream'] },
+      { title: 'Very low‑carb with minimal vegetables', detail: 'Insufficient fiber intake commonly leads to constipation', keywords: ['keto', 'low carb'] },
+      { title: 'Dehydrating alcohol evenings', detail: 'Fluid loss overnight hardens stools next morning', keywords: ['alcohol', 'wine', 'spirits'] },
+    ],
+    lifestyleFocus: [
+      { title: 'Morning bowel routine after breakfast', detail: 'Use the gastrocolic reflex; sit unhurriedly 10–15 min' },
+      { title: 'Footstool for squat‑like posture', detail: 'Improves anorectal angle and reduces straining' },
+      { title: 'Mindful breathing to relax pelvic floor', detail: 'Down‑regulates sympathetic tone that inhibits motility' },
+      { title: 'Consistent sleep and wake time', detail: 'Circadian regularity supports predictable bowel movements' },
+    ],
+  },
 }
 
 const INTERACTION_RULES: Array<{
@@ -1397,6 +1460,19 @@ async function buildStarterSectionWithContext(
     const logged = context.supplements.map(s => s.name)
     const kbAdd = kbKey ? (ISSUE_KNOWLEDGE_BASE[kbKey].helpfulSupplements ?? []) : []
     const kbAvoid = kbKey ? (ISSUE_KNOWLEDGE_BASE[kbKey].avoidSupplements ?? []) : []
+    // Map logged supplements that match helpful KB into "what's working"
+    const supportiveDetails = context.supplements
+      .filter((s) => kbAdd.some((k) => k.pattern.test(s.name)))
+      .map((s) => {
+        const match = kbAdd.find((k) => k.pattern.test(s.name))
+        return {
+          name: s.name,
+          reason: match ? match.why : 'Logged in your plan',
+          dosage: s.dosage ?? null,
+          timing: Array.isArray(s.timing) ? s.timing : [],
+        }
+      })
+      .slice(0, 4)
     const suggestedAdditions = ensureMin(
       kbAdd.map(it => ({
         title: it.pattern.source.replace(/^\/(.*)\/$/, '$1'),
@@ -1431,12 +1507,116 @@ async function buildStarterSectionWithContext(
       dataPoints: [],
       recommendations: [],
       extras: {
-        supportiveDetails: [],
+        supportiveDetails,
         suggestedAdditions,
         avoidList,
         missingDose: [],
         missingTiming: [],
         totalLogged: logged.length,
+        source: 'starter',
+        pipelineVersion: 'v2',
+        validated: true,
+        degraded: true,
+        degradedUsed: true,
+      },
+    }
+  }
+
+  if (section === 'medications') {
+    const logged = context.medications.map(m => m.name)
+    const kbAdd = kbKey ? (ISSUE_KNOWLEDGE_BASE[kbKey].helpfulMedications ?? []) : []
+    const kbAvoid = kbKey ? (ISSUE_KNOWLEDGE_BASE[kbKey].avoidMedications ?? []) : []
+    const supportiveDetails = context.medications
+      .filter((m) => kbAdd.some((k) => k.pattern.test(m.name)))
+      .map((m) => {
+        const match = kbAdd.find((k) => k.pattern.test(m.name))
+        return {
+          name: m.name,
+          reason: match ? match.why : 'Logged in your regimen',
+          dosage: m.dosage ?? null,
+          timing: Array.isArray(m.timing) ? m.timing : [],
+        }
+      })
+      .slice(0, 4)
+    const suggestedAdditions = ensureMin(
+      kbAdd.map(it => ({
+        title: it.pattern.source.replace(/^\/(.*)\/$/, '$1'),
+        reason: it.why,
+        suggestion: it.suggested ?? null,
+        alreadyCovered: logged.some(name => it.pattern.test(name)),
+      })),
+      kbAdd.map(it => ({
+        title: it.pattern.source.replace(/^\/(.*)\/$/, '$1'),
+        reason: it.why,
+        suggestion: it.suggested ?? null,
+        alreadyCovered: false,
+      }))
+    )
+    const avoidList = ensureMin(
+      kbAvoid.map(it => ({ name: it.pattern.source.replace(/^\/(.*)\/$/, '$1'), reason: it.why, dosage: null, timing: [] as string[] })),
+      kbAvoid.map(it => ({ name: it.pattern.source.replace(/^\/(.*)\/$/, '$1'), reason: it.why, dosage: null, timing: [] as string[] }))
+    )
+
+    return {
+      issue: summary,
+      section: 'medications',
+      generatedAt: now,
+      confidence: 0.55,
+      summary: 'Initial guidance generated while we prepare a deeper report.',
+      mode: options.mode,
+      range: undefined,
+      highlights: [
+        { title: 'Discuss with your clinician', detail: suggestedAdditions.map(f => `${f.title}: ${f.reason}`).join('; '), tone: 'neutral' },
+        { title: 'Medications to review', detail: avoidList.map(f => `${f.name}: ${f.reason}`).join('; '), tone: 'warning' },
+      ],
+      dataPoints: [],
+      recommendations: [],
+      extras: {
+        supportiveDetails,
+        suggestedAdditions,
+        avoidList,
+        missingDose: [],
+        missingTiming: [],
+        totalLogged: logged.length,
+        source: 'starter',
+        pipelineVersion: 'v2',
+        validated: true,
+        degraded: true,
+        degradedUsed: true,
+      },
+    }
+  }
+
+  if (section === 'exercise') {
+    const kbActs = kbKey ? (ISSUE_KNOWLEDGE_BASE[kbKey].supportiveExercises ?? []) : []
+    const kbAvoidActs = kbKey ? (ISSUE_KNOWLEDGE_BASE[kbKey].avoidExercises ?? []) : []
+    const suggestedActivities = ensureMin(
+      kbActs.map(a => ({ title: a.title, reason: a.detail })),
+      kbActs.map(a => ({ title: a.title, reason: a.detail }))
+    )
+    const avoidActivities = ensureMin(
+      kbAvoidActs.map(a => ({ title: a.title, reason: a.detail })),
+      kbAvoidActs.map(a => ({ title: a.title, reason: a.detail }))
+    )
+    return {
+      issue: summary,
+      section: 'exercise',
+      generatedAt: now,
+      confidence: 0.55,
+      summary: 'Initial guidance generated while we prepare a deeper report.',
+      mode: options.mode,
+      range: undefined,
+      highlights: [
+        { title: 'Plan these movements', detail: suggestedActivities.map(f => `${f.title}: ${f.reason}`).join('; '), tone: 'neutral' },
+        { title: 'Movements to limit', detail: avoidActivities.map(f => `${f.title}: ${f.reason}`).join('; '), tone: 'warning' },
+      ],
+      dataPoints: [],
+      recommendations: [],
+      extras: {
+        workingActivities: [],
+        suggestedActivities,
+        avoidActivities,
+        totalLogged: context.exerciseLogs.length,
         source: 'starter',
         pipelineVersion: 'v2',
         validated: true,
