@@ -19,10 +19,43 @@ async function fetchSectionJson(page, issueSlug, section) {
   return await response.json()
 }
 
+async function generateSection(page, issueSlug, section, mode = 'daily') {
+  const url = `https://helfi.ai/api/insights/issues/${issueSlug}/sections/${section}`
+  const response = await page.request.post(url, {
+    data: { mode },
+    headers: { 'Content-Type': 'application/json' },
+  })
+  if (!response.ok()) {
+    throw new Error(`Failed to POST ${url}: ${response.status()} ${response.statusText()}`)
+  }
+  const json = await response.json()
+  return json.result || json
+}
+
 function assertMinCount(arr, min, label) {
   if (!Array.isArray(arr)) throw new Error(`${label} is not an array`)
   if (arr.length < min) {
     throw new Error(`${label} has ${arr.length}, expected ≥4`)
+  }
+}
+
+async function waitForCounts(checkFn, { timeoutMs = 600000, intervalMs = 15000, label = 'section' } = {}) {
+  const start = Date.now()
+  let lastErr = null
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    try {
+      await checkFn()
+      return
+    } catch (e) {
+      lastErr = e
+      const elapsed = Date.now() - start
+      if (elapsed >= timeoutMs) {
+        throw new Error(`Timeout waiting for ${label}: ${lastErr.message || lastErr}`)
+      }
+      console.log(`⏳ Waiting for ${label} cache refresh... (${Math.round((timeoutMs - elapsed)/1000)}s left)`) 
+      await new Promise(r => setTimeout(r, intervalMs))
+    }
   }
 }
 
@@ -44,55 +77,61 @@ async function run() {
     const issueSlug = 'bowel-movements'
     const checks = []
 
-    // 2) Supplements
-    {
+    // 2) Supplements (retry until cache bust + deploy ready)
+    await waitForCounts(async () => {
+      // Force fresh compute, then verify
+      await generateSection(page, issueSlug, 'supplements', 'daily')
       const json = await fetchSectionJson(page, issueSlug, 'supplements')
       const extras = (json.extras || {})
       assertMinCount(extras.suggestedAdditions || [], 4, 'Supplements.suggestedAdditions')
       assertMinCount(extras.avoidList || [], 4, 'Supplements.avoidList')
-      checks.push('supplements')
-      console.log('✅ Supplements 4/4 OK')
-    }
+    }, { label: 'supplements' })
+    checks.push('supplements')
+    console.log('✅ Supplements 4/4 OK')
 
     // 3) Medications
-    {
+    await waitForCounts(async () => {
+      await generateSection(page, issueSlug, 'medications', 'daily')
       const json = await fetchSectionJson(page, issueSlug, 'medications')
       const extras = (json.extras || {})
       assertMinCount(extras.suggestedAdditions || [], 4, 'Medications.suggestedAdditions')
       assertMinCount(extras.avoidList || [], 4, 'Medications.avoidList')
-      checks.push('medications')
-      console.log('✅ Medications 4/4 OK')
-    }
+    }, { label: 'medications' })
+    checks.push('medications')
+    console.log('✅ Medications 4/4 OK')
 
     // 4) Nutrition
-    {
+    await waitForCounts(async () => {
+      await generateSection(page, issueSlug, 'nutrition', 'daily')
       const json = await fetchSectionJson(page, issueSlug, 'nutrition')
       const extras = (json.extras || {})
       assertMinCount(extras.suggestedFocus || [], 4, 'Nutrition.suggestedFocus')
       assertMinCount(extras.avoidFoods || [], 4, 'Nutrition.avoidFoods')
-      checks.push('nutrition')
-      console.log('✅ Nutrition 4/4 OK')
-    }
+    }, { label: 'nutrition' })
+    checks.push('nutrition')
+    console.log('✅ Nutrition 4/4 OK')
 
     // 5) Exercise
-    {
+    await waitForCounts(async () => {
+      await generateSection(page, issueSlug, 'exercise', 'daily')
       const json = await fetchSectionJson(page, issueSlug, 'exercise')
       const extras = (json.extras || {})
       assertMinCount(extras.suggestedActivities || [], 4, 'Exercise.suggestedActivities')
       assertMinCount(extras.avoidActivities || [], 4, 'Exercise.avoidActivities')
-      checks.push('exercise')
-      console.log('✅ Exercise 4/4 OK')
-    }
+    }, { label: 'exercise' })
+    checks.push('exercise')
+    console.log('✅ Exercise 4/4 OK')
 
     // 6) Lifestyle
-    {
+    await waitForCounts(async () => {
+      await generateSection(page, issueSlug, 'lifestyle', 'daily')
       const json = await fetchSectionJson(page, issueSlug, 'lifestyle')
       const extras = (json.extras || {})
       assertMinCount(extras.suggestedHabits || [], 4, 'Lifestyle.suggestedHabits')
       assertMinCount(extras.avoidHabits || [], 4, 'Lifestyle.avoidHabits')
-      checks.push('lifestyle')
-      console.log('✅ Lifestyle 4/4 OK')
-    }
+    }, { label: 'lifestyle' })
+    checks.push('lifestyle')
+    console.log('✅ Lifestyle 4/4 OK')
 
     console.log('\n🎉 All checks passed:', checks.join(', '))
     process.exitCode = 0

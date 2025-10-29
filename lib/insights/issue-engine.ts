@@ -323,7 +323,7 @@ const ISSUE_KNOWLEDGE_BASE: Record<string, {
   helpfulSupplements?: Array<{ pattern: RegExp; why: string; suggested?: string }>
   gapSupplements?: Array<{ title: string; why: string; suggested?: string }>
   avoidSupplements?: Array<{ pattern: RegExp; why: string }>
-  helpfulMedications?: Array<{ pattern: RegExp; why: string }>
+  helpfulMedications?: Array<{ pattern: RegExp; why: string; suggested?: string }>
   gapMedications?: Array<{ title: string; why: string; suggested?: string }>
   avoidMedications?: Array<{ pattern: RegExp; why: string }>
   supportiveExercises?: Array<{ title: string; detail: string; keywords?: string[] }>
