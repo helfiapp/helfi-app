@@ -513,6 +513,78 @@ const ISSUE_KNOWLEDGE_BASE: Record<string, {
       { marker: 'Thyroid Panel', optimal: 'TSH 0.8–2.0 µIU/mL, Free T3 upper half', cadence: '6–12 months' },
     ],
   },
+  'brain fog': {
+    aliases: ['cognitive fog', 'mental clarity', 'poor focus'],
+    helpfulSupplements: [
+      { pattern: /lion'?s\s?mane/i, why: 'Supports nerve growth factors and may improve focus', suggested: 'Lion’s mane extract 1–3g/day' },
+      { pattern: /omega|fish oil|epa|dha/i, why: 'Omega-3s aid neuronal membrane fluidity for cognition', suggested: 'Combined EPA/DHA ≥1.5g/day' },
+      { pattern: /rhodiola|adaptogen/i, why: 'Adaptogens can moderate stress-linked brain fog', suggested: 'Rhodiola rosea 200–400mg in the morning' },
+      { pattern: /acetyl[-\s]?l[-\s]?carnitine|alc/i, why: 'Supports mitochondrial energy for mental clarity', suggested: 'ALCAR 1000–2000mg/day' },
+      { pattern: /magnesium threonate|l[-\s]?threonate/i, why: 'Readily crosses the blood-brain barrier to calm overactive nerves', suggested: 'Magnesium L-threonate 2g/day (elemental 144mg)' },
+    ],
+    gapSupplements: [
+      { title: 'B-complex with methylated forms', why: 'B vitamins drive neurotransmitter synthesis when intake is low', suggested: 'Active B-complex with breakfast' },
+      { title: 'Evaluate choline donors', why: 'Choline supports acetylcholine signalling for focus', suggested: 'Alpha-GPC 300mg AM (practitioner guided)' },
+    ],
+    avoidSupplements: [
+      { pattern: /high\s?dose\s?melatonin|10mg/i, why: 'Large melatonin doses can leave a morning haze—cap at 0.3–1mg unless supervised.' },
+      { pattern: /kava|kratom|phenibut/i, why: 'Sedative substances blunt cognition and carry dependency risk.' },
+      { pattern: /excessive\s?5[-\s]?htp/i, why: 'High 5-HTP can cause lethargy and dull focus; tailor dose carefully.' },
+      { pattern: /mega\s?dose\s?cbd|heavy\s?cbn/i, why: 'Large calming cannabinoid doses can increase daytime grogginess.' },
+    ],
+    helpfulMedications: [
+      { pattern: /modafinil|armodafinil/i, why: 'Wakefulness promoters improve vigilance and sustained attention.' },
+      { pattern: /methylphenidate|ritalin|concerta/i, why: 'Stimulants enhance dopamine/norepinephrine signalling for focus.' },
+      { pattern: /amphetamine|dexamphetamine|vyvanse|lisdexamfetamine/i, why: 'Boosts catecholamines for executive function when prescribed.' },
+      { pattern: /bupropion|wellbutrin/i, why: 'Dopamine/norepinephrine reuptake inhibition can lift cognitive fog linked to low drive.' },
+    ],
+    gapMedications: [
+      { title: 'Screen for sleep apnea or narcolepsy', why: 'Treating sleep disorders (e.g., CPAP) often lifts daytime fog', suggested: 'Discuss sleep study referral with clinician' },
+      { title: 'Assess hormone balance', why: 'Hypothyroidism or adrenal insufficiency may need prescription management', suggested: 'Full thyroid + cortisol workup' },
+    ],
+    avoidMedications: [
+      { pattern: /benzodiazepine|diazepam|alprazolam|lorazepam/i, why: 'Benzodiazepines impair memory formation and alertness.' },
+      { pattern: /diphenhydramine|doxylamine/i, why: 'Sedating antihistamines are strongly anticholinergic causing fog.' },
+      { pattern: /opioid|morphine|oxycodone|codeine/i, why: 'Opioids reduce cognitive speed and alertness; review necessity.' },
+      { pattern: /anticholinergic|oxybutynin|amitriptyline/i, why: 'High anticholinergic load is linked with cognitive slowing.' },
+    ],
+    supportiveExercises: [
+      { title: 'Brisk morning walk 20–30 min', detail: 'Boosts cerebral blood flow and primes alertness', keywords: ['walk', 'morning', 'brisk'] },
+      { title: 'Interval cardio 1–2x/week', detail: 'Increases BDNF and neuroplasticity for sharper thinking', keywords: ['interval', 'cardio', 'hiit'] },
+      { title: 'Mind-body practice (yoga, tai chi)', detail: 'Enhances parasympathetic tone and mental clarity', keywords: ['yoga', 'tai chi', 'qigong'] },
+      { title: 'Skill drills (coordination, balance)', detail: 'Novel movement patterns stimulate neuroplasticity', keywords: ['balance', 'coordination', 'drill'] },
+    ],
+    avoidExercises: [
+      { title: 'Late-night exhaustive training', detail: 'Hard sessions close to bedtime disrupt sleep quality and cognition' },
+      { title: 'Monotonous treadmill slogs daily', detail: 'Repeated low-stimulus cardio without variation can add boredom without cognitive benefit' },
+      { title: 'Overtraining without recovery', detail: 'Insufficient rest elevates cortisol and worsens fog' },
+      { title: 'Workouts fasted with low blood sugar', detail: 'Hypoglycaemia post-training undermines mental clarity' },
+    ],
+    nutritionFocus: [
+      { title: 'Protein-rich breakfast', detail: 'Protein plus healthy fats stabilise neurotransmitter precursors', keywords: ['eggs', 'protein', 'yogurt', 'nuts'] },
+      { title: 'Low-glycaemic meal balance', detail: 'Steady glucose prevents mid-morning mental crashes', keywords: ['fiber', 'whole grains', 'legumes', 'vegetables'] },
+      { title: 'Hydration cadence (500ml on waking)', detail: 'Mild dehydration reduces attention and working memory', keywords: ['water', 'electrolyte'] },
+      { title: 'Polyphenol-dense foods', detail: 'Berries, leafy greens, cacao support cerebral blood flow', keywords: ['berries', 'greens', 'cacao'] },
+    ],
+    avoidFoods: [
+      { title: 'Ultra-sweet breakfast cereals', detail: 'High sugar spikes lead to reactive hypoglycaemia fog', keywords: ['cereal', 'sugar', 'sweet'] },
+      { title: 'Heavy lunchtime fast food', detail: 'High saturated fat lunches drive post-meal sleepiness', keywords: ['fast food', 'burger', 'fries'] },
+      { title: 'Evening alcohol wind-downs', detail: 'Alcohol fragments sleep and worsens next-day cognition', keywords: ['wine', 'beer', 'spirits'] },
+      { title: 'Artificial trans-fat snacks', detail: 'Industrial fats impair vascular function and cognition', keywords: ['trans fat', 'margarine', 'packaged snacks'] },
+    ],
+    lifestyleFocus: [
+      { title: 'Consistent 7.5–8h sleep window', detail: 'Regular sleep is foundational for attention and memory' },
+      { title: 'Pomodoro deep-work blocks', detail: 'Focused 25–40 min blocks with breaks maintain clarity' },
+      { title: 'Morning daylight exposure', detail: 'Sets circadian rhythm and boosts cortisol awakening response' },
+      { title: 'Structured micro-breaks every 90 min', detail: 'Short resets clear mental buildup and maintain performance' },
+    ],
+    keyLabs: [
+      { marker: 'Vitamin B12 & Folate', optimal: 'B12 >500 pg/mL, Folate mid-upper reference', cadence: '6–12 months if symptomatic' },
+      { marker: 'Ferritin & Iron panel', optimal: 'Ferritin 70–120 ng/mL', cadence: 'Every 6–12 months or if fatigue returns' },
+      { marker: 'Thyroid panel (TSH, Free T3/T4)', optimal: 'TSH 0.8–2.0 µIU/mL, Free T3 upper-half', cadence: '6–12 months' },
+      { marker: 'Fasting glucose & HbA1c', optimal: 'Glucose 75–90 mg/dL, HbA1c 4.8–5.2%', cadence: 'Annually or with symptoms' },
+    ],
+  },
   'bowel movements': {
     aliases: ['constipation', 'irregular stools', 'sluggish bowels', 'bowel-movement', 'bowel-movements'],
     helpfulSupplements: [
@@ -2019,6 +2091,9 @@ async function buildExerciseSection(
   }
 
   const logMap = new Map(normalizedLogs.map((log) => [canonical(log.name), log]))
+  const kbKeyLocal = pickKnowledgeKey(issue.name.toLowerCase())
+  const kbSupportive = kbKeyLocal ? (ISSUE_KNOWLEDGE_BASE[kbKeyLocal].supportiveExercises ?? []) : []
+  const kbAvoidActivities = kbKeyLocal ? (ISSUE_KNOWLEDGE_BASE[kbKeyLocal].avoidExercises ?? []) : []
 
   const workingActivities = llmResult.working
     .map((item) => {
@@ -2035,9 +2110,7 @@ async function buildExerciseSection(
 
   // Deterministic enrichment: if AI returns zero or too few working items, top up using logs matched to KB supportive exercises
   if (workingActivities.length < 2 && context.exerciseLogs.length > 0) {
-    const kbKeyLocal = pickKnowledgeKey(issue.name.toLowerCase())
-    const kbActs = kbKeyLocal ? (ISSUE_KNOWLEDGE_BASE[kbKeyLocal].supportiveExercises ?? []) : []
-    if (kbActs.length) {
+    if (kbSupportive.length) {
       const seen = new Set<string>(workingActivities.map((activity) => canonical(activity.title)))
       const enriched: Array<{ title: string; reason: string; summary: string; lastLogged: string }> = []
       // Latest log per type
@@ -2057,7 +2130,7 @@ async function buildExerciseSection(
       const needed = Math.max(4 - workingActivities.length, 0)
       if (needed > 0) {
         for (const [key, log] of Array.from(latestByType.entries())) {
-          const match = kbActs.find((a) => tryMatch(log.type, a))
+          const match = kbSupportive.find((a) => tryMatch(log.type, a))
           if (!match || seen.has(key)) continue
           seen.add(key)
           const summaryParts: string[] = []
@@ -2079,20 +2152,44 @@ async function buildExerciseSection(
     }
   }
 
-  const novelSuggestedActivities = llmResult.suggested.filter(
-    (item) => !logMap.has(canonical(item.name))
-  )
+  const novelSuggestedActivities = llmResult.suggested.filter((item) => !logMap.has(canonical(item.name)))
 
-  const suggestedActivities = novelSuggestedActivities.map((item) => ({
+  let suggestedActivities = novelSuggestedActivities.map((item) => ({
     title: item.name,
     reason: item.reason,
     detail: item.protocol ?? null,
   }))
 
-  const avoidActivities = llmResult.avoid.map((item) => ({
+  const kbSuggestedPrimary: Array<{ title: string; reason: string; detail: string | null }> = []
+  const kbSuggestedSecondary: Array<{ title: string; reason: string; detail: string | null }> = []
+  if (kbSupportive.length) {
+    for (const act of kbSupportive) {
+      const candidate = {
+        title: act.title,
+        reason: act.detail,
+        detail: null,
+      }
+      const key = canonical(candidate.title)
+      if (!logMap.has(key)) {
+        kbSuggestedPrimary.push(candidate)
+      } else {
+        kbSuggestedSecondary.push(candidate)
+      }
+    }
+  }
+  suggestedActivities = ensureMin(suggestedActivities, [...kbSuggestedPrimary, ...kbSuggestedSecondary], 4)
+
+  const avoidFromLLM = llmResult.avoid.map((item) => ({
     title: item.name,
     reason: item.reason,
   }))
+
+  const avoidFallback = kbAvoidActivities.map((item) => ({
+    title: item.title,
+    reason: item.detail,
+  }))
+
+  const avoidActivities = ensureMin(avoidFromLLM, avoidFallback, 4)
 
   const validated = suggestedActivities.length >= 4 && avoidActivities.length >= 4
 
@@ -2294,6 +2391,10 @@ async function buildSupplementsSection(
     return fallback ?? []
   }
 
+  const kbKeyLocal = pickKnowledgeKey(issue.name.toLowerCase())
+  const kbAddLocal = kbKeyLocal ? (ISSUE_KNOWLEDGE_BASE[kbKeyLocal].helpfulSupplements ?? []) : []
+  const kbAvoidLocal = kbKeyLocal ? (ISSUE_KNOWLEDGE_BASE[kbKeyLocal].avoidSupplements ?? []) : []
+
   const supportiveDetails = llmResult.working
     .map((item) => {
       const match = supplementMap.get(canonical(item.name))
@@ -2310,8 +2411,6 @@ async function buildSupplementsSection(
 
   // Deterministic enrichment: if AI returned no working items, map logged supplements against helpful KB
   if (supportiveDetails.length === 0 && normalizedSupplements.length > 0) {
-    const kbKeyLocal = pickKnowledgeKey(issue.name.toLowerCase())
-    const kbAddLocal = kbKeyLocal ? (ISSUE_KNOWLEDGE_BASE[kbKeyLocal].helpfulSupplements ?? []) : []
     const enriched = normalizedSupplements
       .map((supp) => {
         const match = kbAddLocal.find((k) => k.pattern.test(supp.name))
@@ -2329,18 +2428,30 @@ async function buildSupplementsSection(
     }
   }
 
-  const novelSuggestions = llmResult.suggested.filter(
-    (item) => !supplementMap.has(canonical(item.name))
-  )
+  const novelSuggestions = llmResult.suggested.filter((item) => !supplementMap.has(canonical(item.name)))
 
-  const suggestedAdditions = novelSuggestions.map((item) => ({
+  let suggestedAdditions = novelSuggestions.map((item) => ({
     title: item.name,
     reason: item.reason,
     suggestion: item.protocol ?? null,
     alreadyCovered: false,
   }))
 
-  const avoidList = llmResult.avoid
+  const kbSuggestionCandidates = kbAddLocal.map((entry) => {
+    const loggedHit = normalizedSupplements.some((supp) => entry.pattern.test(supp.name))
+    return {
+      title: entry.title ?? displayFromPattern(entry.pattern),
+      reason: entry.why,
+      suggestion: entry.suggested ?? null,
+      alreadyCovered: loggedHit,
+    }
+  })
+
+  const fallbackSuggestions = kbSuggestionCandidates.filter((item) => !item.alreadyCovered)
+  const coveredSuggestions = kbSuggestionCandidates.filter((item) => item.alreadyCovered)
+  suggestedAdditions = ensureMin(suggestedAdditions, [...fallbackSuggestions, ...coveredSuggestions], 4)
+
+  const avoidFromLLM = llmResult.avoid
     .map((item) => {
       const match = supplementMap.get(canonical(item.name))
       return {
@@ -2355,6 +2466,15 @@ async function buildSupplementsSection(
       const isLogged = supplementMap.has(canonical(entry.name))
       return isLogged || looksSupplementLike(entry.name) || looksSupplementLike(entry.reason)
     })
+
+  const avoidFallback = kbAvoidLocal.map((entry) => ({
+    name: entry.title ?? displayFromPattern(entry.pattern),
+    reason: entry.why,
+    dosage: null,
+    timing: [],
+  }))
+
+  const avoidList = ensureMin(avoidFromLLM, avoidFallback, 4)
 
   const validated = suggestedAdditions.length >= 4 && avoidList.length >= 4
 
@@ -2563,6 +2683,10 @@ async function buildMedicationsSection(
     return fallback ?? []
   }
 
+  const kbKeyLocal = pickKnowledgeKey(issue.name.toLowerCase())
+  const kbAddLocal = kbKeyLocal ? (ISSUE_KNOWLEDGE_BASE[kbKeyLocal].helpfulMedications ?? []) : []
+  const kbAvoidLocal = kbKeyLocal ? (ISSUE_KNOWLEDGE_BASE[kbKeyLocal].avoidMedications ?? []) : []
+
   const supportiveDetails = llmResult.working
     .map((item) => {
       const nameKey = canonical(item.name)
@@ -2582,8 +2706,6 @@ async function buildMedicationsSection(
 
   // Deterministic enrichment: if AI returned no working items, map logged medications against helpful KB
   if (supportiveDetails.length === 0 && normalizedMeds.length > 0) {
-    const kbKeyLocal = pickKnowledgeKey(issue.name.toLowerCase())
-    const kbAddLocal = kbKeyLocal ? (ISSUE_KNOWLEDGE_BASE[kbKeyLocal].helpfulMedications ?? []) : []
     if (kbAddLocal.length) {
       const seen = new Set<string>()
       const enriched = normalizedMeds
@@ -2614,14 +2736,28 @@ async function buildMedicationsSection(
     return !medMap.has(nameKey)
   })
 
-  const suggestedAdditions = novelSuggestions.map((item) => ({
+  let suggestedAdditions = novelSuggestions.map((item) => ({
     title: item.name,
     reason: item.reason,
     suggestion: item.protocol ?? null,
     alreadyCovered: false,
   }))
 
-  const avoidList = llmResult.avoid
+  const kbSuggestionCandidates = kbAddLocal.map((entry) => {
+    const loggedHit = normalizedMeds.some((med) => entry.pattern.test(med.name))
+    return {
+      title: entry.title ?? displayFromPattern(entry.pattern),
+      reason: entry.why,
+      suggestion: entry.suggested ?? null,
+      alreadyCovered: loggedHit,
+    }
+  })
+
+  const fallbackSuggestions = kbSuggestionCandidates.filter((item) => !item.alreadyCovered)
+  const coveredSuggestions = kbSuggestionCandidates.filter((item) => item.alreadyCovered)
+  suggestedAdditions = ensureMin(suggestedAdditions, [...fallbackSuggestions, ...coveredSuggestions], 4)
+
+  const avoidFromLLM = llmResult.avoid
     .map((item) => {
       const nameKey = canonical(item.name)
       if (supplementNameSet.has(nameKey) || looksSupplementLike(item.name) || looksSupplementLike(item.reason)) {
@@ -2636,6 +2772,15 @@ async function buildMedicationsSection(
       }
     })
     .filter(Boolean) as Array<{ name: string; reason: string; dosage: string | null; timing: string[] }>
+
+  const avoidFallback = kbAvoidLocal.map((entry) => ({
+    name: entry.title ?? displayFromPattern(entry.pattern),
+    reason: entry.why,
+    dosage: null,
+    timing: [],
+  }))
+
+  const avoidList = ensureMin(avoidFromLLM, avoidFallback, 4)
 
   const hasAnyMedicationGuidance =
     supportiveDetails.length + suggestedAdditions.length + avoidList.length > 0
@@ -3294,6 +3439,9 @@ async function buildLifestyleSection(
   }
 
   const hasLifestyleSignals = lifestyleItems.length > 0
+  const kbKeyLocal = pickKnowledgeKey(issue.name.toLowerCase())
+  const kbHabits = kbKeyLocal ? (ISSUE_KNOWLEDGE_BASE[kbKeyLocal].lifestyleFocus ?? []) : []
+  const kbAvoidHabits = kbKeyLocal ? (ISSUE_KNOWLEDGE_BASE[kbKeyLocal].avoidExercises ?? []) : []
 
   console.time(`[insights.llm] lifestyle:${issue.slug}`)
   let llmResult = await generateSectionInsightsFromLLM(
@@ -3371,16 +3519,28 @@ async function buildLifestyleSection(
     }))
   }
 
-  const suggestedHabits = llmResult.suggested.map((item) => ({
+  let suggestedHabits = llmResult.suggested.map((item) => ({
     title: item.name,
     reason: item.reason,
     detail: item.protocol ?? null,
   }))
 
-  const avoidHabits = llmResult.avoid.map((item) => ({
+  const suggestedFallback = kbHabits.map((habit) => ({
+    title: habit.title,
+    reason: habit.detail,
+    detail: null,
+  }))
+  suggestedHabits = ensureMin(suggestedHabits, suggestedFallback, 4)
+
+  const avoidFromLLM = llmResult.avoid.map((item) => ({
     title: item.name,
     reason: item.reason,
   }))
+  const avoidFallback = kbAvoidHabits.map((habit) => ({
+    title: habit.title,
+    reason: habit.detail,
+  }))
+  const avoidHabits = ensureMin(avoidFromLLM, avoidFallback, 4)
 
   const validated = suggestedHabits.length >= 4 && avoidHabits.length >= 4
 
