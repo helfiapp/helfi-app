@@ -2036,40 +2036,38 @@ async function buildExerciseSection(
   if (workingActivities.length === 0 && context.exerciseLogs.length > 0) {
     const kbKeyLocal = pickKnowledgeKey(issue.name.toLowerCase())
     const kbActs = kbKeyLocal ? (ISSUE_KNOWLEDGE_BASE[kbKeyLocal].supportiveExercises ?? []) : []
-    const seen = new Set<string>()
-    const enriched: Array<{ title: string; reason: string; summary: string; lastLogged: string }> = []
-    // Group logs by canonicalised name, most recent first
-    const logsByName = new Map<string, typeof context.exerciseLogs>()
-    for (const log of context.exerciseLogs.slice().sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())) {
-      const key = canonical(log.type)
-      const arr = logsByName.get(key) || ([] as typeof context.exerciseLogs)
-      arr.push(log)
-      logsByName.set(key, arr)
-    }
-    const matches = (name: string) => {
-      const key = canonical(name)
-      const direct = logsByName.get(key)
-      if (direct && direct.length) return direct[0]
-      return null
-    }
-    for (const act of kbActs) {
-      const m = matches(act.title)
-      if (!m) continue
-      const k = canonical(act.title)
-      if (seen.has(k)) continue
-      seen.add(k)
-      const summary = m.duration ? `${m.duration} min${m.intensity ? ` • Intensity: ${m.intensity}` : ''}` : (m.intensity ? `Intensity: ${m.intensity}` : '')
-      enriched.push({
-        title: act.title,
-        reason: act.detail,
-        summary: summary || '',
-        lastLogged: `Logged ${relativeDays(m.createdAt)}`,
-      })
-    }
-    if (enriched.length) {
-      // Use enriched items as working activities when AI returned none
-      // Keep list concise (1–4) and preserve deterministic order from most recent logs matched to KB titles
-      workingActivities.push(...enriched.slice(0, 4))
+    if (kbActs.length) {
+      const seen = new Set<string>()
+      const enriched: Array<{ title: string; reason: string; summary: string; lastLogged: string }> = []
+      // Latest log per type
+      const latestByType = new Map<string, typeof context.exerciseLogs[number]>()
+      for (const log of [...context.exerciseLogs].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())) {
+        const key = canonical(log.type)
+        if (!latestByType.has(key)) latestByType.set(key, log)
+      }
+      const tryMatch = (logName: string, act: { title: string; detail: string; keywords?: string[] }) => {
+        const lname = canonical(logName)
+        const titleKey = canonical(act.title)
+        if (lname === titleKey) return true
+        if (act.keywords && act.keywords.some((kw) => lname.includes(canonical(kw)))) return true
+        const tokens = titleKey.split(/\s+/).filter((t) => t.length >= 4)
+        return tokens.some((t) => lname.includes(t))
+      }
+      for (const [key, log] of latestByType) {
+        const match = kbActs.find((a) => tryMatch(log.type, a))
+        if (!match || seen.has(key)) continue
+        seen.add(key)
+        const summary = log.duration ? `${log.duration} min${log.intensity ? ` • Intensity: ${log.intensity}` : ''}` : (log.intensity ? `Intensity: ${log.intensity}` : '')
+        enriched.push({
+          title: log.type,
+          reason: match.detail,
+          summary: summary || '',
+          lastLogged: `Logged ${relativeDays(log.createdAt)}`,
+        })
+      }
+      if (enriched.length) {
+        workingActivities.push(...enriched.slice(0, 4))
+      }
     }
   }
 
@@ -2301,26 +2299,6 @@ async function buildSupplementsSection(
     })
     .filter(Boolean) as Array<{ name: string; reason: string; dosage: string | null; timing: string[] }>
 
-  // Deterministic enrichment: if AI returned no working items, map logged medications against helpful KB
-  if (supportiveDetails.length === 0 && normalizedMeds.length > 0) {
-    const kbKeyLocal = pickKnowledgeKey(issue.name.toLowerCase())
-    const kbAddLocal = kbKeyLocal ? (ISSUE_KNOWLEDGE_BASE[kbKeyLocal].helpfulMedications ?? []) : []
-    const enriched = normalizedMeds
-      .map((med) => {
-        const match = kbAddLocal.find((k) => k.pattern.test(med.name))
-        if (!match) return null
-        return {
-          name: med.name,
-          reason: match.why,
-          dosage: med.dosage ?? null,
-          timing: parseTiming(null, med.timing ?? []),
-        }
-      })
-      .filter(Boolean) as Array<{ name: string; reason: string; dosage: string | null; timing: string[] }>
-    if (enriched.length) {
-      supportiveDetails.push(...enriched.slice(0, 4))
-    }
-  }
 
   // Deterministic enrichment: if AI returned no working items, map logged supplements against helpful KB
   if (supportiveDetails.length === 0 && normalizedSupplements.length > 0) {
@@ -2593,6 +2571,33 @@ async function buildMedicationsSection(
       }
     })
     .filter(Boolean) as Array<{ name: string; reason: string; dosage: string | null; timing: string[] }>
+
+  // Deterministic enrichment: if AI returned no working items, map logged medications against helpful KB
+  if (supportiveDetails.length === 0 && normalizedMeds.length > 0) {
+    const kbKeyLocal = pickKnowledgeKey(issue.name.toLowerCase())
+    const kbAddLocal = kbKeyLocal ? (ISSUE_KNOWLEDGE_BASE[kbKeyLocal].helpfulMedications ?? []) : []
+    if (kbAddLocal.length) {
+      const seen = new Set<string>()
+      const enriched = normalizedMeds
+        .map((med) => {
+          const key = canonical(med.name)
+          if (supplementNameSet.has(key) || looksSupplementLike(med.name)) return null
+          const match = kbAddLocal.find((k) => k.pattern.test(med.name))
+          if (!match || seen.has(key)) return null
+          seen.add(key)
+          return {
+            name: med.name,
+            reason: match.why,
+            dosage: med.dosage ?? null,
+            timing: parseTiming(null, med.timing ?? []),
+          }
+        })
+        .filter(Boolean) as Array<{ name: string; reason: string; dosage: string | null; timing: string[] }>
+      if (enriched.length) {
+        supportiveDetails.push(...enriched.slice(0, 4))
+      }
+    }
+  }
 
   const novelSuggestions = llmResult.suggested.filter((item) => {
     const nameKey = canonical(item.name)
@@ -3097,16 +3102,29 @@ async function buildNutritionSection(
     // Only show foods the user actually logged as "working".
     .filter((item) => allowFoodName(item.title, item.reason) && foodNameSet.has(canonical(item.title)))
 
-  // Deterministic enrichment: if no AI-flagged working foods but meals are logged, reflect recent items
+  // Deterministic enrichment: if no AI-flagged working foods but meals are logged, reflect items that match KB nutrition focus
   if (workingFocus.length === 0 && hasLoggedFoods) {
-    const recent = foods.slice(0, 3)
-    workingFocus = recent
-      .map((f, idx) => ({
-        title: f.name || f.meal || `Entry ${idx + 1}`,
-        reason: 'Recently logged',
-        example: f.meal ?? '',
-      }))
-      .filter((wf) => allowFoodName(wf.title, wf.reason))
+    const kbFoodsLocal = kbKeyLocal ? (ISSUE_KNOWLEDGE_BASE[kbKeyLocal].nutritionFocus ?? []) : []
+    const enriched: Array<{ title: string; reason: string; example: string }> = []
+    const seen = new Set<string>()
+    for (const food of normalizedFoods) {
+      const key = canonical(food.name)
+      if (seen.has(key)) continue
+      const match = kbFoodsLocal.find((k) => {
+        const titleKey = canonical(k.title)
+        if (key === titleKey) return true
+        if (k.keywords && k.keywords.some((kw) => key.includes(canonical(kw)))) return true
+        const tokens = titleKey.split(/\s+/).filter((t) => t.length >= 4)
+        return tokens.some((t) => key.includes(t))
+      })
+      if (match) {
+        seen.add(key)
+        enriched.push({ title: food.name, reason: match.detail, example: food.dosage ?? food.meal ?? '' })
+      }
+    }
+    if (enriched.length) {
+      workingFocus = enriched.slice(0, 6)
+    }
   }
 
   // Ensure at least 4 suggested and avoid items; top up from knowledge base if the LLM returned too few
@@ -3326,11 +3344,20 @@ async function buildLifestyleSection(
     }
   }
 
-  const workingHabits = llmResult.working.map((item) => ({
+  let workingHabits = llmResult.working.map((item) => ({
     title: item.name,
     reason: item.reason,
     detail: item.dosage ?? item.timing ?? '',
   }))
+
+  // Deterministic enrichment: if no AI-flagged working habits but profile has signals, reflect them
+  if (workingHabits.length === 0 && hasLifestyleSignals) {
+    workingHabits = lifestyleItems.slice(0, 4).map((it) => ({
+      title: it.name,
+      reason: 'Based on your profile data',
+      detail: it.dosage ?? '',
+    }))
+  }
 
   const suggestedHabits = llmResult.suggested.map((item) => ({
     title: item.name,
