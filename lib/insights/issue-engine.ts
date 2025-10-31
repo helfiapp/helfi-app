@@ -320,12 +320,12 @@ function hasRecentFoodLogs(foodLogs: UserInsightContext['foodLogs']) {
 
 const ISSUE_KNOWLEDGE_BASE: Record<string, {
   aliases?: string[]
-  helpfulSupplements?: Array<{ pattern: RegExp; why: string; suggested?: string }>
+  helpfulSupplements?: Array<{ pattern: RegExp; title?: string; why: string; suggested?: string }>
   gapSupplements?: Array<{ title: string; why: string; suggested?: string }>
-  avoidSupplements?: Array<{ pattern: RegExp; why: string }>
-  helpfulMedications?: Array<{ pattern: RegExp; why: string; suggested?: string }>
+  avoidSupplements?: Array<{ pattern: RegExp; title?: string; why: string }>
+  helpfulMedications?: Array<{ pattern: RegExp; title?: string; why: string; suggested?: string }>
   gapMedications?: Array<{ title: string; why: string; suggested?: string }>
-  avoidMedications?: Array<{ pattern: RegExp; why: string }>
+  avoidMedications?: Array<{ pattern: RegExp; title?: string; why: string }>
   supportiveExercises?: Array<{ title: string; detail: string; keywords?: string[] }>
   avoidExercises?: Array<{ title: string; detail: string }>
   nutritionFocus?: Array<{ title: string; detail: string; keywords?: string[] }>
@@ -625,6 +625,26 @@ function unslugify(value: string) {
   return words
     .split(' ')
     .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
+}
+
+// Turn a regex pattern into a readable label as a fallback when no explicit title is provided.
+function displayFromPattern(pattern: RegExp): string {
+  let s = pattern.source
+  s = s
+    .replace(/\\s\?/g, ' ') // optional whitespace
+    .replace(/\\s/g, ' ')
+    .replace(/\[.*?\]/g, ' ') // character classes
+    .replace(/[\\^$*+?]/g, '') // regex operators
+    .replace(/\(\?:/g, '(')
+    .replace(/[()]/g, '')
+    .replace(/\|/g, ' / ')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+  if (!s) return 'Item'
+  return s
+    .split(' ')
+    .map(part => part ? part.charAt(0).toUpperCase() + part.slice(1) : part)
     .join(' ')
 }
 
@@ -1475,21 +1495,21 @@ async function buildStarterSectionWithContext(
       .slice(0, 4)
     const suggestedAdditions = ensureMin(
       kbAdd.map(it => ({
-        title: it.pattern.source.replace(/^\/(.*)\/$/, '$1'),
+        title: it.title ?? displayFromPattern(it.pattern),
         reason: it.why,
         suggestion: it.suggested ?? null,
         alreadyCovered: logged.some(name => it.pattern.test(name)),
       })),
       kbAdd.map(it => ({
-        title: it.pattern.source.replace(/^\/(.*)\/$/, '$1'),
+        title: it.title ?? displayFromPattern(it.pattern),
         reason: it.why,
         suggestion: it.suggested ?? null,
         alreadyCovered: false,
       }))
     )
     const avoidList = ensureMin(
-      kbAvoid.map(it => ({ name: it.pattern.source.replace(/^\/(.*)\/$/, '$1'), reason: it.why, dosage: null, timing: [] as string[] })),
-      kbAvoid.map(it => ({ name: it.pattern.source.replace(/^\/(.*)\/$/, '$1'), reason: it.why, dosage: null, timing: [] as string[] }))
+      kbAvoid.map(it => ({ name: it.title ?? displayFromPattern(it.pattern), reason: it.why, dosage: null, timing: [] as string[] })),
+      kbAvoid.map(it => ({ name: it.title ?? displayFromPattern(it.pattern), reason: it.why, dosage: null, timing: [] as string[] }))
     )
 
     return {
@@ -1540,21 +1560,21 @@ async function buildStarterSectionWithContext(
       .slice(0, 4)
     const suggestedAdditions = ensureMin(
       kbAdd.map(it => ({
-        title: it.pattern.source.replace(/^\/(.*)\/$/, '$1'),
+        title: it.title ?? displayFromPattern(it.pattern),
         reason: it.why,
         suggestion: it.suggested ?? null,
         alreadyCovered: logged.some(name => it.pattern.test(name)),
       })),
       kbAdd.map(it => ({
-        title: it.pattern.source.replace(/^\/(.*)\/$/, '$1'),
+        title: it.title ?? displayFromPattern(it.pattern),
         reason: it.why,
         suggestion: it.suggested ?? null,
         alreadyCovered: false,
       }))
     )
     const avoidList = ensureMin(
-      kbAvoid.map(it => ({ name: it.pattern.source.replace(/^\/(.*)\/$/, '$1'), reason: it.why, dosage: null, timing: [] as string[] })),
-      kbAvoid.map(it => ({ name: it.pattern.source.replace(/^\/(.*)\/$/, '$1'), reason: it.why, dosage: null, timing: [] as string[] }))
+      kbAvoid.map(it => ({ name: it.title ?? displayFromPattern(it.pattern), reason: it.why, dosage: null, timing: [] as string[] })),
+      kbAvoid.map(it => ({ name: it.title ?? displayFromPattern(it.pattern), reason: it.why, dosage: null, timing: [] as string[] }))
     )
 
     return {
