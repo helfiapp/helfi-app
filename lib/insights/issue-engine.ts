@@ -136,6 +136,7 @@ interface BloodResultsData {
 const RATING_SCALE_DEFAULT = 6
 const SECTION_CACHE_TTL_MS = 1000 * 60 * 15
 const DEGRADED_CACHE_TTL_MS = 1000 * 60 * 2
+const CURRENT_PIPELINE_VERSION = 'v3'
 
 const RECENT_DATA_WINDOW_MS = 1000 * 60 * 60 * 24
 
@@ -695,7 +696,7 @@ function shouldCacheSectionResult(result: IssueSectionResult | null): boolean {
   const badSources = new Set(['llm-error', 'needs-data', 'needs-fresh-data'])
   if (badSources.has(source)) return false
   // Cache validated results from the new pipeline
-  if (validated && pipelineVersion === 'v2') return true
+  if (validated && pipelineVersion === CURRENT_PIPELINE_VERSION) return true
   // Additionally, cache degraded results with a short TTL to avoid repeated cold waits
   if (!validated && degraded) return true
   return false
@@ -1468,7 +1469,7 @@ async function buildStarterSectionWithContext(
         avoidFoods,
         totalLogged: loggedFoods.length,
         source: 'starter',
-        pipelineVersion: 'v3',
+        pipelineVersion: CURRENT_PIPELINE_VERSION,
         validated: true,
         degraded: true,
         degradedUsed: true,
@@ -1534,7 +1535,7 @@ async function buildStarterSectionWithContext(
         missingTiming: [],
         totalLogged: logged.length,
         source: 'starter',
-        pipelineVersion: 'v3',
+        pipelineVersion: CURRENT_PIPELINE_VERSION,
         validated: true,
         degraded: true,
         degradedUsed: true,
@@ -1599,7 +1600,7 @@ async function buildStarterSectionWithContext(
         missingTiming: [],
         totalLogged: logged.length,
         source: 'starter',
-        pipelineVersion: 'v3',
+        pipelineVersion: CURRENT_PIPELINE_VERSION,
         validated: true,
         degraded: true,
         degradedUsed: true,
@@ -1638,7 +1639,7 @@ async function buildStarterSectionWithContext(
         avoidActivities,
         totalLogged: context.exerciseLogs.length,
         source: 'starter',
-        pipelineVersion: 'v3',
+        pipelineVersion: CURRENT_PIPELINE_VERSION,
         validated: true,
         degraded: true,
         degradedUsed: true,
@@ -1676,7 +1677,7 @@ async function buildStarterSectionWithContext(
         suggestedHabits,
         avoidHabits,
         source: 'starter',
-        pipelineVersion: 'v3',
+        pipelineVersion: CURRENT_PIPELINE_VERSION,
         validated: true,
         degraded: true,
         degradedUsed: true,
@@ -1705,7 +1706,7 @@ async function computeIssueSection(
     const degraded = Boolean(extras['degraded'])
     const ageMs = Date.now() - cached.updatedAt.getTime()
     const ttl = degraded ? DEGRADED_CACHE_TTL_MS : SECTION_CACHE_TTL_MS
-    const ok = ageMs < ttl && (validated ? pipelineVersion === 'v2' : degraded)
+    const ok = ageMs < ttl && (validated ? pipelineVersion === CURRENT_PIPELINE_VERSION : degraded)
     if (ok) return cached.result
   }
 
@@ -2032,12 +2033,12 @@ async function buildExerciseSection(
     })
     .filter(Boolean) as Array<{ title: string; reason: string; summary: string; lastLogged: string }>
 
-  // Deterministic enrichment: if no AI-flagged working items, derive from logs matched to KB supportive exercises
-  if (workingActivities.length === 0 && context.exerciseLogs.length > 0) {
+  // Deterministic enrichment: if AI returns zero or too few working items, top up using logs matched to KB supportive exercises
+  if (workingActivities.length < 2 && context.exerciseLogs.length > 0) {
     const kbKeyLocal = pickKnowledgeKey(issue.name.toLowerCase())
     const kbActs = kbKeyLocal ? (ISSUE_KNOWLEDGE_BASE[kbKeyLocal].supportiveExercises ?? []) : []
     if (kbActs.length) {
-      const seen = new Set<string>()
+      const seen = new Set<string>(workingActivities.map((activity) => canonical(activity.title)))
       const enriched: Array<{ title: string; reason: string; summary: string; lastLogged: string }> = []
       // Latest log per type
       const latestByType = new Map<string, typeof context.exerciseLogs[number]>()
@@ -2053,20 +2054,27 @@ async function buildExerciseSection(
         const tokens = titleKey.split(/\s+/).filter((t) => t.length >= 4)
         return tokens.some((t) => lname.includes(t))
       }
-      for (const [key, log] of latestByType) {
-        const match = kbActs.find((a) => tryMatch(log.type, a))
-        if (!match || seen.has(key)) continue
-        seen.add(key)
-        const summary = log.duration ? `${log.duration} min${log.intensity ? ` • Intensity: ${log.intensity}` : ''}` : (log.intensity ? `Intensity: ${log.intensity}` : '')
-        enriched.push({
-          title: log.type,
-          reason: match.detail,
-          summary: summary || '',
-          lastLogged: `Logged ${relativeDays(log.createdAt)}`,
-        })
+      const needed = Math.max(4 - workingActivities.length, 0)
+      if (needed > 0) {
+        for (const [key, log] of Array.from(latestByType.entries())) {
+          const match = kbActs.find((a) => tryMatch(log.type, a))
+          if (!match || seen.has(key)) continue
+          seen.add(key)
+          const summaryParts: string[] = []
+          if (log.duration) summaryParts.push(`${log.duration} min`)
+          if (log.intensity) summaryParts.push(`Intensity: ${log.intensity}`)
+          const summary = summaryParts.join(' • ')
+          enriched.push({
+            title: log.type,
+            reason: match.detail ?? 'Logged activity aligns with supportive exercise guidance.',
+            summary,
+            lastLogged: `Logged ${relativeDays(log.createdAt)}`,
+          })
+          if (enriched.length >= needed) break
+        }
       }
       if (enriched.length) {
-        workingActivities.push(...enriched.slice(0, 4))
+        workingActivities.push(...enriched)
       }
     }
   }
@@ -2181,7 +2189,7 @@ async function buildExerciseSection(
       avoidActivities,
       totalLogged: context.exerciseLogs.length,
       source: 'llm',
-      pipelineVersion: 'v3',
+      pipelineVersion: CURRENT_PIPELINE_VERSION,
       validated,
       degraded: !validated,
     },
@@ -2449,7 +2457,7 @@ async function buildSupplementsSection(
       hasLogged: hasSupplements,
       hasRecentUpdates: hasRecentSupplements,
       source: 'llm',
-      pipelineVersion: 'v3',
+      pipelineVersion: CURRENT_PIPELINE_VERSION,
       validated,
       degraded: !validated,
     } as Record<string, unknown>,
@@ -2725,7 +2733,7 @@ async function buildMedicationsSection(
       hasLogged: hasMedications,
       hasRecentUpdates: hasRecentMedicationUpdates,
       source: 'llm',
-      pipelineVersion: 'v3',
+      pipelineVersion: CURRENT_PIPELINE_VERSION,
       validated,
       degraded: !validated,
     } as Record<string, unknown>,
@@ -2980,7 +2988,7 @@ async function buildLabsSection(
       avoidLabs,
       hasLoggedLabs: labItems.length > 0,
       source: 'llm',
-      pipelineVersion: 'v3',
+      pipelineVersion: CURRENT_PIPELINE_VERSION,
       validated,
       degraded: !validated,
     },
@@ -3119,7 +3127,11 @@ async function buildNutritionSection(
       })
       if (match) {
         seen.add(key)
-        enriched.push({ title: food.name, reason: match.detail, example: food.dosage ?? food.meal ?? '' })
+        enriched.push({
+          title: food.name,
+          reason: match.detail,
+          example: food.dosage ?? food.timing[0] ?? '',
+        })
       }
     }
     if (enriched.length) {
@@ -3250,7 +3262,7 @@ async function buildNutritionSection(
       hasLoggedFoods,
       hasRecentFoodData,
       source: 'llm',
-      pipelineVersion: 'v3',
+      pipelineVersion: CURRENT_PIPELINE_VERSION,
       validated,
       degraded: !validated,
     },
@@ -3453,7 +3465,7 @@ async function buildLifestyleSection(
       avoidHabits,
       hasLifestyleSignals,
       source: 'llm',
-      pipelineVersion: 'v3',
+      pipelineVersion: CURRENT_PIPELINE_VERSION,
       validated,
       degraded: !validated,
     },
