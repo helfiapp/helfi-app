@@ -22,7 +22,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'not_authenticated' }, { status: 401 })
     }
 
-    const { section, question } = await request.json().catch(() => ({ section: 'safety', question: '' }))
+    const {
+      section,
+      question,
+      messages: clientMessages,
+      issue,
+    } = await request.json().catch(() => ({ section: 'safety', question: '', messages: null, issue: '' }))
     const sec = String(section || 'safety').toLowerCase()
     const userId = session.user.id
 
@@ -60,40 +65,45 @@ export async function POST(request: NextRequest) {
       if (hasIron && hasCalcium) tips.push('Separate iron and calcium by ~2 hours to support absorption (check with your clinician).')
       if (hasMagnesium) tips.push('Magnesium is often better in the evening, 1–2 hours before sleep; avoid pairing with high‑fiber meals.')
       if (tips.length === 0) tips.push('Log your current supplements/medications and daily symptoms; I will tailor specific safety/timing guidance next refresh.')
-      return {
-        answer: `Here are practical safety pointers based on your current entries:\n- ${tips.join('\n- ')}`,
-        preview: true,
-      }
+      const answer = `Here are practical safety pointers based on your current entries:\n- ${tips.join('\n- ')}`
+      // Return a threaded shape for the client even in fallback
+      const history = Array.isArray(clientMessages) && clientMessages.length
+        ? clientMessages.map((m: any) => ({ role: String(m.role || 'user'), content: String(m.content || '') })).slice(-12)
+        : (question ? [{ role: 'user', content: String(question) }] : [])
+      return { messages: [...history, { role: 'assistant', content: answer }], preview: true }
     }
 
     const openai = getOpenAI()
     if (!openai) return NextResponse.json(fallback(), { status: 200 })
 
-    // Section-specific guidance for Safety
-    const prompt = `You are a careful, non-alarming clinical assistant.
-User asked: ${String(question || 'Give me the most useful safety/timing advice for my current regimen.').slice(0, 400)}
+    // Build threaded chat messages
+    const baseSystem = {
+      role: 'system',
+      content: [
+        'You are a careful, non-alarming clinical assistant.',
+        `SECTION: ${sec}`,
+        'RULES:',
+        '- Never diagnose; avoid certainty; suggest to check with clinician for changes.',
+        '- Use ONLY the JSON profile provided; be specific, short, and actionable.',
+        '- Your reply should be concise and structured with short bullets where helpful.',
+        '',
+        `PROFILE JSON: ${JSON.stringify(profile)}`,
+        issue ? `ISSUE: ${String(issue)}` : '',
+      ].filter(Boolean).join('\n'),
+    }
 
-SECTION: ${sec}
-RULES:
-- Never diagnose; avoid certainty; suggest to check with clinician for changes.
-- Use ONLY the JSON profile below. Be specific, short, and actionable.
-- Output:
-  1) summary (1–2 sentences)
-  2) why (1 sentence referencing user data)
-  3) actions (3–5 bullets)
-
-PROFILE JSON:
-${JSON.stringify(profile)}
-`
+    const history = Array.isArray(clientMessages) && clientMessages.length
+      ? clientMessages.map((m: any) => ({ role: String(m.role || 'user'), content: String(m.content || '') })).slice(-12)
+      : (question ? [{ role: 'user', content: String(question) }] : [])
 
     const resp = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
-      messages: [{ role: 'user', content: prompt }],
+      messages: [baseSystem, ...history],
       temperature: 0.2,
-      max_tokens: 350,
+      max_tokens: 400,
     })
     const text = resp.choices?.[0]?.message?.content || ''
-    return NextResponse.json({ answer: text, preview: false }, { status: 200 })
+    return NextResponse.json({ messages: [...history, { role: 'assistant', content: text }], preview: false }, { status: 200 })
   } catch (e) {
     return NextResponse.json({ error: 'server_error' }, { status: 500 })
   }

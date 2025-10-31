@@ -1468,7 +1468,7 @@ async function buildStarterSectionWithContext(
         avoidFoods,
         totalLogged: loggedFoods.length,
         source: 'starter',
-        pipelineVersion: 'v2',
+        pipelineVersion: 'v3',
         validated: true,
         degraded: true,
         degradedUsed: true,
@@ -1534,7 +1534,7 @@ async function buildStarterSectionWithContext(
         missingTiming: [],
         totalLogged: logged.length,
         source: 'starter',
-        pipelineVersion: 'v2',
+        pipelineVersion: 'v3',
         validated: true,
         degraded: true,
         degradedUsed: true,
@@ -1599,7 +1599,7 @@ async function buildStarterSectionWithContext(
         missingTiming: [],
         totalLogged: logged.length,
         source: 'starter',
-        pipelineVersion: 'v2',
+        pipelineVersion: 'v3',
         validated: true,
         degraded: true,
         degradedUsed: true,
@@ -1638,7 +1638,7 @@ async function buildStarterSectionWithContext(
         avoidActivities,
         totalLogged: context.exerciseLogs.length,
         source: 'starter',
-        pipelineVersion: 'v2',
+        pipelineVersion: 'v3',
         validated: true,
         degraded: true,
         degradedUsed: true,
@@ -1676,7 +1676,7 @@ async function buildStarterSectionWithContext(
         suggestedHabits,
         avoidHabits,
         source: 'starter',
-        pipelineVersion: 'v2',
+        pipelineVersion: 'v3',
         validated: true,
         degraded: true,
         degradedUsed: true,
@@ -2032,6 +2032,47 @@ async function buildExerciseSection(
     })
     .filter(Boolean) as Array<{ title: string; reason: string; summary: string; lastLogged: string }>
 
+  // Deterministic enrichment: if no AI-flagged working items, derive from logs matched to KB supportive exercises
+  if (workingActivities.length === 0 && context.exerciseLogs.length > 0) {
+    const kbKeyLocal = pickKnowledgeKey(issue.name.toLowerCase())
+    const kbActs = kbKeyLocal ? (ISSUE_KNOWLEDGE_BASE[kbKeyLocal].supportiveExercises ?? []) : []
+    const seen = new Set<string>()
+    const enriched: Array<{ title: string; reason: string; summary: string; lastLogged: string }> = []
+    // Group logs by canonicalised name, most recent first
+    const logsByName = new Map<string, typeof context.exerciseLogs>()
+    for (const log of context.exerciseLogs.slice().sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())) {
+      const key = canonical(log.type)
+      const arr = logsByName.get(key) || ([] as typeof context.exerciseLogs)
+      arr.push(log)
+      logsByName.set(key, arr)
+    }
+    const matches = (name: string) => {
+      const key = canonical(name)
+      const direct = logsByName.get(key)
+      if (direct && direct.length) return direct[0]
+      return null
+    }
+    for (const act of kbActs) {
+      const m = matches(act.title)
+      if (!m) continue
+      const k = canonical(act.title)
+      if (seen.has(k)) continue
+      seen.add(k)
+      const summary = m.duration ? `${m.duration} min${m.intensity ? ` • Intensity: ${m.intensity}` : ''}` : (m.intensity ? `Intensity: ${m.intensity}` : '')
+      enriched.push({
+        title: act.title,
+        reason: act.detail,
+        summary: summary || '',
+        lastLogged: `Logged ${relativeDays(m.createdAt)}`,
+      })
+    }
+    if (enriched.length) {
+      // Use enriched items as working activities when AI returned none
+      // Keep list concise (1–4) and preserve deterministic order from most recent logs matched to KB titles
+      workingActivities.push(...enriched.slice(0, 4))
+    }
+  }
+
   const novelSuggestedActivities = llmResult.suggested.filter(
     (item) => !logMap.has(canonical(item.name))
   )
@@ -2142,7 +2183,7 @@ async function buildExerciseSection(
       avoidActivities,
       totalLogged: context.exerciseLogs.length,
       source: 'llm',
-      pipelineVersion: 'v2',
+      pipelineVersion: 'v3',
       validated,
       degraded: !validated,
     },
@@ -2259,6 +2300,48 @@ async function buildSupplementsSection(
       }
     })
     .filter(Boolean) as Array<{ name: string; reason: string; dosage: string | null; timing: string[] }>
+
+  // Deterministic enrichment: if AI returned no working items, map logged medications against helpful KB
+  if (supportiveDetails.length === 0 && normalizedMeds.length > 0) {
+    const kbKeyLocal = pickKnowledgeKey(issue.name.toLowerCase())
+    const kbAddLocal = kbKeyLocal ? (ISSUE_KNOWLEDGE_BASE[kbKeyLocal].helpfulMedications ?? []) : []
+    const enriched = normalizedMeds
+      .map((med) => {
+        const match = kbAddLocal.find((k) => k.pattern.test(med.name))
+        if (!match) return null
+        return {
+          name: med.name,
+          reason: match.why,
+          dosage: med.dosage ?? null,
+          timing: parseTiming(null, med.timing ?? []),
+        }
+      })
+      .filter(Boolean) as Array<{ name: string; reason: string; dosage: string | null; timing: string[] }>
+    if (enriched.length) {
+      supportiveDetails.push(...enriched.slice(0, 4))
+    }
+  }
+
+  // Deterministic enrichment: if AI returned no working items, map logged supplements against helpful KB
+  if (supportiveDetails.length === 0 && normalizedSupplements.length > 0) {
+    const kbKeyLocal = pickKnowledgeKey(issue.name.toLowerCase())
+    const kbAddLocal = kbKeyLocal ? (ISSUE_KNOWLEDGE_BASE[kbKeyLocal].helpfulSupplements ?? []) : []
+    const enriched = normalizedSupplements
+      .map((supp) => {
+        const match = kbAddLocal.find((k) => k.pattern.test(supp.name))
+        if (!match) return null
+        return {
+          name: supp.name,
+          reason: match.why,
+          dosage: supp.dosage ?? null,
+          timing: parseTiming(null, supp.timing ?? []),
+        }
+      })
+      .filter(Boolean) as Array<{ name: string; reason: string; dosage: string | null; timing: string[] }>
+    if (enriched.length) {
+      supportiveDetails.push(...enriched.slice(0, 4))
+    }
+  }
 
   const novelSuggestions = llmResult.suggested.filter(
     (item) => !supplementMap.has(canonical(item.name))
@@ -2388,7 +2471,7 @@ async function buildSupplementsSection(
       hasLogged: hasSupplements,
       hasRecentUpdates: hasRecentSupplements,
       source: 'llm',
-      pipelineVersion: 'v2',
+      pipelineVersion: 'v3',
       validated,
       degraded: !validated,
     } as Record<string, unknown>,
@@ -2637,7 +2720,7 @@ async function buildMedicationsSection(
       hasLogged: hasMedications,
       hasRecentUpdates: hasRecentMedicationUpdates,
       source: 'llm',
-      pipelineVersion: 'v2',
+      pipelineVersion: 'v3',
       validated,
       degraded: !validated,
     } as Record<string, unknown>,
@@ -2892,7 +2975,7 @@ async function buildLabsSection(
       avoidLabs,
       hasLoggedLabs: labItems.length > 0,
       source: 'llm',
-      pipelineVersion: 'v2',
+      pipelineVersion: 'v3',
       validated,
       degraded: !validated,
     },
@@ -3005,7 +3088,7 @@ async function buildNutritionSection(
 
   const foodNameSet = new Set(normalizedFoods.map((f) => canonical(f.name)))
   const kbKeyLocal = pickKnowledgeKey(issue.name.toLowerCase())
-  const workingFocus = llmResult.working
+  let workingFocus = llmResult.working
     .map((item) => ({
       title: item.name,
       reason: item.reason,
@@ -3013,6 +3096,18 @@ async function buildNutritionSection(
     }))
     // Only show foods the user actually logged as "working".
     .filter((item) => allowFoodName(item.title, item.reason) && foodNameSet.has(canonical(item.title)))
+
+  // Deterministic enrichment: if no AI-flagged working foods but meals are logged, reflect recent items
+  if (workingFocus.length === 0 && hasLoggedFoods) {
+    const recent = foods.slice(0, 3)
+    workingFocus = recent
+      .map((f, idx) => ({
+        title: f.name || f.meal || `Entry ${idx + 1}`,
+        reason: 'Recently logged',
+        example: f.meal ?? '',
+      }))
+      .filter((wf) => allowFoodName(wf.title, wf.reason))
+  }
 
   // Ensure at least 4 suggested and avoid items; top up from knowledge base if the LLM returned too few
   const kbFoods = kbKeyLocal ? (ISSUE_KNOWLEDGE_BASE[kbKeyLocal].nutritionFocus ?? []) : []
@@ -3137,7 +3232,7 @@ async function buildNutritionSection(
       hasLoggedFoods,
       hasRecentFoodData,
       source: 'llm',
-      pipelineVersion: 'v2',
+      pipelineVersion: 'v3',
       validated,
       degraded: !validated,
     },
@@ -3331,7 +3426,7 @@ async function buildLifestyleSection(
       avoidHabits,
       hasLifestyleSignals,
       source: 'llm',
-      pipelineVersion: 'v2',
+      pipelineVersion: 'v3',
       validated,
       degraded: !validated,
     },

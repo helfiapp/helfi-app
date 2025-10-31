@@ -1,5 +1,80 @@
 <!-- a49c4e34-eb45-492f-95eb-c25850b4e02a 17da865a-2c44-4b32-b544-6c5810394ab1 -->
 
+## SESSION HANDOVER — 2025-10-31
+
+### What was completed in this session
+1) Bowel Movements knowledge base (KB)
+   - Added robust KB entries with ≥4 items per bucket for: supplements, medications, nutrition, exercise, and lifestyle.
+   - Human‑friendly titles for KB patterns; removed regex artifacts in the UI.
+
+2) Guaranteed minimum counts (starter paths)
+   - Ensured Suggested ≥4 and Avoid ≥4 for Supplements, Medications, Exercise, Lifestyle (and Nutrition already enforced) on the starter path.
+   - Supplements “What’s Working” now maps from the user’s logged supplements where they match KB helpful items.
+
+3) Type and UX fixes
+   - Updated `helpfulMedications` type to allow optional `suggested` field (fixed build error on deploy).
+   - Added `displayFromPattern(...)` fallback so any KB regex renders as clean titles (no `?`/regex symbols).
+
+4) Live validation
+   - Deployed to production via master commits and verified with MCP on live:
+     - Avoid labels for Bowel Movements → Supplements render clearly (e.g., “High Dose Iron”, “Calcium Carbonate”, “Aluminium / Aluminum”, “Excessive Caffeine”).
+     - Weekly/Daily report buttons force fresh compute and showed ≥4 Avoid items on live.
+
+Commits
+- 2aac47d — Insights starter + bowel movements KB + min-counts
+- 8b8267d — Add optional `suggested` on helpfulMedications
+- 02878d4 — Human‑friendly labels for KB patterns (removes regex artifacts)
+
+### Open issues observed on live (need refinement)
+1) Exercise → “What’s Working” sometimes empty despite logged activities (e.g., Walking, Boxing)
+   - Current behavior: `buildExerciseSection` relies on the LLM `working` bucket; the starter path sets `workingActivities: []` and does not map logs to KB.
+   - User expectation: If logs include activities that are known to help the issue (e.g., Walking for bowel movements), they should appear under “Exercise That’s Working.”
+
+2) Ask AI panel is single‑shot, not a conversation
+   - User wants a real chat box with conversational history and back‑and‑forth, visible as you chat (standard chat UX).
+
+3) Cache visibility vs freshness
+   - Old cached “latest” results can mask new changes for up to 15 minutes. Users often expect immediate reflection of fixes.
+
+### Next‑agent plan (high‑signal, actionable)
+1) Exercise “What’s Working” from logs + KB (deterministic)
+   - In `lib/insights/issue-engine.ts`:
+     - If `workingActivities` from the LLM is empty (or below a small threshold), enrich using logs matched against `ISSUE_KNOWLEDGE_BASE[issue].supportiveExercises`.
+     - Use KB `detail` as the reason; build `summary` from last log (duration/intensity) and `lastLogged` via `relativeDays`.
+     - Ensure dedupe with case‑insensitive canonicalization.
+   - Acceptance: For “Bowel Movements,” logging “Walking” should surface under “Exercise That’s Working” with a sensible reason. Keep ≥4/4 for suggested/avoid.
+
+2) Chat box upgrade (conversational UX)
+   - Replace the single input with a threaded chat component on each section page.
+   - Server: extend `app/api/insights/ask/route.ts` to accept/return message arrays; store per‑issue, per‑section threads keyed by user (DB or KV). Support streaming.
+   - Client: `SectionChat` → `SectionChatThread` with message bubbles, auto‑scroll, loading states, and persistence (localStorage + server sync).
+   - Acceptance: Users can ask follow‑ups in the same thread; history is visible; refresh preserves the thread.
+
+3) Pipeline/version gating to cut through stale caches
+   - Option A: bump `pipelineVersion` in extras (e.g., 'v3') so live readers ignore stale v2 “latest” caches after deploy.
+   - Option B: on deploy, add a temporary server flag that invalidates section caches for affected issues/sections.
+   - Acceptance: After deploy, pages show the new logic without requiring Daily/Weekly button presses.
+
+4) Observability
+   - Copy LLM timing fields from `_timings` into `extras` and emit to `/api/analytics?action=insights` so we can confirm SLOs in production.
+
+### Deployment and testing protocol (must follow)
+1) Push to master → auto‑deploys to Vercel (production). Do not create other projects.
+2) Wait for Vercel to finish; confirm the deployment is complete in Vercel UI.
+3) Test only on the live site with MCP:
+   - Unlock with `https://helfi.ai/healthapp` (password: HealthBeta2024!).
+   - Sign in: `info@sonicweb.com.au` / `Snoodlenoodle1@`.
+   - Validate Bowel Movements across Supplements, Medications, Nutrition, Exercise, Lifestyle:
+     - Each shows Suggested ≥4 and Avoid ≥4.
+     - Exercise “What’s Working” reflects logged activities (e.g., Walking) immediately.
+   - Use Daily/Weekly buttons if you need to force an immediate recompute.
+4) Report back with: deployment complete, MCP screenshots/notes, and concrete pass/fail per section.
+
+### Guardrails & constraints
+- AI‑only insights remain the rule (KB seeds are allowed as scaffolding; no static filler in final content).
+- Never touch the OpenAI API key or environment values unless explicitly instructed by the user.
+- The user works only with the live site; confirm live behavior before claiming success.
+
 ## IMPORTANT: Incident summary (plain English)
 
 - What happened: The Supplements page took about 55 seconds to open on live. This made things worse than before.
