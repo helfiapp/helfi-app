@@ -167,6 +167,20 @@ export async function GET(request: NextRequest) {
     }
 
     // Transform to onboarding format
+    let selectedGoals: string[] = []
+    try {
+      const selectedRecord = user.healthGoals.find((goal: any) => goal.name === '__SELECTED_ISSUES__')
+      if (selectedRecord?.category) {
+        const parsed = JSON.parse(selectedRecord.category)
+        if (Array.isArray(parsed)) {
+          selectedGoals = parsed.map((name) => String(name || '')).filter(Boolean)
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to parse __SELECTED_ISSUES__ health goal', error)
+      selectedGoals = []
+    }
+
     const onboardingData = {
       gender: user.gender?.toLowerCase() || '',
       weight: user.weight?.toString() || '',
@@ -174,7 +188,9 @@ export async function GET(request: NextRequest) {
       bodyType: user.bodyType?.toLowerCase() || '',
       exerciseFrequency: exerciseData.exerciseFrequency || '',
       exerciseTypes: exerciseData.exerciseTypes || [],
-      goals: user.healthGoals.filter((goal: any) => !goal.name.startsWith('__')).map((goal: any) => goal.name),
+      goals: selectedGoals.length
+        ? selectedGoals
+        : user.healthGoals.filter((goal: any) => !goal.name.startsWith('__')).map((goal: any) => goal.name),
       healthSituations: healthSituationsData,
       bloodResults: bloodResultsData,
       supplements: user.supplements.map((supp: any) => ({
@@ -359,7 +375,7 @@ export async function POST(request: NextRequest) {
         const deleteResult = await prisma.healthGoal.deleteMany({
           where: { 
             userId: user.id,
-            name: { notIn: ['__EXERCISE_DATA__', '__HEALTH_SITUATIONS_DATA__'] }
+            name: { notIn: ['__EXERCISE_DATA__', '__HEALTH_SITUATIONS_DATA__', '__SELECTED_ISSUES__'] }
           }
         })
         console.log('🗑️ Deleted', deleteResult.count, 'existing health goals')
@@ -381,6 +397,19 @@ export async function POST(request: NextRequest) {
       } else {
         console.log('ℹ️ No health goals to update')
       }
+
+      // Persist the canonical selected issue list separately for insights fallback
+      await prisma.healthGoal.deleteMany({
+        where: { userId: user.id, name: '__SELECTED_ISSUES__' },
+      })
+      await prisma.healthGoal.create({
+        data: {
+          userId: user.id,
+          name: '__SELECTED_ISSUES__',
+          category: JSON.stringify(Array.isArray(data.goals) ? data.goals : []),
+          currentRating: 0,
+        },
+      })
     } catch (error) {
       console.error('❌ Error updating health goals:', error)
       // Continue with other updates

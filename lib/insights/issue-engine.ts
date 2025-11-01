@@ -1134,6 +1134,25 @@ const loadUserInsightContext = cache(async (userId: string): Promise<UserInsight
     visibleGoals.push(healthGoals[goal.name.toLowerCase()])
   }
 
+  let selectedIssues: string[] = []
+  const selectedRecord = user.healthGoals.find((goal) => goal.name === '__SELECTED_ISSUES__')
+  if (selectedRecord?.category) {
+    try {
+      const parsed = JSON.parse(selectedRecord.category)
+      if (Array.isArray(parsed)) {
+        selectedIssues = Array.from(
+          new Set(
+            parsed
+              .map((value) => (typeof value === 'string' ? value.trim() : ''))
+              .filter(Boolean)
+          )
+        )
+      }
+    } catch {
+      selectedIssues = []
+    }
+  }
+
   let issues = issuesRows.map((row) => {
     const normalisedPolarity: 'positive' | 'negative' =
       row.polarity === 'positive' || row.polarity === 'negative'
@@ -1146,6 +1165,28 @@ const loadUserInsightContext = cache(async (userId: string): Promise<UserInsight
       polarity: normalisedPolarity,
     }
   })
+
+  if (!issues.length && selectedIssues.length) {
+    issues = selectedIssues
+      .map((name) => {
+        const lower = name.toLowerCase()
+        const goal = healthGoals[lower]
+        return goal
+          ? {
+              id: goal.id,
+              name: goal.name,
+              slug: slugify(goal.name),
+              polarity: inferPolarityFromName(goal.name),
+            }
+          : {
+              id: `selected:${slugify(name)}`,
+              name,
+              slug: slugify(name),
+              polarity: inferPolarityFromName(name),
+            }
+      })
+      .filter((issue) => issue.name.length > 0)
+  }
 
   if (!issues.length && visibleGoals.length) {
     issues = visibleGoals.map((goal) => ({
@@ -1260,16 +1301,35 @@ const loadUserLandingContext = cache(async (userId: string): Promise<UserInsight
       continue
     }
 
-    const logsAsc = (goal.healthLogs || []).slice().reverse()
-    healthGoals[goal.name.toLowerCase()] = {
-      id: goal.id,
-      name: goal.name,
-      currentRating: goal.currentRating,
-      createdAt: goal.createdAt,
-      updatedAt: goal.updatedAt,
-      healthLogs: logsAsc.map(log => ({ rating: log.rating, notes: null, createdAt: log.createdAt })),
+  const logsAsc = (goal.healthLogs || []).slice().reverse()
+  healthGoals[goal.name.toLowerCase()] = {
+    id: goal.id,
+    name: goal.name,
+    currentRating: goal.currentRating,
+    createdAt: goal.createdAt,
+    updatedAt: goal.updatedAt,
+    healthLogs: logsAsc.map(log => ({ rating: log.rating, notes: null, createdAt: log.createdAt })),
+  }
+  visibleGoals.push(healthGoals[goal.name.toLowerCase()])
+}
+
+  let selectedIssues: string[] = []
+  const selectedRecord = user.healthGoals.find((goal) => goal.name === '__SELECTED_ISSUES__')
+  if (selectedRecord?.category) {
+    try {
+      const parsed = JSON.parse(selectedRecord.category)
+      if (Array.isArray(parsed)) {
+        selectedIssues = Array.from(
+          new Set(
+            parsed
+              .map((value) => (typeof value === 'string' ? value.trim() : ''))
+              .filter(Boolean)
+          )
+        )
+      }
+    } catch {
+      selectedIssues = []
     }
-    visibleGoals.push(healthGoals[goal.name.toLowerCase()])
   }
 
   let issues = issuesRows.map((row) => {
@@ -1284,6 +1344,28 @@ const loadUserLandingContext = cache(async (userId: string): Promise<UserInsight
       polarity: normalisedPolarity,
     }
   })
+
+  if (!issues.length && selectedIssues.length) {
+    issues = selectedIssues
+      .map((name) => {
+        const lower = name.toLowerCase()
+        const goal = healthGoals[lower]
+        return goal
+          ? {
+              id: goal.id,
+              name: goal.name,
+              slug: slugify(goal.name),
+              polarity: inferPolarityFromName(goal.name),
+            }
+          : {
+              id: `selected:${slugify(name)}`,
+              name,
+              slug: slugify(name),
+              polarity: inferPolarityFromName(name),
+            }
+      })
+      .filter((issue) => issue.name.length > 0)
+  }
 
   if (!issues.length && visibleGoals.length) {
     issues = visibleGoals.map((goal) => ({
