@@ -1505,6 +1505,7 @@ const loadUserInsightContext = cache(async (userId: string): Promise<UserInsight
       height: user.height ?? null,
       bodyType: user.bodyType ?? null,
       exerciseFrequency: user.exerciseFrequency ?? null,
+      exerciseTypes: user.exerciseTypes ?? null,
     },
     onboardingComplete,
   }

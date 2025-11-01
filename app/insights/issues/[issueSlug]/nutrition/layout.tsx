@@ -1,8 +1,8 @@
 import { ReactNode } from 'react'
 import { getServerSession } from 'next-auth'
-import { redirect, notFound } from 'next/navigation'
+import { redirect } from 'next/navigation'
 import { authOptions } from '@/lib/auth'
-import { getIssueSection } from '@/lib/insights/issue-engine'
+import { getCachedIssueSection } from '@/lib/insights/issue-engine'
 import NutritionShell from './NutritionShell'
 
 interface NutritionLayoutProps {
@@ -16,10 +16,8 @@ export default async function NutritionLayout({ children, params }: NutritionLay
     redirect('/auth/signin')
   }
 
-  const result = await getIssueSection(session.user.id, params.issueSlug, 'nutrition')
-  if (!result) {
-    notFound()
-  }
+  // Cache-only read - never blocks on LLM during SSR
+  const result = await getCachedIssueSection(session.user.id, params.issueSlug, 'nutrition', { mode: 'latest' })
 
   return (
     <NutritionShell initialResult={result} issueSlug={params.issueSlug}>

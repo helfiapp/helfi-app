@@ -1,8 +1,8 @@
 import { ReactNode } from 'react'
 import { getServerSession } from 'next-auth'
-import { redirect, notFound } from 'next/navigation'
+import { redirect } from 'next/navigation'
 import { authOptions } from '@/lib/auth'
-import { getIssueSection } from '@/lib/insights/issue-engine'
+import { getCachedIssueSection } from '@/lib/insights/issue-engine'
 import ExerciseShell from './ExerciseShell'
 
 interface ExerciseLayoutProps {
@@ -16,10 +16,8 @@ export default async function ExerciseLayout({ children, params }: ExerciseLayou
     redirect('/auth/signin')
   }
 
-  const result = await getIssueSection(session.user.id, params.issueSlug, 'exercise')
-  if (!result) {
-    notFound()
-  }
+  // Cache-only read - never blocks on LLM during SSR
+  const result = await getCachedIssueSection(session.user.id, params.issueSlug, 'exercise', { mode: 'latest' })
 
   return (
     <ExerciseShell initialResult={result} issueSlug={params.issueSlug}>
