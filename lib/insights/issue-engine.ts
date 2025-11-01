@@ -2417,16 +2417,38 @@ async function buildExerciseSection(
   const kbSupportive: Array<{ title: string; detail: string; keywords?: string[] }> = []
   const kbAvoidActivities: Array<{ title: string; detail: string }> = []
 
+  // Create map of intake exercise types for fallback when no logs exist
+  const intakeExerciseTypes = new Set(
+    (context.profile.exerciseTypes ?? []).map((type: string) => canonical(type))
+  )
+
   const workingActivities = llmResult.working
     .map((item) => {
-      const match = logMap.get(canonical(item.name))
-      if (!match) return null
-      return {
-        title: item.name,
-        reason: item.reason,
-        summary: item.dosage ?? match?.dosage ?? '',
-        lastLogged: item.timing ?? match?.timing?.[0] ?? '',
+      const itemKey = canonical(item.name)
+      const match = logMap.get(itemKey)
+      
+      // If it matches a log, use log data
+      if (match) {
+        return {
+          title: item.name,
+          reason: item.reason,
+          summary: item.dosage ?? match?.dosage ?? '',
+          lastLogged: item.timing ?? match?.timing?.[0] ?? '',
+        }
       }
+      
+      // If no log match but it matches intake exerciseTypes, include it with note about intake selection
+      // This allows intake selections to appear as "working" when LLM identifies them as helpful
+      if (intakeExerciseTypes.has(itemKey)) {
+        return {
+          title: item.name,
+          reason: item.reason,
+          summary: 'Selected in health intake',
+          lastLogged: 'From your health profile',
+        }
+      }
+      
+      return null
     })
     .filter(Boolean) as Array<{ title: string; reason: string; summary: string; lastLogged: string }>
 
