@@ -26,12 +26,25 @@ This is a blunt handover for the next agent. The live site still fails the user�
 - Landing issue selection:
   - We now prefer `__SELECTED_ISSUES__`, but historic data and missing backfill can still leak legacy goals.
 
+### NEW: Why users still see 60s+ waits and odd exercise results (root disconnect, confirmed live)
+- Slow path is baked into the generator: `lib/insights/llm.ts::generateSectionInsightsFromLLM` does multiple sequential LLM calls (generate → classify → rewrite → re‑classify → fill‑missing loops). On production this often exceeds 60s.
+- There was no 1‑second first‑byte rule: when cache is cold, the API waits for the full heavy pipeline instead of serving a fast AI‑only starter result.
+- Exercise “What’s Working” shows empty even when the user picked “Walking” in intake because we only treat database exercise logs as “working”. Onboarding “exercise types” were not passed to the model (profile lacked `exerciseTypes`) and are not shown as “working” when no logs exist.
+- The combination above explains both the long wait and the empty/odd lists you see on first open.
+
 ### What changed today (shipped now)
 - Safer `__SELECTED_ISSUES__` writes + detailed logging on GET/POST.
 - Onboarding Step 4 now snapshots selected issues via `/api/user-data`.
 - Landing loader prefers `__SELECTED_ISSUES__` when `CheckinIssues` is empty.
 - Nutrition & Lifestyle: deterministic KB top‑ups added to guarantee 4/4 after domain filtering (build fixed with null‑safe KB access).
 - NOT YET FIXED: Supplements/Medications still missing populated KB fallbacks → <4/4 persists live.
+
+### Hotfix just implemented (v4)
+- AI‑only quick path on cache miss: `computeIssueSection` now returns a fast, AI‑generated “degraded” result within ~1s via `generateDegradedSectionQuick` (no stored KB). It writes this to cache with short TTL and upgrades in the background.
+- Post‑intake cache priming now actually waits up to ~6.5s to store usable results so Insights isn’t cold immediately after pressing Confirm & Begin.
+- Observability: first‑byte and cache flags now appear in `extras` and are emitted to `/api/analytics`.
+- Added `exerciseTypes` to the profile passed to the model so “Walking” is considered in reasoning even when no formal exercise logs exist.
+- Bumped `pipelineVersion` to `v4` to ignore stale rows.
 
 ### Do not repeat
 - Don’t add more background jobs until cache writes/reads are proven.
@@ -40,25 +53,29 @@ This is a blunt handover for the next agent. The live site still fails the user�
 - Don’t fall back to legacy `healthGoals` once a snapshot exists.
 
 ### Action plan (order matters)
-1) Reinstate 4/4 for Supplements/Medications (24–48h):
-   - Populate `kbAddLocal`/`kbAvoidLocal` from `ISSUE_KNOWLEDGE_BASE[pickKnowledgeKey(issue.name)]`.
-   - Deterministically map logged items into “What’s Working” when the LLM omits them (dose/timing from logs).
-   - Maintain domain filters so cross‑domain leakage does not occur.
+1) AI‑only, not KB: Guarantee 4/4 via the quick generator (live now)
+   - Use `generateDegradedSectionQuick` for immediate Suggested/Avoid when cache is cold. No static KB fill for core content.
+   - Keep “What’s Working” strictly from user logs; do not fake.
 
-2) Post‑intake cache priming that actually works (same window):
-   - On `POST /api/user-data` after Confirm & Begin, run `precomputeIssueSectionsForUser` for the selected issues with concurrency 3–4 and await completion up to ~5–7s. If validated results aren’t ready, upsert short‑TTL degraded entries for every section so the read path never goes cold.
+2) Post‑intake cache priming that actually writes (live now):
+   - Await up to ~6.5s and ensure degraded or validated entries exist for every section so first open is never cold.
 
-3) 1‑second first paint from storage:
-   - On read, time‑cap to ~1s. If no validated cache, serve latest stored (validated or degraded) immediately and trigger background upgrade.
+3) 1‑second first paint from storage (live now):
+   - On read miss, we serve AI‑only degraded immediately and upgrade in the background.
 
-4) Observability:
+4) Observability (live now):
    - Include `{ cacheHit, degradedUsed, firstByteMs, computeMs }` and per‑phase LLM timings in `extras`; emit to `/api/analytics?action=insights`.
 
-5) Cut stale caches:
+5) Cut stale caches (live now):
    - Bump `pipelineVersion` after fixes so old rows are ignored by readers.
 
 ### Acceptance tests on live
 - For Libido and Bowel Movements: Supplements, Medications, Nutrition, Lifestyle each show ≥4 Suggested and ≥4 To‑Avoid; “What’s Working” populated from logs. First paint ≤1s warm / ≤7s cold. No legacy issues in the list.
+
+### Notes for future agents (do not repeat)
+- Do not add hard‑coded KB items to force counts. Keep content AI‑generated. If minimums fail, use the AI quick path and then upgrade.
+- Do not block first paint on the heavy multi‑pass pipeline. Always serve the stored/degraded copy immediately.
+- For Exercise accuracy, pass onboarding `exerciseTypes` and keep “working” empty unless actual logs exist. Do not mark “Walking” as avoid for Bowel Movements.
 
 ---
 ## SESSION HANDOVER — 2025-10-31
@@ -319,4 +336,3 @@ Do not deploy from this branch without approval. To restore the prior v2 baselin
    - Confirm the intake flow actually calls `POST /api/user-data` with the current selection on every save.
 3) Decide on a single source of truth for tracked issues (likely `CheckinIssues` once the feature flag is enabled) and migrate existing data, avoiding fallbacks to legacy healthGoals that mask the real bug.
 4) Only reintroduce deterministic fallbacks once the issue source is reliable; otherwise users see empty Suggested/Avoid tabs when the LLM under-delivers.
-

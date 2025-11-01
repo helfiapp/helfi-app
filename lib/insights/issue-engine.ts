@@ -111,6 +111,7 @@ interface UserInsightContext {
     height?: number | null
     bodyType?: string | null
     exerciseFrequency?: string | null
+    exerciseTypes?: string[] | null
   }
   onboardingComplete: boolean
 }
@@ -1001,6 +1002,7 @@ const loadUserInsightContext = cache(async (userId: string): Promise<UserInsight
         weight: true,
         bodyType: true,
         exerciseFrequency: true,
+        exerciseTypes: true,
         healthGoals: {
           select: {
             id: true,
@@ -1385,7 +1387,14 @@ const loadUserLandingContext = cache(async (userId: string): Promise<UserInsight
     todaysFoods: [],
     bloodResults: null,
     dataNeeds,
-    profile: {},
+    profile: {
+      gender: user.gender ?? null,
+      weight: user.weight ?? null,
+      height: user.height ?? null,
+      bodyType: (user.bodyType as any) ?? null,
+      exerciseFrequency: user.exerciseFrequency ?? null,
+      exerciseTypes: (user as any).exerciseTypes ?? null,
+    },
     onboardingComplete,
   }
 })
@@ -1522,6 +1531,29 @@ async function computeIssueSection(
     }
   }
 
+  // Quick AI-only degraded result to avoid long waits
+  const quick = await buildQuickSection(userId, slug, section, mode)
+  if (quick) {
+    // Persist degraded with short TTL and fire background upgrade
+    try {
+      await upsertSectionCache({ userId, slug, section, mode, rangeKey, result: quick })
+    } catch {}
+    // Background full build (non-blocking)
+    setImmediate(async () => {
+      try {
+        const context = await loadUserInsightContext(userId)
+        const full = await buildIssueSectionWithContext(context, slug, section, { mode, range: undefined, force: false })
+        if (full && shouldCacheSectionResult(full)) {
+          await upsertSectionCache({ userId, slug, section, mode, rangeKey, result: full })
+        }
+      } catch (e) {
+        console.warn('[insights.build] background upgrade failed', e)
+      }
+    })
+    return quick
+  }
+
+  // Fallback to full build if quick path failed
   console.time(`[insights.build] ${slug}/${section}`)
   const context = await loadUserInsightContext(userId)
   const built = await buildIssueSectionWithContext(context, slug, section, {
@@ -1531,35 +1563,10 @@ async function computeIssueSection(
   })
   console.timeEnd(`[insights.build] ${slug}/${section}`)
   if (!built) return null
-  const extrasBuilt = (built.extras as Record<string, unknown> | undefined) ?? {}
-  const enriched: IssueSectionResult = {
-    ...built,
-    extras: {
-      ...extrasBuilt,
-      cacheHit: false,
-      degradedUsed: !!extrasBuilt['degraded'],
-      firstByteMs: Date.now() - t0,
-      computeMs: Date.now() - t0,
-    },
+  if (shouldCacheSectionResult(built)) {
+    await upsertSectionCache({ userId, slug, section, mode, rangeKey, result: built })
   }
-  if (shouldCacheSectionResult(enriched)) {
-    await upsertSectionCache({ userId, slug, section, mode, rangeKey, result: enriched })
-  }
-  emitInsightsTimingSafe({
-    userId,
-    slug,
-    section,
-    mode,
-    cache: 'miss',
-    degradedUsed: !!enriched.extras?.['degraded'],
-    generateMs: Number((enriched.extras as any)?.generateMs ?? 0),
-    classifyMs: Number((enriched.extras as any)?.classifyMs ?? 0),
-    rewriteMs: Number((enriched.extras as any)?.rewriteMs ?? 0),
-    fillMs: Number((enriched.extras as any)?.fillMs ?? 0),
-    totalMs: Number((enriched.extras as any)?.totalMs ?? 0),
-    firstByteMs: enriched.extras?.firstByteMs as number,
-  }).catch(() => {})
-  return enriched
+  return built
 }
 
 async function emitInsightsTimingSafe(event: {
@@ -1603,6 +1610,194 @@ async function emitInsightsTimingSafe(event: {
     })
   } catch {
     // best-effort only
+  }
+}
+
+// Build a minimal, AI-only quick result for fast first paint (degraded=true).
+async function buildQuickSection(
+  userId: string,
+  slug: string,
+  section: IssueSectionKey,
+  mode: ReportMode
+): Promise<IssueSectionResult | null> {
+  try {
+    const landing = await loadUserLandingContext(userId)
+    const issue = landing.issues.find((i) => i.slug === slug) || {
+      id: `temp:${slug}`,
+      name: unslugify(slug),
+      slug,
+      polarity: inferPolarityFromName(unslugify(slug)),
+    }
+    const summary = enrichIssueSummary(issue, landing)
+    const map = async (
+      modeKey: 'supplements' | 'medications' | 'exercise' | 'nutrition' | 'lifestyle' | 'labs'
+    ) =>
+      generateDegradedSectionQuick(
+        { issueName: summary.name, issueSummary: summary.highlight, mode: modeKey, items: [], otherItems: [], profile: landing.profile },
+        { minSuggested: 4, minAvoid: 4 }
+      )
+
+    let quick: any = null
+    switch (section) {
+      case 'supplements': {
+        const r = await map('supplements')
+        if (!r) return null
+        quick = {
+          issue: summary,
+          section: 'supplements',
+          generatedAt: new Date().toISOString(),
+          confidence: 0.6,
+          summary: r.summary || 'Initial guidance while we prepare a deeper report.',
+          highlights: [],
+          dataPoints: [],
+          recommendations: [],
+          mode,
+          extras: {
+            supportiveDetails: [],
+            suggestedAdditions: r.suggested.map((s) => ({ title: s.name, reason: s.reason, suggestion: s.protocol ?? null })),
+            avoidList: r.avoid.map((a) => ({ name: a.name, reason: a.reason })),
+            source: 'quick',
+            pipelineVersion: CURRENT_PIPELINE_VERSION,
+            validated: false,
+            degraded: true,
+            cacheHit: false,
+          },
+        }
+        break
+      }
+      case 'medications': {
+        const r = await map('medications')
+        if (!r) return null
+        quick = {
+          issue: summary,
+          section: 'medications',
+          generatedAt: new Date().toISOString(),
+          confidence: 0.6,
+          summary: r.summary || 'Initial guidance while we prepare a deeper report.',
+          highlights: [],
+          dataPoints: [],
+          recommendations: [],
+          mode,
+          extras: {
+            supportiveDetails: [],
+            suggestedAdditions: r.suggested.map((s) => ({ title: s.name, reason: s.reason, suggestion: s.protocol ?? null })),
+            avoidList: r.avoid.map((a) => ({ name: a.name, reason: a.reason })),
+            source: 'quick',
+            pipelineVersion: CURRENT_PIPELINE_VERSION,
+            validated: false,
+            degraded: true,
+            cacheHit: false,
+          },
+        }
+        break
+      }
+      case 'exercise': {
+        const r = await map('exercise')
+        if (!r) return null
+        quick = {
+          issue: summary,
+          section: 'exercise',
+          generatedAt: new Date().toISOString(),
+          confidence: 0.6,
+          summary: r.summary || 'Initial guidance while we prepare a deeper report.',
+          highlights: [],
+          dataPoints: [],
+          recommendations: [],
+          mode,
+          extras: {
+            workingActivities: [],
+            suggestedActivities: r.suggested.map((s) => ({ title: s.name, reason: s.reason, detail: s.protocol ?? null })),
+            avoidActivities: r.avoid.map((a) => ({ title: a.name, reason: a.reason })),
+            source: 'quick',
+            pipelineVersion: CURRENT_PIPELINE_VERSION,
+            validated: false,
+            degraded: true,
+            cacheHit: false,
+          },
+        }
+        break
+      }
+      case 'nutrition': {
+        const r = await map('nutrition')
+        if (!r) return null
+        quick = {
+          issue: summary,
+          section: 'nutrition',
+          generatedAt: new Date().toISOString(),
+          confidence: 0.6,
+          summary: r.summary || 'Initial guidance while we prepare a deeper report.',
+          highlights: [],
+          dataPoints: [],
+          recommendations: [],
+          mode,
+          extras: {
+            workingFocus: [],
+            suggestedFocus: r.suggested.map((s) => ({ title: s.name, reason: s.reason })),
+            avoidFoods: r.avoid.map((a) => ({ name: a.name, reason: a.reason })),
+            source: 'quick',
+            pipelineVersion: CURRENT_PIPELINE_VERSION,
+            validated: false,
+            degraded: true,
+            cacheHit: false,
+          },
+        }
+        break
+      }
+      case 'lifestyle': {
+        const r = await map('lifestyle')
+        if (!r) return null
+        quick = {
+          issue: summary,
+          section: 'lifestyle',
+          generatedAt: new Date().toISOString(),
+          confidence: 0.6,
+          summary: r.summary || 'Initial guidance while we prepare a deeper report.',
+          highlights: [],
+          dataPoints: [],
+          recommendations: [],
+          mode,
+          extras: {
+            suggestedHabits: r.suggested.map((s) => ({ title: s.name, reason: s.reason })),
+            avoidHabits: r.avoid.map((a) => ({ title: a.name, reason: a.reason })),
+            source: 'quick',
+            pipelineVersion: CURRENT_PIPELINE_VERSION,
+            validated: false,
+            degraded: true,
+            cacheHit: false,
+          },
+        }
+        break
+      }
+      case 'labs': {
+        const r = await map('labs')
+        if (!r) return null
+        quick = {
+          issue: summary,
+          section: 'labs',
+          generatedAt: new Date().toISOString(),
+          confidence: 0.6,
+          summary: r.summary || 'Initial guidance while we prepare a deeper report.',
+          highlights: [],
+          dataPoints: [],
+          recommendations: [],
+          mode,
+          extras: {
+            suggestedLabs: r.suggested.map((s) => ({ name: s.name, reason: s.reason, detail: s.protocol ?? null })),
+            avoidLabs: r.avoid.map((a) => ({ name: a.name, reason: a.reason })),
+            source: 'quick',
+            pipelineVersion: CURRENT_PIPELINE_VERSION,
+            validated: false,
+            degraded: true,
+            cacheHit: false,
+          },
+        }
+        break
+      }
+    }
+    return quick as IssueSectionResult
+  } catch (e) {
+    console.warn('[insights.quick] failed', e)
+    return null
   }
 }
 

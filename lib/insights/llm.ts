@@ -87,6 +87,7 @@ interface LLMInputData {
     height?: number | null
     bodyType?: string | null
     exerciseFrequency?: string | null
+    exerciseTypes?: string[] | null
   }
   mode: SectionMode
 }
