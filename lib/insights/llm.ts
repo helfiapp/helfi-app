@@ -325,7 +325,7 @@ function modeGuidance(mode: SectionMode) {
     case 'medications':
       return 'Evaluate prescription and OTC pharmaceutical therapies only (no supplements, herbs, nutraceuticals, or vitamins). Highlight medications that are supporting the issue, medication additions to discuss with a prescriber, and medications that warrant caution or avoidance.'
     case 'exercise':
-      return 'Evaluate exercise and movement patterns. Highlight the training that supports this issue, recommended additions, and activities/protocols to limit or avoid.'
+      return 'Evaluate exercise and movement patterns. Highlight the training that supports this issue, recommended additions, and activities/protocols to limit or avoid. IMPORTANT: If the user has selected exerciseTypes in their health intake profile (check profile.exerciseTypes), and those exercises are supportive for this issue, consider including them in the "working" bucket even if no formal exercise logs exist yet. This helps surface exercises the user is already doing or planning to do.'
     case 'nutrition':
       return 'Evaluate nutrition patterns using foods, meals, or dietary patterns only. Do not mention supplements or pills. Highlight foods/meals that help, additions to include, and foods or dietary approaches to avoid for this issue. Only mark "working" foods that are present in focusItems.'
     case 'lifestyle':
@@ -373,6 +373,7 @@ STRICT RULES:
 - Prioritise logged items: if a focusItem is plausibly supportive for the issue, include it in "working" using the exact name from focusItems and provide rationale.
 - Supplements mode: only include supplements/herbs/nutraceuticals. Never include alcohol, foods, or lifestyle items in any bucket.
 - Nutrition mode: only mark foods as "working" if they appear in focusItems. Use suggested/avoid for novel foods.
+- Exercise mode: if profile.exerciseTypes contains exercises that are supportive for this issue, consider including them in "working" even without formal logs. This helps users see exercises they've selected in intake that align with their health goals.
 - Reasons must include mechanism + relevance; add dose/timing or execution guidance where appropriate.
 - If focusItems is empty or none are supportive, "working" may be empty, but clearly explain the gap in the summary.
 - Even if user data is sparse, you MUST still populate "suggested" and "avoid" to the minimum counts using widely accepted best practice for ${issueName}. Never respond with "everything covered."

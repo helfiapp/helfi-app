@@ -296,6 +296,49 @@ function canonical(value: string) {
   return value.trim().toLowerCase()
 }
 
+// Enhanced matching for exercise name variations
+function matchesExerciseType(exerciseName: string, intakeType: string): boolean {
+  const exerciseKey = canonical(exerciseName)
+  const intakeKey = canonical(intakeType)
+  
+  // Exact match
+  if (exerciseKey === intakeKey) return true
+  
+  // Common exercise name variations
+  const variations: Record<string, string[]> = {
+    'walking': ['walk', 'walking exercise', 'brisk walking', 'walking workout'],
+    'running': ['run', 'jogging', 'jog', 'running workout'],
+    'cycling': ['bike riding', 'bicycle', 'bike', 'cycling workout', 'bike ride'],
+    'swimming': ['swim', 'swimming workout'],
+    'weight training': ['weights', 'weightlifting', 'strength training', 'resistance training'],
+    'yoga': ['yoga practice', 'yoga session'],
+    'boxing': ['boxing workout', 'boxing training', 'box'],
+    'hiit': ['high intensity interval training', 'hiit workout'],
+  }
+  
+  // Check if either name is a key and the other is in its variations
+  for (const [key, vars] of Object.entries(variations)) {
+    const normalizedKey = canonical(key)
+    if (normalizedKey === exerciseKey || normalizedKey === intakeKey) {
+      const otherKey = normalizedKey === exerciseKey ? intakeKey : exerciseKey
+      if (vars.some(v => canonical(v) === otherKey)) return true
+    }
+  }
+  
+  // Partial match: check if one contains the other (for multi-word exercises)
+  const exerciseWords = exerciseKey.split(/\s+/).filter(w => w.length >= 4)
+  const intakeWords = intakeKey.split(/\s+/).filter(w => w.length >= 4)
+  
+  if (exerciseWords.length > 0 && intakeWords.length > 0) {
+    // Check if any significant word from one appears in the other
+    if (exerciseWords.some(w => intakeKey.includes(w)) || intakeWords.some(w => exerciseKey.includes(w))) {
+      return true
+    }
+  }
+  
+  return false
+}
+
 function looksSupplementLike(value: string) {
   const lower = value.toLowerCase()
   return SUPPLEMENT_KEYWORDS.some((keyword) => lower.includes(keyword))
@@ -2048,8 +2091,79 @@ async function buildQuickSection(
           recommendations: [],
           mode,
           extras: {
-            workingActivities: [],
-            suggestedActivities: r.suggested.map((s) => ({ title: s.name, reason: s.reason, detail: s.protocol ?? null })),
+            workingActivities: (() => {
+              // Apply same intake exerciseTypes matching logic as buildExerciseSection
+              const intakeExerciseTypes = new Set(
+                (landing.profile.exerciseTypes ?? []).map((type: string) => canonical(type))
+              )
+              
+              // Process working items from LLM result
+              const working = (r.working ?? []).map((item) => {
+                const itemKey = canonical(item.name)
+                
+                // Enhanced matching: check exact match first, then fuzzy match
+                let hasIntakeMatch = intakeExerciseTypes.has(itemKey)
+                if (!hasIntakeMatch) {
+                  // Try fuzzy matching against all intake exercise types
+                  for (const intakeType of landing.profile.exerciseTypes ?? []) {
+                    if (matchesExerciseType(item.name, intakeType)) {
+                      hasIntakeMatch = true
+                      break
+                    }
+                  }
+                }
+                
+                if (hasIntakeMatch) {
+                  return {
+                    title: item.name,
+                    reason: item.reason,
+                    summary: 'Selected in health intake',
+                    lastLogged: 'From your health profile',
+                  }
+                }
+                
+                return null
+              }).filter(Boolean) as Array<{ title: string; reason: string; summary: string; lastLogged: string }>
+              
+              // Fallback: if LLM returns exercise in suggested bucket that matches intake exerciseTypes, promote it to working
+              const intakeTypesArray = landing.profile.exerciseTypes ?? []
+              const promotedFromSuggested: Array<{ title: string; reason: string; summary: string; lastLogged: string }> = []
+              
+              for (const suggestedItem of r.suggested) {
+                // Check if already in working
+                const alreadyInWorking = working.some(w => canonical(w.title) === canonical(suggestedItem.name))
+                if (alreadyInWorking) continue
+                
+                // Check if it matches any intake exercise type
+                for (const intakeType of intakeTypesArray) {
+                  if (matchesExerciseType(suggestedItem.name, intakeType)) {
+                    promotedFromSuggested.push({
+                      title: suggestedItem.name,
+                      reason: suggestedItem.reason,
+                      summary: 'Selected in health intake',
+                      lastLogged: 'From your health profile',
+                    })
+                    break
+                  }
+                }
+              }
+              
+              if (promotedFromSuggested.length > 0) {
+                working.push(...promotedFromSuggested)
+              }
+              
+              return working
+            })(),
+            suggestedActivities: r.suggested.filter((item) => {
+              // Exclude items that match intake exerciseTypes (they should be in working)
+              const intakeTypesArray = landing.profile.exerciseTypes ?? []
+              for (const intakeType of intakeTypesArray) {
+                if (matchesExerciseType(item.name, intakeType)) {
+                  return false
+                }
+              }
+              return true
+            }).map((s) => ({ title: s.name, reason: s.reason, detail: s.protocol ?? null })),
             avoidActivities: r.avoid.map((a) => ({ title: a.name, reason: a.reason })),
             source: 'quick',
             pipelineVersion: CURRENT_PIPELINE_VERSION,
@@ -2422,10 +2536,32 @@ async function buildExerciseSection(
     (context.profile.exerciseTypes ?? []).map((type: string) => canonical(type))
   )
 
+  // Logging for debugging intake exerciseTypes matching
+  console.log('[exercise.working] Raw profile.exerciseTypes:', context.profile.exerciseTypes)
+  console.log('[exercise.working] Canonicalized intakeExerciseTypes Set:', Array.from(intakeExerciseTypes))
+  console.log('[exercise.working] LLM working items:', llmResult.working.map(w => ({ name: w.name, reason: w.reason })))
+  console.log('[exercise.working] LLM suggested items:', llmResult.suggested.map(s => ({ name: s.name, reason: s.reason })))
+
   const workingActivities = llmResult.working
     .map((item) => {
       const itemKey = canonical(item.name)
       const match = logMap.get(itemKey)
+      
+      // Enhanced matching: check exact match first, then fuzzy match
+      let hasIntakeMatch = intakeExerciseTypes.has(itemKey)
+      if (!hasIntakeMatch) {
+        // Try fuzzy matching against all intake exercise types
+        for (const intakeType of context.profile.exerciseTypes ?? []) {
+          if (matchesExerciseType(item.name, intakeType)) {
+            hasIntakeMatch = true
+            console.log(`[exercise.working] Fuzzy matched "${item.name}" to intake type "${intakeType}"`)
+            break
+          }
+        }
+      }
+      
+      // Log matching attempt
+      console.log(`[exercise.working] Processing "${item.name}" (canonical: "${itemKey}"): logMatch=${!!match}, intakeMatch=${hasIntakeMatch}`)
       
       // If it matches a log, use log data
       if (match) {
@@ -2439,7 +2575,8 @@ async function buildExerciseSection(
       
       // If no log match but it matches intake exerciseTypes, include it with note about intake selection
       // This allows intake selections to appear as "working" when LLM identifies them as helpful
-      if (intakeExerciseTypes.has(itemKey)) {
+      if (hasIntakeMatch) {
+        console.log(`[exercise.working] ✓ Matched intake exerciseType: "${item.name}"`)
         return {
           title: item.name,
           reason: item.reason,
@@ -2451,6 +2588,37 @@ async function buildExerciseSection(
       return null
     })
     .filter(Boolean) as Array<{ title: string; reason: string; summary: string; lastLogged: string }>
+
+  // Fallback: if LLM returns exercise in suggested bucket that matches intake exerciseTypes, promote it to working
+  const intakeTypesArray = context.profile.exerciseTypes ?? []
+  const promotedFromSuggested: Array<{ title: string; reason: string; summary: string; lastLogged: string }> = []
+  
+  for (const suggestedItem of llmResult.suggested) {
+    // Check if already in workingActivities
+    const alreadyInWorking = workingActivities.some(w => canonical(w.title) === canonical(suggestedItem.name))
+    if (alreadyInWorking) continue
+    
+    // Check if it matches any intake exercise type
+    for (const intakeType of intakeTypesArray) {
+      if (matchesExerciseType(suggestedItem.name, intakeType)) {
+        console.log(`[exercise.working] ✓ Promoting suggested "${suggestedItem.name}" to working (matches intake "${intakeType}")`)
+        promotedFromSuggested.push({
+          title: suggestedItem.name,
+          reason: suggestedItem.reason,
+          summary: 'Selected in health intake',
+          lastLogged: 'From your health profile',
+        })
+        break
+      }
+    }
+  }
+  
+  if (promotedFromSuggested.length > 0) {
+    workingActivities.push(...promotedFromSuggested)
+    console.log(`[exercise.working] Promoted ${promotedFromSuggested.length} items from suggested to working`)
+  }
+
+  console.log('[exercise.working] Final workingActivities:', workingActivities.map(w => w.title))
 
   // Deterministic enrichment: if AI returns zero or too few working items, top up using logs matched to KB supportive exercises
   if (workingActivities.length < 2 && context.exerciseLogs.length > 0) {
@@ -2496,7 +2664,12 @@ async function buildExerciseSection(
     }
   }
 
-  const novelSuggestedActivities = llmResult.suggested.filter((item) => !logMap.has(canonical(item.name)))
+  const novelSuggestedActivities = llmResult.suggested.filter((item) => {
+    // Exclude items that match logs
+    if (logMap.has(canonical(item.name))) return false
+    // Exclude items that were promoted to working
+    return !promotedFromSuggested.some(p => canonical(p.title) === canonical(item.name))
+  })
 
   let suggestedActivities = novelSuggestedActivities.map((item) => ({
     title: item.name,
