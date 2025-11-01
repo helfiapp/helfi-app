@@ -1,3 +1,207 @@
+## SESSION HANDOVER — 2025-11-02 (Latest session - SSR performance fix)
+
+### Executive summary (read me first)
+- ✅ **FIXED**: SSR blocking issue - section layouts now use cache-only reads, ensuring ≤1s TTFB regardless of cache state
+- ✅ **FIXED**: Shell components now handle cache misses with client-side fetching, showing "Preparing initial guidance..." loading state
+- ✅ **FIXED**: `exerciseTypes` now included in profile object passed to LLM (was missing before)
+- ❌ **STILL BROKEN**: Exercise "Working" section remains empty even when intake exerciseTypes (Walking, Bike riding, Boxing) are identified by LLM as helpful for the issue
+- All guidance remains AI‑generated. No static/KB filler was added. Quick results are produced by the AI (single pass) and cached; validated results follow in background.
+
+### What was completed in this session (2025-11-02)
+1) **SSR cache-only fix (CRITICAL)** ✅
+   - Updated all 4 section layouts (`supplements`, `exercise`, `medications`, `nutrition`) to use `getCachedIssueSection()` instead of `getIssueSection()`
+   - Layouts now never call LLM during SSR - they only read from cache
+   - If cache is cold, layouts pass `null` to Shell components instead of blocking
+   - **Files modified:**
+     - `app/insights/issues/[issueSlug]/supplements/layout.tsx`
+     - `app/insights/issues/[issueSlug]/exercise/layout.tsx`
+     - `app/insights/issues/[issueSlug]/medications/layout.tsx`
+     - `app/insights/issues/[issueSlug]/nutrition/layout.tsx`
+
+2) **Client-side fetching for cache misses** ✅
+   - Updated all 4 Shell components to accept `initialResult: IssueSectionResult | null`
+   - Added `useEffect` hooks to fetch from GET endpoint when `initialResult` is `null`
+   - Shows "Preparing initial guidance..." loading state while fetching
+   - Displays error state if fetch fails
+   - **Files modified:**
+     - `app/insights/issues/[issueSlug]/supplements/SupplementsShell.tsx`
+     - `app/insights/issues/[issueSlug]/exercise/ExerciseShell.tsx`
+     - `app/insights/issues/[issueSlug]/medications/MedicationsShell.tsx`
+     - `app/insights/issues/[issueSlug]/nutrition/NutritionShell.tsx`
+
+3) **ExerciseTypes added to profile** ✅
+   - Added `exerciseTypes: user.exerciseTypes ?? null` to profile object in `loadUserInsightContext()`
+   - LLM now receives exercise types from health intake (Walking, Bike riding, Boxing)
+   - **File modified:** `lib/insights/issue-engine.ts` (line ~1508)
+
+4) **Attempted fix for Exercise "Working" section** ⚠️
+   - Modified `buildExerciseSection()` to include intake `exerciseTypes` in `workingActivities` when LLM identifies them as helpful
+   - Logic: If LLM returns an exercise as "working" and it matches intake `exerciseTypes`, include it even without logs
+   - **File modified:** `lib/insights/issue-engine.ts` (lines ~2420-2452)
+   - **Commit:** `a471d96` - "Fix Exercise 'Working' to include intake exerciseTypes when LLM identifies them as helpful"
+
+### What is still broken (root cause analysis)
+1) **Exercise "Working" section still empty** ❌
+   - **User report:** Exercise section for Libido shows empty "Working" section even though user selected Walking, Bike riding, Boxing in intake
+   - **Expected behavior:** If LLM identifies these exercises as helpful for Libido, they should appear in "Working" section
+   - **Current behavior:** Section shows message "We haven't spotted any logged workouts that clearly support this issue yet"
+   - **Possible root causes:**
+     a) LLM is not returning these exercises in the `working` bucket even though `exerciseTypes` is now in profile
+     b) The matching logic (`intakeExerciseTypes.has(itemKey)`) might not be matching correctly (case sensitivity, canonicalization issues)
+     c) The cached result was generated before the fix and needs regeneration
+     d) The quick/degraded path (`buildQuickSection`) might not be using the same logic
+
+2) **Cache invalidation needed**
+   - Old cached results may have been generated before `exerciseTypes` was added to profile
+   - User may need to click "Daily report" or "Weekly report" to regenerate with new logic
+   - Or cache needs to be invalidated/version bumped
+
+### Investigation needed for next agent
+1) **Verify LLM is receiving exerciseTypes**
+   - Check logs to confirm `exerciseTypes` array is present in profile when calling LLM
+   - Verify the LLM prompt includes this information
+   - Check if LLM is actually returning Walking/Bike riding/Boxing in `working` bucket for Libido
+
+2) **Debug matching logic**
+   - In `buildExerciseSection()`, add logging to see:
+     - What `exerciseTypes` are in `intakeExerciseTypes` Set
+     - What exercises LLM returns in `llmResult.working`
+     - Whether the canonical matching is working correctly
+   - Check if case sensitivity or name variations (e.g., "Walking" vs "walking" vs "Walk") are causing mismatches
+
+3) **Check quick vs full path**
+   - Verify `buildQuickSection()` also includes intake `exerciseTypes` logic
+   - Quick path might be used when cache is cold and may not have the same logic
+
+4) **Test with fresh generation**
+   - Force regeneration by clicking "Daily report" button
+   - Or bump `pipelineVersion` to invalidate old caches
+   - Verify new results include intake exercises in "Working"
+
+### Recommended fix approach
+1) **Add detailed logging** to `buildExerciseSection()`:
+   ```typescript
+   console.log('[exercise.working] intakeExerciseTypes:', Array.from(intakeExerciseTypes))
+   console.log('[exercise.working] LLM working items:', llmResult.working.map(w => w.name))
+   console.log('[exercise.working] Matched items:', workingActivities.map(w => w.title))
+   ```
+
+2) **Improve matching logic**:
+   - Consider fuzzy matching (e.g., "Bike riding" vs "Cycling" vs "Bicycle")
+   - Handle variations in exercise type names
+   - Consider checking both exact match and partial match
+
+3) **Ensure quick path includes same logic**:
+   - Check `buildQuickSection()` function and ensure it also includes intake `exerciseTypes` when building exercise sections
+
+4) **Force cache refresh**:
+   - Either bump `pipelineVersion` to invalidate old caches
+   - Or add explicit cache invalidation for exercise sections after this fix
+
+### Commits in this session
+- `d55aee1` - Fix Insights SSR performance: cache-only layouts + exerciseTypes fix
+- `a471d96` - Fix Exercise 'Working' to include intake exerciseTypes when LLM identifies them as helpful
+
+### Acceptance criteria for next agent
+- Exercise section shows intake `exerciseTypes` (Walking, Bike riding, Boxing) in "Working" section when LLM identifies them as helpful for the issue
+- First paint ≤1s TTFB (already achieved)
+- Suggested/Avoid sections show ≥4 items each (already working)
+- No regression in other sections
+
+---
+
+## SESSION HANDOVER — 2025-11-02 (High‑priority escalation)
+
+### What changed in this session (shipped)
+1) Quick‑first read hardening
+   - Added analytics+extras on cache hits and misses; emit `firstByteMs` on every read.
+   - Added env guardrails to force quick‑first and optionally pause heavy upgrades.
+
+2) Post‑intake and issue‑overview precompute
+   - Implemented `precomputeQuickSectionsForUser` that generates quick AI for ALL sections of ALL selected issues and writes to DB cache with short TTL.
+   - Wired this into `POST /api/user-data` (Confirm & Begin) with a 6.5s cap.
+   - Updated `POST /api/insights/issues/[slug]/sections/prefetch` to call `precomputeQuickSectionsForUser` so visiting an issue overview warms DB cache for all sections.
+
+3) Source of truth & observability
+   - Hardened `__SELECTED_ISSUES__` so we don’t fall back to legacy `healthGoals` when a snapshot exists.
+   - `/api/analytics?action=insights` now returns `firstByteMs` p50/p95 and cache hit/miss counts.
+
+### Verified live
+- Issue overview prefetch now writes quick results to DB. However, direct navigation into a section (or first open when caches are cold) still blocks on server‑side compute.
+- Exercise page for Libido showed: Working = empty while Suggested/Avoid lists appear later; the message is technically correct given no exercise logs, but the first paint is still too slow.
+
+### What is still broken (root cause)
+- The section layouts render server‑side and call the heavy builder when cache is cold. That blocks the first byte until the LLM finishes (often 60s+ on production). See the direct SSR calls here:
+```19:21:/Volumes/U34 Bolt/HELFI APP/helfi-app/app/insights/issues/[issueSlug]/supplements/layout.tsx
+  const result = await getIssueSection(session.user.id, params.issueSlug, 'supplements')
+  if (!result) {
+    notFound()
+  }
+```
+```19:21:/Volumes/U34 Bolt/HELFI APP/helfi-app/app/insights/issues/[issueSlug]/exercise/layout.tsx
+  const result = await getIssueSection(session.user.id, params.issueSlug, 'exercise')
+  if (!result) {
+    notFound()
+  }
+```
+```19:21:/Volumes/U34 Bolt/HELFI APP/helfi-app/app/insights/issues/[issueSlug]/medications/layout.tsx
+  const result = await getIssueSection(session.user.id, params.issueSlug, 'medications')
+  if (!result) {
+    notFound()
+  }
+```
+```19:21:/Volumes/U34 Bolt/HELFI APP/helfi-app/app/insights/issues/[issueSlug]/nutrition/layout.tsx
+  const result = await getIssueSection(session.user.id, params.issueSlug, 'nutrition')
+  if (!result) {
+    notFound()
+  }
+```
+- Even with quick‑first in the builder, a cold read still triggers an LLM call for “quick” on the server path; this can exceed 7s. We must never call the LLM before first byte.
+
+### Fix plan for next agent (do this first)
+1) Make section SSR read‑only (no LLM on first byte)
+   - In each section layout above, replace `getIssueSection(...)` with a read‑only call:
+     - Attempt `getCachedIssueSection(userId, slug, section, { mode: 'latest' })`.
+     - If `null`, render the shell immediately with a light “preparing initial guidance…” copy and mount a client fetcher that calls `GET /api/insights/issues/[slug]/sections/[section]` (which will return stored or quick). Do not block SSR.
+   - This single change enforces ≤1s TTFB regardless of cache.
+
+2) Ensure precompute always runs before user lands in a section
+   - Keep `POST /api/user-data` quick precompute (already shipped).
+   - Keep issue overview prefetch (already shipped) but also add a tiny client‑side prefetch on the global Insights landing to warm the first two issues proactively.
+
+3) Guarantee 4/4 without KB
+   - Keep current quick AI (single pass) with retry-on-shortfall during precompute (already shipped). Reads must serve cached quick if present; no KB filler.
+
+4) Exercise “What’s Working” clarity
+   - Working is sourced only from logs by design. Improve copy when empty to say: “No recent exercise logs detected. Log Walking/Boxing sessions to surface wins.” Intake exercise types remain context only.
+
+5) Observability to prove the fix
+   - Keep emitting `firstByteMs` and cache flags. After the SSR change, p95 first byte for section GET should be ≤1000ms warm/≤7000ms cold, with cacheHit or quickUsed true.
+
+### Ops switch (if live still slow)
+- Temporarily gate heavy upgrades by setting `INSIGHTS_PAUSE_HEAVY=true` while validating the SSR change. This does not affect quick results and preserves instant loads.
+
+### What we completed vs. what remains
+- Completed this session:
+  - Quick‑first read enrichment + analytics emission on miss/hit.
+  - Quick precompute at Confirm & Begin with 6.5s cap.
+  - Prefetch endpoint now writes quick results to DB cache for all sections.
+  - SELECTED_ISSUES enforcement; analytics p50/p95.
+  - Logs‑only “Working” (no intake conflation) retained as guardrail.
+- Not yet fixed:
+  - SSR layouts still call the builder → cold loads block on LLM → 60–90s waits.
+
+### Acceptance after the fix
+- Navigate to Insights → open issue overview (prefetch runs), then open Exercise/Supplements/Medications/Nutrition:
+  - First paint ≤1s (TTFB), data shows immediately from cached quick.
+  - Each section lists ≥4 Suggested and ≥4 To‑Avoid.
+  - Exercise Working remains logs‑only; copy explains how to surface it.
+  - `/api/analytics?action=insights` shows sensible p50/p95 and increasing cache hits.
+
+### Notes on AI‑only requirement
+- Quick results are produced by the model (no static lists, no KB filler). The SSR change does not inject content; it only avoids blocking SSR on LLM and lets the client fetch the AI output immediately after paint.
+
+---
 <!-- a49c4e34-eb45-492f-95eb-c25850b4e02a 17da865a-2c44-4b32-b544-6c5810394ab1 -->
 
 ## SESSION HANDOVER — 2025-11-01 (Truthful status + explicit requirements)
