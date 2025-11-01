@@ -957,6 +957,13 @@ export async function generateSectionInsightsFromLLM(
       if (meets) {
         break
       }
+      
+      // If minWorking is set due to intake exercises (not logs), be more lenient
+      // Accept best candidate if we have at least some working items, even if not meeting strict minimums
+      if (minWorking === 1 && focusItems.length === 0 && data.working.length > 0) {
+        console.log('[insights.llm] Accepting result with working items despite not meeting strict minimums')
+        break
+      }
     } catch (error) {
       console.error('[insights.llm] Failed to fetch LLM output', error)
     }

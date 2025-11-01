@@ -2472,8 +2472,10 @@ async function buildExerciseSection(
   console.time(`[insights.llm] exercise:${issue.slug}`)
   
   // Set minWorking to at least 1 if user has intake exerciseTypes, even without logs
+  // But use fewer retries to avoid hanging if LLM can't find supportive exercises
   const hasIntakeExerciseTypes = (context.profile.exerciseTypes ?? []).length > 0
   const minWorking = normalizedLogs.length > 0 ? 1 : (hasIntakeExerciseTypes ? 1 : 0)
+  const maxRetries = hasIntakeExerciseTypes && normalizedLogs.length === 0 ? 1 : 3
   
   let llmResult = await generateSectionInsightsFromLLM(
     {
@@ -2484,7 +2486,7 @@ async function buildExerciseSection(
       profile: context.profile,
       mode: 'exercise',
     },
-    { minWorking, minSuggested: 4, minAvoid: 4 }
+    { minWorking, minSuggested: 4, minAvoid: 4, maxRetries }
   )
   console.timeEnd(`[insights.llm] exercise:${issue.slug}`)
 
