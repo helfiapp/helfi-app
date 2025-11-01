@@ -1134,7 +1134,7 @@ const loadUserInsightContext = cache(async (userId: string): Promise<UserInsight
     visibleGoals.push(healthGoals[goal.name.toLowerCase()])
   }
 
-  const issues = issuesRows.map((row) => {
+  let issues = issuesRows.map((row) => {
     const normalisedPolarity: 'positive' | 'negative' =
       row.polarity === 'positive' || row.polarity === 'negative'
         ? (row.polarity as 'positive' | 'negative')
@@ -1146,6 +1146,15 @@ const loadUserInsightContext = cache(async (userId: string): Promise<UserInsight
       polarity: normalisedPolarity,
     }
   })
+
+  if (!issues.length && visibleGoals.length) {
+    issues = visibleGoals.map((goal) => ({
+      id: goal.id,
+      name: goal.name,
+      slug: slugify(goal.name),
+      polarity: inferPolarityFromName(goal.name),
+    }))
+  }
 
   const onboardingComplete = visibleGoals.length > 0
 
@@ -1263,7 +1272,7 @@ const loadUserLandingContext = cache(async (userId: string): Promise<UserInsight
     visibleGoals.push(healthGoals[goal.name.toLowerCase()])
   }
 
-  const issues = issuesRows.map((row) => {
+  let issues = issuesRows.map((row) => {
     const normalisedPolarity: 'positive' | 'negative' =
       row.polarity === 'positive' || row.polarity === 'negative'
         ? (row.polarity as 'positive' | 'negative')
@@ -1275,6 +1284,15 @@ const loadUserLandingContext = cache(async (userId: string): Promise<UserInsight
       polarity: normalisedPolarity,
     }
   })
+
+  if (!issues.length && visibleGoals.length) {
+    issues = visibleGoals.map((goal) => ({
+      id: goal.id,
+      name: goal.name,
+      slug: slugify(goal.name),
+      polarity: inferPolarityFromName(goal.name),
+    }))
+  }
 
   const onboardingComplete = visibleGoals.length > 0
 
