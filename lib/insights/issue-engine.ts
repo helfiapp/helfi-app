@@ -2942,9 +2942,29 @@ async function buildNutritionSection(
   const suggestedFocus = llmResult.suggested
     .map((item) => ({ title: item.name, reason: item.reason, detail: item.protocol ?? null }))
     .filter((item) => allowFoodName(item.title, item.reason))
-  const avoidFoods = llmResult.avoid
+  let avoidFoods = llmResult.avoid
     .map((item) => ({ name: item.name, reason: item.reason }))
     .filter((item) => allowFoodName(item.name, item.reason))
+
+  // Deterministic top-ups to guarantee 4/4 after domain filtering
+  try {
+    const kbKey = pickKnowledgeKey(issue.name)
+    const kbNutrition = (ISSUE_KNOWLEDGE_BASE[kbKey]?.nutritionFocus ?? [])
+      .map((n) => ({ title: n.title, reason: n.detail, detail: null as string | null }))
+    const kbAvoidFoods = (ISSUE_KNOWLEDGE_BASE[kbKey]?.avoidFoods ?? [])
+      .map((n) => ({ name: n.title, reason: n.detail }))
+
+    // Only foods; ensure we keep any LLM items first, then top-up from KB
+    const fbSuggested = kbNutrition.filter((n) => allowFoodName(n.title, n.reason))
+    const fbAvoid = kbAvoidFoods.filter((n) => allowFoodName(n.name, n.reason))
+
+    const suggestedFocusTopped = ensureMin(suggestedFocus, fbSuggested, 4)
+    const avoidFoodsTopped = ensureMin(avoidFoods, fbAvoid, 4)
+
+    // Reassign to maintain references used below
+    ;(suggestedFocus as any) = suggestedFocusTopped
+    avoidFoods = avoidFoodsTopped
+  } catch {}
 
   const validated = suggestedFocus.length >= 4 && avoidFoods.length >= 4
 
@@ -3159,16 +3179,32 @@ async function buildLifestyleSection(
     }))
   }
 
-  const suggestedHabits = llmResult.suggested.map((item) => ({
+  let suggestedHabits = llmResult.suggested.map((item) => ({
     title: item.name,
     reason: item.reason,
     detail: item.protocol ?? null,
   }))
 
-  const avoidHabits = llmResult.avoid.map((item) => ({
+  let avoidHabits = llmResult.avoid.map((item) => ({
     title: item.name,
     reason: item.reason,
   }))
+
+  // Deterministic top-ups from KB to guarantee 4/4 after filtering
+  try {
+    const kbKey = pickKnowledgeKey(issue.name)
+    const kbLifestyle = (ISSUE_KNOWLEDGE_BASE[kbKey]?.lifestyleFocus ?? [])
+      .map((n) => ({ title: n.title, reason: n.detail, detail: null as string | null }))
+    // For lifestyle "avoid", use avoidExercises plus any avoidFoods phrased as habits
+    const kbAvoidFromExercises = (ISSUE_KNOWLEDGE_BASE[kbKey]?.avoidExercises ?? []).map((n) => ({ title: n.title, reason: n.detail }))
+    const kbAvoidFromFoods = (ISSUE_KNOWLEDGE_BASE[kbKey]?.avoidFoods ?? []).map((n) => ({ title: n.title, reason: n.detail }))
+
+    const suggestedHabitsTopped = ensureMin(suggestedHabits, kbLifestyle, 4)
+    const avoidHabitsTopped = ensureMin(avoidHabits, [...kbAvoidFromExercises, ...kbAvoidFromFoods], 4)
+
+    ;(suggestedHabits as any) = suggestedHabitsTopped
+    avoidHabits = avoidHabitsTopped
+  } catch {}
 
   const validated = suggestedHabits.length >= 4 && avoidHabits.length >= 4
 
