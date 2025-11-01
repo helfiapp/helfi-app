@@ -135,7 +135,7 @@ export async function generateSectionCandidates(params: {
   
   // Add exercise-specific guidance for intake exerciseTypes
   const exerciseGuidance = params.mode === 'exercise' && params.profile?.exerciseTypes?.length
-    ? `\nIMPORTANT: The user has selected these exercise types in their health intake: ${JSON.stringify(params.profile.exerciseTypes)}. If any of these exercises are supportive for "${params.issueName}", prioritize including them in the suggested array.`
+    ? `\n\nCRITICAL FOR EXERCISE MODE: The user has selected these exercise types in their health intake: ${JSON.stringify(params.profile.exerciseTypes)}. Evaluate each exercise against "${params.issueName}" - if supportive, consider including them in suggested (they will be promoted to working if they match intake selections).`
     : ''
   
   const user = `Write SECTION: ${params.mode} for issue "${params.issueName}".
@@ -367,6 +367,39 @@ function buildPrompt(
   const guidanceFocus = modeGuidance(mode)
   const header = `You are a clinician-grade health assistant helping with the issue "${issueName}".`
 
+  // CRITICAL: Explicit instruction for exercise mode - must appear early in prompt
+  const exerciseTypesInstruction = mode === 'exercise'
+    ? `
+
+═══════════════════════════════════════════════════════════════════════════════
+EXERCISE MODE - REQUIRED ACTION: EVALUATE profile.exerciseTypes IMMEDIATELY
+═══════════════════════════════════════════════════════════════════════════════
+
+BEFORE you generate any response, you MUST:
+
+1. Look at the user context JSON provided above
+2. Find the "profile" object → look for "exerciseTypes" array (e.g., ["Walking", "Bike riding", "Boxing"])
+3. For EVERY exercise in that array, ask yourself: "Is this exercise supportive for "${issueName}"?"
+4. If YES → You MUST add it to the "working" array with:
+   - name: Use the EXACT name from profile.exerciseTypes (preserve capitalization: "Bike riding" not "Bike Riding" or "Cycling")
+   - reason: Explain the mechanism (e.g., "Walking improves cardiovascular health and reduces stress, which supports libido by enhancing blood flow and reducing cortisol")
+
+CRITICAL REQUIREMENTS:
+- This check is MANDATORY - do not skip it
+- Include exercises even if focusItems is empty
+- Use exact names from profile.exerciseTypes (case-sensitive matching matters)
+- Only include exercises that are genuinely supportive for "${issueName}"
+
+EXAMPLE: If profile.exerciseTypes = ["Walking", "Bike riding", "Boxing"] and issue = "Libido":
+- Walking → Likely supportive (cardiovascular, stress reduction) → ADD to working
+- Bike riding → Evaluate (may be supportive or problematic) → ADD to working if supportive
+- Boxing → Likely supportive (testosterone, stress relief) → ADD to working
+
+═══════════════════════════════════════════════════════════════════════════════
+
+`
+    : ''
+
   const baseGuidance = `
 Provide precise, evidence-aligned guidance. Use the user context plus widely accepted best practice. If data is insufficient, state that but still offer clinician-ready suggestions.
 
@@ -399,34 +432,6 @@ All strings must be non-empty and plain text. Use null when optional fields are 
 Close every array/object and ensure the JSON is syntactically valid—never truncate or omit closing braces.
   `
 
-  // Explicit instructions for exercise mode to evaluate profile.exerciseTypes
-  const exerciseTypesInstruction = mode === 'exercise'
-    ? `
-
-EXERCISE MODE - REQUIRED EVALUATION OF INTAKE EXERCISES:
-
-You MUST perform the following steps before generating your response:
-
-1. Locate the "profile" object in the user context JSON above
-2. Find the "exerciseTypes" array within the profile object (if present)
-3. For EACH exercise listed in profile.exerciseTypes:
-   - Evaluate whether this exercise is supportive for the issue "${issueName}"
-   - Consider the physiological mechanisms by which this exercise type could help with this specific issue
-   - If the exercise IS supportive, you MUST include it in the "working" array with:
-     * The exact exercise name as it appears in profile.exerciseTypes (preserve capitalization and wording)
-     * A mechanism-based reason explaining how this specific exercise supports "${issueName}"
-4. This evaluation is REQUIRED regardless of whether focusItems is empty or contains logged exercises
-5. Do not skip this evaluation - if profile.exerciseTypes exists, you must check each exercise against the current issue
-
-Example: If profile.exerciseTypes contains ["Walking", "Bike riding", "Boxing"] and the issue is "Libido", evaluate each exercise:
-- Walking: Could be supportive for libido through cardiovascular health, stress reduction, etc.
-- Bike riding: Evaluate impact on libido (may be supportive or potentially problematic)
-- Boxing: Evaluate impact on libido (may be supportive through testosterone, stress relief, etc.)
-
-Include in "working" only those exercises that are genuinely supportive for "${issueName}" with clear mechanism-based reasons.
-`
-    : ''
-
   const forceNote = force
     ? `You must output at least ${minWorking} working item(s)${minWorking === 0 ? ' (it is acceptable for working to stay empty only if no focusItems are supportive AND no profile.exerciseTypes are supportive)' : ''}, ${minSuggested} suggested item(s), and ${minAvoid} avoid item(s). Suggested items must not duplicate any names already present in focusItems or otherItems. If logged data is sparse, rely on clinician-grade best-practice guidance for ${issueName} rather than saying everything is covered. Keep every reason to exactly two sentences (mechanism + actionable relevance with dose/timing when helpful).`
     : ''
@@ -437,7 +442,7 @@ Include in "working" only those exercises that are genuinely supportive for "${i
     ? `\nIssue-specific rules for libido:\n- Consider sex, age, weight/height, and training frequency when assessing androgen status and arousal.\n- Evaluate mechanisms: testosterone/DHT, nitric oxide/endothelial function, SHBG, stress/cortisol, sleep.\n- When focusItems include botanicals commonly discussed for libido (e.g., Tongkat Ali, Cistanche, Muira Puama), assess them and include in "working" if supportive with rationale; otherwise omit without moving them to suggested.\n- For males, flag 5-alpha-reductase inhibitors (e.g., saw palmetto) as potential libido-reducing; explain the DHT rationale and advise clinician discussion.\n- Provide concrete protocols where possible (e.g., dosing ranges/timing windows).\n`
     : ''
 
-  return `${header}\n\nIssue summary: ${issueSummary ?? 'Not supplied.'}\n\nUser context (JSON):\n${userContext}\n\n${baseGuidance}${exerciseTypesInstruction}\n${libidoRules}${forceNote}`
+  return `${header}\n\nIssue summary: ${issueSummary ?? 'Not supplied.'}\n\nUser context (JSON):\n${userContext}\n${exerciseTypesInstruction}\n${baseGuidance}\n${libidoRules}${forceNote}`
 }
 
 function uniqueByName<T extends { name: string }>(items: T[]): T[] {
