@@ -4,6 +4,15 @@
 
 This is a blunt handover for the next agent. The live site still fails the user’s core requirements. Fix the foundation before attempting new UX.
 
+### Executive Summary (Read This First)
+
+- After “Confirm & Begin”, all selected issues and all sections must be ready when opened.
+- Exact alignment with the latest intake; no legacy/stale issues.
+- Every section shows ≥4 Suggested and ≥4 To‑Avoid. Always.
+- “What’s Working” is only from the user’s logs (never invented).
+- Content is AI‑generated (no static KB filler). Reliability comes from how we call the AI, not from hard‑coded lists.
+- Speed SLOs: warm ≤1s; cold ≤7s. Enforce a 1‑second first‑byte rule on reads.
+
 ### User’s explicit requirements (must ALL be true)
 - After Health Intake completion ("Confirm & Begin"), Insights must be ready when the user opens them (no minute‑long waits).
 - Issue list must exactly mirror the newest intake selection (no legacy items like "Brain Fog").
@@ -53,24 +62,62 @@ This is a blunt handover for the next agent. The live site still fails the user�
 - Don’t fall back to legacy `healthGoals` once a snapshot exists.
 
 ### Action plan (order matters)
-1) AI‑only, not KB: Guarantee 4/4 via the quick generator (live now)
-   - Use `generateDegradedSectionQuick` for immediate Suggested/Avoid when cache is cold. No static KB fill for core content.
-   - Keep “What’s Working” strictly from user logs; do not fake.
+1) Enforce 1‑second first byte on every section read
+   - Never block the response on a heavy AI pipeline. Return a recent stored AI result (validated or quick) or generate a quick AI result in <1s and send it. Start the heavy generator only after responding.
 
-2) Post‑intake cache priming that actually writes (live now):
-   - Await up to ~6.5s and ensure degraded or validated entries exist for every section so first open is never cold.
+2) Build quick AI for all issues/sections before the user opens them
+   - At “Confirm & Begin”, generate quick AI results for every section of every selected issue and store them (short TTL). Cap total wait ~6–7s; if time runs out, store what’s done and continue upgrading in the background.
 
-3) 1‑second first paint from storage (live now):
-   - On read miss, we serve AI‑only degraded immediately and upgrade in the background.
+3) Guarantee ≥4/4 without KB content
+   - Quick AI calls must request ≥4 Suggested and ≥4 To‑Avoid, strictly in-domain (nutrition=foods, exercise=activities, etc.). If the first quick call returns fewer than 4/4, retry once with a tighter prompt during precompute. Do not inject static KB items.
 
-4) Observability (live now):
-   - Include `{ cacheHit, degradedUsed, firstByteMs, computeMs }` and per‑phase LLM timings in `extras`; emit to `/api/analytics?action=insights`.
+4) “What’s Working” from real logs only
+   - Only logged items appear in “working.” Intake exercise types are context only (not “working”). Pass `exerciseTypes` so Walking/Boxing informs suggestions and is never mislabeled as avoid for Bowel Movements.
 
-5) Cut stale caches (live now):
-   - Bump `pipelineVersion` after fixes so old rows are ignored by readers.
+5) Exact issue alignment
+   - Read issues from `__SELECTED_ISSUES__`. Do not fall back to legacy goals when a snapshot exists.
+
+6) Observability that proves it
+   - Add to `extras` for every response: `{ cacheHit, quickUsed, degradedUsed, firstByteMs, generateMs, classifyMs, rewriteMs, fillMs, totalMs, pipelineVersion }`. Emit `insights-timing` analytics for live checks.
+
+7) Versioning & TTLs
+   - Bump `pipelineVersion` whenever read/write logic changes. Quick results: TTL ≈ 2–5 min. Validated results: TTL ≈ 15–30 min. Readers prefer validated but must not block.
+
+8) Remove KB content fallbacks
+   - Remove any KB-based top-ups for Suggested/Avoid. Keep only formatting helpers. All guidance content must be produced by the AI.
 
 ### Acceptance tests on live
 - For Libido and Bowel Movements: Supplements, Medications, Nutrition, Lifestyle each show ≥4 Suggested and ≥4 To‑Avoid; “What’s Working” populated from logs. First paint ≤1s warm / ≤7s cold. No legacy issues in the list.
+
+### Live Verification Protocol (step‑by‑step)
+1) Complete intake with 3–4 issues, include Walking in exercise types, press Confirm & Begin.
+2) Within 10s, open Insights and check three different issues across Supplements, Medications, Exercise, Nutrition:
+   - Immediate content (quick result) appears; silent upgrade follows.
+   - `extras.firstByteMs` ≤ 1000ms and `extras.cacheHit || extras.quickUsed` is true.
+   - Each section shows ≥4 Suggested and ≥4 To‑Avoid.
+   - Exercise for Bowel Movements does not flag Walking as avoid.
+3) Reload to confirm validated results arrive within 7s cold.
+4) If any check fails, trigger stop conditions and roll back.
+
+### Stop / Rollback Conditions
+- If p95 first byte > 7s OR any section repeatedly returns <4/4:
+  - Force quick‑first on all reads and pause heavy generation.
+  - Revert the last deployment if metrics don’t recover in 30 minutes.
+  - Log an incident with screenshots and timings.
+
+### What future agents must NOT do
+- Do not block first paint on multi‑pass AI.
+- Do not inject KB/static content to hit 4/4.
+- Do not show “What’s Working” unless it comes from the user’s logs.
+- Do not fall back to legacy `healthGoals` when `__SELECTED_ISSUES__` exists.
+
+### Implementation checklist (single page)
+- Reads: 1‑second first byte; return stored or quick AI; background upgrade.
+- Confirm & Begin: quick AI for all sections; cap wait ~6–7s; store partials; continue upgrading.
+- Counts: quick call requests ≥4/4; retry once if short; no KB insertion.
+- Logs: only logs populate “working”; intake exercise types inform suggestions only.
+- Analytics: emit timings; keep `extras` fields consistent; include `pipelineVersion`.
+- Version/TTL: bump `pipelineVersion`; set short TTL for quick, longer for validated.
 
 ### Notes for future agents (do not repeat)
 - Do not add hard‑coded KB items to force counts. Keep content AI‑generated. If minimums fail, use the AI quick path and then upgrade.
