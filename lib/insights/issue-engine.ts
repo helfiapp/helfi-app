@@ -2,7 +2,7 @@ import { cache } from 'react'
 import { prisma } from '@/lib/prisma'
 import { authOptions } from '@/lib/auth'
 import { getServerSession } from 'next-auth'
-import { generateSectionInsightsFromLLM, generateDegradedSection, generateDegradedSectionQuick } from './llm'
+import { generateSectionInsightsFromLLM, generateDegradedSection, generateDegradedSectionQuick, generateDegradedSectionQuickStrict } from './llm'
 
 export type IssueSectionKey =
   | 'overview'
@@ -138,6 +138,8 @@ const RATING_SCALE_DEFAULT = 6
 const SECTION_CACHE_TTL_MS = 1000 * 60 * 15
 const DEGRADED_CACHE_TTL_MS = 1000 * 60 * 2
 const CURRENT_PIPELINE_VERSION = 'v4'
+const FORCE_QUICK_FIRST = process.env.INSIGHTS_FORCE_QUICK_FIRST === 'true'
+const PAUSE_HEAVY = process.env.INSIGHTS_PAUSE_HEAVY === 'true'
 
 const RECENT_DATA_WINDOW_MS = 1000 * 60 * 60 * 24
 
@@ -988,6 +990,271 @@ export async function precomputeIssueSectionsForUser(
   })
 }
 
+export async function precomputeQuickSectionsForUser(
+  userId: string,
+  options: PrecomputeOptions = {}
+) {
+  const context = await loadUserInsightContext(userId)
+  const availableSlugs = context.issues.map((issue) => issue.slug)
+
+  const targetSlugs = options.slugs && options.slugs.length
+    ? Array.from(new Set(options.slugs)).filter(Boolean)
+    : availableSlugs
+
+  if (!targetSlugs.length) return
+
+  const defaultSections = ISSUE_SECTION_ORDER.filter((section) => section !== 'overview' && section !== 'interactions')
+  let targetSections = options.sections && options.sections.length
+    ? Array.from(new Set(options.sections)).filter((s) => s !== 'overview' && s !== 'interactions')
+    : defaultSections
+
+  if (!targetSections.length) return
+
+  const mode = options.mode ?? 'latest'
+  const range = options.range
+  const rangeKey = encodeRange(range)
+  const concurrency = Math.max(1, options.concurrency ?? 4)
+
+  type CountPair = { suggested: number; avoid: number }
+  const countBySection = (section: IssueSectionKey, extras: any): CountPair => {
+    switch (section) {
+      case 'supplements':
+      case 'medications':
+        return {
+          suggested: Array.isArray(extras?.suggestedAdditions) ? extras.suggestedAdditions.length : 0,
+          avoid: Array.isArray(extras?.avoidList) ? extras.avoidList.length : 0,
+        }
+      case 'exercise':
+        return {
+          suggested: Array.isArray(extras?.suggestedActivities) ? extras.suggestedActivities.length : 0,
+          avoid: Array.isArray(extras?.avoidActivities) ? extras.avoidActivities.length : 0,
+        }
+      case 'nutrition':
+        return {
+          suggested: Array.isArray(extras?.suggestedFocus) ? extras.suggestedFocus.length : 0,
+          avoid: Array.isArray(extras?.avoidFoods) ? extras.avoidFoods.length : 0,
+        }
+      case 'lifestyle':
+        return {
+          suggested: Array.isArray(extras?.suggestedHabits) ? extras.suggestedHabits.length : 0,
+          avoid: Array.isArray(extras?.avoidHabits) ? extras.avoidHabits.length : 0,
+        }
+      case 'labs':
+        return {
+          suggested: Array.isArray(extras?.suggestedLabs) ? extras.suggestedLabs.length : 0,
+          avoid: Array.isArray(extras?.avoidLabs) ? extras.avoidLabs.length : 0,
+        }
+      default:
+        return { suggested: 0, avoid: 0 }
+    }
+  }
+
+  const tasks = targetSlugs.flatMap((slug) => targetSections.map((section) => ({ slug, section })))
+
+  await runWithConcurrency(tasks, concurrency, async ({ slug, section }) => {
+    // Build quick once
+    let quick = await buildQuickSection(userId, slug, section, mode)
+    // Retry once with stricter quick if needed during precompute
+    try {
+      const counts = quick ? countBySection(section, (quick as any).extras) : { suggested: 0, avoid: 0 }
+      if (!quick || counts.suggested < 4 || counts.avoid < 4) {
+        const landing = await loadUserLandingContext(userId)
+        const issue = landing.issues.find((i) => i.slug === slug) || {
+          id: `temp:${slug}`,
+          name: unslugify(slug),
+          slug,
+          polarity: inferPolarityFromName(unslugify(slug)),
+        }
+        const summary = enrichIssueSummary(issue, landing)
+        // Strict quick generation per section
+        const mapStrict = async (
+          modeKey: 'supplements' | 'medications' | 'exercise' | 'nutrition' | 'lifestyle' | 'labs'
+        ) =>
+          (await generateDegradedSectionQuickStrict({
+            issueName: summary.name,
+            issueSummary: summary.highlight,
+            items: [],
+            otherItems: [],
+            profile: landing.profile,
+            mode: modeKey,
+          }, { minSuggested: 4, minAvoid: 4 }))
+        let strictResult: any = null
+        switch (section) {
+          case 'supplements': {
+            const r = await mapStrict('supplements')
+            if (r) {
+              strictResult = {
+                issue: summary,
+                section: 'supplements',
+                generatedAt: new Date().toISOString(),
+                confidence: 0.6,
+                summary: r.summary || 'Initial guidance while we prepare a deeper report.',
+                highlights: [],
+                dataPoints: [],
+                recommendations: [],
+                mode,
+                extras: {
+                  supportiveDetails: [],
+                  suggestedAdditions: r.suggested.map((s: any) => ({ title: s.name, reason: s.reason, suggestion: s.protocol ?? null })),
+                  avoidList: r.avoid.map((a: any) => ({ name: a.name, reason: a.reason })),
+                  source: 'quick',
+                  pipelineVersion: CURRENT_PIPELINE_VERSION,
+                  validated: false,
+                  degraded: true,
+                  cacheHit: false,
+                },
+              }
+            }
+            break
+          }
+          case 'medications': {
+            const r = await mapStrict('medications')
+            if (r) {
+              strictResult = {
+                issue: summary,
+                section: 'medications',
+                generatedAt: new Date().toISOString(),
+                confidence: 0.6,
+                summary: r.summary || 'Initial guidance while we prepare a deeper report.',
+                highlights: [],
+                dataPoints: [],
+                recommendations: [],
+                mode,
+                extras: {
+                  supportiveDetails: [],
+                  suggestedAdditions: r.suggested.map((s: any) => ({ title: s.name, reason: s.reason, suggestion: s.protocol ?? null })),
+                  avoidList: r.avoid.map((a: any) => ({ name: a.name, reason: a.reason })),
+                  source: 'quick',
+                  pipelineVersion: CURRENT_PIPELINE_VERSION,
+                  validated: false,
+                  degraded: true,
+                  cacheHit: false,
+                },
+              }
+            }
+            break
+          }
+          case 'exercise': {
+            const r = await mapStrict('exercise')
+            if (r) {
+              strictResult = {
+                issue: summary,
+                section: 'exercise',
+                generatedAt: new Date().toISOString(),
+                confidence: 0.6,
+                summary: r.summary || 'Initial guidance while we prepare a deeper report.',
+                highlights: [],
+                dataPoints: [],
+                recommendations: [],
+                mode,
+                extras: {
+                  workingActivities: [],
+                  suggestedActivities: r.suggested.map((s: any) => ({ title: s.name, reason: s.reason, detail: s.protocol ?? null })),
+                  avoidActivities: r.avoid.map((a: any) => ({ title: a.name, reason: a.reason })),
+                  source: 'quick',
+                  pipelineVersion: CURRENT_PIPELINE_VERSION,
+                  validated: false,
+                  degraded: true,
+                  cacheHit: false,
+                },
+              }
+            }
+            break
+          }
+          case 'nutrition': {
+            const r = await mapStrict('nutrition')
+            if (r) {
+              strictResult = {
+                issue: summary,
+                section: 'nutrition',
+                generatedAt: new Date().toISOString(),
+                confidence: 0.6,
+                summary: r.summary || 'Initial guidance while we prepare a deeper report.',
+                highlights: [],
+                dataPoints: [],
+                recommendations: [],
+                mode,
+                extras: {
+                  workingFocus: [],
+                  suggestedFocus: r.suggested.map((s: any) => ({ title: s.name, reason: s.reason })),
+                  avoidFoods: r.avoid.map((a: any) => ({ name: a.name, reason: a.reason })),
+                  source: 'quick',
+                  pipelineVersion: CURRENT_PIPELINE_VERSION,
+                  validated: false,
+                  degraded: true,
+                  cacheHit: false,
+                },
+              }
+            }
+            break
+          }
+          case 'lifestyle': {
+            const r = await mapStrict('lifestyle')
+            if (r) {
+              strictResult = {
+                issue: summary,
+                section: 'lifestyle',
+                generatedAt: new Date().toISOString(),
+                confidence: 0.6,
+                summary: r.summary || 'Initial guidance while we prepare a deeper report.',
+                highlights: [],
+                dataPoints: [],
+                recommendations: [],
+                mode,
+                extras: {
+                  suggestedHabits: r.suggested.map((s: any) => ({ title: s.name, reason: s.reason })),
+                  avoidHabits: r.avoid.map((a: any) => ({ title: a.name, reason: a.reason })),
+                  source: 'quick',
+                  pipelineVersion: CURRENT_PIPELINE_VERSION,
+                  validated: false,
+                  degraded: true,
+                  cacheHit: false,
+                },
+              }
+            }
+            break
+          }
+          case 'labs': {
+            const r = await mapStrict('labs')
+            if (r) {
+              strictResult = {
+                issue: summary,
+                section: 'labs',
+                generatedAt: new Date().toISOString(),
+                confidence: 0.6,
+                summary: r.summary || 'Initial guidance while we prepare a deeper report.',
+                highlights: [],
+                dataPoints: [],
+                recommendations: [],
+                mode,
+                extras: {
+                  suggestedLabs: r.suggested.map((s: any) => ({ name: s.name, reason: s.reason, detail: s.protocol ?? null })),
+                  avoidLabs: r.avoid.map((a: any) => ({ name: a.name, reason: a.reason })),
+                  source: 'quick',
+                  pipelineVersion: CURRENT_PIPELINE_VERSION,
+                  validated: false,
+                  degraded: true,
+                  cacheHit: false,
+                },
+              }
+            }
+            break
+          }
+        }
+        if (strictResult) {
+          quick = strictResult
+        }
+      }
+    } catch {}
+
+    if (quick && shouldCacheSectionResult(quick)) {
+      try {
+        await upsertSectionCache({ userId, slug, section, mode, rangeKey, result: quick })
+      } catch {}
+    }
+  })
+}
+
 const loadUserInsightContext = cache(async (userId: string): Promise<UserInsightContext> => {
   const [issuesRows, user] = await Promise.all([
     prisma.$queryRawUnsafe<Array<{ id: string; name: string; polarity: string }>>(
@@ -1138,6 +1405,7 @@ const loadUserInsightContext = cache(async (userId: string): Promise<UserInsight
 
   let selectedIssues: string[] = []
   const selectedRecord = user.healthGoals.find((goal) => goal.name === '__SELECTED_ISSUES__')
+  const hasSelectedSnapshot = !!selectedRecord
   if (selectedRecord?.category) {
     try {
       const parsed = JSON.parse(selectedRecord.category)
@@ -1175,20 +1443,22 @@ const loadUserInsightContext = cache(async (userId: string): Promise<UserInsight
               }
         })
         .filter((issue) => issue.name.length > 0)
-    : issuesRows.map((row) => {
-        const normalisedPolarity: 'positive' | 'negative' =
-          row.polarity === 'positive' || row.polarity === 'negative'
-            ? (row.polarity as 'positive' | 'negative')
-            : inferPolarityFromName(row.name)
-        return {
-          id: row.id,
-          name: row.name,
-          slug: slugify(row.name),
-          polarity: normalisedPolarity,
-        }
-      })
+    : !hasSelectedSnapshot
+      ? issuesRows.map((row) => {
+          const normalisedPolarity: 'positive' | 'negative' =
+            row.polarity === 'positive' || row.polarity === 'negative'
+              ? (row.polarity as 'positive' | 'negative')
+              : inferPolarityFromName(row.name)
+          return {
+            id: row.id,
+            name: row.name,
+            slug: slugify(row.name),
+            polarity: normalisedPolarity,
+          }
+        })
+      : []
 
-  if (!issues.length && visibleGoals.length) {
+  if (!issues.length && visibleGoals.length && !hasSelectedSnapshot) {
     issues = visibleGoals.map((goal) => ({
       id: goal.id,
       name: goal.name,
@@ -1321,6 +1591,7 @@ const loadUserLandingContext = cache(async (userId: string): Promise<UserInsight
 
   let selectedIssues: string[] = []
   const selectedRecord = user.healthGoals.find((goal) => goal.name === '__SELECTED_ISSUES__')
+  const hasSelectedSnapshotLanding = !!selectedRecord
   if (selectedRecord?.category) {
     try {
       const parsed = JSON.parse(selectedRecord.category)
@@ -1358,20 +1629,22 @@ const loadUserLandingContext = cache(async (userId: string): Promise<UserInsight
               }
         })
         .filter((issue) => issue.name.length > 0)
-    : issuesRows.map((row) => {
-        const normalisedPolarity: 'positive' | 'negative' =
-          row.polarity === 'positive' || row.polarity === 'negative'
-            ? (row.polarity as 'positive' | 'negative')
-            : inferPolarityFromName(row.name)
-        return {
-          id: row.id,
-          name: row.name,
-          slug: slugify(row.name),
-          polarity: normalisedPolarity,
-        }
-      })
+    : !hasSelectedSnapshotLanding
+      ? issuesRows.map((row) => {
+          const normalisedPolarity: 'positive' | 'negative' =
+            row.polarity === 'positive' || row.polarity === 'negative'
+              ? (row.polarity as 'positive' | 'negative')
+              : inferPolarityFromName(row.name)
+          return {
+            id: row.id,
+            name: row.name,
+            slug: slugify(row.name),
+            polarity: normalisedPolarity,
+          }
+        })
+      : []
 
-  if (!issues.length && visibleGoals.length) {
+  if (!issues.length && visibleGoals.length && !hasSelectedSnapshotLanding) {
     issues = visibleGoals.map((goal) => ({
       id: goal.id,
       name: goal.name,
@@ -1542,20 +1815,53 @@ async function computeIssueSection(
   if (quick) {
     // Persist degraded with short TTL and fire background upgrade
     try {
+      const firstByteMs = Date.now() - t0
+      const extrasQuick = (quick.extras as Record<string, unknown> | undefined) ?? {}
+      quick.extras = {
+        ...extrasQuick,
+        cacheHit: false,
+        quickUsed: true,
+        degradedUsed: true,
+        firstByteMs,
+        generateMs: (extrasQuick as any)?.generateMs ?? 0,
+        classifyMs: (extrasQuick as any)?.classifyMs ?? 0,
+        rewriteMs: (extrasQuick as any)?.rewriteMs ?? 0,
+        fillMs: (extrasQuick as any)?.fillMs ?? 0,
+        totalMs: (extrasQuick as any)?.totalMs ?? firstByteMs,
+      }
       await upsertSectionCache({ userId, slug, section, mode, rangeKey, result: quick })
     } catch {}
+    // Emit analytics for cache miss quick path
+    try {
+      await emitInsightsTimingSafe({
+        userId,
+        slug,
+        section,
+        mode,
+        cache: 'miss',
+        degradedUsed: true,
+        firstByteMs: (quick.extras as any)?.firstByteMs ?? Date.now() - t0,
+        generateMs: Number(((quick.extras as any)?.generateMs) ?? 0),
+        classifyMs: Number(((quick.extras as any)?.classifyMs) ?? 0),
+        rewriteMs: Number(((quick.extras as any)?.rewriteMs) ?? 0),
+        fillMs: Number(((quick.extras as any)?.fillMs) ?? 0),
+        totalMs: Number(((quick.extras as any)?.totalMs) ?? 0),
+      })
+    } catch {}
     // Background full build (non-blocking)
-    setImmediate(async () => {
-      try {
-        const context = await loadUserInsightContext(userId)
-        const full = await buildIssueSectionWithContext(context, slug, section, { mode, range: undefined, force: false })
-        if (full && shouldCacheSectionResult(full)) {
-          await upsertSectionCache({ userId, slug, section, mode, rangeKey, result: full })
+    if (!PAUSE_HEAVY) {
+      setImmediate(async () => {
+        try {
+          const context = await loadUserInsightContext(userId)
+          const full = await buildIssueSectionWithContext(context, slug, section, { mode, range: undefined, force: false })
+          if (full && shouldCacheSectionResult(full)) {
+            await upsertSectionCache({ userId, slug, section, mode, rangeKey, result: full })
+          }
+        } catch (e) {
+          console.warn('[insights.build] background upgrade failed', e)
         }
-      } catch (e) {
-        console.warn('[insights.build] background upgrade failed', e)
-      }
-    })
+      })
+    }
     return quick
   }
 
@@ -1569,6 +1875,36 @@ async function computeIssueSection(
   })
   console.timeEnd(`[insights.build] ${slug}/${section}`)
   if (!built) return null
+  try {
+    const firstByteMs = Date.now() - t0
+    const extrasIn = (built.extras as Record<string, unknown> | undefined) ?? {}
+    built.extras = {
+      ...extrasIn,
+      cacheHit: false,
+      quickUsed: false,
+      degradedUsed: !!(extrasIn as any)?.degraded,
+      firstByteMs,
+      generateMs: (extrasIn as any)?.generateMs ?? 0,
+      classifyMs: (extrasIn as any)?.classifyMs ?? 0,
+      rewriteMs: (extrasIn as any)?.rewriteMs ?? 0,
+      fillMs: (extrasIn as any)?.fillMs ?? 0,
+      totalMs: (extrasIn as any)?.totalMs ?? firstByteMs,
+    }
+    await emitInsightsTimingSafe({
+      userId,
+      slug,
+      section,
+      mode,
+      cache: 'miss',
+      degradedUsed: !!(built.extras as any)?.degraded,
+      firstByteMs,
+      generateMs: Number(((built.extras as any)?.generateMs) ?? 0),
+      classifyMs: Number(((built.extras as any)?.classifyMs) ?? 0),
+      rewriteMs: Number(((built.extras as any)?.rewriteMs) ?? 0),
+      fillMs: Number(((built.extras as any)?.fillMs) ?? 0),
+      totalMs: Number(((built.extras as any)?.totalMs) ?? 0),
+    })
+  } catch {}
   if (shouldCacheSectionResult(built)) {
     await upsertSectionCache({ userId, slug, section, mode, rangeKey, result: built })
   }
@@ -3510,20 +3846,8 @@ async function buildLifestyleSection(
     }
   }
 
-  let workingHabits = llmResult.working.map((item) => ({
-    title: item.name,
-    reason: item.reason,
-    detail: item.dosage ?? item.timing ?? '',
-  }))
-
-  // Deterministic enrichment: if no AI-flagged working habits but profile has signals, reflect them
-  if (workingHabits.length === 0 && hasLifestyleSignals) {
-    workingHabits = lifestyleItems.slice(0, 4).map((it) => ({
-      title: it.name,
-      reason: 'Based on your profile data',
-      detail: it.dosage ?? '',
-    }))
-  }
+  // "What's Working" must only come from real logs; lifestyle has no logs → keep empty
+  let workingHabits: Array<{ title: string; reason: string; detail: string }> = []
 
   let suggestedHabits = llmResult.suggested.map((item) => ({
     title: item.name,

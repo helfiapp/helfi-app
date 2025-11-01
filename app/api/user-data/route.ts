@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { precomputeIssueSectionsForUser } from '@/lib/insights/issue-engine'
+import { precomputeIssueSectionsForUser, precomputeQuickSectionsForUser } from '@/lib/insights/issue-engine'
 import { triggerBackgroundRegeneration } from '@/lib/insights/regeneration-service'
 
 export async function GET(request: NextRequest) {
@@ -714,17 +714,21 @@ export async function POST(request: NextRequest) {
     if (user?.id) {
       // Prime insights cache so sections are ready immediately after intake
       try {
-        console.log('🚀 Priming insights cache for user:', user.id)
-        const priming = precomputeIssueSectionsForUser(user.id, { concurrency: 4 })
+        console.log('🚀 Priming insights QUICK cache for user:', user.id)
+        const quickPriming = precomputeQuickSectionsForUser(user.id, { concurrency: 4 })
         // Wait up to ~6.5s; do not block longer
         await Promise.race([
-          priming.then(() => 'done'),
+          quickPriming.then(() => 'done'),
           new Promise((resolve) => setTimeout(() => resolve('timeout'), 6500)),
         ])
-        console.log('✅ Cache priming finished or timed out (<=6.5s)')
+        console.log('✅ Quick cache priming finished or timed out (<=6.5s)')
       } catch (e) {
-        console.warn('⚠️ Cache priming failed (continuing):', e)
+        console.warn('⚠️ Quick cache priming failed (continuing):', e)
       }
+      // Fire-and-forget heavy precompute in background (do not block response)
+      try {
+        precomputeIssueSectionsForUser(user.id, { concurrency: 4 }).catch(() => {})
+      } catch {}
 
       // NEW APPROACH: Event-driven regeneration based on what actually changed
       // Instead of regenerating everything, we trigger regeneration only for affected sections
