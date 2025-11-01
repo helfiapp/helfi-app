@@ -1,5 +1,66 @@
 <!-- a49c4e34-eb45-492f-95eb-c25850b4e02a 17da865a-2c44-4b32-b544-6c5810394ab1 -->
 
+## SESSION HANDOVER — 2025-11-01 (Truthful status + explicit requirements)
+
+This is a blunt handover for the next agent. The live site still fails the user’s core requirements. Fix the foundation before attempting new UX.
+
+### User’s explicit requirements (must ALL be true)
+- After Health Intake completion ("Confirm & Begin"), Insights must be ready when the user opens them (no minute‑long waits).
+- Issue list must exactly mirror the newest intake selection (no legacy items like "Brain Fog").
+- Every section returns at least 4 Suggested and 4 To‑Avoid items, every time.
+- “What’s Working” reflects logged items immediately (supplements/exercise/etc.) with reasons tied to the selected issue.
+- Content remains AI‑generated, but reliability is non‑negotiable: guarantee the counts and instant first paint.
+- Performance SLOs: warm ≤1s; cold ≤7s.
+
+### Today’s reality (2025‑11‑01)
+- Libido → Supplements shows only 1 avoid item; "What’s Working" empty despite many logged supplements.
+- Cold opens still occur; users wait tens of seconds when caches are cold.
+- Selected issue alignment is improved but not fully verified under live traffic.
+
+### Root causes (by file)
+- `lib/insights/issue-engine.ts`:
+  - Supplements/Medications 4/4 disabled in practice: `kbAddLocal`/`kbAvoidLocal` are declared but not populated; `ensureMin(...)` falls back to empty arrays.
+  - Read path still blocks on heavy context + LLM when cache is cold; degraded result not guaranteed within 1s.
+- `app/api/user-data/route.ts`:
+  - Precompute after intake doesn’t reliably persist usable results before redirect; cache may still be cold.
+- Landing issue selection:
+  - We now prefer `__SELECTED_ISSUES__`, but historic data and missing backfill can still leak legacy goals.
+
+### What changed today (shipped now)
+- Safer `__SELECTED_ISSUES__` writes + detailed logging on GET/POST.
+- Onboarding Step 4 now snapshots selected issues via `/api/user-data`.
+- Landing loader prefers `__SELECTED_ISSUES__` when `CheckinIssues` is empty.
+- Nutrition & Lifestyle: deterministic KB top‑ups added to guarantee 4/4 after domain filtering (build fixed with null‑safe KB access).
+- NOT YET FIXED: Supplements/Medications still missing populated KB fallbacks → <4/4 persists live.
+
+### Do not repeat
+- Don’t add more background jobs until cache writes/reads are proven.
+- Don’t block first paint on LLM; enforce a ≤1s storage response.
+- Don’t allow <4/4 to reach the client.
+- Don’t fall back to legacy `healthGoals` once a snapshot exists.
+
+### Action plan (order matters)
+1) Reinstate 4/4 for Supplements/Medications (24–48h):
+   - Populate `kbAddLocal`/`kbAvoidLocal` from `ISSUE_KNOWLEDGE_BASE[pickKnowledgeKey(issue.name)]`.
+   - Deterministically map logged items into “What’s Working” when the LLM omits them (dose/timing from logs).
+   - Maintain domain filters so cross‑domain leakage does not occur.
+
+2) Post‑intake cache priming that actually works (same window):
+   - On `POST /api/user-data` after Confirm & Begin, run `precomputeIssueSectionsForUser` for the selected issues with concurrency 3–4 and await completion up to ~5–7s. If validated results aren’t ready, upsert short‑TTL degraded entries for every section so the read path never goes cold.
+
+3) 1‑second first paint from storage:
+   - On read, time‑cap to ~1s. If no validated cache, serve latest stored (validated or degraded) immediately and trigger background upgrade.
+
+4) Observability:
+   - Include `{ cacheHit, degradedUsed, firstByteMs, computeMs }` and per‑phase LLM timings in `extras`; emit to `/api/analytics?action=insights`.
+
+5) Cut stale caches:
+   - Bump `pipelineVersion` after fixes so old rows are ignored by readers.
+
+### Acceptance tests on live
+- For Libido and Bowel Movements: Supplements, Medications, Nutrition, Lifestyle each show ≥4 Suggested and ≥4 To‑Avoid; “What’s Working” populated from logs. First paint ≤1s warm / ≤7s cold. No legacy issues in the list.
+
+---
 ## SESSION HANDOVER — 2025-10-31
 
 ### What was completed in this session
@@ -233,4 +294,29 @@ Do not deploy from this branch without approval. To restore the prior v2 baselin
 - v3 attempt commit: d04c946bf2486789ff0a4e9104fa8d3020c2af0a
   - Scope: llm.ts, issue-engine.ts, prefetch route, client prefetcher, analytics route
   - Effect: slower cold path, no immediate degraded render, timings not visible in `extras`.
+## SESSION HANDOVER — 2025-11-01
+
+### What was attempted this session
+1) Removed deterministic KB fallbacks across all sections so insights now depend entirely on live LLM output (commits `c2d4609`, `8418561`).
+   - Deleted the starter-path scaffolding and KB top-ups that previously forced ≥4 Suggested/Avoid items.
+   - Ensured caches now only persist genuine LLM results; degraded states are short-lived (no static filler).
+2) Tried to align tracked issues with the user’s intake selections.
+   - Added a snapshot mechanism that writes the selected goals to a special `HealthGoal` record `__SELECTED_ISSUES__` via `/api/user-data`.
+   - Updated both `loadUserInsightContext` and `loadUserLandingContext` to prioritise that snapshot (then fall back to `CheckinIssues`, then visible `healthGoals` if needed).
+3) Hot-fixed the empty Insights landing screen by temporarily falling back to historic `healthGoals` when `CheckinIssues` is empty (commit `3fe2e03`).
+
+### Current blockers (still unresolved)
+1) **Brain Fog (and other stale issues) continue to appear on Insights** even when the intake flow only lists Libido, Erection Quality, Energy, and Bowel Movements.
+   - Re-running all 11 intake steps still saves only those four issues, but the Insights landing payload contains extra items inherited from historical `healthGoals`.
+   - The newly introduced `__SELECTED_ISSUES__` record is not being refreshed reliably; either the client never posts `data.goals`, or an older route overwrites the record with the legacy list after we save.
+   - `CheckinIssues` remains empty for this account in production (feature flag off), so the fallback path keeps promoting stale `healthGoals`.
+2) **We no longer inject KB fallbacks**, so sections now display fewer than 4 Suggested/Avoid items live until the upstream misalignment is fixed. The user considers this a regression because they expect populated guidance across all issues immediately.
+
+### Recommended next steps
+1) Instrument `/api/user-data` (GET + POST) to confirm exactly what goals the client sends and receives. Log the parsed list and whether `__SELECTED_ISSUES__` is updated.
+2) Audit every code path that touches `HealthGoal` records:
+   - Identify jobs or routes that might reinsert legacy goals (e.g., background syncs, admin tooling, old onboarding endpoints).
+   - Confirm the intake flow actually calls `POST /api/user-data` with the current selection on every save.
+3) Decide on a single source of truth for tracked issues (likely `CheckinIssues` once the feature flag is enabled) and migrate existing data, avoiding fallbacks to legacy healthGoals that mask the real bug.
+4) Only reintroduce deterministic fallbacks once the issue source is reliable; otherwise users see empty Suggested/Avoid tabs when the LLM under-delivers.
 

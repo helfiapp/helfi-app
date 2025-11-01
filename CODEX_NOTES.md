@@ -1,5 +1,92 @@
 # CODEX NOTES
 
+## FRANK HANDOVER — 2025-11-01 (Live still not meeting requirements)
+
+This is a blunt status for the next agent. The live site is still failing core requirements. Below is exactly what the user expects, what is broken, why it is broken (with file-level references), what changed today, and what must be done next.
+
+### User’s non‑negotiable requirements (verbatim intent)
+- AI results must be ready immediately after Health Intake completion ("Confirm & Begin"). No waiting a minute after opening a section.
+- Insights must reflect ONLY the issues the user selected during intake; no legacy/stale items (e.g., “Brain Fog”) appearing.
+- Each relevant section must ALWAYS show at least 4 Suggested and 4 To‑Avoid items.
+- “What’s Working” must reflect the user’s logged items (e.g., supplements, exercise) right away, with clear reasons tied to the issue.
+- Content must be AI‑generated (not static filler), but reliability is non‑negotiable: the system must guarantee the minimum counts even when the model under‑delivers.
+- Performance: warm ≤1s; cold ≤7s; initial post‑intake open must not feel cold.
+
+### Live symptoms observed right now (2025‑11‑01)
+- Libido → Supplements shows empty/weak output:
+  - “What’s Working” empty despite a long supplement list.
+  - “Supplements to Avoid” shows only 1 item (e.g., St John’s Wort) instead of ≥4.
+- Sections can still take 30–60s on first open when cache is cold.
+- Previously selected issues sometimes replaced by legacy goals (historical rows) for some accounts; improvements were made today but require verification under load.
+
+### Why this is still happening (root causes with file‑level pointers)
+1) Supplements/Medications 4/4 top‑ups are effectively disabled.
+   - In `lib/insights/issue-engine.ts` the supplements and medications builders call `ensureMin(...)` with fallbacks (`kbAddLocal`, `kbAvoidLocal`) that are never populated anymore.
+   - Result: output relies solely on live LLM and returns <4 items routinely; “What’s Working” does not map from logs when LLM omits it.
+
+2) Heavy LLM on cold path + fragile caching.
+   - `computeIssueSection(...)` still calls the full context + LLM when cache miss; degraded caching is inconsistent and not always served first.
+   - No time‑cap to return a stored result within ~1s; user sees long spinners.
+
+3) Issue source of truth drifted for some users.
+   - Landing/sections historically fell back to legacy `healthGoals` when `CheckinIssues` was empty. Today we moved toward treating `__SELECTED_ISSUES__` as authoritative, but production still needs verification and data backfill.
+
+4) Observability is insufficient.
+   - Timings/flags are not consistently exposed in `extras` or analytics, making it hard to prove cache hits vs cold builds on live.
+
+### What changed TODAY (deployed)
+- `app/api/user-data/route.ts`:
+  - Guarded `__SELECTED_ISSUES__` so we only update it when a real goals array is posted.
+  - Added precise logging for GET/POST, including parsed snapshot and payload characteristics.
+- `lib/insights/issue-engine.ts`:
+  - Landing loader now prefers `__SELECTED_ISSUES__` ahead of legacy goals when `CheckinIssues` is empty.
+  - Nutrition and Lifestyle now deterministically top‑up to guarantee 4/4 after domain filtering using `ISSUE_KNOWLEDGE_BASE` (live). Build error from KB indexing was fixed (null‑safe access added).
+  - NOTE: Supplements/Medications still need KB‑driven top‑ups re‑enabled (see Next Steps). Their fallback arrays are currently empty → 4/4 is not guaranteed.
+- `app/onboarding/page.tsx`:
+  - On Step 4 we snapshot selected issues to `/api/user-data` so Insights aligns with intake even when check‑ins are disabled.
+
+### Evidence (live)
+- Screenshots show Libido → Supplements with only 1 avoid item and no working mapping despite many logged supplements.
+- First‑open latency still spikes on cold paths.
+
+### Do NOT repeat
+- Don’t add more background layers on a broken cache. Fix cache writes/reads first and prove they work with analytics.
+- Don’t block first paint on LLM. If you cannot guarantee a warm cache after intake, you must serve a stored/degraded result within ~1s, then upgrade in background.
+- Don’t return <4/4 in any section. If the model under‑delivers, run a guaranteed fill stage (AI or KB‑assisted) before responding.
+- Don’t fall back to legacy `healthGoals` once `__SELECTED_ISSUES__` exists for the user.
+
+### Immediate next steps (actionable)
+1) Fix Supplements/Medications 4/4 deterministically (today/tomorrow):
+   - In `buildSupplementsSection` and `buildMedicationsSection`, repopulate `kbAddLocal`/`kbAvoidLocal` from `ISSUE_KNOWLEDGE_BASE[pickKnowledgeKey(issue.name)]` and keep the existing `ensureMin(...)` calls. Also map logged supplements/medications to “What’s Working” when the LLM omits them.
+   - Acceptance: Libido and Bowel Movements show ≥4 Suggested and ≥4 Avoid in Supplements and Medications within one page refresh.
+
+2) Make post‑intake insights actually ready:
+   - On `POST /api/user-data` after “Confirm & Begin”, synchronously kick a bounded precompute for all selected issues/sections and do not redirect until cache writes succeed (or a short timeout writes a degraded result). Limit concurrency and instrument timings.
+
+3) Enforce a strict 1s first‑byte policy on read:
+   - On section GET, if no validated cache in ~1s, return stored degraded (short TTL) immediately and upgrade in background; never leave users waiting.
+
+4) Observability you can read in production:
+   - Put `{ cacheHit, degradedUsed, firstByteMs, computeMs }` and per‑phase LLM timings into `extras`, and emit to `/api/analytics?action=insights`.
+
+5) Cut through stale caches:
+   - Bump `pipelineVersion` once 4/4 is re‑enabled everywhere so old “latest” rows are ignored.
+
+### Acceptance criteria (restate)
+- After intake completion (“Confirm & Begin”), opening any issue → section returns data within ≤1s (warm) or ≤7s (cold) and shows ≥4 Suggested and ≥4 Avoid, with “What’s Working” reflecting logged items when present. Issue list matches intake selection exactly.
+
+---
+
+## SESSION LOG — 2025-11-01 (Issue selection still misaligned)
+- **User-reported symptom:** Insights landing lists “Brain Fog” (and occasionally other legacy issues) even after the health intake is reconfirmed with only Libido, Erection Quality, Energy, and Bowel Movements selected. Re-running all 11 steps does not remove the extra issue.
+- **Recent changes (now live):**
+  - Commit `c2d4609`: stripped all deterministic KB fallbacks so sections only display genuine LLM output (no forced ≥4 Suggested/Avoid). This exposed the underlying data problem because guidance now stays empty until the correct issue list is resolved.
+  - Commit `3fe2e03`: reintroduced a temporary fallback to historic `healthGoals` so Insights didn’t render blank when `CheckinIssues` is empty (check-ins feature flag is off in production).
+  - Commit `8418561`: attempted to snapshot the intake selection by writing `__SELECTED_ISSUES__` via `/api/user-data` and prioritising that list inside `loadUserInsightContext`/`loadUserLandingContext`.
+- **What still goes wrong:** On production, the snapshot either never updates or is immediately overwritten by legacy data. `CheckinIssues` returns zero rows, so the fallback path keeps pulling from older `healthGoals` records that still include “Brain Fog.” Repeating the intake flow does not change what Insights shows.
+- **Do not repeat:** merely shuffling fallback order or deleting KB entries will not fix the core issue. The real fix requires confirming which service writes the authoritative issue list, instrumenting `/api/user-data` (and any other writers) to ensure the selected set is saved, and migrating legacy health goal rows that should no longer surface.
+- **Next actions recommended:** log the exact payloads hitting `/api/user-data`, identify every code path that mutates `HealthGoal` rows, and either (a) turn on `CheckinIssues` for production users and migrate the data, or (b) ensure the snapshot row cannot be overwritten by historical records.
+
 ## LIVE USER FEEDBACK — 2025-10-24
 1) Supplements → What’s Working shows “You’re not taking any supplements…” for Libido despite user logging multiple libido-supportive supplements.
    - Likely cause: the new “starter” path sets `extras.supportiveDetails = []` for supplements, so the Working tab renders empty until the full AI upgrade arrives. This is misleading and looks like “no data”.
