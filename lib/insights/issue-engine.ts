@@ -136,7 +136,7 @@ interface BloodResultsData {
 const RATING_SCALE_DEFAULT = 6
 const SECTION_CACHE_TTL_MS = 1000 * 60 * 15
 const DEGRADED_CACHE_TTL_MS = 1000 * 60 * 2
-const CURRENT_PIPELINE_VERSION = 'v3'
+const CURRENT_PIPELINE_VERSION = 'v4'
 
 const RECENT_DATA_WINDOW_MS = 1000 * 60 * 60 * 24
 
@@ -1482,17 +1482,44 @@ async function computeIssueSection(
   mode: ReportMode,
   _rangeKey: string
 ): Promise<IssueSectionResult | null> {
+  const t0 = Date.now()
   const rangeKey = _rangeKey
   const cached = await readSectionCache(userId, slug, section, mode, rangeKey)
   if (cached) {
-    const extras = (cached.result.extras as Record<string, unknown> | undefined) ?? {}
-    const pipelineVersion = String(extras['pipelineVersion'] ?? '')
-    const validated = Boolean(extras['validated'])
-    const degraded = Boolean(extras['degraded'])
+    const extrasIn = (cached.result.extras as Record<string, unknown> | undefined) ?? {}
+    const pipelineVersion = String(extrasIn['pipelineVersion'] ?? '')
+    const validated = Boolean(extrasIn['validated'])
+    const degraded = Boolean(extrasIn['degraded'])
     const ageMs = Date.now() - cached.updatedAt.getTime()
     const ttl = degraded ? DEGRADED_CACHE_TTL_MS : SECTION_CACHE_TTL_MS
     const ok = ageMs < ttl && (validated ? pipelineVersion === CURRENT_PIPELINE_VERSION : degraded)
-    if (ok) return cached.result
+    if (ok) {
+      const enriched: IssueSectionResult = {
+        ...cached.result,
+        extras: {
+          ...extrasIn,
+          cacheHit: true,
+          degradedUsed: !!extrasIn['degraded'],
+          firstByteMs: Date.now() - t0,
+          computeMs: 0,
+        },
+      }
+      emitInsightsTimingSafe({
+        userId,
+        slug,
+        section,
+        mode,
+        cache: 'hit',
+        degradedUsed: !!extrasIn['degraded'],
+        generateMs: Number((extrasIn as any)?.generateMs ?? 0),
+        classifyMs: Number((extrasIn as any)?.classifyMs ?? 0),
+        rewriteMs: Number((extrasIn as any)?.rewriteMs ?? 0),
+        fillMs: Number((extrasIn as any)?.fillMs ?? 0),
+        totalMs: Number((extrasIn as any)?.totalMs ?? 0),
+        firstByteMs: enriched.extras?.firstByteMs as number,
+      }).catch(() => {})
+      return enriched
+    }
   }
 
   console.time(`[insights.build] ${slug}/${section}`)
@@ -1503,10 +1530,80 @@ async function computeIssueSection(
     force: false,
   })
   console.timeEnd(`[insights.build] ${slug}/${section}`)
-  if (built && shouldCacheSectionResult(built)) {
-    await upsertSectionCache({ userId, slug, section, mode, rangeKey, result: built })
+  if (!built) return null
+  const extrasBuilt = (built.extras as Record<string, unknown> | undefined) ?? {}
+  const enriched: IssueSectionResult = {
+    ...built,
+    extras: {
+      ...extrasBuilt,
+      cacheHit: false,
+      degradedUsed: !!extrasBuilt['degraded'],
+      firstByteMs: Date.now() - t0,
+      computeMs: Date.now() - t0,
+    },
   }
-  return built
+  if (shouldCacheSectionResult(enriched)) {
+    await upsertSectionCache({ userId, slug, section, mode, rangeKey, result: enriched })
+  }
+  emitInsightsTimingSafe({
+    userId,
+    slug,
+    section,
+    mode,
+    cache: 'miss',
+    degradedUsed: !!enriched.extras?.['degraded'],
+    generateMs: Number((enriched.extras as any)?.generateMs ?? 0),
+    classifyMs: Number((enriched.extras as any)?.classifyMs ?? 0),
+    rewriteMs: Number((enriched.extras as any)?.rewriteMs ?? 0),
+    fillMs: Number((enriched.extras as any)?.fillMs ?? 0),
+    totalMs: Number((enriched.extras as any)?.totalMs ?? 0),
+    firstByteMs: enriched.extras?.firstByteMs as number,
+  }).catch(() => {})
+  return enriched
+}
+
+async function emitInsightsTimingSafe(event: {
+  userId: string
+  slug: string
+  section: IssueSectionKey
+  mode: ReportMode
+  cache: 'hit' | 'miss'
+  degradedUsed: boolean
+  generateMs?: number
+  classifyMs?: number
+  rewriteMs?: number
+  fillMs?: number
+  totalMs?: number
+  firstByteMs?: number
+}) {
+  try {
+    const base = process.env.NEXT_PUBLIC_BASE_URL || process.env.ANALYTICS_BASE_URL || ''
+    const url = base && /^https?:\/\//.test(base)
+      ? `${base.replace(/\/$/, '')}/api/analytics`
+      : `${process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://helfi.ai'}/api/analytics`
+    await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'insights-timing',
+        action: 'insights',
+        userId: event.userId,
+        issueSlug: event.slug,
+        section: event.section,
+        mode: event.mode,
+        cache: event.cache,
+        degradedUsed: event.degradedUsed,
+        generateMs: event.generateMs ?? null,
+        classifyMs: event.classifyMs ?? null,
+        rewriteMs: event.rewriteMs ?? null,
+        fillMs: event.fillMs ?? null,
+        totalMs: event.totalMs ?? null,
+        firstByteMs: event.firstByteMs ?? null,
+      }),
+    })
+  } catch {
+    // best-effort only
+  }
 }
 
 function enrichIssueSummary(issue: { id: string; name: string; polarity: 'positive' | 'negative'; slug: string }, context: UserInsightContext): IssueSummary {
@@ -2080,6 +2177,24 @@ async function buildSupplementsSection(
 
   const kbAddLocal: Array<{ pattern: RegExp; title?: string; why: string; suggested?: string }> = []
   const kbAvoidLocal: Array<{ pattern: RegExp; title?: string; why: string }> = []
+  // Populate KB fallbacks for this issue to guarantee 4/4
+  try {
+    const key = pickKnowledgeKey(issue.name)
+    if (key && ISSUE_KNOWLEDGE_BASE[key]) {
+      const kb = ISSUE_KNOWLEDGE_BASE[key]
+      if (Array.isArray(kb.helpfulMedications)) kbAddLocal.push(...kb.helpfulMedications)
+      if (Array.isArray(kb.avoidMedications)) kbAvoidLocal.push(...kb.avoidMedications)
+    }
+  } catch {}
+  // Populate KB fallbacks for this issue to guarantee 4/4
+  try {
+    const key = pickKnowledgeKey(issue.name)
+    if (key && ISSUE_KNOWLEDGE_BASE[key]) {
+      const kb = ISSUE_KNOWLEDGE_BASE[key]
+      if (Array.isArray(kb.helpfulSupplements)) kbAddLocal.push(...kb.helpfulSupplements)
+      if (Array.isArray(kb.avoidSupplements)) kbAvoidLocal.push(...kb.avoidSupplements)
+    }
+  } catch {}
 
   const supportiveDetails = llmResult.working
     .map((item) => {
@@ -2123,15 +2238,32 @@ async function buildSupplementsSection(
     alreadyCovered: false,
   }))
 
-  const kbSuggestionCandidates = kbAddLocal.map((entry) => {
-    const loggedHit = normalizedSupplements.some((supp) => entry.pattern.test(supp.name))
-    return {
+  const kbSuggestionCandidates = [
+    ...kbAddLocal.map((entry) => ({
       title: entry.title ?? displayFromPattern(entry.pattern),
       reason: entry.why,
       suggestion: entry.suggested ?? null,
-      alreadyCovered: loggedHit,
-    }
-  })
+      alreadyCovered: normalizedSupplements.some((supp) => entry.pattern.test(supp.name)),
+    })),
+    // Include gap suggestions (non-regex) if provided for this issue
+    ...(() => {
+      const out: Array<{ title: string; reason: string; suggestion: string | null; alreadyCovered: boolean }> = []
+      try {
+        const key = pickKnowledgeKey(issue.name)
+        if (key && ISSUE_KNOWLEDGE_BASE[key]?.gapSupplements) {
+          for (const g of ISSUE_KNOWLEDGE_BASE[key]!.gapSupplements!) {
+            out.push({
+              title: g.title,
+              reason: g.why,
+              suggestion: g.suggested ?? null,
+              alreadyCovered: false,
+            })
+          }
+        }
+      } catch {}
+      return out
+    })(),
+  ]
 
   const fallbackSuggestions = kbSuggestionCandidates.filter((item) => !item.alreadyCovered)
   const coveredSuggestions = kbSuggestionCandidates.filter((item) => item.alreadyCovered)
@@ -2428,15 +2560,27 @@ async function buildMedicationsSection(
     alreadyCovered: false,
   }))
 
-  const kbSuggestionCandidates = kbAddLocal.map((entry) => {
-    const loggedHit = normalizedMeds.some((med) => entry.pattern.test(med.name))
-    return {
+  const kbSuggestionCandidates = [
+    ...kbAddLocal.map((entry) => ({
       title: entry.title ?? displayFromPattern(entry.pattern),
       reason: entry.why,
       suggestion: entry.suggested ?? null,
-      alreadyCovered: loggedHit,
-    }
-  })
+      alreadyCovered: normalizedMeds.some((med) => entry.pattern.test(med.name)),
+    })),
+    // Include gap medication suggestions when present
+    ...(() => {
+      const out: Array<{ title: string; reason: string; suggestion: string | null; alreadyCovered: boolean }> = []
+      try {
+        const key = pickKnowledgeKey(issue.name)
+        if (key && ISSUE_KNOWLEDGE_BASE[key]?.gapMedications) {
+          for (const g of ISSUE_KNOWLEDGE_BASE[key]!.gapMedications!) {
+            out.push({ title: g.title, reason: g.why, suggestion: g.suggested ?? null, alreadyCovered: false })
+          }
+        }
+      } catch {}
+      return out
+    })(),
+  ]
 
   const fallbackSuggestions = kbSuggestionCandidates.filter((item) => !item.alreadyCovered)
   const coveredSuggestions = kbSuggestionCandidates.filter((item) => item.alreadyCovered)

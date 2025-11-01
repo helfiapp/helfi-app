@@ -712,6 +712,20 @@ export async function POST(request: NextRequest) {
     console.log('✅ POST /api/user-data - All updates completed successfully')
 
     if (user?.id) {
+      // Prime insights cache so sections are ready immediately after intake
+      try {
+        console.log('🚀 Priming insights cache for user:', user.id)
+        const priming = precomputeIssueSectionsForUser(user.id, { concurrency: 4 })
+        // Wait up to ~6.5s; do not block longer
+        await Promise.race([
+          priming.then(() => 'done'),
+          new Promise((resolve) => setTimeout(() => resolve('timeout'), 6500)),
+        ])
+        console.log('✅ Cache priming finished or timed out (<=6.5s)')
+      } catch (e) {
+        console.warn('⚠️ Cache priming failed (continuing):', e)
+      }
+
       // NEW APPROACH: Event-driven regeneration based on what actually changed
       // Instead of regenerating everything, we trigger regeneration only for affected sections
       const changedTypes: Array<'supplements' | 'medications' | 'food' | 'exercise' | 'health_goals' | 'profile' | 'blood_results'> = []
