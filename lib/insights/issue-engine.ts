@@ -2097,6 +2097,12 @@ async function buildQuickSection(
                 (landing.profile.exerciseTypes ?? []).map((type: string) => canonical(type))
               )
               
+              // Logging for debugging quick path
+              console.log('[exercise.working.quick] Raw profile.exerciseTypes:', landing.profile.exerciseTypes)
+              console.log('[exercise.working.quick] Canonicalized intakeExerciseTypes Set:', Array.from(intakeExerciseTypes))
+              console.log('[exercise.working.quick] LLM working items:', r.working ?? [])
+              console.log('[exercise.working.quick] LLM suggested items:', r.suggested.map(s => ({ name: s.name, reason: s.reason })))
+              
               // Process working items from LLM result
               const working = (r.working ?? []).map((item) => {
                 const itemKey = canonical(item.name)
@@ -2108,6 +2114,7 @@ async function buildQuickSection(
                   for (const intakeType of landing.profile.exerciseTypes ?? []) {
                     if (matchesExerciseType(item.name, intakeType)) {
                       hasIntakeMatch = true
+                      console.log(`[exercise.working.quick] Fuzzy matched "${item.name}" to intake type "${intakeType}"`)
                       break
                     }
                   }
@@ -2137,6 +2144,7 @@ async function buildQuickSection(
                 // Check if it matches any intake exercise type
                 for (const intakeType of intakeTypesArray) {
                   if (matchesExerciseType(suggestedItem.name, intakeType)) {
+                    console.log(`[exercise.working.quick] ✓ Promoting suggested "${suggestedItem.name}" to working (matches intake "${intakeType}")`)
                     promotedFromSuggested.push({
                       title: suggestedItem.name,
                       reason: suggestedItem.reason,
@@ -2150,7 +2158,10 @@ async function buildQuickSection(
               
               if (promotedFromSuggested.length > 0) {
                 working.push(...promotedFromSuggested)
+                console.log(`[exercise.working.quick] Promoted ${promotedFromSuggested.length} items from suggested to working`)
               }
+              
+              console.log('[exercise.working.quick] Final workingActivities:', working.map(w => w.title))
               
               return working
             })(),

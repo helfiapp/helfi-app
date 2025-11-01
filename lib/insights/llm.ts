@@ -132,10 +132,16 @@ export async function generateSectionCandidates(params: {
   if (!openai) return null
   const suggested = Math.max(4, params.count?.suggested ?? 6)
   const avoid = Math.max(4, params.count?.avoid ?? 6)
+  
+  // Add exercise-specific guidance for intake exerciseTypes
+  const exerciseGuidance = params.mode === 'exercise' && params.profile?.exerciseTypes?.length
+    ? `\nIMPORTANT: The user has selected these exercise types in their health intake: ${JSON.stringify(params.profile.exerciseTypes)}. If any of these exercises are supportive for "${params.issueName}", prioritize including them in the suggested array.`
+    : ''
+  
   const user = `Write SECTION: ${params.mode} for issue "${params.issueName}".
 Generate only two arrays: suggested and avoid. Each item must include: name, candidateType guess ∈ {food,supplement,exercise,medication,other}, reason (two sentences: mechanism + direct relevance), and optional protocol.
 Counts: suggested≥${suggested}, avoid≥${avoid}.
-Profile: ${JSON.stringify(params.profile ?? {}, null, 2)}
+Profile: ${JSON.stringify(params.profile ?? {}, null, 2)}${exerciseGuidance}
 Return strict JSON {"suggested": [...], "avoid": [...]}`
   try {
     console.time(`[insights.genCandidates:${params.mode}]`)
