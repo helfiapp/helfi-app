@@ -806,6 +806,17 @@ function HealthGoalsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
     try {
       if (process.env.NEXT_PUBLIC_CHECKINS_ENABLED === 'true') {
         const allIssues = [...goals, ...customGoals].map((name: string) => ({ name }));
+        // Fire-and-forget: snapshot selected issues for Insights fallback
+        try {
+          const currentNames = allIssues.map(i => i.name.trim()).filter(Boolean)
+          if (currentNames.length) {
+            fetch('/api/user-data', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ goals: currentNames })
+            }).catch(() => {})
+          }
+        } catch {}
         // Kick off previous list load in parallel to minimize latency
         const previousPromise = (async () => {
           try {
@@ -872,6 +883,17 @@ function HealthGoalsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
       console.warn('check-ins prompt error', e);
     }
     // Fallback if feature is disabled or an error occurred
+    // Fire-and-forget: snapshot selected issues for Insights fallback when check-ins are disabled
+    try {
+      const currentNames = [...goals, ...customGoals].map((n: string) => n.trim()).filter(Boolean)
+      if (currentNames.length) {
+        fetch('/api/user-data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ goals: currentNames })
+        }).catch(() => {})
+      }
+    } catch {}
     onNext({ goals, customGoals });
   };
 
