@@ -399,6 +399,34 @@ All strings must be non-empty and plain text. Use null when optional fields are 
 Close every array/object and ensure the JSON is syntactically valid—never truncate or omit closing braces.
   `
 
+  // Explicit instructions for exercise mode to evaluate profile.exerciseTypes
+  const exerciseTypesInstruction = mode === 'exercise'
+    ? `
+
+EXERCISE MODE - REQUIRED EVALUATION OF INTAKE EXERCISES:
+
+You MUST perform the following steps before generating your response:
+
+1. Locate the "profile" object in the user context JSON above
+2. Find the "exerciseTypes" array within the profile object (if present)
+3. For EACH exercise listed in profile.exerciseTypes:
+   - Evaluate whether this exercise is supportive for the issue "${issueName}"
+   - Consider the physiological mechanisms by which this exercise type could help with this specific issue
+   - If the exercise IS supportive, you MUST include it in the "working" array with:
+     * The exact exercise name as it appears in profile.exerciseTypes (preserve capitalization and wording)
+     * A mechanism-based reason explaining how this specific exercise supports "${issueName}"
+4. This evaluation is REQUIRED regardless of whether focusItems is empty or contains logged exercises
+5. Do not skip this evaluation - if profile.exerciseTypes exists, you must check each exercise against the current issue
+
+Example: If profile.exerciseTypes contains ["Walking", "Bike riding", "Boxing"] and the issue is "Libido", evaluate each exercise:
+- Walking: Could be supportive for libido through cardiovascular health, stress reduction, etc.
+- Bike riding: Evaluate impact on libido (may be supportive or potentially problematic)
+- Boxing: Evaluate impact on libido (may be supportive through testosterone, stress relief, etc.)
+
+Include in "working" only those exercises that are genuinely supportive for "${issueName}" with clear mechanism-based reasons.
+`
+    : ''
+
   const forceNote = force
     ? `You must output at least ${minWorking} working item(s)${minWorking === 0 ? ' (it is acceptable for working to stay empty only if no focusItems are supportive AND no profile.exerciseTypes are supportive)' : ''}, ${minSuggested} suggested item(s), and ${minAvoid} avoid item(s). Suggested items must not duplicate any names already present in focusItems or otherItems. If logged data is sparse, rely on clinician-grade best-practice guidance for ${issueName} rather than saying everything is covered. Keep every reason to exactly two sentences (mechanism + actionable relevance with dose/timing when helpful).`
     : ''
@@ -409,7 +437,7 @@ Close every array/object and ensure the JSON is syntactically valid—never trun
     ? `\nIssue-specific rules for libido:\n- Consider sex, age, weight/height, and training frequency when assessing androgen status and arousal.\n- Evaluate mechanisms: testosterone/DHT, nitric oxide/endothelial function, SHBG, stress/cortisol, sleep.\n- When focusItems include botanicals commonly discussed for libido (e.g., Tongkat Ali, Cistanche, Muira Puama), assess them and include in "working" if supportive with rationale; otherwise omit without moving them to suggested.\n- For males, flag 5-alpha-reductase inhibitors (e.g., saw palmetto) as potential libido-reducing; explain the DHT rationale and advise clinician discussion.\n- Provide concrete protocols where possible (e.g., dosing ranges/timing windows).\n`
     : ''
 
-  return `${header}\n\nIssue summary: ${issueSummary ?? 'Not supplied.'}\n\nUser context (JSON):\n${userContext}\n\n${baseGuidance}\n${libidoRules}${forceNote}`
+  return `${header}\n\nIssue summary: ${issueSummary ?? 'Not supplied.'}\n\nUser context (JSON):\n${userContext}\n\n${baseGuidance}${exerciseTypesInstruction}\n${libidoRules}${forceNote}`
 }
 
 function uniqueByName<T extends { name: string }>(items: T[]): T[] {
