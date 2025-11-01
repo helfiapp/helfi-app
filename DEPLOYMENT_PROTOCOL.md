@@ -15,6 +15,23 @@ environment.
 > links to anything other than the Helfi IDs listed below, stop immediately,
 > log out, and fix the link. Document any incident in CURRENT_ISSUES_LIVE.md.
 
+## Fast Path: GitHub Push Auto‑Deploy (Preferred)
+- Production deploys are triggered automatically by pushing to the `master` branch on GitHub.
+- Do NOT ask the user for Vercel auth or tokens to deploy. Use Git instead.
+- Steps:
+  1. Commit your changes locally.
+  2. Push to `origin master`.
+  3. Vercel will build and deploy automatically. Monitor in Vercel → Deployments until Ready.
+
+Example commands:
+```bash
+git add -A
+git commit -m "Deploy: <short summary>"
+git push origin master
+```
+
+If you only changed documentation or configuration, this same flow applies.
+
 ## 1. Confirm CLI Identity
 - Run `npx vercel whoami`.
 - Expected output: `helfiweb@gmail.com`.
@@ -33,6 +50,13 @@ environment.
   project (especially anything labelled `epg-crm`), choose **Cancel**, run
   `npx vercel logout`, and re-authenticate with the Helfi account.
 - Never run `vercel --prod` while the CLI is prompting to create a new project.
+
+## CLI Deploy (Fallback Only)
+- Use the Vercel CLI only if you specifically need to test a build from this machine and GitHub push is not an option.
+- If the CLI shows `Error: Could not retrieve Project Settings`:
+  - Prefer the GitHub push auto‑deploy path above.
+  - If you must use CLI, re‑link safely: `npx vercel link` → choose Louie Veleski’s projects → helfi-app. Verify IDs match below before running `npx vercel --prod`.
+  - Never create a new project or link anything labelled `epg-crm`.
 
 ## 3. (Optional) Quick Link Sanity Check
 - `npx vercel link --confirm`
