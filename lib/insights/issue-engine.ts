@@ -1251,6 +1251,12 @@ const loadUserLandingContext = cache(async (userId: string): Promise<UserInsight
     prisma.user.findUnique({
       where: { id: userId },
       select: {
+        gender: true,
+        height: true,
+        weight: true,
+        bodyType: true,
+        exerciseFrequency: true,
+        exerciseTypes: true,
         healthGoals: {
           select: {
             id: true,
