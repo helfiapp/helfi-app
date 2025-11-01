@@ -180,6 +180,7 @@ export async function GET(request: NextRequest) {
       console.warn('Failed to parse __SELECTED_ISSUES__ health goal', error)
       selectedGoals = []
     }
+    console.log('GET /api/user-data - Parsed __SELECTED_ISSUES__ snapshot:', { count: selectedGoals.length, goals: selectedGoals })
 
     const onboardingData = {
       gender: user.gender?.toLowerCase() || '',
@@ -286,6 +287,12 @@ export async function POST(request: NextRequest) {
       hasExercise: !!(data.exerciseFrequency || data.exerciseTypes),
       dataSize: JSON.stringify(data).length + ' characters'
     })
+    if (Array.isArray(data.goals)) {
+      const safeGoals = data.goals.map((g: any) => String(g || '').trim()).filter(Boolean)
+      console.log('🎯 POST /api/user-data - goals payload:', { count: safeGoals.length, goals: safeGoals })
+    } else {
+      console.log('ℹ️ POST /api/user-data - no goals array provided; will not modify __SELECTED_ISSUES__')
+    }
 
     // Find or create user
     console.time('⏱️ User Lookup/Creation')
@@ -397,19 +404,24 @@ export async function POST(request: NextRequest) {
       } else {
         console.log('ℹ️ No health goals to update')
       }
-
-      // Persist the canonical selected issue list separately for insights fallback
-      await prisma.healthGoal.deleteMany({
-        where: { userId: user.id, name: '__SELECTED_ISSUES__' },
-      })
-      await prisma.healthGoal.create({
-        data: {
-          userId: user.id,
-          name: '__SELECTED_ISSUES__',
-          category: JSON.stringify(Array.isArray(data.goals) ? data.goals : []),
-          currentRating: 0,
-        },
-      })
+      // Persist the canonical selected issue list only when a goals array is provided
+      if (Array.isArray(data.goals)) {
+        const safeGoals = data.goals.map((g: any) => String(g || '').trim()).filter(Boolean)
+        await prisma.healthGoal.deleteMany({
+          where: { userId: user.id, name: '__SELECTED_ISSUES__' },
+        })
+        await prisma.healthGoal.create({
+          data: {
+            userId: user.id,
+            name: '__SELECTED_ISSUES__',
+            category: JSON.stringify(safeGoals),
+            currentRating: 0,
+          },
+        })
+        console.log('📝 Saved __SELECTED_ISSUES__ snapshot:', { count: safeGoals.length, goals: safeGoals })
+      } else {
+        console.log('🔒 Preserved existing __SELECTED_ISSUES__ (no goals array provided in this request)')
+      }
     } catch (error) {
       console.error('❌ Error updating health goals:', error)
       // Continue with other updates
