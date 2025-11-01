@@ -1,11 +1,93 @@
-## SESSION HANDOVER — 2025-11-02 (Latest session - SSR performance fix)
+## SESSION HANDOVER — 2025-11-02 (Latest session - Exercise Working section fix attempts)
 
 ### Executive summary (read me first)
 - ✅ **FIXED**: SSR blocking issue - section layouts now use cache-only reads, ensuring ≤1s TTFB regardless of cache state
 - ✅ **FIXED**: Shell components now handle cache misses with client-side fetching, showing "Preparing initial guidance..." loading state
 - ✅ **FIXED**: `exerciseTypes` now included in profile object passed to LLM (was missing before)
-- ❌ **STILL BROKEN**: Exercise "Working" section remains empty even when intake exerciseTypes (Walking, Bike riding, Boxing) are identified by LLM as helpful for the issue
-- All guidance remains AI‑generated. No static/KB filler was added. Quick results are produced by the AI (single pass) and cached; validated results follow in background.
+- ❌ **STILL BROKEN**: Exercise "Working" section remains empty. Multiple fix attempts failed, including hanging on "Generating..." state
+- ❌ **NEW ISSUE**: Code changes cause infinite retry loops, causing "Generating..." to hang indefinitely
+
+### What was attempted in this session (2025-11-02) - FAILED ATTEMPTS
+1) **Added logging and matching logic** ❌
+   - Added comprehensive logging to `buildExerciseSection()` and `buildQuickSection()`
+   - Added fuzzy matching function `matchesExerciseType()` to handle variations like "Bike riding" vs "Cycling"
+   - Added logic to promote exercises from `suggested` to `working` if they match intake exerciseTypes
+   - **Result**: Didn't fix root cause - LLM still not checking intake exercises
+
+2) **Updated LLM prompt** ❌
+   - Changed prompt from "consider including" to "CRITICAL - You MUST check profile.exerciseTypes"
+   - Set `minWorking = 1` when intake exerciseTypes exist (even without logs)
+   - Added explicit requirement that intake exercises MUST appear in working if supportive
+   - **Result**: Caused hanging issue - LLM retries fail when it can't find supportive exercises
+
+3) **Added fallback logic** ❌
+   - Added fallback to directly add intake exercises to working if LLM doesn't return them
+   - Added direct LLM evaluation of intake exercises
+   - Added generic supportive reasons for intake exercises
+   - **Result**: User rejected fallback approach - wants root cause fix, not workarounds
+
+4) **Attempted to fix hanging** ❌
+   - Reduced maxRetries to 1 when checking intake exercises
+   - Added lenient acceptance logic to accept results with working items even if not meeting strict minimums
+   - **Result**: Still hanging - the real issue is the LLM prompt/approach is fundamentally wrong
+
+### What FAILED and why
+1. **Over-engineered matching logic**: Added complex fuzzy matching and promotion logic when the real issue is the LLM not checking `profile.exerciseTypes` at all
+2. **Wrong prompt approach**: Made prompt too strict with "MUST" requirements and `minWorking=1`, causing retry loops when LLM genuinely can't find supportive exercises
+3. **Adding complexity instead of fixing root cause**: The LLM already receives `profile.exerciseTypes` in the user context JSON. The issue is the prompt doesn't explicitly instruct it to evaluate those exercises for the current issue and include them in working if they're supportive.
+
+### Root cause (what the next agent needs to fix)
+**The LLM receives `profile.exerciseTypes` in the user context JSON, but the prompt doesn't explicitly tell it to:**
+1. Look at `profile.exerciseTypes` from the health intake
+2. Evaluate each exercise against the current issue (e.g., Libido)
+3. If any of those exercises are supportive for the issue, include them in the "working" bucket with a reason
+
+**The solution is simple:**
+- Update the prompt to explicitly say: "Check profile.exerciseTypes. For each exercise listed there, evaluate if it's supportive for [issue]. If yes, include it in 'working' with a mechanism-based reason."
+- Do NOT set `minWorking=1` unconditionally - this causes retry loops
+- Do NOT add complex matching logic - the LLM should handle this natively
+- The LLM already has the data, it just needs clear instructions to use it
+
+### What NOT to do (what I tried that failed)
+1. ❌ DON'T add complex fuzzy matching logic (`matchesExerciseType` function)
+2. ❌ DON'T add fallback code to directly inject exercises into working
+3. ❌ DON'T set `minWorking=1` unconditionally - causes retry loops
+4. ❌ DON'T add promotion logic from suggested to working
+5. ❌ DON'T reduce retries or add lenient acceptance - masks the real problem
+6. ❌ DON'T add multiple LLM calls or evaluation passes
+
+### What TO do (correct approach)
+1. ✅ Update the `buildPrompt()` function to explicitly instruct LLM to check `profile.exerciseTypes`
+2. ✅ Add a clear, simple instruction: "Review profile.exerciseTypes. For each exercise, if it supports [issue], include it in 'working' with a reason."
+3. ✅ Keep `minWorking` at 0 or conditional - don't force it to 1
+4. ✅ Let the LLM do the evaluation naturally - it already has the data in userContext
+5. ✅ Test with a simple prompt change first before adding complexity
+
+### Files modified in failed attempts
+- `lib/insights/issue-engine.ts`: Added logging, matching logic, promotion logic, fallback code
+- `lib/insights/llm.ts`: Updated prompts, added strict requirements, reduced retries
+
+### Commits from this session (all failed attempts)
+- `34b0671` - Fix Exercise Working section to include intake exerciseTypes
+- `37e85e8` - Enhance quick path to prioritize intake exerciseTypes and add logging
+- `0e07589` - Add final fallback to directly include intake exerciseTypes in working section
+- `6bcfb14` - Fix root cause: Make LLM explicitly check and include intake exerciseTypes
+- `ebcf263` - Fix hanging issue: reduce retries and add lenient acceptance
+
+### Next agent instructions
+1. **Start fresh**: The current code has too much complexity from failed attempts. Consider reverting some changes or simplifying.
+2. **Fix the prompt**: The real fix is in `lib/insights/llm.ts` in the `buildPrompt()` function. Add explicit instruction to check `profile.exerciseTypes` and evaluate exercises for the issue.
+3. **Keep it simple**: Don't add matching logic, fallbacks, or complex retry handling. The LLM should handle this if the prompt is clear.
+4. **Test incrementally**: Make one small prompt change, test, then iterate. Don't add multiple fixes at once.
+5. **Check logs**: The logging I added will show what the LLM is receiving and returning. Use that to debug.
+
+### Acceptance criteria
+- Exercise "Working" section shows intake exerciseTypes (Walking, Bike riding, Boxing) when they're supportive for the issue
+- No hanging on "Generating..." state
+- LLM naturally evaluates intake exercises without forced retries
+- No complex matching or fallback logic needed
+
+---
 
 ### What was completed in this session (2025-11-02)
 1) **SSR cache-only fix (CRITICAL)** ✅
