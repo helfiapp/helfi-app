@@ -2949,9 +2949,10 @@ async function buildNutritionSection(
   // Deterministic top-ups to guarantee 4/4 after domain filtering
   try {
     const kbKey = pickKnowledgeKey(issue.name)
-    const kbNutrition = (ISSUE_KNOWLEDGE_BASE[kbKey]?.nutritionFocus ?? [])
+    const kbBase = kbKey ? ISSUE_KNOWLEDGE_BASE[kbKey] : undefined
+    const kbNutrition = (kbBase?.nutritionFocus ?? [])
       .map((n) => ({ title: n.title, reason: n.detail, detail: null as string | null }))
-    const kbAvoidFoods = (ISSUE_KNOWLEDGE_BASE[kbKey]?.avoidFoods ?? [])
+    const kbAvoidFoods = (kbBase?.avoidFoods ?? [])
       .map((n) => ({ name: n.title, reason: n.detail }))
 
     // Only foods; ensure we keep any LLM items first, then top-up from KB
@@ -3193,11 +3194,12 @@ async function buildLifestyleSection(
   // Deterministic top-ups from KB to guarantee 4/4 after filtering
   try {
     const kbKey = pickKnowledgeKey(issue.name)
-    const kbLifestyle = (ISSUE_KNOWLEDGE_BASE[kbKey]?.lifestyleFocus ?? [])
+    const kbBase = kbKey ? ISSUE_KNOWLEDGE_BASE[kbKey] : undefined
+    const kbLifestyle = (kbBase?.lifestyleFocus ?? [])
       .map((n) => ({ title: n.title, reason: n.detail, detail: null as string | null }))
     // For lifestyle "avoid", use avoidExercises plus any avoidFoods phrased as habits
-    const kbAvoidFromExercises = (ISSUE_KNOWLEDGE_BASE[kbKey]?.avoidExercises ?? []).map((n) => ({ title: n.title, reason: n.detail }))
-    const kbAvoidFromFoods = (ISSUE_KNOWLEDGE_BASE[kbKey]?.avoidFoods ?? []).map((n) => ({ title: n.title, reason: n.detail }))
+    const kbAvoidFromExercises = (kbBase?.avoidExercises ?? []).map((n) => ({ title: n.title, reason: n.detail }))
+    const kbAvoidFromFoods = (kbBase?.avoidFoods ?? []).map((n) => ({ title: n.title, reason: n.detail }))
 
     const suggestedHabitsTopped = ensureMin(suggestedHabits, kbLifestyle, 4)
     const avoidHabitsTopped = ensureMin(avoidHabits, [...kbAvoidFromExercises, ...kbAvoidFromFoods], 4)
