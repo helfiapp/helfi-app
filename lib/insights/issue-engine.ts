@@ -2163,20 +2163,6 @@ async function buildQuickSection(
               
               console.log('[exercise.working.quick] Final workingActivities:', working.map(w => w.title))
               
-              // Final fallback: if working is still empty and we have intake exerciseTypes, 
-              // add them with generic supportive reason
-              if (working.length === 0 && intakeTypesArray.length > 0) {
-                console.log('[exercise.working.quick] Working is empty, adding intake exercises with generic supportive reason')
-                for (const intakeType of intakeTypesArray) {
-                  working.push({
-                    title: intakeType,
-                    reason: `This exercise was selected in your health intake and may support ${summary.name}. Regular ${intakeType.toLowerCase()} can improve circulation, mood, and overall health.`,
-                    summary: 'Selected in health intake',
-                    lastLogged: 'From your health profile',
-                  })
-                }
-              }
-              
               return working
             })(),
             suggestedActivities: r.suggested.filter((item) => {
@@ -2484,6 +2470,11 @@ async function buildExerciseSection(
   }))
 
   console.time(`[insights.llm] exercise:${issue.slug}`)
+  
+  // Set minWorking to at least 1 if user has intake exerciseTypes, even without logs
+  const hasIntakeExerciseTypes = (context.profile.exerciseTypes ?? []).length > 0
+  const minWorking = normalizedLogs.length > 0 ? 1 : (hasIntakeExerciseTypes ? 1 : 0)
+  
   let llmResult = await generateSectionInsightsFromLLM(
     {
       issueName: issue.name,
@@ -2493,7 +2484,7 @@ async function buildExerciseSection(
       profile: context.profile,
       mode: 'exercise',
     },
-    { minWorking: normalizedLogs.length > 0 ? 1 : 0, minSuggested: 4, minAvoid: 4 }
+    { minWorking, minSuggested: 4, minAvoid: 4 }
   )
   console.timeEnd(`[insights.llm] exercise:${issue.slug}`)
 
@@ -2644,61 +2635,6 @@ async function buildExerciseSection(
   }
 
   console.log('[exercise.working] Final workingActivities:', workingActivities.map(w => w.title))
-
-  // Final fallback: if working is still empty and we have intake exerciseTypes, 
-  // directly evaluate them for this issue and add to working
-  if (workingActivities.length === 0 && intakeTypesArray.length > 0) {
-    console.log('[exercise.working] Working is empty, attempting direct evaluation of intake exerciseTypes')
-    
-    // Use LLM to evaluate intake exercises specifically for this issue
-    try {
-      const intakeEvaluationResult = await generateSectionInsightsFromLLM(
-        {
-          issueName: issue.name,
-          issueSummary: issue.highlight,
-          items: intakeTypesArray.map(type => ({ name: type, dosage: null, timing: null })),
-          otherItems: [],
-          profile: context.profile,
-          mode: 'exercise',
-        },
-        { minWorking: 1, minSuggested: 0, minAvoid: 0 }
-      )
-      
-      if (intakeEvaluationResult && intakeEvaluationResult.working.length > 0) {
-        console.log('[exercise.working] Direct evaluation found working items:', intakeEvaluationResult.working.map(w => w.name))
-        for (const item of intakeEvaluationResult.working) {
-          const itemKey = canonical(item.name)
-          // Check if this matches any intake exercise type
-          for (const intakeType of intakeTypesArray) {
-            if (matchesExerciseType(item.name, intakeType) || canonical(intakeType) === itemKey) {
-              workingActivities.push({
-                title: item.name,
-                reason: item.reason,
-                summary: 'Selected in health intake',
-                lastLogged: 'From your health profile',
-              })
-              break
-            }
-          }
-        }
-      }
-    } catch (error) {
-      console.warn('[exercise.working] Direct evaluation failed:', error)
-    }
-    
-    // If still empty after direct evaluation, add intake exercises with generic supportive reason
-    if (workingActivities.length === 0 && intakeTypesArray.length > 0) {
-      console.log('[exercise.working] Adding intake exercises with generic supportive reason')
-      for (const intakeType of intakeTypesArray) {
-        workingActivities.push({
-          title: intakeType,
-          reason: `This exercise was selected in your health intake and may support ${issue.name}. Regular ${intakeType.toLowerCase()} can improve circulation, mood, and overall health.`,
-          summary: 'Selected in health intake',
-          lastLogged: 'From your health profile',
-        })
-      }
-    }
-  }
 
   // Deterministic enrichment: if AI returns zero or too few working items, top up using logs matched to KB supportive exercises
   if (workingActivities.length < 2 && context.exerciseLogs.length > 0) {

@@ -331,7 +331,7 @@ function modeGuidance(mode: SectionMode) {
     case 'medications':
       return 'Evaluate prescription and OTC pharmaceutical therapies only (no supplements, herbs, nutraceuticals, or vitamins). Highlight medications that are supporting the issue, medication additions to discuss with a prescriber, and medications that warrant caution or avoidance.'
     case 'exercise':
-      return 'Evaluate exercise and movement patterns. Highlight the training that supports this issue, recommended additions, and activities/protocols to limit or avoid. IMPORTANT: If the user has selected exerciseTypes in their health intake profile (check profile.exerciseTypes), and those exercises are supportive for this issue, consider including them in the "working" bucket even if no formal exercise logs exist yet. This helps surface exercises the user is already doing or planning to do.'
+      return 'Evaluate exercise and movement patterns. Highlight the training that supports this issue, recommended additions, and activities/protocols to limit or avoid. CRITICAL: You MUST check profile.exerciseTypes in the user context. If any exercises from profile.exerciseTypes are supportive for this issue, you MUST include them in the "working" bucket with a mechanism-based reason, even if no formal exercise logs exist.'
     case 'nutrition':
       return 'Evaluate nutrition patterns using foods, meals, or dietary patterns only. Do not mention supplements or pills. Highlight foods/meals that help, additions to include, and foods or dietary approaches to avoid for this issue. Only mark "working" foods that are present in focusItems.'
     case 'lifestyle':
@@ -379,9 +379,9 @@ STRICT RULES:
 - Prioritise logged items: if a focusItem is plausibly supportive for the issue, include it in "working" using the exact name from focusItems and provide rationale.
 - Supplements mode: only include supplements/herbs/nutraceuticals. Never include alcohol, foods, or lifestyle items in any bucket.
 - Nutrition mode: only mark foods as "working" if they appear in focusItems. Use suggested/avoid for novel foods.
-- Exercise mode: if profile.exerciseTypes contains exercises that are supportive for this issue, consider including them in "working" even without formal logs. This helps users see exercises they've selected in intake that align with their health goals.
+- Exercise mode: CRITICAL - You MUST check profile.exerciseTypes in the user context. If any exercises listed in profile.exerciseTypes are supportive for this issue, you MUST include them in the "working" bucket even if they don't appear in focusItems. Use the exact exercise name from profile.exerciseTypes and provide a mechanism-based reason explaining how it supports the issue. This is required when focusItems is empty or when intake exercises are relevant.
 - Reasons must include mechanism + relevance; add dose/timing or execution guidance where appropriate.
-- If focusItems is empty or none are supportive, "working" may be empty, but clearly explain the gap in the summary.
+- If focusItems is empty but profile.exerciseTypes contains supportive exercises, those exercises MUST appear in "working" - do not leave working empty.
 - Even if user data is sparse, you MUST still populate "suggested" and "avoid" to the minimum counts using widely accepted best practice for ${issueName}. Never respond with "everything covered."
 
 Classify findings into three buckets: working (helpful/supportive today), suggested (worth discussing with clinician to add), avoid (risky or counterproductive). Always provide detailed clinical reasons (two sentences: mechanism + direct issue relevance/action). ${guidanceFocus}
@@ -400,7 +400,7 @@ Close every array/object and ensure the JSON is syntactically valid—never trun
   `
 
   const forceNote = force
-    ? `You must output at least ${minWorking} working item(s)${minWorking === 0 ? ' (it is acceptable for working to stay empty only if no focusItems are supportive)' : ''}, ${minSuggested} suggested item(s), and ${minAvoid} avoid item(s). Suggested items must not duplicate any names already present in focusItems or otherItems. If logged data is sparse, rely on clinician-grade best-practice guidance for ${issueName} rather than saying everything is covered. Keep every reason to exactly two sentences (mechanism + actionable relevance with dose/timing when helpful).`
+    ? `You must output at least ${minWorking} working item(s)${minWorking === 0 ? ' (it is acceptable for working to stay empty only if no focusItems are supportive AND no profile.exerciseTypes are supportive)' : ''}, ${minSuggested} suggested item(s), and ${minAvoid} avoid item(s). Suggested items must not duplicate any names already present in focusItems or otherItems. If logged data is sparse, rely on clinician-grade best-practice guidance for ${issueName} rather than saying everything is covered. Keep every reason to exactly two sentences (mechanism + actionable relevance with dose/timing when helpful).`
     : ''
 
   // Add targeted domain rules for specific issues
