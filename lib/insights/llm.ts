@@ -894,6 +894,13 @@ export async function generateSectionInsightsFromLLM(
     2
   )
 
+  // Debug logging for exercise mode
+  if (input.mode === 'exercise') {
+    console.log('[exercise.llm] Input profile:', JSON.stringify(input.profile, null, 2))
+    console.log('[exercise.llm] exerciseTypes in profile:', input.profile?.exerciseTypes)
+    console.log('[exercise.llm] focusItems (normalized logs):', focusItems)
+  }
+
   const cacheKey = JSON.stringify({
     issueName: input.issueName,
     issueSummary: input.issueSummary ?? '',
