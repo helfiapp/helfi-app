@@ -675,15 +675,15 @@ ${JSON.stringify(focusItems, null, 2)}
 CRITICAL INSTRUCTIONS:
 1. Analyze each logged item by understanding its active ingredients, compounds, mechanisms, or physiological effects
 2. Evaluate whether each item is supportive for "${issueName}" based on evidence-based mechanisms
-3. ALWAYS use the EXACT logged name from the input array - never substitute with generic names, ingredient names, or alternative terminology
-4. For supplements: recognize active ingredients (e.g., "Sunfiber" contains PHGG) but output "Sunfiber", not "PHGG"
-5. For medications: recognize active ingredients but output the exact logged name (brand or generic as logged)
-6. Return ONLY items that are plausibly supportive for this issue
+3. Output matches by INDEX back to the provided array (0-based). Do NOT invent new items.
+4. For each supportive item, return its {index, reason, dosage?, timing?}. You may also include name, but index is REQUIRED.
+5. Return ONLY items that are plausibly supportive for this issue
 
 Return JSON:
 {
   "supportive": Array<{
-    "name": string (EXACT logged name),
+    "index": number (0-based index into the provided items),
+    "name"?: string (optional, should be EXACT logged name),
     "reason": string (two sentences: mechanism + direct relevance),
     "dosage": string | null,
     "timing": string | null
@@ -727,20 +727,25 @@ Return JSON:
       loggedMap.set(key, item)
     }
 
-    return supportive
-      .filter((it: any) => it && typeof it.name === 'string' && typeof it.reason === 'string')
-      .map((it: any) => {
+    const out: Array<{ name: string; reason: string; dosage?: string | null; timing?: string | null }> = []
+    for (const it of supportive) {
+      if (!it || typeof it.reason !== 'string') continue
+      let logged: { name: string; dosage?: string | null; timing?: string[] | null } | undefined
+      if (typeof it.index === 'number' && it.index >= 0 && it.index < focusItems.length) {
+        logged = focusItems[it.index]
+      } else if (typeof it.name === 'string') {
         const key = it.name.trim().toLowerCase()
-        const logged = loggedMap.get(key)
-        // Prefer exact logged name if we can match it
-        const exactName = logged?.name ?? it.name
-        return {
-          name: exactName,
-          reason: it.reason,
-          dosage: logged?.dosage ?? (typeof it.dosage === 'string' ? it.dosage : null),
-          timing: logged?.timing ?? (typeof it.timing === 'string' ? it.timing : null),
-        }
+        logged = loggedMap.get(key)
+      }
+      if (!logged) continue
+      out.push({
+        name: logged.name,
+        reason: it.reason,
+        dosage: logged.dosage ?? (typeof it.dosage === 'string' ? it.dosage : null),
+        timing: Array.isArray(logged.timing) ? (typeof it.timing === 'string' ? it.timing : (logged.timing?.[0] ?? null)) : (typeof it.timing === 'string' ? it.timing : null),
       })
+    }
+    return out
   } catch (error) {
     console.warn('[insights.llm] evaluateFocusItemsForIssue error', error)
     return null
