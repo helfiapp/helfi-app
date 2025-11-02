@@ -1824,7 +1824,7 @@ async function computeIssueSection(
     const degraded = Boolean(extrasIn['degraded'])
     const ageMs = Date.now() - cached.updatedAt.getTime()
     const ttl = degraded ? DEGRADED_CACHE_TTL_MS : SECTION_CACHE_TTL_MS
-    const ok = ageMs < ttl && (validated ? pipelineVersion === CURRENT_PIPELINE_VERSION : degraded)
+    const ok = ageMs < ttl && (validated ? pipelineVersion === CURRENT_PIPELINE_VERSION : (degraded && pipelineVersion === CURRENT_PIPELINE_VERSION))
     
     // Debug logging for cache check
     if (section === 'exercise') {
