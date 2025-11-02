@@ -111,12 +111,62 @@ export async function buildSystemPrompt(userId: string, slug: string, section: I
       return '{}'
     }
   })()
+
+  // Load a privacy-conscious slice of the user's health setup for better grounding
+  let profileJSON = '{}'
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        healthGoals: true,
+        supplements: true,
+        medications: true,
+        healthLogs: { orderBy: { createdAt: 'desc' }, take: 14 },
+        foodLogs: { orderBy: { createdAt: 'desc' }, take: 10 },
+      },
+    })
+    if (user) {
+      const goals = (user.healthGoals || [])
+        .filter((g: any) => typeof g?.name === 'string' && !g.name.startsWith('__'))
+        .map((g: any) => g.name)
+        .slice(0, 12)
+      const supplements = (user.supplements || [])
+        .map((s: any) => ({ name: s.name, dosage: s.dosage, timing: s.timing }))
+        .filter((s: any) => typeof s.name === 'string' && s.name)
+        .slice(0, 12)
+      const medications = (user.medications || [])
+        .map((m: any) => ({ name: m.name, dosage: m.dosage, timing: m.timing }))
+        .filter((m: any) => typeof m.name === 'string' && m.name)
+        .slice(0, 12)
+      const recentHealthLogs = (user.healthLogs || [])
+        .map((h: any) => ({ rating: h.rating, createdAt: h.createdAt }))
+        .slice(0, 14)
+      const recentFood = (user.foodLogs || [])
+        .map((f: any) => ({ name: f.name, createdAt: f.createdAt }))
+        .slice(0, 10)
+      profileJSON = JSON.stringify({
+        gender: user.gender,
+        height: user.height,
+        weight: user.weight,
+        goals,
+        supplements,
+        medications,
+        recentHealthLogs,
+        recentFood,
+      })
+    }
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.warn('[chat] Failed to load user profile slice', e)
+  }
+
   return [
     'You are a careful, concise clinical assistant for the current Insights section.',
     `Issue slug: ${slug}`,
     `Section: ${section}`,
     summary ? `Section summary: ${summary}` : '',
     `Section extras (truncated): ${safeExtras}`,
+    `User profile (truncated): ${profileJSON}`,
     'Rules: avoid diagnosis, encourage clinician consultation for changes. Be specific with practical tips (dose/timing if appropriate).'
   ].filter(Boolean).join('\n')
 }
