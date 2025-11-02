@@ -813,9 +813,30 @@ export async function generateDegradedSectionQuick(
     const finalSuggested = suggested.slice(0, Math.max(minSuggested, 4))
     const finalAvoid = avoid.slice(0, Math.max(minAvoid, 4))
 
+    // For exercise mode, check intake exerciseTypes and add supportive ones to working
+    let working: Array<{ name: string; reason: string; dosage?: string | null; timing?: string | null }> = []
+    if (input.mode === 'exercise' && input.profile?.exerciseTypes?.length) {
+      // For quick path, we'll add intake exercises that are likely supportive
+      // The full path will do a proper LLM evaluation
+      const intakeTypes = input.profile.exerciseTypes
+      console.log('[exercise.quick] Checking intake exerciseTypes for working:', intakeTypes)
+      
+      // Add intake exercises to working with a generic supportive reason
+      // The full path will refine these with proper LLM evaluation
+      for (const exerciseType of intakeTypes) {
+        working.push({
+          name: exerciseType,
+          reason: `${exerciseType} can support ${input.issueName} through improved cardiovascular health, stress reduction, and overall physical wellbeing. Regular ${exerciseType.toLowerCase()} helps maintain optimal body function and may contribute positively to this health goal.`,
+          dosage: null,
+          timing: null,
+        })
+      }
+      console.log('[exercise.quick] Added intake exercises to working:', working.map(w => w.name))
+    }
+
     return {
       summary: 'Initial guidance generated while we prepare a deeper report.',
-      working: [],
+      working,
       suggested: finalSuggested,
       avoid: finalAvoid,
       recommendations: [],
@@ -855,9 +876,26 @@ export async function generateDegradedSectionQuickStrict(
       .map((c) => ({ name: c.name, reason: c.reason }))
     const finalSuggested = suggested.slice(0, Math.max(minSuggested, 4))
     const finalAvoid = avoid.slice(0, Math.max(minAvoid, 4))
+    
+    // For exercise mode, check intake exerciseTypes and add supportive ones to working
+    let working: Array<{ name: string; reason: string; dosage?: string | null; timing?: string | null }> = []
+    if (input.mode === 'exercise' && input.profile?.exerciseTypes?.length) {
+      const intakeTypes = input.profile.exerciseTypes
+      console.log('[exercise.quick.strict] Checking intake exerciseTypes for working:', intakeTypes)
+      for (const exerciseType of intakeTypes) {
+        working.push({
+          name: exerciseType,
+          reason: `${exerciseType} can support ${input.issueName} through improved cardiovascular health, stress reduction, and overall physical wellbeing. Regular ${exerciseType.toLowerCase()} helps maintain optimal body function and may contribute positively to this health goal.`,
+          dosage: null,
+          timing: null,
+        })
+      }
+      console.log('[exercise.quick.strict] Added intake exercises to working:', working.map(w => w.name))
+    }
+    
     return {
       summary: 'Initial guidance generated while we prepare a deeper report.',
-      working: [],
+      working,
       suggested: finalSuggested,
       avoid: finalAvoid,
       recommendations: [],
