@@ -2119,10 +2119,11 @@ async function buildQuickSection(
               console.log('[exercise.working.quick] LLM suggested items:', r.suggested.map(s => ({ name: s.name, reason: s.reason })))
               
               // Process working items from LLM result
+              // If LLM returned working items (including intake exercises we added), include them all
               const working = (r.working ?? []).map((item) => {
                 const itemKey = canonical(item.name)
                 
-                // Enhanced matching: check exact match first, then fuzzy match
+                // Check if it matches any intake exercise type
                 let hasIntakeMatch = intakeExerciseTypes.has(itemKey)
                 if (!hasIntakeMatch) {
                   // Try fuzzy matching against all intake exercise types
@@ -2135,6 +2136,7 @@ async function buildQuickSection(
                   }
                 }
                 
+                // If it matches intake, use the intake-specific format
                 if (hasIntakeMatch) {
                   return {
                     title: item.name,
@@ -2144,7 +2146,14 @@ async function buildQuickSection(
                   }
                 }
                 
-                return null
+                // If LLM returned it as working (even without intake match), still include it
+                // This handles cases where LLM evaluates logs and finds them supportive
+                return {
+                  title: item.name,
+                  reason: item.reason,
+                  summary: item.dosage ?? '',
+                  lastLogged: item.timing ?? '',
+                }
               }).filter(Boolean) as Array<{ title: string; reason: string; summary: string; lastLogged: string }>
               
               // Fallback: if LLM returns exercise in suggested bucket that matches intake exerciseTypes, promote it to working
