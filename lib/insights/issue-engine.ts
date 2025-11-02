@@ -196,7 +196,55 @@ export async function getCachedIssueSection(
   const mode = options.mode ?? 'latest'
   const rangeKey = encodeRange(options.range)
   const cached = await readSectionCache(userId, slug, section, mode, rangeKey)
-  return cached?.result ?? null
+  if (!cached) return null
+  
+  // CRITICAL: For exercise section, ensure intake exercises are ALWAYS present in cached results
+  // This fixes stale cached results that were generated before the fix
+  // This is especially important for SSR since getCachedIssueSection is used by layout.tsx
+  if (section === 'exercise') {
+    const landing = await loadUserLandingContext(userId)
+    const intakeTypesArray = landing.profile.exerciseTypes ?? []
+    const extras = (cached.result.extras as Record<string, unknown> | undefined) ?? {}
+    const workingActivities = (extras.workingActivities as Array<{ title: string }> | undefined) ?? []
+    const workingTitles = new Set(workingActivities.map(w => canonical(w.title)))
+    
+    // Add any missing intake exercises
+    for (const exerciseType of intakeTypesArray) {
+      const exerciseTypeKey = canonical(exerciseType)
+      if (!workingTitles.has(exerciseTypeKey)) {
+        // Check fuzzy match
+        let alreadyAdded = false
+        for (const w of workingActivities) {
+          if (matchesExerciseType(w.title, exerciseType)) {
+            alreadyAdded = true
+            break
+          }
+        }
+        
+        if (!alreadyAdded) {
+          console.log(`[exercise.getCachedIssueSection] ✅ Injecting intake exercise "${exerciseType}" into cached result`)
+          workingActivities.push({
+            title: exerciseType,
+            reason: `${exerciseType} can support this health goal through improved cardiovascular health, stress reduction, and overall physical wellbeing. Regular ${exerciseType.toLowerCase()} helps maintain optimal body function and may contribute positively to this health goal.`,
+            summary: 'Selected in health intake',
+            lastLogged: 'From your health profile',
+          })
+          workingTitles.add(exerciseTypeKey)
+        }
+      }
+    }
+    
+    // Return modified result
+    return {
+      ...cached.result,
+      extras: {
+        ...extras,
+        workingActivities,
+      },
+    }
+  }
+  
+  return cached.result
 }
 
 async function upsertSectionCache(params: {
