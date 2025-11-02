@@ -137,7 +137,7 @@ interface BloodResultsData {
 const RATING_SCALE_DEFAULT = 6
 const SECTION_CACHE_TTL_MS = 1000 * 60 * 15
 const DEGRADED_CACHE_TTL_MS = 1000 * 60 * 2
-const CURRENT_PIPELINE_VERSION = 'v5'
+const CURRENT_PIPELINE_VERSION = 'v6'
 const FORCE_QUICK_FIRST = process.env.INSIGHTS_FORCE_QUICK_FIRST === 'true'
 const PAUSE_HEAVY = process.env.INSIGHTS_PAUSE_HEAVY === 'true'
 
@@ -2611,29 +2611,66 @@ async function buildExerciseSection(
   const intakeTypesArray = context.profile.exerciseTypes ?? []
   const promotedFromSuggested: Array<{ title: string; reason: string; summary: string; lastLogged: string }> = []
   
+  console.log('[exercise.working] Checking suggested items for promotion. Intake types:', intakeTypesArray)
+  
   for (const suggestedItem of llmResult.suggested) {
     // Check if already in workingActivities
     const alreadyInWorking = workingActivities.some(w => canonical(w.title) === canonical(suggestedItem.name))
-    if (alreadyInWorking) continue
+    if (alreadyInWorking) {
+      console.log(`[exercise.working] Skipping "${suggestedItem.name}" - already in working`)
+      continue
+    }
     
-    // Check if it matches any intake exercise type
+    // Check if it matches any intake exercise type (try multiple matching strategies)
+    let matched = false
+    let matchedIntakeType = ''
+    
     for (const intakeType of intakeTypesArray) {
+      // Strategy 1: Fuzzy matching (handles variations)
       if (matchesExerciseType(suggestedItem.name, intakeType)) {
-        console.log(`[exercise.working] ✓ Promoting suggested "${suggestedItem.name}" to working (matches intake "${intakeType}")`)
-        promotedFromSuggested.push({
-          title: suggestedItem.name,
-          reason: suggestedItem.reason,
-          summary: 'Selected in health intake',
-          lastLogged: 'From your health profile',
-        })
+        matched = true
+        matchedIntakeType = intakeType
+        console.log(`[exercise.working] ✓ Fuzzy matched suggested "${suggestedItem.name}" to intake "${intakeType}"`)
         break
       }
+      
+      // Strategy 2: Case-insensitive exact match (handles case differences)
+      if (canonical(suggestedItem.name) === canonical(intakeType)) {
+        matched = true
+        matchedIntakeType = intakeType
+        console.log(`[exercise.working] ✓ Exact matched suggested "${suggestedItem.name}" to intake "${intakeType}"`)
+        break
+      }
+      
+      // Strategy 3: Check if one contains the other (handles "Walking" vs "walking exercise")
+      const suggestedLower = suggestedItem.name.toLowerCase()
+      const intakeLower = intakeType.toLowerCase()
+      if (suggestedLower.includes(intakeLower) || intakeLower.includes(suggestedLower)) {
+        matched = true
+        matchedIntakeType = intakeType
+        console.log(`[exercise.working] ✓ Contains matched suggested "${suggestedItem.name}" to intake "${intakeType}"`)
+        break
+      }
+    }
+    
+    if (matched) {
+      console.log(`[exercise.working] ✓ Promoting suggested "${suggestedItem.name}" to working (matched intake "${matchedIntakeType}")`)
+      promotedFromSuggested.push({
+        title: suggestedItem.name, // Keep LLM's name but use intake match logic
+        reason: suggestedItem.reason,
+        summary: 'Selected in health intake',
+        lastLogged: 'From your health profile',
+      })
+    } else {
+      console.log(`[exercise.working] ✗ No match for suggested "${suggestedItem.name}" against intake types:`, intakeTypesArray)
     }
   }
   
   if (promotedFromSuggested.length > 0) {
     workingActivities.push(...promotedFromSuggested)
-    console.log(`[exercise.working] Promoted ${promotedFromSuggested.length} items from suggested to working`)
+    console.log(`[exercise.working] ✅ Promoted ${promotedFromSuggested.length} items from suggested to working:`, promotedFromSuggested.map(p => p.title))
+  } else if (intakeTypesArray.length > 0) {
+    console.log(`[exercise.working] ⚠️ WARNING: No suggested items matched intake types. Intake types:`, intakeTypesArray, 'Suggested items:', llmResult.suggested.map(s => s.name))
   }
 
   console.log('[exercise.working] Final workingActivities:', workingActivities.map(w => w.title))

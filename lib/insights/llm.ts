@@ -372,29 +372,33 @@ function buildPrompt(
     ? `
 
 ═══════════════════════════════════════════════════════════════════════════════
-EXERCISE MODE - REQUIRED ACTION: EVALUATE profile.exerciseTypes IMMEDIATELY
+🚨 EXERCISE MODE - CRITICAL INSTRUCTION: profile.exerciseTypes → "working" ONLY 🚨
 ═══════════════════════════════════════════════════════════════════════════════
 
-BEFORE you generate any response, you MUST:
+BEFORE generating your response, you MUST:
 
-1. Look at the user context JSON provided above
-2. Find the "profile" object → look for "exerciseTypes" array (e.g., ["Walking", "Bike riding", "Boxing"])
-3. For EVERY exercise in that array, ask yourself: "Is this exercise supportive for "${issueName}"?"
-4. If YES → You MUST add it to the "working" array with:
-   - name: Use the EXACT name from profile.exerciseTypes (preserve capitalization: "Bike riding" not "Bike Riding" or "Cycling")
-   - reason: Explain the mechanism (e.g., "Walking improves cardiovascular health and reduces stress, which supports libido by enhancing blood flow and reducing cortisol")
+1. Look at the user context JSON above
+2. Find the "profile" object → locate the "exerciseTypes" array (e.g., ["Walking", "Bike riding", "Boxing"])
+3. For EVERY exercise in profile.exerciseTypes:
+   a) Evaluate: "Is this exercise supportive for "${issueName}"?"
+   b) If YES → Add it to the "working" array (NOT suggested, NOT avoid - WORKING ONLY)
+   c) Use the EXACT name from profile.exerciseTypes (preserve capitalization exactly)
+   d) Provide a mechanism-based reason
 
-CRITICAL REQUIREMENTS:
-- This check is MANDATORY - do not skip it
-- Include exercises even if focusItems is empty
-- Use exact names from profile.exerciseTypes (case-sensitive matching matters)
-- Only include exercises that are genuinely supportive for "${issueName}"
+🚨 CRITICAL RULE: Exercises from profile.exerciseTypes that are supportive MUST go in "working"
+   - DO NOT put them in "suggested" 
+   - DO NOT put them in "avoid"
+   - They belong in "working" because the user has already selected them in their health intake
 
-EXAMPLE: If profile.exerciseTypes = ["Walking", "Bike riding", "Boxing"] and issue = "Libido":
-- Walking → Likely supportive (cardiovascular, stress reduction) → ADD to working
-- Bike riding → Evaluate (may be supportive or problematic) → ADD to working if supportive
-- Boxing → Likely supportive (testosterone, stress relief) → ADD to working
+EXAMPLE: If profile.exerciseTypes = ["Walking", "Bike riding", "Boxing"] and issue = "Bowel Movements":
+- Walking → Supportive (digestive stimulation) → MUST go in "working" array
+- Bike riding → Evaluate → If supportive, MUST go in "working" array
+- Boxing → Evaluate → If supportive, MUST go in "working" array
 
+If profile.exerciseTypes = ["Walking"] and issue = "Libido":
+- Walking → Supportive (cardiovascular, stress reduction) → MUST go in "working" array
+
+The "suggested" array is ONLY for exercises NOT already in profile.exerciseTypes.
 ═══════════════════════════════════════════════════════════════════════════════
 
 `
