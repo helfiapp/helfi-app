@@ -202,45 +202,60 @@ export async function getCachedIssueSection(
   // This fixes stale cached results that were generated before the fix
   // This is especially important for SSR since getCachedIssueSection is used by layout.tsx
   if (section === 'exercise') {
-    const landing = await loadUserLandingContext(userId)
-    const intakeTypesArray = landing.profile.exerciseTypes ?? []
-    const extras = (cached.result.extras as Record<string, unknown> | undefined) ?? {}
-    const workingActivities = (extras.workingActivities as Array<{ title: string }> | undefined) ?? []
-    const workingTitles = new Set(workingActivities.map(w => canonical(w.title)))
-    
-    // Add any missing intake exercises
-    for (const exerciseType of intakeTypesArray) {
-      const exerciseTypeKey = canonical(exerciseType)
-      if (!workingTitles.has(exerciseTypeKey)) {
-        // Check fuzzy match
-        let alreadyAdded = false
-        for (const w of workingActivities) {
-          if (matchesExerciseType(w.title, exerciseType)) {
-            alreadyAdded = true
-            break
+    try {
+      const landing = await loadUserLandingContext(userId)
+      const intakeTypesArray = landing.profile.exerciseTypes ?? []
+      
+      console.log(`[exercise.getCachedIssueSection] Checking cached result. Intake exercises:`, intakeTypesArray)
+      
+      if (intakeTypesArray.length > 0) {
+        const extras = (cached.result.extras as Record<string, unknown> | undefined) ?? {}
+        const existingWorking = (extras.workingActivities as Array<{ title: string }> | undefined) ?? []
+        const workingActivities = [...existingWorking] // Create a new array to avoid mutation issues
+        const workingTitles = new Set(workingActivities.map(w => canonical(w.title)))
+        
+        console.log(`[exercise.getCachedIssueSection] Existing workingActivities count:`, workingActivities.length)
+        
+        // Add any missing intake exercises
+        for (const exerciseType of intakeTypesArray) {
+          const exerciseTypeKey = canonical(exerciseType)
+          if (!workingTitles.has(exerciseTypeKey)) {
+            // Check fuzzy match
+            let alreadyAdded = false
+            for (const w of workingActivities) {
+              if (matchesExerciseType(w.title, exerciseType)) {
+                alreadyAdded = true
+                break
+              }
+            }
+            
+            if (!alreadyAdded) {
+              console.log(`[exercise.getCachedIssueSection] ✅ Injecting intake exercise "${exerciseType}" into cached result`)
+              workingActivities.push({
+                title: exerciseType,
+                reason: `${exerciseType} can support this health goal through improved cardiovascular health, stress reduction, and overall physical wellbeing. Regular ${exerciseType.toLowerCase()} helps maintain optimal body function and may contribute positively to this health goal.`,
+                summary: 'Selected in health intake',
+                lastLogged: 'From your health profile',
+              })
+              workingTitles.add(exerciseTypeKey)
+            }
           }
         }
         
-        if (!alreadyAdded) {
-          console.log(`[exercise.getCachedIssueSection] ✅ Injecting intake exercise "${exerciseType}" into cached result`)
-          workingActivities.push({
-            title: exerciseType,
-            reason: `${exerciseType} can support this health goal through improved cardiovascular health, stress reduction, and overall physical wellbeing. Regular ${exerciseType.toLowerCase()} helps maintain optimal body function and may contribute positively to this health goal.`,
-            summary: 'Selected in health intake',
-            lastLogged: 'From your health profile',
-          })
-          workingTitles.add(exerciseTypeKey)
+        console.log(`[exercise.getCachedIssueSection] Final workingActivities count:`, workingActivities.length)
+        
+        // Return modified result
+        return {
+          ...cached.result,
+          extras: {
+            ...extras,
+            workingActivities,
+          },
         }
       }
-    }
-    
-    // Return modified result
-    return {
-      ...cached.result,
-      extras: {
-        ...extras,
-        workingActivities,
-      },
+    } catch (error) {
+      console.error(`[exercise.getCachedIssueSection] Error injecting intake exercises:`, error)
+      // Fall through to return cached result as-is if injection fails
     }
   }
   
