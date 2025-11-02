@@ -167,6 +167,19 @@ export async function buildSystemPrompt(userId: string, slug: string, section: I
     summary ? `Section summary: ${summary}` : '',
     `Section extras (truncated): ${safeExtras}`,
     `User profile (truncated): ${profileJSON}`,
+    section === 'supplements'
+      ? 'CRITICAL: Review profile.supplements. Analyze each supplement by understanding its active ingredient(s) and mechanism of action, but ALWAYS reference items by the exact name stored in the profile. If dosage/timing are present, include them briefly. Tie each mention to why it helps this issue.'
+      : section === 'medications'
+      ? 'CRITICAL: Review profile.medications. Analyze each medication by understanding its active ingredient(s) and therapeutic class, but ALWAYS reference items by the exact name stored in the profile. If dosage/timing are present, include them briefly. Tie each mention to why it helps this issue.'
+      : section === 'nutrition'
+      ? 'CRITICAL: Review profile.recentFood. Analyze each logged food/meal by understanding its nutritional profile and physiological effects, but ALWAYS reference items by the exact name stored in the profile. Tie each mention to why it helps this issue.'
+      : section === 'exercise'
+      ? 'CRITICAL: Review profile and any exercise-related context. For logged exercises, analyze their physiological effects but ALWAYS reference items by the exact name stored in the profile. Tie each mention to why it helps this issue.'
+      : section === 'lifestyle'
+      ? 'CRITICAL: Review profile and any lifestyle-related context. Analyze logged habits/patterns by understanding their mechanisms, but ALWAYS reference items by the exact name/description stored in the profile. Tie each mention to why it helps this issue.'
+      : section === 'labs'
+      ? 'CRITICAL: Review profile and any lab-related context. Analyze logged tests by understanding what biomarkers they measure, but ALWAYS reference items by the exact test name stored in the profile. Tie each mention to why it helps this issue.'
+      : '',
     'Rules: avoid diagnosis, encourage clinician consultation for changes. Be specific with practical tips (dose/timing if appropriate).'
   ].filter(Boolean).join('\n')
 }

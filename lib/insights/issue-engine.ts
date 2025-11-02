@@ -2,7 +2,7 @@ import { cache } from 'react'
 import { prisma } from '@/lib/prisma'
 import { authOptions } from '@/lib/auth'
 import { getServerSession } from 'next-auth'
-import { generateSectionInsightsFromLLM, generateDegradedSection, generateDegradedSectionQuick, generateDegradedSectionQuickStrict } from './llm'
+import { generateSectionInsightsFromLLM, generateDegradedSection, generateDegradedSectionQuick, generateDegradedSectionQuickStrict, evaluateFocusItemsForIssue } from './llm'
 
 export type IssueSectionKey =
   | 'overview'
@@ -3206,8 +3206,33 @@ async function buildSupplementsSection(
     })
     .filter(Boolean) as Array<{ name: string; reason: string; dosage: string | null; timing: string[] }>
 
+  // AI-based fallback: if LLM didn't properly match logged supplements, evaluate them directly
+  if (supportiveDetails.length === 0 && normalizedSupplements.length > 0) {
+    console.log(`[supplements] LLM didn't match logged supplements, using AI evaluator fallback for ${normalizedSupplements.length} items`)
+    const evaluated = await evaluateFocusItemsForIssue({
+      issueName: issue.name,
+      issueSummary: issue.highlight,
+      mode: 'supplements',
+      focusItems: normalizedSupplements,
+    })
+    if (evaluated && evaluated.length > 0) {
+      // Map evaluated results to exact logged names with dosage/timing
+      for (const item of evaluated) {
+        const logged = supplementMap.get(canonical(item.name))
+        if (logged) {
+          supportiveDetails.push({
+            name: logged.name, // Use exact logged name
+            reason: item.reason,
+            dosage: item.dosage ?? logged.dosage ?? null,
+            timing: parseTiming(item.timing, logged.timing ?? []),
+          })
+        }
+      }
+      console.log(`[supplements] AI evaluator found ${supportiveDetails.length} supportive supplements`)
+    }
+  }
 
-  // Deterministic enrichment: if AI returned no working items, map logged supplements against helpful KB
+  // Legacy KB fallback (only if AI evaluator also found nothing)
   if (supportiveDetails.length === 0 && normalizedSupplements.length > 0) {
     const enriched = normalizedSupplements
       .map((supp) => {
@@ -3518,7 +3543,35 @@ async function buildMedicationsSection(
     })
     .filter(Boolean) as Array<{ name: string; reason: string; dosage: string | null; timing: string[] }>
 
-  // Deterministic enrichment: if AI returned no working items, map logged medications against helpful KB
+  // AI-based fallback: if LLM didn't properly match logged medications, evaluate them directly
+  if (supportiveDetails.length === 0 && normalizedMeds.length > 0) {
+    console.log(`[medications] LLM didn't match logged medications, using AI evaluator fallback for ${normalizedMeds.length} items`)
+    const evaluated = await evaluateFocusItemsForIssue({
+      issueName: issue.name,
+      issueSummary: issue.highlight,
+      mode: 'medications',
+      focusItems: normalizedMeds,
+    })
+    if (evaluated && evaluated.length > 0) {
+      // Map evaluated results to exact logged names with dosage/timing, filtering out supplements
+      for (const item of evaluated) {
+        const nameKey = canonical(item.name)
+        if (supplementNameSet.has(nameKey) || looksSupplementLike(item.name)) continue
+        const logged = medMap.get(nameKey)
+        if (logged) {
+          supportiveDetails.push({
+            name: logged.name, // Use exact logged name
+            reason: item.reason,
+            dosage: item.dosage ?? logged.dosage ?? null,
+            timing: parseTiming(item.timing, logged.timing ?? []),
+          })
+        }
+      }
+      console.log(`[medications] AI evaluator found ${supportiveDetails.length} supportive medications`)
+    }
+  }
+
+  // Legacy KB fallback (only if AI evaluator also found nothing)
   if (supportiveDetails.length === 0 && normalizedMeds.length > 0) {
     if (kbAddLocal.length) {
       const seen = new Set<string>()
@@ -4079,6 +4132,35 @@ async function buildNutritionSection(
     }))
     // Only show foods the user actually logged as "working".
     .filter((item) => allowFoodName(item.title, item.reason) && foodNameSet.has(canonical(item.title)))
+
+  // AI-based fallback: if LLM didn't properly match logged foods, evaluate them directly
+  if (workingFocus.length === 0 && normalizedFoods.length > 0 && hasLoggedFoods) {
+    console.log(`[nutrition] LLM didn't match logged foods, using AI evaluator fallback for ${normalizedFoods.length} items`)
+    const evaluated = await evaluateFocusItemsForIssue({
+      issueName: issue.name,
+      issueSummary: issue.highlight,
+      mode: 'nutrition',
+      focusItems: normalizedFoods,
+    })
+    if (evaluated && evaluated.length > 0) {
+      // Map evaluated results to exact logged food names
+      for (const item of evaluated) {
+        const nameKey = canonical(item.name)
+        if (!allowFoodName(item.name, item.reason)) continue
+        if (foodNameSet.has(nameKey)) {
+          const logged = normalizedFoods.find((f) => canonical(f.name) === nameKey)
+          if (logged) {
+            workingFocus.push({
+              title: logged.name, // Use exact logged name
+              reason: item.reason,
+              example: item.dosage ?? item.timing ?? logged.dosage ?? '',
+            })
+          }
+        }
+      }
+      console.log(`[nutrition] AI evaluator found ${workingFocus.length} supportive foods`)
+    }
+  }
 
   const suggestedFocus = llmResult.suggested
     .map((item) => ({ title: item.name, reason: item.reason, detail: item.protocol ?? null }))

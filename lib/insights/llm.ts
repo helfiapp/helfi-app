@@ -327,17 +327,17 @@ Requirements:
 function modeGuidance(mode: SectionMode) {
   switch (mode) {
     case 'supplements':
-      return 'Evaluate supplements only (herbs, vitamins, nutraceuticals). Identify which logged supplements are truly helpful for the issue, which novel additions to discuss with a clinician, and which supplements people with this issue should avoid or monitor. Never include alcohol, foods, or lifestyle items in this section.'
+      return 'Evaluate supplements only (herbs, vitamins, nutraceuticals). CRITICAL: You MUST analyze each logged supplement in focusItems by understanding its active ingredient(s) and mechanism of action. For example, if a user logs "Sunfiber", recognize it contains partially hydrolyzed guar gum (PHGG) and evaluate its impact on the issue. However, ALWAYS output the exact logged name from focusItems (e.g., "Sunfiber", not "PHGG"). Identify which logged supplements are truly helpful for the issue, which novel additions to discuss with a clinician, and which supplements people with this issue should avoid or monitor. Never include alcohol, foods, or lifestyle items in this section.'
     case 'medications':
-      return 'Evaluate prescription and OTC pharmaceutical therapies only (no supplements, herbs, nutraceuticals, or vitamins). Highlight medications that are supporting the issue, medication additions to discuss with a prescriber, and medications that warrant caution or avoidance.'
+      return 'Evaluate prescription and OTC pharmaceutical therapies only (no supplements, herbs, nutraceuticals, or vitamins). CRITICAL: You MUST analyze each logged medication in focusItems by understanding its active ingredient(s), mechanism of action, and therapeutic class. For brand-name medications, recognize the generic/active ingredient but ALWAYS output the exact logged name from focusItems. Highlight medications that are supporting the issue, medication additions to discuss with a prescriber, and medications that warrant caution or avoidance.'
     case 'exercise':
-      return 'Evaluate exercise and movement patterns. Highlight the training that supports this issue, recommended additions, and activities/protocols to limit or avoid. CRITICAL: You MUST check profile.exerciseTypes in the user context. If any exercises from profile.exerciseTypes are supportive for this issue, you MUST include them in the "working" bucket with a mechanism-based reason, even if no formal exercise logs exist.'
+      return 'Evaluate exercise and movement patterns. CRITICAL: You MUST check profile.exerciseTypes in the user context. If any exercises from profile.exerciseTypes are supportive for this issue, you MUST include them in the "working" bucket with a mechanism-based reason, even if no formal exercise logs exist. For logged exercises in focusItems, analyze their physiological effects and movement patterns. Highlight the training that supports this issue, recommended additions, and activities/protocols to limit or avoid. Always use the exact logged name from focusItems.'
     case 'nutrition':
-      return 'Evaluate nutrition patterns using foods, meals, or dietary patterns only. Do not mention supplements or pills. Highlight foods/meals that help, additions to include, and foods or dietary approaches to avoid for this issue. Only mark "working" foods that are present in focusItems.'
+      return 'Evaluate nutrition patterns using foods, meals, or dietary patterns only. Do not mention supplements or pills. CRITICAL: Analyze each logged food/meal in focusItems by understanding its macronutrient profile, micronutrients, and physiological effects. Recognize variations (e.g., "Chicken breast" vs "Grilled chicken") but ALWAYS output the exact logged name from focusItems. Highlight foods/meals that help, additions to include, and foods or dietary approaches to avoid for this issue. Only mark "working" foods that are present in focusItems.'
     case 'lifestyle':
-      return 'Evaluate lifestyle habits (sleep, stress, routines). Highlight habits that are helping, habits to add, and habits/behaviours to avoid for this issue.'
+      return 'Evaluate lifestyle habits (sleep, stress, routines). CRITICAL: Analyze each logged habit or pattern in focusItems by understanding its physiological and psychological mechanisms. Always use the exact logged name/description from focusItems. Highlight habits that are helping, habits to add, and habits/behaviours to avoid for this issue.'
     case 'labs':
-      return 'Evaluate labs and biomarker monitoring. Highlight labs already supporting the issue, labs to order or review, and labs/testing patterns that require caution.'
+      return 'Evaluate labs and biomarker monitoring. CRITICAL: Analyze each logged lab result in focusItems by understanding what the biomarker measures and its relationship to the issue. Always use the exact logged test name from focusItems. Highlight labs already supporting the issue, labs to order or review, and labs/testing patterns that require caution.'
     default:
       return ''
   }
@@ -407,16 +407,22 @@ The "suggested" array is ONLY for exercises NOT already in profile.exerciseTypes
   const baseGuidance = `
 Provide precise, evidence-aligned guidance. Use the user context plus widely accepted best practice. If data is insufficient, state that but still offer clinician-ready suggestions.
 
-You MUST audit every item in focusItems (the user's logged items). For each:
-- If it supports the issue, include it in "working" with a mechanism-based reason and optional dose/timing.
-- If it warrants caution for this issue, include it in "avoid" with a short clinical rationale.
-- If it is neutral/irrelevant, you may omit it (do not put in suggested).
+CRITICAL: You MUST thoroughly analyze every item in focusItems (the user's logged items). For each item:
+- Understand what it is at a fundamental level (ingredients, active compounds, mechanisms, nutritional profile, physiological effects)
+- Evaluate how it impacts the current issue based on evidence-based mechanisms
+- If it supports the issue, include it in "working" with a mechanism-based reason and optional dose/timing
+- If it warrants caution for this issue, include it in "avoid" with a short clinical rationale
+- If it is neutral/irrelevant, you may omit it (do not put in suggested)
+- ALWAYS use the EXACT name from focusItems - never substitute with generic names, ingredient names, or alternative terminology
 
 STRICT RULES:
 - Prioritise logged items: if a focusItem is plausibly supportive for the issue, include it in "working" using the exact name from focusItems and provide rationale.
-- Supplements mode: only include supplements/herbs/nutraceuticals. Never include alcohol, foods, or lifestyle items in any bucket.
-- Nutrition mode: only mark foods as "working" if they appear in focusItems. Use suggested/avoid for novel foods.
-- Exercise mode: CRITICAL - You MUST check profile.exerciseTypes in the user context. If any exercises listed in profile.exerciseTypes are supportive for this issue, you MUST include them in the "working" bucket even if they don't appear in focusItems. Use the exact exercise name from profile.exerciseTypes and provide a mechanism-based reason explaining how it supports the issue. This is required when focusItems is empty or when intake exercises are relevant.
+- Supplements mode: Analyze by active ingredient(s) but output exact logged name. Only include supplements/herbs/nutraceuticals. Never include alcohol, foods, or lifestyle items in any bucket.
+- Medications mode: Analyze by active ingredient(s) and therapeutic class but output exact logged name (brand or generic as logged).
+- Nutrition mode: Analyze by nutritional profile and physiological effects but output exact logged name. Only mark foods as "working" if they appear in focusItems. Use suggested/avoid for novel foods.
+- Exercise mode: CRITICAL - You MUST check profile.exerciseTypes in the user context. If any exercises listed in profile.exerciseTypes are supportive for this issue, you MUST include them in the "working" bucket even if they don't appear in focusItems. Use the exact exercise name from profile.exerciseTypes and provide a mechanism-based reason explaining how it supports the issue. This is required when focusItems is empty or when intake exercises are relevant. For logged exercises, analyze physiological effects but use exact logged name.
+- Lifestyle mode: Analyze mechanisms but use exact logged habit/pattern name.
+- Labs mode: Analyze biomarker significance but use exact logged test name.
 - Reasons must include mechanism + relevance; add dose/timing or execution guidance where appropriate.
 - If focusItems is empty but profile.exerciseTypes contains supportive exercises, those exercises MUST appear in "working" - do not leave working empty.
 - Even if user data is sparse, you MUST still populate "suggested" and "avoid" to the minimum counts using widely accepted best practice for ${issueName}. Never respond with "everything covered."
@@ -637,6 +643,106 @@ ${diversityHint}`
       .map((it: any) => ({ name: it.name, reason: it.reason, protocol: it.protocol ?? null }))
   } catch (error) {
     console.warn('[insights.llm] fillMissingItemsForSection error', error)
+    return null
+  }
+}
+
+/**
+ * Evaluates user's logged items (focusItems) to identify which are supportive for the issue.
+ * This is a fallback when the main LLM doesn't properly match logged names.
+ * Analyzes items at ingredient/mechanism level but ALWAYS returns exact logged names.
+ */
+export async function evaluateFocusItemsForIssue(params: {
+  issueName: string
+  issueSummary?: string | null
+  mode: SectionMode
+  focusItems: Array<{ name: string; dosage?: string | null; timing?: string[] | null }>
+}): Promise<Array<{ name: string; reason: string; dosage?: string | null; timing?: string | null }> | null> {
+  const { issueName, issueSummary, mode, focusItems } = params
+  if (!focusItems.length) return []
+
+  const openai = getOpenAIClient()
+  if (!openai) return null
+
+  const modeGuidanceText = modeGuidance(mode)
+  const prompt = `For issue "${issueName}"${issueSummary ? ` (${issueSummary})` : ''}, SECTION: ${mode}.
+
+${modeGuidanceText}
+
+The user has logged these items:
+${JSON.stringify(focusItems, null, 2)}
+
+CRITICAL INSTRUCTIONS:
+1. Analyze each logged item by understanding its active ingredients, compounds, mechanisms, or physiological effects
+2. Evaluate whether each item is supportive for "${issueName}" based on evidence-based mechanisms
+3. ALWAYS use the EXACT logged name from the input array - never substitute with generic names, ingredient names, or alternative terminology
+4. For supplements: recognize active ingredients (e.g., "Sunfiber" contains PHGG) but output "Sunfiber", not "PHGG"
+5. For medications: recognize active ingredients but output the exact logged name (brand or generic as logged)
+6. Return ONLY items that are plausibly supportive for this issue
+
+Return JSON:
+{
+  "supportive": Array<{
+    "name": string (EXACT logged name),
+    "reason": string (two sentences: mechanism + direct relevance),
+    "dosage": string | null,
+    "timing": string | null
+  }>
+}`
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: DEFAULT_INSIGHTS_MODEL,
+      temperature: 0.1,
+      max_tokens: 600,
+      response_format: { type: 'json_object' },
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a clinical decision support assistant. Analyze logged items by their mechanisms but ALWAYS output exact logged names. Output strict JSON only.',
+        },
+        { role: 'user', content: prompt },
+      ],
+    })
+
+    const content = response.choices?.[0]?.message?.content
+    if (!content) return null
+
+    let json: any
+    try {
+      json = JSON.parse(content)
+    } catch {
+      const stripped = content.replace(/```[a-zA-Z]*\n?|```/g, '').trim()
+      const objMatch = stripped.match(/\{[\s\S]*\}/)
+      if (!objMatch) return null
+      json = JSON.parse(objMatch[0])
+    }
+
+    const supportive = Array.isArray(json?.supportive) ? json.supportive : []
+    
+    // Map results back to exact logged names, preserving dosage/timing from logs
+    const loggedMap = new Map<string, { name: string; dosage?: string | null; timing?: string[] | null }>()
+    for (const item of focusItems) {
+      const key = item.name.trim().toLowerCase()
+      loggedMap.set(key, item)
+    }
+
+    return supportive
+      .filter((it: any) => it && typeof it.name === 'string' && typeof it.reason === 'string')
+      .map((it: any) => {
+        const key = it.name.trim().toLowerCase()
+        const logged = loggedMap.get(key)
+        // Prefer exact logged name if we can match it
+        const exactName = logged?.name ?? it.name
+        return {
+          name: exactName,
+          reason: it.reason,
+          dosage: logged?.dosage ?? (typeof it.dosage === 'string' ? it.dosage : null),
+          timing: logged?.timing ?? (typeof it.timing === 'string' ? it.timing : null),
+        }
+      })
+  } catch (error) {
+    console.warn('[insights.llm] evaluateFocusItemsForIssue error', error)
     return null
   }
 }
