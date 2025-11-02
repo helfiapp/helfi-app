@@ -210,7 +210,7 @@ export async function getCachedIssueSection(
       
       if (intakeTypesArray.length > 0) {
         const extras = (cached.result.extras as Record<string, unknown> | undefined) ?? {}
-        const existingWorking = (extras.workingActivities as Array<{ title: string }> | undefined) ?? []
+        const existingWorking = (extras.workingActivities as Array<{ title: string; reason?: string; summary?: string; lastLogged?: string }> | undefined) ?? []
         const workingActivities = [...existingWorking] // Create a new array to avoid mutation issues
         const workingTitles = new Set(workingActivities.map(w => canonical(w.title)))
         
@@ -1909,7 +1909,7 @@ async function computeIssueSection(
       if (section === 'exercise') {
         const landing = await loadUserLandingContext(userId)
         const intakeTypesArray = landing.profile.exerciseTypes ?? []
-        const workingActivities = (extrasIn.workingActivities as Array<{ title: string }> | undefined) ?? []
+        const workingActivities = (extrasIn.workingActivities as Array<{ title: string; reason?: string; summary?: string; lastLogged?: string }> | undefined) ?? []
         const workingTitles = new Set(workingActivities.map(w => canonical(w.title)))
         
         // Add any missing intake exercises
@@ -1978,7 +1978,7 @@ async function computeIssueSection(
       const landing = await loadUserLandingContext(userId)
       const intakeTypesArray = landing.profile.exerciseTypes ?? []
       const extrasQuick = (quick.extras as Record<string, unknown> | undefined) ?? {}
-      const workingActivities = (extrasQuick.workingActivities as Array<{ title: string }> | undefined) ?? []
+      const workingActivities = (extrasQuick.workingActivities as Array<{ title: string; reason?: string; summary?: string; lastLogged?: string }> | undefined) ?? []
       const workingTitles = new Set(workingActivities.map(w => canonical(w.title)))
       
       // Add any missing intake exercises
