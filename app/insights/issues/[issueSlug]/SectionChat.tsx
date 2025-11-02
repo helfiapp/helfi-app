@@ -1,6 +1,6 @@
 'use client'
 
-import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react'
 
 interface SectionChatProps {
   issueSlug: string
@@ -18,6 +18,7 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
   const [error, setError] = useState<string | null>(null)
   const endRef = useRef<HTMLDivElement | null>(null)
   const enabled = (process.env.NEXT_PUBLIC_INSIGHTS_CHAT || 'true').toLowerCase() === 'true' || (process.env.NEXT_PUBLIC_INSIGHTS_CHAT || '') === '1'
+  const [threadId, setThreadId] = useState<string | null>(null)
 
   // Initial load from server (persistent thread). Falls back to localStorage if server unavailable
   useEffect(() => {
@@ -28,6 +29,7 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
         const res = await fetch(`/api/insights/issues/${issueSlug}/sections/${section}/chat`, { cache: 'no-store' })
         if (res.ok) {
           const data = await res.json()
+          if (!cancelled && typeof data?.threadId === 'string') setThreadId(data.threadId)
           const serverMessages = Array.isArray(data?.messages)
             ? data.messages.map((m: any) => ({ role: m.role, content: m.content })).filter((m: any) => m?.content)
             : []
@@ -61,6 +63,30 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading])
+
+  function onComposerKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault()
+      const form = (event.target as HTMLTextAreaElement).closest('form') as HTMLFormElement | null
+      form?.requestSubmit()
+    }
+  }
+
+  async function handleClear() {
+    try {
+      if (!enabled) return
+      setLoading(true)
+      setError(null)
+      await fetch(`/api/insights/issues/${issueSlug}/sections/${section}/chat`, { method: 'DELETE' })
+      setMessages([])
+      setThreadId(null)
+      try { localStorage.removeItem(storageKey) } catch {}
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -125,48 +151,98 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
 
   if (!enabled) return null
   return (
-    <section className="bg-white border border-gray-200 rounded-2xl shadow-sm p-6">
-      <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-3">Ask AI about this section</h3>
-      <div className="space-y-3 max-h-[360px] overflow-y-auto pr-2">
+    <section className="bg-white border border-gray-200 rounded-2xl shadow-sm p-0 overflow-hidden">
+      <header className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-900">Chat about {issueName} ({section})</h3>
+          <p className="text-xs text-gray-500">{threadId ? 'History saved for this section' : 'Start a conversation – it will be saved here'}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleClear}
+            disabled={loading}
+            className="text-xs rounded-md border border-gray-300 px-2 py-1 text-gray-600 hover:bg-gray-50 disabled:opacity-60"
+          >
+            Reset
+          </button>
+        </div>
+      </header>
+
+      <div className="px-5 py-4 h-[420px] overflow-y-auto space-y-3" aria-live="polite">
         {messages.length === 0 && !loading && (
-          <div className="text-sm text-gray-400">Start a conversation about {issueName} ({section}). Your chat history will stay here.</div>
+          <div className="text-sm text-gray-400">
+            Ask follow‑ups like:
+            <div className="mt-2 flex flex-wrap gap-2">
+              {[
+                `How do these recommendations help ${issueName}?`,
+                'Are there safety interactions to watch?',
+                'What should I try first this week?',
+              ].map((q) => (
+                <button
+                  key={q}
+                  onClick={() => setInput(q)}
+                  className="rounded-full border border-gray-300 px-3 py-1 text-xs text-gray-600 hover:bg-gray-50"
+                  type="button"
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
+          </div>
         )}
         {messages.map((m, idx) => (
-          <div key={idx} className={m.role === 'user' ? 'flex justify-end' : 'flex justify-start'}>
-            <div className={
-              m.role === 'user'
-                ? 'inline-block max-w-[85%] rounded-2xl rounded-br-sm bg-helfi-green text-white px-4 py-2 text-sm'
-                : 'inline-block max-w-[85%] rounded-2xl rounded-bl-sm bg-gray-100 text-gray-800 px-4 py-2 text-sm'
-            }>
+          <div key={idx} className={m.role === 'user' ? 'flex items-start justify-end gap-2' : 'flex items-start justify-start gap-2'}>
+            {m.role !== 'user' && (
+              <div className="mt-1 h-7 w-7 shrink-0 rounded-full bg-helfi-green/10 text-helfi-green grid place-items-center text-xs font-bold">AI</div>
+            )}
+            <div
+              className={
+                m.role === 'user'
+                  ? 'inline-block max-w-[85%] rounded-2xl rounded-br-sm bg-helfi-green text-white px-4 py-2 text-sm shadow-sm'
+                  : 'inline-block max-w-[85%] rounded-2xl rounded-bl-sm bg-gray-100 text-gray-800 px-4 py-2 text-sm shadow-sm'
+              }
+            >
               {m.content}
             </div>
+            {m.role === 'user' && (
+              <div className="mt-1 h-7 w-7 shrink-0 rounded-full bg-gray-900 text-white grid place-items-center text-xs font-bold">You</div>
+            )}
           </div>
         ))}
         {loading && (
-          <div className="flex justify-start">
-            <div className="inline-block max-w-[85%] rounded-2xl rounded-bl-sm bg-gray-100 text-gray-500 px-4 py-2 text-sm">Thinking…</div>
+          <div className="flex items-start justify-start gap-2">
+            <div className="mt-1 h-7 w-7 shrink-0 rounded-full bg-helfi-green/10 text-helfi-green grid place-items-center text-xs font-bold">AI</div>
+            <div className="inline-block rounded-2xl rounded-bl-sm bg-gray-100 text-gray-600 px-4 py-2 text-sm">
+              <span className="inline-flex items-center gap-1">
+                <span className="animate-pulse">●</span>
+                <span className="animate-pulse [animation-delay:150ms]">●</span>
+                <span className="animate-pulse [animation-delay:300ms]">●</span>
+              </span>
+            </div>
           </div>
         )}
         <div ref={endRef} />
       </div>
-      <form className="mt-4 space-y-3" onSubmit={handleSubmit}>
-        <textarea
-          value={input}
-          onChange={(event) => setInput(event.target.value)}
-          placeholder={`Ask a follow-up question about ${issueName} (${section}).`}
-          rows={3}
-          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-base leading-6 focus:border-helfi-green focus:outline-none focus:ring-2 focus:ring-helfi-green/40 resize-none"
-        />
-        <div className="flex items-center gap-3">
+
+      <form className="border-t border-gray-200 px-5 py-3" onSubmit={handleSubmit}>
+        <div className="flex items-end gap-2">
+          <textarea
+            value={input}
+            onChange={(event) => setInput(event.target.value)}
+            onKeyDown={onComposerKeyDown}
+            placeholder={`Message AI about ${issueName} (${section})`}
+            rows={1}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-base leading-6 focus:border-helfi-green focus:outline-none focus:ring-2 focus:ring-helfi-green/40 resize-none"
+          />
           <button
             type="submit"
             disabled={loading}
             className="inline-flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-[10px] text-base font-semibold text-white disabled:opacity-60"
           >
-            {loading ? 'Sending…' : 'Ask AI'}
+            Send
           </button>
-          {error && <span className="text-xs text-rose-600">{error}</span>}
         </div>
+        {error && <div className="mt-2 text-xs text-rose-600">{error}</div>}
       </form>
     </section>
   )
