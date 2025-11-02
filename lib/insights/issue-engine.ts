@@ -2159,6 +2159,15 @@ async function buildQuickSection(
               // Fallback: if LLM returns exercise in suggested bucket that matches intake exerciseTypes, promote it to working
               const intakeTypesArray = landing.profile.exerciseTypes ?? []
               
+              // EXTENSIVE DEBUGGING
+              console.log('[exercise.working.quick] ========== DEBUG START ==========')
+              console.log('[exercise.working.quick] landing.profile:', JSON.stringify(landing.profile, null, 2))
+              console.log('[exercise.working.quick] landing.profile.exerciseTypes:', landing.profile.exerciseTypes)
+              console.log('[exercise.working.quick] intakeTypesArray:', intakeTypesArray)
+              console.log('[exercise.working.quick] intakeTypesArray.length:', intakeTypesArray.length)
+              console.log('[exercise.working.quick] working.length BEFORE adding intake:', working.length)
+              console.log('[exercise.working.quick] working items BEFORE:', working.map(w => w.title))
+              
               // CRITICAL FIX: Always add intake exercises if they exist, even if LLM returned some working items
               // This ensures intake exercises ALWAYS appear in working section
               const intakeExercisesInWorking = new Set(
@@ -2186,8 +2195,14 @@ async function buildQuickSection(
                       lastLogged: 'From your health profile',
                     })
                   }
+                } else {
+                  console.log(`[exercise.working.quick] ⏭️ Skipping "${exerciseType}" - already in working`)
                 }
               }
+              
+              console.log('[exercise.working.quick] working.length AFTER adding intake:', working.length)
+              console.log('[exercise.working.quick] working items AFTER:', working.map(w => w.title))
+              console.log('[exercise.working.quick] ========== DEBUG END ==========')
               
               const promotedFromSuggested: Array<{ title: string; reason: string; summary: string; lastLogged: string }> = []
               
