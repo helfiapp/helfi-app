@@ -2158,6 +2158,22 @@ async function buildQuickSection(
               
               // Fallback: if LLM returns exercise in suggested bucket that matches intake exerciseTypes, promote it to working
               const intakeTypesArray = landing.profile.exerciseTypes ?? []
+              
+              // CRITICAL FIX: If no working items from LLM but intake exerciseTypes exist, add them directly
+              // This ensures intake exercises always appear even if LLM doesn't return them
+              if (working.length === 0 && intakeTypesArray.length > 0) {
+                console.log('[exercise.working.quick] ⚠️ No working items from LLM, but intake exerciseTypes exist. Adding directly:', intakeTypesArray)
+                for (const exerciseType of intakeTypesArray) {
+                  working.push({
+                    title: exerciseType,
+                    reason: `${exerciseType} can support ${summary.name} through improved cardiovascular health, stress reduction, and overall physical wellbeing. Regular ${exerciseType.toLowerCase()} helps maintain optimal body function and may contribute positively to this health goal.`,
+                    summary: 'Selected in health intake',
+                    lastLogged: 'From your health profile',
+                  })
+                }
+                console.log('[exercise.working.quick] ✅ Added intake exercises directly to working:', working.map(w => w.title))
+              }
+              
               const promotedFromSuggested: Array<{ title: string; reason: string; summary: string; lastLogged: string }> = []
               
               for (const suggestedItem of r.suggested) {
