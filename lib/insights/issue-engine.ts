@@ -3232,6 +3232,37 @@ async function buildSupplementsSection(
     }
   }
 
+  // AI-based augmentation: if some logged supplements are still missing from working, evaluate only the missing ones
+  if (normalizedSupplements.length > 0) {
+    const present = new Set(supportiveDetails.map((s) => canonical(s.name)))
+    const missing = normalizedSupplements.filter((supp) => !present.has(canonical(supp.name)))
+    if (missing.length > 0) {
+      console.log(`[supplements] Evaluating ${missing.length} missing logged supplements for potential support`)
+      const evaluatedMissing = await evaluateFocusItemsForIssue({
+        issueName: issue.name,
+        issueSummary: issue.highlight,
+        mode: 'supplements',
+        focusItems: missing,
+      })
+      if (evaluatedMissing && evaluatedMissing.length > 0) {
+        for (const item of evaluatedMissing) {
+          const key = canonical(item.name)
+          if (present.has(key)) continue
+          const logged = supplementMap.get(key)
+          if (!logged) continue
+          supportiveDetails.push({
+            name: logged.name,
+            reason: item.reason,
+            dosage: item.dosage ?? logged.dosage ?? null,
+            timing: parseTiming(item.timing, logged.timing ?? []),
+          })
+          present.add(key)
+        }
+        console.log(`[supplements] Added ${supportiveDetails.length} total supportive supplements after augmentation`)
+      }
+    }
+  }
+
   // Legacy KB fallback (only if AI evaluator also found nothing)
   if (supportiveDetails.length === 0 && normalizedSupplements.length > 0) {
     const enriched = normalizedSupplements
@@ -3568,6 +3599,38 @@ async function buildMedicationsSection(
         }
       }
       console.log(`[medications] AI evaluator found ${supportiveDetails.length} supportive medications`)
+    }
+  }
+
+  // AI-based augmentation: if some logged medications are still missing from working, evaluate only the missing ones
+  if (normalizedMeds.length > 0) {
+    const present = new Set(supportiveDetails.map((s) => canonical(s.name)))
+    const missing = normalizedMeds.filter((med) => !present.has(canonical(med.name)))
+    if (missing.length > 0) {
+      console.log(`[medications] Evaluating ${missing.length} missing logged medications for potential support`)
+      const evaluatedMissing = await evaluateFocusItemsForIssue({
+        issueName: issue.name,
+        issueSummary: issue.highlight,
+        mode: 'medications',
+        focusItems: missing,
+      })
+      if (evaluatedMissing && evaluatedMissing.length > 0) {
+        for (const item of evaluatedMissing) {
+          const key = canonical(item.name)
+          if (present.has(key)) continue
+          if (supplementNameSet.has(key) || looksSupplementLike(item.name)) continue
+          const logged = medMap.get(key)
+          if (!logged) continue
+          supportiveDetails.push({
+            name: logged.name,
+            reason: item.reason,
+            dosage: item.dosage ?? logged.dosage ?? null,
+            timing: parseTiming(item.timing, logged.timing ?? []),
+          })
+          present.add(key)
+        }
+        console.log(`[medications] Added ${supportiveDetails.length} total supportive medications after augmentation`)
+      }
     }
   }
 
@@ -4159,6 +4222,37 @@ async function buildNutritionSection(
         }
       }
       console.log(`[nutrition] AI evaluator found ${workingFocus.length} supportive foods`)
+    }
+  }
+
+  // AI-based augmentation: evaluate any remaining logged foods not yet included
+  if (normalizedFoods.length > 0 && hasLoggedFoods) {
+    const present = new Set(workingFocus.map((w) => canonical(w.title)))
+    const missing = normalizedFoods.filter((f) => !present.has(canonical(f.name)))
+    if (missing.length > 0) {
+      console.log(`[nutrition] Evaluating ${missing.length} missing logged foods for potential support`)
+      const evaluatedMissing = await evaluateFocusItemsForIssue({
+        issueName: issue.name,
+        issueSummary: issue.highlight,
+        mode: 'nutrition',
+        focusItems: missing,
+      })
+      if (evaluatedMissing && evaluatedMissing.length > 0) {
+        for (const item of evaluatedMissing) {
+          const key = canonical(item.name)
+          if (present.has(key)) continue
+          if (!allowFoodName(item.name, item.reason)) continue
+          const logged = normalizedFoods.find((f) => canonical(f.name) === key)
+          if (!logged) continue
+          workingFocus.push({
+            title: logged.name,
+            reason: item.reason,
+            example: item.dosage ?? item.timing ?? logged.dosage ?? '',
+          })
+          present.add(key)
+        }
+        console.log(`[nutrition] Added ${workingFocus.length} total working foods after augmentation`)
+      }
     }
   }
 
