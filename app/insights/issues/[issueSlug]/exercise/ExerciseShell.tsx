@@ -49,6 +49,7 @@ export default function ExerciseShell({ children, initialResult, issueSlug }: Ex
   const [customTo, setCustomTo] = useState('')
   const segments = useSelectedLayoutSegments()
   const activeTab = (segments?.[0] as TabKey | undefined) ?? 'working'
+  const DEBUG = process.env.NEXT_PUBLIC_DEBUG_INSIGHTS === '1' || process.env.NEXT_PUBLIC_DEBUG_INSIGHTS === 'true'
 
   // Fetch data client-side if SSR returned null (cache miss)
   useEffect(() => {
@@ -154,6 +155,11 @@ export default function ExerciseShell({ children, initialResult, issueSlug }: Ex
                 <p className="text-sm text-gray-700 leading-relaxed">Preparing initial guidance...</p>
               </div>
             </div>
+            {DEBUG && (
+              <div className="mt-3 rounded-md border border-dashed border-gray-300 bg-gray-50 p-3 text-xs text-gray-600">
+                <div>DEBUG: loading initial result…</div>
+              </div>
+            )}
           </section>
           <nav className="space-y-2">
             {tabs.map((tab) => (
@@ -247,6 +253,13 @@ export default function ExerciseShell({ children, initialResult, issueSlug }: Ex
               {error && <p className="text-xs text-rose-600 max-w-xs">{error}</p>}
             </div>
           </div>
+          {DEBUG && (
+            <div className="mt-3 rounded-md border border-dashed border-gray-300 bg-gray-50 p-3 text-xs text-gray-600">
+              <div>DEBUG: extras.workingActivities = {extras.workingActivities?.length || 0}</div>
+              <div className="mt-1 truncate">Titles: {(extras.workingActivities || []).map((w) => w.title).join(', ') || '—'}</div>
+              <div className="mt-1">Source flags: quickUsed={(result.extras as any)?.quickUsed ? '1' : '0'}, cacheHit={(result.extras as any)?.cacheHit ? '1' : '0'}</div>
+            </div>
+          )}
           {customOpen && (
             <form
               className="mt-4 flex flex-col gap-3 md:flex-row md:items-end"

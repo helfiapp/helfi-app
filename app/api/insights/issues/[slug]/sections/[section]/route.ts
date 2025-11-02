@@ -27,6 +27,19 @@ export async function GET(
     if (!result) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 })
     }
+    if (process.env.INSIGHTS_DEBUG === '1' && sectionParam === 'exercise') {
+      try {
+        const wa = Array.isArray((result as any)?.extras?.workingActivities)
+          ? (result as any).extras.workingActivities
+          : []
+        // eslint-disable-next-line no-console
+        console.log('[insights.api] GET exercise section', {
+          slug: context.params.slug,
+          workingCount: wa.length,
+          workingTitles: wa.map((x: any) => x?.title).filter(Boolean),
+        })
+      } catch {}
+    }
 
     // Add status information to the response
     const enrichedResult = {

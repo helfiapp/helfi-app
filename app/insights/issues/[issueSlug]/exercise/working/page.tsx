@@ -1,15 +1,32 @@
 'use client'
 
+import { useEffect } from 'react'
 import { useExerciseContext } from '../ExerciseShell'
 
 export default function ExerciseWorkingPage() {
   const { extras } = useExerciseContext()
   const items = extras.workingActivities ?? []
+  const DEBUG = process.env.NEXT_PUBLIC_DEBUG_INSIGHTS === '1' || process.env.NEXT_PUBLIC_DEBUG_INSIGHTS === 'true'
+
+  useEffect(() => {
+    if (DEBUG) {
+      try {
+        // Log minimal, safe snapshot for debugging
+        // eslint-disable-next-line no-console
+        console.log('[ExerciseWorkingPage] workingActivities', { count: items.length, titles: items.map((i) => i.title) })
+      } catch {}
+    }
+  }, [DEBUG, items])
 
   if (!items.length) {
     return (
       <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-6 text-sm text-gray-700">
         We haven't spotted any logged workouts that clearly support this issue yet. Explore the “Suggested Exercise” tab to plan your next sessions.
+        {DEBUG && (
+          <div className="mt-3 rounded-md border border-dashed border-gray-300 bg-gray-50 p-3 text-xs text-gray-600">
+            DEBUG: workingActivities empty
+          </div>
+        )}
       </div>
     )
   }
