@@ -1841,6 +1841,43 @@ async function computeIssueSection(
     }
     
     if (ok) {
+      // CRITICAL: For exercise section, ensure intake exercises are ALWAYS present in cached results
+      // This fixes stale cached results that were generated before the fix
+      if (section === 'exercise') {
+        const landing = await loadUserLandingContext(userId)
+        const intakeTypesArray = landing.profile.exerciseTypes ?? []
+        const workingActivities = (extrasIn.workingActivities as Array<{ title: string }> | undefined) ?? []
+        const workingTitles = new Set(workingActivities.map(w => canonical(w.title)))
+        
+        // Add any missing intake exercises
+        for (const exerciseType of intakeTypesArray) {
+          const exerciseTypeKey = canonical(exerciseType)
+          if (!workingTitles.has(exerciseTypeKey)) {
+            // Check fuzzy match
+            let alreadyAdded = false
+            for (const w of workingActivities) {
+              if (matchesExerciseType(w.title, exerciseType)) {
+                alreadyAdded = true
+                break
+              }
+            }
+            
+            if (!alreadyAdded) {
+              console.log(`[exercise.cache] ✅ Injecting intake exercise "${exerciseType}" into cached result`)
+              workingActivities.push({
+                title: exerciseType,
+                reason: `${exerciseType} can support this health goal through improved cardiovascular health, stress reduction, and overall physical wellbeing. Regular ${exerciseType.toLowerCase()} helps maintain optimal body function and may contribute positively to this health goal.`,
+                summary: 'Selected in health intake',
+                lastLogged: 'From your health profile',
+              })
+              workingTitles.add(exerciseTypeKey)
+            }
+          }
+        }
+        
+        extrasIn.workingActivities = workingActivities
+      }
+      
       const enriched: IssueSectionResult = {
         ...cached.result,
         extras: {
@@ -1872,6 +1909,45 @@ async function computeIssueSection(
   // Quick AI-only degraded result to avoid long waits
   const quick = await buildQuickSection(userId, slug, section, mode)
   if (quick) {
+    // CRITICAL: For exercise section, ensure intake exercises are ALWAYS present
+    // This handles cases where cached results are empty or LLM hasn't run yet
+    if (section === 'exercise') {
+      const landing = await loadUserLandingContext(userId)
+      const intakeTypesArray = landing.profile.exerciseTypes ?? []
+      const extrasQuick = (quick.extras as Record<string, unknown> | undefined) ?? {}
+      const workingActivities = (extrasQuick.workingActivities as Array<{ title: string }> | undefined) ?? []
+      const workingTitles = new Set(workingActivities.map(w => canonical(w.title)))
+      
+      // Add any missing intake exercises
+      for (const exerciseType of intakeTypesArray) {
+        const exerciseTypeKey = canonical(exerciseType)
+        if (!workingTitles.has(exerciseTypeKey)) {
+          // Check fuzzy match
+          let alreadyAdded = false
+          for (const w of workingActivities) {
+            if (matchesExerciseType(w.title, exerciseType)) {
+              alreadyAdded = true
+              break
+            }
+          }
+          
+          if (!alreadyAdded) {
+            console.log(`[exercise.computeIssueSection] ✅ Injecting intake exercise "${exerciseType}" directly into quick result`)
+            workingActivities.push({
+              title: exerciseType,
+              reason: `${exerciseType} can support ${quick.issue?.name || slug} through improved cardiovascular health, stress reduction, and overall physical wellbeing. Regular ${exerciseType.toLowerCase()} helps maintain optimal body function and may contribute positively to this health goal.`,
+              summary: 'Selected in health intake',
+              lastLogged: 'From your health profile',
+            })
+            workingTitles.add(exerciseTypeKey)
+          }
+        }
+      }
+      
+      extrasQuick.workingActivities = workingActivities
+      quick.extras = extrasQuick
+    }
+    
     // Persist degraded with short TTL and fire background upgrade
     try {
       const firstByteMs = Date.now() - t0
