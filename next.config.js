@@ -47,6 +47,7 @@ module.exports = {
     NEXT_PUBLIC_CHECKINS_ENABLED: process.env.NEXT_PUBLIC_CHECKINS_ENABLED || 'false',
     NEXT_PUBLIC_INSIGHTS_ENABLED: process.env.NEXT_PUBLIC_INSIGHTS_ENABLED || 'false',
     NEXT_PUBLIC_REPORTS_ENABLED: process.env.NEXT_PUBLIC_REPORTS_ENABLED || 'false',
+    NEXT_PUBLIC_INSIGHTS_CHAT: process.env.NEXT_PUBLIC_INSIGHTS_CHAT || 'true',
   },
   // Add headers to improve session stability
   async headers() {

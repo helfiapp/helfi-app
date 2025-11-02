@@ -17,19 +17,41 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const endRef = useRef<HTMLDivElement | null>(null)
+  const enabled = (process.env.NEXT_PUBLIC_INSIGHTS_CHAT || 'true').toLowerCase() === 'true' || (process.env.NEXT_PUBLIC_INSIGHTS_CHAT || '') === '1'
 
+  // Initial load from server (persistent thread). Falls back to localStorage if server unavailable
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(storageKey)
-      if (saved) {
-        const parsed = JSON.parse(saved)
-        if (Array.isArray(parsed)) {
-          setMessages(parsed.filter((m) => m && typeof m.content === 'string' && (m.role === 'user' || m.role === 'assistant')).slice(-24))
+    if (!enabled) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch(`/api/insights/issues/${issueSlug}/sections/${section}/chat`, { cache: 'no-store' })
+        if (res.ok) {
+          const data = await res.json()
+          const serverMessages = Array.isArray(data?.messages)
+            ? data.messages.map((m: any) => ({ role: m.role, content: m.content })).filter((m: any) => m?.content)
+            : []
+          if (!cancelled && serverMessages.length) setMessages(serverMessages)
         }
+      } catch {}
+      // Also hydrate from localStorage if server has nothing yet
+      if (!cancelled && messages.length === 0) {
+        try {
+          const saved = localStorage.getItem(storageKey)
+          if (saved) {
+            const parsed = JSON.parse(saved)
+            if (Array.isArray(parsed)) {
+              setMessages(parsed.filter((m) => m && typeof m.content === 'string' && (m.role === 'user' || m.role === 'assistant')).slice(-24))
+            }
+          }
+        } catch {}
       }
-    } catch {}
-  }, [storageKey])
+    })()
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled, issueSlug, section])
 
+  // Persist a lightweight copy locally for UX continuity
   useEffect(() => {
     try {
       localStorage.setItem(storageKey, JSON.stringify(messages))
@@ -53,23 +75,47 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
       const nextMessages: ChatMessage[] = [...messages, { role: 'user', content: text }]
       setMessages(nextMessages)
       setInput('')
-      const response = await fetch('/api/insights/ask', {
+
+      // Attempt streaming via SSE to new chat endpoint
+      const url = `/api/insights/issues/${issueSlug}/sections/${section}/chat`
+      const res = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          section,
-          issue: issueName || issueSlug,
-          messages: nextMessages,
-        }),
+        headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
+        body: JSON.stringify({ message: text }),
       })
-      if (!response.ok) {
-        throw new Error('Unable to fetch AI response right now.')
+      if (res.ok && (res.headers.get('content-type') || '').includes('text/event-stream') && res.body) {
+        const reader = res.body.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ''
+        let hasAssistant = false
+        while (true) {
+          const { value, done } = await reader.read()
+          if (done) break
+          buffer += decoder.decode(value, { stream: true })
+          const parts = buffer.split('\n\n')
+          buffer = parts.pop() || ''
+          for (const chunk of parts) {
+            if (chunk.startsWith('data: ')) {
+              const token = chunk.slice(6)
+              if (!hasAssistant) {
+                setMessages((prev) => [...prev, { role: 'assistant', content: token }])
+                hasAssistant = true
+              } else {
+                setMessages((prev) => {
+                  const copy = prev.slice()
+                  copy[copy.length - 1] = { role: 'assistant', content: (copy[copy.length - 1] as any).content + token }
+                  return copy
+                })
+              }
+            }
+          }
+        }
+      } else {
+        // Fallback to non-streaming JSON
+        const data = await res.json().catch(() => null)
+        const textOut = data?.assistant as string | undefined
+        if (textOut) setMessages((prev) => [...prev, { role: 'assistant', content: textOut }])
       }
-      const data = await response.json()
-      const reply: ChatMessage[] = Array.isArray(data?.messages)
-        ? data.messages.filter((m: any) => m && typeof m.content === 'string' && (m.role === 'user' || m.role === 'assistant'))
-        : []
-      if (reply.length) setMessages(reply)
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -77,6 +123,7 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
     }
   }
 
+  if (!enabled) return null
   return (
     <section className="bg-white border border-gray-200 rounded-2xl shadow-sm p-6">
       <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-3">Ask AI about this section</h3>
