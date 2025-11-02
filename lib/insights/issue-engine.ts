@@ -3100,7 +3100,7 @@ async function buildSupplementsSection(
       profile: context.profile,
       mode: 'supplements',
     },
-    { minWorking: normalizedSupplements.length > 0 ? 1 : 0, minSuggested: 4, minAvoid: 4 }
+    { minWorking: Math.min(3, Math.max(0, normalizedSupplements.length)), minSuggested: 4, minAvoid: 4 }
   )
   console.timeEnd(`[insights.llm] supplements:${issue.slug}`)
 
