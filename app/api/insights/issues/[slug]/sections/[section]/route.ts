@@ -27,17 +27,34 @@ export async function GET(
     if (!result) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 })
     }
-    if (process.env.INSIGHTS_DEBUG === '1' && sectionParam === 'exercise') {
+    
+    // Debug headers when INSIGHTS_DEBUG=1
+    const headers: Record<string, string> = {}
+    if (process.env.INSIGHTS_DEBUG === '1') {
       try {
-        const wa = Array.isArray((result as any)?.extras?.workingActivities)
-          ? (result as any).extras.workingActivities
-          : []
-        // eslint-disable-next-line no-console
-        console.log('[insights.api] GET exercise section', {
-          slug: context.params.slug,
-          workingCount: wa.length,
-          workingTitles: wa.map((x: any) => x?.title).filter(Boolean),
-        })
+        const extras = (result as any)?.extras ?? {}
+        const pipelineVersion = extras.pipelineVersion ?? 'unknown'
+        const responseType = extras.quickUsed ? 'quick' : extras.cacheHit ? 'cached' : 'validated'
+        
+        headers['X-Debug-ResponseType'] = responseType
+        headers['X-Debug-PipelineVersion'] = String(pipelineVersion)
+        
+        if (sectionParam === 'supplements') {
+          const supplements = extras.supportiveDetails ?? []
+          const supplementNames = supplements.map((s: any) => s?.name).filter(Boolean)
+          headers['X-Debug-Supplements'] = supplementNames.slice(0, 10).join(',')
+          headers['X-Debug-WorkingCount'] = String(supplements.length)
+        } else if (sectionParam === 'exercise') {
+          const wa = Array.isArray(extras.workingActivities) ? extras.workingActivities : []
+          headers['X-Debug-WorkingCount'] = String(wa.length)
+          headers['X-Debug-WorkingTitles'] = wa.map((x: any) => x?.title).filter(Boolean).slice(0, 10).join(',')
+          // eslint-disable-next-line no-console
+          console.log('[insights.api] GET exercise section', {
+            slug: context.params.slug,
+            workingCount: wa.length,
+            workingTitles: wa.map((x: any) => x?.title).filter(Boolean),
+          })
+        }
       } catch {}
     }
 
@@ -53,7 +70,7 @@ export async function GET(
       },
     }
 
-    return NextResponse.json(enrichedResult, { status: 200 })
+    return NextResponse.json(enrichedResult, { status: 200, headers })
   } catch (error) {
     console.error('GET /api/insights/issues/[slug]/sections/[section] error', error)
     return NextResponse.json({ error: 'Failed to load section' }, { status: 500 })

@@ -137,7 +137,7 @@ interface BloodResultsData {
 const RATING_SCALE_DEFAULT = 6
 const SECTION_CACHE_TTL_MS = 1000 * 60 * 15
 const DEGRADED_CACHE_TTL_MS = 1000 * 60 * 2
-const CURRENT_PIPELINE_VERSION = 'v8'
+const CURRENT_PIPELINE_VERSION = 'v9'
 const FORCE_QUICK_FIRST = process.env.INSIGHTS_FORCE_QUICK_FIRST === 'true'
 const PAUSE_HEAVY = process.env.INSIGHTS_PAUSE_HEAVY === 'true'
 
@@ -2182,6 +2182,79 @@ async function buildQuickSection(
       case 'supplements': {
         const r = await map('supplements')
         if (!r) return null
+        
+        // CRITICAL FIX: Fetch supplements and run evaluator for quick path
+        // loadUserLandingContext doesn't include supplements, so fetch separately
+        let supportiveDetails: Array<{ name: string; reason: string; dosage: string | null; timing: string[] }> = []
+        try {
+          const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: {
+              supplements: {
+                select: {
+                  name: true,
+                  dosage: true,
+                  timing: true,
+                },
+              },
+            },
+          })
+          
+          if (user?.supplements && user.supplements.length > 0) {
+            const normalizedSupplements = user.supplements.map((supp) => ({
+              name: supp.name,
+              dosage: supp.dosage ?? null,
+              timing: Array.isArray(supp.timing) ? supp.timing : [],
+            }))
+            
+            console.log(`[supplements.quick] Evaluating ${normalizedSupplements.length} logged supplements for issue "${summary.name}"`)
+            
+            // Run evaluator to identify supportive supplements
+            const evaluated = await evaluateFocusItemsForIssue({
+              issueName: summary.name,
+              issueSummary: summary.highlight,
+              mode: 'supplements',
+              focusItems: normalizedSupplements,
+            })
+            
+            if (evaluated && evaluated.length > 0) {
+              // Map evaluator results back to exact logged names with dosage/timing
+              const supplementMap = new Map(
+                normalizedSupplements.map((supp) => [canonical(supp.name), supp])
+              )
+              
+              const parseTiming = (timing?: string | null, fallback?: string[]) => {
+                if (timing && timing.trim().length) {
+                  return timing
+                    .split(/[,;]+/)
+                    .map((t) => t.trim())
+                    .filter(Boolean)
+                }
+                return fallback ?? []
+              }
+              
+              for (const item of evaluated) {
+                const logged = supplementMap.get(canonical(item.name))
+                if (logged) {
+                  supportiveDetails.push({
+                    name: logged.name, // Use exact logged name
+                    reason: item.reason,
+                    dosage: item.dosage ?? logged.dosage ?? null,
+                    timing: parseTiming(item.timing, logged.timing ?? []),
+                  })
+                }
+              }
+              
+              console.log(`[supplements.quick] Evaluator found ${supportiveDetails.length} supportive supplements: ${supportiveDetails.map(s => s.name).join(', ')}`)
+            } else {
+              console.log(`[supplements.quick] Evaluator found no supportive supplements`)
+            }
+          }
+        } catch (error) {
+          console.warn('[supplements.quick] Error evaluating supplements in quick path', error)
+          // Continue with empty supportiveDetails - don't fail the quick path
+        }
+        
         quick = {
           issue: summary,
           section: 'supplements',
@@ -2193,7 +2266,7 @@ async function buildQuickSection(
           recommendations: [],
           mode,
           extras: {
-            supportiveDetails: [],
+            supportiveDetails,
             suggestedAdditions: r.suggested.map((s) => ({ title: s.name, reason: s.reason, suggestion: s.protocol ?? null })),
             avoidList: r.avoid.map((a) => ({ name: a.name, reason: a.reason })),
             source: 'quick',
