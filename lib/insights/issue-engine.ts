@@ -259,6 +259,51 @@ export async function getCachedIssueSection(
     }
   }
   
+  // CRITICAL: For supplements section, ensure fiber supplements are present in cached results for bowel issues
+  if (section === 'supplements') {
+    try {
+      const issueName = cached.result.issue?.name || unslugify(slug)
+      const isBowelIssue = /bowel|digestion|constipation|regularity|stool/i.test(issueName)
+      if (isBowelIssue) {
+        const extras = (cached.result.extras as Record<string, unknown> | undefined) ?? {}
+        const supportiveDetails = (extras['supportiveDetails'] as Array<{ name: string; reason?: string; dosage?: string | null; timing?: string[] | null }> | undefined) ?? []
+        const present = new Set(supportiveDetails.map((s) => canonical(s.name)))
+
+        // Fetch current supplements for the user
+        const user = await prisma.user.findUnique({
+          where: { id: userId },
+          select: { supplements: { select: { name: true, dosage: true, timing: true } } },
+        })
+        const supplements = user?.supplements ?? []
+
+        const fiberSupplements = supplements.filter((supp) => {
+          const isFiber = /fiber|fibre|psyllium|inulin|guar gum|phgg/i.test(supp.name)
+          return isFiber && !present.has(canonical(supp.name))
+        })
+
+        if (fiberSupplements.length > 0) {
+          const enriched = fiberSupplements.map((supp) => ({
+            name: supp.name,
+            reason:
+              `${supp.name} contains soluble fiber that supports bowel regularity through hydration, gel formation, and fermentation to short-chain fatty acids that normalize stool consistency.`,
+            dosage: (supp as any).dosage ?? null,
+            timing: Array.isArray((supp as any).timing) ? (supp as any).timing : [],
+          }))
+
+          return {
+            ...cached.result,
+            extras: {
+              ...extras,
+              supportiveDetails: [...supportiveDetails, ...enriched],
+            },
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('[supplements.getCachedIssueSection] Error injecting fiber supplements into cached result', error)
+    }
+  }
+  
   return cached.result
 }
 
