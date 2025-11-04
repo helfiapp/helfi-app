@@ -137,7 +137,7 @@ interface BloodResultsData {
 const RATING_SCALE_DEFAULT = 6
 const SECTION_CACHE_TTL_MS = 1000 * 60 * 15
 const DEGRADED_CACHE_TTL_MS = 1000 * 60 * 2
-const CURRENT_PIPELINE_VERSION = 'v10'
+const CURRENT_PIPELINE_VERSION = 'v11'
 const FORCE_QUICK_FIRST = process.env.INSIGHTS_FORCE_QUICK_FIRST === 'true'
 const PAUSE_HEAVY = process.env.INSIGHTS_PAUSE_HEAVY === 'true'
 
@@ -1939,6 +1939,58 @@ async function computeIssueSection(
         }
         
         extrasIn.workingActivities = workingActivities
+      }
+      
+      // CRITICAL: For supplements section, ensure fiber supplements are detected in cached results
+      if (section === 'supplements') {
+        const issueName = cached.result.issue?.name || unslugify(slug)
+        const isBowelIssue = /bowel|digestion|constipation|regularity|stool/i.test(issueName)
+        
+        if (isBowelIssue) {
+          const supportiveDetails = (extrasIn.supportiveDetails as Array<{ name: string; reason?: string; dosage?: string | null; timing?: string[] | null }> | undefined) ?? []
+          const foundNames = new Set(supportiveDetails.map(s => canonical(s.name)))
+          
+          // Fetch current supplements
+          try {
+            const user = await prisma.user.findUnique({
+              where: { id: userId },
+              select: {
+                supplements: {
+                  select: {
+                    name: true,
+                    dosage: true,
+                    timing: true,
+                  },
+                },
+              },
+            })
+            
+            if (user?.supplements && user.supplements.length > 0) {
+              const fiberSupplements = user.supplements.filter(supp => {
+                const isFiber = /fiber|fibre|psyllium|inulin|guar gum|phgg/i.test(supp.name)
+                return isFiber && !foundNames.has(canonical(supp.name))
+              })
+              
+              if (fiberSupplements.length > 0) {
+                console.log(`[supplements.cache] ✅ Injecting ${fiberSupplements.length} fiber supplements into cached result: ${fiberSupplements.map(s => s.name).join(', ')}`)
+                for (const supp of fiberSupplements) {
+                  const parseTiming = (timing?: string[] | null) => {
+                    return Array.isArray(timing) ? timing : []
+                  }
+                  supportiveDetails.push({
+                    name: supp.name,
+                    reason: `${supp.name} contains soluble fiber that supports bowel regularity through hydration, gel formation, and fermentation to short-chain fatty acids that normalize stool consistency.`,
+                    dosage: supp.dosage ?? null,
+                    timing: parseTiming(supp.timing),
+                  })
+                }
+                extrasIn.supportiveDetails = supportiveDetails
+              }
+            }
+          } catch (error) {
+            console.warn('[supplements.cache] Error injecting fiber supplements into cached result', error)
+          }
+        }
       }
       
       const enriched: IssueSectionResult = {
