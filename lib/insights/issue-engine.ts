@@ -1946,9 +1946,14 @@ async function computeIssueSection(
         const issueName = cached.result.issue?.name || unslugify(slug)
         const isBowelIssue = /bowel|digestion|constipation|regularity|stool/i.test(issueName)
         
+        console.log(`[supplements.cache] Injecting into cached result. Issue: "${issueName}", isBowelIssue: ${isBowelIssue}`)
+        
         if (isBowelIssue) {
           const supportiveDetails = (extrasIn.supportiveDetails as Array<{ name: string; reason?: string; dosage?: string | null; timing?: string[] | null }> | undefined) ?? []
           const foundNames = new Set(supportiveDetails.map(s => canonical(s.name)))
+          
+          console.log(`[supplements.cache] Current supportiveDetails:`, supportiveDetails.map(s => s.name).join(', '))
+          console.log(`[supplements.cache] Found names set:`, Array.from(foundNames))
           
           // Fetch current supplements
           try {
@@ -1965,11 +1970,17 @@ async function computeIssueSection(
               },
             })
             
+            console.log(`[supplements.cache] Fetched ${user?.supplements?.length ?? 0} supplements from DB`)
             if (user?.supplements && user.supplements.length > 0) {
+              console.log(`[supplements.cache] All supplement names:`, user.supplements.map(s => s.name).join(', '))
               const fiberSupplements = user.supplements.filter(supp => {
                 const isFiber = /fiber|fibre|psyllium|inulin|guar gum|phgg/i.test(supp.name)
-                return isFiber && !foundNames.has(canonical(supp.name))
+                const alreadyFound = foundNames.has(canonical(supp.name))
+                console.log(`[supplements.cache] Checking "${supp.name}": isFiber=${isFiber}, alreadyFound=${alreadyFound}`)
+                return isFiber && !alreadyFound
               })
+              
+              console.log(`[supplements.cache] Filtered ${fiberSupplements.length} fiber supplements:`, fiberSupplements.map(s => s.name).join(', '))
               
               if (fiberSupplements.length > 0) {
                 console.log(`[supplements.cache] ✅ Injecting ${fiberSupplements.length} fiber supplements into cached result: ${fiberSupplements.map(s => s.name).join(', ')}`)
@@ -1985,6 +1996,9 @@ async function computeIssueSection(
                   })
                 }
                 extrasIn.supportiveDetails = supportiveDetails
+                console.log(`[supplements.cache] FINAL supportiveDetails after injection:`, supportiveDetails.map(s => s.name).join(', '))
+              } else {
+                console.log(`[supplements.cache] No fiber supplements to inject`)
               }
             }
           } catch (error) {
@@ -2068,10 +2082,14 @@ async function computeIssueSection(
       const issueName = quick.issue?.name || unslugify(slug)
       const isBowelIssue = /bowel|digestion|constipation|regularity|stool/i.test(issueName)
       
+      console.log(`[supplements.quick.compute] Injecting into quick result. Issue: "${issueName}", isBowelIssue: ${isBowelIssue}`)
+      
       if (isBowelIssue) {
         const extrasQuick = (quick.extras as Record<string, unknown> | undefined) ?? {}
         const supportiveDetails = (extrasQuick.supportiveDetails as Array<{ name: string; reason?: string; dosage?: string | null; timing?: string[] | null }> | undefined) ?? []
         const foundNames = new Set(supportiveDetails.map(s => canonical(s.name)))
+        
+        console.log(`[supplements.quick.compute] Current supportiveDetails:`, supportiveDetails.map(s => s.name).join(', '))
         
         // Fetch current supplements
         try {
@@ -2088,11 +2106,17 @@ async function computeIssueSection(
             },
           })
           
+          console.log(`[supplements.quick.compute] Fetched ${user?.supplements?.length ?? 0} supplements from DB`)
           if (user?.supplements && user.supplements.length > 0) {
+            console.log(`[supplements.quick.compute] All supplement names:`, user.supplements.map(s => s.name).join(', '))
             const fiberSupplements = user.supplements.filter(supp => {
               const isFiber = /fiber|fibre|psyllium|inulin|guar gum|phgg/i.test(supp.name)
-              return isFiber && !foundNames.has(canonical(supp.name))
+              const alreadyFound = foundNames.has(canonical(supp.name))
+              console.log(`[supplements.quick.compute] Checking "${supp.name}": isFiber=${isFiber}, alreadyFound=${alreadyFound}`)
+              return isFiber && !alreadyFound
             })
+            
+            console.log(`[supplements.quick.compute] Filtered ${fiberSupplements.length} fiber supplements:`, fiberSupplements.map(s => s.name).join(', '))
             
             if (fiberSupplements.length > 0) {
               console.log(`[supplements.quick.compute] ✅ Injecting ${fiberSupplements.length} fiber supplements into quick result: ${fiberSupplements.map(s => s.name).join(', ')}`)
@@ -2109,6 +2133,9 @@ async function computeIssueSection(
               }
               extrasQuick.supportiveDetails = supportiveDetails
               quick.extras = extrasQuick
+              console.log(`[supplements.quick.compute] FINAL supportiveDetails after injection:`, supportiveDetails.map(s => s.name).join(', '))
+            } else {
+              console.log(`[supplements.quick.compute] No fiber supplements to inject`)
             }
           }
         } catch (error) {
