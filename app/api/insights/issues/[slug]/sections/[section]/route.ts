@@ -100,16 +100,21 @@ export async function POST(
     const mode = (body?.mode === 'weekly' || body?.mode === 'daily' || body?.mode === 'custom') ? body.mode : 'latest'
     const range = body?.range && (body.range.from || body.range.to) ? body.range : undefined
 
-    // 1) If there is no new data since last generation, do NOT recompute.
-    const statusInfo = await checkInsightsStatus(session.user.id, context.params.slug, sectionParam)
-    if (!statusInfo.needsUpdate) {
-      const cached = await getCachedIssueSection(session.user.id, context.params.slug, sectionParam, { mode, range })
-      if (cached) {
-        return NextResponse.json({ result: cached, skipped: true, reason: 'no-new-data' }, { status: 200 })
-      }
-      // If no cached copy, fall through to compute once
+    // Fast path: Return quick result immediately, then upgrade in background
+    // This prevents users from waiting a minute for generation
+    const quickResult = await getIssueSection(session.user.id, context.params.slug, sectionParam, {
+      mode,
+      range,
+      force: false, // Don't force - use quick if available
+    })
+    
+    if (quickResult) {
+      // Return quick result immediately
+      // Background upgrade will happen automatically via computeIssueSection
+      return NextResponse.json({ result: quickResult, upgraded: false }, { status: 200 })
     }
 
+    // Fallback: If no quick result available, do full build (but this should be rare)
     const result = await getIssueSection(session.user.id, context.params.slug, sectionParam, {
       mode,
       range,
@@ -118,7 +123,7 @@ export async function POST(
     if (!result) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 })
     }
-    return NextResponse.json({ result }, { status: 200 })
+    return NextResponse.json({ result, upgraded: true }, { status: 200 })
   } catch (error) {
     console.error('POST /api/insights/issues/[slug]/sections/[section] error', error)
     return NextResponse.json({ error: 'Failed to generate section' }, { status: 500 })

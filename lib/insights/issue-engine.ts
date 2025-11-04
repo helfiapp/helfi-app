@@ -3512,6 +3512,28 @@ async function buildSupplementsSection(
     }
   }
 
+  // FALLBACK: Ensure fiber supplements are included for bowel issues (even if evaluator missed them)
+  const isBowelIssue = /bowel|digestion|constipation|regularity|stool/i.test(issue.name)
+  if (isBowelIssue && normalizedSupplements.length > 0) {
+    const present = new Set(supportiveDetails.map((s) => canonical(s.name)))
+    const fiberSupplements = normalizedSupplements.filter(supp => {
+      const isFiber = /fiber|fibre|psyllium|inulin|guar gum|phgg/i.test(supp.name)
+      return isFiber && !present.has(canonical(supp.name))
+    })
+    
+    if (fiberSupplements.length > 0) {
+      console.log(`[supplements] Adding ${fiberSupplements.length} fiber supplements that evaluator missed: ${fiberSupplements.map(s => s.name).join(', ')}`)
+      for (const supp of fiberSupplements) {
+        supportiveDetails.push({
+          name: supp.name,
+          reason: `${supp.name} contains soluble fiber that supports bowel regularity through hydration, gel formation, and fermentation to short-chain fatty acids that normalize stool consistency.`,
+          dosage: supp.dosage ?? null,
+          timing: parseTiming(null, supp.timing ?? []),
+        })
+      }
+    }
+  }
+
   // Legacy KB fallback (only if AI evaluator also found nothing)
   if (supportiveDetails.length === 0 && normalizedSupplements.length > 0) {
     const enriched = normalizedSupplements
