@@ -2063,6 +2063,60 @@ async function computeIssueSection(
       quick.extras = extrasQuick
     }
     
+    // CRITICAL: For supplements section, ensure fiber supplements are detected in quick results
+    if (section === 'supplements') {
+      const issueName = quick.issue?.name || unslugify(slug)
+      const isBowelIssue = /bowel|digestion|constipation|regularity|stool/i.test(issueName)
+      
+      if (isBowelIssue) {
+        const extrasQuick = (quick.extras as Record<string, unknown> | undefined) ?? {}
+        const supportiveDetails = (extrasQuick.supportiveDetails as Array<{ name: string; reason?: string; dosage?: string | null; timing?: string[] | null }> | undefined) ?? []
+        const foundNames = new Set(supportiveDetails.map(s => canonical(s.name)))
+        
+        // Fetch current supplements
+        try {
+          const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: {
+              supplements: {
+                select: {
+                  name: true,
+                  dosage: true,
+                  timing: true,
+                },
+              },
+            },
+          })
+          
+          if (user?.supplements && user.supplements.length > 0) {
+            const fiberSupplements = user.supplements.filter(supp => {
+              const isFiber = /fiber|fibre|psyllium|inulin|guar gum|phgg/i.test(supp.name)
+              return isFiber && !foundNames.has(canonical(supp.name))
+            })
+            
+            if (fiberSupplements.length > 0) {
+              console.log(`[supplements.quick.compute] ✅ Injecting ${fiberSupplements.length} fiber supplements into quick result: ${fiberSupplements.map(s => s.name).join(', ')}`)
+              for (const supp of fiberSupplements) {
+                const parseTiming = (timing?: string[] | null) => {
+                  return Array.isArray(timing) ? timing : []
+                }
+                supportiveDetails.push({
+                  name: supp.name,
+                  reason: `${supp.name} contains soluble fiber that supports bowel regularity through hydration, gel formation, and fermentation to short-chain fatty acids that normalize stool consistency.`,
+                  dosage: supp.dosage ?? null,
+                  timing: parseTiming(supp.timing),
+                })
+              }
+              extrasQuick.supportiveDetails = supportiveDetails
+              quick.extras = extrasQuick
+            }
+          }
+        } catch (error) {
+          console.warn('[supplements.quick.compute] Error injecting fiber supplements into quick result', error)
+        }
+      }
+    }
+    
     // Persist degraded with short TTL and fire background upgrade
     try {
       const firstByteMs = Date.now() - t0
