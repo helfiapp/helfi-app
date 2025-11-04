@@ -137,7 +137,7 @@ interface BloodResultsData {
 const RATING_SCALE_DEFAULT = 6
 const SECTION_CACHE_TTL_MS = 1000 * 60 * 15
 const DEGRADED_CACHE_TTL_MS = 1000 * 60 * 2
-const CURRENT_PIPELINE_VERSION = 'v9'
+const CURRENT_PIPELINE_VERSION = 'v10'
 const FORCE_QUICK_FIRST = process.env.INSIGHTS_FORCE_QUICK_FIRST === 'true'
 const PAUSE_HEAVY = process.env.INSIGHTS_PAUSE_HEAVY === 'true'
 
@@ -2208,6 +2208,8 @@ async function buildQuickSection(
             }))
             
             console.log(`[supplements.quick] Evaluating ${normalizedSupplements.length} logged supplements for issue "${summary.name}"`)
+            console.log(`[supplements.quick] Supplements list:`, normalizedSupplements.map(s => s.name).join(', '))
+            console.log(`[supplements.quick] Issue slug: "${slug}", Issue name: "${summary.name}"`)
             
             // Run evaluator to identify supportive supplements
             const evaluated = await evaluateFocusItemsForIssue({
@@ -2216,6 +2218,11 @@ async function buildQuickSection(
               mode: 'supplements',
               focusItems: normalizedSupplements,
             })
+            
+            console.log(`[supplements.quick] Evaluator returned ${evaluated?.length ?? 0} supportive items`)
+            if (evaluated && evaluated.length > 0) {
+              console.log(`[supplements.quick] Evaluator results:`, evaluated.map(e => e.name).join(', '))
+            }
             
             if (evaluated && evaluated.length > 0) {
               // Map evaluator results back to exact logged names with dosage/timing
@@ -2248,6 +2255,31 @@ async function buildQuickSection(
               console.log(`[supplements.quick] Evaluator found ${supportiveDetails.length} supportive supplements: ${supportiveDetails.map(s => s.name).join(', ')}`)
             } else {
               console.log(`[supplements.quick] Evaluator found no supportive supplements`)
+            }
+            
+            // FALLBACK: If evaluator missed fiber supplements for bowel issues, explicitly check for them
+            const isBowelIssue = /bowel|digestion|constipation|regularity|stool/i.test(summary.name)
+            if (isBowelIssue) {
+              const foundFiberNames = new Set(supportiveDetails.map(s => canonical(s.name)))
+              const fiberSupplements = normalizedSupplements.filter(supp => {
+                const isFiber = /fiber|fibre|psyllium|inulin|guar gum|phgg/i.test(supp.name)
+                return isFiber && !foundFiberNames.has(canonical(supp.name))
+              })
+              
+              if (fiberSupplements.length > 0) {
+                console.log(`[supplements.quick] Fallback: Adding ${fiberSupplements.length} fiber supplements that evaluator missed: ${fiberSupplements.map(s => s.name).join(', ')}`)
+                for (const supp of fiberSupplements) {
+                  const parseTiming = (timing?: string[] | null) => {
+                    return Array.isArray(timing) ? timing : []
+                  }
+                  supportiveDetails.push({
+                    name: supp.name,
+                    reason: `${supp.name} contains soluble fiber that supports bowel regularity through hydration, gel formation, and fermentation to short-chain fatty acids that normalize stool consistency.`,
+                    dosage: supp.dosage ?? null,
+                    timing: parseTiming(supp.timing),
+                  })
+                }
+              }
             }
           }
         } catch (error) {

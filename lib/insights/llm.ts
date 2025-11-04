@@ -677,7 +677,12 @@ CRITICAL INSTRUCTIONS:
 2. Evaluate whether each item is supportive for "${issueName}" based on evidence-based mechanisms
 3. Output matches by INDEX back to the provided array (0-based). Do NOT invent new items.
 4. For each supportive item, return its {index, reason, dosage?, timing?}. You may also include name, but index is REQUIRED.
-5. If the issue is "Bowel Movements", treat clinically supported soluble/prebiotic fibers (e.g., partially hydrolyzed guar gum, psyllium, inulin, acacia/arabic, methylcellulose, glucomannan, wheat dextrin, pectin) as supportive when appropriate. Explain the mechanism (hydration/gel formation, fermentation to SCFAs, stool normalization). Use the logged dose/timing when provided. When a product name contains the word "fiber", assume it is a fiber supplement and evaluate as above.
+5. FIBER SUPPLEMENTS FOR BOWEL HEALTH: If the issue relates to bowel movements, digestion, constipation, regularity, or stool quality (check case-insensitively), treat clinically supported soluble/prebiotic fibers as supportive. This includes:
+   - Partially hydrolyzed guar gum (PHGG) - includes products like "Sunfiber"
+   - Psyllium husk
+   - Inulin, acacia/arabic gum, methylcellulose, glucomannan, wheat dextrin, pectin
+   - ANY product name containing the word "fiber" (e.g., "Sunfiber", "FiberChoice", "Benefiber")
+   Explain the mechanism (hydration/gel formation, fermentation to SCFAs, stool normalization). Use the logged dose/timing when provided.
 6. Return ONLY items that are plausibly supportive for this issue
 
 Return JSON:
