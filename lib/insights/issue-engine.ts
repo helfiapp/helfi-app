@@ -2316,6 +2316,7 @@ async function buildQuickSection(
             console.log(`[supplements.quick] Evaluating ${normalizedSupplements.length} logged supplements for issue "${summary.name}"`)
             console.log(`[supplements.quick] Supplements list:`, normalizedSupplements.map(s => s.name).join(', '))
             console.log(`[supplements.quick] Issue slug: "${slug}", Issue name: "${summary.name}"`)
+            console.log(`[supplements.quick] ALL SUPPLEMENT NAMES:`, JSON.stringify(normalizedSupplements.map(s => s.name)))
             
             // Run evaluator to identify supportive supplements
             const evaluated = await evaluateFocusItemsForIssue({
@@ -2365,12 +2366,19 @@ async function buildQuickSection(
             
             // FALLBACK: If evaluator missed fiber supplements for bowel issues, explicitly check for them
             const isBowelIssue = /bowel|digestion|constipation|regularity|stool/i.test(summary.name)
+            console.log(`[supplements.quick] Is bowel issue? ${isBowelIssue} (issue name: "${summary.name}")`)
             if (isBowelIssue) {
               const foundFiberNames = new Set(supportiveDetails.map(s => canonical(s.name)))
+              console.log(`[supplements.quick] Already found fiber names:`, Array.from(foundFiberNames))
               const fiberSupplements = normalizedSupplements.filter(supp => {
+                const suppNameLower = supp.name.toLowerCase()
                 const isFiber = /fiber|fibre|psyllium|inulin|guar gum|phgg/i.test(supp.name)
-                return isFiber && !foundFiberNames.has(canonical(supp.name))
+                const alreadyFound = foundFiberNames.has(canonical(supp.name))
+                console.log(`[supplements.quick] Checking "${supp.name}": isFiber=${isFiber}, alreadyFound=${alreadyFound}, canonical="${canonical(supp.name)}"`)
+                return isFiber && !alreadyFound
               })
+              
+              console.log(`[supplements.quick] Filtered fiber supplements:`, fiberSupplements.map(s => s.name).join(', '))
               
               if (fiberSupplements.length > 0) {
                 console.log(`[supplements.quick] Fallback: Adding ${fiberSupplements.length} fiber supplements that evaluator missed: ${fiberSupplements.map(s => s.name).join(', ')}`)
@@ -2385,6 +2393,9 @@ async function buildQuickSection(
                     timing: parseTiming(supp.timing),
                   })
                 }
+                console.log(`[supplements.quick] FINAL supportiveDetails after fallback:`, supportiveDetails.map(s => s.name).join(', '))
+              } else {
+                console.log(`[supplements.quick] No fiber supplements found to add (all ${normalizedSupplements.length} supplements checked)`)
               }
             }
           }
