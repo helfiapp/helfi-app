@@ -1,3 +1,119 @@
+## URGENT ADDENDUM — 2025-11-04 (Sunfiber still not surfaced under Bowel Movements → Supplements → What’s Working)
+
+### Current status (live)
+- ❌ Sunfiber is still not listed under “What’s Working” on Bowel Movements → Supplements. Screenshot provided by user shows only “Magnesium Glycinate”.
+- This indicates the AI is still not correctly evaluating the user’s logged supplements for this issue on the live path that renders the card list.
+
+### What I implemented in this session (now live)
+1) Grounding and evaluation improvements (no brand hints; exact logged names only)
+   - `lib/insights/llm.ts`
+     - Strengthened section-mode guidance to analyze items by active ingredients/mechanisms but ALWAYS output exact logged names (brand preserved).
+     - Added `evaluateFocusItemsForIssue(...)` helper: runs a targeted JSON pass that evaluates the user’s logged items and returns supportive items by 0-based index to guarantee exact-name mapping.
+     - For Issue="Bowel Movements": added general soluble/prebiotic fiber rule (PHGG, psyllium, inulin, acacia/arabic, methylcellulose, glucomannan, wheat dextrin, pectin) and a permissive matcher for any logged name containing “fiber”. This remains AI-only, not a static map.
+2) Builder fallback and augmentation using the evaluator
+   - `lib/insights/issue-engine.ts`
+     - Supplements: if LLM working doesn’t cover logged items, call evaluator; then a second pass evaluates any remaining missing logged supplements and appends supportive ones using the exact logged names. minWorking raised (≤3 when user has logs).
+     - Medications & Nutrition: applied the same evaluator fallback/augmentation pattern for parity.
+     - Bumped `CURRENT_PIPELINE_VERSION` → `v8` to invalidate caches.
+3) Section chat grounding (supplements)
+   - `lib/insights/chat-store.ts`: Chat prompt now explicitly audits `profile.supplements`, analyzes by mechanism, and references exact stored names (dose/timing if present).
+
+Commits: `86e3fd8`, `a6e027b`, `57337c5`, `354de24`, `539468e`, `2b72c8c`, `d8671eb`.
+
+### What I tested (live) and result
+- Used `/staging-signin` and the direct endpoint `/api/auth/signin-direct?email=info@sonicweb.com.au` to sign in.
+- Opened Insights → Bowel Movements → Supplements → What’s Working.
+- Observed “Magnesium Glycinate” present; Sunfiber still missing. The report banner reads “Initial guidance…”, which suggests the quick/degraded path was rendered first. Even after a regeneration, Sunfiber still did not appear.
+
+### Likely causes to investigate next (ranked)
+1) Evaluator path not applied to the returned payload on live for this account/issue
+   - Although augmentation code appends supportive logged items post-LLM, the final `extras.supportiveDetails` seen by the client may originate from a cached/quick copy that never included evaluator results.
+   - The UI banner “Initial guidance…” implies the quick path may be winning the race. The quick path currently doesn’t include evaluator results.
+2) Data mismatch: “Sunfiber” may not actually be present in `user.supplements` for this production account
+   - Action: call `GET /api/user-data` and verify the `supplements` array contains an entry whose `name` includes “Sunfiber”. If not present, fix health setup persistence.
+3) Name normalization mismatch in live data
+   - The logged name may differ (e.g., extra whitespace, different punctuation/emoji) such that the evaluator output (by index) is fine, but the card builder filters out the item (unlikely but possible). Investigate canonicalization and `looksSupplementLike(...)` guards.
+4) Cache/versioning not fully invalidated for this section
+   - Despite `pipelineVersion: v8`, SSR/quick readers may still return an older row or return “quick” before “validated” with evaluator.
+5) Quick path parity gap
+   - The initial quick/degraded result (served to hit the ≤1s first byte) does not include evaluator-backed working items. If the UI remains on quick for too long, users won’t see Sunfiber even though the validated result would contain it.
+
+### Concrete next steps for the next agent
+1) Instrumentation (guarded by `INSIGHTS_DEBUG=1`)
+   - In `app/api/insights/issues/[slug]/sections/[section]/route.ts` add response headers when debug is on:
+     - `X-Debug-Supplements`: CSV of the first N `context.supplements` names
+     - `X-Debug-WorkingCount`: integer count of `extras.supportiveDetails.length`
+     - Log whether the response is quick vs validated and the `pipelineVersion`
+2) Verify live data
+   - Call `GET /api/user-data` and confirm the supplements array includes an entry whose `name` contains “Sunfiber”. If absent, fix Health Setup saving or indexing.
+3) Ensure evaluator results reach the client on the first meaningful paint
+   - Option A (preferred): after quick is served, trigger a client fetch for the validated result and swap in once available; confirm evaluator-backed `supportiveDetails` arrive.
+   - Option B (temporary): include evaluator over logged items in the quick path for Supplements only (small focused pass) so Sunfiber appears immediately.
+4) Force recompute for this account/issue once instrumentation is live
+   - POST `/api/insights/issues/bowel-movements/sections/supplements` with `{ mode: 'daily' }` and verify headers + payload in Network tab; confirm `supportiveDetails` includes Sunfiber.
+
+### Acceptance criteria (unchanged, explicit)
+- Given “Sunfiber” in Health Setup, Bowel Movements → Supplements → What’s Working lists “Sunfiber” (exact logged name) with a concise mechanism-based reason and any logged dose/timing.
+- The same evaluator pattern ensures medications/foods work similarly for their sections.
+
+### Notes for context
+- The changes were intentionally AI-only (no static brand maps). The evaluator uses ingredient/mechanism reasoning and index-based mapping to preserve the exact logged names.
+- The presence of the quick banner suggests the client may be seeing a quick/degraded payload. The evaluator currently runs in the validated builder only.
+
+---
+
+## URGENT ADDENDUM — 2025-11-02 (Supplements context not respected in Bowel Movements; Chat misses Sunfiber)
+
+### Summary (read me first)
+- P0: Live chat and section guidance are not reliably using the user's Health Setup data for Supplements. For the issue "Bowel Movements", the user has Sunfiber (PHGG, partially hydrolyzed guar gum) in Health Setup, but the chat does not recognize or reason over it, and guidance does not explicitly surface it.
+- This is separate from the historic Exercise “Working” issue. The new problem is that supplements present in Health Setup are not being evaluated/mentioned by the chat for the current issue.
+
+### What changed today (context)
+- We implemented a messenger‑style Section chat and a new backend:
+  - Server: `app/api/insights/issues/[slug]/sections/[section]/chat/route.ts`
+  - Helpers: `lib/insights/chat-store.ts`
+  - Client: `app/insights/issues/[issueSlug]/SectionChat.tsx`
+- The chat prompt now includes a privacy‑conscious slice of the user profile: supplements, medications, goals, recent health logs, recent food logs, plus the section summary/extras (truncated).
+- Despite this, the chat does not call out Sunfiber for Bowel Movements.
+
+### Repro (LIVE)
+1. Open `https://helfi.ai/healthapp` (admin gate) → sign in → confirm Health Setup contains Sunfiber (e.g., "Sunfiber – 1 tsp – Evening – Daily").
+2. Navigate to Insights → select "Bowel Movements" → Supplements → scroll to the chat.
+3. Ask: "Am I currently taking any fiber that supports bowel movements?" or "Which of my supplements help bowel regularity?"
+4. Actual: Chat responds generically or lists other items, but does not reference Sunfiber/PHGG.
+5. Expected: Chat should mention Sunfiber explicitly, note that PHGG supports stool form/regularity, and reference timing/dose if present in Health Setup.
+
+### Likely root causes (ranked)
+1) Prompt intent gap: The chat system prompt includes profile JSON, but it does not strictly instruct the model to scan `profile.supplements` and reference by exact names when relevant to the current issue.
+2) Synonym mapping: The model may not associate "Sunfiber" with PHGG/partially hydrolyzed guar gum/soluble fiber. Without a hint, it may miss the link to bowel regularity.
+3) Truncation edge cases: Although we cap arrays generously (top 12), confirm Sunfiber appears in the serialized list for the active account (name non‑empty, within first 12).
+4) Context overshadowing: The prompt includes section extras and profile JSON; the model may bias to section summary and ignore the profile slice without explicit instructions.
+
+### Where to look (files)
+- Prompt and profile assembly: `lib/insights/chat-store.ts` → `buildSystemPrompt(...)`
+- Chat route (SSE + JSON fallback): `app/api/insights/issues/[slug]/sections/[section]/chat/route.ts`
+- Client chat (bubbles, streaming): `app/insights/issues/[issueSlug]/SectionChat.tsx`
+
+### High‑signal plan for next agent (do this; do not over‑engineer)
+1) Strengthen the system prompt so the model must audit the user’s Health Setup for this section:
+   - Add explicit instruction: "Review profile.supplements. Name any items that are directly supportive for the current issue. Reference them by the exact name stored in the profile, and tie the reason to the issue."
+   - Add explicit synonym hint: "Sunfiber ≈ partially hydrolyzed guar gum (PHGG), a soluble fiber supporting bowel regularity." Keep it minimal and generic; do not add large KB.
+2) Verify profile slice contains Sunfiber on live:
+   - Temporarily log the `profileJSON` length and the first N supplement names server‑side (one‑line console) or return an `X-Debug-Profile: true` header when `INSIGHTS_DEBUG=1` (keep off by default).
+3) Test live with the user’s account, Bowel Movements → Supplements chat, re‑ask the question. Acceptance below.
+
+### Acceptance criteria (supplements/chat)
+- Given Sunfiber in Health Setup, when chatting under Issue=Bowel Movements, the model explicitly mentions Sunfiber (PHGG) as supportive for bowel regularity, with a concise reason.
+- The response uses the exact stored name ("Sunfiber") and, when available, references timing/dose from the profile slice.
+- No regression to other sections (Suggested/Avoid counts remain stable; Exercise logic untouched).
+
+### Guardrails / Do not do
+- Do not re‑introduce large static KB into the chat; keep prompts minimal and context‑driven.
+- Do not expand the profile slice beyond necessary fields or exceed token budget; keep current caps (top 12 each) unless missing data demands a slight bump.
+- Do not change the "Working" semantics for sections; this addendum concerns chat correctness and profile grounding.
+
+---
+
 ## SESSION HANDOVER — 2025-11-02 (CRITICAL: Exercise Working section still broken after multiple attempts)
 
 ### Executive summary (read me first)
