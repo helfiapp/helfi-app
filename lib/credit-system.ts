@@ -8,6 +8,7 @@ export const CREDIT_COSTS = {
   INTERACTION_ANALYSIS: 3,
   MEDICAL_IMAGE_ANALYSIS: 2,
   FOOD_REANALYSIS: 1,
+  SYMPTOM_ANALYSIS: 1,
 } as const;
 
 export type FeatureType = keyof typeof CREDIT_COSTS;
