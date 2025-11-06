@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import Image from 'next/image'
 import { useUserData } from '@/components/providers/UserDataProvider'
+import MobileMoreMenu from '@/components/MobileMoreMenu'
 
 export default function Reports() {
   const { data: session } = useSession()
@@ -219,6 +220,9 @@ export default function Reports() {
             </div>
             <span className={`label text-xs mt-1 truncate ${pathname === '/reports' ? 'text-helfi-green font-bold' : 'text-gray-400 font-medium'}`}>Reports</span>
           </Link>
+
+          {/* Intake (Onboarding) */}
+          <MobileMoreMenu />
 
         </div>
       </nav>
