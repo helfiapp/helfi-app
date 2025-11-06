@@ -8,7 +8,7 @@ export default function MobileMoreMenu() {
   const ref = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
-    function onDocClick(e: MouseEvent) {
+    function onDocClick(e: Event) {
       const target = e.target as HTMLElement
       if (open && ref.current && !ref.current.contains(target)) {
         setOpen(false)
