@@ -51,7 +51,7 @@ export default function MobileMoreMenu() {
         <span className={`label text-xs mt-1 truncate ${open ? 'text-helfi-green font-bold' : 'text-gray-400 font-medium'}`}>More</span>
       </button>
       {open && (
-        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-white border border-gray-200 rounded-lg shadow-lg w-56 p-2 z-[100]" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed bottom-16 left-1/2 -translate-x-1/2 bg-white border border-gray-200 rounded-lg shadow-lg w-56 p-2 z-[999]" onClick={(e) => e.stopPropagation()}>
           <Link href="/symptoms" className="block px-3 py-2 rounded-md text-sm text-gray-700 hover:bg-gray-50" onClick={() => setOpen(false)}>Symptom Analysis</Link>
           <Link href="/onboarding?step=1" className="block px-3 py-2 rounded-md text-sm text-gray-700 hover:bg-gray-50" onClick={() => setOpen(false)}>Intake</Link>
         </div>
