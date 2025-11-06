@@ -27,6 +27,9 @@ model User {
   lastMonthlyResetDate     DateTime?        // Track monthly reset for monthly quotas
   totalAnalysisCount       Int @default(0)  // Lifetime usage counter
   dailyAnalysisUsed        Int @default(0)  // Used today
+  // Wallet-based metering (Cursor-style)
+  walletMonthlyUsedCents   Int @default(0)  // Amount used this month in cents
+  walletMonthlyResetAt     DateTime?        // Last time monthly wallet was reset
   
   // Feature-specific credit tracking
   dailyFoodAnalysisUsed      Int @default(0)  // Food analysis credits used today
@@ -54,6 +57,7 @@ model User {
   subscription  Subscription?
   supportTickets SupportTicket[]
   interactionAnalyses InteractionAnalysis[]
+  creditTopUps   CreditTopUp[]
   
   // File relationships (PHASE 2 addition)
   uploadedFiles File[]     @relation("UploadedFiles")
@@ -179,6 +183,20 @@ model Subscription {
   startDate DateTime  @default(now())
   endDate   DateTime?
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Monetary credit top-ups valid for up to 12 months, consumed FIFO
+model CreditTopUp {
+  id           String   @id @default(cuid())
+  userId       String
+  amountCents  Int
+  usedCents    Int      @default(0)
+  purchasedAt  DateTime @default(now())
+  expiresAt    DateTime
+  source       String?  // e.g., Stripe session id or admin note
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
 }
 
 enum Gender {
