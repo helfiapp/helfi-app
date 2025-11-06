@@ -105,8 +105,9 @@ export default function InsightsBottomNav() {
         ))}
         <div ref={moreRef} className="relative pressable ripple flex flex-col items-center py-2 px-1 min-w-0 flex-1">
           <button
-            onPointerDown={() => { triggerHaptic(); setShowMore((s) => !s) }}
+            onClick={() => { triggerHaptic(); setShowMore((s) => !s) }}
             className="flex flex-col items-center focus:outline-none"
+            type="button"
           >
             <div className={`icon ${showMore ? 'text-helfi-green' : 'text-gray-400'}`}>
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.75a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 6a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 6a1.5 1.5 0 110-3 1.5 1.5 0 010 3z"/></svg>

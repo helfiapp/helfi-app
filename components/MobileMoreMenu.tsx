@@ -33,9 +33,7 @@ export default function MobileMoreMenu() {
     } catch {}
   }
 
-  const handleToggle = (e: React.MouseEvent | React.TouchEvent | React.PointerEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
+  const handleToggle = () => {
     triggerHaptic()
     setOpen((s) => !s)
   }
@@ -43,7 +41,7 @@ export default function MobileMoreMenu() {
   return (
     <div ref={ref} className="relative pressable ripple flex flex-col items-center py-2 px-1 min-w-0 flex-1">
       <button
-        onPointerDown={handleToggle}
+        onClick={handleToggle}
         className="flex flex-col items-center focus:outline-none w-full"
         type="button"
       >
