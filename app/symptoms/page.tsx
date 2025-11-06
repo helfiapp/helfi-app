@@ -18,7 +18,8 @@ type AnalysisResult = {
 }
 
 export default function SymptomAnalysisPage() {
-  const [symptoms, setSymptoms] = useState<string>('')
+  const [symptomInput, setSymptomInput] = useState<string>('')
+  const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([])
   const [duration, setDuration] = useState<string>('')
   const [notes, setNotes] = useState<string>('')
 
@@ -56,20 +57,33 @@ export default function SymptomAnalysisPage() {
     return () => clearInterval(timer)
   }, [isAnalyzing])
 
-  const quickTags = ['Fever', 'Headache', 'Cough', 'Sore throat', 'Nausea', 'Vomiting', 'Diarrhea', 'Chest pain', 'Shortness of breath', 'Fatigue']
+  const quickTags = [
+    'Fever','Headache','Cough','Sore throat','Runny nose','Nasal congestion','Sneezing','Fatigue','Body aches','Chills','Night sweats',
+    'Shortness of breath','Chest pain','Palpitations','Dizziness','Lightheadedness','Confusion','Anxiety','Depressed mood','Insomnia',
+    'Nausea','Vomiting','Diarrhea','Constipation','Abdominal pain','Bloating','Heartburn','Indigestion','Loss of appetite',
+    'Back pain','Joint pain','Muscle pain','Swollen joints','Rash','Itchy skin','Hives','Head pressure','Loss of taste','Loss of smell',
+    'Ear pain','Tooth pain','Sore gums','Swollen glands','Frequent urination','Burning urination','Blood in urine','Blood in stool'
+  ]
 
   const handleAddTag = (tag: string) => {
-    setSymptoms((prev) => {
-      const tokens = prev.split(/[,\n]/).map(s => s.trim()).filter(Boolean)
-      if (tokens.includes(tag)) return prev
-      return (prev ? prev + ', ' : '') + tag
-    })
+    setSelectedSymptoms((prev) => (prev.includes(tag) ? prev : [...prev, tag]))
+  }
+
+  const handleAddSymptom = () => {
+    const s = symptomInput.trim()
+    if (!s) return
+    setSelectedSymptoms((prev) => (prev.includes(s) ? prev : [...prev, s]))
+    setSymptomInput('')
+  }
+
+  const handleRemoveSymptom = (symptom: string) => {
+    setSelectedSymptoms((prev) => prev.filter((s) => s !== symptom))
   }
 
   const handleAnalyze = async () => {
     setError('')
     setResult(null)
-    const hasAny = symptoms.trim().length > 0
+    const hasAny = selectedSymptoms.length > 0
     if (!hasAny) {
       setError('Please enter at least one symptom.')
       return
@@ -79,7 +93,7 @@ export default function SymptomAnalysisPage() {
       const res = await fetch('/api/analyze-symptoms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ symptoms, duration, notes })
+        body: JSON.stringify({ symptoms: selectedSymptoms, duration, notes })
       })
 
       if (res.status === 402) {
@@ -144,18 +158,45 @@ export default function SymptomAnalysisPage() {
             <p className="text-sm text-gray-600 mb-4">List symptoms separated by commas (e.g., Headache, Fever). Add duration and any notes.</p>
 
             <div className="mb-3">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Symptoms</label>
-              <textarea
-                value={symptoms}
-                onChange={(e) => setSymptoms(e.target.value)}
-                rows={3}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-helfi-green/30 focus:border-helfi-green"
-                placeholder="Headache, Fever, Cough"
-              />
-              <div className="flex flex-wrap gap-2 mt-2">
-                {quickTags.map((t) => (
-                  <button key={t} onClick={() => handleAddTag(t)} className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full">{t}</button>
-                ))}
+               <label className="block text-sm font-medium text-gray-700 mb-1">Symptoms</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={symptomInput}
+                  onChange={(e) => setSymptomInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddSymptom() } }}
+                  className="flex-1 border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-helfi-green/30 focus:border-helfi-green"
+                  placeholder="e.g., Headache"
+                />
+                <button onClick={handleAddSymptom} className="px-3 py-2 bg-helfi-green text-white rounded-lg hover:bg-helfi-green/90">+ Add</button>
+              </div>
+
+              {/* Selected symptoms */}
+              {selectedSymptoms.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {selectedSymptoms.map((s) => (
+                    <span key={s} className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-full">
+                      {s}
+                      <button aria-label={`Remove ${s}`} onClick={() => handleRemoveSymptom(s)} className="ml-1 text-emerald-800 hover:text-emerald-900">×</button>
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Quick tags */}
+              <div className="flex flex-wrap gap-2 mt-3">
+                {quickTags.map((t) => {
+                  const selected = selectedSymptoms.includes(t)
+                  return (
+                    <button
+                      key={t}
+                      onClick={() => handleAddTag(t)}
+                      className={`${selected ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200'} px-2 py-1 text-xs border rounded-full`}
+                    >
+                      {t}
+                    </button>
+                  )
+                })}
               </div>
             </div>
 
