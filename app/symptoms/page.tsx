@@ -32,7 +32,7 @@ export default function SymptomAnalysisPage() {
 
   const [showCreditsModal, setShowCreditsModal] = useState<boolean>(false)
   const [creditInfo, setCreditInfo] = useState<any>({ dailyUsed: 0, dailyLimit: 0, additionalCredits: 0, plan: 'FREE', creditCost: 1 })
-+  const [tagsExpanded, setTagsExpanded] = useState<boolean>(false)
+  const [tagsExpanded, setTagsExpanded] = useState<boolean>(false)
 
   // Progress phases shown while analyzing
   const phases = useMemo(() => [
@@ -186,32 +186,30 @@ export default function SymptomAnalysisPage() {
               )}
 
               {/* Quick tags */}
--              <div className="flex flex-wrap gap-2 mt-3">
--                {quickTags.map((t) => {
-+              <div className="mt-3">
-+                <div className="flex flex-wrap gap-2">
-+                  {(tagsExpanded ? quickTags : quickTags.slice(0, 12)).map((t) => {
-                     const selected = selectedSymptoms.includes(t)
-                     return (
-                       <button
-                         key={t}
-                         onClick={() => handleAddTag(t)}
-                         className={`${selected ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200'} px-2 py-1 text-xs border rounded-full`}
-                       >
-                         {t}
-                       </button>
-                     )
-                   })}
-+                </div>
-+                {quickTags.length > 12 && (
-+                  <button
-+                    onClick={() => setTagsExpanded(!tagsExpanded)}
-+                    className="mt-2 text-sm text-helfi-green hover:text-helfi-green/80 font-medium"
-+                  >
-+                    {tagsExpanded ? 'Show less' : `Show ${quickTags.length - 12} more`}
-+                  </button>
-+                )}
-               </div>
+              <div className="mt-3">
+                <div className="flex flex-wrap gap-2">
+                  {(tagsExpanded ? quickTags : quickTags.slice(0, 12)).map((t) => {
+                    const selected = selectedSymptoms.includes(t)
+                    return (
+                      <button
+                        key={t}
+                        onClick={() => handleAddTag(t)}
+                        className={`${selected ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-gray-200'} px-2 py-1 text-xs border rounded-full`}
+                      >
+                        {t}
+                      </button>
+                    )
+                  })}
+                </div>
+                {quickTags.length > 12 && (
+                  <button
+                    onClick={() => setTagsExpanded(!tagsExpanded)}
+                    className="mt-2 text-sm text-helfi-green hover:text-helfi-green/80 font-medium"
+                  >
+                    {tagsExpanded ? 'Show less' : `Show ${quickTags.length - 12} more`}
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="grid md:grid-cols-2 gap-3 mb-3">
