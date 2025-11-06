@@ -24,6 +24,7 @@ export default function SymptomChat({ analysisResult, symptoms, duration, notes 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const endRef = useRef<HTMLDivElement | null>(null)
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null)
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -48,6 +49,19 @@ export default function SymptomChat({ analysisResult, symptoms, duration, notes 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading])
+
+  // Auto-resize textarea
+  useEffect(() => {
+    const textarea = textareaRef.current
+    if (!textarea) return
+    // Reset height to auto to get the correct scrollHeight
+    textarea.style.height = 'auto'
+    // Set height based on content, max 5 rows (approximately 120px)
+    const maxHeight = 120
+    const newHeight = Math.min(textarea.scrollHeight, maxHeight)
+    textarea.style.height = `${newHeight}px`
+    textarea.style.overflowY = textarea.scrollHeight > maxHeight ? 'auto' : 'hidden'
+  }, [input])
 
   function onComposerKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
     if (event.key === 'Enter' && !event.shiftKey) {
@@ -211,20 +225,22 @@ export default function SymptomChat({ analysisResult, symptoms, duration, notes 
         <div ref={endRef} />
       </div>
 
-      <form className="border-t border-gray-200 px-5 py-3" onSubmit={handleSubmit}>
+      <form className="border-t border-gray-200 px-4 py-3" onSubmit={handleSubmit}>
         <div className="flex items-end gap-2">
           <textarea
+            ref={textareaRef}
             value={input}
             onChange={(event) => setInput(event.target.value)}
             onKeyDown={onComposerKeyDown}
             placeholder="Message AI about your symptom analysis"
             rows={1}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-base leading-6 focus:border-helfi-green focus:outline-none focus:ring-2 focus:ring-helfi-green/40 resize-none"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-base leading-6 focus:border-helfi-green focus:outline-none focus:ring-2 focus:ring-helfi-green/40 resize-none overflow-hidden min-h-[44px] max-h-[120px]"
+            style={{ height: 'auto' }}
           />
           <button
             type="submit"
-            disabled={loading}
-            className="inline-flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-[10px] text-base font-semibold text-white disabled:opacity-60"
+            disabled={loading || !input.trim()}
+            className="inline-flex items-center justify-center rounded-lg bg-gray-900 px-4 py-2.5 text-base font-semibold text-white disabled:opacity-60 disabled:cursor-not-allowed shrink-0 min-h-[44px]"
           >
             Send
           </button>
@@ -234,4 +250,5 @@ export default function SymptomChat({ analysisResult, symptoms, duration, notes 
     </section>
   )
 }
+
 

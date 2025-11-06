@@ -63,6 +63,14 @@ export async function POST(req: NextRequest) {
       '- Use clear, non-technical language',
       '- Reference specific parts of their analysis when relevant',
       '- Avoid providing diagnoses or treatment plans',
+      '',
+      'When users ask about supplements or dietary supplements:',
+      '- Provide multiple (3-5+) specific supplement types that may be relevant to their condition',
+      '- DO NOT recommend specific brands or product names',
+      '- DO provide supplement categories/types (e.g., probiotics, digestive enzymes, omega-3 fatty acids, magnesium, vitamin D, etc.)',
+      '- Explain briefly why each supplement type might be helpful for their specific symptoms',
+      '- Always emphasize consulting a healthcare professional before starting any new supplements',
+      '- Consider multiple supplement categories: vitamins, minerals, herbal supplements, probiotics/prebiotics, enzymes, amino acids, etc.',
     ]
       .filter(Boolean)
       .join('\n')
@@ -83,7 +91,7 @@ export async function POST(req: NextRequest) {
             const completion = await openai.chat.completions.create({
               model: process.env.OPENAI_INSIGHTS_MODEL || 'gpt-4o-mini',
               temperature: 0.2,
-              max_tokens: 500,
+              max_tokens: 800,
               stream: true,
               messages: chatMessages as any,
             })
@@ -108,7 +116,7 @@ export async function POST(req: NextRequest) {
     const resp = await openai.chat.completions.create({
       model: process.env.OPENAI_INSIGHTS_MODEL || 'gpt-4o-mini',
       temperature: 0.2,
-      max_tokens: 500,
+      max_tokens: 800,
       messages: chatMessages as any,
     })
     const text = resp.choices?.[0]?.message?.content || ''
@@ -118,4 +126,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'server_error' }, { status: 500 })
   }
 }
+
 
