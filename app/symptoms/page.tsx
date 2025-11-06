@@ -5,6 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import CreditPurchaseModal from '@/components/CreditPurchaseModal'
 import MobileMoreMenu from '@/components/MobileMoreMenu'
+import SymptomChat from './SymptomChat'
 
 type AnalysisResult = {
   success: boolean
@@ -304,6 +305,16 @@ export default function SymptomAnalysisPage() {
                 {result.disclaimer || 'This is not medical advice. If you have concerning or worsening symptoms, contact a licensed medical professional or emergency services.'}
               </div>
             </div>
+          )}
+
+          {/* AI Chat */}
+          {result && (
+            <SymptomChat
+              analysisResult={result}
+              symptoms={selectedSymptoms}
+              duration={duration}
+              notes={notes}
+            />
           )}
         </div>
       </main>
