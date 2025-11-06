@@ -211,16 +211,16 @@ export default function SymptomAnalysisPage() {
                   placeholder="e.g., 2 days, 1 week"
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
-                <input
-                  type="text"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-helfi-green/30 focus:border-helfi-green"
-                  placeholder="e.g., started after travel"
-                />
-              </div>
+            </div>
+            <div className="mb-3">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={4}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-helfi-green/30 focus:border-helfi-green"
+                placeholder="e.g., started after travel, any triggers, patterns, etc."
+              />
             </div>
 
             {error && (
