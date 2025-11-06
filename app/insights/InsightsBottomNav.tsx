@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 
 function triggerHaptic() {
@@ -19,6 +19,7 @@ function triggerHaptic() {
 
 export default function InsightsBottomNav() {
   const pathname = usePathname()
+  const router = useRouter()
   const [showMore, setShowMore] = useState(false)
   const moreRef = useRef<HTMLDivElement | null>(null)
 
@@ -116,8 +117,8 @@ export default function InsightsBottomNav() {
           </button>
           {showMore && (
             <div className="fixed bottom-16 left-1/2 -translate-x-1/2 bg-white border border-gray-200 rounded-lg shadow-lg w-56 p-2 z-[999]">
-              <Link href="/symptoms" className="block px-3 py-2 rounded-md text-sm text-gray-700 hover:bg-gray-50" onClick={() => setShowMore(false)}>Symptom Analysis</Link>
-              <Link href="/onboarding?step=1" className="block px-3 py-2 rounded-md text-sm text-gray-700 hover:bg-gray-50" onClick={() => setShowMore(false)}>Intake</Link>
+              <button className="w-full text-left block px-3 py-2 rounded-md text-sm text-gray-700 hover:bg-gray-50" onClick={() => { setShowMore(false); router.push('/symptoms') }}>Symptom Analysis</button>
+              <button className="w-full text-left block px-3 py-2 rounded-md text-sm text-gray-700 hover:bg-gray-50" onClick={() => { setShowMore(false); router.push('/onboarding?step=1') }}>Intake</button>
             </div>
           )}
         </div>
