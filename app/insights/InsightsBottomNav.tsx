@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useEffect, useRef, useState } from 'react'
 
 function triggerHaptic() {
   try {
@@ -18,6 +19,19 @@ function triggerHaptic() {
 
 export default function InsightsBottomNav() {
   const pathname = usePathname()
+  const [showMore, setShowMore] = useState(false)
+  const moreRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    function onDocClick(e: MouseEvent) {
+      const target = e.target as HTMLElement
+      if (showMore && moreRef.current && !moreRef.current.contains(target)) {
+        setShowMore(false)
+      }
+    }
+    document.addEventListener('click', onDocClick)
+    return () => document.removeEventListener('click', onDocClick)
+  }, [showMore])
   const items: Array<{ href: string; label: string; svg: JSX.Element; active: boolean }> = [
     {
       href: '/dashboard',
@@ -54,16 +68,7 @@ export default function InsightsBottomNav() {
       ),
       active: pathname === '/food',
     },
-    {
-      href: '/onboarding?step=1',
-      label: 'Intake',
-      svg: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-        </svg>
-      ),
-      active: pathname.startsWith('/onboarding'),
-    },
+    // Intake moved to More menu
     {
       href: '/settings',
       label: 'Settings',
@@ -98,6 +103,24 @@ export default function InsightsBottomNav() {
             </span>
           </Link>
         ))}
+        <div ref={moreRef} className="relative pressable ripple flex flex-col items-center py-2 px-1 min-w-0 flex-1">
+          <button
+            onClick={() => { triggerHaptic(); setShowMore((s) => !s) }}
+            onTouchStart={() => { triggerHaptic(); setShowMore((s) => !s) }}
+            className="flex flex-col items-center focus:outline-none"
+          >
+            <div className={`icon ${showMore ? 'text-helfi-green' : 'text-gray-400'}`}>
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.75a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 6a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 6a1.5 1.5 0 110-3 1.5 1.5 0 010 3z"/></svg>
+            </div>
+            <span className={`label text-xs mt-1 truncate ${showMore ? 'text-helfi-green font-bold' : 'text-gray-400 font-medium'}`}>More</span>
+          </button>
+          {showMore && (
+            <div className="absolute bottom-12 left-1/2 -translate-x-1/2 bg-white border border-gray-200 rounded-lg shadow-lg w-56 p-2 z-50">
+              <Link href="/symptoms" className="block px-3 py-2 rounded-md text-sm text-gray-700 hover:bg-gray-50" onClick={() => setShowMore(false)}>Symptom Analysis</Link>
+              <Link href="/onboarding?step=1" className="block px-3 py-2 rounded-md text-sm text-gray-700 hover:bg-gray-50" onClick={() => setShowMore(false)}>Intake</Link>
+            </div>
+          )}
+        </div>
       </div>
     </nav>
   )
