@@ -23,6 +23,12 @@ export default function InsightsBottomNav() {
   const [showMore, setShowMore] = useState(false)
   const moreRef = useRef<HTMLDivElement | null>(null)
 
+  const navigate = (href: string) => {
+    setShowMore(false)
+    try { router.push(href) } catch {}
+    try { if (typeof window !== 'undefined') window.location.assign(href) } catch {}
+  }
+
   useEffect(() => {
     function onDocClick(e: MouseEvent) {
       const target = e.target as HTMLElement
@@ -117,8 +123,8 @@ export default function InsightsBottomNav() {
           </button>
           {showMore && (
             <div className="fixed bottom-16 left-1/2 -translate-x-1/2 bg-white border border-gray-200 rounded-lg shadow-lg w-56 p-2 z-[999]">
-              <button className="w-full text-left block px-3 py-2 rounded-md text-sm text-gray-700 hover:bg-gray-50" onClick={() => { setShowMore(false); router.push('/symptoms') }}>Symptom Analysis</button>
-              <button className="w-full text-left block px-3 py-2 rounded-md text-sm text-gray-700 hover:bg-gray-50" onClick={() => { setShowMore(false); router.push('/onboarding?step=1') }}>Intake</button>
+              <button className="w-full text-left block px-3 py-2 rounded-md text-sm text-gray-700 hover:bg-gray-50" onClick={() => navigate('/symptoms')}>Symptom Analysis</button>
+              <button className="w-full text-left block px-3 py-2 rounded-md text-sm text-gray-700 hover:bg-gray-50" onClick={() => navigate('/onboarding?step=1')}>Intake</button>
             </div>
           )}
         </div>

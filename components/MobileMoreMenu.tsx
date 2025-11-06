@@ -10,17 +10,15 @@ export default function MobileMoreMenu() {
   const router = useRouter()
 
   useEffect(() => {
-    function onDocClick(e: Event) {
+    function onDocClick(e: MouseEvent) {
       const target = e.target as HTMLElement
       if (open && ref.current && !ref.current.contains(target)) {
         setOpen(false)
       }
     }
-    document.addEventListener('mousedown', onDocClick)
-    document.addEventListener('touchstart', onDocClick)
+    document.addEventListener('click', onDocClick)
     return () => {
-      document.removeEventListener('mousedown', onDocClick)
-      document.removeEventListener('touchstart', onDocClick)
+      document.removeEventListener('click', onDocClick)
     }
   }, [open])
 
@@ -40,6 +38,12 @@ export default function MobileMoreMenu() {
     setOpen((s) => !s)
   }
 
+  const navigate = (href: string) => {
+    setOpen(false)
+    try { router.push(href) } catch {}
+    try { if (typeof window !== 'undefined') window.location.assign(href) } catch {}
+  }
+
   return (
     <div ref={ref} className="relative pressable ripple flex flex-col items-center py-2 px-1 min-w-0 flex-1">
       <button
@@ -54,8 +58,8 @@ export default function MobileMoreMenu() {
       </button>
       {open && (
         <div className="fixed bottom-16 left-1/2 -translate-x-1/2 bg-white border border-gray-200 rounded-lg shadow-lg w-56 p-2 z-[999]" onClick={(e) => e.stopPropagation()}>
-          <button className="w-full text-left block px-3 py-2 rounded-md text-sm text-gray-700 hover:bg-gray-50" onClick={() => { setOpen(false); router.push('/symptoms') }}>Symptom Analysis</button>
-          <button className="w-full text-left block px-3 py-2 rounded-md text-sm text-gray-700 hover:bg-gray-50" onClick={() => { setOpen(false); router.push('/onboarding?step=1') }}>Intake</button>
+          <button className="w-full text-left block px-3 py-2 rounded-md text-sm text-gray-700 hover:bg-gray-50" onClick={() => navigate('/symptoms')}>Symptom Analysis</button>
+          <button className="w-full text-left block px-3 py-2 rounded-md text-sm text-gray-700 hover:bg-gray-50" onClick={() => navigate('/onboarding?step=1')}>Intake</button>
         </div>
       )}
     </div>
