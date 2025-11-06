@@ -22,22 +22,34 @@ export default function InsightsBottomNav() {
   const router = useRouter()
   const [showMore, setShowMore] = useState(false)
   const moreRef = useRef<HTMLDivElement | null>(null)
+  const menuRef = useRef<HTMLDivElement | null>(null)
 
-  const navigate = (href: string) => {
+  const navigate = (href: string, e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
     setShowMore(false)
-    try { router.push(href) } catch {}
-    try { if (typeof window !== 'undefined') window.location.assign(href) } catch {}
+    setTimeout(() => {
+      try { router.push(href) } catch {}
+      try { if (typeof window !== 'undefined') window.location.href = href } catch {}
+    }, 100)
   }
 
   useEffect(() => {
-    function onDocClick(e: MouseEvent) {
+    function onDocClick(e: MouseEvent | TouchEvent) {
       const target = e.target as HTMLElement
-      if (showMore && moreRef.current && !moreRef.current.contains(target)) {
+      if (showMore && moreRef.current && menuRef.current && 
+          !moreRef.current.contains(target) && 
+          !menuRef.current.contains(target)) {
         setShowMore(false)
       }
     }
-    document.addEventListener('click', onDocClick)
-    return () => document.removeEventListener('click', onDocClick)
+    // Use capture phase and multiple event types for better mobile support
+    document.addEventListener('mousedown', onDocClick, true)
+    document.addEventListener('touchstart', onDocClick, true)
+    return () => {
+      document.removeEventListener('mousedown', onDocClick, true)
+      document.removeEventListener('touchstart', onDocClick, true)
+    }
   }, [showMore])
   const items: Array<{ href: string; label: string; svg: JSX.Element; active: boolean }> = [
     {
@@ -122,9 +134,23 @@ export default function InsightsBottomNav() {
             <span className={`label text-xs mt-1 truncate ${showMore ? 'text-helfi-green font-bold' : 'text-gray-400 font-medium'}`}>More</span>
           </button>
           {showMore && (
-            <div className="fixed bottom-16 left-1/2 -translate-x-1/2 bg-white border border-gray-200 rounded-lg shadow-lg w-56 p-2 z-[999]">
-              <button className="w-full text-left block px-3 py-2 rounded-md text-sm text-gray-700 hover:bg-gray-50" onClick={() => navigate('/symptoms')}>Symptom Analysis</button>
-              <button className="w-full text-left block px-3 py-2 rounded-md text-sm text-gray-700 hover:bg-gray-50" onClick={() => navigate('/onboarding?step=1')}>Intake</button>
+            <div ref={menuRef} className="fixed bottom-16 left-1/2 -translate-x-1/2 bg-white border border-gray-200 rounded-lg shadow-lg w-56 p-2 z-[999]">
+              <button 
+                className="w-full text-left block px-3 py-2 rounded-md text-sm text-gray-700 hover:bg-gray-50 active:bg-gray-100 cursor-pointer touch-manipulation" 
+                onMouseDown={(e) => navigate('/symptoms', e)}
+                onTouchStart={(e) => navigate('/symptoms', e)}
+                type="button"
+              >
+                Symptom Analysis
+              </button>
+              <button 
+                className="w-full text-left block px-3 py-2 rounded-md text-sm text-gray-700 hover:bg-gray-50 active:bg-gray-100 cursor-pointer touch-manipulation" 
+                onMouseDown={(e) => navigate('/onboarding?step=1', e)}
+                onTouchStart={(e) => navigate('/onboarding?step=1', e)}
+                type="button"
+              >
+                Intake
+              </button>
             </div>
           )}
         </div>
