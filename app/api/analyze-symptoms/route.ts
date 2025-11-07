@@ -4,6 +4,8 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { CreditManager, CREDIT_COSTS } from '@/lib/credit-system'
 import OpenAI from 'openai'
+import { chatCompletionWithCost } from '@/lib/metered-openai'
+import { costCentsEstimateFromText } from '@/lib/cost-meter'
 
 // Initialize OpenAI client only when API key is available (same pattern as analyze-food)
 const getOpenAIClient = () => {
@@ -111,15 +113,27 @@ Return two parts:
       }
     ]
 
+    // Wallet pre-check (all non-trial users)
+    const model = 'gpt-4o'
+    const promptText = messages.map((m) => (typeof (m as any).content === 'string' ? (m as any).content : '')).join('\n')
+    const estimateCents = costCentsEstimateFromText(model, promptText, 1200 * 4)
+    {
+      const cm = new CreditManager(refreshedUser.id)
+      const wallet = await cm.getWalletStatus()
+      if (wallet.totalAvailableCents < estimateCents) {
+        return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 })
+      }
+    }
+
     // Progress is handled on UI; this call may take longer for deeper reasoning
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o',
+    const wrapped = await chatCompletionWithCost(openai, {
+      model,
       messages,
       max_tokens: 1200,
       temperature: 0.4,
-    })
+    } as any)
 
-    const content = completion.choices?.[0]?.message?.content || ''
+    const content = wrapped.completion.choices?.[0]?.message?.content || ''
     if (!content) {
       return NextResponse.json({ error: 'No analysis received from OpenAI' }, { status: 500 })
     }
@@ -135,7 +149,15 @@ Return two parts:
       // ignore parsing error, we'll still return analysisText
     }
 
-    // Update counters
+    // Charge wallet and update counters
+    {
+      const cm = new CreditManager(refreshedUser.id)
+      const ok = await cm.chargeCents(wrapped.costCents)
+      if (!ok) {
+        return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 })
+      }
+    }
+
     if (isPremium) {
       await prisma.user.update({
         where: { id: refreshedUser.id },
@@ -144,12 +166,6 @@ Return two parts:
           totalAnalysisCount: { increment: 1 },
         } as any,
       })
-    } else {
-      try {
-        await creditManager.consumeCredits('SYMPTOM_ANALYSIS')
-      } catch {
-        // soft-fail; credits already checked above
-      }
     }
 
     // Build response
@@ -181,5 +197,6 @@ Return two parts:
     return NextResponse.json({ error: 'Failed to analyze symptoms' }, { status: 500 })
   }
 }
+
 
 
