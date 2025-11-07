@@ -82,7 +82,7 @@ export default function MobileMoreMenu() {
             onTouchStart={(e) => navigate('/medical-images', e)}
             type="button"
           >
-            Medical Images
+            Medical Image Analyzer
           </button>
           <button 
             className="w-full text-left block px-3 py-2 rounded-md text-sm text-gray-700 hover:bg-gray-50 active:bg-gray-100 cursor-pointer touch-manipulation" 

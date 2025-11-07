@@ -125,11 +125,27 @@ export default function MedicalImagesPage() {
       <main className="flex-1">
         <div className="max-w-3xl mx-auto px-4 py-6">
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 md:p-6">
-            <h1 className="text-xl font-semibold text-gray-900 mb-1">Medical Image Analysis</h1>
-            <p className="text-sm text-gray-600 mb-4">
-              Upload a photo of a skin condition, rash, mole, or other medical concern for AI analysis. 
-              This is not a substitute for professional medical advice.
-            </p>
+            <h1 className="text-xl font-semibold text-gray-900 mb-1">Medical Image Analyzer</h1>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+              <h2 className="text-sm font-semibold text-blue-900 mb-2">What is this feature?</h2>
+              <p className="text-sm text-blue-800 mb-2">
+                Our AI-powered Medical Image Analyzer helps you understand medical images by providing detailed analysis and insights. 
+                Upload photos of various medical conditions and receive AI-generated descriptions and observations.
+              </p>
+              <p className="text-sm text-blue-800 font-medium mb-1">Perfect for analyzing:</p>
+              <ul className="text-sm text-blue-800 list-disc list-inside space-y-1 ml-2">
+                <li>Skin conditions (rashes, hives, eczema, psoriasis)</li>
+                <li>Skin anomalies (moles, lesions, growths)</li>
+                <li>X-rays and medical scans</li>
+                <li>Wounds and injuries</li>
+                <li>Eye conditions</li>
+                <li>Nail abnormalities</li>
+                <li>Other visible medical concerns</li>
+              </ul>
+              <p className="text-xs text-blue-700 mt-3 italic">
+                ⚠️ This tool provides informational analysis only and is not a substitute for professional medical advice, diagnosis, or treatment.
+              </p>
+            </div>
 
             {/* Image Upload */}
             <div className="mb-4">
