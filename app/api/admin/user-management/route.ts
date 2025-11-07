@@ -59,7 +59,23 @@ export async function GET(request: NextRequest) {
         name: true,
         createdAt: true,
         gender: true,
+        dailyAnalysisCredits: true,
+        dailyAnalysisUsed: true,
+        additionalCredits: true,
+        totalAnalysisCount: true,
+        dailyFoodAnalysisUsed: true,
+        dailyInteractionAnalysisUsed: true,
         subscription: { select: { plan: true, monthlyPriceCents: true, endDate: true, startDate: true } },
+        creditTopUps: {
+          where: {
+            expiresAt: { gt: new Date() }
+          },
+          select: {
+            amountCents: true,
+            usedCents: true,
+            expiresAt: true
+          }
+        },
         _count: {
           select: {
             healthGoals: true,
@@ -74,9 +90,22 @@ export async function GET(request: NextRequest) {
       skip: (page - 1) * limit,
       take: limit
     })
+    
+    // Calculate total available credits from CreditTopUp records
+    const usersWithCredits = users.map(user => {
+      const now = new Date()
+      const availableCredits = user.creditTopUps
+        .filter(topUp => topUp.expiresAt > now)
+        .reduce((sum, topUp) => sum + Math.max(0, topUp.amountCents - topUp.usedCents), 0)
+      
+      return {
+        ...user,
+        totalAvailableCredits: availableCredits // Total in cents (which equals credits)
+      }
+    })
 
     return NextResponse.json({
-      users,
+      users: usersWithCredits,
       pagination: {
         page,
         limit,

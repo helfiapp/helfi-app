@@ -2276,9 +2276,9 @@ The Helfi Team`,
                                 </div>
                                 <div className="text-xs text-gray-500">
                                   📊 {user.dailyAnalysisUsed || 0}/{user.dailyAnalysisCredits || 3} daily
-                                  {user.additionalCredits > 0 && (
-                                    <span className="text-green-600"> (+{user.additionalCredits})</span>
-                                  )}
+                                 {(user.totalAvailableCredits > 0 || (user.additionalCredits && user.additionalCredits > 0)) && (
+                                   <span className="text-green-600"> (+{user.totalAvailableCredits || user.additionalCredits || 0})</span>
+                                 )}
                                 </div>
                               </div>
                             </td>
@@ -2452,7 +2452,9 @@ The Helfi Team`,
                        <div className="flex justify-between items-center">
                          <span className="text-sm text-gray-600">Additional Credits:</span>
                          <span className="text-sm font-medium text-green-600">
-                           {selectedUser.additionalCredits || 0} credits
+                           {selectedUser.totalAvailableCredits !== undefined 
+                             ? `${selectedUser.totalAvailableCredits} credits`
+                             : (selectedUser.additionalCredits || 0) + ' credits'}
                          </span>
                        </div>
                        <div className="flex justify-between items-center">
