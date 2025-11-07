@@ -11,6 +11,8 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { CreditManager, CREDIT_COSTS } from '@/lib/credit-system';
 import OpenAI from 'openai';
+import { chatCompletionWithCost } from '@/lib/metered-openai';
+import { costCentsEstimateFromText } from '@/lib/cost-meter';
 
 // Initialize OpenAI client only when API key is available
 // Updated: 2025-06-26 - Ensure environment variable is properly loaded
@@ -275,19 +277,51 @@ After your explanation and the one-line totals above, also include a compact JSO
       );
     }
 
+    const model = isReanalysis ? 'gpt-4o-mini' : 'gpt-4o';
+    const maxTokens = 500;
+
+    // Wallet pre-check (skip if allowed via trial)
+    if (!allowViaTrial) {
+      const cm = new CreditManager(currentUser.id);
+      const promptText = Array.isArray(messages)
+        ? messages
+            .map((m: any) => {
+              if (!m?.content) return '';
+              if (typeof m.content === 'string') return m.content;
+              if (Array.isArray(m.content)) {
+                return m.content
+                  .map((p: any) => (typeof p?.text === 'string' ? p.text : ''))
+                  .join('\n');
+              }
+              return '';
+            })
+            .join('\n')
+        : '';
+      const estimateCents = costCentsEstimateFromText(model, promptText, maxTokens * 4);
+      const wallet = await cm.getWalletStatus();
+      if (wallet.totalAvailableCents < estimateCents) {
+        return NextResponse.json(
+          { error: 'Insufficient credits' },
+          { status: 402 }
+        );
+      }
+    }
+
     console.log('🤖 Calling OpenAI API with:', {
-      model: 'gpt-4o',
+      model,
       messageCount: messages.length,
       hasImageContent: messages[0]?.content && Array.isArray(messages[0].content)
     });
 
-    // Call OpenAI API
-    const response = await openai.chat.completions.create({
-      model: isReanalysis ? "gpt-4o-mini" : "gpt-4o", // Cheaper model for re-analysis
+    // Call OpenAI API (metered)
+    const primary = await chatCompletionWithCost(openai, {
+      model,
       messages,
-      max_tokens: 500,
-      temperature: 0.3, // Lower temperature for more consistent food analysis
-    });
+      max_tokens: maxTokens,
+      temperature: 0.3,
+    } as any);
+
+    const response = primary.completion;
 
     console.log('📋 OpenAI Response:', {
       hasResponse: !!response,
@@ -297,6 +331,7 @@ After your explanation and the one-line totals above, also include a compact JSO
     });
 
     let analysis = response.choices[0]?.message?.content;
+    let totalCostCents = primary.costCents;
 
     if (!analysis) {
       console.log('❌ No analysis received from OpenAI');
@@ -317,18 +352,22 @@ After your explanation and the one-line totals above, also include a compact JSO
     if (!(hasCalories && hasProtein && hasCarbs && hasFat)) {
       try {
         console.log('ℹ️ Nutrition line missing; running compact extractor');
-        const extractResponse = await openai.chat.completions.create({
-          model: "gpt-4o",
+        const extract = await chatCompletionWithCost(openai, {
+          model: 'gpt-4o',
           messages: [
             {
-              role: "user",
-              content: `From the following text, extract ONLY a single line in this exact format: \n\nCalories: [number], Protein: [g], Carbs: [g], Fat: [g]\n\nIf you cannot infer a value, write 'unknown' for that field. No extra words.\n\nText:\n${analysis}`
-            }
+              role: 'user',
+              content:
+                `From the following text, extract ONLY a single line in this exact format: \n\n` +
+                `Calories: [number], Protein: [g], Carbs: [g], Fat: [g]\n\n` +
+                `If you cannot infer a value, write 'unknown' for that field. No extra words.\n\nText:\n${analysis}`,
+            },
           ],
           max_tokens: 60,
-          temperature: 0
-        });
-        const extracted = extractResponse.choices?.[0]?.message?.content?.trim();
+          temperature: 0,
+        } as any);
+        totalCostCents += extract.costCents;
+        const extracted = extract.completion.choices?.[0]?.message?.content?.trim();
         if (extracted && /calories/i.test(extracted)) {
           analysis = `${analysis}\n${extracted}`;
           console.log('✅ Appended nutrition line:', extracted);
@@ -338,7 +377,21 @@ After your explanation and the one-line totals above, also include a compact JSO
       }
     }
     
-    // Update counters after successful analysis
+    // Charge wallet (skip if allowed via trial)
+    if (!allowViaTrial) {
+      try {
+        const cm = new CreditManager(currentUser.id);
+        const ok = await cm.chargeCents(totalCostCents);
+        if (!ok) {
+          return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
+        }
+      } catch (e) {
+        console.warn('Wallet charge failed:', e);
+        return NextResponse.json({ error: 'Billing error' }, { status: 402 });
+      }
+    }
+
+    // Update counters after successful analysis (legacy counters kept during transition)
     if (allowViaTrial) {
       await prisma.user.update({
         where: { id: currentUser.id },
@@ -359,15 +412,6 @@ After your explanation and the one-line totals above, also include a compact JSO
           totalAnalysisCount: { increment: 1 },
         } ) as any
       });
-    } else {
-      // Non-premium using credits
-      try {
-        if (creditManager) {
-          await creditManager.consumeCredits('FOOD_ANALYSIS');
-        }
-      } catch (e) {
-        console.warn('Credit consume failed:', e);
-      }
     }
     
     console.log('=== FOOD ANALYZER DEBUG END ===');
