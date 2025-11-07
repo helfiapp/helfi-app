@@ -264,13 +264,20 @@ Be thorough but not alarmist. Provide actionable recommendations.`;
 
     // Update counters and mark free use as used
     if (allowViaFreeUse && !reanalysis) {
-      // Mark free use as used
-      await prisma.user.update({
-        where: { id: user.id },
-        data: {
-          hasUsedFreeInteractionAnalysis: true,
-        } as any
-      });
+      // Mark free use as used (safe if column doesn't exist yet - migration pending)
+      try {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            hasUsedFreeInteractionAnalysis: true,
+          } as any
+        })
+      } catch (e: any) {
+        // Ignore if column doesn't exist yet (migration pending)
+        if (!e.message?.includes('does not exist')) {
+          console.warn('Failed to update hasUsedFreeInteractionAnalysis:', e)
+        }
+      }
     } else if (isPremium) {
       await prisma.user.update({
         where: { id: user.id },

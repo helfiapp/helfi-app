@@ -383,13 +383,20 @@ After your explanation and the one-line totals above, also include a compact JSO
 
     // Update counters and mark free use as used
     if (allowViaFreeUse && !isReanalysis) {
-      // Mark free use as used
-      await prisma.user.update({
-        where: { id: currentUser.id },
-        data: {
-          hasUsedFreeFoodAnalysis: true,
-        } as any
-      });
+      // Mark free use as used (safe if column doesn't exist yet - migration pending)
+      try {
+        await prisma.user.update({
+          where: { id: currentUser.id },
+          data: {
+            hasUsedFreeFoodAnalysis: true,
+          } as any
+        })
+      } catch (e: any) {
+        // Ignore if column doesn't exist yet (migration pending)
+        if (!e.message?.includes('does not exist')) {
+          console.warn('Failed to update hasUsedFreeFoodAnalysis:', e)
+        }
+      }
     } else if (isPremium) {
       await prisma.user.update({
         where: { id: currentUser.id },
