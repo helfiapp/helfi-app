@@ -10,6 +10,10 @@ import {
   buildSystemPrompt,
 } from '@/lib/insights/chat-store'
 import type { IssueSectionKey } from '@/lib/insights/issue-engine'
+import { prisma } from '@/lib/prisma'
+import { CreditManager } from '@/lib/credit-system'
+import { costCentsEstimateFromText } from '@/lib/cost-meter'
+import { chatCompletionWithCost } from '@/lib/metered-openai'
 
 const rateMap = new Map<string, number>()
 const MIN_INTERVAL_MS = 1500
@@ -115,13 +119,24 @@ export async function POST(
     ]
 
     if (wantsStream) {
+    // Wallet pre-check using conservative estimate (max_tokens)
+    const model = process.env.OPENAI_INSIGHTS_MODEL || 'gpt-4o-mini'
+    {
+      const cm = new CreditManager(session.user.id)
+      const promptText = [system, ...history.map((m) => m.content)].join('\n')
+      const estimateCents = costCentsEstimateFromText(model, promptText, 500 * 4)
+      const wallet = await cm.getWalletStatus()
+      if (wallet.totalAvailableCents < estimateCents) {
+        return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 })
+      }
+    }
       const enc = new TextEncoder()
       const stream = new ReadableStream({
         async start(controller) {
           let full = ''
           try {
             const completion = await openai.chat.completions.create({
-              model: process.env.OPENAI_INSIGHTS_MODEL || 'gpt-4o-mini',
+            model: process.env.OPENAI_INSIGHTS_MODEL || 'gpt-4o-mini',
               temperature: 0.2,
               max_tokens: 500,
               stream: true,
@@ -135,6 +150,17 @@ export async function POST(
               }
             }
             await appendMessage(thread.id, 'assistant', full)
+          // Post-charge actual estimated cost
+          try {
+            const cm = new CreditManager(session.user.id)
+            const promptText = [system, ...history.map((m) => m.content)].join('\n')
+            const cents = costCentsEstimateFromText(
+              process.env.OPENAI_INSIGHTS_MODEL || 'gpt-4o-mini',
+              promptText,
+              full.length
+            )
+            await cm.chargeCents(cents)
+          } catch {}
             controller.enqueue(enc.encode('event: end\n\n'))
             controller.close()
           } catch (err) {
@@ -147,15 +173,26 @@ export async function POST(
     }
 
     // Non-streaming fallback
-    const resp = await openai.chat.completions.create({
-      model: process.env.OPENAI_INSIGHTS_MODEL || 'gpt-4o-mini',
+  {
+    const model = process.env.OPENAI_INSIGHTS_MODEL || 'gpt-4o-mini'
+    const cm = new CreditManager(session.user.id)
+    const promptText = [system, ...history.map((m) => m.content)].join('\n')
+    const estimateCents = costCentsEstimateFromText(model, promptText, 500 * 4)
+    const wallet = await cm.getWalletStatus()
+    if (wallet.totalAvailableCents < estimateCents) {
+      return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 })
+    }
+    const wrapped = await chatCompletionWithCost(openai, {
+      model,
       temperature: 0.2,
       max_tokens: 500,
       messages: chatMessages as any,
-    })
-    const text = resp.choices?.[0]?.message?.content || ''
+    } as any)
+    await cm.chargeCents(wrapped.costCents).catch(() => {})
+    const text = wrapped.completion.choices?.[0]?.message?.content || ''
     await appendMessage(thread.id, 'assistant', text)
     return NextResponse.json({ assistant: text })
+  }
   } catch (error) {
     console.error('[chat.POST] error', error)
     return NextResponse.json({ error: 'server_error' }, { status: 500 })
