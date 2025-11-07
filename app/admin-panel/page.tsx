@@ -2522,21 +2522,15 @@ The Helfi Team`,
                            onClick={() => handleUserAction('grant_trial', selectedUser.id, { trialDays: 7 })}
                            className="bg-blue-500 text-white px-3 py-2 rounded hover:bg-blue-600 transition-colors text-xs"
                          >
-                           7-Day Premium
+                           7-Day Premium<br/>(1,000 credits)
                          </button>
                          <button
                            onClick={() => handleUserAction('grant_trial', selectedUser.id, { trialDays: 30 })}
                            className="bg-blue-500 text-white px-3 py-2 rounded hover:bg-blue-600 transition-colors text-xs"
                          >
-                           30-Day Premium
+                           30-Day Premium<br/>(1,000 credits)
                          </button>
                        </div>
-                       <button
-                         onClick={() => handleUserAction('grant_free_access', selectedUser.id)}
-                         className="w-full mt-2 bg-emerald-500 text-white px-4 py-2 rounded hover:bg-emerald-600 transition-colors text-sm"
-                       >
-                         🎉 Grant Permanent Premium
-                       </button>
                      </div>
                      
                      {/* Credit Packages */}
