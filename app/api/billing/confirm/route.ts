@@ -24,8 +24,8 @@ export async function GET(request: NextRequest) {
     }
 
     // Determine the user
-    const serverSession = await getServerSession(authOptions as any)
-    const email = serverSession?.user?.email || (checkout.customer_details?.email ?? checkout.customer_email ?? '')
+    const serverSession = (await getServerSession(authOptions as any)) as any
+    const email = (serverSession?.user?.email as string) || (checkout.customer_details?.email ?? checkout.customer_email ?? '')
     if (!email) {
       return NextResponse.json({ error: 'user_email_missing' }, { status: 400 })
     }
