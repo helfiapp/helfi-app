@@ -294,6 +294,8 @@ export default function AdminPanel() {
         body: JSON.stringify({ action, userId, data })
       })
 
+      const result = await response.json()
+
       if (response.ok) {
         // Reload the user list to show updated data
         loadUserManagement(userSearch, userFilter, currentPage)
@@ -301,11 +303,13 @@ export default function AdminPanel() {
         setSelectedUser(null)
         alert(`User ${action} completed successfully`)
       } else {
-        alert('Action failed. Please try again.')
+        const errorMessage = result.error || 'Action failed. Please try again.'
+        console.error('API Error:', result)
+        alert(`Action failed: ${errorMessage}`)
       }
     } catch (error) {
       console.error('Error performing user action:', error)
-      alert('Action failed. Please try again.')
+      alert(`Action failed: ${error instanceof Error ? error.message : 'Please try again.'}`)
     }
   }
 
