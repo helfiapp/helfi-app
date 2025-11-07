@@ -246,6 +246,7 @@ export default function SymptomAnalysisPage() {
             >
               {isAnalyzing ? 'Analyzing…' : 'Analyze symptoms'}
             </button>
+            <p className="mt-2 text-xs text-gray-500">Typical cost: 2–3 credits</p>
 
             {/* Progress Bar */}
             {isAnalyzing && (

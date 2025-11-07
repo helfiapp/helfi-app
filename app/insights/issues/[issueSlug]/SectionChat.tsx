@@ -156,6 +156,7 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
         <div>
           <h3 className="text-sm font-semibold text-gray-900">Chat about {issueName} ({section})</h3>
           <p className="text-xs text-gray-500">{threadId ? 'History saved for this section' : 'Start a conversation – it will be saved here'}</p>
+          <p className="text-[11px] text-gray-400 mt-0.5">Typical cost: ~1–2 credits</p>
         </div>
         <div className="flex items-center gap-2">
           <button

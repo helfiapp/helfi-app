@@ -939,6 +939,8 @@ Please add nutritional information manually if needed.`);
                       '🤖 Analyze with AI'
                     )}
                   </button>
+                  <p className="mt-1 text-xs text-gray-500 text-center">Typical cost: 1–2 credits</p>
+                  <p className="text-xs text-gray-500 mt-1 text-center">Typical cost: 1–2 credits</p>
                   
                   {/* Photo Management Options */}
                   <div className="flex gap-3">
