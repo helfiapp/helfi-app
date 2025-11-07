@@ -84,7 +84,19 @@ export class CreditManager {
     });
     if (!user) throw new Error('User not found');
     const plan = user.subscription?.plan || null;
-    const monthlyCapCents = plan ? CreditManager.monthlyCapCentsForPlan(plan) : 0;
+    
+    // Use monthlyPriceCents if available, otherwise fall back to plan-based calculation
+    let monthlyCapCents = 0;
+    if (plan && user.subscription) {
+      if (user.subscription.monthlyPriceCents) {
+        // Use the stored price tier
+        monthlyCapCents = Math.floor(user.subscription.monthlyPriceCents * CreditManager.walletPercentOfPlan());
+      } else {
+        // Fall back to plan-based calculation (defaults to $20)
+        monthlyCapCents = CreditManager.monthlyCapCentsForPlan(plan);
+      }
+    }
+    
     const monthlyUsedCents = (user as any).walletMonthlyUsedCents || 0;
 
     // Fetch available (non-expired) top-ups
@@ -132,7 +144,17 @@ export class CreditManager {
     if (!user) throw new Error('User not found');
 
     const plan = user.subscription?.plan || null;
-    const monthlyCapCents = plan ? CreditManager.monthlyCapCentsForPlan(plan) : 0;
+    
+    // Use monthlyPriceCents if available, otherwise fall back to plan-based calculation
+    let monthlyCapCents = 0;
+    if (plan && user.subscription) {
+      if (user.subscription.monthlyPriceCents) {
+        monthlyCapCents = Math.floor(user.subscription.monthlyPriceCents * CreditManager.walletPercentOfPlan());
+      } else {
+        monthlyCapCents = CreditManager.monthlyCapCentsForPlan(plan);
+      }
+    }
+    
     const monthlyUsedCents = (user as any).walletMonthlyUsedCents || 0;
     let remainingMonthly = Math.max(0, monthlyCapCents - monthlyUsedCents);
 

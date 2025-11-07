@@ -107,11 +107,47 @@ export async function POST(request: NextRequest) {
 
     switch (action) {
       case 'activate':
-        // Create or update subscription to PREMIUM
+        // Create or update subscription to PREMIUM (defaults to $20 tier)
         await prisma.subscription.upsert({
           where: { userId },
-          update: { plan: 'PREMIUM' },
-          create: { userId, plan: 'PREMIUM' }
+          update: { 
+            plan: 'PREMIUM',
+            monthlyPriceCents: 2000 // Default to $20 tier
+          },
+          create: { 
+            userId, 
+            plan: 'PREMIUM',
+            monthlyPriceCents: 2000
+          }
+        })
+        // Update daily credits for premium
+        await prisma.user.update({
+          where: { id: userId },
+          data: { dailyAnalysisCredits: 30 }
+        })
+        break
+
+      case 'grant_subscription':
+        // Grant subscription with specific tier ($20, $30, or $50)
+        const tier = data?.tier // '20', '30', or '50'
+        const priceCentsMap: Record<string, number> = {
+          '20': 2000,
+          '30': 3000,
+          '50': 5000
+        }
+        const priceCents = priceCentsMap[tier || '20'] || 2000
+        
+        await prisma.subscription.upsert({
+          where: { userId },
+          update: { 
+            plan: 'PREMIUM',
+            monthlyPriceCents: priceCents
+          },
+          create: { 
+            userId, 
+            plan: 'PREMIUM',
+            monthlyPriceCents: priceCents
+          }
         })
         // Update daily credits for premium
         await prisma.user.update({
@@ -130,7 +166,7 @@ export async function POST(request: NextRequest) {
         break
 
       case 'grant_free_access':
-        // Grant permanent PREMIUM subscription (admin-only)
+        // Grant permanent PREMIUM subscription (admin-only) - defaults to $20 tier
         const endDate = new Date()
         endDate.setFullYear(endDate.getFullYear() + 100) // 100 years = permanent
         
@@ -138,18 +174,20 @@ export async function POST(request: NextRequest) {
           where: { userId },
           update: { 
             plan: 'PREMIUM',
-            endDate: endDate
+            endDate: endDate,
+            monthlyPriceCents: 2000 // Default to $20 tier
           },
           create: { 
             userId, 
             plan: 'PREMIUM',
-            endDate: endDate
+            endDate: endDate,
+            monthlyPriceCents: 2000
           }
         })
         break
 
       case 'grant_trial':
-        // Grant temporary PREMIUM subscription (admin-only)
+        // Grant temporary PREMIUM subscription (admin-only) - defaults to $20 tier
         const trialDays = data?.trialDays || 30
         const trialEndDate = new Date()
         trialEndDate.setDate(trialEndDate.getDate() + trialDays)
@@ -158,12 +196,14 @@ export async function POST(request: NextRequest) {
           where: { userId },
           update: { 
             plan: 'PREMIUM',
-            endDate: trialEndDate
+            endDate: trialEndDate,
+            monthlyPriceCents: 2000 // Default to $20 tier
           },
           create: { 
             userId, 
             plan: 'PREMIUM',
-            endDate: trialEndDate
+            endDate: trialEndDate,
+            monthlyPriceCents: 2000
           }
         })
         break
