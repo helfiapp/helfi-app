@@ -342,7 +342,7 @@ export default function BillingPage() {
         {/* Credits */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
           <h2 className="text-2xl font-bold text-gray-900 mb-6">Buy Extra Credits</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
             <div className="border border-gray-200 rounded-lg p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Try with $5 (250 credits)</h3>
               <p className="text-sm text-gray-600 mb-6">One‑time top‑up. Credits valid for 12 months.</p>
@@ -354,6 +354,32 @@ export default function BillingPage() {
                 className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors"
               >
                 Buy $5 Credits
+              </button>
+            </div>
+            <div className="border border-gray-200 rounded-lg p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">$10 (500 credits)</h3>
+              <p className="text-sm text-gray-600 mb-6">One‑time top‑up. Credits valid for 12 months.</p>
+              <button
+                onClick={() => {
+                  alert('We are currently in the process of building this amazing application. If you would like to be notified the moment we go live, please sign up below on the homepage.')
+                  window.location.href = '/#waitlist-signup'
+                }}
+                className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors"
+              >
+                Buy $10 Credits
+              </button>
+            </div>
+            <div className="border border-gray-200 rounded-lg p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">$20 (1,000 credits)</h3>
+              <p className="text-sm text-gray-600 mb-6">One‑time top‑up. Credits valid for 12 months.</p>
+              <button
+                onClick={() => {
+                  alert('We are currently in the process of building this amazing application. If you would like to be notified the moment we go live, please sign up below on the homepage.')
+                  window.location.href = '/#waitlist-signup'
+                }}
+                className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors"
+              >
+                Buy $20 Credits
               </button>
             </div>
           </div>

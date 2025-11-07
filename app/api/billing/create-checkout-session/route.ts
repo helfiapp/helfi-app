@@ -24,10 +24,20 @@ export async function POST(request: Request) {
     const quantity: number = Number(body?.quantity || 1)
 
     const PLAN_TO_PRICE: Record<string, string | undefined> = {
+      // Monthly subscription plans
+      plan_20_monthly: process.env.STRIPE_PRICE_20_MONTHLY,
+      plan_30_monthly: process.env.STRIPE_PRICE_30_MONTHLY,
+      plan_50_monthly: process.env.STRIPE_PRICE_50_MONTHLY,
+      // Legacy plan names (for backward compatibility)
       premium_monthly: process.env.STRIPE_PRICE_PREMIUM_MONTHLY,
       premium_yearly: process.env.STRIPE_PRICE_PREMIUM_YEARLY,
       premium_plus_monthly: process.env.STRIPE_PRICE_PREMIUM_PLUS_MONTHLY,
       premium_plus_yearly: process.env.STRIPE_PRICE_PREMIUM_PLUS_YEARLY,
+      // Credit top-ups (one-time payments)
+      credits_250: process.env.STRIPE_PRICE_CREDITS_250,
+      credits_500: process.env.STRIPE_PRICE_CREDITS_500,
+      credits_1000: process.env.STRIPE_PRICE_CREDITS_1000,
+      // Legacy credit name
       credits_100: process.env.STRIPE_PRICE_CREDITS_100,
     }
 
