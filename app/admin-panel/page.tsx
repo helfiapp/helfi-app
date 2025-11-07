@@ -2288,9 +2288,11 @@ The Helfi Team`,
                                 </button>
                                 <button
                                   onClick={() => {
-                                    const credits = prompt('Enter number of credits to add:')
-                                    if (credits && !isNaN(parseInt(credits)) && parseInt(credits) > 0) {
-                                      handleUserAction('add_credits', user.id, { creditAmount: parseInt(credits) })
+                                    const credits = prompt('Enter credit package (250, 500, or 1000):')
+                                    if (credits && ['250', '500', '1000'].includes(credits)) {
+                                      handleUserAction('add_credits', user.id, { creditPackage: credits })
+                                    } else if (credits) {
+                                      alert('Invalid package. Use: 250, 500, or 1000')
                                     }
                                   }}
                                   className="bg-green-500 text-white px-3 py-1 rounded text-xs hover:bg-green-600 transition-colors"
