@@ -115,8 +115,9 @@ export default function MedicalImagesPage() {
               />
             </Link>
           </div>
-          <div className="flex items-center gap-3">
-            <UsageMeter compact={true} />
+          <div className="text-right">
+            <div className="text-sm text-gray-500">AI Tools</div>
+            <div className="text-base font-semibold text-gray-900">Medical Image Analyzer</div>
           </div>
         </div>
       </nav>
