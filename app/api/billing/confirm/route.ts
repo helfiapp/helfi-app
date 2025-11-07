@@ -4,9 +4,13 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import Stripe from 'stripe'
 
+// Force dynamic so this route isn't considered for static optimization at build time
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export async function GET(request: NextRequest) {
   try {
-    const sessionParam = request.nextUrl.searchParams.get('session_id')
+    const sessionParam = new URL(request.url).searchParams.get('session_id')
     if (!sessionParam) {
       return NextResponse.json({ error: 'missing_session_id' }, { status: 400 })
     }
