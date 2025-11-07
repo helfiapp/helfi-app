@@ -298,9 +298,19 @@ export default function AdminPanel() {
 
       if (response.ok) {
         // Reload the user list to show updated data
-        loadUserManagement(userSearch, userFilter, currentPage)
-        setShowUserModal(false)
-        setSelectedUser(null)
+        await loadUserManagement(userSearch, userFilter, currentPage)
+        // Refresh selected user if modal is open
+        if (selectedUser && showUserModal) {
+          const refreshedUsers = await fetch(`/api/admin/user-management?search=${selectedUser.email}&plan=all&page=1&limit=1`, {
+            headers: { 'Authorization': `Bearer ${adminToken}` }
+          }).then(r => r.json())
+          if (refreshedUsers.users && refreshedUsers.users.length > 0) {
+            setSelectedUser(refreshedUsers.users[0])
+          }
+        } else {
+          setShowUserModal(false)
+          setSelectedUser(null)
+        }
         alert(`User ${action} completed successfully`)
       } else {
         const errorMessage = result.error || 'Action failed. Please try again.'
