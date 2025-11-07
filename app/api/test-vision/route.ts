@@ -102,12 +102,19 @@ export async function POST(req: NextRequest) {
     
     // Mark free use as used if this was a free use
     if (!isPremium && !hasPurchasedCredits && !hasUsedFreeMedical) {
-      await prisma.user.update({
-        where: { id: user.id },
-        data: {
-          hasUsedFreeMedicalAnalysis: true,
-        } as any
-      });
+      try {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            hasUsedFreeMedicalAnalysis: true,
+          } as any
+        })
+      } catch (e: any) {
+        // Ignore if column doesn't exist yet (migration pending)
+        if (!e.message?.includes('does not exist')) {
+          console.warn('Failed to update hasUsedFreeMedicalAnalysis:', e)
+        }
+      }
     }
     
     console.log('OpenAI Response:', {
