@@ -136,6 +136,14 @@ export default function InsightsBottomNav() {
               </button>
               <button 
                 className="w-full text-left block px-3 py-2 rounded-md text-sm text-gray-700 hover:bg-gray-50 active:bg-gray-100 cursor-pointer touch-manipulation" 
+                onMouseDown={(e) => navigate('/medical-images', e)}
+                onTouchStart={(e) => navigate('/medical-images', e)}
+                type="button"
+              >
+                Medical Images
+              </button>
+              <button 
+                className="w-full text-left block px-3 py-2 rounded-md text-sm text-gray-700 hover:bg-gray-50 active:bg-gray-100 cursor-pointer touch-manipulation" 
                 onMouseDown={(e) => navigate('/onboarding?step=1', e)}
                 onTouchStart={(e) => navigate('/onboarding?step=1', e)}
                 type="button"
