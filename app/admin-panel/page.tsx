@@ -2397,11 +2397,25 @@ The Helfi Team`,
                          <div className="flex justify-between items-center">
                            <span className="text-sm text-gray-600">Subscription Tier:</span>
                            <span className="text-sm font-semibold text-emerald-700">
-                             {selectedUser.subscription.monthlyPriceCents === 500 ? '$5/month (250 credits)' :
-                              selectedUser.subscription.monthlyPriceCents === 2000 ? '$20/month (1,000 credits)' :
-                              selectedUser.subscription.monthlyPriceCents === 3000 ? '$30/month (1,700 credits)' :
-                              selectedUser.subscription.monthlyPriceCents === 5000 ? '$50/month (3,000 credits)' :
-                              `$${(selectedUser.subscription.monthlyPriceCents / 100).toFixed(0)}/month`}
+                             {selectedUser.subscription.endDate ? (
+                               // Temporary access - show duration and credits
+                               (() => {
+                                 const endDate = new Date(selectedUser.subscription.endDate)
+                                 const daysRemaining = Math.ceil((endDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+                                 const credits = Math.floor(selectedUser.subscription.monthlyPriceCents * 0.5) // 50% of price = credits
+                                 if (daysRemaining > 90) {
+                                   return `Permanent (${credits} credits/month)`
+                                 } else {
+                                   return `${daysRemaining}-Day Access (${credits} credits)`
+                                 }
+                               })()
+                             ) : (
+                               // Permanent subscription - show monthly tier
+                               selectedUser.subscription.monthlyPriceCents === 2000 ? '$20/month (1,000 credits)' :
+                               selectedUser.subscription.monthlyPriceCents === 3000 ? '$30/month (1,700 credits)' :
+                               selectedUser.subscription.monthlyPriceCents === 5000 ? '$50/month (3,000 credits)' :
+                               `$${(selectedUser.subscription.monthlyPriceCents / 100).toFixed(0)}/month`
+                             )}
                            </span>
                          </div>
                        )}
