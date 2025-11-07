@@ -14,6 +14,8 @@ export default function BillingPage() {
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly')
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [profileImage, setProfileImage] = useState<string>('')
+  const [walletPercentUsed, setWalletPercentUsed] = useState<number | null>(null)
+  const [walletRefreshAt, setWalletRefreshAt] = useState<string | null>(null)
   const router = useRouter()
 
   // Profile data - using consistent green avatar
@@ -67,6 +69,23 @@ export default function BillingPage() {
     if (session) {
       setLoading(false)
     }
+  }, [session])
+
+  // Load credit wallet status (percentage only)
+  useEffect(() => {
+    const loadStatus = async () => {
+      try {
+        const res = await fetch('/api/credit/status', { cache: 'no-store' })
+        if (res.ok) {
+          const data = await res.json()
+          if (typeof data.percentUsed === 'number') setWalletPercentUsed(data.percentUsed)
+          if (data.refreshAt) setWalletRefreshAt(data.refreshAt)
+        }
+      } catch {
+        // ignore
+      }
+    }
+    if (session?.user) loadStatus()
   }, [session])
 
   const handleSignOut = async () => {
@@ -189,6 +208,26 @@ export default function BillingPage() {
                 <p className="text-gray-600">per month</p>
               </div>
             </div>
+            {/* Wallet usage bar (percentage only) */}
+            <div className="mt-6">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-gray-800">Monthly usage</span>
+                <span className="text-sm text-gray-600">
+                  {walletPercentUsed == null ? '—' : `${walletPercentUsed}%`}
+                </span>
+              </div>
+              <div className="w-full bg-gray-200/60 rounded-full h-2.5 overflow-hidden">
+                <div
+                  className="bg-helfi-green h-2.5 transition-all"
+                  style={{ width: `${Math.min(100, Math.max(0, walletPercentUsed ?? 0))}%` }}
+                />
+              </div>
+              {walletRefreshAt && (
+                <p className="text-xs text-gray-500 mt-2">
+                  Resets on {new Date(walletRefreshAt).toLocaleDateString()}
+                </p>
+              )}
+            </div>
           </div>
         </div>
 
@@ -290,7 +329,7 @@ export default function BillingPage() {
             <div className="border border-gray-200 rounded-lg p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-2">100 Credits</h3>
               <p className="text-2xl font-bold text-gray-900 mb-4">$5</p>
-              <p className="text-sm text-gray-600 mb-6">Use for additional AI analyses. Credits never expire.</p>
+              <p className="text-sm text-gray-600 mb-6">Use for additional AI analyses. Credits valid for 12 months from purchase.</p>
               <button
                 onClick={() => {
                   alert('We are currently in the process of building this amazing application. If you would like to be notified the moment we go live, please sign up below on the homepage.')
