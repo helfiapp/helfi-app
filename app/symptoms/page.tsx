@@ -7,6 +7,7 @@ import Image from 'next/image'
 import CreditPurchaseModal from '@/components/CreditPurchaseModal'
 import MobileMoreMenu from '@/components/MobileMoreMenu'
 import SymptomChat from './SymptomChat'
+import UsageMeter from '@/components/UsageMeter'
 
 type AnalysisResult = {
   success: boolean
@@ -247,7 +248,10 @@ export default function SymptomAnalysisPage() {
             >
               {isAnalyzing ? 'Analyzing…' : 'Analyze symptoms'}
             </button>
-            <p className="mt-2 text-xs text-gray-500">Typical cost: 2–3 credits</p>
+            <div className="mt-2">
+              <p className="text-xs text-gray-500 mb-2">Typical cost: 2–3 credits</p>
+              <UsageMeter inline={true} />
+            </div>
 
             {/* Progress Bar */}
             {isAnalyzing && (

@@ -115,12 +115,9 @@ export default function MedicalImagesPage() {
               />
             </Link>
           </div>
-          <div className="flex items-center gap-3">
-            <UsageMeter compact={true} />
-            <div className="text-right">
-              <div className="text-sm text-gray-500">AI Tools</div>
-              <div className="text-base font-semibold text-gray-900">Medical Image Analyzer</div>
-            </div>
+          <div className="text-right">
+            <div className="text-sm text-gray-500">AI Tools</div>
+            <div className="text-base font-semibold text-gray-900">Medical Image Analyzer</div>
           </div>
         </div>
       </nav>
@@ -226,7 +223,10 @@ export default function MedicalImagesPage() {
                 </button>
               )}
             </div>
-            <p className="mt-2 text-xs text-gray-500">Cost: 2 credits per analysis</p>
+            <div className="mt-2">
+              <p className="text-xs text-gray-500 mb-2">Typical cost: 2 credits</p>
+              <UsageMeter inline={true} />
+            </div>
 
             {/* Analysis Results */}
             {analysis && (
