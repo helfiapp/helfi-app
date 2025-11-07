@@ -242,30 +242,7 @@ After your explanation and the one-line totals above, also include a compact JSO
       }
     }
 
-    if (isPremium) {
-      // Premium daily limits
-      const limit = isReanalysis ? 10 : 30;
-      const used = isReanalysis ? (((currentUser as any).dailyFoodReanalysisUsed || 0)) : (((currentUser as any).dailyFoodAnalysisUsed || 0));
-      if (used >= limit) {
-        return NextResponse.json({ error: 'Daily limit reached. Try again tomorrow.' }, { status: 429 });
-      }
-    } else if (!allowViaTrial) {
-      // Not premium and not allowed via trial → check credit system
-      creditManager = new CreditManager(user.id);
-      const creditStatus = await creditManager.checkCredits('FOOD_ANALYSIS');
-      if (!creditStatus.hasCredits) {
-        return NextResponse.json({
-          error: 'Insufficient credits',
-          creditsRemaining: creditStatus.totalCreditsRemaining,
-          dailyCreditsRemaining: creditStatus.dailyCreditsRemaining,
-          additionalCredits: creditStatus.additionalCreditsRemaining,
-          creditCost: CREDIT_COSTS.FOOD_ANALYSIS,
-          featureUsageToday: creditStatus.featureUsageToday,
-          dailyLimits: creditStatus.dailyLimits,
-          plan: user.subscription?.plan || 'FREE'
-        }, { status: 402 });
-      }
-    }
+    // Daily gating removed – wallet pre-check happens below (trial still allowed)
 
     // Get OpenAI client
     const openai = getOpenAIClient();
