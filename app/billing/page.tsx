@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { useSession, signOut } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
 import MobileMoreMenu from '@/components/MobileMoreMenu'
@@ -17,6 +17,7 @@ export default function BillingPage() {
   const [walletPercentUsed, setWalletPercentUsed] = useState<number | null>(null)
   const [walletRefreshAt, setWalletRefreshAt] = useState<string | null>(null)
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   // Profile data - using consistent green avatar
   const defaultAvatar = 'data:image/svg+xml;base64,' + btoa(`
@@ -87,6 +88,27 @@ export default function BillingPage() {
     }
     if (session?.user) loadStatus()
   }, [session])
+
+  // If returning from Stripe, confirm top-up
+  useEffect(() => {
+    const checkout = searchParams?.get('checkout')
+    const sid = searchParams?.get('session_id')
+    if (checkout === 'success' && sid) {
+      fetch(`/api/billing/confirm?session_id=${encodeURIComponent(sid)}`)
+        .then(() => {
+          // Refresh wallet bar
+          return fetch('/api/credit/status', { cache: 'no-store' })
+        })
+        .then(async (r) => {
+          if (r?.ok) {
+            const data = await r.json()
+            if (typeof data.percentUsed === 'number') setWalletPercentUsed(data.percentUsed)
+            if (data.refreshAt) setWalletRefreshAt(data.refreshAt)
+          }
+        })
+        .catch(() => {})
+    }
+  }, [searchParams])
 
   const handleSignOut = async () => {
     // Clear user-specific localStorage before signing out
