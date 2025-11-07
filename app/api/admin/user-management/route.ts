@@ -264,54 +264,84 @@ export async function POST(request: NextRequest) {
 
       case 'add_credits':
         // Add credits using wallet-based system (CreditTopUp)
-        // Credit packages: 250 credits ($5), 500 credits ($10), 1000 credits ($20)
+        // Credits = cents (1 credit = 1 cent)
         const creditPackage = data?.creditPackage // e.g., '250', '500', '1000'
+        const creditAmount = data?.creditAmount // Direct credit amount
+        
+        let centsAmount = 0
         
         if (creditPackage) {
-          // Map credit package names to dollar amounts in cents
-          // $5 = 500 cents, $10 = 1000 cents, $20 = 2000 cents
+          // Credit packages: 250, 500, or 1000 credits (1 credit = 1 cent)
           const packageMap: Record<string, number> = {
-            '250': 500,    // $5 worth = 500 cents
-            '500': 1000,   // $10 worth = 1000 cents
-            '1000': 2000   // $20 worth = 2000 cents
+            '250': 250,    // 250 credits = 250 cents
+            '500': 500,    // 500 credits = 500 cents
+            '1000': 1000   // 1000 credits = 1000 cents
           }
           
-          const centsAmount = packageMap[creditPackage]
-          if (centsAmount) {
-            const expiresAt = new Date()
-            expiresAt.setMonth(expiresAt.getMonth() + 12) // Credits valid for 12 months
-            
-            await prisma.creditTopUp.create({
-              data: {
-                userId,
-                amountCents: centsAmount,
-                usedCents: 0,
-                expiresAt,
-                source: `admin_grant_${creditPackage}_credits`
-              }
-            })
-          } else {
+          centsAmount = packageMap[creditPackage]
+          if (!centsAmount) {
             return NextResponse.json({ error: 'Invalid credit package. Use: 250, 500, or 1000' }, { status: 400 })
           }
+        } else if (creditAmount && creditAmount > 0) {
+          // Direct credit amount (credits = cents)
+          centsAmount = creditAmount
         } else {
-          // Allow direct cents amount for custom grants
-          const creditAmountCents = data?.creditAmountCents || 0
-          if (creditAmountCents > 0) {
-            const expiresAt = new Date()
-            expiresAt.setMonth(expiresAt.getMonth() + 12)
-            
-            await prisma.creditTopUp.create({
+          return NextResponse.json({ error: 'Invalid credit amount or package. Provide creditPackage (250/500/1000) or creditAmount (number)' }, { status: 400 })
+        }
+        
+        const expiresAt = new Date()
+        expiresAt.setMonth(expiresAt.getMonth() + 12) // Credits valid for 12 months
+        
+        await prisma.creditTopUp.create({
+          data: {
+            userId,
+            amountCents: centsAmount,
+            usedCents: 0,
+            expiresAt,
+            source: creditPackage ? `admin_grant_${creditPackage}_credits` : `admin_grant_${creditAmount}_credits`
+          }
+        })
+        break
+
+      case 'remove_credits':
+        // Remove credits by creating a negative top-up or marking existing top-ups as used
+        const removeAmount = data?.creditAmount || 0
+        if (removeAmount <= 0) {
+          return NextResponse.json({ error: 'Invalid credit amount to remove' }, { status: 400 })
+        }
+        
+        // Get all non-expired, unused top-ups
+        const now = new Date()
+        const topUps = await prisma.creditTopUp.findMany({
+          where: {
+            userId,
+            expiresAt: { gt: now }
+          },
+          orderBy: { expiresAt: 'asc' } // FIFO - oldest first
+        })
+        
+        let remainingToRemove = removeAmount
+        for (const topUp of topUps) {
+          if (remainingToRemove <= 0) break
+          
+          const available = topUp.amountCents - topUp.usedCents
+          if (available > 0) {
+            const toRemove = Math.min(remainingToRemove, available)
+            await prisma.creditTopUp.update({
+              where: { id: topUp.id },
               data: {
-                userId,
-                amountCents: creditAmountCents,
-                usedCents: 0,
-                expiresAt,
-                source: 'admin_grant_direct'
+                usedCents: topUp.usedCents + toRemove
               }
             })
-          } else {
-            return NextResponse.json({ error: 'Invalid credit amount or package' }, { status: 400 })
+            remainingToRemove -= toRemove
           }
+        }
+        
+        if (remainingToRemove > 0) {
+          return NextResponse.json({ 
+            error: `Only ${removeAmount - remainingToRemove} credits were available to remove. ${remainingToRemove} credits could not be removed.`,
+            partial: true 
+          }, { status: 200 }) // Still return 200 since some credits were removed
         }
         break
 
