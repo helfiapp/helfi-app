@@ -60,25 +60,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // Gating: Premium daily limit (medical-type analyses), else credits
-    if (isPremium) {
-      const DAILY_MEDICAL_LIMIT = 15
-      const used = (refreshedUser as any).dailyMedicalAnalysisUsed || 0
-      if (used >= DAILY_MEDICAL_LIMIT) {
-        return NextResponse.json({ error: 'Daily limit reached. Try again tomorrow.' }, { status: 429 })
-      }
-    } else {
-      if (!creditStatus.hasCredits) {
-        return NextResponse.json({
-          error: 'Insufficient credits',
-          creditsRemaining: creditStatus.totalCreditsRemaining,
-          dailyCreditsRemaining: creditStatus.dailyCreditsRemaining,
-          additionalCredits: creditStatus.additionalCreditsRemaining,
-          creditCost: CREDIT_COSTS.SYMPTOM_ANALYSIS,
-          plan: refreshedUser.subscription?.plan || 'FREE',
-        }, { status: 402 })
-      }
-    }
+    // Daily/plan gating removed – wallet pre-check below governs access
 
     // Build prompt for careful, longer analysis with structured JSON
     const symptomsStr = symptomsList.join(', ')
