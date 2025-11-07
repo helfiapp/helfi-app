@@ -4,6 +4,8 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { CreditManager, CREDIT_COSTS } from '@/lib/credit-system';
 import OpenAI from 'openai';
+import { chatCompletionWithCost } from '@/lib/metered-openai';
+import { costCentsEstimateFromText } from '@/lib/cost-meter';
 
 // Lazily initialize OpenAI to avoid build-time env requirements
 function getOpenAIClient() {
@@ -137,8 +139,20 @@ Be thorough but not alarmist. Provide actionable recommendations.`;
       return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 });
     }
 
-    const completion = await openai.chat.completions.create({
-      model: reanalysis ? "gpt-4o-mini" : "gpt-4",
+    const model = reanalysis ? "gpt-4o-mini" : "gpt-4";
+
+    // Wallet pre-check (trial gating above may have returned early)
+    {
+      const cm = new CreditManager(user.id);
+      const estimateCents = costCentsEstimateFromText(model, prompt, 2000 * 4);
+      const wallet = await cm.getWalletStatus();
+      if (wallet.totalAvailableCents < estimateCents) {
+        return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
+      }
+    }
+
+    const wrapped = await chatCompletionWithCost(openai, {
+      model,
       messages: [
         {
           role: "system",
@@ -151,9 +165,9 @@ Be thorough but not alarmist. Provide actionable recommendations.`;
       ],
       temperature: 0.3,
       max_tokens: 2000,
-    });
+    } as any);
 
-    const analysisText = completion.choices[0].message.content;
+    const analysisText = wrapped.completion.choices[0].message.content;
     console.log('OpenAI Response:', analysisText);
     
     // Parse the JSON response with improved error handling
@@ -224,7 +238,16 @@ Be thorough but not alarmist. Provide actionable recommendations.`;
       }
     });
 
-    // Update counters after successful analysis
+    // Charge wallet and update counters after successful analysis
+    {
+      const cm = new CreditManager(user.id);
+      const ok = await cm.chargeCents(wrapped.costCents);
+      if (!ok) {
+        return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
+      }
+    }
+
+    // Update legacy counters during transition
     if (!isPremium && (user as any).trialActive) {
       await prisma.user.update({
         where: { id: user.id },
