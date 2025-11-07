@@ -25,6 +25,7 @@ export async function GET(_req: NextRequest) {
     return NextResponse.json({
       percentUsed: status.percentUsed, // percentage of monthly wallet only
       refreshAt: nextReset.toISOString(),
+      plan: status.plan, // Include plan to check if user has PREMIUM
       // Additional details for UI (kept minimal; no dollar values shown)
       monthlyCapCents: status.monthlyCapCents,
       monthlyUsedCents: status.monthlyUsedCents,
@@ -35,5 +36,8 @@ export async function GET(_req: NextRequest) {
     return NextResponse.json({ error: 'server_error' }, { status: 500 })
   }
 }
+
+
+
 
 

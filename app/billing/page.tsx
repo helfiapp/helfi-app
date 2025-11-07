@@ -13,7 +13,6 @@ export default function BillingPage() {
   const { data: session } = useSession()
   const [loading, setLoading] = useState(true)
   const [currentPlan, setCurrentPlan] = useState('free')
-  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly')
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [profileImage, setProfileImage] = useState<string>('')
   const router = useRouter()
@@ -197,19 +196,6 @@ export default function BillingPage() {
         <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-gray-900">Plans</h2>
-            <div className="flex items-center gap-2 text-sm">
-              <span className={billingCycle === 'monthly' ? 'font-semibold text-gray-900' : 'text-gray-500'}>Monthly</span>
-              <button
-                onClick={() => setBillingCycle((v) => (v === 'monthly' ? 'yearly' : 'monthly'))}
-                className="relative inline-flex h-6 w-11 items-center rounded-full bg-gray-200"
-                aria-label="Toggle yearly billing"
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition ${billingCycle === 'yearly' ? 'translate-x-6' : 'translate-x-1'}`}
-                />
-              </button>
-              <span className={billingCycle === 'yearly' ? 'font-semibold text-gray-900' : 'text-gray-500'}>Yearly</span>
-            </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

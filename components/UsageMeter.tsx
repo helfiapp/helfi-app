@@ -13,6 +13,7 @@ export default function UsageMeter({ compact = false, showResetDate = false, cla
   const [walletPercentUsed, setWalletPercentUsed] = useState<number | null>(null)
   const [walletRefreshAt, setWalletRefreshAt] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [isPremium, setIsPremium] = useState(false)
 
   useEffect(() => {
     const loadStatus = async () => {
@@ -24,11 +25,17 @@ export default function UsageMeter({ compact = false, showResetDate = false, cla
         const res = await fetch('/api/credit/status', { cache: 'no-store' })
         if (res.ok) {
           const data = await res.json()
-          if (typeof data.percentUsed === 'number') {
-            setWalletPercentUsed(data.percentUsed)
-          }
-          if (data.refreshAt) {
-            setWalletRefreshAt(data.refreshAt)
+          // Only show usage meter for PREMIUM subscriptions
+          if (data.plan === 'PREMIUM') {
+            setIsPremium(true)
+            if (typeof data.percentUsed === 'number') {
+              setWalletPercentUsed(data.percentUsed)
+            }
+            if (data.refreshAt) {
+              setWalletRefreshAt(data.refreshAt)
+            }
+          } else {
+            setIsPremium(false)
           }
         }
       } catch {
@@ -44,8 +51,8 @@ export default function UsageMeter({ compact = false, showResetDate = false, cla
     return () => clearInterval(interval)
   }, [session])
 
-  // Don't render if not authenticated or still loading
-  if (!session || loading) {
+  // Don't render if not authenticated, still loading, or not premium
+  if (!session || loading || !isPremium) {
     return null
   }
 
