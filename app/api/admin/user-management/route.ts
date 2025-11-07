@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
         name: true,
         createdAt: true,
         gender: true,
-        subscription: { select: { plan: true } },
+        subscription: { select: { plan: true, monthlyPriceCents: true, endDate: true, startDate: true } },
         _count: {
           select: {
             healthGoals: true,
