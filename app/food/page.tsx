@@ -16,6 +16,7 @@ import { usePathname } from 'next/navigation'
 import { useUserData } from '@/components/providers/UserDataProvider'
 import MobileMoreMenu from '@/components/MobileMoreMenu'
 import UsageMeter from '@/components/UsageMeter'
+import CreditPurchaseModal from '@/components/CreditPurchaseModal'
 
 export default function FoodDiary() {
   const { data: session } = useSession()
@@ -57,6 +58,15 @@ export default function FoodDiary() {
   })
   const [historyFoods, setHistoryFoods] = useState<any[] | null>(null)
   const [isLoadingHistory, setIsLoadingHistory] = useState<boolean>(false)
+  const [showCreditsModal, setShowCreditsModal] = useState<boolean>(false)
+  const [creditInfo, setCreditInfo] = useState<any>({
+    dailyUsed: 0,
+    dailyLimit: 0,
+    additionalCredits: 0,
+    plan: 'FREE',
+    creditCost: 1,
+    featureUsageToday: { foodAnalysis: 0, interactionAnalysis: 0 }
+  })
 
   // Profile data - using consistent green avatar
   const defaultAvatar = 'data:image/svg+xml;base64,' + btoa(`
@@ -366,6 +376,26 @@ export default function FoodDiary() {
       });
 
       if (!response.ok) {
+        // Handle payment required (402) with modal
+        if (response.status === 402) {
+          try {
+            const errorData = await response.json();
+            setCreditInfo({
+              dailyUsed: 0,
+              dailyLimit: 0,
+              additionalCredits: errorData.additionalCredits ?? 0,
+              plan: errorData.plan ?? 'FREE',
+              creditCost: 1, // Food analysis costs 1 credit
+              featureUsageToday: { foodAnalysis: 0, interactionAnalysis: 0 }
+            });
+            setShowCreditsModal(true);
+            setIsAnalyzing(false);
+            return;
+          } catch (parseError) {
+            console.error('❌ Could not parse error response:', parseError);
+          }
+        }
+        
         let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
         try {
           const errorData = await response.json();
@@ -1928,6 +1958,13 @@ Please add nutritional information manually if needed.`);
           </div>
         )}
       </div>
+
+      {/* Credit Purchase Modal */}
+      <CreditPurchaseModal
+        isOpen={showCreditsModal}
+        onClose={() => setShowCreditsModal(false)}
+        creditInfo={creditInfo}
+      />
 
       {/* Mobile Bottom Navigation - with pressed, ripple and active states */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-2 z-40">
