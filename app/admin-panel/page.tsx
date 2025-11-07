@@ -2490,29 +2490,54 @@ The Helfi Team`,
 
                    {/* Actions */}
                    <div className="space-y-4">
-                     <h4 className="font-medium text-gray-900">Grant Access</h4>
+                     <h4 className="font-medium text-gray-900">Grant Subscription</h4>
                      
-                     <div className="grid grid-cols-2 gap-3">
+                     {/* Subscription Tiers - matching billing page */}
+                     <div className="grid grid-cols-3 gap-2 mb-3">
                        <button
-                         onClick={() => handleUserAction('grant_trial', selectedUser.id, { trialDays: 7 })}
-                         className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors text-sm"
+                         onClick={() => handleUserAction('grant_subscription', selectedUser.id, { tier: '20' })}
+                         className="bg-emerald-500 text-white px-3 py-2 rounded hover:bg-emerald-600 transition-colors text-xs"
                        >
-                         7-Day Premium
+                         $20/month<br/>(1,000 credits)
                        </button>
                        <button
-                         onClick={() => handleUserAction('grant_trial', selectedUser.id, { trialDays: 30 })}
-                         className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors text-sm"
+                         onClick={() => handleUserAction('grant_subscription', selectedUser.id, { tier: '30' })}
+                         className="bg-emerald-600 text-white px-3 py-2 rounded hover:bg-emerald-700 transition-colors text-xs font-semibold"
                        >
-                         30-Day Premium
+                         $30/month<br/>(1,700 credits)
+                       </button>
+                       <button
+                         onClick={() => handleUserAction('grant_subscription', selectedUser.id, { tier: '50' })}
+                         className="bg-gray-900 text-white px-3 py-2 rounded hover:bg-gray-800 transition-colors text-xs"
+                       >
+                         $50/month<br/>(3,000 credits)
                        </button>
                      </div>
                      
-                     <button
-                       onClick={() => handleUserAction('grant_free_access', selectedUser.id)}
-                       className="w-full bg-emerald-500 text-white px-4 py-2 rounded hover:bg-emerald-600 transition-colors text-sm"
-                     >
-                       🎉 Grant Permanent Premium
-                     </button>
+                     {/* Temporary Access */}
+                     <div className="border-t pt-3">
+                       <h5 className="text-sm font-medium text-gray-700 mb-2">Temporary Access</h5>
+                       <div className="grid grid-cols-2 gap-2">
+                         <button
+                           onClick={() => handleUserAction('grant_trial', selectedUser.id, { trialDays: 7 })}
+                           className="bg-blue-500 text-white px-3 py-2 rounded hover:bg-blue-600 transition-colors text-xs"
+                         >
+                           7-Day Premium
+                         </button>
+                         <button
+                           onClick={() => handleUserAction('grant_trial', selectedUser.id, { trialDays: 30 })}
+                           className="bg-blue-500 text-white px-3 py-2 rounded hover:bg-blue-600 transition-colors text-xs"
+                         >
+                           30-Day Premium
+                         </button>
+                       </div>
+                       <button
+                         onClick={() => handleUserAction('grant_free_access', selectedUser.id)}
+                         className="w-full mt-2 bg-emerald-500 text-white px-4 py-2 rounded hover:bg-emerald-600 transition-colors text-sm"
+                       >
+                         🎉 Grant Permanent Premium
+                       </button>
+                     </div>
                      
                      {/* Credit Packages */}
                      <div className="border-t pt-4">
