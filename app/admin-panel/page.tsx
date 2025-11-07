@@ -2522,7 +2522,7 @@ The Helfi Team`,
                            onClick={() => handleUserAction('grant_trial', selectedUser.id, { trialDays: 7 })}
                            className="bg-blue-500 text-white px-3 py-2 rounded hover:bg-blue-600 transition-colors text-xs"
                          >
-                           7-Day Premium<br/>(1,000 credits)
+                           7-Day Premium<br/>(250 credits)
                          </button>
                          <button
                            onClick={() => handleUserAction('grant_trial', selectedUser.id, { trialDays: 30 })}

@@ -187,23 +187,27 @@ export async function POST(request: NextRequest) {
         break
 
       case 'grant_trial':
-        // Grant temporary PREMIUM subscription (admin-only) - defaults to $20 tier
+        // Grant temporary PREMIUM subscription (admin-only)
         const trialDays = data?.trialDays || 30
         const trialEndDate = new Date()
         trialEndDate.setDate(trialEndDate.getDate() + trialDays)
+        
+        // For 7-day trials, grant 250 credits ($5 tier = 500 cents, 50% = 250 credits)
+        // For 30-day trials, grant 1,000 credits ($20 tier = 2000 cents, 50% = 1,000 credits)
+        const monthlyPriceCents = trialDays === 7 ? 500 : 2000
         
         await prisma.subscription.upsert({
           where: { userId },
           update: { 
             plan: 'PREMIUM',
             endDate: trialEndDate,
-            monthlyPriceCents: 2000 // Default to $20 tier
+            monthlyPriceCents: monthlyPriceCents
           },
           create: { 
             userId, 
             plan: 'PREMIUM',
             endDate: trialEndDate,
-            monthlyPriceCents: 2000
+            monthlyPriceCents: monthlyPriceCents
           }
         })
         break
