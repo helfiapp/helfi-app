@@ -271,37 +271,15 @@ export default function BillingPage() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Free Plan */}
+            {/* $20 plan */}
             <div className="border border-gray-200 rounded-2xl p-8 shadow-sm hover:shadow-md transition-shadow bg-white">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Free 7‑Day Trial</h3>
-              <p className="text-3xl font-bold text-gray-900 mb-4">$0<span className="text-sm font-normal">/month</span></p>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">$20 / month</h3>
+              <p className="text-3xl font-bold text-gray-900 mb-1">Monthly wallet: 1,000 credits</p>
+              <p className="text-xs text-gray-500 mb-4">Credits refresh monthly. No rollover.</p>
               <ul className="space-y-2 mb-6 text-sm text-gray-600">
-                <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> All core features for 7 days</li>
-                <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> 3 food photos/day</li>
-                <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> 1 re‑analysis per photo</li>
-                <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> 1 interaction check/day</li>
-                <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Medical image analysis not included</li>
-              </ul>
-              <button className="w-full bg-gray-100 text-gray-400 px-4 py-2 rounded-lg cursor-not-allowed">Current Plan</button>
-            </div>
-
-            {/* Premium */}
-            <div className="border-2 border-helfi-green rounded-2xl p-8 relative shadow-sm hover:shadow-lg transition-shadow bg-white">
-              <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                <span className="bg-helfi-green text-white px-3 py-1 rounded-full text-sm font-medium">Most Popular</span>
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Premium</h3>
-              <p className="text-3xl font-bold text-gray-900 mb-1">
-                {billingCycle === 'monthly' ? '$20' : '$216'}
-                <span className="text-sm font-normal">/{billingCycle === 'monthly' ? 'month' : 'year'}</span>
-              </p>
-              {billingCycle === 'yearly' && (
-                <p className="text-xs text-gray-500 mb-4">$18/month billed yearly</p>
-              )}
-              <ul className="space-y-2 mb-6 text-sm text-gray-600">
-                <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> 30 food photo analyses/day</li>
-                <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> 30 re‑analyses/day</li>
-                <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> 30 medical image analyses/day</li>
+                <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> All features unlocked</li>
+                <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Percentage‑based usage meter</li>
+                <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Top‑ups valid 12 months</li>
               </ul>
               <button
                 onClick={() => {
@@ -310,24 +288,43 @@ export default function BillingPage() {
                 }}
                 className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors"
               >
-                {billingCycle === 'monthly' ? 'Start 7‑Day Free Trial' : 'Start 7‑Day Free Trial'}
+                Choose $20 Plan
               </button>
             </div>
 
-            {/* Premium Plus */}
-            <div className="border border-gray-200 rounded-2xl p-8 shadow-sm hover:shadow-md transition-shadow bg-white">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Premium Plus</h3>
-              <p className="text-3xl font-bold text-gray-900 mb-1">
-                {billingCycle === 'monthly' ? '$30' : '$312'}
-                <span className="text-sm font-normal">/{billingCycle === 'monthly' ? 'month' : 'year'}</span>
-              </p>
-              {billingCycle === 'yearly' && (
-                <p className="text-xs text-gray-500 mb-4">$26/month billed yearly</p>
-              )}
+            {/* $30 plan */}
+            <div className="border-2 border-helfi-green rounded-2xl p-8 relative shadow-sm hover:shadow-lg transition-shadow bg-white">
+              <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+                <span className="bg-helfi-green text-white px-3 py-1 rounded-full text-sm font-medium">Most Popular</span>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">$30 / month</h3>
+              <p className="text-3xl font-bold text-gray-900 mb-1">Monthly wallet: 1,700 credits</p>
+              <p className="text-xs text-gray-500 mb-4">Credits refresh monthly. No rollover.</p>
               <ul className="space-y-2 mb-6 text-sm text-gray-600">
-                <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Everything in Premium</li>
-                <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Higher usage limits (set in app)</li>
-                <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Priority support</li>
+                <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> All features unlocked</li>
+                <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Percentage‑based usage meter</li>
+                <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Top‑ups valid 12 months</li>
+              </ul>
+              <button
+                onClick={() => {
+                  alert('We are currently in the process of building this amazing application. If you would like to be notified the moment we go live, please sign up below on the homepage.')
+                  window.location.href = '/#waitlist-signup'
+                }}
+                className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors"
+              >
+                Choose $30 Plan
+              </button>
+            </div>
+
+            {/* $50 plan */}
+            <div className="border border-gray-200 rounded-2xl p-8 shadow-sm hover:shadow-md transition-shadow bg-white">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">$50 / month</h3>
+              <p className="text-3xl font-bold text-gray-900 mb-1">Monthly wallet: 3,000 credits</p>
+              <p className="text-xs text-gray-500 mb-4">Credits refresh monthly. No rollover.</p>
+              <ul className="space-y-2 mb-6 text-sm text-gray-600">
+                <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> All features unlocked</li>
+                <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Percentage‑based usage meter</li>
+                <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Top‑ups valid 12 months</li>
               </ul>
               <button
                 onClick={() => {
@@ -336,7 +333,7 @@ export default function BillingPage() {
                 }}
                 className="w-full bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors"
               >
-                {billingCycle === 'monthly' ? 'Upgrade to Premium Plus' : 'Upgrade to Premium Plus'}
+                Choose $50 Plan
               </button>
             </div>
           </div>
@@ -347,9 +344,8 @@ export default function BillingPage() {
           <h2 className="text-2xl font-bold text-gray-900 mb-6">Buy Extra Credits</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <div className="border border-gray-200 rounded-lg p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">100 Credits</h3>
-              <p className="text-2xl font-bold text-gray-900 mb-4">$5</p>
-              <p className="text-sm text-gray-600 mb-6">Use for additional AI analyses. Credits valid for 12 months from purchase.</p>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Try with $5 (250 credits)</h3>
+              <p className="text-sm text-gray-600 mb-6">One‑time top‑up. Credits valid for 12 months.</p>
               <button
                 onClick={() => {
                   alert('We are currently in the process of building this amazing application. If you would like to be notified the moment we go live, please sign up below on the homepage.')
@@ -357,7 +353,7 @@ export default function BillingPage() {
                 }}
                 className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors"
               >
-                Buy 100 Credits – $5
+                Buy $5 Credits
               </button>
             </div>
           </div>
