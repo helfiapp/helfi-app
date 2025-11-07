@@ -44,12 +44,34 @@ export async function POST(req: NextRequest) {
     }
 
     // Fetch user
-    const user = await prisma.user.findUnique({ where: { email: session.user.email }, include: { subscription: true } })
+    const user = await prisma.user.findUnique({ where: { email: session.user.email }, include: { subscription: true, creditTopUps: true } })
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
+    // PREMIUM/CREDITS/FREE USE GATING
     const isPremium = user.subscription?.plan === 'PREMIUM'
+    
+    // Check if user has purchased credits (non-expired)
+    const now = new Date()
+    const hasPurchasedCredits = user.creditTopUps.some(
+      (topUp: any) => topUp.expiresAt > now && (topUp.amountCents - topUp.usedCents) > 0
+    )
+    
+    // Note: Symptom analysis doesn't have free use (it's not an AI image analysis feature)
+    // Users need subscription or credits for symptom analysis
+    
+    if (!isPremium && !hasPurchasedCredits) {
+      return NextResponse.json(
+        { 
+          error: 'Payment required',
+          message: 'Symptom analysis requires a subscription or credits. Subscribe to a monthly plan or purchase credits to continue.',
+          requiresPayment: true
+        },
+        { status: 402 }
+      )
+    }
+    
     const creditManager = new CreditManager(user.id)
     // Trigger daily reset logic via credit system (ensures dailyMedicalAnalysisUsed resets too)
     const creditStatus = await creditManager.checkCredits('SYMPTOM_ANALYSIS')

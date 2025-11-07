@@ -77,3 +77,6 @@ STRIPE_PRICE_CREDITS_1000=price_1SQfraFFFsf6Yn8z8uipLLdg
 
 **Note**: These are TEST MODE Price IDs. When you go live, you'll need to create new products in live mode and get new Price IDs.
 
+
+
+

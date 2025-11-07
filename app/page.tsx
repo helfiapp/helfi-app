@@ -582,7 +582,7 @@ export default function SplashPage() {
                   </div>
                 </div>
                 <button onClick={handleWaitlistCta} className="btn-primary w-full text-center block" type="button">
-                  Start 7‑Day Free Trial
+                  Subscribe Now
                 </button>
               </div>
             </div>

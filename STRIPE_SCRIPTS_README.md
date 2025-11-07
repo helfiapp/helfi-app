@@ -108,3 +108,6 @@ If you prefer to create products manually:
 - Live mode keys should be kept secure and only used in production
 - The `.gitignore` file should exclude `.env.local` and `*.json` files with sensitive data
 
+
+
+

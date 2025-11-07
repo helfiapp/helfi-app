@@ -32,16 +32,41 @@ export async function POST(request: NextRequest) {
     // Find user and check credit quota
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
-      include: { subscription: true }
+      include: { subscription: true, creditTopUps: true }
     });
 
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    // Trial/Premium gating: allow 1 trial, or 30/month if premium
+    // PREMIUM/CREDITS/FREE USE GATING
     const isPremium = user.subscription?.plan === 'PREMIUM';
+    
+    // Check if user has purchased credits (non-expired)
     const now = new Date();
+    const hasPurchasedCredits = user.creditTopUps.some(
+      (topUp: any) => topUp.expiresAt > now && (topUp.amountCents - topUp.usedCents) > 0
+    );
+    
+    // Check if user has used their free interaction analysis
+    const hasUsedFreeInteraction = (user as any).hasUsedFreeInteractionAnalysis || false;
+    
+    // Allow if: Premium subscription OR has purchased credits OR hasn't used free use yet
+    let allowViaFreeUse = false;
+    if (!isPremium && !hasPurchasedCredits && !hasUsedFreeInteraction && !reanalysis) {
+      // First time use - allow free
+      allowViaFreeUse = true;
+    } else if (!isPremium && !hasPurchasedCredits) {
+      // No subscription, no credits, and already used free - require payment
+      return NextResponse.json(
+        { 
+          error: 'Payment required',
+          message: 'You\'ve used your free interaction analysis. Subscribe to a monthly plan or purchase credits to continue.',
+          requiresPayment: true
+        },
+        { status: 402 }
+      );
+    }
     // Use optional chaining to avoid type errors if field not present in client types
     const lastMonthlyReset = (user as any).lastMonthlyResetDate as Date | null;
     const monthChanged = !lastMonthlyReset || lastMonthlyReset.getUTCFullYear() !== now.getUTCFullYear() || lastMonthlyReset.getUTCMonth() !== now.getUTCMonth();
@@ -131,8 +156,8 @@ Be thorough but not alarmist. Provide actionable recommendations.`;
 
     const model = reanalysis ? "gpt-4o-mini" : "gpt-4";
 
-    // Wallet pre-check (trial gating above may have returned early)
-    {
+    // Wallet pre-check (skip if allowed via free use)
+    if (!allowViaFreeUse) {
       const cm = new CreditManager(user.id);
       const estimateCents = costCentsEstimateFromText(model, prompt, 2000 * 4);
       const wallet = await cm.getWalletStatus();
@@ -228,8 +253,8 @@ Be thorough but not alarmist. Provide actionable recommendations.`;
       }
     });
 
-    // Charge wallet and update counters after successful analysis
-    {
+    // Charge wallet and update counters (skip if allowed via free use)
+    if (!allowViaFreeUse) {
       const cm = new CreditManager(user.id);
       const ok = await cm.chargeCents(wrapped.costCents);
       if (!ok) {
@@ -237,14 +262,14 @@ Be thorough but not alarmist. Provide actionable recommendations.`;
       }
     }
 
-    // Update legacy counters during transition
-    if (!isPremium && (user as any).trialActive) {
+    // Update counters and mark free use as used
+    if (allowViaFreeUse && !reanalysis) {
+      // Mark free use as used
       await prisma.user.update({
         where: { id: user.id },
-        data: ( {
-          trialInteractionRemaining: Math.max(0, ((user as any).trialInteractionRemaining || 0) - 1),
-          trialActive: ((user as any).trialFoodRemaining || 0) > 0 || (((user as any).trialInteractionRemaining || 0) - 1) > 0
-        } as any )
+        data: {
+          hasUsedFreeInteractionAnalysis: true,
+        } as any
       });
     } else if (isPremium) {
       await prisma.user.update({

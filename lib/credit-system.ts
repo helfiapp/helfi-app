@@ -41,7 +41,6 @@ export class CreditManager {
   //
 
   private static PLAN_PRICE_CENTS: Record<string, number> = {
-    FREE: 0,
     PREMIUM: 2000, // $20/month
     // If a Premium Plus is added later in schema, we can map it here.
     PREMIUM_PLUS: 3000, // $30/month (defensive default)
@@ -54,7 +53,7 @@ export class CreditManager {
   }
 
   private static monthlyCapCentsForPlan(plan: string | null | undefined): number {
-    const price = CreditManager.PLAN_PRICE_CENTS[String(plan || 'FREE')] ?? 0;
+    const price = CreditManager.PLAN_PRICE_CENTS[String(plan || 'PREMIUM')] ?? 0;
     return Math.floor(price * CreditManager.walletPercentOfPlan());
   }
 
@@ -84,8 +83,8 @@ export class CreditManager {
       include: { subscription: true },
     });
     if (!user) throw new Error('User not found');
-    const plan = user.subscription?.plan || 'FREE';
-    const monthlyCapCents = CreditManager.monthlyCapCentsForPlan(plan);
+    const plan = user.subscription?.plan || null;
+    const monthlyCapCents = plan ? CreditManager.monthlyCapCentsForPlan(plan) : 0;
     const monthlyUsedCents = (user as any).walletMonthlyUsedCents || 0;
 
     // Fetch available (non-expired) top-ups
@@ -132,8 +131,8 @@ export class CreditManager {
     });
     if (!user) throw new Error('User not found');
 
-    const plan = user.subscription?.plan || 'FREE';
-    const monthlyCapCents = CreditManager.monthlyCapCentsForPlan(plan);
+    const plan = user.subscription?.plan || null;
+    const monthlyCapCents = plan ? CreditManager.monthlyCapCentsForPlan(plan) : 0;
     const monthlyUsedCents = (user as any).walletMonthlyUsedCents || 0;
     let remainingMonthly = Math.max(0, monthlyCapCents - monthlyUsedCents);
 
@@ -376,7 +375,7 @@ export class CreditManager {
         },
       },
       lastReset: user.lastAnalysisResetDate,
-      plan: user.subscription?.plan || 'FREE',
+      plan: user.subscription?.plan || null,
     };
   }
 } 

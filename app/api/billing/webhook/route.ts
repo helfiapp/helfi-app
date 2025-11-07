@@ -38,8 +38,7 @@ export async function POST(request: NextRequest) {
         }
         if (!email) break
 
-        // Set plan and trial flags
-        const isTrial = !!sub.trial_end && (sub.trial_end * 1000) > Date.now()
+        // Set plan to PREMIUM (no trial periods)
         await prisma.user.update({
           where: { email: email.toLowerCase() },
           data: {
@@ -47,31 +46,12 @@ export async function POST(request: NextRequest) {
               create: { plan: 'PREMIUM' },
               update: { plan: 'PREMIUM' }
             }},
-            trialActive: isTrial,
           }
         })
         break
       }
       case 'customer.subscription.trial_will_end': {
-        const sub = event.data.object as Stripe.Subscription
-        const customerId = typeof sub.customer === 'string' ? sub.customer : sub.customer?.id
-        let email: string | undefined
-        if (customerId) {
-          try {
-            const customer = await stripe.customers.retrieve(customerId)
-            if ((customer as Stripe.Customer).email) {
-              email = (customer as Stripe.Customer).email as string
-            }
-          } catch {}
-        }
-        if (email && resend) {
-          await resend.emails.send({
-            from: 'Helfi Team <support@helfi.ai>',
-            to: email,
-            subject: 'Your Helfi trial ends in 2 days',
-            html: `<p>Your 7‑day trial ends in 2 days. To keep AI features, your plan will start automatically unless you cancel before then.</p><p><a href="https://helfi.ai/billing">Manage subscription</a></p>`
-          })
-        }
+        // Trial periods removed - this event can be ignored
         break
       }
       case 'customer.subscription.deleted': {
@@ -87,15 +67,11 @@ export async function POST(request: NextRequest) {
           } catch {}
         }
         if (email) {
-          await prisma.user.update({
-            where: { email: email.toLowerCase() },
-            data: {
-              subscription: { upsert: {
-                create: { plan: 'FREE' },
-                update: { plan: 'FREE' }
-              }},
-              trialActive: false,
-            }
+          // Delete subscription instead of setting to FREE
+          await prisma.subscription.delete({
+            where: { user: { email: email.toLowerCase() } }
+          }).catch(() => {
+            // Ignore if subscription doesn't exist
           })
         }
         break

@@ -40,10 +40,11 @@ model User {
   totalInteractionAnalysisCount Int @default(0)  // Lifetime interaction analysis count
   monthlyInteractionAnalysisUsed Int @default(0) // Monthly interactions used (premium)
 
-  // Trial fields
-  trialActive                 Boolean @default(true)
-  trialFoodRemaining          Int     @default(3)  // 3 food photos total
-  trialInteractionRemaining   Int     @default(1)  // 1 interaction total
+  // One-time free use tracking (one free use per AI feature)
+  hasUsedFreeFoodAnalysis        Boolean @default(false)  // Has used free food analysis
+  hasUsedFreeInteractionAnalysis Boolean @default(false)  // Has used free interaction analysis
+  hasUsedFreeMedicalAnalysis     Boolean @default(false)  // Has used free medical image analysis
+  
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
   accounts      Account[]
@@ -179,7 +180,7 @@ model ExerciseLog {
 model Subscription {
   id        String    @id @default(cuid())
   userId    String    @unique
-  plan      Plan      @default(FREE)
+  plan      Plan      @default(PREMIUM)
   startDate DateTime  @default(now())
   endDate   DateTime?
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -211,7 +212,6 @@ enum BodyType {
 }
 
 enum Plan {
-  FREE
   PREMIUM
 }
 

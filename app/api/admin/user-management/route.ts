@@ -32,8 +32,12 @@ export async function GET(request: NextRequest) {
     }
 
     if (plan !== 'all') {
-      where.subscription = {
-        plan: plan.toUpperCase()
+      if (plan === 'premium') {
+        where.subscription = {
+          plan: 'PREMIUM'
+        }
+      } else if (plan === 'non-subscribed') {
+        where.subscription = null
       }
     }
 
@@ -117,57 +121,21 @@ export async function POST(request: NextRequest) {
         break
 
       case 'deactivate':
-        // Update subscription to FREE
-        await prisma.subscription.upsert({
-          where: { userId },
-          update: { plan: 'FREE' },
-          create: { userId, plan: 'FREE' }
-        })
-        // Update daily credits for free
-        await prisma.user.update({
-          where: { id: userId },
-          data: { dailyAnalysisCredits: 3 }
+        // Remove subscription (delete subscription record)
+        await prisma.subscription.delete({
+          where: { userId }
+        }).catch(() => {
+          // Ignore if subscription doesn't exist
         })
         break
 
       case 'grant_free_access':
-        // Grant permanent free premium access (we'll use a special flag or extended date)
-        const endDate = new Date()
-        endDate.setFullYear(endDate.getFullYear() + 100) // 100 years = permanent
-        
-        await prisma.subscription.upsert({
-          where: { userId },
-          update: { 
-            plan: 'PREMIUM',
-            endDate: endDate
-          },
-          create: { 
-            userId, 
-            plan: 'PREMIUM',
-            endDate: endDate
-          }
-        })
-        break
+        // This action is deprecated - no free subscriptions
+        return NextResponse.json({ error: 'Free subscriptions are no longer available' }, { status: 400 })
 
       case 'grant_trial':
-        // Grant trial access (default 30 days)
-        const trialDays = data?.trialDays || 30
-        const trialEndDate = new Date()
-        trialEndDate.setDate(trialEndDate.getDate() + trialDays)
-        
-        await prisma.subscription.upsert({
-          where: { userId },
-          update: { 
-            plan: 'PREMIUM',
-            endDate: trialEndDate
-          },
-          create: { 
-            userId, 
-            plan: 'PREMIUM',
-            endDate: trialEndDate
-          }
-        })
-        break
+        // This action is deprecated - no trial periods
+        return NextResponse.json({ error: 'Trial periods are no longer available' }, { status: 400 })
 
       case 'update_profile':
         // Update user profile information

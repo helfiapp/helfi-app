@@ -20,12 +20,35 @@ export async function POST(req: NextRequest) {
     }
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
-      include: { subscription: true }
+      include: { subscription: true, creditTopUps: true }
     });
     if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    
+    // PREMIUM/CREDITS/FREE USE GATING
     const isPremium = user.subscription?.plan === 'PREMIUM';
-    if (!isPremium) {
-      return NextResponse.json({ error: 'This is a premium feature. Subscribe now to unlock medical analysis.' }, { status: 402 });
+    
+    // Check if user has purchased credits (non-expired)
+    const now = new Date();
+    const hasPurchasedCredits = user.creditTopUps.some(
+      (topUp: any) => topUp.expiresAt > now && (topUp.amountCents - topUp.usedCents) > 0
+    );
+    
+    // Check if user has used their free medical analysis
+    const hasUsedFreeMedical = (user as any).hasUsedFreeMedicalAnalysis || false;
+    
+    // Allow if: Premium subscription OR has purchased credits OR hasn't used free use yet
+    if (!isPremium && !hasPurchasedCredits && !hasUsedFreeMedical) {
+      // First time use - allow free (will mark as used after successful analysis)
+    } else if (!isPremium && !hasPurchasedCredits) {
+      // No subscription, no credits, and already used free - require payment
+      return NextResponse.json(
+        { 
+          error: 'Payment required',
+          message: 'You\'ve used your free medical image analysis. Subscribe to a monthly plan or purchase credits to continue.',
+          requiresPayment: true
+        },
+        { status: 402 }
+      );
     }
 
     const formData = await req.formData();
@@ -76,6 +99,16 @@ export async function POST(req: NextRequest) {
     });
 
     const analysis = response.choices[0]?.message?.content;
+    
+    // Mark free use as used if this was a free use
+    if (!isPremium && !hasPurchasedCredits && !hasUsedFreeMedical) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          hasUsedFreeMedicalAnalysis: true,
+        } as any
+      });
+    }
     
     console.log('OpenAI Response:', {
       usage: response.usage,

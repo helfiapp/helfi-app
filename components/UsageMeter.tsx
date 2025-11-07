@@ -25,8 +25,8 @@ export default function UsageMeter({ compact = false, showResetDate = false, cla
         const res = await fetch('/api/credit/status', { cache: 'no-store' })
         if (res.ok) {
           const data = await res.json()
-          // Only show usage meter for PREMIUM subscriptions
-          if (data.plan === 'PREMIUM') {
+          // Show usage meter if user has access (subscription OR credits)
+          if (data.hasAccess === true) {
             setIsPremium(true)
             if (typeof data.percentUsed === 'number') {
               setWalletPercentUsed(data.percentUsed)
@@ -51,7 +51,7 @@ export default function UsageMeter({ compact = false, showResetDate = false, cla
     return () => clearInterval(interval)
   }, [session])
 
-  // Don't render if not authenticated, still loading, or not premium
+  // Don't render if not authenticated, still loading, or no access
   if (!session || loading || !isPremium) {
     return null
   }

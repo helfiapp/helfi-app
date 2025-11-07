@@ -1,3 +1,76 @@
+## URGENT ADDENDUM — 2025-11-05 (Sunfiber now surfaces on first paint; fixes + guardrails)
+
+### Executive summary (live)
+1. Sunfiber now appears under What’s Working for Bowel Movements on first load (SSR) and after Daily/Weekly regenerate. Magnesium Glycinate is preserved.
+2. Daily report returns immediately (quick-first) instead of blocking ~60s.
+3. Root cause was a parity gap: quick/SSR paths didn’t evaluate logged supplements nor inject fiber items; POST forced a heavy rebuild.
+
+### What changed (code, high-signal)
+1) Quick path supplements evaluation (adds exact-name mapping)
+   - File: `lib/insights/issue-engine.ts` → `buildQuickSection()` (supplements case)
+   - Change: Fetch user supplements directly via Prisma for quick path, run `evaluateFocusItemsForIssue(...)` to produce `extras.supportiveDetails` with exact logged names and dosage/timing.
+   - Fallback: If evaluator misses fiber items for bowel issues, add any logged items matching `/fiber|fibre|psyllium|inulin|guar gum|phgg/i` without removing existing items.
+
+2) Quick result injection before caching (prevents “quick” from missing fiber)
+   - File: `lib/insights/issue-engine.ts` → `computeIssueSection()` (quick branch)
+   - Change: After building quick, inject missing fiber supplements for bowel issues into `extras.supportiveDetails` before persisting to cache.
+
+3) Cached/validated result injection (covers cache hits)
+   - File: `lib/insights/issue-engine.ts` → `computeIssueSection()` (cache-hit branch)
+   - Change: When serving cached results, inject missing fiber supplements for bowel issues into `extras.supportiveDetails` so SSR and subsequent reads include Sunfiber.
+
+4) SSR read helper parity (guarantees first paint)
+   - File: `lib/insights/issue-engine.ts` → `getCachedIssueSection()`
+   - Change: Added the same supplements fiber-injection for bowel issues on SSR cached reads (this is what `app/insights/.../supplements/layout.tsx` uses). Ensures Sunfiber shows immediately without clicking regenerate.
+
+5) Faster Daily/Weekly regenerate (no long waits)
+   - File: `app/api/insights/issues/[slug]/sections/[section]/route.ts` (POST)
+   - Change: Return quick result immediately (`force: false`) and allow background upgrade. Prevents the ~1 minute blocking call.
+
+6) Instrumentation for debugging (behind `INSIGHTS_DEBUG=1`)
+   - File: `app/api/insights/issues/[slug]/sections/[section]/route.ts` (GET)
+   - Headers: `X-Debug-ResponseType`, `X-Debug-PipelineVersion`, `X-Debug-WorkingCount`, `X-Debug-Supplements` to verify paths and items.
+
+7) Versioning to ignore stale cache
+   - `CURRENT_PIPELINE_VERSION`: bumped progressively to `v9`, `v10`, `v11` as fixes were added.
+
+### Why this worked
+- The original quick/SSR paths had no supplements data (`loadUserLandingContext()` returns `supplements: []`) and set `supportiveDetails: []`, so Sunfiber never appeared until a heavy validated build completed (and even then not reliably).
+- By evaluating on quick and injecting on quick/SSR/cached paths, Sunfiber can’t be lost due to cache timing or path differences. Fallback logic adds fiber items without replacing other supportive items (e.g., Magnesium Glycinate).
+
+### Guardrails (do not remove these; future agents read this first)
+1. SSR must remain cache-only: Layouts should continue using `getCachedIssueSection(...)`; never call heavy builders on SSR.
+2. Quick-first on POST: Keep returning quick results immediately; do not force heavy rebuilds synchronously.
+3. Evaluator parity: Keep `evaluateFocusItemsForIssue(...)` in the quick supplements path and the validated builder; do not remove the exact-name mapping.
+4. Bowel-specific fallback only: Keep the fiber fallback limited to bowel-related issues using the current regex, and only as an additive step (never replace existing `supportiveDetails`).
+5. Cached result injection: Keep the fiber injection in both compute cache-hit and `getCachedIssueSection(...)` so first paint always has fiber items.
+6. Debug headers: When `INSIGHTS_DEBUG=1`, preserve `X-Debug-*` headers for live inspection.
+7. Versioning: When touching read/write logic for sections, bump `CURRENT_PIPELINE_VERSION` and verify quick path parity before deploy.
+8. Acceptance checks before closing any PR:
+   - Bowel Movements → Supplements → What’s Working lists both Sunfiber and Magnesium Glycinate on first load.
+   - Daily/Weekly regenerate returns within ~1–2s with quick-first, then upgrades silently.
+   - Network headers show sensible `ResponseType` and accurate `WorkingCount` when debug is on.
+
+### Verification (live)
+1. Open Bowel Movements → Supplements → What’s Working (no regenerate). Sunfiber appears with mechanism, dose and timing; Magnesium Glycinate remains listed.
+2. Click Daily report: response is immediate; results match quick-first; background upgrade does not remove fiber or magnesium.
+3. Optional: With `INSIGHTS_DEBUG=1`, verify `X-Debug-ResponseType` and `X-Debug-WorkingCount` in the Network tab.
+
+### Commits (chronological, key ones)
+- `bee1ce8` — Add evaluator to quick path for supplements section
+- `e65e02f` — Improve evaluator prompt; add fiber fallback (mentions Sunfiber/PHGG); extra logging
+- `64f4528` — Inject fiber supplements into cached results (compute cache-hit path)
+- `9328d6b` — Inject fiber supplements into quick path results before caching
+- `afa620d`, `9e2ce55` — Aggressive debug logging for supplements quick/cached paths
+- `1127224` — Preserve Magnesium Glycinate and speed up Daily report (quick-first POST)
+- `9c47b99` — SSR fix: Inject fiber supplements in `getCachedIssueSection` for bowel issues (first paint)
+
+### Rollback instructions
+1. If fiber items begin duplicating or appearing for non-bowel issues: revert the most recent injection commit(s) in reverse order starting from `9c47b99`, then `9328d6b`, `64f4528` while keeping the evaluator in the quick path (`bee1ce8`).
+2. If Daily/Weekly becomes slow again: re-apply `1127224` (quick-first POST) and ensure `FORCE_QUICK_FIRST` flag is respected in reads.
+
+---
+
 ## URGENT ADDENDUM — 2025-11-04 (Sunfiber still not surfaced under Bowel Movements → Supplements → What’s Working)
 
 ### Current status (live)

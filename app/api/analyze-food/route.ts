@@ -45,8 +45,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    // We'll perform trial gating first; if not allowed via trial, then check credits
-    let allowViaTrial = false;
+    // We'll check free use, premium, or credits below
     let creditManager: CreditManager | null = null;
     
     // Check if API key is configured
@@ -203,17 +202,43 @@ After your explanation and the one-line totals above, also include a compact JSO
       ];
     }
 
-    // TRIAL/PREMIUM GATING
+    // PREMIUM/CREDITS/FREE USE GATING
     const currentUser = await prisma.user.findUnique({
       where: { email: session.user.email },
-      include: { subscription: true }
+      include: { subscription: true, creditTopUps: true }
     });
     if (!currentUser) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
     const isPremium = currentUser.subscription?.plan === 'PREMIUM';
+    
+    // Check if user has purchased credits (non-expired)
     const now = new Date();
+    const hasPurchasedCredits = currentUser.creditTopUps.some(
+      (topUp: any) => topUp.expiresAt > now && (topUp.amountCents - topUp.usedCents) > 0
+    );
+    
+    // Check if user has used their free food analysis
+    const hasUsedFreeFood = (currentUser as any).hasUsedFreeFoodAnalysis || false;
+    
+    // Allow if: Premium subscription OR has purchased credits OR hasn't used free use yet
+    let allowViaFreeUse = false;
+    if (!isPremium && !hasPurchasedCredits && !hasUsedFreeFood && !isReanalysis) {
+      // First time use - allow free
+      allowViaFreeUse = true;
+    } else if (!isPremium && !hasPurchasedCredits) {
+      // No subscription, no credits, and already used free - require payment
+      return NextResponse.json(
+        { 
+          error: 'Payment required',
+          message: 'You\'ve used your free food analysis. Subscribe to a monthly plan or purchase credits to continue.',
+          requiresPayment: true
+        },
+        { status: 402 }
+      );
+    }
+
     const lastReset = currentUser.lastAnalysisResetDate;
     const shouldReset = !lastReset || (now.getTime() - lastReset.getTime()) > 24*60*60*1000;
     if (shouldReset) {
@@ -228,18 +253,6 @@ After your explanation and the one-line totals above, also include a compact JSO
       });
       (currentUser as any).dailyFoodAnalysisUsed = 0 as any;
       (currentUser as any).dailyFoodReanalysisUsed = 0 as any;
-    }
-
-    if (!isPremium && (currentUser as any).trialActive) {
-      if (isReanalysis) {
-        return NextResponse.json({ error: "You've reached your trial limit. Subscribe to unlock full access." }, { status: 402 });
-      }
-      const remaining = ((currentUser as any).trialFoodRemaining || 0);
-      if (remaining > 0) {
-        allowViaTrial = true; // allow without checking credits
-      } else {
-        // trial active but no remaining – fall through to credits check below
-      }
     }
 
     // Daily gating removed – wallet pre-check happens below (trial still allowed)
@@ -257,8 +270,8 @@ After your explanation and the one-line totals above, also include a compact JSO
     const model = isReanalysis ? 'gpt-4o-mini' : 'gpt-4o';
     const maxTokens = 500;
 
-    // Wallet pre-check (skip if allowed via trial)
-    if (!allowViaTrial) {
+    // Wallet pre-check (skip if allowed via free use)
+    if (!allowViaFreeUse) {
       const cm = new CreditManager(currentUser.id);
       const promptText = Array.isArray(messages)
         ? messages
@@ -354,8 +367,8 @@ After your explanation and the one-line totals above, also include a compact JSO
       }
     }
     
-    // Charge wallet (skip if allowed via trial)
-    if (!allowViaTrial) {
+    // Charge wallet (skip if allowed via free use)
+    if (!allowViaFreeUse) {
       try {
         const cm = new CreditManager(currentUser.id);
         const ok = await cm.chargeCents(totalCostCents);
@@ -368,14 +381,14 @@ After your explanation and the one-line totals above, also include a compact JSO
       }
     }
 
-    // Update counters after successful analysis (legacy counters kept during transition)
-    if (allowViaTrial) {
+    // Update counters and mark free use as used
+    if (allowViaFreeUse && !isReanalysis) {
+      // Mark free use as used
       await prisma.user.update({
         where: { id: currentUser.id },
-        data: ( {
-          trialFoodRemaining: Math.max(0, (((currentUser as any).trialFoodRemaining || 0) - (isReanalysis ? 0 : 1))),
-          trialActive: (((currentUser as any).trialFoodRemaining || 0) - (isReanalysis ? 0 : 1)) > 0 || (((currentUser as any).trialInteractionRemaining || 0) > 0)
-        } as any )
+        data: {
+          hasUsedFreeFoodAnalysis: true,
+        } as any
       });
     } else if (isPremium) {
       await prisma.user.update({

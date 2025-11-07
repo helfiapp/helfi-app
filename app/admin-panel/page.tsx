@@ -441,7 +441,7 @@ export default function AdminPanel() {
   const handleSelectByTier = (tier: string) => {
     const filteredUsers = managedUsers.filter(user => {
       if (tier === 'premium') return user.subscription?.plan === 'PREMIUM'
-      if (tier === 'free') return !user.subscription?.plan || user.subscription.plan === 'FREE'
+      if (tier === 'non-subscribed') return !user.subscription?.plan
       return true
     })
     setSelectedUserEmails(filteredUsers.map(user => user.email))
@@ -1880,8 +1880,8 @@ The Helfi Team`,
                     className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                   >
                     <option value="all">All Users</option>
-                    <option value="free">Free Plan</option>
                     <option value="premium">Premium Plan</option>
+                    <option value="non-subscribed">Non-Subscribed</option>
                   </select>
                   <button
                     onClick={() => loadUserManagement(userSearch, userFilter, 1)}
@@ -1920,10 +1920,10 @@ The Helfi Team`,
                     💎 Premium Users ({managedUsers.filter(u => u.subscription?.plan === 'PREMIUM').length})
                   </button>
                   <button
-                    onClick={() => handleSelectByTier('free')}
+                    onClick={() => handleSelectByTier('non-subscribed')}
                     className="bg-blue-500 text-white px-3 py-2 rounded-lg hover:bg-blue-600 transition-colors text-sm"
                   >
-                    🆓 Free Users ({managedUsers.filter(u => !u.subscription?.plan || u.subscription.plan === 'FREE').length})
+                    👤 Non-Subscribed Users ({managedUsers.filter(u => !u.subscription?.plan).length})
                   </button>
                 </div>
               </div>
@@ -2226,7 +2226,7 @@ The Helfi Team`,
                                      ? 'bg-emerald-100 text-emerald-800' 
                                      : 'bg-gray-100 text-gray-800'
                                  }`}>
-                                   {user.subscription?.plan || 'FREE'}
+                                   {user.subscription?.plan || 'No Subscription'}
                                    {user.subscription?.endDate && new Date(user.subscription.endDate).getFullYear() > 2050 && (
                                      <span className="ml-1 text-xs">∞</span>
                                    )}
@@ -2373,7 +2373,7 @@ The Helfi Team`,
                              ? 'bg-emerald-100 text-emerald-800' 
                              : 'bg-gray-100 text-gray-800'
                          }`}>
-                           {selectedUser.subscription?.plan || 'FREE'}
+                           {selectedUser.subscription?.plan || 'No Subscription'}
                          </span>
                        </div>
                        
@@ -2382,8 +2382,8 @@ The Helfi Team`,
                            <span className="text-sm text-gray-600">Access Type:</span>
                            <span className="text-sm font-medium">
                              {new Date(selectedUser.subscription.endDate).getFullYear() > 2050 
-                               ? '🎉 Permanent Free Access' 
-                               : `⏰ Trial expires ${new Date(selectedUser.subscription.endDate).toLocaleDateString()}`
+                               ? '🎉 Permanent Access' 
+                               : `⏰ Expires ${new Date(selectedUser.subscription.endDate).toLocaleDateString()}`
                              }
                            </span>
                          </div>
@@ -2396,10 +2396,10 @@ The Helfi Team`,
                          </div>
                        )}
                        
-                       {(!selectedUser.subscription || selectedUser.subscription?.plan === 'FREE') && (
+                       {!selectedUser.subscription && (
                          <div className="flex justify-between items-center">
                            <span className="text-sm text-gray-600">Access Type:</span>
-                           <span className="text-sm font-medium text-gray-600">🆓 Free Plan</span>
+                           <span className="text-sm font-medium text-gray-600">👤 No Subscription</span>
                          </div>
                        )}
                        
