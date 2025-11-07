@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import OpenAI from 'openai'
+import { prisma } from '@/lib/prisma'
+import { CreditManager } from '@/lib/credit-system'
+import { costCentsEstimateFromText } from '@/lib/cost-meter'
+import { chatCompletionWithCost } from '@/lib/metered-openai'
 
 function getOpenAIClient(): OpenAI | null {
   if (!process.env.OPENAI_API_KEY) return null
@@ -39,6 +43,10 @@ export async function POST(req: NextRequest) {
     const openai = getOpenAIClient()
     if (!openai) {
       return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 })
+    }
+    const user = await prisma.user.findUnique({ where: { email: session.user.email }, include: { subscription: true } })
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
     // Build system prompt with analysis context
@@ -84,9 +92,21 @@ export async function POST(req: NextRequest) {
     ]
 
     if (wantsStream) {
+      // Wallet pre-check using a conservative estimate (max_tokens)
+      const model = process.env.OPENAI_INSIGHTS_MODEL || 'gpt-4o-mini'
+      {
+        const cm = new CreditManager(user.id)
+        const estimateCents = costCentsEstimateFromText(model, `${systemPrompt}\n${question}`, 800 * 4)
+        const wallet = await cm.getWalletStatus()
+        if (wallet.totalAvailableCents < estimateCents) {
+          return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 })
+        }
+      }
+
       const enc = new TextEncoder()
       const stream = new ReadableStream({
         async start(controller) {
+          let full = ''
           try {
             const completion = await openai.chat.completions.create({
               model: process.env.OPENAI_INSIGHTS_MODEL || 'gpt-4o-mini',
@@ -98,8 +118,21 @@ export async function POST(req: NextRequest) {
             for await (const part of completion) {
               const token = part.choices?.[0]?.delta?.content || ''
               if (token) {
+                full += token
                 controller.enqueue(enc.encode(`data: ${token}\n\n`))
               }
+            }
+            // After stream completes, charge actual cost estimated from output length
+            try {
+              const cm = new CreditManager(user.id)
+              const actualCents = costCentsEstimateFromText(
+                model,
+                `${systemPrompt}\n${question}`,
+                full.length
+              )
+              await cm.chargeCents(actualCents)
+            } catch {
+              // Do not interrupt the finished stream; just swallow errors
             }
             controller.enqueue(enc.encode('event: end\n\n'))
             controller.close()
@@ -113,14 +146,30 @@ export async function POST(req: NextRequest) {
     }
 
     // Non-streaming fallback
-    const resp = await openai.chat.completions.create({
-      model: process.env.OPENAI_INSIGHTS_MODEL || 'gpt-4o-mini',
-      temperature: 0.2,
-      max_tokens: 800,
-      messages: chatMessages as any,
-    })
-    const text = resp.choices?.[0]?.message?.content || ''
-    return NextResponse.json({ assistant: text })
+    {
+      const model = process.env.OPENAI_INSIGHTS_MODEL || 'gpt-4o-mini'
+      // Pre-check
+      {
+        const cm = new CreditManager(user.id)
+        const estimateCents = costCentsEstimateFromText(model, `${systemPrompt}\n${question}`, 800 * 4)
+        const wallet = await cm.getWalletStatus()
+        if (wallet.totalAvailableCents < estimateCents) {
+          return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 })
+        }
+      }
+      const wrapped = await chatCompletionWithCost(openai, {
+        model,
+        temperature: 0.2,
+        max_tokens: 800,
+        messages: chatMessages as any,
+      } as any)
+      try {
+        const cm = new CreditManager(user.id)
+        await cm.chargeCents(wrapped.costCents)
+      } catch {}
+      const text = wrapped.completion.choices?.[0]?.message?.content || ''
+      return NextResponse.json({ assistant: text })
+    }
   } catch (error) {
     console.error('[symptom-chat.POST] error', error)
     return NextResponse.json({ error: 'server_error' }, { status: 500 })
