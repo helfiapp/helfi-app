@@ -15,6 +15,7 @@ import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useUserData } from '@/components/providers/UserDataProvider'
 import MobileMoreMenu from '@/components/MobileMoreMenu'
+import UsageMeter from '@/components/UsageMeter'
 
 export default function FoodDiary() {
   const { data: session } = useSession()
@@ -737,7 +738,9 @@ Please add nutritional information manually if needed.`);
             </Link>
           </div>
           
-          <div className="relative dropdown-container">
+          <div className="flex items-center gap-3">
+            <UsageMeter compact={true} />
+            <div className="relative dropdown-container">
             <button
               onClick={() => setDropdownOpen((v) => !v)}
               className="focus:outline-none relative"

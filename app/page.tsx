@@ -481,58 +481,6 @@ export default function SplashPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 lg:gap-8 max-w-6xl mx-auto">
-            {/* Free Trial */}
-            <div className="bg-white rounded-2xl p-8 border-2 border-gray-200">
-              <div className="text-center">
-                <h3 className="text-2xl font-bold text-helfi-black mb-2">Free 7‑Day Trial</h3>
-                <div className="mb-6">
-                  <span className="text-4xl font-bold text-helfi-black">$0</span>
-                  <div className="text-sm text-gray-500 mt-1">7 days</div>
-                </div>
-                <ul className="space-y-3 text-left mb-8">
-                  <li className="flex items-center">
-                    <svg className="w-5 h-5 text-helfi-green mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    All core features for 7 days
-                  </li>
-                  <li className="flex items-center">
-                    <svg className="w-5 h-5 text-helfi-green mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    3 AI food photo analyses per day
-                  </li>
-                  <li className="flex items-center">
-                    <svg className="w-5 h-5 text-helfi-green mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    1 re‑analysis per food item
-                  </li>
-                  <li className="flex items-center">
-                    <svg className="w-5 h-5 text-helfi-green mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    1 interaction check per day
-                  </li>
-                  <li className="flex items-center text-gray-400">
-                    <svg className="w-5 h-5 text-gray-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                    No medication interaction analysis
-                  </li>
-                  <li className="flex items-center text-gray-400">
-                    <svg className="w-5 h-5 text-gray-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                    No medical image analysis
-                  </li>
-                </ul>
-                <button onClick={handleWaitlistCta} className="btn-secondary w-full text-center block" type="button">
-                  Start Free Trial
-                </button>
-              </div>
-            </div>
-
             {/* Premium Plan */}
             <div className="bg-white rounded-2xl p-8 border-2 border-helfi-green relative">
               <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">

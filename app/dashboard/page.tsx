@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useUserData } from '@/components/providers/UserDataProvider'
 import MobileMoreMenu from '@/components/MobileMoreMenu'
+import UsageMeter from '@/components/UsageMeter'
 
 export default function Dashboard() {
   const { data: session } = useSession()
@@ -247,9 +248,10 @@ export default function Dashboard() {
             </Link>
           </div>
           
-          {/* Right actions: Upgrade + Profile */}
+          {/* Right actions: Upgrade + Usage Meter + Profile */}
           <div className="flex items-center gap-3">
             <Link href="/billing" className="hidden sm:inline-flex items-center bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors font-medium">Upgrade</Link>
+            <UsageMeter compact={true} />
             {/* Profile Avatar & Dropdown */}
             <div className="relative dropdown-container" id="profile-dropdown">
             <button

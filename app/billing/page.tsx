@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
 import MobileMoreMenu from '@/components/MobileMoreMenu'
+import UsageMeter from '@/components/UsageMeter'
 
 export default function BillingPage() {
   const { data: session } = useSession()
@@ -15,8 +16,6 @@ export default function BillingPage() {
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly')
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [profileImage, setProfileImage] = useState<string>('')
-  const [walletPercentUsed, setWalletPercentUsed] = useState<number | null>(null)
-  const [walletRefreshAt, setWalletRefreshAt] = useState<string | null>(null)
   const router = useRouter()
 
   // Profile data - using consistent green avatar
@@ -72,23 +71,6 @@ export default function BillingPage() {
     }
   }, [session])
 
-  // Load credit wallet status (percentage only)
-  useEffect(() => {
-    const loadStatus = async () => {
-      try {
-        const res = await fetch('/api/credit/status', { cache: 'no-store' })
-        if (res.ok) {
-          const data = await res.json()
-          if (typeof data.percentUsed === 'number') setWalletPercentUsed(data.percentUsed)
-          if (data.refreshAt) setWalletRefreshAt(data.refreshAt)
-        }
-      } catch {
-        // ignore
-      }
-    }
-    if (session?.user) loadStatus()
-  }, [session])
-
   // If returning from Stripe, confirm top-up (no useSearchParams to keep static safe)
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -97,14 +79,6 @@ export default function BillingPage() {
     const sid = params.get('session_id')
     if (checkout === 'success' && sid) {
       fetch(`/api/billing/confirm?session_id=${encodeURIComponent(sid)}`)
-        .then(() => fetch('/api/credit/status', { cache: 'no-store' }))
-        .then(async (r) => {
-          if (r?.ok) {
-            const data = await r.json()
-            if (typeof data.percentUsed === 'number') setWalletPercentUsed(data.percentUsed)
-            if (data.refreshAt) setWalletRefreshAt(data.refreshAt)
-          }
-        })
         .catch(() => {})
     }
   }, [])
@@ -156,7 +130,10 @@ export default function BillingPage() {
             </Link>
           </div>
           
-          {/* Profile Avatar & Dropdown on the right */}
+          {/* Right actions: Usage Meter + Profile */}
+          <div className="flex items-center gap-3">
+            <UsageMeter compact={true} />
+            {/* Profile Avatar & Dropdown on the right */}
           <div className="relative dropdown-container" id="profile-dropdown">
             <button
               onClick={() => setDropdownOpen((v) => !v)}
@@ -215,43 +192,6 @@ export default function BillingPage() {
 
       {/* Main Content */}
               <div className="max-w-6xl mx-auto px-6 py-8 pb-24 md:pb-8">
-        {/* Current Plan */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">Current Plan</h2>
-          <div className="bg-helfi-green/10 border border-helfi-green/20 rounded-lg p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-xl font-semibold text-helfi-green">Free 7‑Day Trial</h3>
-                <p className="text-gray-600 mt-2">Trial caps: 3 food photos/day, 1 re‑analysis/photo, 1 interaction/day</p>
-              </div>
-              <div className="text-right">
-                <p className="text-3xl font-bold text-helfi-green">$0</p>
-                <p className="text-gray-600">per month</p>
-              </div>
-            </div>
-            {/* Wallet usage bar (percentage only) */}
-            <div className="mt-6">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-gray-800">Monthly usage</span>
-                <span className="text-sm text-gray-600">
-                  {walletPercentUsed == null ? '—' : `${walletPercentUsed}%`}
-                </span>
-              </div>
-              <div className="w-full bg-gray-200/60 rounded-full h-2.5 overflow-hidden">
-                <div
-                  className="bg-helfi-green h-2.5 transition-all"
-                  style={{ width: `${Math.min(100, Math.max(0, walletPercentUsed ?? 0))}%` }}
-                />
-              </div>
-              {walletRefreshAt && (
-                <p className="text-xs text-gray-500 mt-2">
-                  Resets on {new Date(walletRefreshAt).toLocaleDateString()}
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-
         {/* Available Plans */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
           <div className="flex items-center justify-between mb-6">

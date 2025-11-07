@@ -4,6 +4,7 @@ import { Cog6ToothIcon } from '@heroicons/react/24/outline'
 import { usePathname } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { ReactNode } from 'react'
+import UsageMeter from '@/components/UsageMeter'
 
 // Desktop Sidebar Navigation Component  
 function DesktopSidebar() {
@@ -17,6 +18,11 @@ function DesktopSidebar() {
             src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/HELFI_TRANSPARENT_rmssry.png"
             alt="Helfi"
           />
+        </div>
+        
+        {/* Usage Meter */}
+        <div className="px-4 pt-4 border-b border-gray-200 pb-4">
+          <UsageMeter showResetDate={true} />
         </div>
         
         {/* Navigation */}
