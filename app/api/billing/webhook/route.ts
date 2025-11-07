@@ -68,11 +68,19 @@ export async function POST(request: NextRequest) {
         }
         if (email) {
           // Delete subscription instead of setting to FREE
-          await prisma.subscription.delete({
-            where: { user: { email: email.toLowerCase() } }
-          }).catch(() => {
-            // Ignore if subscription doesn't exist
+          // First find the user by email to get userId
+          const user = await prisma.user.findUnique({
+            where: { email: email.toLowerCase() },
+            select: { id: true }
           })
+          
+          if (user) {
+            await prisma.subscription.delete({
+              where: { userId: user.id }
+            }).catch(() => {
+              // Ignore if subscription doesn't exist
+            })
+          }
         }
         break
       }
