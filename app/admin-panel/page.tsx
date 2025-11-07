@@ -2488,7 +2488,7 @@ The Helfi Team`,
                        )}
                      </div>
                      
-                     <div className="mt-4 grid grid-cols-2 gap-3">
+                     <div className="mt-4 grid grid-cols-3 gap-3">
                        <button
                          onClick={() => {
                            const credits = prompt('Enter number of credits to add:')
@@ -2499,6 +2499,19 @@ The Helfi Team`,
                          className="bg-green-500 text-white px-3 py-2 rounded text-sm hover:bg-green-600 transition-colors"
                        >
                          💳 Add Credits
+                       </button>
+                       <button
+                         onClick={() => {
+                           const credits = prompt('Enter number of credits to remove:')
+                           if (credits && !isNaN(parseInt(credits)) && parseInt(credits) > 0) {
+                             if (confirm(`Are you sure you want to remove ${credits} credits?`)) {
+                               handleUserAction('remove_credits', selectedUser.id, { creditAmount: parseInt(credits) })
+                             }
+                           }
+                         }}
+                         className="bg-red-500 text-white px-3 py-2 rounded text-sm hover:bg-red-600 transition-colors"
+                       >
+                         ➖ Remove Credits
                        </button>
                        <button
                          onClick={() => {
