@@ -769,7 +769,6 @@ Please add nutritional information manually if needed.`);
           </div>
           
           <div className="flex items-center gap-3">
-            <UsageMeter compact={true} />
             <div className="relative dropdown-container">
             <button
               onClick={() => setDropdownOpen((v) => !v)}
