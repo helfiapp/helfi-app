@@ -785,6 +785,7 @@ Please add nutritional information manually if needed.`);
               </div>
             )}
           </div>
+          </div>
         </div>
       </nav>
 
