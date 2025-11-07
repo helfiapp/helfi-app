@@ -130,12 +130,43 @@ export async function POST(request: NextRequest) {
         break
 
       case 'grant_free_access':
-        // This action is deprecated - no free subscriptions
-        return NextResponse.json({ error: 'Free subscriptions are no longer available' }, { status: 400 })
+        // Grant permanent PREMIUM subscription (admin-only)
+        const endDate = new Date()
+        endDate.setFullYear(endDate.getFullYear() + 100) // 100 years = permanent
+        
+        await prisma.subscription.upsert({
+          where: { userId },
+          update: { 
+            plan: 'PREMIUM',
+            endDate: endDate
+          },
+          create: { 
+            userId, 
+            plan: 'PREMIUM',
+            endDate: endDate
+          }
+        })
+        break
 
       case 'grant_trial':
-        // This action is deprecated - no trial periods
-        return NextResponse.json({ error: 'Trial periods are no longer available' }, { status: 400 })
+        // Grant temporary PREMIUM subscription (admin-only)
+        const trialDays = data?.trialDays || 30
+        const trialEndDate = new Date()
+        trialEndDate.setDate(trialEndDate.getDate() + trialDays)
+        
+        await prisma.subscription.upsert({
+          where: { userId },
+          update: { 
+            plan: 'PREMIUM',
+            endDate: trialEndDate
+          },
+          create: { 
+            userId, 
+            plan: 'PREMIUM',
+            endDate: trialEndDate
+          }
+        })
+        break
 
       case 'update_profile':
         // Update user profile information
@@ -159,12 +190,56 @@ export async function POST(request: NextRequest) {
         break
 
       case 'add_credits':
-        // Add additional credits to user account using new credit system
-        const creditAmount = data?.creditAmount || 0
-        if (creditAmount <= 0) {
-          return NextResponse.json({ error: 'Invalid credit amount' }, { status: 400 })
+        // Add credits using wallet-based system (CreditTopUp)
+        // Credit packages: 250 credits ($5), 500 credits ($10), 1000 credits ($20)
+        const creditPackage = data?.creditPackage // e.g., '250', '500', '1000'
+        
+        if (creditPackage) {
+          // Map credit package names to dollar amounts in cents
+          // $5 = 500 cents, $10 = 1000 cents, $20 = 2000 cents
+          const packageMap: Record<string, number> = {
+            '250': 500,    // $5 worth = 500 cents
+            '500': 1000,   // $10 worth = 1000 cents
+            '1000': 2000   // $20 worth = 2000 cents
+          }
+          
+          const centsAmount = packageMap[creditPackage]
+          if (centsAmount) {
+            const expiresAt = new Date()
+            expiresAt.setMonth(expiresAt.getMonth() + 12) // Credits valid for 12 months
+            
+            await prisma.creditTopUp.create({
+              data: {
+                userId,
+                amountCents: centsAmount,
+                usedCents: 0,
+                expiresAt,
+                source: `admin_grant_${creditPackage}_credits`
+              }
+            })
+          } else {
+            return NextResponse.json({ error: 'Invalid credit package. Use: 250, 500, or 1000' }, { status: 400 })
+          }
+        } else {
+          // Allow direct cents amount for custom grants
+          const creditAmountCents = data?.creditAmountCents || 0
+          if (creditAmountCents > 0) {
+            const expiresAt = new Date()
+            expiresAt.setMonth(expiresAt.getMonth() + 12)
+            
+            await prisma.creditTopUp.create({
+              data: {
+                userId,
+                amountCents: creditAmountCents,
+                usedCents: 0,
+                expiresAt,
+                source: 'admin_grant_direct'
+              }
+            })
+          } else {
+            return NextResponse.json({ error: 'Invalid credit amount or package' }, { status: 400 })
+          }
         }
-        await CreditManager.addCredits(userId, creditAmount)
         break
 
       case 'reset_daily_quota':

@@ -2517,7 +2517,7 @@ The Helfi Team`,
                              onClick={() => handleUserAction('deactivate', selectedUser.id)}
                              className="bg-orange-500 text-white px-4 py-2 rounded hover:bg-orange-600 transition-colors text-sm"
                            >
-                             ⬇️ Downgrade to Free
+                             ⬇️ Remove Subscription
                            </button>
                          ) : (
                            <button
