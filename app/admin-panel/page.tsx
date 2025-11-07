@@ -2491,13 +2491,13 @@ The Helfi Team`,
                          onClick={() => handleUserAction('grant_trial', selectedUser.id, { trialDays: 7 })}
                          className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors text-sm"
                        >
-                         7-Day Trial
+                         7-Day Premium
                        </button>
                        <button
                          onClick={() => handleUserAction('grant_trial', selectedUser.id, { trialDays: 30 })}
                          className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors text-sm"
                        >
-                         30-Day Trial
+                         30-Day Premium
                        </button>
                      </div>
                      
@@ -2505,8 +2505,33 @@ The Helfi Team`,
                        onClick={() => handleUserAction('grant_free_access', selectedUser.id)}
                        className="w-full bg-emerald-500 text-white px-4 py-2 rounded hover:bg-emerald-600 transition-colors text-sm"
                      >
-                       🎉 Grant Permanent Free Access
+                       🎉 Grant Permanent Premium
                      </button>
+                     
+                     {/* Credit Packages */}
+                     <div className="border-t pt-4">
+                       <h4 className="font-medium text-gray-900 mb-3">Grant Credits</h4>
+                       <div className="grid grid-cols-3 gap-2">
+                         <button
+                           onClick={() => handleUserAction('add_credits', selectedUser.id, { creditPackage: '250' })}
+                           className="bg-purple-500 text-white px-3 py-2 rounded hover:bg-purple-600 transition-colors text-xs"
+                         >
+                           250 Credits ($5)
+                         </button>
+                         <button
+                           onClick={() => handleUserAction('add_credits', selectedUser.id, { creditPackage: '500' })}
+                           className="bg-purple-500 text-white px-3 py-2 rounded hover:bg-purple-600 transition-colors text-xs"
+                         >
+                           500 Credits ($10)
+                         </button>
+                         <button
+                           onClick={() => handleUserAction('add_credits', selectedUser.id, { creditPackage: '1000' })}
+                           className="bg-purple-500 text-white px-3 py-2 rounded hover:bg-purple-600 transition-colors text-xs"
+                         >
+                           1000 Credits ($20)
+                         </button>
+                       </div>
+                     </div>
                      
                      {/* Plan Controls */}
                      <div className="border-t pt-4">
