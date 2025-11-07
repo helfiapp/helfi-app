@@ -56,17 +56,7 @@ export async function POST(request: NextRequest) {
       (user as any).monthlyInteractionAnalysisUsed = 0 as any;
     }
 
-    if (!isPremium && (user as any).trialActive) {
-      if (((user as any).trialInteractionRemaining || 0) <= 0) {
-        return NextResponse.json({ error: "You've reached your trial limit. Subscribe to unlock full access." }, { status: 402 });
-      }
-    } else if (!isPremium && !(user as any).trialActive) {
-      return NextResponse.json({ error: "You've reached your trial limit. Subscribe to unlock full access." }, { status: 402 });
-    } else if (isPremium) {
-      if (((user as any).monthlyInteractionAnalysisUsed || 0) >= 30) {
-        return NextResponse.json({ error: 'Monthly interaction analysis limit reached.' }, { status: 429 });
-      }
-    }
+    // Plan/trial gating removed – wallet pre-check governs access (trial counters still updated later)
 
     // Prepare the data for OpenAI analysis
     const supplementList = (supplements as any[]).map((s: any) => ({
