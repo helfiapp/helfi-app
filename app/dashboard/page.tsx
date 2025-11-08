@@ -392,7 +392,7 @@ export default function Dashboard() {
               <UsageMeter compact={true} />
             </div>
             <div className="text-center">
-              <h1 className="text-lg font-semibold text-gray-900">Dashboard</h1>
+              <h1 className="text-lg font-semibold text-gray-900 dark:text-white">Dashboard</h1>
             </div>
           </div>
           
