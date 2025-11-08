@@ -21,7 +21,65 @@ environment.
 - Steps:
   1. Commit your changes locally.
   2. Push to `origin master`.
-  3. Vercel will build and deploy automatically. Monitor in Vercel → Deployments until Ready.
+  3. **MANDATORY**: Check deployment status using Vercel API before claiming changes are live.
+  4. **NEVER** tell the user "changes are live" or "deployment complete" without verifying the deployment succeeded.
+  5. If deployment fails, fix the issue and redeploy before reporting success.
+
+### ⚠️ CRITICAL: Deployment Status Verification
+
+**ALL AGENTS MUST VERIFY DEPLOYMENT STATUS BEFORE CLAIMING SUCCESS**
+
+After pushing to GitHub, you MUST check the deployment status using the Vercel API:
+
+1. **Get the latest deployment**:
+   ```bash
+   # Using Vercel API (requires VERCEL_TOKEN from STRIPE_PRODUCTS_DOCUMENTATION.md)
+   curl -H "Authorization: Bearer $VERCEL_TOKEN" \
+     "https://api.vercel.com/v6/deployments?projectId=prj_0QdxIeqz4oIUEx7aAdLrsjGsqst7&limit=1"
+   ```
+
+2. **Check deployment state**:
+   - `state: "READY"` = ✅ Success - deployment is live
+   - `state: "BUILDING"` = ⏳ Still building - wait and check again
+   - `state: "ERROR"` = ❌ Failed - check build logs and fix issues
+   - `state: "QUEUED"` = ⏳ Waiting - check again shortly
+
+3. **If deployment failed**:
+   - Check the build logs in the API response or Vercel dashboard
+   - Fix any errors (missing files, syntax errors, etc.)
+   - Commit fixes and push again
+   - Verify the new deployment succeeds before reporting to user
+
+4. **Only report success when**:
+   - Deployment state is `"READY"`
+   - Build completed without errors
+   - You have verified the deployment URL is accessible
+
+**Example verification script**:
+```bash
+# Check latest deployment status
+VERCEL_TOKEN="2MLfXoXXv8hIaHIE7lQcdQ39"
+PROJECT_ID="prj_0QdxIeqz4oIUEx7aAdLrsjGsqst7"
+
+DEPLOYMENT=$(curl -s -H "Authorization: Bearer $VERCEL_TOKEN" \
+  "https://api.vercel.com/v6/deployments?projectId=$PROJECT_ID&limit=1" | \
+  jq -r '.deployments[0]')
+
+STATE=$(echo $DEPLOYMENT | jq -r '.state')
+URL=$(echo $DEPLOYMENT | jq -r '.url')
+
+echo "Deployment State: $STATE"
+echo "Deployment URL: $URL"
+
+if [ "$STATE" = "READY" ]; then
+  echo "✅ Deployment successful - changes are live"
+elif [ "$STATE" = "ERROR" ]; then
+  echo "❌ Deployment failed - check logs and fix issues"
+  exit 1
+else
+  echo "⏳ Deployment in progress - state: $STATE"
+fi
+```
 
 Example commands:
 ```bash
