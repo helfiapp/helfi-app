@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useEffect, useMemo, useState } from 'react'
+import PageHeader from '@/components/PageHeader'
 
 const LABELS = [
   'Really bad',
@@ -84,13 +85,16 @@ export default function CheckInPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 px-4 py-8">
-      <div className="max-w-3xl mx-auto bg-white rounded-2xl shadow-sm p-6">
-        <div className="flex items-center justify-between gap-4 mb-2">
-          <h1 className="text-2xl font-bold">Today's check‑in</h1>
-          <a href="/check-in/history" className="text-sm text-helfi-green hover:underline">View history</a>
-        </div>
-        <p className="text-sm text-gray-600 mb-6">Rate how you went today. One tap per item, then Save.</p>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
+      <PageHeader title="Today's Check-In" backHref="/more" />
+      
+      <main className="max-w-3xl mx-auto px-4 py-6">
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-6">
+          <div className="flex items-center justify-between gap-4 mb-2">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Today's check‑in</h1>
+            <a href="/check-in/history" className="text-sm text-helfi-green hover:underline font-medium">View history</a>
+          </div>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Rate how you went today. One tap per item, then Save.</p>
 
         <div className="space-y-6">
           {issues.length === 0 && (
@@ -165,7 +169,8 @@ export default function CheckInPage() {
         <div className="mt-6 flex justify-end">
           <button onClick={handleSave} className="bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90">Save today's ratings</button>
         </div>
-      </div>
+        </div>
+      </main>
     </div>
   )
 }
