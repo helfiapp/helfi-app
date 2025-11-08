@@ -38,10 +38,11 @@ git push origin master
 
 # 2. Wait a few seconds for deployment to start
 
-# 3. Check deployment status
+# 3. Check deployment status (script waits until completion)
 ./scripts/check-deployment-status.sh
 
-# 4. Only report success if status is READY
+# 4. Script will only exit when deployment is READY or ERROR
+#    DO NOT report "deployment in progress" - wait for script to complete
 ```
 
 ---

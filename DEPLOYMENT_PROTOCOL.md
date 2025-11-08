@@ -57,10 +57,11 @@ After pushing to GitHub, you MUST check the deployment status using the Vercel A
 
 **Verification Methods**:
 
-1. **Using the helper script** (recommended):
+1. **Using the helper script** (recommended - WAITS until deployment completes):
    ```bash
    ./scripts/check-deployment-status.sh
    ```
+   **IMPORTANT**: This script will wait until deployment is READY or ERROR. Do NOT report "deployment in progress" - wait for completion.
 
 2. **Using Vercel API** (if script doesn't work, try API directly):
    ```bash
