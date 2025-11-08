@@ -230,7 +230,7 @@ export default function MedicalImagesPage() {
             <div className="mt-2">
               <p className="text-xs text-gray-500 mb-2">Typical cost: 2 credits</p>
               <UsageMeter inline={true} refreshTrigger={usageMeterRefresh} />
-              <FeatureUsageDisplay featureName="medicalImageAnalysis" featureLabel="Medical Image Analysis" />
+              <FeatureUsageDisplay featureName="medicalImageAnalysis" featureLabel="Medical Image Analysis" refreshTrigger={usageMeterRefresh} />
             </div>
 
             {/* Analysis Results */}

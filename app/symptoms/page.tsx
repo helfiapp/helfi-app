@@ -256,7 +256,7 @@ export default function SymptomAnalysisPage() {
             <div className="mt-2">
               <p className="text-xs text-gray-500 mb-2">Typical cost: 2-3 credits per analysis</p>
               <UsageMeter inline={true} refreshTrigger={usageMeterRefresh} />
-              <FeatureUsageDisplay featureName="symptomAnalysis" featureLabel="Symptom Analysis" />
+              <FeatureUsageDisplay featureName="symptomAnalysis" featureLabel="Symptom Analysis" refreshTrigger={usageMeterRefresh} />
             </div>
 
             {/* Progress Bar */}

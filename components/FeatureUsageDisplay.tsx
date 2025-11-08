@@ -20,17 +20,19 @@ interface FeatureUsageData {
 interface FeatureUsageDisplayProps {
   featureName: 'symptomAnalysis' | 'foodAnalysis' | 'interactionAnalysis' | 'medicalImageAnalysis'
   featureLabel: string
+  refreshTrigger?: number // Trigger refresh when this changes
 }
 
-export default function FeatureUsageDisplay({ featureName, featureLabel }: FeatureUsageDisplayProps) {
+export default function FeatureUsageDisplay({ featureName, featureLabel, refreshTrigger }: FeatureUsageDisplayProps) {
   const [usage, setUsage] = useState<FeatureUsage | null>(null)
   const [hasSubscription, setHasSubscription] = useState(false)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchUsage = async () => {
+      setLoading(true)
       try {
-        const res = await fetch('/api/credit/feature-usage')
+        const res = await fetch('/api/credit/feature-usage', { cache: 'no-store' })
         if (res.ok) {
           const data: FeatureUsageData = await res.json()
           setUsage(data.featureUsage[featureName])
@@ -43,7 +45,7 @@ export default function FeatureUsageDisplay({ featureName, featureLabel }: Featu
       }
     }
     fetchUsage()
-  }, [featureName])
+  }, [featureName, refreshTrigger])
 
   if (loading || !usage) {
     return null
