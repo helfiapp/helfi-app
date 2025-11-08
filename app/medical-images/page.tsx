@@ -7,6 +7,7 @@ import Image from 'next/image'
 import CreditPurchaseModal from '@/components/CreditPurchaseModal'
 import MobileMoreMenu from '@/components/MobileMoreMenu'
 import UsageMeter from '@/components/UsageMeter'
+import FeatureUsageDisplay from '@/components/FeatureUsageDisplay'
 
 export default function MedicalImagesPage() {
   const [imageFile, setImageFile] = useState<File | null>(null)
@@ -229,6 +230,7 @@ export default function MedicalImagesPage() {
             <div className="mt-2">
               <p className="text-xs text-gray-500 mb-2">Typical cost: 2 credits</p>
               <UsageMeter inline={true} refreshTrigger={usageMeterRefresh} />
+              <FeatureUsageDisplay featureName="medicalImageAnalysis" featureLabel="Medical Image Analysis" />
             </div>
 
             {/* Analysis Results */}

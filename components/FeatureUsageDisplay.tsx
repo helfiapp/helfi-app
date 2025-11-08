@@ -53,16 +53,16 @@ export default function FeatureUsageDisplay({ featureName, featureLabel }: Featu
     return null
   }
 
-  // Show usage for subscription users only (they have monthly reset)
-  // For credit-only users, we don't show per-feature usage since credits don't reset monthly
-  if (!hasSubscription) {
-    return null
-  }
+  // Calculate total credits used for this feature
+  const creditsUsed = usage.count * usage.costPerUse
+  const timeLabel = hasSubscription ? 'This month' : 'Total'
 
   return (
     <div className="mt-2 text-xs text-gray-600">
-      <span className="text-gray-500">This month: </span>
-      <span className="font-medium">You have used this feature {usage.count} {usage.count === 1 ? 'time' : 'times'}</span>
+      <span className="text-gray-500">{timeLabel}: </span>
+      <span className="font-medium">
+        This AI feature has been used {usage.count} {usage.count === 1 ? 'time' : 'times'} at a cost of {creditsUsed} {creditsUsed === 1 ? 'credit' : 'credits'}
+      </span>
     </div>
   )
 }
