@@ -397,6 +397,7 @@ After your explanation and the one-line totals above, also include a compact JSO
           console.warn('Failed to update hasUsedFreeFoodAnalysis:', e)
         }
       }
+    }
     // Update counters (for all users, not just premium)
     await prisma.user.update({
       where: { id: currentUser.id },

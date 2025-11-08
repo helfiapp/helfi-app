@@ -278,6 +278,7 @@ Be thorough but not alarmist. Provide actionable recommendations.`;
           console.warn('Failed to update hasUsedFreeInteractionAnalysis:', e)
         }
       }
+    }
     // Update counters (for all users, not just premium)
     await prisma.user.update({
       where: { id: user.id },
