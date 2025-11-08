@@ -9,6 +9,7 @@ import { flushSync } from 'react-dom';
 import CreditPurchaseModal from '@/components/CreditPurchaseModal';
 import { useUserData } from '@/components/providers/UserDataProvider';
 import MobileMoreMenu from '@/components/MobileMoreMenu';
+import UsageMeter from '@/components/UsageMeter';
 
 // Auth-enabled onboarding flow
 
@@ -3659,6 +3660,8 @@ function InteractionAnalysisStep({ onNext, onBack, initial, onAnalysisSettled }:
         setDidFreshAnalysis(true);
         // CRITICAL FIX: Reload previous analyses after new analysis to show history
         loadPreviousAnalyses();
+        // Notify global listeners to refresh credits meter
+        try { window.dispatchEvent(new Event('helfiCreditsUpdated')); } catch {}
       } else {
         throw new Error('Invalid API response structure');
       }
@@ -4271,6 +4274,7 @@ export default function Onboarding() {
   const [profileImage, setProfileImage] = useState<string>('');
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [showFirstTimeModal, setShowFirstTimeModal] = useState(false);
+  const [usageMeterRefresh, setUsageMeterRefresh] = useState(0);
 
   const stepNames = [
     'Gender',
@@ -4565,6 +4569,13 @@ export default function Onboarding() {
 
   const handleContinueFirstTime = () => setShowFirstTimeModal(false);
 
+  // Refresh UsageMeter when credits are updated elsewhere
+  useEffect(() => {
+    const handler = () => setUsageMeterRefresh((v) => v + 1);
+    try { window.addEventListener('helfiCreditsUpdated', handler as any); } catch {}
+    return () => { try { window.removeEventListener('helfiCreditsUpdated', handler as any); } catch {} };
+  }, []);
+
   return (
     <div className="relative min-h-screen bg-gray-50 overflow-y-auto overflow-x-hidden" id="onboarding-container">
       {showFirstTimeModal && (
@@ -4763,6 +4774,11 @@ export default function Onboarding() {
               className="bg-green-600 h-2 rounded-full transition-all duration-300 ease-out"
               style={{ width: `${((step + 1) / stepNames.length) * 100}%` }}
             />
+          </div>
+
+          {/* Credits Meter */}
+          <div className="max-w-4xl mx-auto">
+            <UsageMeter inline={true} refreshTrigger={usageMeterRefresh} />
           </div>
 
           {/* Loading Indicator */}
