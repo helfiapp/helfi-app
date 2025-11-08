@@ -13,14 +13,17 @@ export async function GET(_req: NextRequest) {
 
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
+      include: { subscription: true },
       select: {
         totalFoodAnalysisCount: true,
         totalInteractionAnalysisCount: true,
         totalAnalysisCount: true,
-        dailyFoodAnalysisUsed: true,
-        dailyInteractionAnalysisUsed: true,
-        dailyMedicalAnalysisUsed: true,
         walletMonthlyUsedCents: true,
+        subscription: {
+          select: {
+            plan: true,
+          },
+        },
       },
     })
 
@@ -28,47 +31,36 @@ export async function GET(_req: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // Calculate estimated credits used per feature this month
-    // Note: This is an estimate based on counts * typical cost
-    // Actual costs may vary slightly based on API usage
+    // Check if user has a subscription (not just purchased credits)
+    const hasSubscription = user.subscription?.plan === 'PREMIUM'
+
+    // Since we don't track monthly per-feature usage, we'll show lifetime usage
+    // but only display it if user has subscription (for "This month" context)
+    // For non-subscription users with credits, we won't show per-feature usage
     const featureUsage = {
       symptomAnalysis: {
-        count: (user.totalAnalysisCount || 0) - (user.totalFoodAnalysisCount || 0) - (user.totalInteractionAnalysisCount || 0),
-        creditsUsed: ((user.totalAnalysisCount || 0) - (user.totalFoodAnalysisCount || 0) - (user.totalInteractionAnalysisCount || 0)) * CREDIT_COSTS.SYMPTOM_ANALYSIS,
+        // Estimate: totalAnalysisCount includes all analyses, subtract food and interaction
+        count: Math.max(0, (user.totalAnalysisCount || 0) - (user.totalFoodAnalysisCount || 0) - (user.totalInteractionAnalysisCount || 0)),
         costPerUse: CREDIT_COSTS.SYMPTOM_ANALYSIS,
       },
       foodAnalysis: {
         count: user.totalFoodAnalysisCount || 0,
-        creditsUsed: (user.totalFoodAnalysisCount || 0) * CREDIT_COSTS.FOOD_ANALYSIS,
         costPerUse: CREDIT_COSTS.FOOD_ANALYSIS,
       },
       interactionAnalysis: {
         count: user.totalInteractionAnalysisCount || 0,
-        creditsUsed: (user.totalInteractionAnalysisCount || 0) * CREDIT_COSTS.INTERACTION_ANALYSIS,
         costPerUse: CREDIT_COSTS.INTERACTION_ANALYSIS,
       },
       medicalImageAnalysis: {
-        count: user.dailyMedicalAnalysisUsed || 0, // Note: This is daily, not lifetime
-        creditsUsed: (user.dailyMedicalAnalysisUsed || 0) * CREDIT_COSTS.MEDICAL_IMAGE_ANALYSIS,
+        count: 0, // We don't have reliable tracking for this
         costPerUse: CREDIT_COSTS.MEDICAL_IMAGE_ANALYSIS,
       },
     }
 
-    // Total estimated credits (may not match walletMonthlyUsedCents exactly due to actual API costs)
-    const totalEstimatedCredits = Object.values(featureUsage).reduce(
-      (sum, feature) => sum + feature.creditsUsed,
-      0
-    )
-
     return NextResponse.json({
       featureUsage,
-      totalEstimatedCredits,
+      hasSubscription,
       actualCreditsUsed: user.walletMonthlyUsedCents || 0,
-      dailyUsage: {
-        foodAnalysis: user.dailyFoodAnalysisUsed || 0,
-        interactionAnalysis: user.dailyInteractionAnalysisUsed || 0,
-        medicalImageAnalysis: user.dailyMedicalAnalysisUsed || 0,
-      },
     })
   } catch (err) {
     console.error('Error fetching feature usage:', err)

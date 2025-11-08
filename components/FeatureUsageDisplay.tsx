@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react'
 
 interface FeatureUsage {
   count: number
-  creditsUsed: number
   costPerUse: number
 }
 
@@ -14,7 +13,7 @@ interface FeatureUsageData {
     interactionAnalysis: FeatureUsage
     medicalImageAnalysis: FeatureUsage
   }
-  totalEstimatedCredits: number
+  hasSubscription: boolean
   actualCreditsUsed: number
 }
 
@@ -25,6 +24,7 @@ interface FeatureUsageDisplayProps {
 
 export default function FeatureUsageDisplay({ featureName, featureLabel }: FeatureUsageDisplayProps) {
   const [usage, setUsage] = useState<FeatureUsage | null>(null)
+  const [hasSubscription, setHasSubscription] = useState(false)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -34,6 +34,7 @@ export default function FeatureUsageDisplay({ featureName, featureLabel }: Featu
         if (res.ok) {
           const data: FeatureUsageData = await res.json()
           setUsage(data.featureUsage[featureName])
+          setHasSubscription(data.hasSubscription)
         }
       } catch (err) {
         console.error('Failed to fetch feature usage:', err)
@@ -52,12 +53,15 @@ export default function FeatureUsageDisplay({ featureName, featureLabel }: Featu
     return null
   }
 
+  // Only show for subscription users (they have monthly reset)
+  if (!hasSubscription) {
+    return null
+  }
+
   return (
     <div className="mt-2 text-xs text-gray-600">
       <span className="text-gray-500">This month: </span>
-      <span className="font-medium">{usage.count} {usage.count === 1 ? 'use' : 'uses'}</span>
-      <span className="text-gray-500"> • </span>
-      <span className="font-medium">~{usage.creditsUsed} credits</span>
+      <span className="font-medium">You have used this feature {usage.count} {usage.count === 1 ? 'time' : 'times'}</span>
     </div>
   )
 }
