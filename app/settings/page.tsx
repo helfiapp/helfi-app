@@ -524,11 +524,30 @@ export default function Settings() {
                   <button
                     onClick={async () => {
                       try {
+                        // Check notification permission first
+                        if (Notification.permission !== 'granted') {
+                          alert('Notifications are not enabled. Please enable them in your browser settings.')
+                          return
+                        }
+                        
                         const res = await fetch('/api/push/test', { method: 'POST' })
-                        if (!res.ok) throw new Error('Failed')
-                        alert('Test notification sent')
-                      } catch (e) {
-                        alert('Could not send test. Make sure notifications are enabled for this device.')
+                        const data = await res.json().catch(() => ({}))
+                        
+                        if (!res.ok) {
+                          const errorMsg = data.error || 'Failed to send notification'
+                          if (errorMsg.includes('No subscription')) {
+                            alert('No push subscription found. Please toggle notifications off and on again to re-register.')
+                          } else if (errorMsg.includes('VAPID')) {
+                            alert('Server configuration error. Please contact support.')
+                          } else {
+                            alert(`Failed: ${errorMsg}`)
+                          }
+                          return
+                        }
+                        
+                        alert('Test notification sent! Check your browser notifications. If you don\'t see it, check your browser\'s notification settings.')
+                      } catch (e: any) {
+                        alert(`Error: ${e?.message || 'Could not send test notification. Make sure notifications are enabled.'}`)
                       }
                     }}
                     className="px-3 py-1.5 rounded-md bg-helfi-green text-white text-sm font-medium hover:opacity-90"
@@ -546,17 +565,41 @@ export default function Settings() {
                   <button
                     onClick={async () => {
                       try {
+                        // Check notification permission first
+                        if (Notification.permission !== 'granted') {
+                          alert('Notifications are not enabled. Please enable them in your browser settings.')
+                          return
+                        }
+                        
                         const res = await fetch('/api/push/send-reminder-now', { method: 'POST' })
-                        if (!res.ok) throw new Error('Failed')
-                        alert('Reminder sent')
-                      } catch (e) {
-                        alert('Could not send reminder now.')
+                        const data = await res.json().catch(() => ({}))
+                        
+                        if (!res.ok) {
+                          const errorMsg = data.error || 'Failed to send reminder'
+                          if (errorMsg.includes('No subscription')) {
+                            alert('No push subscription found. Please toggle notifications off and on again to re-register.')
+                          } else {
+                            alert(`Failed: ${errorMsg}`)
+                          }
+                          return
+                        }
+                        
+                        alert('Reminder sent! Check your browser notifications. Clicking it will open the check-in page.')
+                      } catch (e: any) {
+                        alert(`Error: ${e?.message || 'Could not send reminder.'}`)
                       }
                     }}
                     className="px-3 py-1.5 rounded-md bg-helfi-green text-white text-sm font-medium hover:opacity-90"
                   >
                     Send
                   </button>
+                </div>
+              )}
+              {pushNotifications && (
+                <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                  <p className="text-xs text-blue-800 dark:text-blue-200">
+                    <strong>Note:</strong> Notifications may not appear if your browser is in the foreground. Try minimizing the browser window or switching to another app. On macOS, check System Preferences → Notifications → [Your Browser].
+                  </p>
                 </div>
               )}
               {/* Removed Save/Reset subscription actions after successful wiring */}
@@ -684,7 +727,15 @@ export default function Settings() {
 
         {/* Reminder Times */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Reminder Times</h2>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Reminder Times</h2>
+            <Link href="/check-in" className="text-sm text-helfi-green hover:underline font-medium">
+              Go to Check-In →
+            </Link>
+          </div>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+            Set up to 3 reminder times per day to rate your health issues. Reminders will be sent via push notifications.
+          </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Time 1</label>

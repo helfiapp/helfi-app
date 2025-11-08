@@ -70,14 +70,17 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html: `
-              // Register service worker if check-ins enabled
+              // Register service worker for push notifications
               (function(){
                 try {
-                  var enabled = (process.env.NEXT_PUBLIC_CHECKINS_ENABLED === 'true');
-                  if ('serviceWorker' in navigator && enabled) {
-                    navigator.serviceWorker.register('/sw.js');
+                  if ('serviceWorker' in navigator) {
+                    navigator.serviceWorker.register('/sw.js').catch(function(err) {
+                      console.log('Service worker registration failed:', err);
+                    });
                   }
-                } catch (e) {}
+                } catch (e) {
+                  console.log('Service worker not supported:', e);
+                }
               })();
 
               // Global dark mode toggle function
