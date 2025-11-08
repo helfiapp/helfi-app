@@ -95,7 +95,27 @@ export default function TermsPage() {
             </section>
 
             <section>
-              <h2 className="text-2xl font-bold text-gray-900 mb-4 border-b-2 border-green-500 pb-2">5. AI Limitations and Liability</h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-4 border-b-2 border-green-500 pb-2">4a. Laboratory Report PDFs</h2>
+              <p className="text-gray-700 leading-relaxed mb-3">
+                By uploading a laboratory report in PDF format, you represent that you are permitted to provide the report to Helfi for the sole purpose of extracting and analyzing laboratory test results for your personal use.
+              </p>
+              <ul className="text-gray-700 leading-relaxed space-y-2 list-disc pl-6">
+                <li>If your PDF is password-protected and you choose to supply the password, you expressly authorize Helfi to use that password once to decrypt and process the file. We do not store your password.</li>
+                <li>You may choose whether Helfi retains an encrypted copy of your original PDF; by default, we delete the original file after extraction.</li>
+                <li>We may refuse processing of unreadable or corrupted files.</li>
+                <li>Structured lab data (analyte names, values, units, reference ranges, collection dates, accession numbers, and laboratory names) is extracted and encrypted at rest using industry-standard encryption.</li>
+              </ul>
+            </section>
+
+            <section>
+              <h2 className="text-2xl font-bold text-gray-900 mb-4 border-b-2 border-green-500 pb-2">5. Security & Encryption</h2>
+              <p className="text-gray-700 leading-relaxed mb-3">
+                Helfi uses industry-standard encryption to protect sensitive information in transit and at rest. Structured data is encrypted using per-record keys, and retained originals are encrypted with managed key services. If a breach occurs that may cause harm, Helfi will notify affected users and authorities per applicable law.
+              </p>
+            </section>
+
+            <section>
+              <h2 className="text-2xl font-bold text-gray-900 mb-4 border-b-2 border-green-500 pb-2">6. AI Limitations and Liability</h2>
               <ul className="text-gray-700 leading-relaxed space-y-2 list-disc pl-6">
                 <li>AI suggestions are based on pattern recognition and probability, not clinical assessment.</li>
                 <li>Helfi may occasionally provide incorrect or incomplete information.</li>
@@ -105,7 +125,7 @@ export default function TermsPage() {
             </section>
 
             <section>
-              <h2 className="text-2xl font-bold text-gray-900 mb-4 border-b-2 border-green-500 pb-2">6. Intellectual Property</h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-4 border-b-2 border-green-500 pb-2">7. Intellectual Property</h2>
               <ul className="text-gray-700 leading-relaxed space-y-2 list-disc pl-6">
                 <li>All content, design, software, and functionality of the app are owned by Helfi or its licensors.</li>
                 <li>You may not reproduce, distribute, reverse-engineer, or exploit any part of the app without our prior written consent.</li>
@@ -113,7 +133,7 @@ export default function TermsPage() {
             </section>
 
             <section>
-              <h2 className="text-2xl font-bold text-gray-900 mb-4 border-b-2 border-green-500 pb-2">7. Account Termination</h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-4 border-b-2 border-green-500 pb-2">8. Account Termination</h2>
               <ul className="text-gray-700 leading-relaxed space-y-2 list-disc pl-6">
                 <li>We reserve the right to suspend or terminate accounts that violate these terms, misuse the platform, or engage in unlawful activity.</li>
                 <li>You may cancel your account at any time via your profile settings.</li>
@@ -121,7 +141,7 @@ export default function TermsPage() {
             </section>
 
             <section>
-              <h2 className="text-2xl font-bold text-gray-900 mb-4 border-b-2 border-green-500 pb-2">8. Indemnification</h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-4 border-b-2 border-green-500 pb-2">9. Indemnification</h2>
               <p className="text-gray-700 leading-relaxed">
                 You agree to defend, indemnify, and hold harmless Helfi, its owners, officers, employees, agents, partners, and affiliates from and against any claims, liabilities, damages, losses, or expenses (including legal fees) arising out of or related to:
               </p>
@@ -133,7 +153,7 @@ export default function TermsPage() {
             </section>
 
             <section>
-              <h2 className="text-2xl font-bold text-gray-900 mb-4 border-b-2 border-green-500 pb-2">9. Dispute Resolution and Governing Law</h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-4 border-b-2 border-green-500 pb-2">10. Dispute Resolution and Governing Law</h2>
               <ul className="text-gray-700 leading-relaxed space-y-2 list-disc pl-6">
                 <li>These Terms are governed by the laws of Victoria, Australia, regardless of conflict-of-law principles.</li>
                 <li>Any disputes, claims, or legal proceedings arising from your use of the app shall be resolved exclusively through arbitration or courts located in Melbourne, Victoria, Australia.</li>
@@ -142,21 +162,21 @@ export default function TermsPage() {
             </section>
 
             <section>
-              <h2 className="text-2xl font-bold text-gray-900 mb-4 border-b-2 border-green-500 pb-2">10. Modifications</h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-4 border-b-2 border-green-500 pb-2">11. Modifications</h2>
               <p className="text-gray-700 leading-relaxed">
                 We may update these Terms of Use at any time. Continued use of the app after changes are posted constitutes your acceptance.
               </p>
             </section>
 
             <section>
-              <h2 className="text-2xl font-bold text-gray-900 mb-4 border-b-2 border-green-500 pb-2">11. No Emergency Services Clause</h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-4 border-b-2 border-green-500 pb-2">12. No Emergency Services Clause</h2>
               <p className="text-gray-700 leading-relaxed">
                 Helfi is not intended for use in emergency situations. Do not use the app to seek or provide help in emergencies. If you are experiencing a medical emergency, call your local emergency number immediately.
               </p>
             </section>
 
             <section>
-              <h2 className="text-2xl font-bold text-gray-900 mb-4 border-b-2 border-green-500 pb-2">12. Limitation of Liability (Expanded)</h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-4 border-b-2 border-green-500 pb-2">13. Limitation of Liability (Expanded)</h2>
               <p className="text-gray-700 leading-relaxed mb-3">
                 To the fullest extent permitted by applicable law, Helfi and its affiliates shall not be liable for any indirect, incidental, special, consequential, or punitive damages, or for loss of profits, data, use, goodwill, or other intangible losses resulting from:
               </p>
@@ -169,28 +189,28 @@ export default function TermsPage() {
             </section>
 
             <section>
-              <h2 className="text-2xl font-bold text-gray-900 mb-4 border-b-2 border-green-500 pb-2">13. Force Majeure</h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-4 border-b-2 border-green-500 pb-2">14. Force Majeure</h2>
               <p className="text-gray-700 leading-relaxed">
                 Helfi shall not be held liable for any failure or delay in performance caused by circumstances beyond its reasonable control, including but not limited to acts of God, natural disasters, war, terrorism, labor conditions, power failures, internet disturbances, cyberattacks, or government actions.
               </p>
             </section>
 
             <section>
-              <h2 className="text-2xl font-bold text-gray-900 mb-4 border-b-2 border-green-500 pb-2">14. Severability</h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-4 border-b-2 border-green-500 pb-2">15. Severability</h2>
               <p className="text-gray-700 leading-relaxed">
                 If any provision of these Terms is found to be unlawful, void, or unenforceable for any reason, that provision shall be deemed severable and shall not affect the validity or enforceability of the remaining provisions.
               </p>
             </section>
 
             <section>
-              <h2 className="text-2xl font-bold text-gray-900 mb-4 border-b-2 border-green-500 pb-2">15. Export Control</h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-4 border-b-2 border-green-500 pb-2">16. Export Control</h2>
               <p className="text-gray-700 leading-relaxed">
                 You agree not to use, export, or re-export the app except as authorized by the laws of Australia and the laws of the jurisdiction in which the app was obtained. You represent and warrant that you are not located in any country subject to Australian government embargo or listed on any government list of prohibited or restricted parties.
               </p>
             </section>
 
             <section>
-              <h2 className="text-2xl font-bold text-gray-900 mb-4 border-b-2 border-green-500 pb-2">16. Assignment</h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-4 border-b-2 border-green-500 pb-2">17. Assignment</h2>
               <p className="text-gray-700 leading-relaxed">
                 You may not assign or transfer your rights or obligations under these Terms without our prior written consent. We may freely assign or transfer these Terms without restriction.
               </p>

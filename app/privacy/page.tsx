@@ -69,6 +69,7 @@ export default function PrivacyPage() {
                   <li>Name, email address, gender, age, height, weight, and other demographic data</li>
                   <li>Health goals, symptom ratings, supplement and medication data</li>
                   <li>Uploaded content (e.g., supplement labels, symptom images, notes)</li>
+                  <li>Laboratory report PDFs and extracted lab test results (analyte names, values, units, reference ranges, collection dates, accession numbers, and laboratory names)</li>
                   <li>Payment and subscription information</li>
                   <li>Customer support communications</li>
                 </ul>
@@ -98,6 +99,7 @@ export default function PrivacyPage() {
               <ul className="text-gray-700 leading-relaxed space-y-2 list-disc pl-6">
                 <li>Provide and personalize the App's features</li>
                 <li>Deliver AI-generated reports and symptom analysis</li>
+                <li>Parse, normalize, display, and analyze laboratory test results for your personal use</li>
                 <li>Improve app functionality and AI accuracy through anonymized training data</li>
                 <li>Process payments and manage subscriptions</li>
                 <li>Send reminders, updates, and relevant notifications</li>
@@ -121,8 +123,23 @@ export default function PrivacyPage() {
 
             <section>
               <h2 className="text-2xl font-bold text-gray-900 mb-4 border-b-2 border-green-500 pb-2">4. Data Security</h2>
-              <p className="text-gray-700 leading-relaxed">
+              <p className="text-gray-700 leading-relaxed mb-3">
                 We use encryption, secure cloud storage, and access control measures to protect your data. Despite best efforts, no system is completely secure. You use the App at your own risk.
+              </p>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
+                <h3 className="text-blue-900 font-semibold mb-2">Laboratory Report Security</h3>
+                <ul className="text-blue-800 text-sm space-y-1 list-disc list-inside">
+                  <li><strong>TLS in transit:</strong> All data is encrypted during transmission</li>
+                  <li><strong>Encryption at rest:</strong> Structured lab data is encrypted using AES-256-GCM with per-record keys</li>
+                  <li><strong>KMS envelope encryption:</strong> Data encryption keys are wrapped using AWS KMS</li>
+                  <li><strong>SSE-KMS on S3:</strong> Original PDFs (if retained) are encrypted with server-side encryption using KMS</li>
+                  <li><strong>Restricted access:</strong> Only authorized workers can decrypt and process PDFs</li>
+                  <li><strong>Audit logs:</strong> Full audit trail maintained for all processing activities</li>
+                  <li><strong>Password handling:</strong> PDF passwords are used only once for decryption and are never stored</li>
+                </ul>
+              </div>
+              <p className="text-gray-700 leading-relaxed mt-4">
+                <strong>Breach notification:</strong> If a breach occurs that may cause harm, Helfi will notify affected users and authorities per the Australian Notifiable Data Breaches scheme.
               </p>
             </section>
 
@@ -152,9 +169,18 @@ export default function PrivacyPage() {
 
             <section>
               <h2 className="text-2xl font-bold text-gray-900 mb-4 border-b-2 border-green-500 pb-2">7. Data Retention</h2>
-              <p className="text-gray-700 leading-relaxed">
+              <p className="text-gray-700 leading-relaxed mb-3">
                 We retain your personal data as long as your account is active or as needed to provide services. We may also retain data to comply with legal obligations, enforce agreements, or resolve disputes. You can request deletion at any time.
               </p>
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mt-4">
+                <h3 className="text-gray-900 font-semibold mb-2">Laboratory Report Retention</h3>
+                <ul className="text-gray-700 text-sm space-y-1 list-disc list-inside">
+                  <li><strong>Structured data:</strong> Lab values are retained until account deletion</li>
+                  <li><strong>Original PDFs:</strong> Deleted by default after extraction unless you choose to retain them</li>
+                  <li><strong>Consent records:</strong> Retained for compliance and audit purposes</li>
+                  <li><strong>Audit events:</strong> Retained per legal requirements</li>
+                </ul>
+              </div>
             </section>
 
             <section>

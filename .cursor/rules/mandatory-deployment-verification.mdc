@@ -1,0 +1,15 @@
+---
+alwaysApply: true
+---
+
+After pushing code to GitHub, ALWAYS run ./scripts/check-deployment-status.sh
+
+The script will wait until deployment completes (READY or ERROR)
+
+NEVER report "deployment in progress" or "deployment building" to the user
+
+ONLY report success when deployment state is READY
+
+If deployment fails (ERROR state), fix the issue and redeploy before reporting
+
+Read DEPLOYMENT_PROTOCOL.md and AGENT_START_HERE.md for full details
