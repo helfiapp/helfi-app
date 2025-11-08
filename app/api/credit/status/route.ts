@@ -42,6 +42,8 @@ export async function GET(_req: NextRequest) {
 
     const cm = new CreditManager(user.id)
     const status = await cm.getWalletStatus()
+    // Also fetch credit counts (daily + additional) to support numeric credit display
+    const creditCounts = await cm.checkCredits('SYMPTOM_ANALYSIS')
 
     // Compute next reset timestamp (1st of next month, UTC)
     const nextReset = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 0, 0))
@@ -56,6 +58,12 @@ export async function GET(_req: NextRequest) {
       monthlyUsedCents: status.monthlyUsedCents,
       topUps: status.topUps, // [{ id, availableCents, expiresAt }]
       totalAvailableCents: status.totalAvailableCents,
+      // Credits (credits == cents). These include daily allowance + additional purchased credits.
+      credits: {
+        total: creditCounts.totalCreditsRemaining,
+        dailyRemaining: creditCounts.dailyCreditsRemaining,
+        additionalRemaining: creditCounts.additionalCreditsRemaining,
+      },
     })
   } catch (err) {
     return NextResponse.json({ error: 'server_error' }, { status: 500 })
