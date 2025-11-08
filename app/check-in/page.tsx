@@ -42,8 +42,14 @@ export default function CheckInPage() {
   }, [])
 
   const setRating = (issueId: string, value: number) => {
-    setRatings((r) => ({ ...r, [issueId]: value }))
-    setNa((n) => ({ ...n, [issueId]: false }))
+    setRatings((r) => {
+      const updated = { ...r, [issueId]: value }
+      return updated
+    })
+    setNa((n) => {
+      const updated = { ...n, [issueId]: false }
+      return updated
+    })
   }
 
   const handleSave = async () => {
@@ -103,7 +109,7 @@ export default function CheckInPage() {
             </div>
           )}
           {issues
-            // By default, show only issues not yet rated today. Use ?show=all to display everything.
+            // Filter only for ?new= parameter, otherwise show all issues so users can see and edit their ratings
             .filter((it) => {
               try {
                 const params = new URLSearchParams(window.location.search || '')
@@ -113,9 +119,10 @@ export default function CheckInPage() {
                   const set = new Set(onlyNew.split('|').map(s => s.toLowerCase()))
                   return set.has((it.name || '').toLowerCase())
                 }
-                if (params.get('show') === 'all') return true
+                // Always show all issues - users should see what they've rated
+                return true
               } catch {}
-              return ratings[it.id] === undefined || ratings[it.id] === null
+              return true
             })
             .map((issue) => {
             const isPlural = () => {
@@ -129,23 +136,29 @@ export default function CheckInPage() {
             const question = issue.polarity === 'negative'
               ? `How were your ${issue.name} levels today?`
               : (isPlural() ? `How were your ${issue.name} today?` : `How was your ${issue.name} today?`)
-            const selected = ratings[issue.id]
-            const isSelected = (idx: number) => selected === idx && !na[issue.id]
+            const selectedRating = ratings[issue.id]
+            const isNotApplicable = na[issue.id]
             return (
               <div key={issue.id} className="border border-gray-200 dark:border-gray-700 rounded-xl p-4 dark:bg-gray-800/50">
                 <div className="font-medium mb-3 text-gray-900 dark:text-white">{question}</div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
                   {LABELS.map((label, idx) => {
-                    const selectedState = isSelected(idx)
+                    const isSelected = selectedRating === idx && !isNotApplicable
                     return (
                       <button
                         key={idx}
-                        onClick={() => setRating(issue.id, idx)}
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          setRating(issue.id, idx)
+                        }}
                         className={`text-xs px-2 py-2 rounded-lg border transition-all duration-200 font-medium ${
-                          selectedState
-                            ? 'bg-helfi-green text-white border-helfi-green shadow-md scale-105'
-                            : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:border-helfi-green hover:bg-gray-50 dark:hover:bg-gray-600'
+                          isSelected
+                            ? 'bg-[#4CAF50] text-white border-[#4CAF50] shadow-md'
+                            : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:border-[#4CAF50] hover:bg-gray-50 dark:hover:bg-gray-600'
                         }`}
+                        style={isSelected ? { backgroundColor: '#4CAF50', color: 'white', borderColor: '#4CAF50' } : undefined}
                       >
                         {label}
                       </button>
