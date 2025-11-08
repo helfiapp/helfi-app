@@ -13,7 +13,6 @@ export async function GET(_req: NextRequest) {
 
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
-      include: { subscription: true },
       select: {
         totalFoodAnalysisCount: true,
         totalInteractionAnalysisCount: true,
