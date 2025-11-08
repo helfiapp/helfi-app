@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState, useMemo } from 'react'
+import React, { Fragment, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import PageHeader from '@/components/PageHeader'
 import { Line } from 'react-chartjs-2'
@@ -8,23 +8,29 @@ import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
+  TimeScale,
   PointElement,
   LineElement,
   Title,
   Tooltip,
   Legend,
-  Filler
+  Filler,
 } from 'chart.js'
+import 'chartjs-adapter-date-fns'
+import { format } from 'date-fns'
+import { Menu, Transition } from '@headlessui/react'
+import { EllipsisVerticalIcon } from '@heroicons/react/24/outline'
 
 ChartJS.register(
   CategoryScale,
   LinearScale,
+  TimeScale,
   PointElement,
   LineElement,
   Title,
   Tooltip,
   Legend,
-  Filler
+  Filler,
 )
 
 export const dynamic = 'force-dynamic'
@@ -41,10 +47,31 @@ export default function CheckinHistoryPage() {
   const [editingEntry, setEditingEntry] = useState<Row | null>(null)
   const [editValue, setEditValue] = useState<number | null>(null)
   const [editNote, setEditNote] = useState<string>('')
-  const [showDeleteMenu, setShowDeleteMenu] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
   const LABELS = ['Really bad', 'Bad', 'Below average', 'Average', 'Above average', 'Good', 'Excellent'] as const
+  const COLOR_PALETTE = [
+    'rgb(34, 197, 94)',
+    'rgb(59, 130, 246)',
+    'rgb(168, 85, 247)',
+    'rgb(236, 72, 153)',
+    'rgb(251, 146, 60)',
+    'rgb(234, 179, 8)',
+    'rgb(14, 165, 233)',
+  ]
+
+  const getRatingLabel = (value: number | null) => {
+    if (value === null || value === undefined) return 'N/A'
+    const clamped = Math.max(0, Math.min(6, value))
+    return LABELS[clamped]
+  }
+
+  const classNames = (...classes: (string | false | null | undefined)[]) => classes.filter(Boolean).join(' ')
+
+  const toRGBA = (color: string, alpha: number) =>
+    color.startsWith('rgb(')
+      ? color.replace('rgb(', 'rgba(').replace(')', `, ${alpha})`)
+      : color
 
   const load = async () => {
     setLoading(true)
@@ -85,7 +112,7 @@ export default function CheckinHistoryPage() {
       const res = await fetch(`/api/checkins/ratings?date=${date}&issueId=${issueId}`, { method: 'DELETE' })
       if (res.ok) {
         await load()
-        setShowDeleteMenu(null)
+        // setShowDeleteMenu(null) // This state was removed
       } else {
         alert('Failed to delete rating')
       }
@@ -98,7 +125,7 @@ export default function CheckinHistoryPage() {
     setEditingEntry(entry)
     setEditValue(entry.value)
     setEditNote(entry.note || '')
-    setShowDeleteMenu(null)
+    // setShowDeleteMenu(null) // This state was removed
   }
 
   const handleSaveEdit = async () => {
@@ -215,16 +242,26 @@ export default function CheckinHistoryPage() {
         })
 
       // Build data array aligned with allDates
-      const data = allDates.map(date => valueMap.get(date) ?? null)
+      const data = allDates.map(date => {
+        const value = valueMap.get(date)
+        return {
+          x: date,
+          y: value === undefined ? null : value,
+        }
+      })
+
+      const color = COLOR_PALETTE[index % COLOR_PALETTE.length]
 
       return {
         label: name,
-        data: data,
-        borderColor: colors[index % colors.length],
-        backgroundColor: colors[index % colors.length] + '20',
-        tension: 0.4,
+        data,
+        borderColor: color,
+        backgroundColor: toRGBA(color, 0.15),
+        tension: 0.35,
         fill: true,
         spanGaps: true,
+        pointRadius: 3,
+        pointHoverRadius: 5,
       }
     })
     
@@ -233,6 +270,51 @@ export default function CheckinHistoryPage() {
       datasets
     }
   }, [filteredRows])
+
+  const chartOptions = useMemo(() => ({
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: {
+          usePointStyle: true,
+          padding: 15,
+        }
+      },
+      tooltip: {
+        mode: 'index',
+        intersect: false,
+        title: (items) => {
+          if (!items?.length) return ''
+          const parsedX = items[0].parsed.x
+          const dateValue = typeof parsedX === 'string' ? parsedX : Number(parsedX)
+          return format(new Date(dateValue), 'MMM d, yyyy')
+        },
+      }
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        max: 6,
+        ticks: {
+          stepSize: 1,
+        }
+      },
+      x: {
+        ticks: {
+          maxRotation: 0,
+          autoSkip: true,
+          maxTicksLimit: 7,
+          callback: (value) => {
+            const dateValue = typeof value === 'string' ? value : Number(value)
+            const date = new Date(dateValue)
+            return format(date, 'MMM d')
+          },
+        },
+      }
+    }
+  }), [])
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
@@ -328,38 +410,32 @@ export default function CheckinHistoryPage() {
 
           {/* Chart */}
           {filteredRows.length > 0 && chartData.datasets.length > 0 && (
-            <div className="mb-6 p-4 bg-white dark:bg-gray-700/30 rounded-lg">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Trends Over Time</h3>
-              <div className="h-64">
-                <Line
-                  data={chartData}
-                  options={{
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                      legend: {
-                        position: 'bottom',
-                        labels: {
-                          usePointStyle: true,
-                          padding: 15,
-                        }
-                      },
-                      tooltip: {
-                        mode: 'index',
-                        intersect: false,
-                      }
-                    },
-                    scales: {
-                      y: {
-                        beginAtZero: true,
-                        max: 6,
-                        ticks: {
-                          stepSize: 1,
-                        }
-                      }
-                    }
-                  }}
-                />
+            <div className="mb-6 p-6 bg-gradient-to-br from-white via-helfi-green/5 to-white dark:from-gray-800 dark:via-helfi-green/10 dark:to-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Trends Over Time</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-300">
+                    Ratings are scored 0 (Really bad) to 6 (Excellent). Hover the chart to see exact values.
+                  </p>
+                </div>
+              </div>
+              <div className="h-72">
+                <Line data={chartData} options={chartOptions} />
+              </div>
+              <div className="flex flex-wrap gap-2 mt-4">
+                {chartData.datasets.map((dataset) => (
+                  <div
+                    key={dataset.label}
+                    className="inline-flex items-center gap-2 rounded-full bg-white/80 dark:bg-gray-700/70 px-3 py-1 text-xs font-medium text-gray-700 dark:text-gray-200 shadow-sm border border-gray-200 dark:border-gray-600"
+                  >
+                    <span
+                      className="w-3 h-3 rounded-full"
+                      style={{ backgroundColor: dataset.borderColor as string }}
+                      aria-hidden="true"
+                    />
+                    <span>{dataset.label}</span>
+                  </div>
+                ))}
               </div>
             </div>
           )}
@@ -377,7 +453,7 @@ export default function CheckinHistoryPage() {
               </thead>
               <tbody>
                 {filteredRows.map((r, i) => {
-                  const label = (r.value === null || r.value === undefined) ? 'N/A' : LABELS[Math.max(0, Math.min(6, r.value))]
+                  const label = getRatingLabel(r.value)
                   const color = r.value === null || r.value === undefined ? 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-700 dark:text-gray-400' :
                     r.value <= 1 ? 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400' :
                     r.value <= 3 ? 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400' :
@@ -396,32 +472,56 @@ export default function CheckinHistoryPage() {
                         </span>
                       </td>
                       <td className="py-3 pr-4">
-                        <div className="relative">
-                          <button
-                            onClick={() => setShowDeleteMenu(showDeleteMenu === `${r.date}-${r.issueId}` ? null : `${r.date}-${r.issueId}`)}
-                            className="p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
+                        <Menu as="div" className="relative inline-block text-left">
+                          <div>
+                            <Menu.Button className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none">
+                              <EllipsisVerticalIcon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                            </Menu.Button>
+                          </div>
+
+                          <Transition
+                            as={Fragment}
+                            enter="transition ease-out duration-100"
+                            enterFrom="transform opacity-0 scale-95"
+                            enterTo="transform opacity-100 scale-100"
+                            leave="transition ease-in duration-75"
+                            leaveFrom="transform opacity-100 scale-100"
+                            leaveTo="transform opacity-0 scale-95"
                           >
-                            <svg className="w-5 h-5 text-gray-600 dark:text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                              <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
-                            </svg>
-                          </button>
-                          {showDeleteMenu === `${r.date}-${r.issueId}` && (
-                            <div className="absolute right-0 mt-1 w-32 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-10">
-                              <button
-                                onClick={() => handleEdit(r)}
-                                className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-t-lg"
-                              >
-                                Edit
-                              </button>
-                              <button
-                                onClick={() => handleDelete(r.date, r.issueId)}
-                                className="w-full text-left px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-b-lg"
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          )}
-                        </div>
+                            <Menu.Items className="absolute right-0 z-20 mt-2 w-36 origin-top-right rounded-lg bg-white dark:bg-gray-800 shadow-lg ring-1 ring-black/5 focus:outline-none border border-gray-200 dark:border-gray-700">
+                              <div className="py-1">
+                                <Menu.Item>
+                                  {({ active }) => (
+                                    <button
+                                      onClick={() => handleEdit(r)}
+                                      className={classNames(
+                                        active && 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100',
+                                        !active && 'text-gray-700 dark:text-gray-200',
+                                        'block w-full px-4 py-2 text-left text-sm'
+                                      )}
+                                    >
+                                      Edit
+                                    </button>
+                                  )}
+                                </Menu.Item>
+                                <Menu.Item>
+                                  {({ active }) => (
+                                    <button
+                                      onClick={() => handleDelete(r.date, r.issueId)}
+                                      className={classNames(
+                                        active && 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300',
+                                        !active && 'text-red-600 dark:text-red-400',
+                                        'block w-full px-4 py-2 text-left text-sm'
+                                      )}
+                                    >
+                                      Delete
+                                    </button>
+                                  )}
+                                </Menu.Item>
+                              </div>
+                            </Menu.Items>
+                          </Transition>
+                        </Menu>
                       </td>
                     </tr>
                   )
