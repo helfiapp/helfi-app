@@ -13,13 +13,18 @@ export async function GET() {
   try {
     // @ts-ignore: allow raw read without schema coupling
     const rows: any[] = await prisma.$queryRawUnsafe(
-      `SELECT time1, time2, time3, timezone, COALESCE(frequency, 3) as frequency FROM CheckinSettings WHERE userId = $1 LIMIT 1`,
+      `SELECT time1, timezone FROM CheckinSettings WHERE userId = $1 LIMIT 1`,
       user.id
     )
-    if (rows?.length) return NextResponse.json(rows[0])
+    if (rows?.length) {
+      return NextResponse.json({ 
+        time1: rows[0].time1 || '21:00', 
+        timezone: rows[0].timezone || 'Australia/Melbourne' 
+      })
+    }
   } catch {}
 
-  return NextResponse.json({ time1: '12:30', time2: '18:30', time3: '21:30', timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, frequency: 3 })
+  return NextResponse.json({ time1: '21:00', timezone: 'Australia/Melbourne' })
 }
 
 export async function POST(req: NextRequest) {
@@ -29,11 +34,11 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
   const body = await req.json().catch(() => ({}))
-  let { time1, time2, time3, timezone, frequency } = body as any
+  let { time1, timezone } = body as any
 
-  // Normalize times on the server to avoid client formatting issues
+  // Normalize time on the server to avoid client formatting issues
   const normalizeTime = (input?: string): string => {
-    if (!input) return '00:00'
+    if (!input) return '21:00'
     const s = String(input).trim().toLowerCase()
     const m24 = s.match(/^([01]?\d|2[0-3]):([0-5]\d)$/)
     if (m24) return `${m24[1].padStart(2,'0')}:${m24[2]}`
@@ -53,36 +58,30 @@ export async function POST(req: NextRequest) {
       const mm = parseInt(digits.slice(-2), 10)
       return `${String(Math.max(0, Math.min(23, h))).padStart(2,'0')}:${String(Math.max(0, Math.min(59, mm))).padStart(2,'0')}`
     }
-    return '00:00'
+    return '21:00'
   }
 
   time1 = normalizeTime(time1)
-  time2 = normalizeTime(time2)
-  time3 = normalizeTime(time3)
-  timezone = (timezone && String(timezone).trim()) || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
-  frequency = Math.min(3, Math.max(1, Number(frequency || 3)))
+  timezone = (timezone && String(timezone).trim()) || 'Australia/Melbourne'
 
-  // Auto-create table if missing (safe add-only)
+  // Auto-create table if missing (simplified schema - only time1 needed)
   try {
-    console.log('Saving CheckinSettings for', user.id, { time1, time2, time3, timezone, frequency })
+    console.log('Saving CheckinSettings for', user.id, { time1, timezone })
     await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS CheckinSettings (
         userId TEXT PRIMARY KEY,
         time1 TEXT NOT NULL,
-        time2 TEXT NOT NULL,
-        time3 TEXT NOT NULL,
-        timezone TEXT NOT NULL,
-        frequency INTEGER NOT NULL DEFAULT 3
+        timezone TEXT NOT NULL
       )
     `)
-    // Forward-compatible: add missing columns if table pre-existed without them
-    await prisma.$executeRawUnsafe(`ALTER TABLE CheckinSettings ADD COLUMN IF NOT EXISTS frequency INTEGER NOT NULL DEFAULT 3`)
-    await prisma.$executeRawUnsafe(`ALTER TABLE CheckinSettings ADD COLUMN IF NOT EXISTS timezone TEXT NOT NULL DEFAULT 'UTC'`)
+    // Ensure timezone column exists (for backward compatibility)
+    await prisma.$executeRawUnsafe(`ALTER TABLE CheckinSettings ADD COLUMN IF NOT EXISTS timezone TEXT NOT NULL DEFAULT 'Australia/Melbourne'`).catch(() => {})
+    // Update existing records to use time1 as the reminder time
     await prisma.$executeRawUnsafe(
-      `INSERT INTO CheckinSettings (userId, time1, time2, time3, timezone, frequency)
-       VALUES ($1,$2,$3,$4,$5,$6)
-       ON CONFLICT (userId) DO UPDATE SET time1=EXCLUDED.time1, time2=EXCLUDED.time2, time3=EXCLUDED.time3, timezone=EXCLUDED.timezone, frequency=EXCLUDED.frequency`,
-      user.id, time1, time2, time3, timezone, frequency
+      `INSERT INTO CheckinSettings (userId, time1, timezone)
+       VALUES ($1,$2,$3)
+       ON CONFLICT (userId) DO UPDATE SET time1=EXCLUDED.time1, timezone=EXCLUDED.timezone`,
+      user.id, time1, timezone
     )
     return NextResponse.json({ success: true })
   } catch (e) {

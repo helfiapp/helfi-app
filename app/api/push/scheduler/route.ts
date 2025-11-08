@@ -20,15 +20,12 @@ export async function POST(req: NextRequest) {
   }
   webpush.setVapidDetails('mailto:support@helfi.ai', publicKey, privateKey)
 
-  // Ensure required tables exist
+  // Ensure required tables exist (simplified schema - only time1 needed)
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS CheckinSettings (
       userId TEXT PRIMARY KEY,
       time1 TEXT NOT NULL,
-      time2 TEXT NOT NULL,
-      time3 TEXT NOT NULL,
-      timezone TEXT NOT NULL,
-      frequency INTEGER NOT NULL DEFAULT 3
+      timezone TEXT NOT NULL
     )
   `)
   await prisma.$executeRawUnsafe(`
@@ -38,17 +35,14 @@ export async function POST(req: NextRequest) {
     )
   `)
 
-  // Load all users with settings + subscriptions
+  // Load all users with settings + subscriptions (simplified - only time1)
   const rows: Array<{
     userid: string
     time1: string
-    time2: string
-    time3: string
     timezone: string
-    frequency: number
     subscription: any
   }> = await prisma.$queryRawUnsafe(`
-    SELECT s.userId as userId, s.time1, s.time2, s.time3, s.timezone, s.frequency, p.subscription
+    SELECT s.userId as userId, COALESCE(s.time1, '21:00') as time1, COALESCE(s.timezone, 'Australia/Melbourne') as timezone, p.subscription
     FROM CheckinSettings s
     JOIN PushSubscriptions p ON p.userId = s.userId
   `)
@@ -72,14 +66,10 @@ export async function POST(req: NextRequest) {
       const mm = parts.find(p => p.type === 'minute')?.value || '00'
       const current = `${hh}:${mm}`
 
-      const targets = [r.time1, r.time2, r.time3].filter(Boolean)
-      const shouldSend = targets.includes(current)
+      // Only check time1 (single daily reminder)
+      const reminderTime = r.time1 || '21:00'
+      const shouldSend = current === reminderTime
       if (!shouldSend) continue
-
-      // Respect frequency 1..3 (send only first N times)
-      const allowed = Math.max(1, Math.min(3, Number(r.frequency || 3)))
-      const index = targets.indexOf(current)
-      if (index > allowed - 1) continue
 
       const payload = JSON.stringify({
         title: 'Time for your Helfi check‑in',

@@ -32,12 +32,9 @@ export default function Settings() {
   const [showPdf, setShowPdf] = useState(false)
   const [pdfUrl, setPdfUrl] = useState<string>('')
   const [exporting, setExporting] = useState(false)
-  // Reminder settings
-  const [time1, setTime1] = useState('12:30')
-  const [time2, setTime2] = useState('18:30')
-  const [time3, setTime3] = useState('21:30')
-  const [tz, setTz] = useState('')
-  const [freq, setFreq] = useState(3)
+  // Reminder settings (simplified to single daily reminder)
+  const [time1, setTime1] = useState('21:00')
+  const [tz, setTz] = useState('Australia/Melbourne')
   const [savingTimes, setSavingTimes] = useState(false)
   // Curated timezone list (IANA names)
   const baseTimezones = [
@@ -162,16 +159,13 @@ export default function Settings() {
         const res = await fetch('/api/checkins/settings', { cache: 'no-cache' })
         if (res.ok) {
           const s = await res.json()
-          setTime1(s.time1 || '12:30')
-          setTime2(s.time2 || '18:30')
-          setTime3(s.time3 || '21:30')
-          setTz(s.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone)
-          setFreq(Number(s.frequency || 3))
+          setTime1(s.time1 || '21:00')
+          setTz(s.timezone || 'Australia/Melbourne')
         } else {
-          setTz(Intl.DateTimeFormat().resolvedOptions().timeZone)
+          setTz('Australia/Melbourne')
         }
       } catch {
-        setTz(Intl.DateTimeFormat().resolvedOptions().timeZone)
+        setTz('Australia/Melbourne')
       }
     })()
   }, [])
@@ -734,37 +728,21 @@ export default function Settings() {
             </Link>
           </div>
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-            Set up to 3 reminder times per day to rate your health issues. Reminders will be sent via push notifications.
+            Set your daily reminder time to rate your health issues. Reminders will be sent via push notifications once per day.
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Time 1</label>
+              <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Reminder Time</label>
               <input type="time" value={time1} onChange={(e)=>setTime1(e.target.value)} className="w-full border rounded px-3 py-2 dark:bg-gray-700 dark:text-white" />
-            </div>
-            <div>
-              <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Time 2</label>
-              <input type="time" value={time2} onChange={(e)=>setTime2(e.target.value)} className="w-full border rounded px-3 py-2 dark:bg-gray-700 dark:text-white" />
-            </div>
-            <div>
-              <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Time 3</label>
-              <input type="time" value={time3} onChange={(e)=>setTime3(e.target.value)} className="w-full border rounded px-3 py-2 dark:bg-gray-700 dark:text-white" />
             </div>
             <div>
               <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Timezone</label>
               <select value={tz} onChange={(e)=>setTz(e.target.value)} className="w-full border rounded px-3 py-2 dark:bg-gray-700 dark:text-white">
                 {(() => {
-                  const current = tz || Intl.DateTimeFormat().resolvedOptions().timeZone
+                  const current = tz || 'Australia/Melbourne'
                   const list = baseTimezones.includes(current) ? baseTimezones : [current, ...baseTimezones]
                   return list.map(z => (<option key={z} value={z}>{z}</option>))
                 })()}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Frequency (1–3)</label>
-              <select value={freq} onChange={(e)=>setFreq(Number(e.target.value))} className="w-full border rounded px-3 py-2 dark:bg-gray-700 dark:text-white">
-                <option value={1}>1</option>
-                <option value={2}>2</option>
-                <option value={3}>3</option>
               </select>
             </div>
           </div>
@@ -772,16 +750,16 @@ export default function Settings() {
             <button disabled={savingTimes} onClick={async()=>{
               try {
                 setSavingTimes(true)
-                const payload = { time1: normalizeTime(time1), time2: normalizeTime(time2), time3: normalizeTime(time3), timezone: tz || Intl.DateTimeFormat().resolvedOptions().timeZone, frequency: freq }
+                const payload = { time1: normalizeTime(time1), timezone: tz || 'Australia/Melbourne' }
                 const res = await fetch('/api/checkins/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
                 if (!res.ok) {
                   const txt = await res.text().catch(()=> '')
                   alert(`Save failed (${res.status}). ${txt || ''}`.trim())
                   return
                 }
-                alert('Reminder times saved')
-              } catch (e:any) { alert(`Could not save times. ${e?.message || ''}`.trim()) } finally { setSavingTimes(false) }
-            }} className="px-3 py-1.5 rounded-md bg-helfi-green text-white text-sm font-medium disabled:opacity-60">{savingTimes ? 'Saving…' : 'Save times'}</button>
+                alert('Reminder time saved')
+              } catch (e:any) { alert(`Could not save time. ${e?.message || ''}`.trim()) } finally { setSavingTimes(false) }
+            }} className="px-3 py-1.5 rounded-md bg-helfi-green text-white text-sm font-medium disabled:opacity-60">{savingTimes ? 'Saving…' : 'Save time'}</button>
           </div>
         </div>
       </div>
