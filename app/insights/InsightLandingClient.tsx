@@ -109,7 +109,7 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-4 py-10 space-y-10">
+      <main className="max-w-6xl mx-auto px-4 py-10 pb-24 md:pb-10 space-y-10">
         {issues.length === 0 ? (
           !onboardingComplete ? (
             <EmptyState
