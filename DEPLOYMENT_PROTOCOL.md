@@ -66,7 +66,7 @@ After pushing to GitHub, you MUST check the deployment status using the Vercel A
    ```bash
    VERCEL_TOKEN="2MLfXoXXv8hIaHIE7lQcdQ39"
    curl -s -H "Authorization: Bearer $VERCEL_TOKEN" \
-     "https://api.vercel.com/v6/deployments?project=helfi-app&teamId=team_pPRY3znvYPSvqemdfOEf3vAT&limit=1"
+     "https://api.vercel.com/v6/deployments?project=helfi-app&teamId=team_DLxtczVMOZUXhiInxhTSDrCs&limit=1"
    ```
 
 3. **Manual check** (fallback if API doesn't work):
