@@ -249,8 +249,16 @@ export default function Dashboard() {
           </div>
           
           {/* Right actions: Upgrade + Usage Meter (mobile only) + Profile */}
-          <div className="flex items-center gap-3">
-            <Link href="/billing" className="hidden sm:inline-flex items-center bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors font-medium">Upgrade</Link>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Link 
+              href="/billing" 
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-medium text-helfi-green border border-helfi-green/30 rounded-md hover:bg-helfi-green/5 hover:border-helfi-green/50 transition-all active:scale-95"
+            >
+              <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              Upgrade
+            </Link>
             {/* Usage Meter - mobile only (desktop has sidebar meter) */}
             <div className="md:hidden">
               <UsageMeter compact={true} />
