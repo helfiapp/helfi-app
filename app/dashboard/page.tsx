@@ -231,95 +231,176 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Navigation Header - First Row */}
+      {/* Navigation Header - Mobile: Logo + Profile Row, Desktop: Logo + Actions Row */}
       <nav className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-3 sm:px-4 py-3">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          {/* Logo on the left */}
-          <div className="flex items-center">
-            <Link href="/" className="w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20 cursor-pointer hover:opacity-80 transition-opacity">
+        <div className="max-w-7xl mx-auto">
+          {/* Mobile: Logo and Profile Row */}
+          <div className="md:hidden flex items-center justify-between mb-3">
+            <Link href="/" className="w-14 h-14 cursor-pointer hover:opacity-80 transition-opacity">
               <Image
                 src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/HELFI_TRANSPARENT_rmssry.png"
                 alt="Helfi Logo"
-                width={80}
-                height={80}
+                width={56}
+                height={56}
                 className="w-full h-full object-contain"
                 priority
               />
             </Link>
-          </div>
-          
-          {/* Right actions: Upgrade + Usage Meter (mobile only) + Profile */}
-          <div className="flex items-center gap-2 sm:gap-3">
-            <Link 
-              href="/billing" 
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-medium text-helfi-green border border-helfi-green/30 rounded-md hover:bg-helfi-green/5 hover:border-helfi-green/50 transition-all active:scale-95"
-            >
-              <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-              Upgrade
-            </Link>
-            {/* Usage Meter - mobile only (desktop has sidebar meter) */}
-            <div className="md:hidden">
-              <UsageMeter compact={true} />
-            </div>
-            {/* Profile Avatar & Dropdown */}
-            <div className="relative dropdown-container" id="profile-dropdown">
-            <button
-              onClick={() => setDropdownOpen((v) => !v)}
-              className="focus:outline-none"
-              aria-label="Open profile menu"
-            >
-              <Image
-                src={userImage}
-                alt="Profile"
-                width={48}
-                height={48}
-                className="w-12 h-12 rounded-full border-2 border-helfi-green shadow-sm object-cover"
-              />
-            </button>
-            {dropdownOpen && (
-              <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-100 animate-fade-in">
-                <div className="flex items-center px-4 py-3 border-b border-gray-100">
+            <div className="flex items-center gap-2">
+              <Link 
+                href="/billing" 
+                className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-helfi-green border border-helfi-green/30 rounded-md hover:bg-helfi-green/5 transition-all"
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                Upgrade
+              </Link>
+              <div className="relative dropdown-container" id="profile-dropdown">
+                <button
+                  onClick={() => setDropdownOpen((v) => !v)}
+                  className="focus:outline-none"
+                  aria-label="Open profile menu"
+                >
                   <Image
                     src={userImage}
                     alt="Profile"
                     width={40}
                     height={40}
-                    className="w-10 h-10 rounded-full object-cover mr-3"
+                    className="w-10 h-10 rounded-full border-2 border-helfi-green shadow-sm object-cover"
                   />
-                  <div>
-                    <div className="font-semibold text-gray-900">{userName}</div>
-                    <div className="text-xs text-gray-500">{session?.user?.email || 'user@email.com'}</div>
+                </button>
+                {dropdownOpen && (
+                  <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-100 animate-fade-in">
+                    <div className="flex items-center px-4 py-3 border-b border-gray-100">
+                      <Image
+                        src={userImage}
+                        alt="Profile"
+                        width={40}
+                        height={40}
+                        className="w-10 h-10 rounded-full object-cover mr-3"
+                      />
+                      <div>
+                        <div className="font-semibold text-gray-900">{userName}</div>
+                        <div className="text-xs text-gray-500">{session?.user?.email || 'user@email.com'}</div>
+                      </div>
+                    </div>
+                    <Link href="/profile" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Profile</Link>
+                    <Link href="/account" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Account Settings</Link>
+                    <Link href="/profile/image" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Upload/Change Profile Photo</Link>
+                    <Link href="/billing" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Subscription & Billing</Link>
+                    <Link href="/notifications" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Notifications</Link>
+                    <Link href="/privacy" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Privacy Settings</Link>
+                    <Link href="/support" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
+                    <div className="border-t border-gray-100 my-2"></div>
+                    <Link href="/reports" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Reports</Link>
+                    <button 
+                      onClick={handleSignOut}
+                      className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50 font-semibold"
+                    >
+                      Logout
+                    </button>
                   </div>
-                </div>
-                <Link href="/profile" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Profile</Link>
-                <Link href="/account" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Account Settings</Link>
-                <Link href="/profile/image" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Upload/Change Profile Photo</Link>
-                <Link href="/billing" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Subscription & Billing</Link>
-                <Link href="/notifications" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Notifications</Link>
-                <Link href="/privacy" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Privacy Settings</Link>
-                <Link href="/support" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
-                <div className="border-t border-gray-100 my-2"></div>
-                <Link href="/reports" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Reports</Link>
-                              <button 
-                onClick={handleSignOut}
-                className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50 font-semibold"
-              >
-                Logout
-              </button>
+                )}
               </div>
-            )}
+            </div>
           </div>
+          
+          {/* Desktop: Logo + Actions Row */}
+          <div className="hidden md:flex justify-between items-center">
+            <div className="flex items-center">
+              <Link href="/" className="w-16 h-16 lg:w-20 lg:h-20 cursor-pointer hover:opacity-80 transition-opacity">
+                <Image
+                  src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/HELFI_TRANSPARENT_rmssry.png"
+                  alt="Helfi Logo"
+                  width={80}
+                  height={80}
+                  className="w-full h-full object-contain"
+                  priority
+                />
+              </Link>
+            </div>
+            
+            <div className="flex items-center gap-3">
+              <Link 
+                href="/billing" 
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-helfi-green border border-helfi-green/30 rounded-md hover:bg-helfi-green/5 hover:border-helfi-green/50 transition-all"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                Upgrade
+              </Link>
+              <div className="relative dropdown-container" id="profile-dropdown-desktop">
+                <button
+                  onClick={() => setDropdownOpen((v) => !v)}
+                  className="focus:outline-none"
+                  aria-label="Open profile menu"
+                >
+                  <Image
+                    src={userImage}
+                    alt="Profile"
+                    width={48}
+                    height={48}
+                    className="w-12 h-12 rounded-full border-2 border-helfi-green shadow-sm object-cover"
+                  />
+                </button>
+                {dropdownOpen && (
+                  <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-100 animate-fade-in">
+                    <div className="flex items-center px-4 py-3 border-b border-gray-100">
+                      <Image
+                        src={userImage}
+                        alt="Profile"
+                        width={40}
+                        height={40}
+                        className="w-10 h-10 rounded-full object-cover mr-3"
+                      />
+                      <div>
+                        <div className="font-semibold text-gray-900">{userName}</div>
+                        <div className="text-xs text-gray-500">{session?.user?.email || 'user@email.com'}</div>
+                      </div>
+                    </div>
+                    <Link href="/profile" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Profile</Link>
+                    <Link href="/account" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Account Settings</Link>
+                    <Link href="/profile/image" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Upload/Change Profile Photo</Link>
+                    <Link href="/billing" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Subscription & Billing</Link>
+                    <Link href="/notifications" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Notifications</Link>
+                    <Link href="/privacy" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Privacy Settings</Link>
+                    <Link href="/support" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
+                    <div className="border-t border-gray-100 my-2"></div>
+                    <Link href="/reports" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Reports</Link>
+                    <button 
+                      onClick={handleSignOut}
+                      className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50 font-semibold"
+                    >
+                      Logout
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </nav>
 
-      {/* Second Row - Page Title Centered */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-3 sm:px-4 py-4">
-        <div className="max-w-7xl mx-auto text-center">
-          <h1 className="text-lg md:text-xl font-semibold text-gray-900">Dashboard</h1>
-          <p className="text-sm text-gray-500 hidden sm:block">Welcome back, {userName}</p>
+      {/* Page Title Row - Mobile: Below Logo/Profile, Desktop: Centered */}
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-3 sm:px-4 py-3 md:py-4">
+        <div className="max-w-7xl mx-auto">
+          {/* Mobile: Credits Meter + Dashboard Title */}
+          <div className="md:hidden space-y-2">
+            <div className="flex justify-center">
+              <UsageMeter compact={true} />
+            </div>
+            <div className="text-center">
+              <h1 className="text-lg font-semibold text-gray-900">Dashboard</h1>
+            </div>
+          </div>
+          
+          {/* Desktop: Centered Title */}
+          <div className="hidden md:block text-center">
+            <h1 className="text-xl font-semibold text-gray-900">Dashboard</h1>
+            <p className="text-sm text-gray-500 mt-1">Welcome back, {userName}</p>
+          </div>
         </div>
       </div>
 
