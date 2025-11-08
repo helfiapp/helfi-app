@@ -894,6 +894,12 @@ Please add nutritional information manually if needed.`);
             </svg>
           </button>
 
+          {/* Credits usage meter for Food Analysis (visible on initial load) */}
+          <div className="mt-2">
+            <UsageMeter inline={true} refreshTrigger={usageMeterRefresh} />
+            <FeatureUsageDisplay featureName="foodAnalysis" featureLabel="Food Analysis" refreshTrigger={usageMeterRefresh} />
+          </div>
+
           {/* Simplified Dropdown Options */}
           {showPhotoOptions && (
             <div className="food-options-dropdown absolute top-full left-0 right-0 mt-2 bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden z-50">
