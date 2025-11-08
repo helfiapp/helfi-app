@@ -19,6 +19,7 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
   const [hasAccess, setHasAccess] = useState(false)
   const [totalAvailableCents, setTotalAvailableCents] = useState<number>(0)
   const [monthlyUsedCents, setMonthlyUsedCents] = useState<number>(0)
+  const [monthlyCapCents, setMonthlyCapCents] = useState<number>(0)
 
   useEffect(() => {
     const loadStatus = async () => {
@@ -54,6 +55,9 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
             if (typeof data.monthlyUsedCents === 'number') {
               setMonthlyUsedCents(data.monthlyUsedCents)
             }
+            if (typeof data.monthlyCapCents === 'number') {
+              setMonthlyCapCents(data.monthlyCapCents)
+            }
           } else {
             setHasAccess(false)
           }
@@ -76,14 +80,21 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
     return null
   }
 
-  // Calculate percent remaining (for reverse mode) and percent used
-  const percentUsed = walletPercentUsed ?? 0
-  const percentRemaining = Math.max(0, 100 - percentUsed)
-  const displayPercentUsed = Math.min(100, Math.max(0, percentUsed))
-  const displayPercentRemaining = Math.min(100, Math.max(0, percentRemaining))
+  // Calculate precise percent used when we know wallet cents (subscription case).
+  // Fallback to server-reported percentage when only top-ups are present.
+  const percentUsedPrecise =
+    monthlyCapCents > 0
+      ? (monthlyUsedCents / Math.max(1, monthlyCapCents)) * 100
+      : (walletPercentUsed ?? 0)
+  const clampedUsed = Math.min(100, Math.max(0, percentUsedPrecise))
+  const percentRemainingPrecise = Math.max(0, 100 - clampedUsed)
+  // Non-inline variants show integer rounding to keep UI calm
+  const displayPercentUsed = Math.round(clampedUsed)
+  // Inline variant shows 0.1% precision so each analysis visibly reduces the meter
+  const displayPercentRemainingInline = Number(percentRemainingPrecise.toFixed(1))
   
   // Check if credits are low (5% or less remaining)
-  const isLowCredits = percentRemaining <= 5
+  const isLowCredits = percentRemainingPrecise <= 5
 
   if (inline) {
     // Inline version for AI feature pages - reverse mode (starts full, gets shorter)
@@ -94,7 +105,7 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
           <span className={`text-xs font-semibold ${
             isLowCredits ? 'text-red-600' : 'text-gray-700'
           }`}>
-            {displayPercentRemaining.toFixed(0)}%
+            {displayPercentRemainingInline.toFixed(1)}%
           </span>
         </div>
         <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden relative">
@@ -103,14 +114,14 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
             className={`h-2 transition-all duration-300 ${
               isLowCredits ? 'bg-red-500' : 'bg-helfi-green'
             }`}
-            style={{ width: `${displayPercentRemaining}%` }}
+            style={{ width: `${percentRemainingPrecise}%` }}
           />
         </div>
         {isLowCredits && (
           <div className="mt-2 bg-red-50 border border-red-200 rounded-lg p-2">
             <p className="text-xs text-red-800 font-medium mb-1">⚠️ Low Credits Warning</p>
             <p className="text-xs text-red-700 mb-2">
-              You're running low on credits ({displayPercentRemaining.toFixed(0)}% remaining). 
+              You're running low on credits ({displayPercentRemainingInline.toFixed(1)}% remaining). 
               Purchase more credits or upgrade your subscription to continue using AI features.
             </p>
             <div className="flex gap-2">
@@ -134,46 +145,46 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
   }
 
   if (compact) {
-    // Compact version for headers - horizontal layout (forward mode)
+    // Compact version for headers - horizontal layout (reverse mode: credits remaining)
     return (
       <div className={`flex items-center gap-2 ${className}`}>
         <div className="flex items-center gap-1.5">
-          <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Usage</span>
+          <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Credits remaining</span>
           <span className="text-sm font-semibold text-gray-900 dark:text-white">
-            {displayPercentUsed}%
+            {Math.round(percentRemainingPrecise)}%
           </span>
         </div>
         <div className="w-16 bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
           <div
             className={`h-1.5 transition-all ${
-              displayPercentUsed >= 90 ? 'bg-red-500' : 
-              displayPercentUsed >= 70 ? 'bg-yellow-500' : 
+              percentRemainingPrecise <= 10 ? 'bg-red-500' : 
+              percentRemainingPrecise <= 30 ? 'bg-yellow-500' : 
               'bg-helfi-green'
             }`}
-            style={{ width: `${displayPercentUsed}%` }}
+            style={{ width: `${percentRemainingPrecise}%` }}
           />
         </div>
       </div>
     )
   }
 
-  // Full version for sidebar - vertical layout (forward mode)
+  // Full version for sidebar - vertical layout (reverse mode: credits remaining)
   return (
     <div className={`px-4 py-3 ${className}`}>
       <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Monthly usage</span>
+        <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Credits remaining</span>
         <span className="text-xs font-semibold text-gray-900 dark:text-white">
-          {displayPercentUsed}%
+          {Math.round(percentRemainingPrecise)}%
         </span>
       </div>
       <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
         <div
           className={`h-2 transition-all ${
-            displayPercentUsed >= 90 ? 'bg-red-500' : 
-            displayPercentUsed >= 70 ? 'bg-yellow-500' : 
+            percentRemainingPrecise <= 10 ? 'bg-red-500' : 
+            percentRemainingPrecise <= 30 ? 'bg-yellow-500' : 
             'bg-helfi-green'
           }`}
-          style={{ width: `${displayPercentUsed}%` }}
+          style={{ width: `${percentRemainingPrecise}%` }}
         />
       </div>
       {showResetDate && walletRefreshAt && (
@@ -184,4 +195,5 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
     </div>
   )
 }
+
 

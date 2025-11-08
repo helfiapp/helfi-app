@@ -24,6 +24,7 @@ export default function SymptomChat({ analysisResult, symptoms, duration, notes 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const endRef = useRef<HTMLDivElement | null>(null)
+  const containerRef = useRef<HTMLDivElement | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
 
   // Load from localStorage on mount
@@ -47,7 +48,10 @@ export default function SymptomChat({ analysisResult, symptoms, duration, notes 
   }, [messages, storageKey])
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const container = containerRef.current
+    if (!container) return
+    // Scroll inside the chat container only, avoid scrolling the whole page
+    container.scrollTop = container.scrollHeight
   }, [messages, loading])
 
   // Auto-resize textarea
@@ -168,7 +172,7 @@ export default function SymptomChat({ analysisResult, symptoms, duration, notes 
         </div>
       </header>
 
-      <div className="px-5 py-4 h-[420px] overflow-y-auto space-y-3" aria-live="polite">
+      <div ref={containerRef} className="px-5 py-4 h-[420px] overflow-y-auto space-y-3" aria-live="polite">
         {messages.length === 0 && !loading && (
           <div className="text-sm text-gray-400">
             Ask follow‑ups like:
