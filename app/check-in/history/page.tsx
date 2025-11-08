@@ -27,6 +27,8 @@ ChartJS.register(
   Filler
 )
 
+export const dynamic = 'force-dynamic'
+
 type Row = { date: string; issueId: string; name: string; polarity: 'positive'|'negative'; value: number | null; note?: string }
 
 export default function CheckinHistoryPage() {
