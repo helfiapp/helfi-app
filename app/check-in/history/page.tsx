@@ -16,6 +16,7 @@ import {
   Legend,
   Filler,
 } from 'chart.js'
+import type { ChartData, ChartOptions, TooltipItem } from 'chart.js'
 import 'chartjs-adapter-date-fns'
 import { format } from 'date-fns'
 import { Menu, Transition } from '@headlessui/react'
@@ -216,7 +217,7 @@ export default function CheckinHistoryPage() {
   }
 
   // Prepare chart data
-  const chartData = useMemo(() => {
+  const chartData: ChartData<'line', { x: string; y: number | null }[]> = useMemo(() => {
     if (filteredRows.length === 0) return { labels: [], datasets: [] }
 
     const allDates = Array.from(new Set(filteredRows.map(r => r.date))).sort()
@@ -271,7 +272,7 @@ export default function CheckinHistoryPage() {
     }
   }, [filteredRows])
 
-  const chartOptions = useMemo(() => ({
+  const chartOptions: ChartOptions<'line'> = useMemo(() => ({
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
@@ -285,12 +286,18 @@ export default function CheckinHistoryPage() {
       tooltip: {
         mode: 'index',
         intersect: false,
-        title: (items) => {
+        title: (items: TooltipItem<'line'>[]) => {
           if (!items?.length) return ''
           const parsedX = items[0].parsed.x
           const dateValue = typeof parsedX === 'string' ? parsedX : Number(parsedX)
           return format(new Date(dateValue), 'MMM d, yyyy')
         },
+        label: (context: TooltipItem<'line'>) => {
+          const datasetLabel = context.dataset.label || ''
+          const value = context.parsed.y
+          if (value === null) return `${datasetLabel}: N/A`
+          return `${datasetLabel}: ${value} • ${getRatingLabel(value)}`
+        }
       }
     },
     scales: {
