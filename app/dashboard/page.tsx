@@ -248,10 +248,13 @@ export default function Dashboard() {
             </Link>
           </div>
           
-          {/* Right actions: Upgrade + Usage Meter + Profile */}
+          {/* Right actions: Upgrade + Usage Meter (mobile only) + Profile */}
           <div className="flex items-center gap-3">
             <Link href="/billing" className="hidden sm:inline-flex items-center bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors font-medium">Upgrade</Link>
-            <UsageMeter compact={true} />
+            {/* Usage Meter - mobile only (desktop has sidebar meter) */}
+            <div className="md:hidden">
+              <UsageMeter compact={true} />
+            </div>
             {/* Profile Avatar & Dropdown */}
             <div className="relative dropdown-container" id="profile-dropdown">
             <button
