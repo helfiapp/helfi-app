@@ -764,10 +764,6 @@ Please add nutritional information manually if needed.`);
           <div className="hidden md:block"></div>
 
           <div className="flex items-center gap-4">
-            {/* Usage Meter - Always visible (AI feature) */}
-            <div className="min-w-[180px]">
-              <UsageMeter inline={true} refreshTrigger={usageMeterRefresh} />
-            </div>
             {/* Profile Avatar & Dropdown */}
             <div className="relative dropdown-container" id="profile-dropdown">
               <button

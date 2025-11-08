@@ -5,7 +5,6 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { signOut } from 'next-auth/react'
 import { useUserData } from '@/components/providers/UserDataProvider'
-import UsageMeter from '@/components/UsageMeter'
 
 export const DEFAULT_INSIGHTS_AVATAR = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTI4IiBoZWlnaHQ9IjEyOCIgdmlld0JveD0iMCAwIDEyOCAxMjgiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iNjQiIGN5PSI2NCIgcj0iNjQiIGZpbGw9IiMxMEI5ODEiLz48Y2lyY2xlIGN4PSI2NCIgY3k9IjQ4IiByPSIyMCIgZmlsbD0id2hpdGUiLz48cGF0aCBkPSJNNjQgNzZjLTEzLjMzIDAtMjQgNS4zNC0yNCAxMnYxNmMwIDguODQgNy4xNiAxNiAxNiAxNmgxNmM4Ljg0IDAgMTYtNy4xNiAxNi0xNlY4OGMwLTYuNjYtMTAuNjctMTItMjQtMTJ6IiBmaWxsPSJ3aGl0ZSIvPjwvc3ZnPg=='
 
@@ -20,7 +19,6 @@ interface InsightsTopNavProps {
 export default function InsightsTopNav({ sessionUser }: InsightsTopNavProps) {
   const { profileImage: providerProfileImage } = useUserData()
   const [dropdownOpen, setDropdownOpen] = useState(false)
-  const [refresh, setRefresh] = useState(0)
 
   const avatarSrc = useMemo(() => {
     return providerProfileImage || sessionUser.image || DEFAULT_INSIGHTS_AVATAR
@@ -39,13 +37,6 @@ export default function InsightsTopNav({ sessionUser }: InsightsTopNavProps) {
     }
   }, [dropdownOpen])
 
-  // Refresh UsageMeter when credits are updated
-  useEffect(() => {
-    const h = () => setRefresh((r) => r + 1)
-    try { window.addEventListener('helfiCreditsUpdated', h as any) } catch {}
-    return () => { try { window.removeEventListener('helfiCreditsUpdated', h as any) } catch {} }
-  }, [])
-
   return (
     <nav className="bg-white border-b border-gray-200 px-4 py-3">
       <div className="max-w-7xl mx-auto flex justify-between items-center">
@@ -53,12 +44,8 @@ export default function InsightsTopNav({ sessionUser }: InsightsTopNavProps) {
         <h1 className="md:hidden flex-1 text-center text-lg font-semibold text-gray-900">Insights</h1>
         <div className="hidden md:block"></div>
 
-        <div className="flex items-center gap-4">
-          {/* Usage Meter - Always visible for Insights (AI feature) */}
-          <div className="min-w-[180px]">
-            <UsageMeter inline={true} refreshTrigger={refresh} />
-          </div>
-          <div className="relative dropdown-container" id="insights-profile-dropdown">
+        {/* Profile Avatar & Dropdown */}
+        <div className="relative dropdown-container" id="insights-profile-dropdown">
           <button
             onClick={() => setDropdownOpen((v) => !v)}
             className="focus:outline-none"

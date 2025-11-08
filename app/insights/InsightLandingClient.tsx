@@ -97,7 +97,6 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
 
       <header className="bg-white border-b border-gray-200 px-4 py-6">
         <div className="max-w-7xl mx-auto text-center md:text-left">
-          <p className="text-xs uppercase tracking-[0.2em] text-helfi-green font-semibold mb-2">Insights</p>
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Your health focus areas</h1>
