@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import crypto from 'crypto'
 
 export async function GET() {
   const session = await getServerSession(authOptions)
@@ -52,7 +53,71 @@ export async function GET() {
     } catch { /* ignore if already nullable */ }
   } catch {}
 
-  const issues: any[] = await prisma.$queryRawUnsafe(`SELECT id, name, polarity FROM CheckinIssues WHERE userId = $1`, user.id)
+  let issues: any[] = await prisma.$queryRawUnsafe(`SELECT id, name, polarity FROM CheckinIssues WHERE userId = $1`, user.id)
+  
+  // If no issues found in CheckinIssues, sync from HealthGoal table
+  if (issues.length === 0) {
+    try {
+      // Try to get selected issues from __SELECTED_ISSUES__ record
+      const selectedIssuesRecord = await prisma.healthGoal.findFirst({
+        where: {
+          userId: user.id,
+          name: '__SELECTED_ISSUES__'
+        }
+      })
+      
+      let issueNames: string[] = []
+      
+      if (selectedIssuesRecord?.category) {
+        try {
+          const parsed = JSON.parse(selectedIssuesRecord.category)
+          if (Array.isArray(parsed)) {
+            issueNames = parsed.map((name: any) => String(name || '').trim()).filter(Boolean)
+          }
+        } catch {}
+      }
+      
+      // Fallback: get from regular health goals if no selected issues found
+      if (issueNames.length === 0) {
+        const healthGoals = await prisma.healthGoal.findMany({
+          where: {
+            userId: user.id,
+            name: { notIn: ['__EXERCISE_DATA__', '__HEALTH_SITUATIONS_DATA__', '__SELECTED_ISSUES__'] }
+          }
+        })
+        issueNames = healthGoals.map(goal => goal.name.trim()).filter(Boolean)
+      }
+      
+      // Sync issues to CheckinIssues table
+      if (issueNames.length > 0) {
+        // Ensure unique constraint exists
+        await prisma.$executeRawUnsafe(`
+          CREATE UNIQUE INDEX IF NOT EXISTS checkinissues_user_name_idx ON CheckinIssues (userId, name)
+        `).catch(() => {})
+        
+        for (const issueName of issueNames) {
+          const polarity = /pain|ache|anxiety|depress|fatigue|nausea|bloat|insomnia|brain fog|headache|migraine|cramp|stress|itch|rash|acne|diarrh|constipat|gas|heartburn/i.test(issueName) ? 'negative' : 'positive'
+          const id = crypto.randomUUID()
+          try {
+            await prisma.$queryRawUnsafe(
+              `INSERT INTO CheckinIssues (id, userId, name, polarity) VALUES ($1,$2,$3,$4)
+               ON CONFLICT (userId, name) DO UPDATE SET polarity=EXCLUDED.polarity`,
+              id, user.id, issueName, polarity
+            )
+          } catch (e) {
+            // Ignore conflicts, continue with next issue
+            console.error('Error syncing issue:', issueName, e)
+          }
+        }
+        
+        // Reload issues after sync
+        issues = await prisma.$queryRawUnsafe(`SELECT id, name, polarity FROM CheckinIssues WHERE userId = $1`, user.id)
+      }
+    } catch (e) {
+      console.error('Error syncing health goals to CheckinIssues:', e)
+    }
+  }
+  
   const ratings: any[] = await prisma.$queryRawUnsafe(`SELECT issueId, value FROM CheckinRatings WHERE userId = $1 AND date = $2`, user.id, today)
 
   return NextResponse.json({ issues, ratings })

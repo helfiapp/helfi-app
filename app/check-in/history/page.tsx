@@ -1,7 +1,8 @@
 'use client'
 
 import React, { Fragment, useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
+import Link from 'next/link'
 import PageHeader from '@/components/PageHeader'
 import { Line } from 'react-chartjs-2'
 import {
@@ -40,6 +41,7 @@ type Row = { date: string; issueId: string; name: string; polarity: 'positive'|'
 
 export default function CheckinHistoryPage() {
   const router = useRouter()
+  const pathname = usePathname()
   const [rows, setRows] = useState<Row[]>([])
   const [allIssues, setAllIssues] = useState<string[]>([])
   const [selectedIssues, setSelectedIssues] = useState<Set<string>>(new Set())
@@ -325,10 +327,38 @@ export default function CheckinHistoryPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
-      <PageHeader title="Daily Health Ratings" backHref="/check-in" />
+      <PageHeader title="Today's Check-In" backHref="/more" />
+      
+      {/* Tabs */}
+      <div className="max-w-7xl mx-auto px-4 pt-4">
+        <div className="bg-white dark:bg-gray-800 rounded-t-xl border-b border-gray-200 dark:border-gray-700">
+          <div className="flex">
+            <Link
+              href="/check-in"
+              className={`flex-1 px-4 py-3 text-center font-medium transition-colors ${
+                pathname !== '/check-in/history'
+                  ? 'text-helfi-green border-b-2 border-helfi-green'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+              }`}
+            >
+              Today's Check-in
+            </Link>
+            <Link
+              href="/check-in/history"
+              className={`flex-1 px-4 py-3 text-center font-medium transition-colors ${
+                pathname === '/check-in/history'
+                  ? 'text-helfi-green border-b-2 border-helfi-green'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+              }`}
+            >
+              Rating History
+            </Link>
+          </div>
+        </div>
+      </div>
       
       <main className="max-w-7xl mx-auto px-4 py-6">
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-6">
+        <div className="bg-white dark:bg-gray-800 rounded-b-2xl shadow-sm p-6">
           <div className="mb-6">
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Check-in History</h1>
             <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">

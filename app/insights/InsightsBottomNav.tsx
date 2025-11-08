@@ -59,7 +59,7 @@ export default function InsightsBottomNav() {
     {
       href: '/settings',
       label: 'Settings',
-      svg: (<Cog6ToothIcon className="w-6 h-6" />),
+      svg: (<Cog6ToothIcon className="w-6 h-6 flex-shrink-0" style={{ minWidth: '24px', minHeight: '24px' }} />),
       active: pathname === '/settings',
     },
   ]

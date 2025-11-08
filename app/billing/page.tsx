@@ -268,7 +268,7 @@ export default function BillingPage() {
           {/* Settings */}
           <Link href="/settings" className="flex flex-col items-center py-2 px-1 min-w-0 flex-1">
             <div className="text-gray-400">
-              <Cog6ToothIcon className="w-6 h-6" />
+              <Cog6ToothIcon className="w-6 h-6 flex-shrink-0" style={{ minWidth: '24px', minHeight: '24px' }} />
             </div>
             <span className="text-xs text-gray-400 mt-1 font-medium truncate">Settings</span>
           </Link>

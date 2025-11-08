@@ -1,6 +1,8 @@
 'use client'
 
 import React, { useEffect, useMemo, useState } from 'react'
+import { usePathname } from 'next/navigation'
+import Link from 'next/link'
 import PageHeader from '@/components/PageHeader'
 
 const LABELS = [
@@ -96,17 +98,48 @@ export default function CheckInPage() {
     }
   }
 
+  const pathname = usePathname()
+  const isHistoryPage = pathname === '/check-in/history'
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
       <PageHeader title="Today's Check-In" backHref="/more" />
       
-      <main className="max-w-3xl mx-auto px-4 py-6">
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-6">
-          <div className="flex items-center justify-between gap-4 mb-2">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Today's check‑in</h1>
-            <a href="/check-in/history" className="text-sm text-helfi-green hover:underline font-medium">View history</a>
+      {/* Tabs */}
+      <div className="max-w-3xl mx-auto px-4 pt-4">
+        <div className="bg-white dark:bg-gray-800 rounded-t-xl border-b border-gray-200 dark:border-gray-700">
+          <div className="flex">
+            <Link
+              href="/check-in"
+              className={`flex-1 px-4 py-3 text-center font-medium transition-colors ${
+                !isHistoryPage
+                  ? 'text-helfi-green border-b-2 border-helfi-green'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+              }`}
+            >
+              Today's Check-in
+            </Link>
+            <Link
+              href="/check-in/history"
+              className={`flex-1 px-4 py-3 text-center font-medium transition-colors ${
+                isHistoryPage
+                  ? 'text-helfi-green border-b-2 border-helfi-green'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+              }`}
+            >
+              Rating History
+            </Link>
           </div>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Rate how you went today. One tap per item, then Save.</p>
+        </div>
+      </div>
+
+      {!isHistoryPage ? (
+        <main className="max-w-3xl mx-auto px-4 py-6">
+          <div className="bg-white dark:bg-gray-800 rounded-b-2xl shadow-sm p-6">
+            <div className="mb-2">
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Today's check‑in</h1>
+            </div>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Rate how you went today. One tap per item, then Save.</p>
 
         {loading ? (
           <div className="flex items-center justify-center py-12">
@@ -204,8 +237,9 @@ export default function CheckInPage() {
             <button onClick={handleSave} className="bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90">Save today's ratings</button>
           </div>
         )}
-        </div>
-      </main>
+          </div>
+        </main>
+      ) : null}
     </div>
   )
 }

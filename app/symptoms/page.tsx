@@ -357,7 +357,7 @@ export default function SymptomAnalysisPage() {
           <MobileMoreMenu />
           <Link href="/settings" className="pressable ripple flex flex-col items-center py-2 px-1 min-w-0 flex-1">
             <div className="icon text-gray-400">
-              <Cog6ToothIcon className="w-6 h-6" />
+              <Cog6ToothIcon className="w-6 h-6 flex-shrink-0" style={{ minWidth: '24px', minHeight: '24px' }} />
             </div>
             <span className="label text-xs mt-1 truncate text-gray-400 font-medium">Settings</span>
           </Link>

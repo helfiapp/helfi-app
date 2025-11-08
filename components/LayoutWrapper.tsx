@@ -99,6 +99,15 @@ function DesktopSidebar() {
           
           <div className="border-t border-gray-200 mt-6 pt-6">
             <a
+              href="/check-in"
+              className="text-gray-700 hover:text-helfi-green hover:bg-gray-50 group flex items-center px-2 py-2 text-sm font-medium rounded-md"
+            >
+              <svg className="text-gray-400 group-hover:text-helfi-green mr-3 h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Today's Check-in
+            </a>
+            <a
               href="/check-in/history"
               className="text-gray-700 hover:text-helfi-green hover:bg-gray-50 group flex items-center px-2 py-2 text-sm font-medium rounded-md"
             >
@@ -111,7 +120,7 @@ function DesktopSidebar() {
               href="/settings"
               className="text-gray-700 hover:text-helfi-green hover:bg-gray-50 group flex items-center px-2 py-2 text-sm font-medium rounded-md"
             >
-              <Cog6ToothIcon className="text-gray-400 group-hover:text-helfi-green mr-3 h-6 w-6" />
+              <Cog6ToothIcon className="text-gray-400 group-hover:text-helfi-green mr-3 h-6 w-6 flex-shrink-0" style={{ minWidth: '24px', minHeight: '24px' }} />
               Settings
             </a>
             

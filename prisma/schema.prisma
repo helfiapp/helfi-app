@@ -8,67 +8,67 @@ datasource db {
 }
 
 model User {
-  id                String    @id @default(cuid())
-  email             String    @unique
-  emailVerified     DateTime?
-  name              String?
-  image             String?
-  gender            Gender?
-  weight            Float?
-  height            Float?
-  bodyType          BodyType?
-  exerciseFrequency String?
-  exerciseTypes     String[]
-  termsAccepted     Boolean   @default(false)
+  id                     String    @id @default(cuid())
+  email                  String    @unique
+  emailVerified          DateTime?
+  name                   String?
+  image                  String?
+  gender                 Gender?
+  weight                 Float?
+  height                 Float?
+  bodyType               BodyType?
+  exerciseFrequency      String?
+  exerciseTypes          String[]
+  termsAccepted          Boolean   @default(false)
   // Credit system fields
-  dailyAnalysisCredits     Int @default(3)  // Free: 3, Premium: 30
-  additionalCredits        Int @default(0)  // Purchased credits that don't expire
-  lastAnalysisResetDate    DateTime?        // Track daily reset
-  lastMonthlyResetDate     DateTime?        // Track monthly reset for monthly quotas
-  totalAnalysisCount       Int @default(0)  // Lifetime usage counter
-  dailyAnalysisUsed        Int @default(0)  // Used today
+  dailyAnalysisCredits   Int       @default(3) // Free: 3, Premium: 30
+  additionalCredits      Int       @default(0) // Purchased credits that don't expire
+  lastAnalysisResetDate  DateTime? // Track daily reset
+  lastMonthlyResetDate   DateTime? // Track monthly reset for monthly quotas
+  totalAnalysisCount     Int       @default(0) // Lifetime usage counter
+  dailyAnalysisUsed      Int       @default(0) // Used today
   // Wallet-based metering (Cursor-style)
-  walletMonthlyUsedCents   Int @default(0)  // Amount used this month in cents
-  walletMonthlyResetAt     DateTime?        // Last time monthly wallet was reset
-  
+  walletMonthlyUsedCents Int       @default(0) // Amount used this month in cents
+  walletMonthlyResetAt   DateTime? // Last time monthly wallet was reset
+
   // Feature-specific credit tracking
-  dailyFoodAnalysisUsed      Int @default(0)  // Food analysis credits used today
-  dailyFoodReanalysisUsed    Int @default(0)  // Food re-analysis used today
-  dailyMedicalAnalysisUsed    Int @default(0)  // Medical image analyses used today
-  dailyInteractionAnalysisUsed Int @default(0)  // Interaction analysis credits used today
-  totalFoodAnalysisCount     Int @default(0)  // Lifetime food analysis count
-  totalInteractionAnalysisCount Int @default(0)  // Lifetime interaction analysis count
+  dailyFoodAnalysisUsed          Int @default(0) // Food analysis credits used today
+  dailyFoodReanalysisUsed        Int @default(0) // Food re-analysis used today
+  dailyMedicalAnalysisUsed       Int @default(0) // Medical image analyses used today
+  dailyInteractionAnalysisUsed   Int @default(0) // Interaction analysis credits used today
+  totalFoodAnalysisCount         Int @default(0) // Lifetime food analysis count
+  totalInteractionAnalysisCount  Int @default(0) // Lifetime interaction analysis count
   monthlyInteractionAnalysisUsed Int @default(0) // Monthly interactions used (premium)
-  
+
   // Monthly per-feature usage tracking (resets monthly)
-  monthlySymptomAnalysisUsed Int @default(0)  // Symptom analyses used this month
-  monthlyFoodAnalysisUsed    Int @default(0)  // Food analyses used this month
-  monthlyMedicalImageAnalysisUsed Int @default(0)  // Medical image analyses used this month
+  monthlySymptomAnalysisUsed      Int @default(0) // Symptom analyses used this month
+  monthlyFoodAnalysisUsed         Int @default(0) // Food analyses used this month
+  monthlyMedicalImageAnalysisUsed Int @default(0) // Medical image analyses used this month
 
   // One-time free use tracking (one free use per AI feature)
-  hasUsedFreeFoodAnalysis        Boolean @default(false)  // Has used free food analysis
-  hasUsedFreeInteractionAnalysis Boolean @default(false)  // Has used free interaction analysis
-  hasUsedFreeMedicalAnalysis     Boolean @default(false)  // Has used free medical image analysis
-  
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  accounts      Account[]
-  sessions      Session[]
-  healthGoals   HealthGoal[]
-  supplements   Supplement[]
-  medications   Medication[]
-  healthLogs    HealthLog[]
-  foodLogs      FoodLog[]
-  exerciseLogs  ExerciseLog[]
-  subscription  Subscription?
-  supportTickets SupportTicket[]
+  hasUsedFreeFoodAnalysis        Boolean @default(false) // Has used free food analysis
+  hasUsedFreeInteractionAnalysis Boolean @default(false) // Has used free interaction analysis
+  hasUsedFreeMedicalAnalysis     Boolean @default(false) // Has used free medical image analysis
+
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  accounts            Account[]
+  sessions            Session[]
+  healthGoals         HealthGoal[]
+  supplements         Supplement[]
+  medications         Medication[]
+  healthLogs          HealthLog[]
+  foodLogs            FoodLog[]
+  exerciseLogs        ExerciseLog[]
+  subscription        Subscription?
+  supportTickets      SupportTicket[]
   interactionAnalyses InteractionAnalysis[]
-  creditTopUps   CreditTopUp[]
-  
+  creditTopUps        CreditTopUp[]
+
   // File relationships (PHASE 2 addition)
-  uploadedFiles File[]     @relation("UploadedFiles")
-  profileImages File[]     @relation("ProfileImages")
-  
+  uploadedFiles File[] @relation("UploadedFiles")
+  profileImages File[] @relation("ProfileImages")
+
   // Lab report relationships
   reports        Report[]
   consentRecords ConsentRecord[]
@@ -130,9 +130,9 @@ model Supplement {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+
   // File relationships (PHASE 2 addition)
-  images    File[]   @relation("SupplementImages")
+  images File[] @relation("SupplementImages")
 }
 
 model Medication {
@@ -145,9 +145,9 @@ model Medication {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+
   // File relationships (PHASE 2 addition)
-  images    File[]   @relation("MedicationImages")
+  images File[] @relation("MedicationImages")
 }
 
 model HealthLog {
@@ -170,9 +170,9 @@ model FoodLog {
   nutrients   Json?
   createdAt   DateTime @default(now())
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+
   // File relationships (PHASE 2 addition)
-  images      File[]   @relation("FoodLogImages")
+  images File[] @relation("FoodLogImages")
 }
 
 model ExerciseLog {
@@ -187,25 +187,25 @@ model ExerciseLog {
 }
 
 model Subscription {
-  id              String    @id @default(cuid())
-  userId          String    @unique
-  plan            Plan      @default(PREMIUM)
-  monthlyPriceCents Int?    // Track subscription tier: 2000 ($20), 3000 ($30), 5000 ($50)
-  startDate       DateTime  @default(now())
-  endDate         DateTime?
-  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                String    @id @default(cuid())
+  userId            String    @unique
+  plan              Plan      @default(PREMIUM)
+  monthlyPriceCents Int? // Track subscription tier: 2000 ($20), 3000 ($30), 5000 ($50)
+  startDate         DateTime  @default(now())
+  endDate           DateTime?
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 // Monetary credit top-ups valid for up to 12 months, consumed FIFO
 model CreditTopUp {
-  id           String   @id @default(cuid())
-  userId       String
-  amountCents  Int
-  usedCents    Int      @default(0)
-  purchasedAt  DateTime @default(now())
-  expiresAt    DateTime
-  source       String?  // e.g., Stripe session id or admin note
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id          String   @id @default(cuid())
+  userId      String
+  amountCents Int
+  usedCents   Int      @default(0)
+  purchasedAt DateTime @default(now())
+  expiresAt   DateTime
+  source      String? // e.g., Stripe session id or admin note
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, expiresAt])
 }
@@ -233,20 +233,20 @@ model Waitlist {
 }
 
 model AdminUser {
-  id           String      @id @default(cuid())
-  email        String      @unique
-  password     String      // Hashed password
-  name         String
-  role         AdminRole   @default(ADMIN)
-  isActive     Boolean     @default(true)
-  lastLogin    DateTime?
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
-  createdBy    String?     // ID of admin who created this user
-  
+  id        String    @id @default(cuid())
+  email     String    @unique
+  password  String // Hashed password
+  name      String
+  role      AdminRole @default(ADMIN)
+  isActive  Boolean   @default(true)
+  lastLogin DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  createdBy String? // ID of admin who created this user
+
   // Support ticket relations
-  assignedTickets    SupportTicket[]  @relation("AssignedTickets")
-  ticketResponses    TicketResponse[] @relation("TicketResponses")
+  assignedTickets SupportTicket[]  @relation("AssignedTickets")
+  ticketResponses TicketResponse[] @relation("TicketResponses")
 }
 
 enum AdminRole {
@@ -256,16 +256,16 @@ enum AdminRole {
 }
 
 model EmailTemplate {
-  id          String            @id @default(cuid())
-  name        String            // Display name (e.g., "Welcome New Users")
-  category    EmailCategory     @default(MARKETING)
-  subject     String            // Email subject line
-  content     String            // Email body content
-  isActive    Boolean           @default(true)
-  isBuiltIn   Boolean           @default(false) // True for system templates, false for custom
-  createdBy   String?           // Admin user ID who created it
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  id        String        @id @default(cuid())
+  name      String // Display name (e.g., "Welcome New Users")
+  category  EmailCategory @default(MARKETING)
+  subject   String // Email subject line
+  content   String // Email body content
+  isActive  Boolean       @default(true)
+  isBuiltIn Boolean       @default(false) // True for system templates, false for custom
+  createdBy String? // Admin user ID who created it
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
 }
 
 enum EmailCategory {
@@ -278,38 +278,38 @@ enum EmailCategory {
 }
 
 model SupportTicket {
-  id                  String            @id @default(cuid())
-  subject             String
-  message             String
-  userEmail           String
-  userName            String?
-  userId              String?           // Optional link to registered user
-  status              TicketStatus      @default(OPEN)
-  priority            TicketPriority    @default(MEDIUM)
-  category            TicketCategory    @default(GENERAL)
-  externalMessageId   String?           // For email threading
-  assignedAdminId     String?
-  createdAt           DateTime          @default(now())
-  updatedAt           DateTime          @updatedAt
-  
+  id                String         @id @default(cuid())
+  subject           String
+  message           String
+  userEmail         String
+  userName          String?
+  userId            String? // Optional link to registered user
+  status            TicketStatus   @default(OPEN)
+  priority          TicketPriority @default(MEDIUM)
+  category          TicketCategory @default(GENERAL)
+  externalMessageId String? // For email threading
+  assignedAdminId   String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
   // Relations
-  user                User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
-  assignedAdmin       AdminUser?        @relation("AssignedTickets", fields: [assignedAdminId], references: [id], onDelete: SetNull)
-  responses           TicketResponse[]
+  user          User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
+  assignedAdmin AdminUser?       @relation("AssignedTickets", fields: [assignedAdminId], references: [id], onDelete: SetNull)
+  responses     TicketResponse[]
 }
 
 model TicketResponse {
-  id              String      @id @default(cuid())
+  id              String   @id @default(cuid())
   ticketId        String
   message         String
-  isAdminResponse Boolean     @default(false)
-  adminId         String?     // If admin response
-  userEmail       String?     // If user response (for non-registered users)
-  createdAt       DateTime    @default(now())
-  
+  isAdminResponse Boolean  @default(false)
+  adminId         String? // If admin response
+  userEmail       String? // If user response (for non-registered users)
+  createdAt       DateTime @default(now())
+
   // Relations
-  ticket          SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  admin           AdminUser?    @relation("TicketResponses", fields: [adminId], references: [id], onDelete: SetNull)
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  admin  AdminUser?    @relation("TicketResponses", fields: [adminId], references: [id], onDelete: SetNull)
 }
 
 enum TicketStatus {
@@ -340,30 +340,30 @@ enum TicketCategory {
 
 // File Management System - PHASE 2 ADDITION
 model File {
-  id              String      @id @default(cuid())
-  originalName    String      // Original filename from user
-  fileName        String      // Processed filename
-  fileSize        Int         // File size in bytes
-  mimeType        String      // File MIME type (image/jpeg, etc.)
-  cloudinaryId    String      // Cloudinary public_id
-  cloudinaryUrl   String      // Full Cloudinary URL
-  secureUrl       String      // Secure HTTPS Cloudinary URL
-  uploadedById    String      // User who uploaded it
-  fileType        FileType    @default(IMAGE)
-  usage           FileUsage   @default(OTHER)
-  metadata        Json?       // Additional file metadata
-  isPublic        Boolean     @default(false)
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  id            String    @id @default(cuid())
+  originalName  String // Original filename from user
+  fileName      String // Processed filename
+  fileSize      Int // File size in bytes
+  mimeType      String // File MIME type (image/jpeg, etc.)
+  cloudinaryId  String // Cloudinary public_id
+  cloudinaryUrl String // Full Cloudinary URL
+  secureUrl     String // Secure HTTPS Cloudinary URL
+  uploadedById  String // User who uploaded it
+  fileType      FileType  @default(IMAGE)
+  usage         FileUsage @default(OTHER)
+  metadata      Json? // Additional file metadata
+  isPublic      Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   // Relations
-  uploadedBy      User        @relation("UploadedFiles", fields: [uploadedById], references: [id], onDelete: Cascade)
+  uploadedBy User @relation("UploadedFiles", fields: [uploadedById], references: [id], onDelete: Cascade)
 
   // Optional relationships to existing models (for future use)
-  profileUsers    User[]      @relation("ProfileImages")
-  supplementFiles Supplement[] @relation("SupplementImages") 
+  profileUsers    User[]       @relation("ProfileImages")
+  supplementFiles Supplement[] @relation("SupplementImages")
   medicationFiles Medication[] @relation("MedicationImages")
-  foodLogFiles    FoodLog[]   @relation("FoodLogImages")
+  foodLogFiles    FoodLog[]    @relation("FoodLogImages")
 }
 
 enum FileType {
@@ -384,93 +384,93 @@ enum FileUsage {
 }
 
 model InteractionAnalysis {
-  id                    String   @id @default(cuid())
-  userId                String
-  analysisName          String   // User-friendly name for the analysis
-  overallRisk           String   // low, medium, high
-  supplementCount       Int      @default(0)
-  medicationCount       Int      @default(0)
-  analysisData          Json     // Full analysis results (interactions, recommendations, etc.)
-  supplementsAnalyzed   Json     // Array of supplements that were analyzed
-  medicationsAnalyzed   Json     // Array of medications that were analyzed
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-  
+  id                  String   @id @default(cuid())
+  userId              String
+  analysisName        String // User-friendly name for the analysis
+  overallRisk         String // low, medium, high
+  supplementCount     Int      @default(0)
+  medicationCount     Int      @default(0)
+  analysisData        Json // Full analysis results (interactions, recommendations, etc.)
+  supplementsAnalyzed Json // Array of supplements that were analyzed
+  medicationsAnalyzed Json // Array of medications that were analyzed
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
   // Relations
-  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([userId, createdAt])
 }
 
 // PDF Lab Report Intake & Encryption System
 model Report {
-  id                    String      @id @default(cuid())
+  id                    String       @id @default(cuid())
   userId                String
-  originalFileName      String      // Original filename from user
-  s3Key                 String      // Blob pathname (stored in s3Key field for compatibility)
-  fileSize              Int          // File size in bytes
-  mimeType              String      @default("application/pdf")
+  originalFileName      String // Original filename from user
+  s3Key                 String // Blob pathname (stored in s3Key field for compatibility)
+  fileSize              Int // File size in bytes
+  mimeType              String       @default("application/pdf")
   status                ReportStatus @default(PENDING)
-  isPasswordProtected   Boolean     @default(false)
-  passwordHash          String?     // Ephemeral hash (not the actual password) - only for verification attempts
-  retainOriginal        Boolean     @default(false) // User consent to retain original PDF
-  originalDeletedAt     DateTime?   // When original was deleted
+  isPasswordProtected   Boolean      @default(false)
+  passwordHash          String? // Ephemeral hash (not the actual password) - only for verification attempts
+  retainOriginal        Boolean      @default(false) // User consent to retain original PDF
+  originalDeletedAt     DateTime? // When original was deleted
   processingStartedAt   DateTime?
   processingCompletedAt DateTime?
-  processingError       String?     // Error message if processing failed
-  consentRecordId       String      // Link to consent record
-  metadata              Json?       // Store blob URL and other metadata
-  createdAt             DateTime    @default(now())
-  updatedAt             DateTime    @updatedAt
-  
+  processingError       String? // Error message if processing failed
+  consentRecordId       String // Link to consent record
+  metadata              Json? // Store blob URL and other metadata
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+
   // Relations
-  user                  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  consentRecord         ConsentRecord @relation(fields: [consentRecordId], references: [id], onDelete: Cascade)
-  labResults            LabResult[]
-  auditEvents           AuditEvent[]
-  
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  consentRecord ConsentRecord @relation(fields: [consentRecordId], references: [id], onDelete: Cascade)
+  labResults    LabResult[]
+  auditEvents   AuditEvent[]
+
   @@index([userId, createdAt])
   @@index([status])
   @@index([consentRecordId])
 }
 
 model LabResult {
-  id                    String      @id @default(cuid())
-  reportId              String
+  id                       String   @id @default(cuid())
+  reportId                 String
   // All sensitive fields are encrypted with AES-256-GCM
-  analyteNameEncrypted  String      // AES-256-GCM encrypted analyte name (e.g., "Glucose", "Cholesterol")
-  valueEncrypted        String      // AES-256-GCM encrypted test value
-  unitEncrypted         String?     // AES-256-GCM encrypted unit of measurement
-  referenceRangeEncrypted String?   // AES-256-GCM encrypted normal range
-  collectionDateEncrypted String?   // AES-256-GCM encrypted date (ISO string)
-  accessionNumberEncrypted String?  // AES-256-GCM encrypted lab accession number
-  laboratoryNameEncrypted String?   // AES-256-GCM encrypted lab name
-  dataKeyEncrypted      String      // KMS-wrapped data encryption key (envelope encryption)
-  createdAt             DateTime    @default(now())
-  updatedAt             DateTime    @updatedAt
-  
+  analyteNameEncrypted     String // AES-256-GCM encrypted analyte name (e.g., "Glucose", "Cholesterol")
+  valueEncrypted           String // AES-256-GCM encrypted test value
+  unitEncrypted            String? // AES-256-GCM encrypted unit of measurement
+  referenceRangeEncrypted  String? // AES-256-GCM encrypted normal range
+  collectionDateEncrypted  String? // AES-256-GCM encrypted date (ISO string)
+  accessionNumberEncrypted String? // AES-256-GCM encrypted lab accession number
+  laboratoryNameEncrypted  String? // AES-256-GCM encrypted lab name
+  dataKeyEncrypted         String // KMS-wrapped data encryption key (envelope encryption)
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
   // Relations
-  report                Report      @relation(fields: [reportId], references: [id], onDelete: Cascade)
-  
+  report Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
   @@index([reportId])
 }
 
 model ConsentRecord {
-  id                    String      @id @default(cuid())
-  userId                String
-  consentType           ConsentType @default(PDF_DECRYPTION)
-  consentText           String      // Full text of consent shown to user
-  decryptionConsent     Boolean     // Required: User authorized PDF decryption
-  passwordConsent       Boolean     // Required: User authorized password use (ephemeral)
-  retentionConsent      Boolean     @default(false) // Optional: User chose to retain original PDF
-  ipAddress             String?     // User's IP at time of consent
-  userAgent             String?     // User's browser/device info
-  consentedAt           DateTime    @default(now())
-  
+  id                String      @id @default(cuid())
+  userId            String
+  consentType       ConsentType @default(PDF_DECRYPTION)
+  consentText       String // Full text of consent shown to user
+  decryptionConsent Boolean // Required: User authorized PDF decryption
+  passwordConsent   Boolean // Required: User authorized password use (ephemeral)
+  retentionConsent  Boolean     @default(false) // Optional: User chose to retain original PDF
+  ipAddress         String? // User's IP at time of consent
+  userAgent         String? // User's browser/device info
+  consentedAt       DateTime    @default(now())
+
   // Relations
-  user                  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  reports               Report[]
-  
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reports Report[]
+
   @@index([userId, consentedAt])
 }
 
@@ -481,19 +481,19 @@ enum ConsentType {
 }
 
 model AuditEvent {
-  id                    String      @id @default(cuid())
-  reportId              String?
-  userId                String
-  eventType             AuditEventType
-  eventDescription      String      // Human-readable description
-  metadata              Json?       // Additional event data (redacted of sensitive info)
-  ipAddress             String?
-  userAgent             String?
-  createdAt             DateTime    @default(now())
-  
+  id               String         @id @default(cuid())
+  reportId         String?
+  userId           String
+  eventType        AuditEventType
+  eventDescription String // Human-readable description
+  metadata         Json? // Additional event data (redacted of sensitive info)
+  ipAddress        String?
+  userAgent        String?
+  createdAt        DateTime       @default(now())
+
   // Relations
-  report                Report?     @relation(fields: [reportId], references: [id], onDelete: SetNull)
-  
+  report Report? @relation(fields: [reportId], references: [id], onDelete: SetNull)
+
   @@index([userId, createdAt])
   @@index([reportId])
   @@index([eventType, createdAt])
@@ -515,9 +515,9 @@ enum AuditEventType {
 }
 
 enum ReportStatus {
-  PENDING           // Uploaded, awaiting processing
-  PROCESSING        // Currently being processed
-  COMPLETED         // Successfully processed
-  FAILED            // Processing failed
+  PENDING // Uploaded, awaiting processing
+  PROCESSING // Currently being processed
+  COMPLETED // Successfully processed
+  FAILED // Processing failed
   DECRYPTION_FAILED // Password incorrect or PDF corrupted
 }
