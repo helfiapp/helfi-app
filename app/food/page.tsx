@@ -980,6 +980,7 @@ Please add nutritional information manually if needed.`);
                   <div className="mt-2">
                     <p className="text-xs text-gray-500 text-center mb-2">Typical cost: 1–2 credits</p>
                     <UsageMeter inline={true} refreshTrigger={usageMeterRefresh} />
+                    <FeatureUsageDisplay featureName="foodAnalysis" featureLabel="Food Analysis" />
                   </div>
                   
                   {/* Photo Management Options */}
