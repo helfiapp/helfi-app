@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 interface FeatureUsage {
   count: number
   costPerUse: number
+  label?: 'monthly' | 'total'
 }
 
 interface FeatureUsageData {
@@ -58,9 +59,8 @@ export default function FeatureUsageDisplay({ featureName, featureLabel, refresh
   // Calculate total credits used for this feature
   const creditsUsed = usage.count * usage.costPerUse
   
-  // Determine label: if hasSubscription and count > 0, show "This month", otherwise "Total"
-  // Note: API now returns lifetime counts as fallback when monthly is 0
-  const timeLabel = hasSubscription && usage.count > 0 ? 'This month' : 'Total'
+  // Determine label based on API-provided label (monthly vs total)
+  const timeLabel = usage.label === 'monthly' && hasSubscription ? 'This month' : 'Total'
 
   return (
     <div className="mt-2 text-xs text-gray-600">

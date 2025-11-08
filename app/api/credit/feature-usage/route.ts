@@ -42,30 +42,32 @@ export async function GET(_req: NextRequest) {
       (user.totalAnalysisCount || 0) - (user.totalFoodAnalysisCount || 0) - (user.totalInteractionAnalysisCount || 0)
     )
 
-    // Return monthly per-feature usage, but fall back to lifetime if monthly is 0
-    // This handles cases where monthly counters were just added and don't reflect past usage
+    // Choose the larger of monthly vs lifetime to reflect usage before monthly counters existed
+    const symptomMonthly = user.monthlySymptomAnalysisUsed || 0
+    const foodMonthly = user.monthlyFoodAnalysisUsed || 0
+    const interactionMonthly = user.monthlyInteractionAnalysisUsed || 0
+    const medicalMonthly = user.monthlyMedicalImageAnalysisUsed || 0
+
     const featureUsage = {
       symptomAnalysis: {
-        count: (user.monthlySymptomAnalysisUsed || 0) > 0 
-          ? (user.monthlySymptomAnalysisUsed || 0)
-          : symptomAnalysisLifetime, // Fall back to lifetime if monthly is 0
+        count: Math.max(symptomMonthly, symptomAnalysisLifetime),
         costPerUse: CREDIT_COSTS.SYMPTOM_ANALYSIS,
+        label: symptomMonthly >= symptomAnalysisLifetime && symptomMonthly > 0 ? 'monthly' : 'total',
       },
       foodAnalysis: {
-        count: (user.monthlyFoodAnalysisUsed || 0) > 0
-          ? (user.monthlyFoodAnalysisUsed || 0)
-          : (user.totalFoodAnalysisCount || 0), // Fall back to lifetime if monthly is 0
+        count: Math.max(foodMonthly, (user.totalFoodAnalysisCount || 0)),
         costPerUse: CREDIT_COSTS.FOOD_ANALYSIS,
+        label: foodMonthly >= (user.totalFoodAnalysisCount || 0) && foodMonthly > 0 ? 'monthly' : 'total',
       },
       interactionAnalysis: {
-        count: (user.monthlyInteractionAnalysisUsed || 0) > 0
-          ? (user.monthlyInteractionAnalysisUsed || 0)
-          : (user.totalInteractionAnalysisCount || 0), // Fall back to lifetime if monthly is 0
+        count: Math.max(interactionMonthly, (user.totalInteractionAnalysisCount || 0)),
         costPerUse: CREDIT_COSTS.INTERACTION_ANALYSIS,
+        label: interactionMonthly >= (user.totalInteractionAnalysisCount || 0) && interactionMonthly > 0 ? 'monthly' : 'total',
       },
       medicalImageAnalysis: {
-        count: user.monthlyMedicalImageAnalysisUsed || 0,
+        count: medicalMonthly,
         costPerUse: CREDIT_COSTS.MEDICAL_IMAGE_ANALYSIS,
+        label: medicalMonthly > 0 ? 'monthly' : 'total',
       },
     }
 
