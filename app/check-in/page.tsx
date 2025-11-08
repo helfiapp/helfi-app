@@ -130,19 +130,27 @@ export default function CheckInPage() {
               ? `How were your ${issue.name} levels today?`
               : (isPlural() ? `How were your ${issue.name} today?` : `How was your ${issue.name} today?`)
             const selected = ratings[issue.id]
+            const isSelected = (idx: number) => selected === idx && !na[issue.id]
             return (
-              <div key={issue.id} className="border border-gray-200 rounded-xl p-4">
-                <div className="font-medium mb-3">{question}</div>
+              <div key={issue.id} className="border border-gray-200 dark:border-gray-700 rounded-xl p-4 dark:bg-gray-800/50">
+                <div className="font-medium mb-3 text-gray-900 dark:text-white">{question}</div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
-                  {LABELS.map((label, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => setRating(issue.id, idx)}
-                      className={`text-xs px-2 py-2 rounded-lg border transition-colors ${selected === idx && !na[issue.id] ? 'bg-helfi-green text-white border-helfi-green' : 'bg-white text-gray-700 border-gray-200 hover:border-helfi-green'}`}
-                    >
-                      {label}
-                    </button>
-                  ))}
+                  {LABELS.map((label, idx) => {
+                    const selectedState = isSelected(idx)
+                    return (
+                      <button
+                        key={idx}
+                        onClick={() => setRating(issue.id, idx)}
+                        className={`text-xs px-2 py-2 rounded-lg border transition-all duration-200 font-medium ${
+                          selectedState
+                            ? 'bg-helfi-green text-white border-helfi-green shadow-md scale-105'
+                            : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:border-helfi-green hover:bg-gray-50 dark:hover:bg-gray-600'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    )
+                  })}
                 </div>
                 {/* Optional details accordion */}
                 <details className="mt-3">
