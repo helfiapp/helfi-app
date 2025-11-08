@@ -41,13 +41,9 @@ export async function POST(req: NextRequest) {
     timezone: string
     subscription: any
   }> = await prisma.$queryRawUnsafe(`
-    SELECT s.userId as userId, COALESCE(s.timezone, 'Australia/Melbourne') as timezone, p.subscription
-    FROM CheckinSettings s
-    JOIN PushSubscriptions p ON p.userId = s.userId
-    UNION
-    SELECT p.userId as userId, 'Australia/Melbourne' as timezone, p.subscription
+    SELECT DISTINCT p.userId as userId, COALESCE(s.timezone, 'Australia/Melbourne') as timezone, p.subscription
     FROM PushSubscriptions p
-    WHERE p.userId NOT IN (SELECT userId FROM CheckinSettings)
+    LEFT JOIN CheckinSettings s ON s.userId = p.userId
   `)
 
   // Determine current HH:MM in each user's timezone and match one of their times
