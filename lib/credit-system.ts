@@ -107,11 +107,24 @@ export class CreditManager {
     });
     const topUpsTotalAvailable =
       topUps.reduce((sum, t) => sum + Math.max(0, t.amountCents - t.usedCents), 0) || 0;
+    const topUpsTotalPurchased =
+      topUps.reduce((sum, t) => sum + t.amountCents, 0) || 0;
+    const topUpsTotalUsed =
+      topUps.reduce((sum, t) => sum + t.usedCents, 0) || 0;
 
     const monthlyRemaining = Math.max(0, monthlyCapCents - monthlyUsedCents);
     const totalAvailable = monthlyRemaining + topUpsTotalAvailable;
-    const percentUsed =
-      monthlyCapCents <= 0 ? 0 : Math.min(100, Math.floor((monthlyUsedCents / monthlyCapCents) * 100));
+    
+    // Calculate percentUsed: if user has subscription, use monthly wallet; otherwise use top-ups
+    let percentUsed = 0;
+    if (monthlyCapCents > 0) {
+      // User has subscription - calculate based on monthly wallet
+      percentUsed = Math.min(100, Math.floor((monthlyUsedCents / monthlyCapCents) * 100));
+    } else if (topUpsTotalPurchased > 0) {
+      // User has no subscription but has top-ups - calculate based on top-up usage
+      percentUsed = Math.min(100, Math.floor((topUpsTotalUsed / topUpsTotalPurchased) * 100));
+    }
+    // If neither subscription nor top-ups, percentUsed remains 0
 
     return {
       plan,
