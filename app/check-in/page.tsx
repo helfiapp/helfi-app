@@ -20,25 +20,31 @@ export default function CheckInPage() {
   const [notes, setNotes] = useState<Record<string, string>>({})
   const [na, setNa] = useState<Record<string, boolean>>({})
   const [issues, setIssues] = useState<UserIssue[]>([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     // Load actual issues if API is available
-    fetch('/api/checkins/today', { cache: 'no-store' as any }).then(r => r.json()).then((data) => {
-      if (Array.isArray(data?.issues)) {
-        const seen = new Set<string>()
-        const unique = [] as UserIssue[]
-        for (const it of data.issues as UserIssue[]) {
-          const key = (it.name || '').toLowerCase().trim()
-          if (!seen.has(key)) { seen.add(key); unique.push(it) }
+    setLoading(true)
+    fetch('/api/checkins/today', { cache: 'no-store' as any })
+      .then(r => r.json())
+      .then((data) => {
+        if (Array.isArray(data?.issues)) {
+          const seen = new Set<string>()
+          const unique = [] as UserIssue[]
+          for (const it of data.issues as UserIssue[]) {
+            const key = (it.name || '').toLowerCase().trim()
+            if (!seen.has(key)) { seen.add(key); unique.push(it) }
+          }
+          if (unique.length > 0) setIssues(unique)
         }
-        if (unique.length > 0) setIssues(unique)
-      }
-      if (Array.isArray(data?.ratings)) {
-        const map: Record<string, number> = {}
-        for (const r of data.ratings) map[r.issueId] = r.value
-        setRatings(map)
-      }
-    }).catch(() => {})
+        if (Array.isArray(data?.ratings)) {
+          const map: Record<string, number> = {}
+          for (const r of data.ratings) map[r.issueId] = r.value
+          setRatings(map)
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false))
   }, [])
 
   const setRating = (issueId: string, value: number) => {
@@ -102,12 +108,17 @@ export default function CheckInPage() {
           </div>
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">Rate how you went today. One tap per item, then Save.</p>
 
-        <div className="space-y-6">
-          {issues.length === 0 && (
-            <div className="border border-yellow-200 bg-yellow-50 text-yellow-800 rounded-xl p-4 text-sm">
-              No issues selected yet. Go to <a className="underline" href="/onboarding?step=4">Health Setup</a> to choose what you want to track.
-            </div>
-          )}
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-helfi-green"></div>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {issues.length === 0 && (
+              <div className="border border-yellow-200 bg-yellow-50 text-yellow-800 rounded-xl p-4 text-sm">
+                No issues selected yet. Go to <a className="underline" href="/onboarding?step=4">Health Setup</a> to choose what you want to track.
+              </div>
+            )}
           {issues
             // Filter only for ?new= parameter, otherwise show all issues so users can see and edit their ratings
             .filter((it) => {
@@ -185,11 +196,14 @@ export default function CheckInPage() {
               </div>
             )
           })}
-        </div>
+          </div>
+        )}
 
-        <div className="mt-6 flex justify-end">
-          <button onClick={handleSave} className="bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90">Save today's ratings</button>
-        </div>
+        {!loading && (
+          <div className="mt-6 flex justify-end">
+            <button onClick={handleSave} className="bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90">Save today's ratings</button>
+          </div>
+        )}
         </div>
       </main>
     </div>
