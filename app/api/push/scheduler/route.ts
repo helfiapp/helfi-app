@@ -35,16 +35,19 @@ export async function POST(req: NextRequest) {
     )
   `)
 
-  // Load all users with settings + subscriptions (simplified - only time1)
+  // Load all users with subscriptions (use default 9pm for everyone)
   const rows: Array<{
     userid: string
-    time1: string
     timezone: string
     subscription: any
   }> = await prisma.$queryRawUnsafe(`
-    SELECT s.userId as userId, COALESCE(s.time1, '21:00') as time1, COALESCE(s.timezone, 'Australia/Melbourne') as timezone, p.subscription
+    SELECT s.userId as userId, COALESCE(s.timezone, 'Australia/Melbourne') as timezone, p.subscription
     FROM CheckinSettings s
     JOIN PushSubscriptions p ON p.userId = s.userId
+    UNION
+    SELECT p.userId as userId, 'Australia/Melbourne' as timezone, p.subscription
+    FROM PushSubscriptions p
+    WHERE p.userId NOT IN (SELECT userId FROM CheckinSettings)
   `)
 
   // Determine current HH:MM in each user's timezone and match one of their times
@@ -66,8 +69,8 @@ export async function POST(req: NextRequest) {
       const mm = parts.find(p => p.type === 'minute')?.value || '00'
       const current = `${hh}:${mm}`
 
-      // Only check time1 (single daily reminder)
-      const reminderTime = r.time1 || '21:00'
+      // Always use default 9pm (21:00) for all users
+      const reminderTime = '21:00'
       const shouldSend = current === reminderTime
       if (!shouldSend) continue
 
