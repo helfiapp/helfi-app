@@ -56,7 +56,7 @@ export default function CheckinHistoryPage() {
       setRows(history)
       
       // Extract unique issue names
-      const issues = Array.from(new Set(history.map((r: Row) => r.name))).sort()
+      const issues = Array.from(new Set(history.map((r: Row) => r.name))).sort() as string[]
       setAllIssues(issues)
       if (selectedIssues.size === 0) {
         setSelectedIssues(new Set(issues))
