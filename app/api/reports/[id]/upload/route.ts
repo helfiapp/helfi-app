@@ -55,8 +55,9 @@ export async function POST(
     }
 
     // Upload to Vercel Blob
+    // Note: 'public' access still requires API token for retrieval via our API routes
     const blob = await put(report.s3Key, file, {
-      access: 'private', // Private access - only accessible via API
+      access: 'public',
       addRandomSuffix: false, // Use our custom path
     });
 

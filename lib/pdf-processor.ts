@@ -1,20 +1,35 @@
 /**
  * PDF processing utilities for lab reports
  * Handles password-protected PDFs, text extraction, and lab value parsing
+ * Uses pdfjs-dist with server-side configuration
  */
 
-import * as pdfjsLib from 'pdfjs-dist';
-import { getDocument, PDFDocumentProxy } from 'pdfjs-dist';
+// For server-side, we need to use a different approach
+// pdfjs-dist has issues with DOMMatrix in Node.js, so we'll use pdf-parse as fallback
+// or configure pdfjs-dist to work without DOM APIs
 
-// Configure PDF.js worker
+let pdfjsLib: any;
+let getDocument: any;
+let PDFDocumentProxy: any;
+
+// Dynamic import to handle server-side vs client-side
 if (typeof window === 'undefined') {
-  // Server-side: use Node.js worker
-  pdfjsLib.GlobalWorkerOptions.workerSrc = require.resolve('pdfjs-dist/build/pdf.worker.mjs');
+  // Server-side: Use pdfjs-dist without worker (synchronous mode)
+  // This avoids DOMMatrix issues
+  const pdfjs = require('pdfjs-dist/legacy/build/pdf.mjs');
+  pdfjsLib = pdfjs;
+  getDocument = pdfjs.getDocument;
+  
+  // Disable worker for server-side (use synchronous rendering)
+  pdfjsLib.GlobalWorkerOptions.workerSrc = '';
 } else {
-  // Client-side: use CDN worker
+  // Client-side: Use standard pdfjs-dist
+  pdfjsLib = require('pdfjs-dist');
+  getDocument = pdfjsLib.getDocument;
   pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 }
 
+// Type definitions
 export interface LabValue {
   analyteName: string;
   value: string;
@@ -31,16 +46,21 @@ export interface PDFProcessingResult {
   pageCount: number;
 }
 
+export type PDFDocumentProxyType = any;
+
 /**
  * Load and decrypt password-protected PDF
  */
 export async function loadPDF(
   pdfBuffer: Buffer,
   password?: string
-): Promise<PDFDocumentProxy> {
+): Promise<PDFDocumentProxyType> {
   const loadingTask = getDocument({
     data: pdfBuffer,
     password: password,
+    useWorkerFetch: false, // Disable worker fetch for server-side
+    isEvalSupported: false, // Disable eval for security
+    verbosity: 0, // Reduce logging
   });
 
   try {
@@ -57,7 +77,7 @@ export async function loadPDF(
 /**
  * Extract text from PDF
  */
-export async function extractTextFromPDF(pdf: PDFDocumentProxy): Promise<string> {
+export async function extractTextFromPDF(pdf: PDFDocumentProxyType): Promise<string> {
   let fullText = '';
   const numPages = pdf.numPages;
 
