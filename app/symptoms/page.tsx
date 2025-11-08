@@ -138,7 +138,7 @@ export default function SymptomAnalysisPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      <PageHeader title="Symptom Analysis" backHref="/dashboard" />
+      <PageHeader title="Symptom Analysis" />
 
       {/* Content */}
       <main className="flex-1">

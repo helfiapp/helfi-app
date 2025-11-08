@@ -145,7 +145,7 @@ export default function Profile() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <PageHeader title="Profile" backHref="/dashboard" />
+      <PageHeader title="Profile" />
 
       {/* Main Content */}
       <div className="max-w-3xl mx-auto px-4 py-8 pb-24 md:pb-8">

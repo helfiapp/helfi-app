@@ -105,7 +105,7 @@ export default function MedicalImagesPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      <PageHeader title="Medical Image Analyzer" backHref="/dashboard" />
+      <PageHeader title="Medical Image Analyzer" />
 
       {/* Content */}
       <main className="flex-1">
