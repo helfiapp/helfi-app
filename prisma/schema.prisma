@@ -34,11 +34,16 @@ model User {
   // Feature-specific credit tracking
   dailyFoodAnalysisUsed      Int @default(0)  // Food analysis credits used today
   dailyFoodReanalysisUsed    Int @default(0)  // Food re-analysis used today
-  dailyMedicalAnalysisUsed   Int @default(0)  // Medical image analyses used today
+  dailyMedicalAnalysisUsed    Int @default(0)  // Medical image analyses used today
   dailyInteractionAnalysisUsed Int @default(0)  // Interaction analysis credits used today
   totalFoodAnalysisCount     Int @default(0)  // Lifetime food analysis count
   totalInteractionAnalysisCount Int @default(0)  // Lifetime interaction analysis count
   monthlyInteractionAnalysisUsed Int @default(0) // Monthly interactions used (premium)
+  
+  // Monthly per-feature usage tracking (resets monthly)
+  monthlySymptomAnalysisUsed Int @default(0)  // Symptom analyses used this month
+  monthlyFoodAnalysisUsed    Int @default(0)  // Food analyses used this month
+  monthlyMedicalImageAnalysisUsed Int @default(0)  // Medical image analyses used this month
 
   // One-time free use tracking (one free use per AI feature)
   hasUsedFreeFoodAnalysis        Boolean @default(false)  // Has used free food analysis

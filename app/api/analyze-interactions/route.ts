@@ -278,15 +278,15 @@ Be thorough but not alarmist. Provide actionable recommendations.`;
           console.warn('Failed to update hasUsedFreeInteractionAnalysis:', e)
         }
       }
-    } else if (isPremium) {
-      await prisma.user.update({
-        where: { id: user.id },
-        data: ( {
-          monthlyInteractionAnalysisUsed: { increment: 1 },
-          totalAnalysisCount: { increment: 1 },
-        } as any )
-      });
-    }
+    // Update counters (for all users, not just premium)
+    await prisma.user.update({
+      where: { id: user.id },
+      data: ( {
+        monthlyInteractionAnalysisUsed: { increment: 1 },
+        totalInteractionAnalysisCount: { increment: 1 },
+        totalAnalysisCount: { increment: 1 },
+      } as any )
+    });
 
     // Fire-and-forget: update insights preview based on new interaction results
     try { fetch('/api/insights/generate?preview=1', { method: 'POST' }).catch(()=>{}) } catch {}

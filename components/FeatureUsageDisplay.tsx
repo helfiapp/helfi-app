@@ -53,13 +53,15 @@ export default function FeatureUsageDisplay({ featureName, featureLabel }: Featu
     return null
   }
 
-  // Show usage for all users (subscription or credits)
-  // For subscription users, show "This month"; for credit-only users, show lifetime
-  const timeLabel = hasSubscription ? 'This month' : 'Total'
+  // Show usage for subscription users only (they have monthly reset)
+  // For credit-only users, we don't show per-feature usage since credits don't reset monthly
+  if (!hasSubscription) {
+    return null
+  }
 
   return (
     <div className="mt-2 text-xs text-gray-600">
-      <span className="text-gray-500">{timeLabel}: </span>
+      <span className="text-gray-500">This month: </span>
       <span className="font-medium">You have used this feature {usage.count} {usage.count === 1 ? 'time' : 'times'}</span>
     </div>
   )

@@ -397,19 +397,19 @@ After your explanation and the one-line totals above, also include a compact JSO
           console.warn('Failed to update hasUsedFreeFoodAnalysis:', e)
         }
       }
-    } else if (isPremium) {
-      await prisma.user.update({
-        where: { id: currentUser.id },
-        data: ( isReanalysis ? {
-          dailyFoodReanalysisUsed: { increment: 1 },
-          totalAnalysisCount: { increment: 1 },
-        } : {
-          dailyFoodAnalysisUsed: { increment: 1 },
-          totalFoodAnalysisCount: { increment: 1 },
-          totalAnalysisCount: { increment: 1 },
-        } ) as any
-      });
-    }
+    // Update counters (for all users, not just premium)
+    await prisma.user.update({
+      where: { id: currentUser.id },
+      data: ( isReanalysis ? {
+        dailyFoodReanalysisUsed: { increment: 1 },
+        totalAnalysisCount: { increment: 1 },
+      } : {
+        dailyFoodAnalysisUsed: { increment: 1 },
+        totalFoodAnalysisCount: { increment: 1 },
+        totalAnalysisCount: { increment: 1 },
+        monthlyFoodAnalysisUsed: { increment: 1 },
+      } ) as any
+    });
     
     console.log('=== FOOD ANALYZER DEBUG END ===');
 

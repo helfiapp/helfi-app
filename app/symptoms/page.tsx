@@ -8,6 +8,7 @@ import CreditPurchaseModal from '@/components/CreditPurchaseModal'
 import MobileMoreMenu from '@/components/MobileMoreMenu'
 import SymptomChat from './SymptomChat'
 import UsageMeter from '@/components/UsageMeter'
+import FeatureUsageDisplay from '@/components/FeatureUsageDisplay'
 
 type AnalysisResult = {
   success: boolean
@@ -255,6 +256,7 @@ export default function SymptomAnalysisPage() {
             <div className="mt-2">
               <p className="text-xs text-gray-500 mb-2">Typical cost: 2-3 credits per analysis</p>
               <UsageMeter inline={true} refreshTrigger={usageMeterRefresh} />
+              <FeatureUsageDisplay featureName="symptomAnalysis" featureLabel="Symptom Analysis" />
             </div>
 
             {/* Progress Bar */}

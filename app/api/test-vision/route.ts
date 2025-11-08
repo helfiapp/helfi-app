@@ -3,6 +3,8 @@ import OpenAI from 'openai';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { CreditManager } from '@/lib/credit-system';
+import { chatCompletionWithCost } from '@/lib/metered-openai';
 
 function getOpenAIClient() {
   if (!process.env.OPENAI_API_KEY) {
@@ -69,12 +71,13 @@ export async function POST(req: NextRequest) {
       base64Length: imageBase64.length
     });
 
-    // Test with simple image analysis
+    // Test with simple image analysis using metered wrapper
     const openai = getOpenAIClient();
     if (!openai) {
       return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 });
     }
-    const response = await openai.chat.completions.create({
+    
+    const wrapped = await chatCompletionWithCost(openai, {
       model: "gpt-4o",
       messages: [
         {
@@ -96,12 +99,22 @@ export async function POST(req: NextRequest) {
       ],
       max_tokens: 500,
       temperature: 0.1
-    });
+    } as any);
 
-    const analysis = response.choices[0]?.message?.content;
+    const analysis = wrapped.completion.choices[0]?.message?.content;
+    
+    // Charge wallet (skip if allowed via free use)
+    const allowViaFreeUse = !isPremium && !hasPurchasedCredits && !hasUsedFreeMedical;
+    if (!allowViaFreeUse) {
+      const cm = new CreditManager(user.id);
+      const ok = await cm.chargeCents(wrapped.costCents);
+      if (!ok) {
+        return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
+      }
+    }
     
     // Mark free use as used if this was a free use
-    if (!isPremium && !hasPurchasedCredits && !hasUsedFreeMedical) {
+    if (allowViaFreeUse) {
       try {
         await prisma.user.update({
           where: { id: user.id },
@@ -117,8 +130,19 @@ export async function POST(req: NextRequest) {
       }
     }
     
+    // Update monthly counter (for all users, not just premium)
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        monthlyMedicalImageAnalysisUsed: { increment: 1 },
+      } as any,
+    });
+    
     console.log('OpenAI Response:', {
-      usage: response.usage,
+      usage: {
+        prompt: wrapped.promptTokens,
+        completion: wrapped.completionTokens,
+      },
       analysis: analysis?.substring(0, 100) + '...'
     });
 
@@ -128,7 +152,10 @@ export async function POST(req: NextRequest) {
       debug: {
         imageType: imageFile.type,
         imageSize: imageFile.size,
-        tokensUsed: response.usage
+        tokensUsed: {
+          prompt: wrapped.promptTokens,
+          completion: wrapped.completionTokens,
+        }
       }
     });
 

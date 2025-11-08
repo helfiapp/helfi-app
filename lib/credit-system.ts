@@ -89,6 +89,11 @@ export class CreditManager {
         data: {
           walletMonthlyUsedCents: 0,
           walletMonthlyResetAt: now,
+          // Reset monthly per-feature usage counters
+          monthlySymptomAnalysisUsed: 0,
+          monthlyFoodAnalysisUsed: 0,
+          monthlyMedicalImageAnalysisUsed: 0,
+          monthlyInteractionAnalysisUsed: 0,
         } as any,
       });
     }

@@ -162,15 +162,14 @@ Return two parts:
       }
     }
 
-    if (isPremium) {
-      await prisma.user.update({
-        where: { id: refreshedUser.id },
-        data: {
-          dailyMedicalAnalysisUsed: { increment: 1 },
-          totalAnalysisCount: { increment: 1 },
-        } as any,
-      })
-    }
+    // Update counters (for all users, not just premium)
+    await prisma.user.update({
+      where: { id: refreshedUser.id },
+      data: {
+        totalAnalysisCount: { increment: 1 },
+        monthlySymptomAnalysisUsed: { increment: 1 },
+      } as any,
+    })
 
     // Build response
     const resp: any = {
