@@ -88,7 +88,6 @@ export default function InsightsTopNav({ sessionUser }: InsightsTopNavProps) {
               </button>
             </div>
           )}
-          </div>
         </div>
       </div>
     </nav>
