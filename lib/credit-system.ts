@@ -40,6 +40,13 @@ export class CreditManager {
   // ===== Wallet Engine (Cursor‑style percentage wallet) =====
   //
 
+  // Map subscription price directly to advertised credit amounts
+  private static SUBSCRIPTION_CREDITS_MAP: Record<number, number> = {
+    2000: 1000,  // $20/month → 1,000 credits
+    3000: 1700,  // $30/month → 1,700 credits
+    5000: 3000,  // $50/month → 3,000 credits
+  };
+
   private static PLAN_PRICE_CENTS: Record<string, number> = {
     PREMIUM: 2000, // $20/month
     // If a Premium Plus is added later in schema, we can map it here.
@@ -55,6 +62,17 @@ export class CreditManager {
   private static monthlyCapCentsForPlan(plan: string | null | undefined): number {
     const price = CreditManager.PLAN_PRICE_CENTS[String(plan || 'PREMIUM')] ?? 0;
     return Math.floor(price * CreditManager.walletPercentOfPlan());
+  }
+
+  // Get credit cap from subscription price (uses direct mapping, not percentage)
+  private static creditsForSubscriptionPrice(monthlyPriceCents: number | null | undefined): number {
+    if (!monthlyPriceCents) return 0;
+    // Use direct mapping if available, otherwise fall back to percentage
+    if (CreditManager.SUBSCRIPTION_CREDITS_MAP[monthlyPriceCents]) {
+      return CreditManager.SUBSCRIPTION_CREDITS_MAP[monthlyPriceCents];
+    }
+    // Fallback to 50% for any unmapped prices
+    return Math.floor(monthlyPriceCents * CreditManager.walletPercentOfPlan());
   }
 
   private async ensureMonthlyReset(now = new Date()): Promise<void> {
@@ -89,8 +107,8 @@ export class CreditManager {
     let monthlyCapCents = 0;
     if (plan && user.subscription) {
       if (user.subscription.monthlyPriceCents) {
-        // Use the stored price tier
-        monthlyCapCents = Math.floor(user.subscription.monthlyPriceCents * CreditManager.walletPercentOfPlan());
+        // Use direct credit mapping (e.g., $30 → 1,700 credits)
+        monthlyCapCents = CreditManager.creditsForSubscriptionPrice(user.subscription.monthlyPriceCents);
       } else {
         // Fall back to plan-based calculation (defaults to $20)
         monthlyCapCents = CreditManager.monthlyCapCentsForPlan(plan);
@@ -162,7 +180,8 @@ export class CreditManager {
     let monthlyCapCents = 0;
     if (plan && user.subscription) {
       if (user.subscription.monthlyPriceCents) {
-        monthlyCapCents = Math.floor(user.subscription.monthlyPriceCents * CreditManager.walletPercentOfPlan());
+        // Use direct credit mapping (e.g., $30 → 1,700 credits)
+        monthlyCapCents = CreditManager.creditsForSubscriptionPrice(user.subscription.monthlyPriceCents);
       } else {
         monthlyCapCents = CreditManager.monthlyCapCentsForPlan(plan);
       }
