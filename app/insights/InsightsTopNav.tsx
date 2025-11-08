@@ -61,8 +61,8 @@ export default function InsightsTopNav({ sessionUser }: InsightsTopNavProps) {
         </Link>
 
         <div className="flex items-center gap-4">
-          {/* Inline credits meter */}
-          <div className="hidden md:block min-w-[220px]">
+          {/* Inline credits meter - mobile only to avoid duplicating desktop sidebar meter */}
+          <div className="block md:hidden min-w-[180px]">
             <UsageMeter inline={true} refreshTrigger={refresh} />
           </div>
           <div className="relative dropdown-container" id="insights-profile-dropdown">
