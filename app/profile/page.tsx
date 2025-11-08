@@ -7,6 +7,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useUserData } from '@/components/providers/UserDataProvider'
 import MobileMoreMenu from '@/components/MobileMoreMenu'
+import PageHeader from '@/components/PageHeader'
 
 export default function Profile() {
   const { data: session } = useSession()
@@ -144,79 +145,7 @@ export default function Profile() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Navigation Header - First Row */}
-      <nav className="bg-white border-b border-gray-200 px-4 py-3">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          {/* Logo on the left */}
-          <div className="flex items-center">
-            <Link href="/" className="w-16 h-16 md:w-20 md:h-20 cursor-pointer hover:opacity-80 transition-opacity">
-              <Image
-                src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/HELFI_TRANSPARENT_rmssry.png"
-                alt="Helfi Logo"
-                width={80}
-                height={80}
-                className="w-full h-full object-contain"
-                priority
-              />
-            </Link>
-          </div>
-          
-          {/* Profile Avatar & Dropdown on the right */}
-          <div className="relative dropdown-container" id="profile-dropdown">
-            <button
-              onClick={() => setDropdownOpen((v) => !v)}
-              className="focus:outline-none"
-              aria-label="Open profile menu"
-            >
-              <Image
-                src={userImage}
-                alt="Profile"
-                width={48}
-                height={48}
-                className="w-12 h-12 rounded-full border-2 border-helfi-green shadow-sm object-cover"
-              />
-            </button>
-            {dropdownOpen && (
-              <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-100 animate-fade-in">
-                <div className="flex items-center px-4 py-3 border-b border-gray-100">
-                  <Image
-                    src={userImage}
-                    alt="Profile"
-                    width={40}
-                    height={40}
-                    className="w-10 h-10 rounded-full object-cover mr-3"
-                  />
-                  <div>
-                    <div className="font-semibold text-gray-900">{userName}</div>
-                    <div className="text-xs text-gray-500">{session?.user?.email || 'user@email.com'}</div>
-                  </div>
-                </div>
-                <Link href="/profile" className="block px-4 py-2 text-gray-700 hover:bg-gray-50 bg-gray-50 font-medium">Profile</Link>
-                <Link href="/account" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Account Settings</Link>
-                <Link href="/profile/image" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Upload/Change Profile Photo</Link>
-                <Link href="/billing" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Subscription & Billing</Link>
-                <Link href="/notifications" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Notifications</Link>
-                <Link href="/privacy" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Privacy Settings</Link>
-                <Link href="/help" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
-                <button
-                  onClick={() => signOut({ callbackUrl: '/auth/signin' })}
-                  className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50 font-semibold"
-                >
-                  Logout
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </nav>
-
-      {/* Second Row - Page Title Centered */}
-      <div className="bg-white border-b border-gray-200 px-4 py-4">
-        <div className="max-w-7xl mx-auto text-center">
-          <h1 className="text-lg md:text-xl font-semibold text-gray-900">Profile</h1>
-          <p className="text-sm text-gray-500 hidden sm:block">Manage your personal information</p>
-        </div>
-      </div>
+      <PageHeader title="Profile" backHref="/dashboard" />
 
       {/* Main Content */}
       <div className="max-w-3xl mx-auto px-4 py-8 pb-24 md:pb-8">

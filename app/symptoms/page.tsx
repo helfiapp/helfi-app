@@ -9,6 +9,7 @@ import MobileMoreMenu from '@/components/MobileMoreMenu'
 import SymptomChat from './SymptomChat'
 import UsageMeter from '@/components/UsageMeter'
 import FeatureUsageDisplay from '@/components/FeatureUsageDisplay'
+import PageHeader from '@/components/PageHeader'
 
 type AnalysisResult = {
   success: boolean
@@ -137,27 +138,7 @@ export default function SymptomAnalysisPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Header */}
-      <nav className="bg-white border-b border-gray-200 px-4 py-3">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <div className="flex items-center">
-            <Link href="/" className="w-16 h-16 md:w-20 md:h-20 cursor-pointer hover:opacity-80 transition-opacity">
-              <Image
-                src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/HELFI_TRANSPARENT_rmssry.png"
-                alt="Helfi Logo"
-                width={80}
-                height={80}
-                className="w-full h-full object-contain"
-                priority
-              />
-            </Link>
-          </div>
-          <div className="text-right">
-            <div className="text-sm text-gray-500">AI Tools</div>
-            <div className="text-base font-semibold text-gray-900">Symptom Analysis</div>
-          </div>
-        </div>
-      </nav>
+      <PageHeader title="Symptom Analysis" backHref="/dashboard" />
 
       {/* Content */}
       <main className="flex-1">

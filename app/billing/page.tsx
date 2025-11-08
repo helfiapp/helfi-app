@@ -8,6 +8,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import MobileMoreMenu from '@/components/MobileMoreMenu'
 import UsageMeter from '@/components/UsageMeter'
+import PageHeader from '@/components/PageHeader'
 
 export default function BillingPage() {
   const { data: session } = useSession()
@@ -93,102 +94,7 @@ export default function BillingPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Navigation Header - First Row */}
-      <nav className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-6">
-            <Link href="/dashboard" className="text-gray-700 dark:text-gray-300 hover:text-helfi-green transition-colors font-medium">
-              Dashboard
-            </Link>
-            <Link href="/insights" className="text-gray-700 dark:text-gray-300 hover:text-helfi-green transition-colors font-medium">
-              AI Insights
-            </Link>
-            <Link href="/food" className="text-gray-700 dark:text-gray-300 hover:text-helfi-green transition-colors font-medium">
-              Food
-            </Link>
-            <Link href="/onboarding?step=1" className="text-gray-700 dark:text-gray-300 hover:text-helfi-green transition-colors font-medium">
-              Intake
-            </Link>
-            <Link href="/settings" className="text-gray-700 dark:text-gray-300 hover:text-helfi-green transition-colors font-medium">
-              Settings
-            </Link>
-          </div>
-
-          {/* Logo */}
-          <div className="flex items-center">
-            <Link href="/" className="w-16 h-16 md:w-20 md:h-20 cursor-pointer hover:opacity-80 transition-opacity">
-              <Image
-                src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/HELFI_TRANSPARENT_rmssry.png"
-                alt="Helfi Logo"
-                width={80}
-                height={80}
-                className="w-full h-full object-contain"
-                priority
-              />
-            </Link>
-          </div>
-          
-          {/* Right actions: Usage Meter + Profile */}
-          <div className="flex items-center gap-3">
-            <UsageMeter compact={true} />
-            {/* Profile Avatar & Dropdown on the right */}
-          <div className="relative dropdown-container" id="profile-dropdown">
-            <button
-              onClick={() => setDropdownOpen((v) => !v)}
-              className="focus:outline-none"
-              aria-label="Open profile menu"
-            >
-              <Image
-                src={userImage}
-                alt="Profile"
-                width={48}
-                height={48}
-                className="w-12 h-12 rounded-full border-2 border-helfi-green shadow-sm object-cover"
-              />
-            </button>
-            {dropdownOpen && (
-              <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-xl shadow-lg py-2 z-50 border border-gray-100 dark:border-gray-700 animate-fade-in">
-                <div className="flex items-center px-4 py-3 border-b border-gray-100 dark:border-gray-700">
-                  <Image
-                    src={userImage}
-                    alt="Profile"
-                    width={40}
-                    height={40}
-                    className="w-10 h-10 rounded-full object-cover mr-3"
-                  />
-                  <div>
-                    <div className="font-semibold text-gray-900 dark:text-white">{userName}</div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">{session?.user?.email || 'user@email.com'}</div>
-                  </div>
-                </div>
-                <Link href="/settings" className="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 font-medium">← Back to Settings</Link>
-                <div className="border-t border-gray-100 dark:border-gray-700 my-2"></div>
-                <Link href="/profile" className="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">Profile</Link>
-                <Link href="/account" className="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">Account Settings</Link>
-                <Link href="/profile/image" className="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">Upload/Change Profile Photo</Link>
-                <Link href="/billing" className="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 bg-gray-50 dark:bg-gray-700 font-medium">Subscription & Billing</Link>
-                <Link href="/help" className="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">Help & Support</Link>
-                <button
-                  onClick={() => signOut({ callbackUrl: '/auth/signin' })}
-                  className="block w-full text-left px-4 py-2 text-red-600 dark:text-red-400 hover:bg-gray-50 dark:hover:bg-gray-700 font-semibold"
-                >
-                  Logout
-                </button>
-              </div>
-            )}
-          </div>
-          </div>
-        </div>
-      </nav>
-
-      {/* Second Row - Page Title Centered */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-4">
-        <div className="max-w-7xl mx-auto text-center">
-          <h1 className="text-lg md:text-xl font-semibold text-gray-900 dark:text-white">Subscription & Billing</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 hidden sm:block">Manage your subscription and billing information</p>
-        </div>
-      </div>
+      <PageHeader title="Subscription & Billing" backHref="/dashboard" />
 
       {/* Main Content */}
               <div className="max-w-6xl mx-auto px-6 py-8 pb-24 md:pb-8">

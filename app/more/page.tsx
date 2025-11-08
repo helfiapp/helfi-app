@@ -1,11 +1,9 @@
 'use client'
 
-import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import Image from 'next/image'
-import { useUserData } from '@/components/providers/UserDataProvider'
 import MobileMoreMenu from '@/components/MobileMoreMenu'
+import PageHeader from '@/components/PageHeader'
 
 interface MenuItem {
   icon: React.ReactNode
@@ -15,11 +13,7 @@ interface MenuItem {
 }
 
 export default function MorePage() {
-  const { data: session } = useSession()
-  const { profileImage } = useUserData()
   const pathname = usePathname()
-
-  const userImage = profileImage || '/default-avatar.png'
 
   // Health & Analysis section
   const healthItems: MenuItem[] = [
@@ -146,12 +140,7 @@ export default function MorePage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
-      {/* Header */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">More</h1>
-        </div>
-      </div>
+      <PageHeader title="More" backHref="/dashboard" />
 
       {/* Content */}
       <main className="max-w-7xl mx-auto px-4 py-6">

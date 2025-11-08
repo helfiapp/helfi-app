@@ -18,6 +18,7 @@ import MobileMoreMenu from '@/components/MobileMoreMenu'
 import UsageMeter from '@/components/UsageMeter'
 import FeatureUsageDisplay from '@/components/FeatureUsageDisplay'
 import CreditPurchaseModal from '@/components/CreditPurchaseModal'
+import PageHeader from '@/components/PageHeader'
 
 export default function FoodDiary() {
   const { data: session } = useSession()
@@ -756,78 +757,12 @@ Please add nutritional information manually if needed.`);
           </div>
         </div>
       )}
-      {/* Navigation Header */}
-      <nav className="bg-white border-b border-gray-200 px-4 py-3">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          <div className="flex items-center">
-            <Link href="/" className="w-16 h-16 md:w-20 md:h-20 cursor-pointer hover:opacity-80 transition-opacity">
-              <Image
-                src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/HELFI_TRANSPARENT_rmssry.png"
-                alt="Helfi Logo"
-                width={80}
-                height={80}
-                className="w-full h-full object-contain"
-                priority
-              />
-            </Link>
-          </div>
-          
-          <div className="flex items-center gap-3">
-            <div className="relative dropdown-container">
-            <button
-              onClick={() => setDropdownOpen((v) => !v)}
-              className="focus:outline-none relative"
-            >
-              <Image
-                src={userImage}
-                alt="Profile"
-                width={48}
-                height={48}
-                className="w-12 h-12 rounded-full border-2 border-helfi-green shadow-sm object-cover"
-                priority
-              />
-            </button>
-            {dropdownOpen && (
-              <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-100">
-                <div className="flex items-center px-4 py-3 border-b border-gray-100">
-                  <div className="relative mr-3">
-                    <Image 
-                      src={userImage} 
-                      alt="Profile" 
-                      width={40} 
-                      height={40} 
-                      className="w-10 h-10 rounded-full object-cover" 
-                      loading="eager"
-                    />
-                  </div>
-                  <div>
-                    <div className="font-medium text-gray-900">{userName}</div>
-                    <div className="text-xs text-gray-500">{session?.user?.email || 'user@email.com'}</div>
-                  </div>
-                </div>
-                <Link href="/profile" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Profile</Link>
-                <Link href="/account" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Account Settings</Link>
-                <Link href="/profile/image" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Upload/Change Profile Photo</Link>
-                <Link href="/billing" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Subscription & Billing</Link>
-                <Link href="/notifications" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Notifications</Link>
-                <Link href="/privacy" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Privacy Settings</Link>
-                <Link href="/help" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
-                <div className="border-t border-gray-100 my-2"></div>
-                <Link href="/reports" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Reports</Link>
-                <button onClick={() => signOut({ callbackUrl: '/auth/signin' })} className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50 font-semibold">Logout</button>
-              </div>
-            )}
-          </div>
-          </div>
-        </div>
-      </nav>
-
-      {/* Page Title */}
+      <PageHeader title="Food Diary" backHref="/dashboard" />
+      
+      {/* Date selector */}
       <div className="bg-white border-b border-gray-200 px-4 py-4">
-        <div className="max-w-7xl mx-auto text-center">
-          <h1 className="text-xl md:text-2xl font-light text-gray-800 tracking-wide">Food Diary</h1>
-          {/* Date selector */}
-          <div className="mt-3 flex items-center justify-center gap-3">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex items-center justify-center gap-3">
             <button
               onClick={() => {
                 const d = new Date(selectedDate);
