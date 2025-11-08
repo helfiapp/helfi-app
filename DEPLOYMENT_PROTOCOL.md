@@ -55,31 +55,25 @@ After pushing to GitHub, you MUST check the deployment status using the Vercel A
    - Build completed without errors
    - You have verified the deployment URL is accessible
 
-**Example verification script**:
-```bash
-# Check latest deployment status
-VERCEL_TOKEN="2MLfXoXXv8hIaHIE7lQcdQ39"
-PROJECT_ID="prj_0QdxIeqz4oIUEx7aAdLrsjGsqst7"
+**Verification Methods**:
 
-DEPLOYMENT=$(curl -s -H "Authorization: Bearer $VERCEL_TOKEN" \
-  "https://api.vercel.com/v6/deployments?projectId=$PROJECT_ID&limit=1" | \
-  jq -r '.deployments[0]')
+1. **Using the helper script** (recommended):
+   ```bash
+   ./scripts/check-deployment-status.sh
+   ```
 
-STATE=$(echo $DEPLOYMENT | jq -r '.state')
-URL=$(echo $DEPLOYMENT | jq -r '.url')
+2. **Using Vercel API** (if script doesn't work, try API directly):
+   ```bash
+   VERCEL_TOKEN="2MLfXoXXv8hIaHIE7lQcdQ39"
+   curl -s -H "Authorization: Bearer $VERCEL_TOKEN" \
+     "https://api.vercel.com/v6/deployments?project=helfi-app&teamId=team_pPRY3znvYPSvqemdfOEf3vAT&limit=1"
+   ```
 
-echo "Deployment State: $STATE"
-echo "Deployment URL: $URL"
-
-if [ "$STATE" = "READY" ]; then
-  echo "✅ Deployment successful - changes are live"
-elif [ "$STATE" = "ERROR" ]; then
-  echo "❌ Deployment failed - check logs and fix issues"
-  exit 1
-else
-  echo "⏳ Deployment in progress - state: $STATE"
-fi
-```
+3. **Manual check** (fallback if API doesn't work):
+   - Visit: https://vercel.com/louie-veleskis-projects/helfi-app/deployments
+   - Check the latest deployment status
+   - Only report success if status shows "Ready" (green checkmark)
+   - If status shows "Error" (red X), check build logs, fix issues, and redeploy
 
 Example commands:
 ```bash
