@@ -2456,21 +2456,15 @@ The Helfi Team`,
                    {/* Credit Management */}
                    <div className="bg-green-50 rounded-lg p-4 mb-6 border-l-4 border-green-500">
                      <h4 className="font-medium text-gray-900 mb-3">📊 Credit Management</h4>
-                     <div className="space-y-2">
-                       <div className="flex justify-between items-center">
-                         <span className="text-sm text-gray-600">Daily Credits:</span>
-                         <span className="text-sm font-medium">
-                           {selectedUser.dailyAnalysisUsed || 0} / {selectedUser.dailyAnalysisCredits || 3} used
-                         </span>
-                       </div>
-                       <div className="flex justify-between items-center">
-                         <span className="text-sm text-gray-600">Additional Credits:</span>
-                         <span className="text-sm font-medium text-green-600">
-                           {selectedUser.totalAvailableCredits !== undefined 
-                             ? `${selectedUser.totalAvailableCredits} credits`
-                             : (selectedUser.additionalCredits || 0) + ' credits'}
-                         </span>
-                       </div>
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Additional Credits:</span>
+                        <span className="text-sm font-medium text-green-600">
+                          {selectedUser.totalAvailableCredits !== undefined 
+                            ? `${selectedUser.totalAvailableCredits} credits`
+                            : (selectedUser.additionalCredits || 0) + ' credits'}
+                        </span>
+                      </div>
                        <div className="flex justify-between items-center">
                          <span className="text-sm text-gray-600">Total Analyses:</span>
                          <span className="text-sm font-medium">

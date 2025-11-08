@@ -106,8 +106,13 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
   const isLowCredits = percentRemainingPrecise <= 5
 
   if (inline) {
-    // Inline version for AI feature pages - numeric credits remaining
+    // Inline version for AI feature pages - credits remaining with green bar (reverse fill)
     const creditsDisplayInline = creditsTotal ?? Math.round(totalAvailableCents)
+    // Calculate percent remaining for bar display
+    const creditsRemainingPercent = monthlyCapCents > 0 
+      ? percentRemainingPrecise 
+      : (creditsDisplayInline > 0 ? 100 : 0) // If no cap, show full bar
+    
     return (
       <div className={`mt-2 ${className}`}>
         <div className="flex items-center justify-between mb-1.5">
@@ -115,6 +120,15 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
           <span className={`text-xs font-semibold ${isLowCredits ? 'text-red-600' : 'text-gray-700'}`}>
             {creditsDisplayInline?.toLocaleString()}
           </span>
+        </div>
+        <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden relative">
+          {/* Background bar - shows remaining (green) */}
+          <div
+            className={`h-2 transition-all duration-300 ${
+              isLowCredits ? 'bg-red-500' : 'bg-helfi-green'
+            }`}
+            style={{ width: `${Math.min(100, Math.max(0, creditsRemainingPercent))}%` }}
+          />
         </div>
         {isLowCredits && creditsDisplayInline !== null && creditsDisplayInline <= 5 && (
           <div className="mt-2 bg-red-50 border border-red-200 rounded-lg p-2">
@@ -144,10 +158,22 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
   }
 
   if (compact) {
-    // Compact version for headers - numeric credits remaining (no bar)
+    // Compact version for headers - credits remaining with green bar (reverse fill)
     const creditsDisplay = creditsTotal ?? Math.round(totalAvailableCents) // fallback to cents if credits missing
+    const creditsRemainingPercent = monthlyCapCents > 0 
+      ? percentRemainingPrecise 
+      : (creditsDisplay > 0 ? 100 : 0) // If no cap, show full bar
+    
     return (
       <div className={`flex items-center gap-2 ${className}`}>
+        <div className="w-24 bg-gray-200 rounded-full h-2 overflow-hidden">
+          <div
+            className={`h-2 transition-all duration-300 ${
+              isLowCredits ? 'bg-red-500' : 'bg-helfi-green'
+            }`}
+            style={{ width: `${Math.min(100, Math.max(0, creditsRemainingPercent))}%` }}
+          />
+        </div>
         <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Credits remaining</span>
         <span className="text-sm font-semibold text-gray-900 dark:text-white">
           {creditsDisplay?.toLocaleString()}
@@ -156,8 +182,12 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
     )
   }
 
-  // Full version for sidebar - numeric credits remaining (no bar)
+  // Full version for sidebar - credits remaining with green bar (reverse fill)
   const creditsDisplay = creditsTotal ?? Math.round(totalAvailableCents) // fallback to cents if credits missing
+  const creditsRemainingPercent = monthlyCapCents > 0 
+    ? percentRemainingPrecise 
+    : (creditsDisplay > 0 ? 100 : 0) // If no cap, show full bar
+  
   return (
     <div className={`px-4 py-3 ${className}`}>
       <div className="flex items-center justify-between mb-2">
@@ -165,6 +195,14 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
         <span className="text-xs font-semibold text-gray-900 dark:text-white">
           {creditsDisplay?.toLocaleString()}
         </span>
+      </div>
+      <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden mb-2">
+        <div
+          className={`h-2 transition-all duration-300 ${
+            isLowCredits ? 'bg-red-500' : 'bg-helfi-green'
+          }`}
+          style={{ width: `${Math.min(100, Math.max(0, creditsRemainingPercent))}%` }}
+        />
       </div>
       {showResetDate && walletRefreshAt && (
         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">
