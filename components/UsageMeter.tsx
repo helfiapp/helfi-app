@@ -8,9 +8,10 @@ interface UsageMeterProps {
   showResetDate?: boolean // Show reset date below meter
   inline?: boolean // Inline version next to typical cost (reverse mode)
   className?: string // Additional CSS classes
+  refreshTrigger?: number // When this changes, force a refresh
 }
 
-export default function UsageMeter({ compact = false, showResetDate = false, inline = false, className = '' }: UsageMeterProps) {
+export default function UsageMeter({ compact = false, showResetDate = false, inline = false, className = '', refreshTrigger = 0 }: UsageMeterProps) {
   const { data: session } = useSession()
   const [walletPercentUsed, setWalletPercentUsed] = useState<number | null>(null)
   const [walletRefreshAt, setWalletRefreshAt] = useState<string | null>(null)
@@ -59,7 +60,7 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
     // Refresh every 30 seconds to keep usage meter updated
     const interval = setInterval(loadStatus, 30000)
     return () => clearInterval(interval)
-  }, [session])
+  }, [session, refreshTrigger]) // Added refreshTrigger to dependencies
 
   // Don't render if not authenticated, still loading, or no access
   if (!session || loading || !hasAccess) {

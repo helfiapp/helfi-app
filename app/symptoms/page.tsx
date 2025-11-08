@@ -35,6 +35,7 @@ export default function SymptomAnalysisPage() {
   const [showCreditsModal, setShowCreditsModal] = useState<boolean>(false)
   const [creditInfo, setCreditInfo] = useState<any>({ dailyUsed: 0, dailyLimit: 0, additionalCredits: 0, plan: 'FREE', creditCost: 1 })
   const [tagsExpanded, setTagsExpanded] = useState<boolean>(false)
+  const [usageMeterRefresh, setUsageMeterRefresh] = useState<number>(0) // Trigger for UsageMeter refresh
 
   // Progress phases shown while analyzing
   const phases = useMemo(() => [
@@ -122,6 +123,8 @@ export default function SymptomAnalysisPage() {
 
       const data: AnalysisResult = await res.json()
       setResult(data)
+      // Trigger usage meter refresh after successful analysis
+      setUsageMeterRefresh(prev => prev + 1)
     } catch (e: any) {
       setError(e?.message || 'Something went wrong')
     } finally {
@@ -250,7 +253,7 @@ export default function SymptomAnalysisPage() {
             </button>
             <div className="mt-2">
               <p className="text-xs text-gray-500 mb-2">Typical cost: 2–3 credits</p>
-              <UsageMeter inline={true} />
+              <UsageMeter inline={true} refreshTrigger={usageMeterRefresh} />
             </div>
 
             {/* Progress Bar */}

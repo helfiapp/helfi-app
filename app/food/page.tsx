@@ -67,6 +67,7 @@ export default function FoodDiary() {
     creditCost: 1,
     featureUsageToday: { foodAnalysis: 0, interactionAnalysis: 0 }
   })
+  const [usageMeterRefresh, setUsageMeterRefresh] = useState<number>(0) // Trigger for UsageMeter refresh
 
   // Profile data - using consistent green avatar
   const defaultAvatar = 'data:image/svg+xml;base64,' + btoa(`
@@ -420,6 +421,8 @@ export default function FoodDiary() {
         setAiDescription(result.analysis);
         setAnalyzedNutrition(extractNutritionData(result.analysis));
         setShowAiResult(true);
+        // Trigger usage meter refresh after successful analysis
+        setUsageMeterRefresh(prev => prev + 1);
       } else {
         console.error('❌ Invalid API response format:', result);
         throw new Error('Invalid response format from AI service');
@@ -975,7 +978,7 @@ Please add nutritional information manually if needed.`);
                   </button>
                   <div className="mt-2">
                     <p className="text-xs text-gray-500 text-center mb-2">Typical cost: 1–2 credits</p>
-                    <UsageMeter inline={true} />
+                    <UsageMeter inline={true} refreshTrigger={usageMeterRefresh} />
                   </div>
                   
                   {/* Photo Management Options */}

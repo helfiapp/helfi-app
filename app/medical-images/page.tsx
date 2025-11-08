@@ -23,6 +23,7 @@ export default function MedicalImagesPage() {
     creditCost: 2, // Medical image analysis costs 2 credits
     featureUsageToday: { foodAnalysis: 0, interactionAnalysis: 0 }
   })
+  const [usageMeterRefresh, setUsageMeterRefresh] = useState<number>(0) // Trigger for UsageMeter refresh
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -81,6 +82,8 @@ export default function MedicalImagesPage() {
       const result = await response.json()
       if (result.success && result.analysis) {
         setAnalysis(result.analysis)
+        // Trigger usage meter refresh after successful analysis
+        setUsageMeterRefresh(prev => prev + 1)
       } else {
         throw new Error('Invalid response from server')
       }
@@ -225,7 +228,7 @@ export default function MedicalImagesPage() {
             </div>
             <div className="mt-2">
               <p className="text-xs text-gray-500 mb-2">Typical cost: 2 credits</p>
-              <UsageMeter inline={true} />
+              <UsageMeter inline={true} refreshTrigger={usageMeterRefresh} />
             </div>
 
             {/* Analysis Results */}
