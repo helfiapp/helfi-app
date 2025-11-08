@@ -188,37 +188,43 @@ export default function CheckinHistoryPage() {
 
   // Prepare chart data
   const chartData = useMemo(() => {
-    const issueData: Record<string, { dates: string[], values: (number | null)[] }> = {}
-    
-    filteredRows.forEach(row => {
-      if (!issueData[row.name]) {
-        issueData[row.name] = { dates: [], values: [] }
-      }
-      issueData[row.name].dates.push(row.date)
-      issueData[row.name].values.push(row.value)
-    })
+    if (filteredRows.length === 0) return { labels: [], datasets: [] }
 
-    const datasets = Object.entries(issueData).map(([name, data], index) => {
-      const colors = [
-        'rgb(34, 197, 94)', // green
-        'rgb(59, 130, 246)', // blue
-        'rgb(168, 85, 247)', // purple
-        'rgb(236, 72, 153)', // pink
-        'rgb(251, 146, 60)', // orange
-        'rgb(234, 179, 8)', // yellow
-        'rgb(14, 165, 233)', // sky
-      ]
+    const allDates = Array.from(new Set(filteredRows.map(r => r.date))).sort()
+    const allIssueNames = Array.from(new Set(filteredRows.map(r => r.name))).sort()
+    
+    const colors = [
+      'rgb(34, 197, 94)', // green
+      'rgb(59, 130, 246)', // blue
+      'rgb(168, 85, 247)', // purple
+      'rgb(236, 72, 153)', // pink
+      'rgb(251, 146, 60)', // orange
+      'rgb(234, 179, 8)', // yellow
+      'rgb(14, 165, 233)', // sky
+    ]
+
+    const datasets = allIssueNames.map((name, index) => {
+      // Create a map of date -> value for this issue
+      const valueMap = new Map<string, number | null>()
+      filteredRows
+        .filter(r => r.name === name)
+        .forEach(r => {
+          valueMap.set(r.date, r.value)
+        })
+
+      // Build data array aligned with allDates
+      const data = allDates.map(date => valueMap.get(date) ?? null)
+
       return {
         label: name,
-        data: data.values,
+        data: data,
         borderColor: colors[index % colors.length],
         backgroundColor: colors[index % colors.length] + '20',
         tension: 0.4,
         fill: true,
+        spanGaps: true,
       }
     })
-
-    const allDates = Array.from(new Set(filteredRows.map(r => r.date))).sort()
     
     return {
       labels: allDates,

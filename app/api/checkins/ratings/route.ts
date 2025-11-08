@@ -46,9 +46,12 @@ export async function PATCH(req: NextRequest) {
 
   try {
     const clamped = (value === null || value === undefined) ? null : Math.max(0, Math.min(6, Number(value)))
+    // Use INSERT ... ON CONFLICT to handle both update and insert
     await prisma.$executeRawUnsafe(
-      `UPDATE CheckinRatings SET value = $1, note = $2 WHERE userId = $3 AND date = $4 AND issueId = $5`,
-      clamped, String(note || ''), user.id, date, issueId
+      `INSERT INTO CheckinRatings (userId, issueId, date, value, note)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (userId, issueId, date) DO UPDATE SET value = EXCLUDED.value, note = EXCLUDED.note`,
+      user.id, issueId, date, clamped, String(note || '')
     )
     return NextResponse.json({ success: true })
   } catch (e) {
