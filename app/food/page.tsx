@@ -18,7 +18,6 @@ import MobileMoreMenu from '@/components/MobileMoreMenu'
 import UsageMeter from '@/components/UsageMeter'
 import FeatureUsageDisplay from '@/components/FeatureUsageDisplay'
 import CreditPurchaseModal from '@/components/CreditPurchaseModal'
-import PageHeader from '@/components/PageHeader'
 
 export default function FoodDiary() {
   const { data: session } = useSession()
@@ -757,7 +756,69 @@ Please add nutritional information manually if needed.`);
           </div>
         </div>
       )}
-      <PageHeader title="Food Diary" />
+      {/* Header - No back button (main nav item) */}
+      <nav className="bg-white border-b border-gray-200 px-4 py-3">
+        <div className="max-w-7xl mx-auto flex justify-between items-center">
+          {/* Page Title - Mobile only */}
+          <h1 className="md:hidden flex-1 text-center text-lg font-semibold text-gray-900">Food Diary</h1>
+          <div className="hidden md:block"></div>
+
+          <div className="flex items-center gap-4">
+            {/* Usage Meter - Always visible (AI feature) */}
+            <div className="min-w-[180px]">
+              <UsageMeter inline={true} refreshTrigger={usageMeterRefresh} />
+            </div>
+            {/* Profile Avatar & Dropdown */}
+            <div className="relative dropdown-container" id="profile-dropdown">
+              <button
+                onClick={() => setDropdownOpen((v) => !v)}
+                className="focus:outline-none"
+                aria-label="Open profile menu"
+              >
+                <Image
+                  src={userImage}
+                  alt="Profile"
+                  width={40}
+                  height={40}
+                  className="w-10 h-10 rounded-full border-2 border-helfi-green shadow-sm object-cover"
+                />
+              </button>
+              {dropdownOpen && (
+                <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-100 animate-fade-in">
+                  <div className="flex items-center px-4 py-3 border-b border-gray-100">
+                    <Image
+                      src={userImage}
+                      alt="Profile"
+                      width={40}
+                      height={40}
+                      className="w-10 h-10 rounded-full object-cover mr-3"
+                    />
+                    <div>
+                      <div className="font-semibold text-gray-900">{userName}</div>
+                      <div className="text-xs text-gray-500">{session?.user?.email || 'user@email.com'}</div>
+                    </div>
+                  </div>
+                  <Link href="/profile" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Profile</Link>
+                  <Link href="/account" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Account Settings</Link>
+                  <Link href="/profile/image" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Upload/Change Profile Photo</Link>
+                  <Link href="/billing" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Subscription & Billing</Link>
+                  <Link href="/notifications" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Notifications</Link>
+                  <Link href="/privacy" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Privacy Settings</Link>
+                  <Link href="/support" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
+                  <div className="border-t border-gray-100 my-2"></div>
+                  <Link href="/reports" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Reports</Link>
+                  <button 
+                    onClick={() => signOut({ callbackUrl: '/auth/signin' })}
+                    className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50 font-semibold"
+                  >
+                    Logout
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </nav>
       
       {/* Date selector */}
       <div className="bg-white border-b border-gray-200 px-4 py-4">

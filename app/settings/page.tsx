@@ -8,7 +8,6 @@ import { usePathname } from 'next/navigation'
 import Image from 'next/image'
 import { useUserData } from '@/components/providers/UserDataProvider'
 import MobileMoreMenu from '@/components/MobileMoreMenu'
-import PageHeader from '@/components/PageHeader'
 
 // Global dark mode function type
 declare global {
@@ -371,7 +370,63 @@ export default function Settings() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <PageHeader title="Settings" />
+      {/* Header - No back button (main nav item) */}
+      <nav className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
+        <div className="max-w-7xl mx-auto flex justify-between items-center">
+          {/* Page Title - Mobile only */}
+          <h1 className="md:hidden flex-1 text-center text-lg font-semibold text-gray-900 dark:text-white">Settings</h1>
+          <div className="hidden md:block"></div>
+
+          {/* Profile Avatar & Dropdown */}
+          <div className="relative dropdown-container" id="profile-dropdown">
+            <button
+              onClick={() => setDropdownOpen((v) => !v)}
+              className="focus:outline-none"
+              aria-label="Open profile menu"
+            >
+              <Image
+                src={userImage}
+                alt="Profile"
+                width={40}
+                height={40}
+                className="w-10 h-10 rounded-full border-2 border-helfi-green shadow-sm object-cover"
+              />
+            </button>
+            {dropdownOpen && (
+              <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-xl shadow-lg py-2 z-50 border border-gray-100 dark:border-gray-700 animate-fade-in">
+                <div className="flex items-center px-4 py-3 border-b border-gray-100 dark:border-gray-700">
+                  <Image
+                    src={userImage}
+                    alt="Profile"
+                    width={40}
+                    height={40}
+                    className="w-10 h-10 rounded-full object-cover mr-3"
+                  />
+                  <div>
+                    <div className="font-semibold text-gray-900 dark:text-white">{userName}</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">{session?.user?.email || 'user@email.com'}</div>
+                  </div>
+                </div>
+                <Link href="/profile" className="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">Profile</Link>
+                <Link href="/account" className="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">Account Settings</Link>
+                <Link href="/profile/image" className="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">Upload/Change Profile Photo</Link>
+                <Link href="/billing" className="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">Subscription & Billing</Link>
+                <Link href="/notifications" className="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">Notifications</Link>
+                <Link href="/privacy" className="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">Privacy Settings</Link>
+                <Link href="/help" className="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">Help & Support</Link>
+                <div className="border-t border-gray-100 dark:border-gray-700 my-2"></div>
+                <Link href="/reports" className="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">Reports</Link>
+                <button
+                  onClick={() => signOut({ callbackUrl: '/auth/signin' })}
+                  className="block w-full text-left px-4 py-2 text-red-600 dark:text-red-400 hover:bg-gray-50 dark:hover:bg-gray-700 font-semibold"
+                >
+                  Logout
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </nav>
 
       {/* Main Content - Fixed bottom padding for mobile navigation */}
       <div className="max-w-3xl mx-auto px-4 py-8 pb-24 md:pb-8">

@@ -49,20 +49,13 @@ export default function InsightsTopNav({ sessionUser }: InsightsTopNavProps) {
   return (
     <nav className="bg-white border-b border-gray-200 px-4 py-3">
       <div className="max-w-7xl mx-auto flex justify-between items-center">
-        <Link href="/" className="w-16 h-16 md:w-20 md:h-20 cursor-pointer hover:opacity-80 transition-opacity">
-          <Image
-            src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/HELFI_TRANSPARENT_rmssry.png"
-            alt="Helfi Logo"
-            width={80}
-            height={80}
-            className="w-full h-full object-contain"
-            priority
-          />
-        </Link>
+        {/* Page Title - Mobile only (desktop has sidebar) */}
+        <h1 className="md:hidden flex-1 text-center text-lg font-semibold text-gray-900">Insights</h1>
+        <div className="hidden md:block"></div>
 
         <div className="flex items-center gap-4">
-          {/* Inline credits meter - mobile only to avoid duplicating desktop sidebar meter */}
-          <div className="block md:hidden min-w-[180px]">
+          {/* Usage Meter - Always visible for Insights (AI feature) */}
+          <div className="min-w-[180px]">
             <UsageMeter inline={true} refreshTrigger={refresh} />
           </div>
           <div className="relative dropdown-container" id="insights-profile-dropdown">
