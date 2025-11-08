@@ -9,21 +9,7 @@ export async function GET() {
   const user = await prisma.user.findUnique({ where: { email: session.user.email } })
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
-  // For now, read from a simple table if exists; otherwise return defaults
-  try {
-    // @ts-ignore: allow raw read without schema coupling
-    const rows: any[] = await prisma.$queryRawUnsafe(
-      `SELECT time1, timezone FROM CheckinSettings WHERE userId = $1 LIMIT 1`,
-      user.id
-    )
-    if (rows?.length) {
-      return NextResponse.json({ 
-        time1: rows[0].time1 || '21:00', 
-        timezone: rows[0].timezone || 'Australia/Melbourne' 
-      })
-    }
-  } catch {}
-
+  // Always return default 9pm Melbourne time (no custom times allowed for now)
   return NextResponse.json({ time1: '21:00', timezone: 'Australia/Melbourne' })
 }
 

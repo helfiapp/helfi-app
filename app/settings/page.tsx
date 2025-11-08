@@ -152,22 +152,10 @@ export default function Settings() {
     })()
   }, [])
 
-  // Load reminder settings
+  // Load reminder settings (always use defaults - no custom times allowed)
   useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch('/api/checkins/settings', { cache: 'no-cache' })
-        if (res.ok) {
-          const s = await res.json()
-          setTime1(s.time1 || '21:00')
-          setTz(s.timezone || 'Australia/Melbourne')
-        } else {
-          setTz('Australia/Melbourne')
-        }
-      } catch {
-        setTz('Australia/Melbourne')
-      }
-    })()
+    setTime1('21:00')
+    setTz('Australia/Melbourne')
   }, [])
 
   // Auto-save profile visibility
@@ -728,38 +716,29 @@ export default function Settings() {
             </Link>
           </div>
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-            Set your daily reminder time to rate your health issues. Reminders will be sent via push notifications once per day.
+            Daily reminders are sent via push notifications once per day at the default time.
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Reminder Time</label>
-              <input type="time" value={time1} onChange={(e)=>setTime1(e.target.value)} className="w-full border rounded px-3 py-2 dark:bg-gray-700 dark:text-white" />
+              <div 
+                onClick={() => alert('Currently 9 PM is the default time for all reminders.')}
+                className="w-full border rounded px-3 py-2 dark:bg-gray-700 dark:text-white bg-gray-50 dark:bg-gray-700 cursor-not-allowed opacity-60 flex items-center justify-between"
+              >
+                <span>9:00 PM</span>
+                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Default time for all users</p>
             </div>
             <div>
               <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Timezone</label>
-              <select value={tz} onChange={(e)=>setTz(e.target.value)} className="w-full border rounded px-3 py-2 dark:bg-gray-700 dark:text-white">
-                {(() => {
-                  const current = tz || 'Australia/Melbourne'
-                  const list = baseTimezones.includes(current) ? baseTimezones : [current, ...baseTimezones]
-                  return list.map(z => (<option key={z} value={z}>{z}</option>))
-                })()}
-              </select>
+              <div className="w-full border rounded px-3 py-2 dark:bg-gray-700 dark:text-white bg-gray-50 dark:bg-gray-700 cursor-not-allowed opacity-60">
+                Australia/Melbourne
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Default timezone</p>
             </div>
-          </div>
-          <div className="flex justify-end mt-4">
-            <button disabled={savingTimes} onClick={async()=>{
-              try {
-                setSavingTimes(true)
-                const payload = { time1: normalizeTime(time1), timezone: tz || 'Australia/Melbourne' }
-                const res = await fetch('/api/checkins/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-                if (!res.ok) {
-                  const txt = await res.text().catch(()=> '')
-                  alert(`Save failed (${res.status}). ${txt || ''}`.trim())
-                  return
-                }
-                alert('Reminder time saved')
-              } catch (e:any) { alert(`Could not save time. ${e?.message || ''}`.trim()) } finally { setSavingTimes(false) }
-            }} className="px-3 py-1.5 rounded-md bg-helfi-green text-white text-sm font-medium disabled:opacity-60">{savingTimes ? 'Saving…' : 'Save time'}</button>
           </div>
         </div>
       </div>
