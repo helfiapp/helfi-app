@@ -1,5 +1,7 @@
 # Helfi - Personal Health Intelligence Platform
 
+**🤖 AI AGENTS: Read `AGENT_START_HERE.md` FIRST before making any changes!**
+
 Helfi is a personal-health intelligence platform that combines passive data collection, manual logging, and conversational AI to help users identify exactly what makes them feel, look, and perform their best.
 
 ## Features

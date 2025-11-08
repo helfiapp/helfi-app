@@ -50,8 +50,9 @@ export default function SymptomAnalysisPage() {
     setPhase(0)
     setProgress(0)
     let pct = 0
+    // Cap progress at 85% during simulation, will jump to 100% when API completes
     const timer = setInterval(() => {
-      pct = Math.min(99, pct + Math.random() * 7 + 3)
+      pct = Math.min(85, pct + Math.random() * 7 + 3)
       setProgress(pct)
       // advance phase roughly every ~25%
       if (pct > 75) setPhase(3)

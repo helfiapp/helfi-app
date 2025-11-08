@@ -27,7 +27,16 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
         return
       }
       try {
-        const res = await fetch('/api/credit/status', { cache: 'no-store' })
+        // Add timestamp to prevent caching when refreshTrigger changes
+        const cacheBuster = refreshTrigger > 0 ? `?t=${Date.now()}` : ''
+        const res = await fetch(`/api/credit/status${cacheBuster}`, { 
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          }
+        })
         if (res.ok) {
           const data = await res.json()
           // Show usage meter if user has access (subscription OR credits)
