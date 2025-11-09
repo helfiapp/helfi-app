@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useSelectedLayoutSegments } from 'next/navigation'
 import SectionChat from '../SectionChat'
 import type { IssueSectionResult } from '@/lib/insights/issue-engine'
+import InsightsProgressBar from '@/components/InsightsProgressBar'
 
 // Progress bar component that animates smoothly to 100%
 function ProgressBar() {
@@ -104,10 +105,11 @@ export default function SupplementsShell({ children, initialResult, issueSlug }:
       })
       
       if (response.ok) {
-        // Wait a moment, then refresh the page to show updated insights
+        // Regeneration runs in background - wait 60 seconds for it to complete
+        // Then refresh the page to show updated insights
         setTimeout(() => {
           window.location.reload()
-        }, 2000)
+        }, 60000) // Wait 60 seconds for background regeneration
       } else {
         const data = await response.json()
         alert(data.message || 'Failed to update insights. Please try again.')
@@ -324,6 +326,11 @@ export default function SupplementsShell({ children, initialResult, issueSlug }:
               <p className="text-xs text-gray-500 mt-3">
                 Generated {new Date(result.generatedAt).toLocaleString()} • Confidence {(result.confidence * 100).toFixed(0)}%
               </p>
+              {isUpdating && (
+                <div className="mt-4">
+                  <InsightsProgressBar isGenerating={true} message="Regenerating insights..." />
+                </div>
+              )}
             </div>
             <button
               onClick={handleUpdateInsights}
