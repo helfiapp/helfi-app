@@ -3483,6 +3483,16 @@ function BloodResultsStep({ onNext, onBack, initial }: { onNext: (data: any) => 
           </button>
         </div>
       </div>
+
+      {/* Update Insights Popup */}
+      <UpdateInsightsPopup
+        isOpen={showUpdatePopup}
+        onClose={() => {
+          setShowUpdatePopup(false);
+        }}
+        onUpdateInsights={handleUpdateInsights}
+        isGenerating={isGeneratingInsights}
+      />
     </div>
   );
 }
