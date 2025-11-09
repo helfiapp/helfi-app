@@ -44,7 +44,7 @@ function BackToTopButton() {
 
 export default function SplashPage() {
   const [showInfoModal, setShowInfoModal] = useState(false)
-  const [showSubscribeModal, setShowSubscribeModal] = useState(false)
+  const [showWaitlistModal, setShowWaitlistModal] = useState(false)
 
   const handleWaitlistCta = () => {
     setShowInfoModal(true)
@@ -54,18 +54,45 @@ export default function SplashPage() {
     setShowInfoModal(true)
   }
 
-  const handleInfoModalOk = () => {
+  const handleInfoModalSubscribe = () => {
     setShowInfoModal(false)
-    setShowSubscribeModal(true)
+    setShowWaitlistModal(true)
   }
 
-  const handleSubscribeModalClose = () => {
-    setShowSubscribeModal(false)
+  const handleInfoModalClose = () => {
+    setShowInfoModal(false)
   }
 
-  const handleSubscribeNow = () => {
-    setShowSubscribeModal(false)
-    document.getElementById('waitlist-signup')?.scrollIntoView({ behavior: 'smooth' })
+  const handleWaitlistModalClose = () => {
+    setShowWaitlistModal(false)
+  }
+
+  const handleWaitlistSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    const formData = new FormData(e.currentTarget)
+    const email = String(formData.get('email') || '').trim().toLowerCase()
+    const name = String(formData.get('name') || '').trim()
+
+    try {
+      const res = await fetch('/api/waitlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, name })
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok && data?.success) {
+        alert(data.message || 'Thanks for joining our waitlist! We\'ll be in touch soon.')
+        setShowWaitlistModal(false)
+        ;(e.target as HTMLFormElement).reset()
+      } else if (res.status === 409) {
+        alert('You\'re already on the waitlist. We\'ll notify you when we go live.')
+        setShowWaitlistModal(false)
+      } else {
+        alert(data?.error || 'Something went wrong. Please try again.')
+      }
+    } catch {
+      alert('Something went wrong. Please try again.')
+    }
   }
   return (
     <div className="min-h-screen bg-gradient-to-br from-helfi-green/5 via-white to-blue-50">
@@ -983,7 +1010,7 @@ export default function SplashPage() {
       {showInfoModal && (
         <div 
           className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
-          onClick={handleInfoModalOk}
+          onClick={handleInfoModalClose}
         >
           <div 
             className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl"
@@ -991,25 +1018,31 @@ export default function SplashPage() {
           >
             <h3 className="text-xl font-bold text-gray-900 mb-4">Coming Soon</h3>
             <p className="text-gray-600 mb-6">
-              We are currently in the process of building this amazing application. If you would like to be notified the moment we go live, please sign up below.
+              We are currently in the process of building this amazing application. If you would like to be notified the moment we go live, please sign up.
             </p>
-            <div className="flex justify-end">
+            <div className="flex gap-3 justify-end">
               <button
-                onClick={handleInfoModalOk}
+                onClick={handleInfoModalClose}
+                className="bg-gray-100 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Maybe Later
+              </button>
+              <button
+                onClick={handleInfoModalSubscribe}
                 className="bg-helfi-green text-white px-6 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors"
               >
-                OK
+                Subscribe Now
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Subscribe Modal */}
-      {showSubscribeModal && (
+      {/* Waitlist Form Modal */}
+      {showWaitlistModal && (
         <div 
           className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
-          onClick={handleSubscribeModalClose}
+          onClick={handleWaitlistModalClose}
         >
           <div 
             className="bg-white rounded-2xl max-w-lg w-full p-8 shadow-xl"
@@ -1018,7 +1051,7 @@ export default function SplashPage() {
             <div className="flex justify-between items-start mb-4">
               <h3 className="text-2xl font-bold text-gray-900">Join the Waitlist</h3>
               <button
-                onClick={handleSubscribeModalClose}
+                onClick={handleWaitlistModalClose}
                 className="text-gray-400 hover:text-gray-600 transition-colors"
                 aria-label="Close"
               >
@@ -1030,20 +1063,30 @@ export default function SplashPage() {
             <p className="text-gray-600 mb-6">
               Be the first to know when we launch! Join our exclusive waitlist and get early access to Helfi when we're ready.
             </p>
-            <div className="space-y-3">
+            <form onSubmit={handleWaitlistSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <input
+                  type="text"
+                  name="name"
+                  placeholder="Your name"
+                  required
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:border-helfi-green focus:ring-2 focus:ring-helfi-green/20 outline-none"
+                />
+                <input
+                  type="email"
+                  name="email"
+                  placeholder="your@email.com"
+                  required
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:border-helfi-green focus:ring-2 focus:ring-helfi-green/20 outline-none"
+                />
+              </div>
               <button
-                onClick={handleSubscribeNow}
-                className="w-full bg-helfi-green text-white px-6 py-3 rounded-lg hover:bg-helfi-green/90 transition-colors font-semibold text-lg"
+                type="submit"
+                className="w-full bg-helfi-green text-white px-8 py-4 rounded-lg text-lg font-semibold hover:bg-helfi-green/90 transition-colors"
               >
-                Subscribe Now
+                Join the Waitlist
               </button>
-              <button
-                onClick={handleSubscribeModalClose}
-                className="w-full bg-gray-100 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-200 transition-colors"
-              >
-                Maybe Later
-              </button>
-            </div>
+            </form>
           </div>
         </div>
       )}
