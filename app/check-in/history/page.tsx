@@ -311,15 +311,17 @@ export default function CheckinHistoryPage() {
         }
       },
       x: {
+        type: 'time',
+        time: {
+          unit: 'day',
+          displayFormats: {
+            day: 'MMM d'
+          }
+        },
         ticks: {
           maxRotation: 0,
           autoSkip: true,
           maxTicksLimit: 7,
-          callback: (value) => {
-            const dateValue = typeof value === 'string' ? value : Number(value)
-            const date = new Date(dateValue)
-            return format(date, 'MMM d')
-          },
         },
       }
     }
