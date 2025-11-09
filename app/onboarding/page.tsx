@@ -1281,6 +1281,58 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
   const [supplementsToSave, setSupplementsToSave] = useState<any[]>([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false); // Track if user added but didn't update insights
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
+  const [imageQualityWarning, setImageQualityWarning] = useState<{front?: string, back?: string}>({});
+
+  // Validate image quality
+  const validateImageQuality = async (file: File, type: 'front' | 'back') => {
+    return new Promise<void>((resolve) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        
+        // Check image dimensions (minimum 800x600 for clarity)
+        const minWidth = 800;
+        const minHeight = 600;
+        
+        // Check file size (too small might indicate poor quality)
+        const minSize = 50 * 1024; // 50KB minimum
+        
+        let warning = '';
+        
+        if (img.width < minWidth || img.height < minHeight) {
+          warning = `Image resolution is low (${img.width}x${img.height}). Please take a clearer photo with better lighting.`;
+        } else if (file.size < minSize) {
+          warning = 'Image file size is very small. Please ensure the photo is clear and well-lit.';
+        }
+        
+        if (warning) {
+          setImageQualityWarning(prev => ({ ...prev, [type]: warning }));
+          // Show alert
+          setTimeout(() => {
+            alert(`⚠️ Image Quality Warning\n\n${warning}\n\nPlease take a clearer image for better accuracy.`);
+          }, 100);
+        } else {
+          setImageQualityWarning(prev => {
+            const updated = { ...prev };
+            delete updated[type];
+            return updated;
+          });
+        }
+        
+        resolve();
+      };
+      
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        setImageQualityWarning(prev => ({ ...prev, [type]: 'Unable to load image. Please try again.' }));
+        resolve();
+      };
+      
+      img.src = url;
+    });
+  };
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -1389,55 +1441,8 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
   const addSupplement = async () => {
     const currentDate = new Date().toISOString();
     
-    if (uploadMethod === 'manual' && name && dosage && timing.length > 0) {
-      // Combine timing and individual dosages with units
-      const timingWithDosages = timing.map(time => {
-        const timeSpecificDosage = timingDosages[time];
-        const timeSpecificUnit = timingDosageUnits[time] || dosageUnit;
-        return timeSpecificDosage 
-          ? `${time}: ${timeSpecificDosage} ${timeSpecificUnit}` 
-          : `${time}: ${dosage} ${dosageUnit}`;
-      });
-      
-      const scheduleInfo = dosageSchedule === 'daily' ? 'Daily' : selectedDays.join(', ');
-      
-      const supplementData = { 
-        id: Date.now().toString(), // Unique ID for editing
-        name, 
-        dosage: `${dosage} ${dosageUnit}`, 
-        timing: timingWithDosages, 
-        scheduleInfo: scheduleInfo,
-        method: 'manual',
-        dateAdded: currentDate
-      };
-      
-      if (editingIndex !== null) {
-        // Update existing supplement
-        setSupplements((prev: any[]) => prev.map((item: any, index: number) => 
-          index === editingIndex ? supplementData : item
-        ));
-        setEditingIndex(null);
-      } else {
-        // Add new supplement
-        setSupplements((prev: any[]) => [...prev, supplementData]);
-      }
-      
-      clearForm();
-      
-      // Store data for potential popup action, but don't save immediately
-      const updatedSupplements = editingIndex !== null 
-        ? supplements.map((item: any, index: number) => 
-            index === editingIndex ? supplementData : item
-          )
-        : [...supplements, supplementData];
-      setSupplementsToSave(updatedSupplements);
-      
-      // Mark as having unsaved changes
-      setHasUnsavedChanges(true);
-      
-      // Show popup and wait for user decision - no automatic actions
-      setShowUpdatePopup(true);
-    } else if (uploadMethod === 'photo' && frontImage && photoDosage && photoTiming.length > 0) {
+    // Only photo method now - require both images
+    if (frontImage && backImage && photoDosage && photoTiming.length > 0) {
       // Combine timing and individual dosages with units for photos
       const timingWithDosages = photoTiming.map(time => {
         const timeSpecificDosage = photoTimingDosages[time];
@@ -1659,37 +1664,10 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
     <div className="max-w-md mx-auto">
       <div className="bg-white rounded-lg shadow-sm p-6">
         <h2 className="text-2xl font-bold mb-4">Upload your supplements</h2>
-        <p className="mb-6 text-gray-600">Add photos or enter manually to get AI guidance on interactions and optimizations.</p>
+        <p className="mb-6 text-gray-600">Add photos of both the front and back of your supplement bottles/packets to get accurate AI guidance on interactions and optimizations.</p>
         
-        {/* Upload Method Toggle */}
-        <div className="mb-6">
-          <div className="flex rounded-lg border border-gray-200 p-1">
-            <button
-              onClick={() => setUploadMethod('photo')}
-              className={`flex-1 px-3 py-2 rounded-md text-sm transition-colors ${
-                uploadMethod === 'photo'
-                  ? 'bg-green-600 text-white'
-                  : 'text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              📷 Upload Photos
-            </button>
-            <button
-              onClick={() => setUploadMethod('manual')}
-              className={`flex-1 px-3 py-2 rounded-md text-sm transition-colors ${
-                uploadMethod === 'manual'
-                  ? 'bg-green-600 text-white'
-                  : 'text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              ⌨️ Enter Manually
-            </button>
-          </div>
-        </div>
-
-        {/* Photo Upload Method */}
-        {uploadMethod === 'photo' && (
-          <div className="mb-6 space-y-4">
+        {/* Photo Upload Method - Only Option */}
+        <div className="mb-6 space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Front of supplement bottle/packet *
@@ -1699,13 +1677,23 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
                   type="file"
                   accept="image/*"
                   capture="environment"
-                  onChange={(e) => setFrontImage(e.target.files?.[0] || null)}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    setFrontImage(file);
+                    // Validate image quality
+                    if (file) {
+                      validateImageQuality(file, 'front');
+                    }
+                  }}
                   className="hidden"
                   id="front-image"
+                  required
                 />
                 <label
                   htmlFor="front-image"
-                  className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
+                  className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-gray-50 transition-colors ${
+                    frontImage ? 'border-green-500 bg-green-50' : 'border-gray-300'
+                  }`}
                 >
                   {frontImage ? (
                     <div className="text-center">
@@ -1724,20 +1712,30 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Back of supplement bottle/packet (optional)
+                Back of supplement bottle/packet *
               </label>
               <div className="relative">
                 <input
                   type="file"
                   accept="image/*"
                   capture="environment"
-                  onChange={(e) => setBackImage(e.target.files?.[0] || null)}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    setBackImage(file);
+                    // Validate image quality
+                    if (file) {
+                      validateImageQuality(file, 'back');
+                    }
+                  }}
                   className="hidden"
                   id="back-image"
+                  required
                 />
                 <label
                   htmlFor="back-image"
-                  className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
+                  className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-gray-50 transition-colors ${
+                    backImage ? 'border-green-500 bg-green-50' : 'border-gray-300'
+                  }`}
                 >
                   {backImage ? (
                     <div className="text-center">
@@ -1896,23 +1894,13 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
             <button 
               className="w-full bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-300" 
               onClick={addSupplement}
-              disabled={!frontImage || !photoDosage || photoTiming.length === 0 || (photoDosageSchedule === 'specific' && photoSelectedDays.length === 0)}
+              disabled={!frontImage || !backImage || !photoDosage || photoTiming.length === 0 || (photoDosageSchedule === 'specific' && photoSelectedDays.length === 0)}
             >
-              {editingIndex !== null ? 'Update Supplement' : 'Add Supplement Photos'}
+              {editingIndex !== null ? 'Update Supplement' : 'Add Supplement'}
             </button>
           </div>
-        )}
 
-        {/* Manual Entry Method */}
-        {uploadMethod === 'manual' && (
-          <div className="mb-6 space-y-4">
-            <input 
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-green-500 focus:ring-1 focus:ring-green-500" 
-              type="text" 
-              placeholder="Supplement name" 
-              value={name} 
-              onChange={e => setName(e.target.value)} 
-            />
+        {/* Manual Entry Method - REMOVED - Only photo uploads allowed */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Dosage *
@@ -2164,12 +2152,40 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
           <div className="mb-6 p-4 bg-blue-50 rounded-lg">
             <div className="flex items-start gap-2">
               <div className="text-blue-600 text-xl">🤖</div>
-              <div>
+              <div className="flex-1">
                 <div className="font-medium text-blue-900">AI Analysis Ready</div>
                 <div className="text-sm text-blue-700">
                   We'll analyze your supplements for interactions, optimal timing, and missing nutrients.
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Manual Update Insights Button - Show if there are unsaved changes */}
+        {hasUnsavedChanges && supplements.length > 0 && (
+          <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <div className="font-medium text-yellow-900 mb-1">Update Insights</div>
+                <div className="text-sm text-yellow-700">
+                  You've added supplements that haven't been analyzed yet. Click below to update your insights.
+                </div>
+              </div>
+              <button
+                onClick={() => setShowUpdatePopup(true)}
+                disabled={isGeneratingInsights}
+                className="ml-4 px-4 py-2 bg-helfi-green text-white rounded-lg hover:bg-helfi-green/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed font-medium text-sm whitespace-nowrap"
+              >
+                {isGeneratingInsights ? (
+                  <>
+                    <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2"></span>
+                    Updating...
+                  </>
+                ) : (
+                  'Update Insights'
+                )}
+              </button>
             </div>
           </div>
         )}
@@ -2247,6 +2263,58 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
   const [medicationsToSave, setMedicationsToSave] = useState<any[]>([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false); // Track if user added but didn't update insights
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
+  const [imageQualityWarning, setImageQualityWarning] = useState<{front?: string, back?: string}>({});
+
+  // Validate image quality
+  const validateImageQuality = async (file: File, type: 'front' | 'back') => {
+    return new Promise<void>((resolve) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        
+        // Check image dimensions (minimum 800x600 for clarity)
+        const minWidth = 800;
+        const minHeight = 600;
+        
+        // Check file size (too small might indicate poor quality)
+        const minSize = 50 * 1024; // 50KB minimum
+        
+        let warning = '';
+        
+        if (img.width < minWidth || img.height < minHeight) {
+          warning = `Image resolution is low (${img.width}x${img.height}). Please take a clearer photo with better lighting.`;
+        } else if (file.size < minSize) {
+          warning = 'Image file size is very small. Please ensure the photo is clear and well-lit.';
+        }
+        
+        if (warning) {
+          setImageQualityWarning(prev => ({ ...prev, [type]: warning }));
+          // Show alert
+          setTimeout(() => {
+            alert(`⚠️ Image Quality Warning\n\n${warning}\n\nPlease take a clearer image for better accuracy.`);
+          }, 100);
+        } else {
+          setImageQualityWarning(prev => {
+            const updated = { ...prev };
+            delete updated[type];
+            return updated;
+          });
+        }
+        
+        resolve();
+      };
+      
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        setImageQualityWarning(prev => ({ ...prev, [type]: 'Unable to load image. Please try again.' }));
+        resolve();
+      };
+      
+      img.src = url;
+    });
+  };
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -2369,7 +2437,7 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
       
       // Show popup and wait for user decision - no automatic actions
       setShowUpdatePopup(true);
-    } else if (uploadMethod === 'photo' && frontImage && photoDosage && photoTiming.length > 0) {
+    } else if (frontImage && backImage && photoDosage && photoTiming.length > 0) {
       // Combine timing and individual dosages with units for photos
       const timingWithDosages = photoTiming.map(time => {
         const timeSpecificDosage = photoTimingDosages[time];
