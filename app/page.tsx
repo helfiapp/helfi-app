@@ -45,12 +45,10 @@ function BackToTopButton() {
 export default function SplashPage() {
   const handleWaitlistCta = () => {
     alert("We are currently in the process of building this amazing application. If you would like to be notified the moment we go live, please sign up below.")
-    document.getElementById('waitlist-signup')?.scrollIntoView({ behavior: 'smooth' })
   }
 
   const handleCreditPurchase = () => {
     alert("We are currently in the process of building this amazing application. If you would like to be notified the moment we go live, please sign up below.")
-    document.getElementById('waitlist-signup')?.scrollIntoView({ behavior: 'smooth' })
   }
   return (
     <div className="min-h-screen bg-gradient-to-br from-helfi-green/5 via-white to-blue-50">
