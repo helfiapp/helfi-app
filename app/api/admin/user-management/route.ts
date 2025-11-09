@@ -166,23 +166,53 @@ export async function POST(request: NextRequest) {
         }
         const priceCents = priceCentsMap[tier || '20'] || 2000
         
+        // Check if subscription already exists and if tier is changing
+        const existingSub = await prisma.subscription.findUnique({
+          where: { userId }
+        })
+        
+        // If tier is changing, reset startDate to start new billing cycle
+        const shouldResetStartDate = existingSub && existingSub.monthlyPriceCents !== priceCents
+        
+        const newStartDate = shouldResetStartDate || !existingSub ? new Date() : existingSub.startDate
+        
         await prisma.subscription.upsert({
           where: { userId },
           update: { 
             plan: 'PREMIUM',
-            monthlyPriceCents: priceCents
+            monthlyPriceCents: priceCents,
+            // Reset startDate if tier changed or if subscription didn't exist
+            startDate: newStartDate
           },
           create: { 
             userId, 
             plan: 'PREMIUM',
-            monthlyPriceCents: priceCents
+            monthlyPriceCents: priceCents,
+            startDate: newStartDate
           }
         })
-        // Update daily credits for premium
-        await prisma.user.update({
-          where: { id: userId },
-          data: { dailyAnalysisCredits: 30 }
-        })
+        
+        // Reset monthly counters and wallet when starting new subscription cycle
+        if (shouldResetStartDate || !existingSub) {
+          await prisma.user.update({
+            where: { id: userId },
+            data: {
+              dailyAnalysisCredits: 30,
+              walletMonthlyUsedCents: 0,
+              walletMonthlyResetAt: newStartDate,
+              monthlySymptomAnalysisUsed: 0,
+              monthlyFoodAnalysisUsed: 0,
+              monthlyMedicalImageAnalysisUsed: 0,
+              monthlyInteractionAnalysisUsed: 0,
+            } as any
+          })
+        } else {
+          // Just update daily credits if not resetting
+          await prisma.user.update({
+            where: { id: userId },
+            data: { dailyAnalysisCredits: 30 }
+          })
+        }
         break
 
       case 'deactivate':

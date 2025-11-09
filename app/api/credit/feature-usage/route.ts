@@ -142,21 +142,28 @@ export async function GET(_req: NextRequest) {
       foodLabel = foodMonthly >= (user.totalFoodAnalysisCount || 0) && foodMonthly > 0 ? 'monthly' : 'total'
     }
 
-    // Calculate symptom analysis count: totalAnalysisCount minus food and interaction
+    // Calculate symptom analysis count
+    // If user has subscription, only show monthly count (not lifetime)
+    // If no subscription, show lifetime count
+    const symptomMonthly = user.monthlySymptomAnalysisUsed || 0
     const symptomAnalysisLifetime = Math.max(0, 
       (user.totalAnalysisCount || 0) - (user.totalFoodAnalysisCount || 0) - (user.totalInteractionAnalysisCount || 0)
     )
+    
+    // For symptom analysis: if subscription exists, use monthly count only
+    // Otherwise, use lifetime count
+    const symptomCount = hasSubscription ? symptomMonthly : Math.max(symptomMonthly, symptomAnalysisLifetime)
+    const symptomLabel = hasSubscription && symptomMonthly > 0 ? 'monthly' : 'total'
 
     // Choose the larger of monthly vs lifetime to reflect usage before monthly counters existed
-    const symptomMonthly = user.monthlySymptomAnalysisUsed || 0
     const interactionMonthly = user.monthlyInteractionAnalysisUsed || 0
     const medicalMonthly = user.monthlyMedicalImageAnalysisUsed || 0
 
     const featureUsage = {
       symptomAnalysis: {
-        count: Math.max(symptomMonthly, symptomAnalysisLifetime),
+        count: symptomCount,
         costPerUse: CREDIT_COSTS.SYMPTOM_ANALYSIS,
-        label: symptomMonthly >= symptomAnalysisLifetime && symptomMonthly > 0 ? 'monthly' : 'total',
+        label: symptomLabel,
       },
       foodAnalysis: {
         count: actualFoodUsage,

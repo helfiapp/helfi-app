@@ -2446,6 +2446,46 @@ The Helfi Team`,
                          </div>
                        )}
                        
+                       {selectedUser.subscription && (
+                         <>
+                           <div className="flex justify-between items-center">
+                             <span className="text-sm text-gray-600">Subscription Started:</span>
+                             <span className="text-sm font-medium">
+                               {selectedUser.subscription.startDate 
+                                 ? new Date(selectedUser.subscription.startDate).toLocaleDateString()
+                                 : 'Unknown'}
+                             </span>
+                           </div>
+                           
+                           {selectedUser.subscription.startDate && !selectedUser.subscription.endDate && (
+                             <div className="flex justify-between items-center">
+                               <span className="text-sm text-gray-600">Next Renewal:</span>
+                               <span className="text-sm font-medium">
+                                 {(() => {
+                                   const startDate = new Date(selectedUser.subscription.startDate)
+                                   const now = new Date()
+                                   const startYear = startDate.getUTCFullYear()
+                                   const startMonth = startDate.getUTCMonth()
+                                   const startDay = startDate.getUTCDate()
+                                   
+                                   const currentYear = now.getUTCFullYear()
+                                   const currentMonth = now.getUTCMonth()
+                                   const currentDay = now.getUTCDate()
+                                   
+                                   let monthsSinceStart = (currentYear - startYear) * 12 + (currentMonth - startMonth)
+                                   if (currentDay < startDay) {
+                                     monthsSinceStart--
+                                   }
+                                   
+                                   const nextRenewal = new Date(Date.UTC(startYear, startMonth + monthsSinceStart + 1, startDay, 0, 0, 0, 0))
+                                   return nextRenewal.toLocaleDateString()
+                                 })()}
+                               </span>
+                             </div>
+                           )}
+                         </>
+                       )}
+                       
                        <div className="flex justify-between items-center">
                          <span className="text-sm text-gray-600">Member since:</span>
                          <span className="text-sm">{new Date(selectedUser.createdAt).toLocaleDateString()}</span>
