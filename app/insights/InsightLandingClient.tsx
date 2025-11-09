@@ -135,30 +135,7 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
               <p className="text-sm text-gray-500 mt-2">Start with your tracked issues, then unlock deeper reports.</p>
             </div>
             <div className="flex flex-col items-center md:items-end gap-2">
-              {onboardingComplete && issues.length > 0 && (
-                <button
-                  onClick={handleUpdateInsights}
-                  disabled={isUpdating}
-                  className="inline-flex items-center gap-2 rounded-lg bg-helfi-green px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 disabled:cursor-not-allowed hover:bg-helfi-green/90 transition-colors"
-                >
-                  {isUpdating ? (
-                    <>
-                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
-                      Updating...
-                    </>
-                  ) : (
-                    <>
-                      <span>🔄</span>
-                      Update Insights
-                    </>
-                  )}
-                </button>
-              )}
-              {updateMessage && (
-                <p className={`text-xs ${updateMessage.includes('Failed') ? 'text-red-600' : 'text-green-600'}`}>
-                  {updateMessage}
-                </p>
-              )}
+              {/* Update Insights button removed - insights update automatically when health data changes */}
               <div className="text-xs text-gray-400 md:text-right">
                 Updated {new Date(lastLoaded).toLocaleString()}
               </div>

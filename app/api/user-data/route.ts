@@ -796,31 +796,35 @@ export async function POST(request: NextRequest) {
         } catch {}
       }
 
-      // NEW APPROACH: Event-driven regeneration based on what actually changed
-      // Instead of regenerating everything, we trigger regeneration only for affected sections
-      const changedTypes: Array<'supplements' | 'medications' | 'food' | 'exercise' | 'health_goals' | 'profile' | 'blood_results'> = []
-      
-      if (data.supplements) changedTypes.push('supplements')
-      if (data.medications) changedTypes.push('medications')
-      if (data.goals) changedTypes.push('health_goals')
-      if (data.gender || data.weight || data.height || data.bodyType) changedTypes.push('profile')
-      if (data.exerciseFrequency || data.exerciseTypes) changedTypes.push('exercise')
-      if (data.bloodResults) changedTypes.push('blood_results')
-      if (data.todaysFoods) changedTypes.push('food')
+      // When health data is updated (not full onboarding), generate ALL insights
+      // This ensures insights are ready when user navigates to insights page
+      if (!isFullOnboarding) {
+        const changedTypes: Array<'supplements' | 'medications' | 'food' | 'exercise' | 'health_goals' | 'profile' | 'blood_results'> = []
+        
+        if (data.supplements) changedTypes.push('supplements')
+        if (data.medications) changedTypes.push('medications')
+        if (data.goals) changedTypes.push('health_goals')
+        if (data.gender || data.weight || data.height || data.bodyType) changedTypes.push('profile')
+        if (data.exerciseFrequency || data.exerciseTypes) changedTypes.push('exercise')
+        if (data.bloodResults) changedTypes.push('blood_results')
+        if (data.todaysFoods) changedTypes.push('food')
 
-      // Trigger background regeneration for each changed data type
-      // This is NON-BLOCKING - user doesn't wait
-      for (const changeType of changedTypes) {
-        triggerBackgroundRegeneration({
-          userId: user.id,
-          changeType,
-          timestamp: new Date(),
-        }).catch((error) => {
-          console.warn(`⚠️ Failed to trigger regeneration for ${changeType}`, error)
-        })
+        // If any health data changed, generate ALL insights (not just affected sections)
+        // This ensures complete insights are ready when user navigates to insights page
+        if (changedTypes.length > 0) {
+          try {
+            console.log('🚀 Generating ALL insights after health data update for user:', user.id)
+            // Generate full insights for all issues (not just affected sections)
+            // This runs in background - user sees progress bar on their page
+            precomputeIssueSectionsForUser(user.id, { concurrency: 4 }).catch((error) => {
+              console.warn('⚠️ Failed to generate insights after health data update:', error)
+            })
+            console.log(`🔄 Triggered full insights generation after health data changes: ${changedTypes.join(', ')}`)
+          } catch (error) {
+            console.warn('⚠️ Error triggering insights generation:', error)
+          }
+        }
       }
-
-      console.log(`🔄 Triggered background regeneration for: ${changedTypes.join(', ')}`)
     }
 
     // 🔍 FINAL PERFORMANCE MEASUREMENT

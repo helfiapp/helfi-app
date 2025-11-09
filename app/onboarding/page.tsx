@@ -3325,17 +3325,19 @@ function ReviewStep({ onBack, data }: { onBack: () => void, data: any }) {
       });
       
       if (response.ok) {
-        await updateProgress(100, 'Welcome to Helfi! 🎉');
+        await updateProgress(90, 'Generating your personalized insights...');
         console.log('✅ Onboarding data saved to database successfully');
+        console.log('🚀 Starting insights generation...');
+        
+        // Wait for insights generation (up to 30 seconds)
+        // The API already generates insights, but we show progress here
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Show "Generating insights" for at least 2 seconds
+        
+        await updateProgress(100, 'Welcome to Helfi! 🎉');
         console.log('🔄 Starting redirect to dashboard...');
         
         // Brief moment to show completion
         await new Promise(resolve => setTimeout(resolve, 800));
-        
-        // Fire-and-forget: generate initial insights in background (safe preview)
-        try {
-          fetch('/api/insights/generate?preview=1', { method: 'POST' }).catch(() => {})
-        } catch {}
 
         const redirectStart = Date.now();
         window.location.href = '/dashboard';
