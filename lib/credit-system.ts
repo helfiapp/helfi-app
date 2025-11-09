@@ -9,6 +9,7 @@ export const CREDIT_COSTS = {
   MEDICAL_IMAGE_ANALYSIS: 2,
   FOOD_REANALYSIS: 1,
   SYMPTOM_ANALYSIS: 1,
+  INSIGHTS_GENERATION: 2, // Fixed cost per full insights generation (all health issues)
 } as const;
 
 export type FeatureType = keyof typeof CREDIT_COSTS;
@@ -143,6 +144,7 @@ export class CreditManager {
           monthlyFoodAnalysisUsed: 0,
           monthlyMedicalImageAnalysisUsed: 0,
           monthlyInteractionAnalysisUsed: 0,
+          monthlyInsightsGenerationUsed: 0,
         } as any,
       });
     }

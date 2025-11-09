@@ -67,6 +67,7 @@ export async function GET(request: NextRequest) {
         dailyFoodReanalysisUsed: true,
         dailyMedicalAnalysisUsed: true,
         dailyInteractionAnalysisUsed: true,
+        monthlyInsightsGenerationUsed: true,
         subscription: { select: { plan: true, monthlyPriceCents: true, endDate: true, startDate: true } },
         creditTopUps: {
           where: {
@@ -206,6 +207,7 @@ export async function POST(request: NextRequest) {
               monthlyFoodAnalysisUsed: 0,
               monthlyMedicalImageAnalysisUsed: 0,
               monthlyInteractionAnalysisUsed: 0,
+              monthlyInsightsGenerationUsed: 0,
             } as any
           })
         } else {

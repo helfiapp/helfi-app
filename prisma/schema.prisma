@@ -44,6 +44,7 @@ model User {
   monthlySymptomAnalysisUsed      Int @default(0) // Symptom analyses used this month
   monthlyFoodAnalysisUsed         Int @default(0) // Food analyses used this month
   monthlyMedicalImageAnalysisUsed Int @default(0) // Medical image analyses used this month
+  monthlyInsightsGenerationUsed   Int @default(0) // Insights generations used this month
 
   // One-time free use tracking (one free use per AI feature)
   hasUsedFreeFoodAnalysis        Boolean @default(false) // Has used free food analysis

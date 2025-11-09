@@ -13,13 +13,14 @@ interface FeatureUsageData {
     foodAnalysis: FeatureUsage
     interactionAnalysis: FeatureUsage
     medicalImageAnalysis: FeatureUsage
+    insightsGeneration: FeatureUsage
   }
   hasSubscription: boolean
   actualCreditsUsed: number
 }
 
 interface FeatureUsageDisplayProps {
-  featureName: 'symptomAnalysis' | 'foodAnalysis' | 'interactionAnalysis' | 'medicalImageAnalysis'
+  featureName: 'symptomAnalysis' | 'foodAnalysis' | 'interactionAnalysis' | 'medicalImageAnalysis' | 'insightsGeneration'
   featureLabel: string
   refreshTrigger?: number // Trigger refresh when this changes
 }

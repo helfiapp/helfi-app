@@ -2533,8 +2533,9 @@ The Helfi Team`,
                              <span className="font-medium">{selectedUser.dailyInteractionAnalysisUsed || 0}</span>
                            </div>
                          </div>
-                         <div className="mt-2 text-xs text-gray-400 italic">
-                           Note: Symptom Analysis is tracked monthly only
+                         <div className="flex justify-between">
+                           <span>Insights Generation:</span>
+                           <span className="font-medium">{selectedUser.monthlyInsightsGenerationUsed || 0} (monthly)</span>
                          </div>
                        </div>
                        {selectedUser.lastAnalysisResetDate && (

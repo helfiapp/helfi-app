@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { precomputeIssueSectionsForUser, precomputeQuickSectionsForUser } from '@/lib/insights/issue-engine'
 import { triggerBackgroundRegeneration } from '@/lib/insights/regeneration-service'
+import { CreditManager, CREDIT_COSTS } from '@/lib/credit-system'
 
 export async function GET(request: NextRequest) {
   try {
@@ -712,6 +713,41 @@ export async function POST(request: NextRequest) {
     console.log('✅ POST /api/user-data - All updates completed successfully')
 
     if (user?.id) {
+      // Check if this is a full onboarding completion (all data provided at once)
+      // This indicates a new user completing onboarding, so we should charge for insights generation
+      const isFullOnboarding = !!(data.gender && data.weight && data.height && 
+        (data.goals?.length || data.supplements?.length || data.medications?.length))
+      
+      // Charge credits for insights generation if this is full onboarding
+      if (isFullOnboarding) {
+        try {
+          const cm = new CreditManager(user.id)
+          const hasCredits = await cm.checkCredits('INSIGHTS_GENERATION')
+          
+          if (hasCredits.hasCredits) {
+            // Charge credits for insights generation
+            const costCents = CREDIT_COSTS.INSIGHTS_GENERATION
+            const charged = await cm.chargeCents(costCents)
+            
+            if (charged) {
+              // Update monthly counter
+              await prisma.user.update({
+                where: { id: user.id },
+                data: {
+                  monthlyInsightsGenerationUsed: { increment: 1 },
+                } as any,
+              })
+              console.log('✅ Charged credits for insights generation:', costCents)
+            } else {
+              console.warn('⚠️ Insufficient credits for insights generation, skipping')
+            }
+          }
+        } catch (error) {
+          console.warn('⚠️ Failed to charge credits for insights generation:', error)
+          // Continue with insights generation even if charging fails (don't block onboarding)
+        }
+      }
+      
       // Prime insights cache so sections are ready immediately after intake
       try {
         console.log('🚀 Priming insights QUICK cache for user:', user.id)

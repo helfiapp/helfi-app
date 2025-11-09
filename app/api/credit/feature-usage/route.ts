@@ -19,6 +19,7 @@ export async function GET(_req: NextRequest) {
         monthlyFoodAnalysisUsed: true,
         monthlyMedicalImageAnalysisUsed: true,
         monthlyInteractionAnalysisUsed: true,
+        monthlyInsightsGenerationUsed: true,
         totalAnalysisCount: true,
         totalFoodAnalysisCount: true,
         totalInteractionAnalysisCount: true,
@@ -158,6 +159,7 @@ export async function GET(_req: NextRequest) {
     // Choose the larger of monthly vs lifetime to reflect usage before monthly counters existed
     const interactionMonthly = user.monthlyInteractionAnalysisUsed || 0
     const medicalMonthly = user.monthlyMedicalImageAnalysisUsed || 0
+    const insightsMonthly = user.monthlyInsightsGenerationUsed || 0
 
     const featureUsage = {
       symptomAnalysis: {
@@ -179,6 +181,11 @@ export async function GET(_req: NextRequest) {
         count: medicalMonthly,
         costPerUse: CREDIT_COSTS.MEDICAL_IMAGE_ANALYSIS,
         label: medicalMonthly > 0 ? 'monthly' : 'total',
+      },
+      insightsGeneration: {
+        count: insightsMonthly,
+        costPerUse: CREDIT_COSTS.INSIGHTS_GENERATION,
+        label: insightsMonthly > 0 ? 'monthly' : 'total',
       },
     }
 
