@@ -1347,6 +1347,20 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
     return () => document.removeEventListener('click', handleClickOutside);
   }, []);
 
+  // Prevent browser navigation when there are unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = 'You have unsaved changes. Please update your insights before leaving.';
+        return e.returnValue;
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
   // Check for existing interaction analysis
   useEffect(() => {
     const checkExistingAnalysis = async () => {
@@ -2179,6 +2193,20 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
     document.addEventListener('click', handleClickOutside);
     return () => document.removeEventListener('click', handleClickOutside);
   }, []);
+
+  // Prevent browser navigation when there are unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = 'You have unsaved changes. Please update your insights before leaving.';
+        return e.returnValue;
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
 
   // Check for existing interaction analysis
   useEffect(() => {

@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { useSelectedLayoutSegments } from 'next/navigation'
 import SectionChat from '../SectionChat'
 import type { IssueSectionResult } from '@/lib/insights/issue-engine'
-import InsightsProgressBar from '@/components/InsightsProgressBar'
 
 // Progress bar component that animates smoothly to 100%
 function ProgressBar() {
@@ -91,68 +90,8 @@ export default function SupplementsShell({ children, initialResult, issueSlug }:
   const [result, setResult] = useState<IssueSectionResult | null>(initialResult)
   const [loading, setLoading] = useState(!initialResult)
   const [error, setError] = useState<string | null>(null)
-  const [isUpdating, setIsUpdating] = useState(false)
   const segments = useSelectedLayoutSegments()
   const activeTab = (segments?.[0] as TabKey | undefined) ?? 'working'
-
-  // Handle Update Insights button click
-  const handleUpdateInsights = async () => {
-    setIsUpdating(true)
-    try {
-      const response = await fetch('/api/insights/regenerate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      })
-      
-      if (response.ok) {
-        // Regeneration runs in background - poll the supplements endpoint to check when it's done
-        // Check every 5 seconds, up to 2 minutes
-        let attempts = 0
-        const maxAttempts = 24 // 24 * 5 seconds = 2 minutes
-        
-        const checkInterval = setInterval(async () => {
-          attempts++
-          
-          try {
-            // Fetch the current supplements section to see if it's been updated
-            const checkResponse = await fetch(`/api/insights/issues/${issueSlug}/sections/supplements?t=${Date.now()}`, {
-              cache: 'no-store'
-            })
-            
-            if (checkResponse.ok) {
-              const newData = await checkResponse.json()
-              const newGeneratedAt = new Date(newData.generatedAt).getTime()
-              const oldGeneratedAt = result ? new Date(result.generatedAt).getTime() : 0
-              
-              // If the generated timestamp is newer, regeneration is complete
-              if (newGeneratedAt > oldGeneratedAt) {
-                clearInterval(checkInterval)
-                // Refresh the page to show updated insights
-                window.location.reload()
-                return
-              }
-            }
-          } catch (error) {
-            console.error('Error checking regeneration status:', error)
-          }
-          
-          // If we've checked enough times, refresh anyway
-          if (attempts >= maxAttempts) {
-            clearInterval(checkInterval)
-            window.location.reload()
-          }
-        }, 5000) // Check every 5 seconds
-      } else {
-        const data = await response.json()
-        alert(data.message || 'Failed to update insights. Please try again.')
-        setIsUpdating(false)
-      }
-    } catch (error) {
-      console.error('Error updating insights:', error)
-      alert('Failed to update insights. Please try again.')
-      setIsUpdating(false)
-    }
-  }
 
   // Fetch data client-side if SSR returned null (cache miss)
   useEffect(() => {
@@ -358,26 +297,7 @@ export default function SupplementsShell({ children, initialResult, issueSlug }:
               <p className="text-xs text-gray-500 mt-3">
                 Generated {new Date(result.generatedAt).toLocaleString()} • Confidence {(result.confidence * 100).toFixed(0)}%
               </p>
-              {isUpdating && (
-                <div className="mt-4">
-                  <InsightsProgressBar isGenerating={true} message="Regenerating insights..." />
-                </div>
-              )}
             </div>
-            <button
-              onClick={handleUpdateInsights}
-              disabled={isUpdating}
-              className="px-4 py-2 bg-helfi-green text-white rounded-lg hover:bg-helfi-green/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed font-medium text-sm whitespace-nowrap"
-            >
-              {isUpdating ? (
-                <>
-                  <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2"></span>
-                  Updating...
-                </>
-              ) : (
-                'Update Insights'
-              )}
-            </button>
           </div>
         </section>
 
