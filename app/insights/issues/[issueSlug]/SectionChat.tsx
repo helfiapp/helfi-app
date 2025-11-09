@@ -60,9 +60,18 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
     } catch {}
   }, [messages, storageKey])
 
+  // Only auto-scroll when user sends a message, not on initial load
+  const [hasUserInteracted, setHasUserInteracted] = useState(false)
+  
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, loading])
+    // Only scroll if user has interacted (sent a message)
+    if (hasUserInteracted && messages.length > 0) {
+      // Use setTimeout to ensure scroll happens after render
+      setTimeout(() => {
+        endRef.current?.scrollIntoView({ behavior: 'smooth' })
+      }, 100)
+    }
+  }, [messages, loading, hasUserInteracted])
 
   function onComposerKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
     if (event.key === 'Enter' && !event.shiftKey) {
@@ -96,6 +105,7 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
       return
     }
     try {
+      setHasUserInteracted(true) // Mark that user has interacted
       setLoading(true)
       setError(null)
       const nextMessages: ChatMessage[] = [...messages, { role: 'user', content: text }]

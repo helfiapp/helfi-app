@@ -6,6 +6,38 @@ import { useSelectedLayoutSegments } from 'next/navigation'
 import SectionChat from '../SectionChat'
 import type { IssueSectionResult } from '@/lib/insights/issue-engine'
 
+// Progress bar component that animates through stages
+function ProgressBar() {
+  const [progress, setProgress] = useState(0)
+  
+  useEffect(() => {
+    // Animate progress bar through stages: 0% -> 30% -> 60% -> 85% -> 95% -> 100%
+    const stages = [30, 60, 85, 95, 100]
+    let currentStage = 0
+    
+    const interval = setInterval(() => {
+      if (currentStage < stages.length) {
+        setProgress(stages[currentStage])
+        currentStage++
+      } else {
+        // Once at 100%, pulse between 95-100% to show it's still working
+        setProgress(prev => prev === 100 ? 95 : 100)
+      }
+    }, 800) // Change stage every 800ms
+    
+    return () => clearInterval(interval)
+  }, [])
+  
+  return (
+    <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+      <div 
+        className="bg-helfi-green h-2 rounded-full transition-all duration-500 ease-out"
+        style={{ width: `${progress}%` }}
+      ></div>
+    </div>
+  )
+}
+
 type TabKey = 'working' | 'suggested' | 'avoid'
 
 type MedicationsExtras = {
@@ -55,6 +87,9 @@ export default function MedicationsShell({ children, initialResult, issueSlug }:
     if (!initialResult) {
       setLoading(true)
       const scrollPosition = window.scrollY || document.documentElement.scrollTop
+      // Save scroll position to prevent any scrolling
+      sessionStorage.setItem(`scroll-${issueSlug}-medications`, scrollPosition.toString())
+      
       fetch(`/api/insights/issues/${issueSlug}/sections/medications`)
         .then((res) => {
           if (!res.ok) {
@@ -65,20 +100,55 @@ export default function MedicationsShell({ children, initialResult, issueSlug }:
         .then((data) => {
           setResult(data)
           setLoading(false)
-          // Prevent scroll - restore original position
-          requestAnimationFrame(() => {
+          // Prevent scroll - restore original position multiple times to ensure it sticks
+          const preventScroll = () => {
             window.scrollTo(0, scrollPosition)
-          })
+            document.documentElement.scrollTop = scrollPosition
+            document.body.scrollTop = scrollPosition
+          }
+          preventScroll()
+          requestAnimationFrame(preventScroll)
+          setTimeout(preventScroll, 0)
+          setTimeout(preventScroll, 50)
+          setTimeout(preventScroll, 100)
+          setTimeout(preventScroll, 200)
         })
         .catch((err) => {
           setError((err as Error).message)
           setLoading(false)
-          requestAnimationFrame(() => {
+          const preventScroll = () => {
             window.scrollTo(0, scrollPosition)
-          })
+            document.documentElement.scrollTop = scrollPosition
+            document.body.scrollTop = scrollPosition
+          }
+          preventScroll()
+          requestAnimationFrame(preventScroll)
+          setTimeout(preventScroll, 0)
+          setTimeout(preventScroll, 50)
         })
     }
   }, [initialResult, issueSlug])
+  
+  // Additional scroll prevention when result loads
+  useEffect(() => {
+    if (result && !loading) {
+      // Prevent any auto-scrolling when result finishes loading
+      const preventScroll = () => {
+        const savedPosition = sessionStorage.getItem(`scroll-${issueSlug}-medications`)
+        if (savedPosition) {
+          const position = parseInt(savedPosition, 10)
+          window.scrollTo(0, position)
+          document.documentElement.scrollTop = position
+          document.body.scrollTop = position
+        }
+      }
+      preventScroll()
+      requestAnimationFrame(preventScroll)
+      setTimeout(preventScroll, 0)
+      setTimeout(preventScroll, 100)
+      setTimeout(preventScroll, 200)
+    }
+  }, [result, loading, issueSlug])
 
   async function handleGenerate(mode: 'daily' | 'weekly' | 'custom', range?: { from?: string; to?: string }) {
     // This function is kept for backward compatibility but is no longer used
@@ -146,9 +216,7 @@ export default function MedicationsShell({ children, initialResult, issueSlug }:
               <div className="flex-1">
                 <h2 className="text-lg font-semibold text-gray-900 mb-2">Medications report</h2>
                 <p className="text-sm text-gray-700 leading-relaxed mb-3">Preparing initial guidance...</p>
-                <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-                  <div className="bg-helfi-green h-2 rounded-full animate-pulse" style={{ width: '60%' }}></div>
-                </div>
+                <ProgressBar />
               </div>
             </div>
           </section>
