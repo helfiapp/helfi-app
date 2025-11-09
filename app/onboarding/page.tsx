@@ -2240,55 +2240,8 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
   const addMedication = async () => {
     const currentDate = new Date().toISOString();
     
-    if (uploadMethod === 'manual' && name && dosage && timing.length > 0) {
-      // Combine timing and individual dosages with units
-      const timingWithDosages = timing.map(time => {
-        const timeSpecificDosage = timingDosages[time];
-        const timeSpecificUnit = timingDosageUnits[time] || dosageUnit;
-        return timeSpecificDosage 
-          ? `${time}: ${timeSpecificDosage} ${timeSpecificUnit}` 
-          : `${time}: ${dosage} ${dosageUnit}`;
-      });
-      
-      const scheduleInfo = dosageSchedule === 'daily' ? 'Daily' : selectedDays.join(', ');
-      
-      const medicationData = { 
-        id: Date.now().toString(), // Unique ID for editing
-        name, 
-        dosage: `${dosage} ${dosageUnit}`, 
-        timing: timingWithDosages, 
-        scheduleInfo: scheduleInfo,
-        method: 'manual',
-        dateAdded: currentDate
-      };
-      
-      if (editingIndex !== null) {
-        // Update existing medication
-        setMedications((prev: any[]) => prev.map((item: any, index: number) => 
-          index === editingIndex ? medicationData : item
-        ));
-        setEditingIndex(null);
-      } else {
-        // Add new medication
-        setMedications((prev: any[]) => [...prev, medicationData]);
-      }
-      
-      clearMedForm();
-      
-      // Store data for potential popup action, but don't save immediately
-      const updatedMedications = editingIndex !== null 
-        ? medications.map((item: any, index: number) => 
-            index === editingIndex ? medicationData : item
-          )
-        : [...medications, medicationData];
-      setMedicationsToSave(updatedMedications);
-      
-      // Mark as having unsaved changes
-      setHasUnsavedChanges(true);
-      
-      // Show popup and wait for user decision - no automatic actions
-      setShowUpdatePopup(true);
-    } else if (frontImage && backImage && photoDosage && photoTiming.length > 0) {
+    // Only photo method now - require both images
+    if (frontImage && backImage && photoDosage && photoTiming.length > 0) {
       // Combine timing and individual dosages with units for photos
       const timingWithDosages = photoTiming.map(time => {
         const timeSpecificDosage = photoTimingDosages[time];
@@ -2508,37 +2461,10 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
     <div className="max-w-md mx-auto">
       <div className="bg-white rounded-lg shadow-sm p-6">
         <h2 className="text-2xl font-bold mb-4">Add your medications</h2>
-        <p className="mb-6 text-gray-600">Upload photos or enter manually to check for supplement-medication interactions.</p>
+        <p className="mb-6 text-gray-600">Upload photos of both the front and back of your medication bottles/packets to check for supplement-medication interactions.</p>
         
-        {/* Upload Method Toggle */}
-        <div className="mb-6">
-          <div className="flex rounded-lg border border-gray-200 p-1">
-            <button
-              onClick={() => setUploadMethod('photo')}
-              className={`flex-1 px-3 py-2 rounded-md text-sm transition-colors ${
-                uploadMethod === 'photo'
-                  ? 'bg-green-600 text-white'
-                  : 'text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              📷 Upload Photos
-            </button>
-            <button
-              onClick={() => setUploadMethod('manual')}
-              className={`flex-1 px-3 py-2 rounded-md text-sm transition-colors ${
-                uploadMethod === 'manual'
-                  ? 'bg-green-600 text-white'
-                  : 'text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              ⌨️ Enter Manually
-            </button>
-          </div>
-        </div>
-
-        {/* Photo Upload Method */}
-        {uploadMethod === 'photo' && (
-          <div className="mb-6 space-y-4">
+        {/* Photo Upload Method - Only Option */}
+        <div className="mb-6 space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Front of medication bottle/packet *
@@ -2548,13 +2474,23 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
                   type="file"
                   accept="image/*"
                   capture="environment"
-                  onChange={(e) => setFrontImage(e.target.files?.[0] || null)}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    setFrontImage(file);
+                    // Validate image quality
+                    if (file) {
+                      validateImageQuality(file, 'front');
+                    }
+                  }}
                   className="hidden"
                   id="med-front-image"
+                  required
                 />
                 <label
                   htmlFor="med-front-image"
-                  className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
+                  className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-gray-50 transition-colors ${
+                    frontImage ? 'border-green-500 bg-green-50' : 'border-gray-300'
+                  }`}
                 >
                   {frontImage ? (
                     <div className="text-center">
@@ -2573,20 +2509,30 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Back of medication bottle/packet (optional)
+                Back of medication bottle/packet *
               </label>
               <div className="relative">
                 <input
                   type="file"
                   accept="image/*"
                   capture="environment"
-                  onChange={(e) => setBackImage(e.target.files?.[0] || null)}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    setBackImage(file);
+                    // Validate image quality
+                    if (file) {
+                      validateImageQuality(file, 'back');
+                    }
+                  }}
                   className="hidden"
                   id="med-back-image"
+                  required
                 />
                 <label
                   htmlFor="med-back-image"
-                  className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
+                  className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-gray-50 transition-colors ${
+                    backImage ? 'border-green-500 bg-green-50' : 'border-gray-300'
+                  }`}
                 >
                   {backImage ? (
                     <div className="text-center">
@@ -2741,165 +2687,11 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
             <button 
               className="w-full bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-300" 
               onClick={addMedication}
-              disabled={!frontImage || !photoDosage || photoTiming.length === 0 || (photoDosageSchedule === 'specific' && photoSelectedDays.length === 0)}
-            >
-              {editingIndex !== null ? 'Update Medication' : 'Add Medication Photos'}
-            </button>
-          </div>
-        )}
-
-        {/* Manual Entry Method */}
-        {uploadMethod === 'manual' && (
-          <div className="mb-6 space-y-4">
-            <input 
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-green-500 focus:ring-1 focus:ring-green-500" 
-              type="text" 
-              placeholder="Medication name" 
-              value={name} 
-              onChange={e => setName(e.target.value)} 
-            />
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Dosage *
-              </label>
-              <div className="flex space-x-2">
-                <input 
-                  className="flex-1 rounded-lg border border-gray-300 px-3 py-2 focus:border-green-500 focus:ring-1 focus:ring-green-500" 
-                  type="text" 
-                  inputMode="numeric"
-                  placeholder="e.g., 10, 1" 
-                  value={dosage} 
-                  onChange={e => setDosage(e.target.value)} 
-                />
-                <select
-                  value={dosageUnit}
-                  onChange={e => setDosageUnit(e.target.value)}
-                  className="w-24 rounded-lg border border-gray-300 px-2 py-2 focus:border-green-500 focus:ring-1 focus:ring-green-500 text-sm"
-                >
-                  {dosageUnits.map(unit => (
-                    <option key={unit} value={unit}>{unit}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                How often do you take this medication? *
-              </label>
-              <div className="space-y-3">
-                <div className="flex items-center space-x-3">
-                  <input
-                    type="radio"
-                    checked={dosageSchedule === 'daily'}
-                    onChange={() => handleScheduleChange('daily', false)}
-                    className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 focus:ring-green-500 focus:ring-2"
-                    id="manual-med-daily"
-                  />
-                  <label htmlFor="manual-med-daily" className="cursor-pointer">
-                    <span className="text-gray-700">Every day</span>
-                  </label>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <input
-                    type="radio"
-                    checked={dosageSchedule === 'specific'}
-                    onChange={() => handleScheduleChange('specific', false)}
-                    className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 focus:ring-green-500 focus:ring-2"
-                    id="manual-med-specific"
-                  />
-                  <label htmlFor="manual-med-specific" className="cursor-pointer">
-                    <span className="text-gray-700">Specific days only</span>
-                  </label>
-                </div>
-                
-                {dosageSchedule === 'specific' && (
-                  <div className="ml-7 space-y-2">
-                    <div className="text-sm text-gray-600 mb-2">Select the days you take this medication:</div>
-                    <div className="grid grid-cols-2 gap-2">
-                      {daysOfWeek.map(day => (
-                        <div key={day} className="flex items-center space-x-2">
-                          <input
-                            type="checkbox"
-                            checked={selectedDays.includes(day)}
-                            onChange={() => toggleDay(day, false)}
-                            className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
-                            id={`manual-med-day-${day}`}
-                          />
-                          <label htmlFor={`manual-med-day-${day}`} className="text-sm cursor-pointer">
-                            {day.substring(0, 3)}
-                          </label>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                When do you take this medication? *
-              </label>
-              <div className="space-y-3">
-                {timingOptions.map(time => (
-                  <div key={time} className="flex items-center space-x-3">
-                    <input
-                      type="checkbox"
-                      checked={timing.includes(time)}
-                      onChange={() => toggleTiming(time, false)}
-                      className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
-                      id={`timing-${time}`}
-                    />
-                    <label htmlFor={`timing-${time}`} className="flex-1 cursor-pointer">
-                      <span className="text-gray-700">{time}</span>
-                    </label>
-                    {timing.includes(time) && (
-                      <div className="flex space-x-1">
-                        <input
-                          type="text"
-                          inputMode="numeric" placeholder="Amount"
-                          value={timingDosages[time] || ''}
-                          className="w-16 px-2 py-1 border border-gray-300 rounded text-base focus:border-green-500 focus:ring-1 focus:ring-green-500"
-                          onChange={(e) => {
-                            setTimingDosages(prev => ({
-                              ...prev,
-                              [time]: e.target.value
-                            }));
-                          }}
-                        />
-                        <select
-                          value={timingDosageUnits[time] || dosageUnit}
-                          onChange={(e) => {
-                            setTimingDosageUnits(prev => ({
-                              ...prev,
-                              [time]: e.target.value
-                            }));
-                          }}
-                          className="w-16 px-1 py-1 border border-gray-300 rounded text-base focus:border-green-500 focus:ring-1 focus:ring-green-500"
-                        >
-                          {dosageUnits.map(unit => (
-                            <option key={unit} value={unit}>{unit}</option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-              <div className="mt-2 text-xs text-gray-500">
-                💡 Tip: If you split your medication (e.g., 5mg Tadalafil as 2.5mg twice daily), 
-                check multiple times and enter the dosage for each time.
-              </div>
-            </div>
-            <button 
-              className="w-full bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-300" 
-              onClick={addMedication}
-              disabled={!name || !dosage || timing.length === 0 || (dosageSchedule === 'specific' && selectedDays.length === 0)}
+              disabled={!frontImage || !backImage || !photoDosage || photoTiming.length === 0 || (photoDosageSchedule === 'specific' && photoSelectedDays.length === 0)}
             >
               {editingIndex !== null ? 'Update Medication' : 'Add Medication'}
             </button>
           </div>
-        )}
 
         {/* Added Medications List */}
         {medications.length > 0 && (
@@ -3004,12 +2796,40 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
           <div className="mb-6 p-4 bg-orange-50 rounded-lg">
             <div className="flex items-start gap-2">
               <div className="text-orange-600 text-xl">⚠️</div>
-              <div>
+              <div className="flex-1">
                 <div className="font-medium text-orange-900">Important Safety Check</div>
                 <div className="text-sm text-orange-700">
                   We'll analyze potential interactions between your medications and supplements.
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Manual Update Insights Button - Show if there are unsaved changes */}
+        {hasUnsavedChanges && medications.length > 0 && (
+          <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <div className="font-medium text-yellow-900 mb-1">Update Insights</div>
+                <div className="text-sm text-yellow-700">
+                  You've added medications that haven't been analyzed yet. Click below to update your insights.
+                </div>
+              </div>
+              <button
+                onClick={() => setShowUpdatePopup(true)}
+                disabled={isGeneratingInsights}
+                className="ml-4 px-4 py-2 bg-helfi-green text-white rounded-lg hover:bg-helfi-green/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed font-medium text-sm whitespace-nowrap"
+              >
+                {isGeneratingInsights ? (
+                  <>
+                    <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2"></span>
+                    Updating...
+                  </>
+                ) : (
+                  'Update Insights'
+                )}
+              </button>
             </div>
           </div>
         )}
