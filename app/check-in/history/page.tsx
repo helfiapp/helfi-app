@@ -525,20 +525,19 @@ export default function CheckinHistoryPage() {
               </div>
               
               {/* Time Period Filter */}
-              <div className="mb-4 flex flex-wrap gap-2">
-                {(['daily', 'weekly', 'monthly', 'yearly', 'all'] as const).map((period) => (
-                  <button
-                    key={period}
-                    onClick={() => setTimePeriod(period)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      timePeriod === period
-                        ? 'bg-helfi-green text-white'
-                        : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:border-helfi-green'
-                    }`}
-                  >
-                    {period === 'daily' ? '30 Days' : period === 'weekly' ? '12 Weeks' : period === 'monthly' ? '12 Months' : period === 'yearly' ? '5 Years' : 'All Time'}
-                  </button>
-                ))}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Time Period</label>
+                <select
+                  value={timePeriod}
+                  onChange={(e) => setTimePeriod(e.target.value as 'daily' | 'weekly' | 'monthly' | 'yearly' | 'all')}
+                  className="w-full sm:w-auto min-w-[180px] border border-gray-300 dark:border-gray-600 rounded-lg px-4 py-2.5 dark:bg-gray-700 dark:text-white bg-white text-gray-900 focus:ring-2 focus:ring-helfi-green focus:border-transparent cursor-pointer"
+                >
+                  <option value="daily">30 Days</option>
+                  <option value="weekly">12 Weeks</option>
+                  <option value="monthly">12 Months</option>
+                  <option value="yearly">5 Years</option>
+                  <option value="all">All Time</option>
+                </select>
               </div>
               
               <div className="h-72">
