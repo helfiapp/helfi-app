@@ -201,7 +201,7 @@ export default function PrivacyPage() {
               <ul className="text-gray-700 leading-relaxed space-y-2 list-disc pl-6 mb-3">
                 <li>Structured health data is retained until you delete your account or request deletion.</li>
                 <li>System audit logs are maintained for security and compliance purposes. We retain audit logs as necessary to comply with legal obligations and for security monitoring.</li>
-                <li>You can request data deletion or export at any time via in-app settings or by contacting us at <a href="mailto:privacy@helfiai.com" className="text-green-600 hover:text-green-800 font-medium">privacy@helfiai.com</a></li>
+                <li>You can request data deletion or export at any time via in-app settings or by contacting us at <a href="mailto:support@helfi.ai" className="text-green-600 hover:text-green-800 font-medium">support@helfi.ai</a></li>
               </ul>
               <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mt-4">
                 <h3 className="text-gray-900 font-semibold mb-2">Laboratory Report Retention</h3>
