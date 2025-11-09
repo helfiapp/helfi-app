@@ -43,12 +43,29 @@ function BackToTopButton() {
 }
 
 export default function SplashPage() {
+  const [showInfoModal, setShowInfoModal] = useState(false)
+  const [showSubscribeModal, setShowSubscribeModal] = useState(false)
+
   const handleWaitlistCta = () => {
-    alert("We are currently in the process of building this amazing application. If you would like to be notified the moment we go live, please sign up below.")
+    setShowInfoModal(true)
   }
 
   const handleCreditPurchase = () => {
-    alert("We are currently in the process of building this amazing application. If you would like to be notified the moment we go live, please sign up below.")
+    setShowInfoModal(true)
+  }
+
+  const handleInfoModalOk = () => {
+    setShowInfoModal(false)
+    setShowSubscribeModal(true)
+  }
+
+  const handleSubscribeModalClose = () => {
+    setShowSubscribeModal(false)
+  }
+
+  const handleSubscribeNow = () => {
+    setShowSubscribeModal(false)
+    document.getElementById('waitlist-signup')?.scrollIntoView({ behavior: 'smooth' })
   }
   return (
     <div className="min-h-screen bg-gradient-to-br from-helfi-green/5 via-white to-blue-50">
@@ -961,6 +978,75 @@ export default function SplashPage() {
 
       {/* Back to Top Button */}
       <BackToTopButton />
+
+      {/* Info Modal */}
+      {showInfoModal && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          onClick={handleInfoModalOk}
+        >
+          <div 
+            className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-xl font-bold text-gray-900 mb-4">Coming Soon</h3>
+            <p className="text-gray-600 mb-6">
+              We are currently in the process of building this amazing application. If you would like to be notified the moment we go live, please sign up below.
+            </p>
+            <div className="flex justify-end">
+              <button
+                onClick={handleInfoModalOk}
+                className="bg-helfi-green text-white px-6 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors"
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Subscribe Modal */}
+      {showSubscribeModal && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          onClick={handleSubscribeModalClose}
+        >
+          <div 
+            className="bg-white rounded-2xl max-w-lg w-full p-8 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-start mb-4">
+              <h3 className="text-2xl font-bold text-gray-900">Join the Waitlist</h3>
+              <button
+                onClick={handleSubscribeModalClose}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+                aria-label="Close"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <p className="text-gray-600 mb-6">
+              Be the first to know when we launch! Join our exclusive waitlist and get early access to Helfi when we're ready.
+            </p>
+            <div className="space-y-3">
+              <button
+                onClick={handleSubscribeNow}
+                className="w-full bg-helfi-green text-white px-6 py-3 rounded-lg hover:bg-helfi-green/90 transition-colors font-semibold text-lg"
+              >
+                Subscribe Now
+              </button>
+              <button
+                onClick={handleSubscribeModalClose}
+                className="w-full bg-gray-100 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Maybe Later
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   )
