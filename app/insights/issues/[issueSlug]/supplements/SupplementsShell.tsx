@@ -105,11 +105,43 @@ export default function SupplementsShell({ children, initialResult, issueSlug }:
       })
       
       if (response.ok) {
-        // Regeneration runs in background - wait 60 seconds for it to complete
-        // Then refresh the page to show updated insights
-        setTimeout(() => {
-          window.location.reload()
-        }, 60000) // Wait 60 seconds for background regeneration
+        // Regeneration runs in background - poll the supplements endpoint to check when it's done
+        // Check every 5 seconds, up to 2 minutes
+        let attempts = 0
+        const maxAttempts = 24 // 24 * 5 seconds = 2 minutes
+        
+        const checkInterval = setInterval(async () => {
+          attempts++
+          
+          try {
+            // Fetch the current supplements section to see if it's been updated
+            const checkResponse = await fetch(`/api/insights/issues/${issueSlug}/sections/supplements?t=${Date.now()}`, {
+              cache: 'no-store'
+            })
+            
+            if (checkResponse.ok) {
+              const newData = await checkResponse.json()
+              const newGeneratedAt = new Date(newData.generatedAt).getTime()
+              const oldGeneratedAt = result ? new Date(result.generatedAt).getTime() : 0
+              
+              // If the generated timestamp is newer, regeneration is complete
+              if (newGeneratedAt > oldGeneratedAt) {
+                clearInterval(checkInterval)
+                // Refresh the page to show updated insights
+                window.location.reload()
+                return
+              }
+            }
+          } catch (error) {
+            console.error('Error checking regeneration status:', error)
+          }
+          
+          // If we've checked enough times, refresh anyway
+          if (attempts >= maxAttempts) {
+            clearInterval(checkInterval)
+            window.location.reload()
+          }
+        }, 5000) // Check every 5 seconds
       } else {
         const data = await response.json()
         alert(data.message || 'Failed to update insights. Please try again.')
