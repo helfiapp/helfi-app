@@ -386,6 +386,83 @@ function ExerciseStep({ onNext, onBack, initial }: { onNext: (data: any) => void
   const [exerciseFrequency, setExerciseFrequency] = useState(initial?.exerciseFrequency || '');
   const [exerciseTypes, setExerciseTypes] = useState<string[]>(initial?.exerciseTypes || []);
   const [customExercise, setCustomExercise] = useState('');
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showUpdatePopup, setShowUpdatePopup] = useState(false);
+  const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
+
+  // Track changes from initial values
+  useEffect(() => {
+    const initialFrequency = initial?.exerciseFrequency || '';
+    const initialTypes = initial?.exerciseTypes || [];
+    const hasChanged = exerciseFrequency !== initialFrequency || 
+                       JSON.stringify(exerciseTypes.sort()) !== JSON.stringify(initialTypes.sort());
+    setHasUnsavedChanges(hasChanged && (exerciseFrequency || exerciseTypes.length > 0));
+  }, [exerciseFrequency, exerciseTypes, initial]);
+
+  // Prevent browser navigation when there are unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = 'You have unsaved changes. Please update your insights before leaving.';
+        return e.returnValue;
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  // Handle Update Insights button click
+  const handleUpdateInsights = async () => {
+    setIsGeneratingInsights(true);
+    try {
+      const response = await fetch('/api/user-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          exerciseFrequency: exerciseFrequency || 'not specified',
+          exerciseTypes: exerciseTypes || []
+        })
+      });
+      
+      if (response.ok) {
+        setHasUnsavedChanges(false);
+        setTimeout(() => {
+          setShowUpdatePopup(false);
+          setIsGeneratingInsights(false);
+        }, 2000);
+      } else {
+        alert('Failed to update insights. Please try again.');
+        setIsGeneratingInsights(false);
+      }
+    } catch (error) {
+      console.error('Error updating insights:', error);
+      alert('Failed to update insights. Please try again.');
+      setIsGeneratingInsights(false);
+    }
+  };
+
+  // Handle navigation with unsaved changes check
+  const handleNext = () => {
+    if (hasUnsavedChanges) {
+      if (!showUpdatePopup) {
+        setShowUpdatePopup(true);
+      }
+      return;
+    }
+    onNext({ exerciseFrequency: exerciseFrequency || 'not specified', exerciseTypes: exerciseTypes || [] });
+  };
+
+  const handleBack = () => {
+    if (hasUnsavedChanges) {
+      if (!showUpdatePopup) {
+        setShowUpdatePopup(true);
+      }
+      return;
+    }
+    onBack();
+  };
 
   return (
     <div className="max-w-md mx-auto">
@@ -663,26 +740,42 @@ function ExerciseStep({ onNext, onBack, initial }: { onNext: (data: any) => void
         <div className="flex justify-between pt-4">
           <button 
             className="border border-green-600 text-green-600 px-6 py-3 rounded-lg hover:bg-green-600 hover:text-white transition-colors" 
-            onClick={onBack}
+            onClick={handleBack}
           >
             Back
           </button>
           <div className="flex space-x-3">
             <button 
               className="text-gray-600 hover:text-gray-900 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors"
-              onClick={() => onNext({ exerciseFrequency: exerciseFrequency || 'not specified', exerciseTypes: exerciseTypes || [] })}
+              onClick={() => {
+                if (hasUnsavedChanges) {
+                  setShowUpdatePopup(true);
+                  return;
+                }
+                onNext({ exerciseFrequency: exerciseFrequency || 'not specified', exerciseTypes: exerciseTypes || [] });
+              }}
             >
               Skip
             </button>
             <button 
               className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors" 
-              onClick={() => onNext({ exerciseFrequency, exerciseTypes })}
+              onClick={handleNext}
             >
               Continue
             </button>
           </div>
         </div>
       </div>
+
+      {/* Update Insights Popup */}
+      <UpdateInsightsPopup
+        isOpen={showUpdatePopup}
+        onClose={() => {
+          setShowUpdatePopup(false);
+        }}
+        onUpdateInsights={handleUpdateInsights}
+        isGenerating={isGeneratingInsights}
+      />
     </div>
   );
 }
@@ -708,6 +801,65 @@ function HealthGoalsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showUpdatePopup, setShowUpdatePopup] = useState(false);
+  const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
+
+  // Track changes from initial values
+  useEffect(() => {
+    const initialGoals = initial?.goals || [];
+    const initialCustomGoals = initial?.customGoals || [];
+    const goalsChanged = JSON.stringify(goals.sort()) !== JSON.stringify(initialGoals.sort());
+    const customGoalsChanged = JSON.stringify(customGoals.sort()) !== JSON.stringify(initialCustomGoals.sort());
+    setHasUnsavedChanges((goalsChanged || customGoalsChanged) && (goals.length > 0 || customGoals.length > 0));
+  }, [goals, customGoals, initial]);
+
+  // Prevent browser navigation when there are unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = 'You have unsaved changes. Please update your insights before leaving.';
+        return e.returnValue;
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  // Handle Update Insights button click
+  const handleUpdateInsights = async () => {
+    setIsGeneratingInsights(true);
+    try {
+      const allIssues = [...goals, ...customGoals].map((name: string) => ({ name }));
+      const currentNames = allIssues.map(i => i.name.trim()).filter(Boolean);
+      
+      // Save goals to both endpoints
+      await Promise.all([
+        fetch('/api/user-data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ goals: currentNames })
+        }),
+        fetch('/api/checkins/issues', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ issues: allIssues })
+        })
+      ]);
+      
+      setHasUnsavedChanges(false);
+      setTimeout(() => {
+        setShowUpdatePopup(false);
+        setIsGeneratingInsights(false);
+      }, 2000);
+    } catch (error) {
+      console.error('Error updating insights:', error);
+      alert('Failed to update insights. Please try again.');
+      setIsGeneratingInsights(false);
+    }
+  };
 
   // Get all available goals (custom + default)
   const allAvailableGoals = [...customGoals, ...defaultGoals];
@@ -824,6 +976,14 @@ function HealthGoalsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
   };
 
   const handleNext = async () => {
+    // Check for unsaved changes first
+    if (hasUnsavedChanges) {
+      if (!showUpdatePopup) {
+        setShowUpdatePopup(true);
+      }
+      return;
+    }
+
     // If check-ins feature is enabled, handle check-ins first to avoid step-5 flash
     try {
       if (process.env.NEXT_PUBLIC_CHECKINS_ENABLED === 'true') {
@@ -917,6 +1077,16 @@ function HealthGoalsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
       }
     } catch {}
     onNext({ goals, customGoals });
+  };
+
+  const handleBack = () => {
+    if (hasUnsavedChanges) {
+      if (!showUpdatePopup) {
+        setShowUpdatePopup(true);
+      }
+      return;
+    }
+    onBack();
   };
 
   return (
@@ -1109,14 +1279,20 @@ function HealthGoalsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
         <div className="flex justify-between pt-4">
           <button 
             className="border border-green-600 text-green-600 px-6 py-3 rounded-lg hover:bg-green-600 hover:text-white transition-colors" 
-            onClick={onBack}
+            onClick={handleBack}
           >
             Back
           </button>
           <div className="flex space-x-3">
             <button 
               className="text-gray-600 hover:text-gray-900 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors"
-              onClick={() => onNext({ goals: [], customGoals: [] })}
+              onClick={() => {
+                if (hasUnsavedChanges) {
+                  setShowUpdatePopup(true);
+                  return;
+                }
+                onNext({ goals: [], customGoals: [] });
+              }}
             >
               Skip
             </button>
@@ -1129,6 +1305,16 @@ function HealthGoalsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
           </div>
         </div>
       </div>
+
+      {/* Update Insights Popup */}
+      <UpdateInsightsPopup
+        isOpen={showUpdatePopup}
+        onClose={() => {
+          setShowUpdatePopup(false);
+        }}
+        onUpdateInsights={handleUpdateInsights}
+        isGenerating={isGeneratingInsights}
+      />
     </div>
   );
 }
@@ -1138,8 +1324,76 @@ function HealthSituationsStep({ onNext, onBack, initial }: { onNext: (data: any)
   const [healthProblems, setHealthProblems] = useState(initial?.healthSituations?.healthProblems || initial?.healthProblems || '');
   const [additionalInfo, setAdditionalInfo] = useState(initial?.healthSituations?.additionalInfo || initial?.additionalInfo || '');
   const [skipped, setSkipped] = useState(initial?.healthSituations?.skipped || initial?.skipped || false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showUpdatePopup, setShowUpdatePopup] = useState(false);
+  const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
+
+  // Track changes from initial values
+  useEffect(() => {
+    const initialIssues = initial?.healthSituations?.healthIssues || initial?.healthIssues || '';
+    const initialProblems = initial?.healthSituations?.healthProblems || initial?.healthProblems || '';
+    const initialInfo = initial?.healthSituations?.additionalInfo || initial?.additionalInfo || '';
+    const hasChanged = healthIssues.trim() !== initialIssues.trim() || 
+                       healthProblems.trim() !== initialProblems.trim() || 
+                       additionalInfo.trim() !== initialInfo.trim();
+    setHasUnsavedChanges(hasChanged && !skipped && (healthIssues.trim() || healthProblems.trim() || additionalInfo.trim()));
+  }, [healthIssues, healthProblems, additionalInfo, skipped, initial]);
+
+  // Prevent browser navigation when there are unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = 'You have unsaved changes. Please update your insights before leaving.';
+        return e.returnValue;
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  // Handle Update Insights button click
+  const handleUpdateInsights = async () => {
+    setIsGeneratingInsights(true);
+    try {
+      const response = await fetch('/api/user-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          healthSituations: {
+            healthIssues: healthIssues.trim(),
+            healthProblems: healthProblems.trim(),
+            additionalInfo: additionalInfo.trim(),
+            skipped: false
+          }
+        })
+      });
+      
+      if (response.ok) {
+        setHasUnsavedChanges(false);
+        setTimeout(() => {
+          setShowUpdatePopup(false);
+          setIsGeneratingInsights(false);
+        }, 2000);
+      } else {
+        alert('Failed to update insights. Please try again.');
+        setIsGeneratingInsights(false);
+      }
+    } catch (error) {
+      console.error('Error updating insights:', error);
+      alert('Failed to update insights. Please try again.');
+      setIsGeneratingInsights(false);
+    }
+  };
 
   const handleNext = () => {
+    if (hasUnsavedChanges) {
+      if (!showUpdatePopup) {
+        setShowUpdatePopup(true);
+      }
+      return;
+    }
     const healthSituationsData = { 
       healthIssues: healthIssues.trim(), 
       healthProblems: healthProblems.trim(),
@@ -1150,7 +1404,23 @@ function HealthSituationsStep({ onNext, onBack, initial }: { onNext: (data: any)
     onNext({ healthSituations: healthSituationsData });
   };
 
+  const handleBack = () => {
+    if (hasUnsavedChanges) {
+      if (!showUpdatePopup) {
+        setShowUpdatePopup(true);
+      }
+      return;
+    }
+    onBack();
+  };
+
   const handleSkip = () => {
+    if (hasUnsavedChanges) {
+      if (!showUpdatePopup) {
+        setShowUpdatePopup(true);
+      }
+      return;
+    }
     setSkipped(true);
     onNext({ healthSituations: { skipped: true, healthIssues: '', healthProblems: '', additionalInfo: '' } });
   };
@@ -1161,7 +1431,7 @@ function HealthSituationsStep({ onNext, onBack, initial }: { onNext: (data: any)
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold">Tell us about your current health situation</h2>
           <button 
-            onClick={onBack}
+            onClick={handleBack}
             className="text-gray-600 hover:text-gray-900 flex items-center"
           >
             <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1244,6 +1514,16 @@ function HealthSituationsStep({ onNext, onBack, initial }: { onNext: (data: any)
           </button>
         </div>
       </div>
+
+      {/* Update Insights Popup */}
+      <UpdateInsightsPopup
+        isOpen={showUpdatePopup}
+        onClose={() => {
+          setShowUpdatePopup(false);
+        }}
+        onUpdateInsights={handleUpdateInsights}
+        isGenerating={isGeneratingInsights}
+      />
     </div>
   );
 }
@@ -2900,6 +3180,71 @@ function BloodResultsStep({ onNext, onBack, initial }: { onNext: (data: any) => 
   const [images, setImages] = useState<File[]>(initial?.bloodResults?.images || initial?.images || []);
   const [notes, setNotes] = useState(initial?.bloodResults?.notes || initial?.notes || '');
   const [skipped, setSkipped] = useState(initial?.bloodResults?.skipped || initial?.skipped || false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showUpdatePopup, setShowUpdatePopup] = useState(false);
+  const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
+
+  // Track changes from initial values
+  useEffect(() => {
+    const initialDocs = initial?.bloodResults?.documents || initial?.documents || [];
+    const initialImgs = initial?.bloodResults?.images || initial?.images || [];
+    const initialNotes = initial?.bloodResults?.notes || initial?.notes || '';
+    const docsChanged = documents.length !== initialDocs.length || 
+                       documents.some((doc, idx) => doc.name !== initialDocs[idx]?.name);
+    const imgsChanged = images.length !== initialImgs.length || 
+                        images.some((img, idx) => img.name !== initialImgs[idx]?.name);
+    const notesChanged = notes.trim() !== initialNotes.trim();
+    setHasUnsavedChanges((docsChanged || imgsChanged || notesChanged) && !skipped && (documents.length > 0 || images.length > 0 || notes.trim()));
+  }, [documents, images, notes, skipped, initial]);
+
+  // Prevent browser navigation when there are unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = 'You have unsaved changes. Please update your insights before leaving.';
+        return e.returnValue;
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  // Handle Update Insights button click
+  const handleUpdateInsights = async () => {
+    setIsGeneratingInsights(true);
+    try {
+      const response = await fetch('/api/user-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          bloodResults: {
+            uploadMethod,
+            documents: documents.map(f => f.name),
+            images: images.map(f => f.name),
+            notes: notes.trim(),
+            skipped: false
+          }
+        })
+      });
+      
+      if (response.ok) {
+        setHasUnsavedChanges(false);
+        setTimeout(() => {
+          setShowUpdatePopup(false);
+          setIsGeneratingInsights(false);
+        }, 2000);
+      } else {
+        alert('Failed to update insights. Please try again.');
+        setIsGeneratingInsights(false);
+      }
+    } catch (error) {
+      console.error('Error updating insights:', error);
+      alert('Failed to update insights. Please try again.');
+      setIsGeneratingInsights(false);
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'documents' | 'images') => {
     const files = Array.from(e.target.files || []);
@@ -2919,6 +3264,12 @@ function BloodResultsStep({ onNext, onBack, initial }: { onNext: (data: any) => 
   };
 
   const handleNext = () => {
+    if (hasUnsavedChanges) {
+      if (!showUpdatePopup) {
+        setShowUpdatePopup(true);
+      }
+      return;
+    }
     const bloodResultsData = {
       uploadMethod,
       documents: documents.filter(f => f != null).map(f => f.name),
@@ -2930,7 +3281,23 @@ function BloodResultsStep({ onNext, onBack, initial }: { onNext: (data: any) => 
     onNext({ bloodResults: bloodResultsData });
   };
 
+  const handleBack = () => {
+    if (hasUnsavedChanges) {
+      if (!showUpdatePopup) {
+        setShowUpdatePopup(true);
+      }
+      return;
+    }
+    onBack();
+  };
+
   const handleSkip = () => {
+    if (hasUnsavedChanges) {
+      if (!showUpdatePopup) {
+        setShowUpdatePopup(true);
+      }
+      return;
+    }
     setSkipped(true);
     onNext({ bloodResults: { skipped: true, uploadMethod: 'documents', documents: [], images: [], notes: '' } });
   };
