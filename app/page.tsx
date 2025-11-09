@@ -43,8 +43,6 @@ function BackToTopButton() {
 }
 
 export default function SplashPage() {
-  const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly')
-
   const handleWaitlistCta = () => {
     alert("We are currently in the process of building this amazing application. If you would like to be notified the moment we go live, please sign up below.")
     document.getElementById('waitlist-signup')?.scrollIntoView({ behavior: 'smooth' })
@@ -509,179 +507,85 @@ export default function SplashPage() {
             <p className="text-xl text-gray-600">
               Choose the plan that fits your health journey
             </p>
-            <div className="mt-6 flex items-center justify-center gap-3 text-sm">
-              <span className={billingCycle === 'monthly' ? 'font-semibold text-gray-900' : 'text-gray-500'}>Monthly</span>
-              <button
-                onClick={() => setBillingCycle((v) => (v === 'monthly' ? 'yearly' : 'monthly'))}
-                className="relative inline-flex h-6 w-11 items-center rounded-full bg-gray-200"
-                aria-label="Toggle yearly billing"
-              >
-                <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition ${billingCycle === 'yearly' ? 'translate-x-6' : 'translate-x-1'}`} />
-              </button>
-              <span className={billingCycle === 'yearly' ? 'font-semibold text-gray-900' : 'text-gray-500'}>Yearly</span>
-            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 lg:gap-8 max-w-6xl mx-auto">
-            {/* Premium Plan */}
-            <div className="bg-white rounded-2xl p-8 border-2 border-helfi-green relative">
-              <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                <span className="bg-helfi-green text-white px-4 py-1 rounded-full text-sm font-medium">
-                  Most Popular
-                </span>
+          {/* Plans Section */}
+          <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">Plans</h2>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {/* $20 plan */}
+              <div className="border border-gray-200 rounded-2xl p-8 shadow-sm hover:shadow-md transition-shadow bg-white">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">$20 / month</h3>
+                <p className="text-3xl font-bold text-gray-900 mb-1">Monthly wallet: 1,000 credits</p>
+                <p className="text-xs text-gray-500 mb-4">Credits refresh monthly. No rollover.</p>
+                <ul className="space-y-2 mb-6 text-sm text-gray-600">
+                  <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> All features unlocked</li>
+                  <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Percentage‑based usage meter</li>
+                  <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Top‑ups valid 12 months</li>
+                </ul>
+                <button onClick={handleWaitlistCta} className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors" type="button">
+                  Choose $20 Plan
+                </button>
               </div>
-              <div className="text-center">
-                <h3 className="text-2xl font-bold text-helfi-black mb-2">AI Health Coach</h3>
-                <div className="mb-6">
-                  <span className="text-4xl font-bold text-helfi-black">{billingCycle === 'monthly' ? '$20' : '$216'}</span>
-                  <span className="text-gray-600">/{billingCycle === 'monthly' ? 'month' : 'year'}</span>
-                  {billingCycle === 'yearly' && (
-                    <div className="text-sm text-gray-500 mt-1">$18/month (save 10%)</div>
-                  )}
+
+              {/* $30 plan */}
+              <div className="border-2 border-helfi-green rounded-2xl p-8 relative shadow-sm hover:shadow-lg transition-shadow bg-white">
+                <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+                  <span className="bg-helfi-green text-white px-3 py-1 rounded-full text-sm font-medium">Most Popular</span>
                 </div>
-                
-                {/* Feature Categories */}
-                <div className="text-left mb-8 space-y-6">
-                  <div>
-                    <h4 className="font-semibold text-helfi-green mb-3 flex items-center">
-                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                      </svg>
-                      Food Analysis (30/day)
-                    </h4>
-                    <ul className="space-y-2 ml-7">
-                      <li className="flex items-center text-sm">
-                        <svg className="w-4 h-4 text-helfi-green mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        30 AI food photo analyses per day
-                      </li>
-                      <li className="flex items-center text-sm">
-                        <svg className="w-4 h-4 text-helfi-green mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        30 reanalysis credits per day
-                      </li>
-                    </ul>
-                  </div>
-                  
-                  <div>
-                    <h4 className="font-semibold text-blue-600 mb-3 flex items-center">
-                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      Medical Analysis (30/day)
-                    </h4>
-                    <ul className="space-y-2 ml-7">
-                      <li className="flex items-center text-sm">
-                        <svg className="w-4 h-4 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        30 medical image analyses per day (rashes, moles, etc.)
-                      </li>
-                      <li className="flex items-center text-sm">
-                        <svg className="w-4 h-4 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        AI observations & recommendations
-                      </li>
-                    </ul>
-                  </div>
-                  
-                  <div>
-                    <h4 className="font-semibold text-purple-600 mb-3 flex items-center">
-                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                      </svg>
-                      Premium Features
-                    </h4>
-                    <ul className="space-y-2 ml-7">
-                      <li className="flex items-center text-sm">
-                        <svg className="w-4 h-4 text-purple-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        Full medication interaction analysis
-                      </li>
-                      <li className="flex items-center text-sm">
-                        <svg className="w-4 h-4 text-purple-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        Advanced AI health insights
-                      </li>
-                      <li className="flex items-center text-sm">
-                        <svg className="w-4 h-4 text-purple-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        Priority customer support
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-                
-                <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-lg p-4 mb-6">
-                  <div className="text-sm text-gray-700 space-y-3">
-                    <div className="font-semibold mb-2">Need more credits?</div>
-                    <button 
-                      onClick={handleCreditPurchase}
-                      className="w-full flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 hover:border-helfi-green hover:shadow-sm transition-all text-left"
-                    >
-                      <div>
-                        <div className="font-medium text-gray-900">100 credits</div>
-                        <div className="text-xs text-gray-500">Never expire</div>
-                      </div>
-                      <span className="font-bold text-helfi-green text-lg">$5</span>
-                    </button>
-                    <button 
-                      onClick={handleCreditPurchase}
-                      className="w-full flex items-center justify-between p-3 bg-white rounded-lg border-2 border-helfi-green hover:shadow-sm transition-all text-left"
-                    >
-                      <div>
-                        <div className="font-medium text-gray-900">150 credits</div>
-                        <div className="text-xs text-gray-500">Best Value • Never expire</div>
-                      </div>
-                      <span className="font-bold text-helfi-green text-lg">$10</span>
-                    </button>
-                  </div>
-                </div>
-                <button onClick={handleWaitlistCta} className="btn-primary w-full text-center block" type="button">
-                  Subscribe Now
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">$30 / month</h3>
+                <p className="text-3xl font-bold text-gray-900 mb-1">Monthly wallet: 1,700 credits</p>
+                <p className="text-xs text-gray-500 mb-4">Credits refresh monthly. No rollover.</p>
+                <ul className="space-y-2 mb-6 text-sm text-gray-600">
+                  <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> All features unlocked</li>
+                  <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Percentage‑based usage meter</li>
+                  <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Top‑ups valid 12 months</li>
+                </ul>
+                <button onClick={handleWaitlistCta} className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors" type="button">
+                  Choose $30 Plan
+                </button>
+              </div>
+
+              {/* $50 plan */}
+              <div className="border border-gray-200 rounded-2xl p-8 shadow-sm hover:shadow-md transition-shadow bg-white">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">$50 / month</h3>
+                <p className="text-3xl font-bold text-gray-900 mb-1">Monthly wallet: 3,000 credits</p>
+                <p className="text-xs text-gray-500 mb-4">Credits refresh monthly. No rollover.</p>
+                <ul className="space-y-2 mb-6 text-sm text-gray-600">
+                  <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> All features unlocked</li>
+                  <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Percentage‑based usage meter</li>
+                  <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Top‑ups valid 12 months</li>
+                </ul>
+                <button onClick={handleWaitlistCta} className="w-full bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors" type="button">
+                  Choose $50 Plan
                 </button>
               </div>
             </div>
+          </div>
 
-            {/* Premium Plus */}
-            <div className="bg-white rounded-2xl p-8 border-2 border-gray-200">
-              <div className="text-center">
-                <h3 className="text-2xl font-bold text-helfi-black mb-2">Premium Plus</h3>
-                <div className="mb-6">
-                  <span className="text-4xl font-bold text-helfi-black">{billingCycle === 'monthly' ? '$30' : '$312'}</span>
-                  <span className="text-gray-600">/{billingCycle === 'monthly' ? 'month' : 'year'}</span>
-                  {billingCycle === 'yearly' && (
-                    <div className="text-sm text-gray-500 mt-1">$26/month (save 13%)</div>
-                  )}
-                </div>
-                <ul className="space-y-3 text-left mb-8">
-                  <li className="flex items-center">
-                    <svg className="w-5 h-5 text-helfi-green mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    Everything in Premium
-                  </li>
-                  <li className="flex items-center">
-                    <svg className="w-5 h-5 text-helfi-green mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    Higher usage limits (set in app)
-                  </li>
-                  <li className="flex items-center">
-                    <svg className="w-5 h-5 text-helfi-green mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    Priority support
-                  </li>
-                </ul>
-                <button onClick={handleWaitlistCta} className="btn-secondary w-full text-center block" type="button">
-                  Upgrade to Premium Plus
+          {/* Buy Extra Credits Section */}
+          <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">Buy Extra Credits</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+              <div className="border border-gray-200 rounded-lg p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Try with $5 (250 credits)</h3>
+                <p className="text-sm text-gray-600 mb-6">One‑time top‑up. Credits valid for 12 months.</p>
+                <button onClick={handleCreditPurchase} className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors" type="button">
+                  Buy $5 Credits
+                </button>
+              </div>
+              <div className="border border-gray-200 rounded-lg p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">$10 (500 credits)</h3>
+                <p className="text-sm text-gray-600 mb-6">One‑time top‑up. Credits valid for 12 months.</p>
+                <button onClick={handleCreditPurchase} className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors" type="button">
+                  Buy $10 Credits
+                </button>
+              </div>
+              <div className="border border-gray-200 rounded-lg p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">$20 (1,000 credits)</h3>
+                <p className="text-sm text-gray-600 mb-6">One‑time top‑up. Credits valid for 12 months.</p>
+                <button onClick={handleCreditPurchase} className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors" type="button">
+                  Buy $20 Credits
                 </button>
               </div>
             </div>
