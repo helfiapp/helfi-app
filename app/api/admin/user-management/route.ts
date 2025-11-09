@@ -64,6 +64,8 @@ export async function GET(request: NextRequest) {
         additionalCredits: true,
         totalAnalysisCount: true,
         dailyFoodAnalysisUsed: true,
+        dailyFoodReanalysisUsed: true,
+        dailyMedicalAnalysisUsed: true,
         dailyInteractionAnalysisUsed: true,
         subscription: { select: { plan: true, monthlyPriceCents: true, endDate: true, startDate: true } },
         creditTopUps: {

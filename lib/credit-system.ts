@@ -76,14 +76,63 @@ export class CreditManager {
   }
 
   private async ensureMonthlyReset(now = new Date()): Promise<void> {
-    const user = await prisma.user.findUnique({ where: { id: this.userId } });
+    const user = await prisma.user.findUnique({ 
+      where: { id: this.userId },
+      include: { subscription: true }
+    });
     if (!user) return;
+    
     const last = (user as any).walletMonthlyResetAt as Date | null;
-    const monthChanged =
-      !last ||
-      last.getUTCFullYear() !== now.getUTCFullYear() ||
-      last.getUTCMonth() !== now.getUTCMonth();
-    if (monthChanged) {
+    
+    // Check if reset is needed based on subscription start date (if subscription exists)
+    // Otherwise fall back to calendar month
+    let shouldReset = false;
+    
+    if (user.subscription?.startDate) {
+      // Reset based on subscription start date (same calendar day each month)
+      const subStartDate = new Date(user.subscription.startDate);
+      const startYear = subStartDate.getUTCFullYear();
+      const startMonth = subStartDate.getUTCMonth();
+      const startDay = subStartDate.getUTCDate();
+      
+      if (!last) {
+        // Never reset before - reset now
+        shouldReset = true;
+      } else {
+        // Check if we've passed the subscription renewal date this month
+        const lastYear = last.getUTCFullYear();
+        const lastMonth = last.getUTCMonth();
+        const lastDay = last.getUTCDate();
+        
+        const currentYear = now.getUTCFullYear();
+        const currentMonth = now.getUTCMonth();
+        const currentDay = now.getUTCDate();
+        
+        // Calculate which subscription month we should be in based on last reset
+        let expectedMonthsSinceStart = (lastYear - startYear) * 12 + (lastMonth - startMonth);
+        if (lastDay < startDay) {
+          expectedMonthsSinceStart--;
+        }
+        
+        // Calculate which subscription month we're actually in now
+        let actualMonthsSinceStart = (currentYear - startYear) * 12 + (currentMonth - startMonth);
+        if (currentDay < startDay) {
+          actualMonthsSinceStart--;
+        }
+        
+        // Reset if we've moved to a new subscription month
+        shouldReset = actualMonthsSinceStart > expectedMonthsSinceStart;
+      }
+    } else {
+      // No subscription - use calendar month reset
+      const monthChanged =
+        !last ||
+        last.getUTCFullYear() !== now.getUTCFullYear() ||
+        last.getUTCMonth() !== now.getUTCMonth();
+      shouldReset = monthChanged;
+    }
+    
+    if (shouldReset) {
       await prisma.user.update({
         where: { id: this.userId },
         data: {

@@ -2372,8 +2372,8 @@ The Helfi Team`,
 
                          {/* User Management Modal */}
              {showUserModal && selectedUser && (
-               <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
-                 <div className="bg-white p-6 rounded-lg shadow-xl max-w-lg w-full mx-4">
+               <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center py-8">
+                 <div className="bg-white p-6 rounded-lg shadow-xl max-w-lg w-full mx-4 max-h-[85vh] overflow-y-auto">
                    <h3 className="text-lg font-semibold text-gray-900 mb-4">
                      Manage User: {selectedUser.name || selectedUser.email}
                    </h3>
@@ -2521,9 +2521,20 @@ The Helfi Team`,
                              <span className="font-medium">{selectedUser.dailyFoodAnalysisUsed || 0}</span>
                            </div>
                            <div className="flex justify-between">
+                             <span>Food Reanalysis:</span>
+                             <span className="font-medium">{selectedUser.dailyFoodReanalysisUsed || 0}</span>
+                           </div>
+                           <div className="flex justify-between">
+                             <span>Medical Image:</span>
+                             <span className="font-medium">{selectedUser.dailyMedicalAnalysisUsed || 0}</span>
+                           </div>
+                           <div className="flex justify-between">
                              <span>Interaction Analysis:</span>
                              <span className="font-medium">{selectedUser.dailyInteractionAnalysisUsed || 0}</span>
                            </div>
+                         </div>
+                         <div className="mt-2 text-xs text-gray-400 italic">
+                           Note: Symptom Analysis is tracked monthly only
                          </div>
                        </div>
                        {selectedUser.lastAnalysisResetDate && (
