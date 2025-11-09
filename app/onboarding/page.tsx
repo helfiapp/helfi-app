@@ -1432,6 +1432,9 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
         : [...supplements, supplementData];
       setSupplementsToSave(updatedSupplements);
       
+      // Mark as having unsaved changes
+      setHasUnsavedChanges(true);
+      
       // Show popup and wait for user decision - no automatic actions
       setShowUpdatePopup(true);
     } else if (uploadMethod === 'photo' && frontImage && photoDosage && photoTiming.length > 0) {
