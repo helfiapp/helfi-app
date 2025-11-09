@@ -10,11 +10,22 @@ import CreditPurchaseModal from '@/components/CreditPurchaseModal';
 import { useUserData } from '@/components/providers/UserDataProvider';
 import MobileMoreMenu from '@/components/MobileMoreMenu';
 import UsageMeter from '@/components/UsageMeter';
+import InsightsProgressBar from '@/components/InsightsProgressBar';
 
 // Auth-enabled onboarding flow
 
-// Interaction Analysis Update Popup Component
-function InteractionAnalysisUpdatePopup({ isOpen, onClose, onUpdate, onNavigateToAnalysis }: { isOpen: boolean, onClose: () => void, onUpdate: () => void, onNavigateToAnalysis?: () => void }) {
+// Update Insights Popup Component
+function UpdateInsightsPopup({ 
+  isOpen, 
+  onClose, 
+  onUpdateInsights, 
+  isGenerating 
+}: { 
+  isOpen: boolean
+  onClose: () => void
+  onUpdateInsights: () => void
+  isGenerating: boolean
+}) {
   if (!isOpen) return null;
 
   return (
@@ -22,40 +33,49 @@ function InteractionAnalysisUpdatePopup({ isOpen, onClose, onUpdate, onNavigateT
       <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
         <div className="flex items-center mb-4">
           <div className="flex-shrink-0">
-            <svg className="h-6 w-6 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            <svg className="h-6 w-6 text-helfi-green" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
             </svg>
           </div>
           <h3 className="ml-3 text-lg font-medium text-gray-900">
-            Update Interaction Analysis?
+            Update Insights?
           </h3>
         </div>
         
         <div className="mb-6">
-          <p className="text-sm text-gray-600">
-            You've made changes to your supplements or medications. Would you like to run a fresh analysis that includes all your current entries?
+          <p className="text-sm text-gray-600 mb-4">
+            You've added new health information. Would you like to update your insights now?
           </p>
-          <p className="text-sm text-gray-500 mt-2">
-            This will take you to the analysis page and generate a new comprehensive report.
-          </p>
+          {isGenerating && (
+            <div className="mb-4">
+              <InsightsProgressBar isGenerating={true} message="Generating insights..." />
+            </div>
+          )}
         </div>
         
         <div className="flex flex-col space-y-3">
           <button
-            onClick={onClose}
-            className="w-full px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+            onClick={onUpdateInsights}
+            disabled={isGenerating}
+            className="w-full px-4 py-3 bg-helfi-green text-white rounded-lg hover:bg-helfi-green/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed font-medium"
             type="button"
           >
-            Not Now
+            {isGenerating ? (
+              <>
+                <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2"></span>
+                Updating Insights...
+              </>
+            ) : (
+              'Update Insights'
+            )}
           </button>
           <button
-            onClick={() => {
-              onUpdate();
-            }}
-            className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            onClick={onClose}
+            disabled={isGenerating}
+            className="w-full px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
             type="button"
           >
-            Run Fresh Analysis
+            Add More
           </button>
         </div>
       </div>
@@ -1255,10 +1275,12 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [showDropdown, setShowDropdown] = useState<number | null>(null);
   
-  // Interaction analysis update popup state
+  // Update insights popup state
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
   const [hasExistingAnalysis, setHasExistingAnalysis] = useState(false);
   const [supplementsToSave, setSupplementsToSave] = useState<any[]>([]);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false); // Track if user added but didn't update insights
+  const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -1481,9 +1503,67 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
         : [...supplements, supplementData];
       setSupplementsToSave(updatedSupplements);
       
+      // Mark as having unsaved changes
+      setHasUnsavedChanges(true);
+      
       // Show popup and wait for user decision - no automatic actions
       setShowUpdatePopup(true);
     }
+  };
+  
+  // Handle Update Insights button click
+  const handleUpdateInsights = async () => {
+    setIsGeneratingInsights(true);
+    try {
+      // Save supplements to database
+      const response = await fetch('/api/user-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ supplements: supplementsToSave })
+      });
+      
+      if (response.ok) {
+        // Update local state
+        setSupplements(supplementsToSave);
+        setHasUnsavedChanges(false);
+        
+        // Close popup after a short delay to show progress
+        setTimeout(() => {
+          setShowUpdatePopup(false);
+          setIsGeneratingInsights(false);
+        }, 2000);
+      } else {
+        alert('Failed to update insights. Please try again.');
+        setIsGeneratingInsights(false);
+      }
+    } catch (error) {
+      console.error('Error updating insights:', error);
+      alert('Failed to update insights. Please try again.');
+      setIsGeneratingInsights(false);
+    }
+  };
+  
+  // Handle navigation with unsaved changes check
+  const handleNext = () => {
+    if (hasUnsavedChanges) {
+      // Show popup if it's not already showing
+      if (!showUpdatePopup) {
+        setShowUpdatePopup(true);
+      }
+      return;
+    }
+    onNext({ supplements: supplementsToSave && supplementsToSave.length ? supplementsToSave : supplements });
+  };
+  
+  const handleBack = () => {
+    if (hasUnsavedChanges) {
+      // Show popup if it's not already showing
+      if (!showUpdatePopup) {
+        setShowUpdatePopup(true);
+      }
+      return;
+    }
+    onBack();
   };
 
   const clearForm = () => {
@@ -2095,45 +2175,28 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
         <div className="flex justify-between pt-4">
           <button 
             className="border border-green-600 text-green-600 px-6 py-3 rounded-lg hover:bg-green-600 hover:text-white transition-colors" 
-            onClick={onBack}
+            onClick={handleBack}
           >
             Back
           </button>
           <button 
             className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors" 
-            onClick={() => onNext({ supplements: (supplementsToSave && supplementsToSave.length ? supplementsToSave : supplements) })}
+            onClick={handleNext}
           >
             Next
           </button>
         </div>
       </div>
       
-      {/* Interaction Analysis Update Popup */}
-      <InteractionAnalysisUpdatePopup
+      {/* Update Insights Popup */}
+      <UpdateInsightsPopup
         isOpen={showUpdatePopup}
-        onClose={() => setShowUpdatePopup(false)}
-        onUpdate={async () => {
-          try {
-            // Clear existing analysis to trigger re-analysis
-            const response = await fetch('/api/interaction-history', {
-              method: 'DELETE'
-            });
-            if (response.ok) {
-              console.log('✅ Cleared existing analysis - will navigate to page 8 for fresh analysis');
-            }
-            
-            // Close popup first
-            setShowUpdatePopup(false);
-            
-            // CRITICAL FIX: Pass data to navigation function
-            if (onNavigateToAnalysis) {
-              onNavigateToAnalysis({ supplements: supplementsToSave });
-            }
-          } catch (error) {
-            console.error('Error clearing analysis:', error);
-          }
+        onClose={() => {
+          // When "Add More" is clicked, just close the popup
+          setShowUpdatePopup(false);
         }}
-        onNavigateToAnalysis={onNavigateToAnalysis}
+        onUpdateInsights={handleUpdateInsights}
+        isGenerating={isGeneratingInsights}
       />
     </div>
   );
