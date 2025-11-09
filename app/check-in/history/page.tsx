@@ -47,6 +47,7 @@ export default function CheckinHistoryPage() {
   const [selectedIssues, setSelectedIssues] = useState<Set<string>>(new Set())
   const [start, setStart] = useState<string>('')
   const [end, setEnd] = useState<string>('')
+  const [timePeriod, setTimePeriod] = useState<'daily' | 'weekly' | 'monthly' | 'yearly' | 'all'>('all')
   const [editingEntry, setEditingEntry] = useState<Row | null>(null)
   const [editValue, setEditValue] = useState<number | null>(null)
   const [editNote, setEditNote] = useState<string>('')
@@ -102,12 +103,41 @@ export default function CheckinHistoryPage() {
 
   useEffect(() => { load() }, [])
 
+  // Filter rows by selected issues and time period
   const filteredRows = useMemo(() => {
-    if (selectedIssues.size === 0 || selectedIssues.size === allIssues.length) {
-      return rows
+    let filtered = rows
+    
+    // Filter by selected issues
+    if (selectedIssues.size > 0 && selectedIssues.size < allIssues.length) {
+      filtered = filtered.filter(r => selectedIssues.has(r.name))
     }
-    return rows.filter(r => selectedIssues.has(r.name))
-  }, [rows, selectedIssues, allIssues.length])
+    
+    // Filter by time period
+    if (timePeriod !== 'all' && filtered.length > 0) {
+      const now = new Date()
+      const cutoffDate = new Date()
+      
+      switch (timePeriod) {
+        case 'daily':
+          cutoffDate.setDate(now.getDate() - 30) // Last 30 days
+          break
+        case 'weekly':
+          cutoffDate.setDate(now.getDate() - 84) // Last 12 weeks
+          break
+        case 'monthly':
+          cutoffDate.setMonth(now.getMonth() - 12) // Last 12 months
+          break
+        case 'yearly':
+          cutoffDate.setFullYear(now.getFullYear() - 5) // Last 5 years
+          break
+      }
+      
+      const cutoffStr = cutoffDate.toISOString().slice(0, 10)
+      filtered = filtered.filter(r => r.date >= cutoffStr)
+    }
+    
+    return filtered
+  }, [rows, selectedIssues, allIssues.length, timePeriod])
 
   const handleDelete = async (date: string, issueId: string) => {
     if (!confirm('Delete this rating?')) return
@@ -274,58 +304,93 @@ export default function CheckinHistoryPage() {
     }
   }, [filteredRows])
 
-  const chartOptions: ChartOptions<'line'> = useMemo(() => ({
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        position: 'bottom',
-        labels: {
-          usePointStyle: true,
-          padding: 15,
-        }
-      },
-      tooltip: {
-        mode: 'index',
-        intersect: false,
-        title: (items: TooltipItem<'line'>[]) => {
-          if (!items?.length) return ''
-          const parsedX = items[0].parsed.x
-          const dateValue = typeof parsedX === 'string' ? parsedX : Number(parsedX)
-          return format(new Date(dateValue), 'MMM d, yyyy')
-        },
-        label: (context: TooltipItem<'line'>) => {
-          const datasetLabel = context.dataset.label || ''
-          const value = context.parsed.y
-          if (value === null) return `${datasetLabel}: N/A`
-          return `${datasetLabel}: ${value} • ${getRatingLabel(value)}`
-        }
-      }
-    },
-    scales: {
-      y: {
-        beginAtZero: true,
-        max: 6,
-        ticks: {
-          stepSize: 1,
-        }
-      },
-      x: {
-        type: 'time',
-        time: {
-          unit: 'day',
-          displayFormats: {
-            day: 'MMM d'
+  const chartOptions: ChartOptions<'line'> = useMemo(() => {
+    // Determine time unit and format based on selected period
+    let timeUnit: 'day' | 'week' | 'month' | 'year' = 'day'
+    let displayFormat = 'MMM d'
+    let maxTicks = 7
+    
+    switch (timePeriod) {
+      case 'daily':
+        timeUnit = 'day'
+        displayFormat = 'MMM d'
+        maxTicks = 10
+        break
+      case 'weekly':
+        timeUnit = 'week'
+        displayFormat = 'MMM d'
+        maxTicks = 12
+        break
+      case 'monthly':
+        timeUnit = 'month'
+        displayFormat = 'MMM yyyy'
+        maxTicks = 12
+        break
+      case 'yearly':
+        timeUnit = 'year'
+        displayFormat = 'yyyy'
+        maxTicks = 5
+        break
+      case 'all':
+        timeUnit = 'day'
+        displayFormat = 'MMM d, yyyy'
+        maxTicks = 15
+        break
+    }
+    
+    return {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: {
+            usePointStyle: true,
+            padding: 15,
           }
         },
-        ticks: {
-          maxRotation: 0,
-          autoSkip: true,
-          maxTicksLimit: 7,
+        tooltip: {
+          mode: 'index',
+          intersect: false,
+          title: (items: TooltipItem<'line'>[]) => {
+            if (!items?.length) return ''
+            const parsedX = items[0].parsed.x
+            const dateValue = typeof parsedX === 'string' ? parsedX : Number(parsedX)
+            return format(new Date(dateValue), displayFormat === 'MMM d' ? 'MMM d, yyyy' : displayFormat)
+          },
+          label: (context: TooltipItem<'line'>) => {
+            const datasetLabel = context.dataset.label || ''
+            const value = context.parsed.y
+            if (value === null) return `${datasetLabel}: N/A`
+            return `${datasetLabel}: ${value} • ${getRatingLabel(value)}`
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          max: 6,
+          ticks: {
+            stepSize: 1,
+          }
         },
+        x: {
+          type: 'time',
+          time: {
+            unit: timeUnit,
+            displayFormats: {
+              [timeUnit]: displayFormat
+            }
+          },
+          ticks: {
+            maxRotation: 0,
+            autoSkip: true,
+            maxTicksLimit: maxTicks,
+          },
+        }
       }
     }
-  }), [])
+  }, [timePeriod])
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
@@ -458,6 +523,24 @@ export default function CheckinHistoryPage() {
                   </p>
                 </div>
               </div>
+              
+              {/* Time Period Filter */}
+              <div className="mb-4 flex flex-wrap gap-2">
+                {(['daily', 'weekly', 'monthly', 'yearly', 'all'] as const).map((period) => (
+                  <button
+                    key={period}
+                    onClick={() => setTimePeriod(period)}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      timePeriod === period
+                        ? 'bg-helfi-green text-white'
+                        : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:border-helfi-green'
+                    }`}
+                  >
+                    {period === 'daily' ? '30 Days' : period === 'weekly' ? '12 Weeks' : period === 'monthly' ? '12 Months' : period === 'yearly' ? '5 Years' : 'All Time'}
+                  </button>
+                ))}
+              </div>
+              
               <div className="h-72">
                 <Line data={chartData} options={chartOptions} />
               </div>
