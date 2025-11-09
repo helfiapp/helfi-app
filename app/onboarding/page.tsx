@@ -2241,10 +2241,12 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [showDropdown, setShowDropdown] = useState<number | null>(null);
   
-  // Interaction analysis update popup state
+  // Update insights popup state
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
   const [hasExistingAnalysis, setHasExistingAnalysis] = useState(false);
   const [medicationsToSave, setMedicationsToSave] = useState<any[]>([]);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false); // Track if user added but didn't update insights
+  const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -2362,6 +2364,9 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
         : [...medications, medicationData];
       setMedicationsToSave(updatedMedications);
       
+      // Mark as having unsaved changes
+      setHasUnsavedChanges(true);
+      
       // Show popup and wait for user decision - no automatic actions
       setShowUpdatePopup(true);
     } else if (uploadMethod === 'photo' && frontImage && photoDosage && photoTiming.length > 0) {
@@ -2433,9 +2438,67 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
         : [...medications, medicationData];
       setMedicationsToSave(updatedMedications);
       
+      // Mark as having unsaved changes
+      setHasUnsavedChanges(true);
+      
       // Show popup and wait for user decision - no automatic actions
       setShowUpdatePopup(true);
     }
+  };
+  
+  // Handle Update Insights button click
+  const handleUpdateInsights = async () => {
+    setIsGeneratingInsights(true);
+    try {
+      // Save medications to database
+      const response = await fetch('/api/user-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ medications: medicationsToSave })
+      });
+      
+      if (response.ok) {
+        // Update local state
+        setMedications(medicationsToSave);
+        setHasUnsavedChanges(false);
+        
+        // Close popup after a short delay to show progress
+        setTimeout(() => {
+          setShowUpdatePopup(false);
+          setIsGeneratingInsights(false);
+        }, 2000);
+      } else {
+        alert('Failed to update insights. Please try again.');
+        setIsGeneratingInsights(false);
+      }
+    } catch (error) {
+      console.error('Error updating insights:', error);
+      alert('Failed to update insights. Please try again.');
+      setIsGeneratingInsights(false);
+    }
+  };
+  
+  // Handle navigation with unsaved changes check
+  const handleNext = () => {
+    if (hasUnsavedChanges) {
+      // Show popup if it's not already showing
+      if (!showUpdatePopup) {
+        setShowUpdatePopup(true);
+      }
+      return;
+    }
+    onNext({ medications: medicationsToSave && medicationsToSave.length ? medicationsToSave : medications });
+  };
+  
+  const handleBack = () => {
+    if (hasUnsavedChanges) {
+      // Show popup if it's not already showing
+      if (!showUpdatePopup) {
+        setShowUpdatePopup(true);
+      }
+      return;
+    }
+    onBack();
   };
 
   const clearMedForm = () => {
@@ -3036,46 +3099,29 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
         <div className="space-y-3">
           <button 
             className="w-full bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-300" 
-            onClick={() => onNext({ medications: (medicationsToSave && medicationsToSave.length ? medicationsToSave : medications) })}
+            onClick={handleNext}
             disabled={medications.length === 0}
           >
             Analyze for Interactions & Contradictions
           </button>
           <button 
             className="w-full border border-green-600 text-green-600 px-6 py-3 rounded-lg hover:bg-green-600 hover:text-white transition-colors" 
-            onClick={onBack}
+            onClick={handleBack}
           >
             Back
           </button>
         </div>
       </div>
       
-      {/* Interaction Analysis Update Popup */}
-      <InteractionAnalysisUpdatePopup
+      {/* Update Insights Popup */}
+      <UpdateInsightsPopup
         isOpen={showUpdatePopup}
-        onClose={() => setShowUpdatePopup(false)}
-        onUpdate={async () => {
-          try {
-            // Clear existing analysis to trigger re-analysis
-            const response = await fetch('/api/interaction-history', {
-              method: 'DELETE'
-            });
-            if (response.ok) {
-              console.log('✅ Cleared existing analysis - will navigate to page 8 for fresh analysis');
-            }
-            
-            // Close popup first
-            setShowUpdatePopup(false);
-            
-            // CRITICAL FIX: Pass data to navigation function
-            if (onNavigateToAnalysis) {
-              onNavigateToAnalysis({ medications: medicationsToSave });
-            }
-          } catch (error) {
-            console.error('Error clearing analysis:', error);
-          }
+        onClose={() => {
+          // When "Add More" is clicked, just close the popup
+          setShowUpdatePopup(false);
         }}
-        onNavigateToAnalysis={onNavigateToAnalysis}
+        onUpdateInsights={handleUpdateInsights}
+        isGenerating={isGeneratingInsights}
       />
     </div>
   );
