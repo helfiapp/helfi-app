@@ -23,6 +23,8 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
   const router = useRouter()
   const [pendingSlug, setPendingSlug] = useState<string | null>(null)
   const [isNavigating, startTransition] = useTransition()
+  const [isUpdating, setIsUpdating] = useState(false)
+  const [updateMessage, setUpdateMessage] = useState<string | null>(null)
   const lastLoaded = generatedAt
 
   const actionableNeeds = dataNeeds.filter((need) => need.status !== 'complete')
@@ -40,6 +42,36 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
       }
     })
   }, [issues, router])
+
+  async function handleUpdateInsights() {
+    if (isUpdating) return
+    
+    setIsUpdating(true)
+    setUpdateMessage('Regenerating insights...')
+    
+    try {
+      const response = await fetch('/api/insights/regenerate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+      
+      const data = await response.json()
+      
+      if (response.ok) {
+        setUpdateMessage('Insights are being regenerated. This may take a few minutes. Refresh the page to see updates.')
+        // Refresh the page after a delay to show updated insights
+        setTimeout(() => {
+          router.refresh()
+        }, 3000)
+      } else {
+        setUpdateMessage(data.message || 'Failed to regenerate insights. Please try again.')
+        setIsUpdating(false)
+      }
+    } catch (error) {
+      setUpdateMessage('Failed to regenerate insights. Please try again.')
+      setIsUpdating(false)
+    }
+  }
 
   const deepDiveSections = [
     {
@@ -102,8 +134,34 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
               <h1 className="text-3xl font-bold text-gray-900">Your health focus areas</h1>
               <p className="text-sm text-gray-500 mt-2">Start with your tracked issues, then unlock deeper reports.</p>
             </div>
-            <div className="text-xs text-gray-400 md:text-right">
-              Updated {new Date(lastLoaded).toLocaleString()}
+            <div className="flex flex-col items-center md:items-end gap-2">
+              {onboardingComplete && issues.length > 0 && (
+                <button
+                  onClick={handleUpdateInsights}
+                  disabled={isUpdating}
+                  className="inline-flex items-center gap-2 rounded-lg bg-helfi-green px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 disabled:cursor-not-allowed hover:bg-helfi-green/90 transition-colors"
+                >
+                  {isUpdating ? (
+                    <>
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+                      Updating...
+                    </>
+                  ) : (
+                    <>
+                      <span>🔄</span>
+                      Update Insights
+                    </>
+                  )}
+                </button>
+              )}
+              {updateMessage && (
+                <p className={`text-xs ${updateMessage.includes('Failed') ? 'text-red-600' : 'text-green-600'}`}>
+                  {updateMessage}
+                </p>
+              )}
+              <div className="text-xs text-gray-400 md:text-right">
+                Updated {new Date(lastLoaded).toLocaleString()}
+              </div>
             </div>
           </div>
         </div>
