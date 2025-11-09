@@ -44,21 +44,18 @@ export async function POST(request: NextRequest) {
       } as any,
     })
 
-    // Trigger regeneration for all issues (non-blocking)
-    // Start quick regeneration first, then full regeneration in background
+    // Trigger FULL regeneration for all issues (not just quick cache)
+    // Start quick regeneration first, then full regeneration
     setImmediate(async () => {
       try {
-        console.log('🚀 Starting insights regeneration for user:', userId)
+        console.log('🚀 Starting FULL insights regeneration for user:', userId)
         
-        // Quick regeneration first (faster, less detailed)
-        await precomputeQuickSectionsForUser(userId, { concurrency: 4 })
-        
-        // Full regeneration in background (more detailed, takes longer)
+        // Generate full insights for all issues
         await precomputeIssueSectionsForUser(userId, { concurrency: 2 })
         
-        console.log('✅ Insights regeneration complete for user:', userId)
+        console.log('✅ FULL insights regeneration complete for user:', userId)
       } catch (error) {
-        console.error('❌ Insights regeneration failed:', error)
+        console.error('❌ FULL insights regeneration failed:', error)
       }
     })
 

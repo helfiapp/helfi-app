@@ -748,23 +748,53 @@ export async function POST(request: NextRequest) {
         }
       }
       
-      // Prime insights cache so sections are ready immediately after intake
-      try {
-        console.log('🚀 Priming insights QUICK cache for user:', user.id)
-        const quickPriming = precomputeQuickSectionsForUser(user.id, { concurrency: 4 })
-        // Wait up to ~6.5s; do not block longer
-        await Promise.race([
-          quickPriming.then(() => 'done'),
-          new Promise((resolve) => setTimeout(() => resolve('timeout'), 6500)),
-        ])
-        console.log('✅ Quick cache priming finished or timed out (<=6.5s)')
-      } catch (e) {
-        console.warn('⚠️ Quick cache priming failed (continuing):', e)
+      // Generate FULL insights when user completes onboarding
+      // This ensures all insights are ready immediately after onboarding
+      if (isFullOnboarding) {
+        try {
+          console.log('🚀 Generating FULL insights for user:', user.id)
+          // Generate full insights (not just quick cache)
+          // Wait up to 30 seconds for completion - this is acceptable during onboarding
+          const fullInsightsPromise = precomputeIssueSectionsForUser(user.id, { concurrency: 4 })
+          
+          await Promise.race([
+            fullInsightsPromise.then(() => {
+              console.log('✅ Full insights generation completed')
+              return 'done'
+            }),
+            new Promise((resolve) => setTimeout(() => {
+              console.log('⏱️ Full insights generation timed out after 30s, continuing in background')
+              resolve('timeout')
+            }, 30000)), // Wait up to 30 seconds
+          ])
+          
+          // Continue generation in background if it's still running
+          fullInsightsPromise.catch((error) => {
+            console.warn('⚠️ Full insights generation error (continuing):', error)
+          })
+        } catch (e) {
+          console.warn('⚠️ Full insights generation failed (continuing):', e)
+          // Continue even if insights generation fails
+        }
+      } else {
+        // For partial updates (not full onboarding), use quick cache + background full generation
+        try {
+          console.log('🚀 Priming insights QUICK cache for user:', user.id)
+          const quickPriming = precomputeQuickSectionsForUser(user.id, { concurrency: 4 })
+          // Wait up to ~6.5s; do not block longer
+          await Promise.race([
+            quickPriming.then(() => 'done'),
+            new Promise((resolve) => setTimeout(() => resolve('timeout'), 6500)),
+          ])
+          console.log('✅ Quick cache priming finished or timed out (<=6.5s)')
+        } catch (e) {
+          console.warn('⚠️ Quick cache priming failed (continuing):', e)
+        }
+        // Fire-and-forget heavy precompute in background (do not block response)
+        try {
+          precomputeIssueSectionsForUser(user.id, { concurrency: 4 }).catch(() => {})
+        } catch {}
       }
-      // Fire-and-forget heavy precompute in background (do not block response)
-      try {
-        precomputeIssueSectionsForUser(user.id, { concurrency: 4 }).catch(() => {})
-      } catch {}
 
       // NEW APPROACH: Event-driven regeneration based on what actually changed
       // Instead of regenerating everything, we trigger regeneration only for affected sections

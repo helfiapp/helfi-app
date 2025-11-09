@@ -6,33 +6,44 @@ import { useSelectedLayoutSegments } from 'next/navigation'
 import SectionChat from '../SectionChat'
 import type { IssueSectionResult } from '@/lib/insights/issue-engine'
 
-// Progress bar component that animates through stages
+// Progress bar component that animates smoothly to 100%
 function ProgressBar() {
   const [progress, setProgress] = useState(0)
   
   useEffect(() => {
-    // Animate progress bar through stages: 0% -> 30% -> 60% -> 85% -> 95% -> 100%
-    const stages = [30, 60, 85, 95, 100]
-    let currentStage = 0
+    // Smooth animation: start at 0%, gradually increase to 100%
+    // Use a more realistic curve that slows down as it approaches 100%
+    let startTime: number | null = null
+    const duration = 3000 // 3 seconds total animation
+    const targetProgress = 100
     
-    const interval = setInterval(() => {
-      if (currentStage < stages.length) {
-        setProgress(stages[currentStage])
-        currentStage++
+    const animate = (timestamp: number) => {
+      if (startTime === null) startTime = timestamp
+      const elapsed = timestamp - startTime
+      const progressRatio = Math.min(elapsed / duration, 1)
+      
+      // Ease-out curve: fast start, slow end
+      const eased = 1 - Math.pow(1 - progressRatio, 3)
+      const currentProgress = eased * targetProgress
+      
+      setProgress(currentProgress)
+      
+      if (progressRatio < 1) {
+        requestAnimationFrame(animate)
       } else {
-        // Once at 100%, pulse between 95-100% to show it's still working
-        setProgress(prev => prev === 100 ? 95 : 100)
+        // Once at 100%, stay there (no pulsing)
+        setProgress(100)
       }
-    }, 800) // Change stage every 800ms
+    }
     
-    return () => clearInterval(interval)
+    requestAnimationFrame(animate)
   }, [])
   
   return (
     <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
       <div 
-        className="bg-helfi-green h-2 rounded-full transition-all duration-500 ease-out"
-        style={{ width: `${progress}%` }}
+        className="bg-helfi-green h-2 rounded-full transition-all duration-300 ease-out"
+        style={{ width: `${Math.min(progress, 100)}%` }}
       ></div>
     </div>
   )
