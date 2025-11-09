@@ -68,6 +68,8 @@ export async function GET(request: NextRequest) {
         dailyMedicalAnalysisUsed: true,
         dailyInteractionAnalysisUsed: true,
         monthlyInsightsGenerationUsed: true,
+        monthlyMedicalImageAnalysisUsed: true,
+        monthlySymptomAnalysisUsed: true,
         subscription: { select: { plan: true, monthlyPriceCents: true, endDate: true, startDate: true } },
         creditTopUps: {
           where: {

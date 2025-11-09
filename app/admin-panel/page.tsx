@@ -2514,7 +2514,7 @@ The Helfi Team`,
                        
                        {/* Feature-specific usage */}
                        <div className="pt-2 border-t border-gray-200">
-                         <div className="text-xs text-gray-500 mb-2">Today's Feature Usage:</div>
+                         <div className="text-xs text-gray-500 mb-2">Feature Usage:</div>
                          <div className="grid grid-cols-2 gap-2 text-xs">
                            <div className="flex justify-between">
                              <span>Food Analysis:</span>
@@ -2526,16 +2526,20 @@ The Helfi Team`,
                            </div>
                            <div className="flex justify-between">
                              <span>Medical Image:</span>
-                             <span className="font-medium">{selectedUser.dailyMedicalAnalysisUsed || 0}</span>
+                             <span className="font-medium">{selectedUser.monthlyMedicalImageAnalysisUsed || 0} (monthly)</span>
                            </div>
                            <div className="flex justify-between">
                              <span>Interaction Analysis:</span>
                              <span className="font-medium">{selectedUser.dailyInteractionAnalysisUsed || 0}</span>
                            </div>
-                         </div>
-                         <div className="flex justify-between">
-                           <span>Insights Generation:</span>
-                           <span className="font-medium">{selectedUser.monthlyInsightsGenerationUsed || 0} (monthly)</span>
+                           <div className="flex justify-between">
+                             <span>Symptom Analysis:</span>
+                             <span className="font-medium">{selectedUser.monthlySymptomAnalysisUsed || 0} (monthly)</span>
+                           </div>
+                           <div className="flex justify-between">
+                             <span>Insights Generation:</span>
+                             <span className="font-medium">{selectedUser.monthlyInsightsGenerationUsed || 0} (monthly)</span>
+                           </div>
                          </div>
                        </div>
                        {selectedUser.lastAnalysisResetDate && (
