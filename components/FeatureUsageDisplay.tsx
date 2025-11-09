@@ -59,14 +59,16 @@ export default function FeatureUsageDisplay({ featureName, featureLabel, refresh
   // Calculate total credits used for this feature
   const creditsUsed = usage.count * usage.costPerUse
   
-  // Determine label based on API-provided label (monthly vs total)
-  const timeLabel = usage.label === 'monthly' && hasSubscription ? 'This month' : 'Total'
+  // Determine label and suffix based on API-provided label (monthly vs total)
+  const isMonthly = usage.label === 'monthly'
+  const timeLabel = isMonthly ? 'This month' : 'Total'
+  const suffix = isMonthly ? ' for this month' : ''
 
   return (
     <div className="mt-2 text-xs text-gray-600">
       <span className="text-gray-500">{timeLabel}: </span>
       <span className="font-medium">
-        This AI feature has been used {usage.count} {usage.count === 1 ? 'time' : 'times'} at a cost of {creditsUsed} {creditsUsed === 1 ? 'credit' : 'credits'}
+        This AI feature has been used {usage.count} {usage.count === 1 ? 'time' : 'times'} at a cost of {creditsUsed} {creditsUsed === 1 ? 'credit' : 'credits'}{suffix}
       </span>
     </div>
   )

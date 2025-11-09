@@ -14,6 +14,7 @@ export async function GET(_req: NextRequest) {
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
       select: {
+        id: true,
         monthlySymptomAnalysisUsed: true,
         monthlyFoodAnalysisUsed: true,
         monthlyMedicalImageAnalysisUsed: true,
@@ -25,6 +26,16 @@ export async function GET(_req: NextRequest) {
         subscription: {
           select: {
             plan: true,
+            startDate: true, // Need this for calculating monthly reset date
+          },
+        },
+        creditTopUps: {
+          select: {
+            purchasedAt: true,
+            expiresAt: true,
+          },
+          orderBy: {
+            purchasedAt: 'desc', // Most recent first
           },
         },
       },
@@ -37,6 +48,100 @@ export async function GET(_req: NextRequest) {
     // Check if user has a subscription (not just purchased credits)
     const hasSubscription = user.subscription?.plan === 'PREMIUM'
 
+    // Calculate the start date for monthly food analysis counting
+    // Priority: subscription start date > most recent credit purchase date
+    let monthlyStartDate: Date | null = null
+    
+    if (hasSubscription && user.subscription?.startDate) {
+      // For subscriptions: calculate current subscription month based on start date
+      // Reset on the same calendar day each month (e.g., if started on 15th, reset on 15th)
+      const subStartDate = new Date(user.subscription.startDate)
+      const now = new Date()
+      
+      // Calculate the start of the current subscription month
+      // Find which subscription month we're in (0 = first month, 1 = second month, etc.)
+      const startYear = subStartDate.getUTCFullYear()
+      const startMonth = subStartDate.getUTCMonth()
+      const startDay = subStartDate.getUTCDate()
+      
+      const currentYear = now.getUTCFullYear()
+      const currentMonth = now.getUTCMonth()
+      const currentDay = now.getUTCDate()
+      
+      // Calculate how many months have passed
+      let monthsSinceStart = (currentYear - startYear) * 12 + (currentMonth - startMonth)
+      
+      // If we haven't reached the same day this month yet, we're still in the previous month
+      if (currentDay < startDay) {
+        monthsSinceStart--
+      }
+      
+      // Calculate the start date of the current subscription month
+      monthlyStartDate = new Date(Date.UTC(startYear, startMonth + monthsSinceStart, startDay, 0, 0, 0, 0))
+      
+      // Ensure we don't go into the future
+      if (monthlyStartDate > now) {
+        monthsSinceStart--
+        monthlyStartDate = new Date(Date.UTC(startYear, startMonth + monthsSinceStart, startDay, 0, 0, 0, 0))
+      }
+    } else if (user.creditTopUps && user.creditTopUps.length > 0) {
+      // For credit purchases: calculate current month from purchase date
+      // Reset on the same calendar day each month (e.g., if purchased on 10th, reset on 10th)
+      const mostRecentTopUp = user.creditTopUps[0]
+      if (mostRecentTopUp && mostRecentTopUp.expiresAt > new Date()) {
+        const purchaseDate = new Date(mostRecentTopUp.purchasedAt)
+        const now = new Date()
+        
+        const purchaseYear = purchaseDate.getUTCFullYear()
+        const purchaseMonth = purchaseDate.getUTCMonth()
+        const purchaseDay = purchaseDate.getUTCDate()
+        
+        const currentYear = now.getUTCFullYear()
+        const currentMonth = now.getUTCMonth()
+        const currentDay = now.getUTCDate()
+        
+        // Calculate how many months have passed since purchase
+        let monthsSincePurchase = (currentYear - purchaseYear) * 12 + (currentMonth - purchaseMonth)
+        
+        // If we haven't reached the same day this month yet, we're still in the previous month
+        if (currentDay < purchaseDay) {
+          monthsSincePurchase--
+        }
+        
+        // Calculate the start date of the current month based on purchase date
+        monthlyStartDate = new Date(Date.UTC(purchaseYear, purchaseMonth + monthsSincePurchase, purchaseDay, 0, 0, 0, 0))
+        
+        // Ensure we don't go into the future
+        if (monthlyStartDate > now) {
+          monthsSincePurchase--
+          monthlyStartDate = new Date(Date.UTC(purchaseYear, purchaseMonth + monthsSincePurchase, purchaseDay, 0, 0, 0, 0))
+        }
+      }
+    }
+
+    // Query actual food analysis usage from FoodLog since monthlyStartDate
+    let actualFoodUsage = 0
+    let foodLabel: 'monthly' | 'total' = 'total'
+    
+    if (monthlyStartDate) {
+      // Count FoodLog entries created since the start of current subscription month
+      const foodLogCount = await prisma.foodLog.count({
+        where: {
+          userId: user.id,
+          createdAt: {
+            gte: monthlyStartDate,
+          },
+        },
+      })
+      actualFoodUsage = foodLogCount
+      foodLabel = 'monthly'
+    } else {
+      // Fallback: use monthly counter or total count
+      const foodMonthly = user.monthlyFoodAnalysisUsed || 0
+      actualFoodUsage = Math.max(foodMonthly, (user.totalFoodAnalysisCount || 0))
+      foodLabel = foodMonthly >= (user.totalFoodAnalysisCount || 0) && foodMonthly > 0 ? 'monthly' : 'total'
+    }
+
     // Calculate symptom analysis count: totalAnalysisCount minus food and interaction
     const symptomAnalysisLifetime = Math.max(0, 
       (user.totalAnalysisCount || 0) - (user.totalFoodAnalysisCount || 0) - (user.totalInteractionAnalysisCount || 0)
@@ -44,7 +149,6 @@ export async function GET(_req: NextRequest) {
 
     // Choose the larger of monthly vs lifetime to reflect usage before monthly counters existed
     const symptomMonthly = user.monthlySymptomAnalysisUsed || 0
-    const foodMonthly = user.monthlyFoodAnalysisUsed || 0
     const interactionMonthly = user.monthlyInteractionAnalysisUsed || 0
     const medicalMonthly = user.monthlyMedicalImageAnalysisUsed || 0
 
@@ -55,9 +159,9 @@ export async function GET(_req: NextRequest) {
         label: symptomMonthly >= symptomAnalysisLifetime && symptomMonthly > 0 ? 'monthly' : 'total',
       },
       foodAnalysis: {
-        count: Math.max(foodMonthly, (user.totalFoodAnalysisCount || 0)),
+        count: actualFoodUsage,
         costPerUse: CREDIT_COSTS.FOOD_ANALYSIS,
-        label: foodMonthly >= (user.totalFoodAnalysisCount || 0) && foodMonthly > 0 ? 'monthly' : 'total',
+        label: foodLabel,
       },
       interactionAnalysis: {
         count: Math.max(interactionMonthly, (user.totalInteractionAnalysisCount || 0)),

@@ -86,16 +86,31 @@ export async function POST(req: NextRequest) {
       messages = [
         {
           role: "user",
-          content: `Analyze this food description and provide accurate nutrition information based on the EXACT portion size specified. Be precise about size differences. Keep your explanation concise (1-2 sentences) and ALWAYS include a single nutrition line at the end in this exact format:
+          content: `Analyze this food description and provide accurate nutrition information based on the EXACT portion size specified. Be precise about size differences.
+
+CRITICAL FOR MEALS WITH MULTIPLE COMPONENTS:
+- If the description mentions multiple distinct foods (e.g., plate with protein, vegetables, grains, salads, soups, stews, sandwiches with multiple fillings, bowls with toppings), you MUST:
+  1. Identify EACH component separately
+  2. Estimate portion size for EACH component accurately
+  3. Calculate nutrition for EACH component individually
+  4. Sum all components to provide TOTAL nutrition values
+  5. List components briefly in your description
+
+- For complex meals, be thorough: don't miss side dishes, condiments, dressings, or toppings mentioned
+- Estimate portions realistically based on the description
+- If unsure about a component, estimate conservatively but include it in your totals
+- For mixed dishes (salads, soups, stews), break down the main ingredients and sum them
+
+Keep your explanation concise (2-3 sentences) and ALWAYS include a single nutrition line at the end in this exact format:
 
 Calories: [number], Protein: [g], Carbs: [g], Fat: [g]
 
-[Food name] ([portion size])
+[Food name/meal description] ([total portion size])
 
 Food description: ${textDescription}
 Food type: ${foodType}
 
-${preferMultiDetect ? `If multiple distinct foods or components are mentioned (e.g., salads/soups/stews/plate with sides), describe them briefly.
+${preferMultiDetect ? `The description likely contains multiple foods or components - analyze each one carefully, calculate nutrition for each, then sum the totals.
 ` : ''}
 
 IMPORTANT: Different sizes have different nutrition values:
@@ -107,13 +122,10 @@ Examples:
 "Medium banana (1 whole)
 Calories: 105, Protein: 1g, Carbs: 27g, Fat: 0g"
 
-"Large egg (1 whole)
-Calories: 70, Protein: 6g, Carbs: 1g, Fat: 5g"
+"Grilled chicken breast (6 oz) with brown rice (1 cup) and steamed broccoli (1 cup)
+Calories: 485, Protein: 45g, Carbs: 45g, Fat: 8g"
 
-"Medium egg (1 whole)
-Calories: 55, Protein: 5g, Carbs: 1g, Fat: 4g"
-
-Pay close attention to portion size words like small, medium, large, or specific measurements. Calculate nutrition accordingly. End your response with the nutrition line exactly once as shown.
+Pay close attention to portion size words like small, medium, large, or specific measurements. For meals, sum all components. Calculate nutrition accordingly. End your response with the nutrition line exactly once as shown.
 ${wantStructured ? `
 After your explanation and the one-line totals above, also include a compact JSON block between <ITEMS_JSON> and </ITEMS_JSON> with this exact shape for any detected foods (use an empty array if only one item):
 <ITEMS_JSON>{"items":[{"name":"string","portion":"string","calories":0,"protein_g":0,"carbs_g":0,"fat_g":0}],"total":{"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0}}</ITEMS_JSON>
@@ -160,13 +172,28 @@ After your explanation and the one-line totals above, also include a compact JSO
           content: [
             {
               type: "text",
-              text: `Analyze this food image and provide accurate nutrition information based on the visible portion size. Be precise about size differences. Keep your explanation concise (1-2 sentences) and ALWAYS include a single nutrition line at the end in this exact format:
+              text: `Analyze this food image and provide accurate nutrition information based on the visible portion size. Be precise about size differences.
+
+CRITICAL FOR MEALS WITH MULTIPLE COMPONENTS:
+- If the image contains multiple distinct foods (e.g., plate with protein, vegetables, grains, salads, soups, stews, sandwiches with multiple fillings, bowls with toppings), you MUST:
+  1. Identify EACH component separately
+  2. Estimate portion size for EACH component accurately
+  3. Calculate nutrition for EACH component individually
+  4. Sum all components to provide TOTAL nutrition values
+  5. List components briefly in your description
+
+- For complex meals, be thorough: don't miss side dishes, condiments, dressings, or toppings
+- Estimate portions realistically based on what's visible in the image
+- If unsure about a component, estimate conservatively but include it in your totals
+- For mixed dishes (salads, soups, stews), break down the main ingredients and sum them
+
+Keep your explanation concise (2-3 sentences) and ALWAYS include a single nutrition line at the end in this exact format:
 
 Calories: [number], Protein: [g], Carbs: [g], Fat: [g]
 
-[Food name] ([portion size])
+[Food name/meal description] ([total portion size])
 
-${preferMultiDetect ? `If the image contains multiple distinct foods or components (e.g., salads/soups/stews/plate with sides), describe them briefly.
+${preferMultiDetect ? `The image likely contains multiple foods or components - analyze each one carefully, calculate nutrition for each, then sum the totals.
 ` : ''}
 
 IMPORTANT: Different sizes have different nutrition values:
@@ -178,13 +205,13 @@ Examples:
 "Medium banana (1 whole)
 Calories: 105, Protein: 1g, Carbs: 27g, Fat: 0g"
 
-"Large egg (1 whole)
-Calories: 70, Protein: 6g, Carbs: 1g, Fat: 5g"
+"Grilled chicken breast (6 oz) with brown rice (1 cup) and steamed broccoli (1 cup)
+Calories: 485, Protein: 45g, Carbs: 45g, Fat: 8g"
 
-"Medium egg (1 whole)
-Calories: 55, Protein: 5g, Carbs: 1g, Fat: 4g"
+"Caesar salad with grilled chicken (large)
+Calories: 520, Protein: 35g, Carbs: 18g, Fat: 32g"
 
-Estimate portion size carefully from the image and calculate nutrition accordingly. End your response with the nutrition line exactly once as shown.
+Estimate portion size carefully from the image and calculate nutrition accordingly. For meals, sum all components. End your response with the nutrition line exactly once as shown.
 ${wantStructured ? `
 After your explanation and the one-line totals above, also include a compact JSON block between <ITEMS_JSON> and </ITEMS_JSON> with this exact shape for any detected foods (use an empty array if only one item):
 <ITEMS_JSON>{"items":[{"name":"string","portion":"string","calories":0,"protein_g":0,"carbs_g":0,"fat_g":0}],"total":{"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0}}</ITEMS_JSON>
