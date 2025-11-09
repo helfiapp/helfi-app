@@ -90,8 +90,35 @@ export default function SupplementsShell({ children, initialResult, issueSlug }:
   const [result, setResult] = useState<IssueSectionResult | null>(initialResult)
   const [loading, setLoading] = useState(!initialResult)
   const [error, setError] = useState<string | null>(null)
+  const [isUpdating, setIsUpdating] = useState(false)
   const segments = useSelectedLayoutSegments()
   const activeTab = (segments?.[0] as TabKey | undefined) ?? 'working'
+
+  // Handle Update Insights button click
+  const handleUpdateInsights = async () => {
+    setIsUpdating(true)
+    try {
+      const response = await fetch('/api/insights/regenerate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+      
+      if (response.ok) {
+        // Wait a moment, then refresh the page to show updated insights
+        setTimeout(() => {
+          window.location.reload()
+        }, 2000)
+      } else {
+        const data = await response.json()
+        alert(data.message || 'Failed to update insights. Please try again.')
+        setIsUpdating(false)
+      }
+    } catch (error) {
+      console.error('Error updating insights:', error)
+      alert('Failed to update insights. Please try again.')
+      setIsUpdating(false)
+    }
+  }
 
   // Fetch data client-side if SSR returned null (cache miss)
   useEffect(() => {
@@ -291,13 +318,27 @@ export default function SupplementsShell({ children, initialResult, issueSlug }:
       <div className="space-y-6">
         <section className="bg-white border border-gray-200 rounded-2xl shadow-sm p-6">
           <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-            <div>
+            <div className="flex-1">
               <h2 className="text-lg font-semibold text-gray-900 mb-2">Supplements report</h2>
               <p className="text-sm text-gray-700 leading-relaxed">{result.summary}</p>
               <p className="text-xs text-gray-500 mt-3">
                 Generated {new Date(result.generatedAt).toLocaleString()} • Confidence {(result.confidence * 100).toFixed(0)}%
               </p>
             </div>
+            <button
+              onClick={handleUpdateInsights}
+              disabled={isUpdating}
+              className="px-4 py-2 bg-helfi-green text-white rounded-lg hover:bg-helfi-green/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed font-medium text-sm whitespace-nowrap"
+            >
+              {isUpdating ? (
+                <>
+                  <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2"></span>
+                  Updating...
+                </>
+              ) : (
+                'Update Insights'
+              )}
+            </button>
           </div>
         </section>
 
