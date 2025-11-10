@@ -368,9 +368,8 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
         const textOut = data?.assistant as string | undefined
         if (textOut) {
           setMessages((prev) => [...prev, { role: 'assistant', content: textOut }])
-          if (voiceEnabled) {
-            speakText(textOut)
-          }
+          // On iOS, we can't autoplay speech - user must click speak button
+          console.log('[VoiceChat] Response complete, ready for voice playback')
         }
       }
     } catch (err: any) {
@@ -436,11 +435,23 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
               )}
             </div>
             <div className={`flex-1 ${m.role === 'user' ? 'text-right' : ''}`}>
-              <div className={`inline-block px-4 py-2.5 rounded-2xl ${
+              <div className={`inline-block px-4 py-2.5 rounded-2xl relative ${
                 m.role === 'user' 
                   ? 'bg-gray-900 text-white' 
                   : 'bg-gray-100 text-gray-900'
               }`}>
+                {m.role === 'assistant' && voiceEnabled && m.content && (
+                  <button
+                    type="button"
+                    onClick={() => speakText(m.content)}
+                    className="absolute top-2 right-2 w-6 h-6 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center transition-colors"
+                    aria-label="Speak response"
+                  >
+                    <svg className="w-3.5 h-3.5 text-gray-600" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+                    </svg>
+                  </button>
+                )}
                 <div className="text-[15px] leading-relaxed break-words">
                   {m.content.split(/\n\n+/).map((para, paraIdx) => {
                     if (!para.trim()) return null
