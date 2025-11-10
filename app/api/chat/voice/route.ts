@@ -261,13 +261,12 @@ export async function POST(req: NextRequest) {
     const wantsStream = accept.includes('text/event-stream')
 
     const model = process.env.OPENAI_INSIGHTS_MODEL || 'gpt-4o-mini'
-    const chatMessages = [
-      { role: 'system' as const, content: systemPrompt },
-      { role: 'user' as const, content: question },
-    ]
-    
     // Add formatting reminder to user message for better compliance
     const enhancedQuestion = `${question}\n\nPlease format your response with proper paragraphs, line breaks, and structure.`
+    const chatMessages = [
+      { role: 'system' as const, content: systemPrompt },
+      { role: 'user' as const, content: enhancedQuestion },
+    ]
 
     // Estimate cost (2x for user)
     const estimateCents = costCentsEstimateFromText(model, `${systemPrompt}\n${question}`, 1000 * 4)
