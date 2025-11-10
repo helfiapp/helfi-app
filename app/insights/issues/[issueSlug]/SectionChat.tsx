@@ -1,6 +1,6 @@
 'use client'
 
-import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState, useCallback } from 'react'
 
 interface SectionChatProps {
   issueSlug: string
@@ -21,6 +21,23 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
   const enabled = (process.env.NEXT_PUBLIC_INSIGHTS_CHAT || 'true').toLowerCase() === 'true' || (process.env.NEXT_PUBLIC_INSIGHTS_CHAT || '') === '1'
   const [threadId, setThreadId] = useState<string | null>(null)
   const recognitionRef = useRef<any>(null)
+  const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Debounced resize function to prevent pulsating
+  const resizeTextarea = useCallback(() => {
+    if (resizeTimeoutRef.current) {
+      clearTimeout(resizeTimeoutRef.current)
+    }
+    resizeTimeoutRef.current = setTimeout(() => {
+      const textarea = document.querySelector('textarea') as HTMLTextAreaElement | null
+      if (!textarea) return
+      textarea.style.height = 'auto'
+      const maxHeight = 200
+      const newHeight = Math.min(textarea.scrollHeight, maxHeight)
+      textarea.style.height = `${newHeight}px`
+      textarea.style.overflowY = textarea.scrollHeight > maxHeight ? 'auto' : 'hidden'
+    }, 50)
+  }, [])
 
   // Initialize speech recognition
   useEffect(() => {
@@ -274,51 +291,62 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
           </div>
         )}
         {messages.map((m, idx) => (
-          <div key={idx} className={m.role === 'user' ? 'flex items-start justify-end gap-2' : 'flex items-start justify-start gap-2'}>
-            {m.role !== 'user' && (
-              <div className="mt-1 h-7 w-7 shrink-0 rounded-full bg-helfi-green/10 text-helfi-green grid place-items-center text-xs font-bold">AI</div>
-            )}
-            <div
-              className={
-                m.role === 'user'
-                  ? 'inline-block max-w-[85%] rounded-2xl rounded-br-sm bg-helfi-green text-white px-4 py-2 text-sm shadow-sm'
-                  : 'inline-block max-w-[85%] rounded-2xl rounded-bl-sm bg-gray-100 text-gray-800 px-4 py-2 text-sm shadow-sm'
-              }
-            >
-              {m.content}
+          <div key={idx} className={`flex gap-4 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
+            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
+              {m.role === 'user' ? (
+                <svg className="w-5 h-5 text-gray-600" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                </svg>
+              ) : (
+                <svg className="w-5 h-5 text-gray-600" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                </svg>
+              )}
             </div>
-            {m.role === 'user' && (
-              <div className="mt-1 h-7 w-7 shrink-0 rounded-full bg-gray-900 text-white grid place-items-center text-xs font-bold">You</div>
-            )}
+            <div className={`flex-1 ${m.role === 'user' ? 'text-right' : ''}`}>
+              <div className={`inline-block px-4 py-2.5 rounded-2xl ${
+                m.role === 'user' 
+                  ? 'bg-gray-900 text-white' 
+                  : 'bg-gray-100 text-gray-900'
+              }`}>
+                <div className="text-[15px] leading-relaxed whitespace-pre-wrap">{m.content}</div>
+              </div>
+            </div>
           </div>
         ))}
         {loading && (
-          <div className="flex items-start justify-start gap-2">
-            <div className="mt-1 h-7 w-7 shrink-0 rounded-full bg-helfi-green/10 text-helfi-green grid place-items-center text-xs font-bold">AI</div>
-            <div className="inline-block rounded-2xl rounded-bl-sm bg-gray-100 text-gray-600 px-4 py-2 text-sm">
-              <span className="inline-flex items-center gap-1">
-                <span className="animate-pulse">●</span>
-                <span className="animate-pulse [animation-delay:150ms]">●</span>
-                <span className="animate-pulse [animation-delay:300ms]">●</span>
-              </span>
+          <div className="flex gap-4">
+            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
+              <svg className="w-5 h-5 text-gray-600" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+              </svg>
+            </div>
+            <div className="flex-1">
+              <div className="inline-block px-4 py-2.5 rounded-2xl bg-gray-100">
+                <div className="flex gap-1">
+                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                </div>
+              </div>
             </div>
           </div>
         )}
         <div ref={endRef} />
       </div>
 
-      <form className="border-t border-gray-200 px-5 py-3" onSubmit={handleSubmit}>
+      <form className="border-t border-gray-200 px-4 py-3 bg-white" onSubmit={handleSubmit}>
         <div className="flex items-end gap-2">
           {recognitionRef.current && (
             <button
               type="button"
               onClick={isListening ? stopListening : startListening}
               disabled={loading}
-              className={`inline-flex items-center justify-center rounded-lg px-3 py-2 text-base font-semibold shrink-0 min-h-[44px] ${
+              className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
                 isListening
-                  ? 'bg-red-500 text-white hover:bg-red-600'
-                  : 'bg-purple-500 text-white hover:bg-purple-600'
-              } disabled:opacity-60 disabled:cursor-not-allowed`}
+                  ? 'bg-red-500 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              } disabled:opacity-50 disabled:cursor-not-allowed`}
               aria-label={isListening ? 'Stop listening' : 'Start voice input'}
             >
               {isListening ? (
@@ -333,35 +361,32 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
               )}
             </button>
           )}
-          <textarea
-            value={input}
-            onChange={(event) => {
-              setInput(event.target.value)
-              // Trigger resize on change
-              setTimeout(() => {
-                const textarea = event.target as HTMLTextAreaElement
-                textarea.style.height = 'auto'
-                const maxHeight = 120
-                const newHeight = Math.min(textarea.scrollHeight, maxHeight)
-                textarea.style.height = `${newHeight}px`
-                textarea.style.overflowY = textarea.scrollHeight > maxHeight ? 'auto' : 'hidden'
-              }, 0)
-            }}
-            onKeyDown={onComposerKeyDown}
-            placeholder={recognitionRef.current ? `Type or use voice input...` : `Message AI about ${issueName} (${section})`}
-            rows={1}
-            className="w-full rounded-xl border-2 border-gray-200 px-4 py-3 text-base leading-6 focus:border-helfi-green focus:outline-none focus:ring-2 focus:ring-helfi-green/20 resize-none transition-all duration-200 min-h-[52px] max-h-[120px] bg-white"
-            style={{ height: '52px' }}
-          />
+          <div className="flex-1 relative">
+            <textarea
+              value={input}
+              onChange={(event) => {
+                setInput(event.target.value)
+                resizeTextarea()
+              }}
+              onKeyDown={onComposerKeyDown}
+              placeholder={recognitionRef.current ? `Type or use voice input...` : `Message AI about ${issueName} (${section})`}
+              rows={1}
+              className="w-full rounded-2xl border-0 bg-gray-100 px-4 py-3 pr-12 text-[15px] leading-6 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-0 resize-none transition-all duration-200 min-h-[52px] max-h-[200px]"
+              style={{ height: '52px' }}
+            />
+          </div>
           <button
             type="submit"
             disabled={loading || isListening}
-            className="inline-flex items-center gap-2 rounded-lg bg-gray-900 px-4 py-[10px] text-base font-semibold text-white disabled:opacity-60"
+            className="flex-shrink-0 w-10 h-10 rounded-full bg-gray-900 text-white flex items-center justify-center hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            aria-label="Send message"
           >
-            Send
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+            </svg>
           </button>
         </div>
-        {error && <div className="mt-2 text-xs text-rose-600">{error}</div>}
+        {error && <div className="mt-2 text-xs text-red-600">{error}</div>}
       </form>
     </section>
   )

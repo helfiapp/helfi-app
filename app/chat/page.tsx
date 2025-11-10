@@ -7,19 +7,12 @@ import Link from 'next/link'
 
 export default function ChatPage() {
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-white flex flex-col">
       <PageHeader title="Talk to AI" />
 
-      {/* Main Content */}
-      <div className="max-w-4xl mx-auto px-4 py-6 pb-24 md:pb-8">
-        <div className="mb-6">
-          <p className="text-gray-600">
-            Ask your AI health assistant anything about your health, medications, supplements, and more. 
-            Your assistant has access to all your health data for personalized responses.
-          </p>
-        </div>
-
-        <VoiceChat />
+      {/* Main Content - Full height chat */}
+      <div className="flex-1 flex flex-col overflow-hidden pb-24 md:pb-8">
+        <VoiceChat className="flex-1" />
       </div>
 
       {/* Mobile Bottom Navigation */}

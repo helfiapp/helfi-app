@@ -1,6 +1,6 @@
 'use client'
 
-import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState, useCallback } from 'react'
 
 interface VoiceChatProps {
   context?: {
@@ -32,6 +32,23 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const recognitionRef = useRef<any>(null)
   const synthRef = useRef<SpeechSynthesis | null>(null)
+  const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Debounced resize function to prevent pulsating
+  const resizeTextarea = useCallback(() => {
+    if (resizeTimeoutRef.current) {
+      clearTimeout(resizeTimeoutRef.current)
+    }
+    resizeTimeoutRef.current = setTimeout(() => {
+      const textarea = textareaRef.current
+      if (!textarea) return
+      textarea.style.height = 'auto'
+      const maxHeight = 200
+      const newHeight = Math.min(textarea.scrollHeight, maxHeight)
+      textarea.style.height = `${newHeight}px`
+      textarea.style.overflowY = textarea.scrollHeight > maxHeight ? 'auto' : 'hidden'
+    }, 50) // Debounce resize by 50ms
+  }, [])
 
   // Initialize speech recognition
   useEffect(() => {
@@ -110,16 +127,10 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
     container.scrollTop = container.scrollHeight
   }, [messages, loading])
 
-  // Auto-resize textarea
+  // Auto-resize textarea with debounce
   useEffect(() => {
-    const textarea = textareaRef.current
-    if (!textarea) return
-    textarea.style.height = 'auto'
-    const maxHeight = 120
-    const newHeight = Math.min(textarea.scrollHeight, maxHeight)
-    textarea.style.height = `${newHeight}px`
-    textarea.style.overflowY = textarea.scrollHeight > maxHeight ? 'auto' : 'hidden'
-  }, [input])
+    resizeTextarea()
+  }, [input, resizeTextarea])
 
   function onComposerKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
     if (event.key === 'Enter' && !event.shiftKey) {
@@ -315,31 +326,15 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
   }
 
   return (
-    <section className={`bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden ${className}`}>
-      <header className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
-        <div>
-          <h3 className="text-sm font-semibold text-gray-900">Talk to AI Health Assistant</h3>
-          <p className="text-xs text-gray-500">
-            {voiceEnabled ? 'Voice or text input • Responses can be spoken' : 'Text input only'}
-            {estimatedCost && ` • Est. cost: ${(estimatedCost / 100).toFixed(2)} credits`}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleClear}
-            disabled={loading}
-            className="text-xs rounded-md border border-gray-300 px-2 py-1 text-gray-600 hover:bg-gray-50 disabled:opacity-60"
-          >
-            Reset
-          </button>
-        </div>
-      </header>
-
-      <div ref={containerRef} className="px-5 py-4 h-[420px] overflow-y-auto space-y-3" aria-live="polite">
+    <div className={`flex flex-col h-full ${className}`}>
+      {/* Messages Area - ChatGPT style */}
+      <div ref={containerRef} className="flex-1 overflow-y-auto px-4 py-6 space-y-6" aria-live="polite">
         {messages.length === 0 && !loading && (
-          <div className="text-sm text-gray-400">
-            Ask anything about your health:
-            <div className="mt-2 flex flex-wrap gap-2">
+          <div className="max-w-3xl mx-auto">
+            <div className="text-center mb-8">
+              <h2 className="text-2xl font-semibold text-gray-900 mb-2">How can I help you today?</h2>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {[
                 'What supplements should I take?',
                 'How are my medications interacting?',
@@ -349,7 +344,7 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
                 <button
                   key={q}
                   onClick={() => setInput(q)}
-                  className="rounded-full border border-gray-300 px-3 py-1 text-xs text-gray-600 hover:bg-gray-50"
+                  className="text-left px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded-xl text-sm text-gray-700 transition-colors"
                   type="button"
                 >
                   {q}
@@ -359,110 +354,122 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
           </div>
         )}
         {messages.map((m, idx) => (
-          <div key={idx} className={m.role === 'user' ? 'flex items-start justify-end gap-2' : 'flex items-start justify-start gap-2'}>
-            {m.role !== 'user' && (
-              <div className="mt-1 h-7 w-7 shrink-0 rounded-full bg-helfi-green/10 text-helfi-green grid place-items-center text-xs font-bold">AI</div>
-            )}
-            <div
-              className={
-                m.role === 'user'
-                  ? 'inline-block max-w-[85%] rounded-2xl rounded-br-sm bg-helfi-green text-white px-4 py-2 text-sm shadow-sm'
-                  : 'inline-block max-w-[85%] rounded-2xl rounded-bl-sm bg-gray-100 text-gray-800 px-4 py-2 text-sm shadow-sm'
-              }
-            >
-              {m.content}
+          <div key={idx} className={`flex gap-4 max-w-3xl mx-auto ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
+            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
+              {m.role === 'user' ? (
+                <svg className="w-5 h-5 text-gray-600" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                </svg>
+              ) : (
+                <svg className="w-5 h-5 text-gray-600" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                </svg>
+              )}
             </div>
-            {m.role === 'user' && (
-              <div className="mt-1 h-7 w-7 shrink-0 rounded-full bg-gray-900 text-white grid place-items-center text-xs font-bold">You</div>
-            )}
+            <div className={`flex-1 ${m.role === 'user' ? 'text-right' : ''}`}>
+              <div className={`inline-block px-4 py-2.5 rounded-2xl ${
+                m.role === 'user' 
+                  ? 'bg-gray-900 text-white' 
+                  : 'bg-gray-100 text-gray-900'
+              }`}>
+                <div className="text-[15px] leading-relaxed whitespace-pre-wrap">{m.content}</div>
+              </div>
+            </div>
           </div>
         ))}
         {loading && (
-          <div className="flex items-start justify-start gap-2">
-            <div className="mt-1 h-7 w-7 shrink-0 rounded-full bg-helfi-green/10 text-helfi-green grid place-items-center text-xs font-bold">AI</div>
-            <div className="inline-block rounded-2xl rounded-bl-sm bg-gray-100 text-gray-600 px-4 py-2 text-sm">
-              <span className="inline-flex items-center gap-1">
-                <span className="animate-pulse">●</span>
-                <span className="animate-pulse [animation-delay:150ms]">●</span>
-                <span className="animate-pulse [animation-delay:300ms]">●</span>
-              </span>
+          <div className="flex gap-4 max-w-3xl mx-auto">
+            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
+              <svg className="w-5 h-5 text-gray-600" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+              </svg>
+            </div>
+            <div className="flex-1">
+              <div className="inline-block px-4 py-2.5 rounded-2xl bg-gray-100">
+                <div className="flex gap-1">
+                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                </div>
+              </div>
             </div>
           </div>
         )}
         <div ref={endRef} />
       </div>
 
-      <form className="border-t border-gray-200 px-4 py-3" onSubmit={handleSubmit}>
-        <div className="flex items-end gap-2">
-          {voiceEnabled && (
-            <button
-              type="button"
-              onClick={isListening ? stopListening : startListening}
-              disabled={loading || isSpeaking}
-              className={`inline-flex items-center justify-center rounded-lg px-3 py-2.5 text-base font-semibold shrink-0 min-h-[44px] ${
-                isListening
-                  ? 'bg-red-500 text-white hover:bg-red-600'
-                  : 'bg-purple-500 text-white hover:bg-purple-600'
-              } disabled:opacity-60 disabled:cursor-not-allowed`}
-              aria-label={isListening ? 'Stop listening' : 'Start voice input'}
-            >
-              {isListening ? (
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/>
-                </svg>
-              ) : (
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
-                  <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
-                </svg>
+      {/* Input Area - ChatGPT style */}
+      <div className="border-t border-gray-200 bg-white">
+        {error && (
+          <div className="px-4 py-2 text-sm text-red-600 bg-red-50">{error}</div>
+        )}
+        <form className="px-4 py-3" onSubmit={handleSubmit}>
+          <div className="max-w-3xl mx-auto flex items-end gap-2">
+            {voiceEnabled && (
+              <button
+                type="button"
+                onClick={isListening ? stopListening : startListening}
+                disabled={loading || isSpeaking}
+                className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+                  isListening
+                    ? 'bg-red-500 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+                aria-label={isListening ? 'Stop listening' : 'Start voice input'}
+              >
+                {isListening ? (
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/>
+                  </svg>
+                ) : (
+                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+                    <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                  </svg>
+                )}
+              </button>
+            )}
+            <div className="flex-1 relative">
+              <textarea
+                ref={textareaRef}
+                value={input}
+                onChange={(event) => {
+                  setInput(event.target.value)
+                  resizeTextarea()
+                }}
+                onKeyDown={onComposerKeyDown}
+                placeholder="Ask anything"
+                rows={1}
+                className="w-full rounded-2xl border-0 bg-gray-100 px-4 py-3 pr-12 text-[15px] leading-6 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-0 resize-none transition-all duration-200 min-h-[52px] max-h-[200px]"
+                style={{ height: '52px' }}
+              />
+              {isSpeaking && (
+                <button
+                  type="button"
+                  onClick={stopSpeaking}
+                  className="absolute right-2 bottom-2 w-8 h-8 rounded-full bg-orange-500 text-white flex items-center justify-center hover:bg-orange-600"
+                  aria-label="Stop speaking"
+                >
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M6 6h12v12H6z"/>
+                  </svg>
+                </button>
               )}
-            </button>
-          )}
-          <textarea
-            ref={textareaRef}
-            value={input}
-            onChange={(event) => {
-              setInput(event.target.value)
-              // Trigger resize on change
-              setTimeout(() => {
-                const textarea = textareaRef.current
-                if (!textarea) return
-                textarea.style.height = 'auto'
-                const maxHeight = 120
-                const newHeight = Math.min(textarea.scrollHeight, maxHeight)
-                textarea.style.height = `${newHeight}px`
-                textarea.style.overflowY = textarea.scrollHeight > maxHeight ? 'auto' : 'hidden'
-              }, 0)
-            }}
-            onKeyDown={onComposerKeyDown}
-            placeholder={voiceEnabled ? "Type or use voice input..." : "Ask a question..."}
-            rows={1}
-            className="w-full rounded-xl border-2 border-gray-200 px-4 py-3 text-base leading-6 focus:border-helfi-green focus:outline-none focus:ring-2 focus:ring-helfi-green/20 resize-none transition-all duration-200 min-h-[52px] max-h-[120px] bg-white"
-            style={{ height: '52px' }}
-          />
-          {isSpeaking && (
+            </div>
             <button
-              type="button"
-              onClick={stopSpeaking}
-              className="inline-flex items-center justify-center rounded-lg bg-orange-500 text-white px-3 py-2.5 text-base font-semibold shrink-0 min-h-[44px] hover:bg-orange-600"
-              aria-label="Stop speaking"
+              type="submit"
+              disabled={loading || !input.trim() || isListening}
+              className="flex-shrink-0 w-10 h-10 rounded-full bg-gray-900 text-white flex items-center justify-center hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              aria-label="Send message"
             >
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M6 6h12v12H6z"/>
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
               </svg>
             </button>
-          )}
-          <button
-            type="submit"
-            disabled={loading || !input.trim() || isListening}
-            className="inline-flex items-center justify-center rounded-lg bg-gray-900 px-4 py-2.5 text-base font-semibold text-white disabled:opacity-60 disabled:cursor-not-allowed shrink-0 min-h-[44px]"
-          >
-            Send
-          </button>
-        </div>
-        {error && <div className="mt-2 text-xs text-rose-600">{error}</div>}
-      </form>
-    </section>
+          </div>
+        </form>
+      </div>
+    </div>
   )
 }
 
