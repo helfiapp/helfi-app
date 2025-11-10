@@ -180,7 +180,12 @@ export async function buildSystemPrompt(userId: string, slug: string, section: I
       : section === 'labs'
       ? 'CRITICAL: Review profile and any lab-related context. Analyze logged tests by understanding what biomarkers they measure, but ALWAYS reference items by the exact test name stored in the profile. Tie each mention to why it helps this issue.'
       : '',
-    'Rules: avoid diagnosis, encourage clinician consultation for changes. Be specific with practical tips (dose/timing if appropriate).'
+    'Rules: avoid diagnosis, encourage clinician consultation for changes. Be specific with practical tips (dose/timing if appropriate).',
+    'IMPORTANT: Format your responses with proper paragraphs, bullet points, and line breaks for readability.',
+    'Use **bold** for emphasis on key terms or headings.',
+    'Break up long responses into clear sections with line breaks.',
+    'Never provide responses as one continuous block of text.',
+    'When answering follow-up questions, provide NEW information or clarification, not a repetition of previous answers.'
   ].filter(Boolean).join('\n')
 }
 

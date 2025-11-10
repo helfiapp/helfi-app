@@ -309,7 +309,21 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
                   ? 'bg-gray-900 text-white' 
                   : 'bg-gray-100 text-gray-900'
               }`}>
-                <div className="text-[15px] leading-relaxed whitespace-pre-wrap">{m.content}</div>
+                <div className="text-[15px] leading-relaxed whitespace-pre-wrap">
+                  {m.content.split('\n').map((line, i) => {
+                    const parts = line.split(/(\*\*.*?\*\*)/g)
+                    return (
+                      <div key={i} className={i > 0 ? 'mt-2' : ''}>
+                        {parts.map((part, j) => {
+                          if (part.startsWith('**') && part.endsWith('**')) {
+                            return <strong key={j}>{part.slice(2, -2)}</strong>
+                          }
+                          return <span key={j}>{part}</span>
+                        })}
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
             </div>
           </div>
@@ -336,7 +350,7 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
       </div>
 
       <form className="border-t border-gray-200 px-4 py-3 bg-white" onSubmit={handleSubmit}>
-        <div className="flex items-end gap-2">
+        <div className="flex items-center gap-2">
           {recognitionRef.current && (
             <button
               type="button"
@@ -361,7 +375,7 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
               )}
             </button>
           )}
-          <div className="flex-1 relative">
+          <div className="flex-1 relative flex items-center">
             <textarea
               value={input}
               onChange={(event) => {

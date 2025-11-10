@@ -186,6 +186,10 @@ function buildSystemPrompt(context: Awaited<ReturnType<typeof loadFullUserContex
     '- Consider interactions between their medications and supplements',
     '- Reference their health goals and tracking data when relevant',
     '- Keep responses concise but comprehensive',
+    '- IMPORTANT: Format your responses with proper paragraphs, bullet points, and line breaks for readability',
+    '- Use **bold** for emphasis on key terms or headings',
+    '- Break up long responses into clear sections with line breaks',
+    '- Never provide responses as one continuous block of text',
   )
 
   return parts.join('\n')

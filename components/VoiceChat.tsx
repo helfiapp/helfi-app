@@ -372,7 +372,22 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
                   ? 'bg-gray-900 text-white' 
                   : 'bg-gray-100 text-gray-900'
               }`}>
-                <div className="text-[15px] leading-relaxed whitespace-pre-wrap">{m.content}</div>
+                <div className="text-[15px] leading-relaxed whitespace-pre-wrap prose prose-sm max-w-none">
+                  {m.content.split('\n').map((line, i) => {
+                    // Handle markdown bold
+                    const parts = line.split(/(\*\*.*?\*\*)/g)
+                    return (
+                      <div key={i} className={i > 0 ? 'mt-2' : ''}>
+                        {parts.map((part, j) => {
+                          if (part.startsWith('**') && part.endsWith('**')) {
+                            return <strong key={j}>{part.slice(2, -2)}</strong>
+                          }
+                          return <span key={j}>{part}</span>
+                        })}
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
             </div>
           </div>
@@ -404,7 +419,7 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
           <div className="px-4 py-2 text-sm text-red-600 bg-red-50">{error}</div>
         )}
         <form className="px-4 py-3" onSubmit={handleSubmit}>
-          <div className="max-w-3xl mx-auto flex items-end gap-2">
+          <div className="max-w-3xl mx-auto flex items-center gap-2">
             {voiceEnabled && (
               <button
                 type="button"
@@ -429,7 +444,7 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
                 )}
               </button>
             )}
-            <div className="flex-1 relative">
+            <div className="flex-1 relative flex items-center">
               <textarea
                 ref={textareaRef}
                 value={input}
@@ -447,8 +462,9 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
                 <button
                   type="button"
                   onClick={stopSpeaking}
-                  className="absolute right-2 bottom-2 w-8 h-8 rounded-full bg-orange-500 text-white flex items-center justify-center hover:bg-orange-600"
+                  className="absolute right-2 w-8 h-8 rounded-full bg-orange-500 text-white flex items-center justify-center hover:bg-orange-600"
                   aria-label="Stop speaking"
+                  style={{ top: '50%', transform: 'translateY(-50%)' }}
                 >
                   <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M6 6h12v12H6z"/>
