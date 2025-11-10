@@ -303,7 +303,7 @@ export async function POST(req: NextRequest) {
           try {
             const completion = await openai.chat.completions.create({
               model,
-              temperature: 0.7,
+              temperature: 0.4,
               max_tokens: 1000,
               stream: true,
               messages: chatMessages as any,
@@ -350,7 +350,7 @@ export async function POST(req: NextRequest) {
         model,
         messages: chatMessages,
         max_tokens: 1000,
-        temperature: 0.7,
+        temperature: 0.4,
       })
 
       // Charge user (2x cost)
