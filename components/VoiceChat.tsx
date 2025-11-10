@@ -52,9 +52,11 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
   useEffect(() => {
     if (typeof window === 'undefined') return
 
-    // Check for speech recognition support
+    // Check for speech recognition support immediately
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-    if (!SpeechRecognition) {
+    if (SpeechRecognition) {
+      setHasSpeechRecognition(true)
+    } else {
       return
     }
 
