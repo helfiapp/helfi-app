@@ -268,7 +268,7 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
         </div>
       </header>
 
-      <div className="px-5 py-4 h-[420px] overflow-y-auto space-y-3" aria-live="polite">
+      <div className="px-5 py-4 h-[420px] overflow-y-auto overflow-x-hidden space-y-3" aria-live="polite">
         {messages.length === 0 && !loading && (
           <div className="text-sm text-gray-400">
             Ask follow‑ups like:
@@ -309,16 +309,56 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
                   ? 'bg-gray-900 text-white' 
                   : 'bg-gray-100 text-gray-900'
               }`}>
-                <div className="text-[15px] leading-relaxed whitespace-pre-wrap">
-                  {m.content.split('\n').map((line, i) => {
-                    const parts = line.split(/(\*\*.*?\*\*)/g)
+                <div className="text-[15px] leading-relaxed break-words">
+                  {m.content.split(/\n\n+/).map((para, paraIdx) => {
+                    if (!para.trim()) return null
+                    const lines = para.split('\n')
                     return (
-                      <div key={i} className={i > 0 ? 'mt-2' : ''}>
-                        {parts.map((part, j) => {
-                          if (part.startsWith('**') && part.endsWith('**')) {
-                            return <strong key={j}>{part.slice(2, -2)}</strong>
+                      <div key={paraIdx} className={paraIdx > 0 ? 'mt-4' : ''}>
+                        {lines.map((line, lineIdx) => {
+                          const trimmed = line.trim()
+                          if (!trimmed) return null
+                          
+                          if (/^[\d]+\.\s/.test(trimmed)) {
+                            const parts = trimmed.split(/(\*\*.*?\*\*)/g)
+                            return (
+                              <div key={lineIdx} className="ml-4 mb-1">
+                                {parts.map((part, j) => {
+                                  if (part.startsWith('**') && part.endsWith('**')) {
+                                    return <strong key={j}>{part.slice(2, -2)}</strong>
+                                  }
+                                  return <span key={j}>{part}</span>
+                                })}
+                              </div>
+                            )
                           }
-                          return <span key={j}>{part}</span>
+                          
+                          if (/^[-*•]\s/.test(trimmed)) {
+                            const parts = trimmed.replace(/^[-*•]\s/, '').split(/(\*\*.*?\*\*)/g)
+                            return (
+                              <div key={lineIdx} className="ml-4 mb-1">
+                                <span className="mr-2">•</span>
+                                {parts.map((part, j) => {
+                                  if (part.startsWith('**') && part.endsWith('**')) {
+                                    return <strong key={j}>{part.slice(2, -2)}</strong>
+                                  }
+                                  return <span key={j}>{part}</span>
+                                })}
+                              </div>
+                            )
+                          }
+                          
+                          const parts = trimmed.split(/(\*\*.*?\*\*)/g)
+                          return (
+                            <div key={lineIdx} className={lineIdx > 0 ? 'mt-2' : ''}>
+                              {parts.map((part, j) => {
+                                if (part.startsWith('**') && part.endsWith('**')) {
+                                  return <strong key={j}>{part.slice(2, -2)}</strong>
+                                }
+                                return <span key={j}>{part}</span>
+                              })}
+                            </div>
+                          )
                         })}
                       </div>
                     )

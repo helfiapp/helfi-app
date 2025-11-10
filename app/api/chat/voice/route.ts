@@ -186,10 +186,12 @@ function buildSystemPrompt(context: Awaited<ReturnType<typeof loadFullUserContex
     '- Consider interactions between their medications and supplements',
     '- Reference their health goals and tracking data when relevant',
     '- Keep responses concise but comprehensive',
-    '- IMPORTANT: Format your responses with proper paragraphs, bullet points, and line breaks for readability',
+    '- CRITICAL: Always format responses with proper paragraphs separated by blank lines',
+    '- Use numbered lists (1. 2. 3.) or bullet points (- or *) for multiple items',
     '- Use **bold** for emphasis on key terms or headings',
-    '- Break up long responses into clear sections with line breaks',
-    '- Never provide responses as one continuous block of text',
+    '- Break up long responses into clear sections with line breaks between paragraphs',
+    '- NEVER provide responses as one continuous block of text without line breaks',
+    '- Each paragraph should be separated by a blank line (double newline)',
   )
 
   return parts.join('\n')
