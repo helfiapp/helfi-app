@@ -36,18 +36,45 @@ export default function SymptomChat({ analysisResult, symptoms, duration, notes 
     if (!SpeechRecognition) return
 
     const recognition = new SpeechRecognition()
-    recognition.continuous = false
-    recognition.interimResults = false
+    recognition.continuous = true
+    recognition.interimResults = true
     recognition.lang = 'en-US'
 
-    recognition.onstart = () => setIsListening(true)
-    recognition.onresult = (event: any) => {
-      setInput(event.results[0][0].transcript)
-      setIsListening(false)
-      recognition.stop()
+    let finalTranscript = ''
+
+    recognition.onstart = () => {
+      setIsListening(true)
+      finalTranscript = ''
     }
-    recognition.onerror = () => setIsListening(false)
-    recognition.onend = () => setIsListening(false)
+
+    recognition.onresult = (event: any) => {
+      let interimTranscript = ''
+      
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript
+        if (event.results[i].isFinal) {
+          finalTranscript += transcript + ' '
+        } else {
+          interimTranscript += transcript
+        }
+      }
+      
+      setInput(finalTranscript + interimTranscript)
+    }
+
+    recognition.onerror = (event: any) => {
+      setIsListening(false)
+      if (event.error !== 'no-speech') {
+        setError('Speech recognition error. Please try again.')
+      }
+    }
+
+    recognition.onend = () => {
+      setIsListening(false)
+      if (finalTranscript.trim()) {
+        setInput(finalTranscript.trim())
+      }
+    }
 
     recognitionRef.current = recognition
     return () => {
@@ -67,6 +94,7 @@ export default function SymptomChat({ analysisResult, symptoms, duration, notes 
   function stopListening() {
     if (recognitionRef.current && isListening) {
       recognitionRef.current.stop()
+      setIsListening(false)
     }
   }
 
@@ -302,12 +330,24 @@ export default function SymptomChat({ analysisResult, symptoms, duration, notes 
           <textarea
             ref={textareaRef}
             value={input}
-            onChange={(event) => setInput(event.target.value)}
+            onChange={(event) => {
+              setInput(event.target.value)
+              // Trigger resize on change
+              setTimeout(() => {
+                const textarea = textareaRef.current
+                if (!textarea) return
+                textarea.style.height = 'auto'
+                const maxHeight = 120
+                const newHeight = Math.min(textarea.scrollHeight, maxHeight)
+                textarea.style.height = `${newHeight}px`
+                textarea.style.overflowY = textarea.scrollHeight > maxHeight ? 'auto' : 'hidden'
+              }, 0)
+            }}
             onKeyDown={onComposerKeyDown}
             placeholder={recognitionRef.current ? "Type or use voice input..." : "Message AI about your symptom analysis"}
             rows={1}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-base leading-6 focus:border-helfi-green focus:outline-none focus:ring-2 focus:ring-helfi-green/40 resize-none overflow-hidden min-h-[44px] max-h-[120px]"
-            style={{ height: 'auto' }}
+            className="w-full rounded-xl border-2 border-gray-200 px-4 py-3 text-base leading-6 focus:border-helfi-green focus:outline-none focus:ring-2 focus:ring-helfi-green/20 resize-none transition-all duration-200 min-h-[52px] max-h-[120px] bg-white"
+            style={{ height: '52px' }}
           />
           <button
             type="submit"
