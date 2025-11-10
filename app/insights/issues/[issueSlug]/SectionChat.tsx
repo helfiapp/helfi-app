@@ -272,7 +272,7 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
         {messages.length === 0 && !loading && (
           <div className="text-sm text-gray-400">
             Ask follow‑ups like:
-            <div className="mt-2 flex flex-wrap gap-2">
+            <div className="mt-3 flex flex-wrap gap-2">
               {[
                 `How do these recommendations help ${issueName}?`,
                 'Are there safety interactions to watch?',
@@ -281,7 +281,7 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
                 <button
                   key={q}
                   onClick={() => setInput(q)}
-                  className="rounded-full border border-gray-300 px-3 py-1 text-xs text-gray-600 hover:bg-gray-50"
+                  className="text-left px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded-xl text-sm text-gray-700 transition-colors"
                   type="button"
                 >
                   {q}
