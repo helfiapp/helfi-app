@@ -24,6 +24,7 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
   const [error, setError] = useState<string | null>(null)
   const [isListening, setIsListening] = useState(false)
   const [estimatedCost, setEstimatedCost] = useState<number | null>(null)
+  const [hasSpeechRecognition, setHasSpeechRecognition] = useState(false)
   
   const endRef = useRef<HTMLDivElement | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -388,7 +389,7 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
         )}
         <form className="px-4 py-3" onSubmit={handleSubmit}>
           <div className="max-w-3xl mx-auto flex items-center gap-2">
-            {recognitionRef.current && (
+            {hasSpeechRecognition && (
               <button
                 type="button"
                 onClick={isListening ? stopListening : startListening}

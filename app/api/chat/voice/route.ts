@@ -207,6 +207,8 @@ function buildSystemPrompt(context: Awaited<ReturnType<typeof loadFullUserContex
     '- NEVER write responses as one continuous paragraph',
     '- Keep paragraphs to 2-4 sentences maximum',
     '- Break up long explanations into multiple paragraphs',
+    '- If your response is longer than 3 sentences, you MUST break it into multiple paragraphs',
+    '- Every 2-3 sentences should be followed by a blank line',
     '',
     'USER DATA USAGE:',
     '- Only reference user data when directly relevant to their question',
