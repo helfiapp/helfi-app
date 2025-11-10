@@ -315,7 +315,9 @@ export async function POST(req: NextRequest) {
               const token = part.choices?.[0]?.delta?.content || ''
               if (token) {
                 full += token
-                controller.enqueue(enc.encode(`data: ${token}\n\n`))
+                // Send JSON payload so newlines are preserved safely over SSE
+                const payload = JSON.stringify({ token })
+                controller.enqueue(enc.encode(`data: ${payload}\n\n`))
               }
             }
 

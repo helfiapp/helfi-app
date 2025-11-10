@@ -222,7 +222,21 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
           buffer = parts.pop() || ''
           for (const chunk of parts) {
             if (chunk.startsWith('data: ')) {
-              const token = chunk.slice(6)
+              const raw = chunk.slice(6).trim()
+              let token = ''
+              // Prefer JSON payloads to preserve newlines; fall back to raw
+              try {
+                const parsed = JSON.parse(raw)
+                if (typeof parsed === 'string') {
+                  token = parsed
+                } else if (parsed && typeof parsed.token === 'string') {
+                  token = parsed.token
+                } else {
+                  token = raw
+                }
+              } catch {
+                token = raw
+              }
               fullResponse += token
               if (!hasAssistant) {
                 setMessages((prev) => [...prev, { role: 'assistant', content: token }])
