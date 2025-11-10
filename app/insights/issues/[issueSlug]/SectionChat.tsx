@@ -309,8 +309,51 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
                   ? 'bg-gray-900 text-white' 
                   : 'bg-gray-100 text-gray-900'
               }`} style={{ wordWrap: 'break-word', overflowWrap: 'break-word' }}>
-                <div className="text-lg leading-relaxed break-words whitespace-pre-wrap">
-                  {m.content}
+                <div className="text-lg leading-relaxed break-words" style={{ whiteSpace: 'pre-wrap' }}>
+                  {m.content.split('\n').map((line, idx) => {
+                    const trimmed = line.trim()
+                    if (!trimmed) {
+                      return <div key={idx} className="h-3" />
+                    }
+                    
+                    if (trimmed.startsWith('**') && trimmed.endsWith('**') && trimmed.length > 4) {
+                      return (
+                        <div key={idx} className="font-bold text-gray-900 mb-2 mt-3 first:mt-0">
+                          {trimmed.slice(2, -2)}
+                        </div>
+                      )
+                    }
+                    
+                    const numberedMatch = trimmed.match(/^(\d+)\.\s+(.+)$/)
+                    if (numberedMatch) {
+                      return (
+                        <div key={idx} className="ml-4 mb-1.5">
+                          <span className="font-medium">{numberedMatch[1]}.</span> {numberedMatch[2]}
+                        </div>
+                      )
+                    }
+                    
+                    const bulletMatch = trimmed.match(/^[-•*]\s+(.+)$/)
+                    if (bulletMatch) {
+                      return (
+                        <div key={idx} className="ml-4 mb-1.5">
+                          <span className="mr-2">•</span> {bulletMatch[1]}
+                        </div>
+                      )
+                    }
+                    
+                    const parts = trimmed.split(/(\*\*.*?\*\*)/g)
+                    return (
+                      <div key={idx} className="mb-2">
+                        {parts.map((part, j) => {
+                          if (part.startsWith('**') && part.endsWith('**')) {
+                            return <strong key={j} className="font-semibold">{part.slice(2, -2)}</strong>
+                          }
+                          return <span key={j}>{part}</span>
+                        })}
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             </div>

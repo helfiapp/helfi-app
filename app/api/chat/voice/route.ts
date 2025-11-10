@@ -178,20 +178,50 @@ function buildSystemPrompt(context: Awaited<ReturnType<typeof loadFullUserContex
   }
 
   parts.push(
+    'RESPONSE FORMATTING (CRITICAL - FOLLOW EXACTLY):',
+    '',
+    'You MUST format all responses with proper structure. Example format:',
+    '',
+    '**Heading or Key Point**',
+    '',
+    'First paragraph here. Keep it concise and focused.',
+    '',
+    'Second paragraph here if needed.',
+    '',
+    '1. First numbered item',
+    '2. Second numbered item',
+    '3. Third numbered item',
+    '',
+    '• Bullet point one',
+    '• Bullet point two',
+    '',
+    '**Another Section**',
+    '',
+    'Final paragraph.',
+    '',
+    'RULES:',
+    '- ALWAYS separate paragraphs with a blank line (double newline: \\n\\n)',
+    '- Use numbered lists (1. 2. 3.) for sequential items',
+    '- Use bullet points (- or •) for non-sequential items',
+    '- Use **bold** for section headings and key terms',
+    '- NEVER write responses as one continuous paragraph',
+    '- Keep paragraphs to 2-4 sentences maximum',
+    '- Break up long explanations into multiple paragraphs',
+    '',
+    'USER DATA USAGE:',
+    '- Only reference user data when directly relevant to their question',
+    '- Do NOT list all their supplements/medications unless specifically asked',
+    '- Do NOT dump their entire health profile unless requested',
+    '- When asked for "concise" or "brief" answers, provide ONLY the essential information',
+    '- Focus on answering the specific question asked, not providing a data dump',
+    '',
     'GUIDELINES:',
-    '- Always remind users to consult healthcare professionals for medical advice, diagnosis, or treatment',
-    '- Provide personalized recommendations based on their data when relevant',
+    '- Always remind users to consult healthcare professionals for medical advice',
+    '- Provide personalized recommendations based on their data ONLY when relevant',
     '- Be supportive, clear, and non-alarming',
     '- If asked about supplements, provide types/categories, not specific brands',
-    '- Consider interactions between their medications and supplements',
-    '- Reference their health goals and tracking data when relevant',
-    '- Keep responses concise but comprehensive',
-    '- CRITICAL: Always format responses with proper paragraphs separated by blank lines',
-    '- Use numbered lists (1. 2. 3.) or bullet points (- or *) for multiple items',
-    '- Use **bold** for emphasis on key terms or headings',
-    '- Break up long responses into clear sections with line breaks between paragraphs',
-    '- NEVER provide responses as one continuous block of text without line breaks',
-    '- Each paragraph should be separated by a blank line (double newline)',
+    '- Consider interactions between medications and supplements when relevant',
+    '- Keep responses focused on the user\'s actual question',
   )
 
   return parts.join('\n')
@@ -235,6 +265,9 @@ export async function POST(req: NextRequest) {
       { role: 'system' as const, content: systemPrompt },
       { role: 'user' as const, content: question },
     ]
+    
+    // Add formatting reminder to user message for better compliance
+    const enhancedQuestion = `${question}\n\nPlease format your response with proper paragraphs, line breaks, and structure.`
 
     // Estimate cost (2x for user)
     const estimateCents = costCentsEstimateFromText(model, `${systemPrompt}\n${question}`, 1000 * 4)
