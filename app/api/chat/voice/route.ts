@@ -13,7 +13,7 @@ function getOpenAIClient(): OpenAI | null {
 }
 
 async function loadFullUserContext(userId: string) {
-  const [user, issues, checkins] = await Promise.all([
+  const [user, issues] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -83,25 +83,6 @@ async function loadFullUserContext(userId: string) {
       'SELECT id, name, polarity, slug FROM "CheckinIssues" WHERE "userId" = $1',
       userId
     ).catch(() => []),
-    prisma.checkin.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-      take: 10,
-      select: {
-        createdAt: true,
-        issues: {
-          select: {
-            issue: {
-              select: {
-                name: true,
-                slug: true,
-              },
-            },
-            rating: true,
-          },
-        },
-      },
-    }),
   ])
 
   if (!user) return null
@@ -121,14 +102,6 @@ async function loadFullUserContext(userId: string) {
     exerciseLogs: user.exerciseLogs,
     foodLogs: user.foodLogs,
     issues: issues.map((i) => ({ id: i.id, name: i.name, polarity: i.polarity, slug: i.slug })),
-    checkins: checkins.map((c) => ({
-      date: c.createdAt,
-      issues: c.issues.map((ci) => ({
-        name: ci.issue.name,
-        slug: ci.issue.slug,
-        rating: ci.rating,
-      })),
-    })),
   }
 }
 
