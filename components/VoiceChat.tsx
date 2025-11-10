@@ -24,14 +24,11 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
   const [error, setError] = useState<string | null>(null)
   const [isListening, setIsListening] = useState(false)
   const [estimatedCost, setEstimatedCost] = useState<number | null>(null)
-  const [voiceEnabled, setVoiceEnabled] = useState(true)
-  const [isSpeaking, setIsSpeaking] = useState(false)
   
   const endRef = useRef<HTMLDivElement | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const recognitionRef = useRef<any>(null)
-  const synthRef = useRef<SpeechSynthesis | null>(null)
   const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // Debounced resize function to prevent pulsating
@@ -57,7 +54,6 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
     // Check for speech recognition support
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
     if (!SpeechRecognition) {
-      setVoiceEnabled(false)
       return
     }
 
@@ -108,34 +104,10 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
     }
 
     recognitionRef.current = recognition
-    
-    // Initialize speech synthesis
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      synthRef.current = window.speechSynthesis
-      
-      // iOS Safari needs voices to be loaded first - trigger load
-      if (synthRef.current.getVoices().length === 0) {
-        // Force voice loading on iOS
-        const loadVoices = () => {
-          const voices = synthRef.current?.getVoices() || []
-          if (voices.length > 0) {
-            console.log('[VoiceChat] Voices loaded:', voices.length)
-          }
-        }
-        synthRef.current.addEventListener('voiceschanged', loadVoices)
-        // Trigger voiceschanged event on iOS
-        const dummyUtterance = new SpeechSynthesisUtterance('')
-        synthRef.current.speak(dummyUtterance)
-        synthRef.current.cancel()
-      }
-    }
 
     return () => {
       if (recognitionRef.current) {
         recognitionRef.current.stop()
-      }
-      if (synthRef.current) {
-        synthRef.current.cancel()
       }
     }
   }, [])
@@ -177,102 +149,6 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
     }
   }
 
-  function speakText(text: string) {
-    if (!synthRef.current || !voiceEnabled) {
-      console.log('[VoiceChat] TTS disabled or not available')
-      return
-    }
-    
-    // Clean text - remove markdown formatting for speech
-    const cleanText = text
-      .replace(/\*\*/g, '')
-      .replace(/#{1,6}\s/g, '')
-      .replace(/\n\n+/g, '. ')
-      .replace(/\n/g, '. ')
-      .trim()
-    
-    if (!cleanText) {
-      console.log('[VoiceChat] No text to speak')
-      return
-    }
-    
-    console.log('[VoiceChat] Starting TTS for:', cleanText.substring(0, 50) + '...')
-    
-    // Cancel any ongoing speech
-    synthRef.current.cancel()
-    
-    // Wait a bit for voices to load if needed
-    const voices = synthRef.current.getVoices()
-    if (voices.length === 0) {
-      // Voices might not be loaded yet, wait and retry
-      setTimeout(() => {
-        const retryVoices = synthRef.current?.getVoices() || []
-        if (retryVoices.length > 0) {
-          speakText(text)
-        } else {
-          console.warn('[VoiceChat] No voices available')
-        }
-      }, 100)
-      return
-    }
-    
-    const utterance = new SpeechSynthesisUtterance(cleanText)
-    
-    // Use a high-quality voice if available
-    const preferredVoices = voices.filter((v) => 
-      v.name.includes('Google') || 
-      v.name.includes('Microsoft') || 
-      v.name.includes('Samantha') || 
-      v.name.includes('Alex') ||
-      v.name.includes('Karen') ||
-      v.name.includes('Victoria') ||
-      v.lang.startsWith('en')
-    )
-    
-    if (preferredVoices.length > 0) {
-      // Prefer female voices (more natural sounding)
-      const femaleVoices = preferredVoices.filter((v) => 
-        v.name.toLowerCase().includes('female') || 
-        v.name.includes('Samantha') ||
-        v.name.includes('Karen') ||
-        v.name.includes('Victoria')
-      )
-      utterance.voice = (femaleVoices.length > 0 ? femaleVoices : preferredVoices)[0]
-      console.log('[VoiceChat] Using voice:', utterance.voice?.name)
-    }
-    
-    utterance.rate = 1.0
-    utterance.pitch = 1.0
-    utterance.volume = 1.0
-    
-    utterance.onstart = () => {
-      console.log('[VoiceChat] TTS started')
-      setIsSpeaking(true)
-    }
-    utterance.onend = () => {
-      console.log('[VoiceChat] TTS ended')
-      setIsSpeaking(false)
-    }
-    utterance.onerror = (e) => {
-      console.error('[VoiceChat] TTS error:', e)
-      setIsSpeaking(false)
-    }
-    
-    try {
-      synthRef.current.speak(utterance)
-      console.log('[VoiceChat] speak() called')
-    } catch (err) {
-      console.error('[VoiceChat] Failed to speak:', err)
-      setIsSpeaking(false)
-    }
-  }
-
-  function stopSpeaking() {
-    if (synthRef.current) {
-      synthRef.current.cancel()
-      setIsSpeaking(false)
-    }
-  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -286,7 +162,6 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
       setLoading(true)
       setError(null)
       stopListening()
-      stopSpeaking()
       
       const nextMessages: ChatMessage[] = [...messages, { role: 'user', content: text }]
       setMessages(nextMessages)
@@ -357,9 +232,7 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
                 })
               }
             } else if (chunk.startsWith('event: end')) {
-              // On iOS, we can't autoplay speech - user must click speak button
-              // Store the response for manual playback
-              console.log('[VoiceChat] Response complete, ready for voice playback')
+              // Response complete
             }
           }
         }
@@ -368,8 +241,6 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
         const textOut = data?.assistant as string | undefined
         if (textOut) {
           setMessages((prev) => [...prev, { role: 'assistant', content: textOut }])
-          // On iOS, we can't autoplay speech - user must click speak button
-          console.log('[VoiceChat] Response complete, ready for voice playback')
         }
       }
     } catch (err: any) {
@@ -385,7 +256,6 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
       setError(null)
       setMessages([])
       stopListening()
-      stopSpeaking()
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -396,7 +266,7 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
   return (
     <div className={`flex flex-col h-full ${className}`}>
       {/* Messages Area - ChatGPT style */}
-      <div ref={containerRef} className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-6 space-y-6" aria-live="polite">
+      <div ref={containerRef} className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-6 space-y-6 min-w-0" aria-live="polite" style={{ maxWidth: '100%', wordWrap: 'break-word' }}>
         {messages.length === 0 && !loading && (
           <div className="max-w-3xl mx-auto">
             <div className="text-center mb-8">
@@ -434,83 +304,14 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
                 </svg>
               )}
             </div>
-            <div className={`flex-1 ${m.role === 'user' ? 'text-right' : ''}`}>
-              <div className={`inline-block px-4 py-2.5 rounded-2xl relative ${
+            <div className={`flex-1 min-w-0 ${m.role === 'user' ? 'text-right' : ''}`}>
+              <div className={`inline-block max-w-full px-4 py-2.5 rounded-2xl ${
                 m.role === 'user' 
                   ? 'bg-gray-900 text-white' 
                   : 'bg-gray-100 text-gray-900'
-              }`}>
-                {m.role === 'assistant' && voiceEnabled && m.content && (
-                  <button
-                    type="button"
-                    onClick={() => speakText(m.content)}
-                    className="absolute top-2 right-2 w-6 h-6 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center transition-colors"
-                    aria-label="Speak response"
-                  >
-                    <svg className="w-3.5 h-3.5 text-gray-600" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
-                    </svg>
-                  </button>
-                )}
-                <div className="text-[15px] leading-relaxed break-words">
-                  {m.content.split(/\n\n+/).map((para, paraIdx) => {
-                    if (!para.trim()) return null
-                    // Check if it's a numbered list (1. 2. 3.) or bullet list (- * •)
-                    const isList = /^[\d]+\.\s/.test(para.trim()) || /^[-*•]\s/.test(para.trim())
-                    const lines = para.split('\n')
-                    return (
-                      <div key={paraIdx} className={paraIdx > 0 ? 'mt-4' : ''}>
-                        {lines.map((line, lineIdx) => {
-                          const trimmed = line.trim()
-                          if (!trimmed) return null
-                          
-                          // Handle numbered lists
-                          if (/^[\d]+\.\s/.test(trimmed)) {
-                            const parts = trimmed.split(/(\*\*.*?\*\*)/g)
-                            return (
-                              <div key={lineIdx} className="ml-4 mb-1">
-                                {parts.map((part, j) => {
-                                  if (part.startsWith('**') && part.endsWith('**')) {
-                                    return <strong key={j}>{part.slice(2, -2)}</strong>
-                                  }
-                                  return <span key={j}>{part}</span>
-                                })}
-                              </div>
-                            )
-                          }
-                          
-                          // Handle bullet points
-                          if (/^[-*•]\s/.test(trimmed)) {
-                            const parts = trimmed.replace(/^[-*•]\s/, '').split(/(\*\*.*?\*\*)/g)
-                            return (
-                              <div key={lineIdx} className="ml-4 mb-1">
-                                <span className="mr-2">•</span>
-                                {parts.map((part, j) => {
-                                  if (part.startsWith('**') && part.endsWith('**')) {
-                                    return <strong key={j}>{part.slice(2, -2)}</strong>
-                                  }
-                                  return <span key={j}>{part}</span>
-                                })}
-                              </div>
-                            )
-                          }
-                          
-                          // Regular paragraph
-                          const parts = trimmed.split(/(\*\*.*?\*\*)/g)
-                          return (
-                            <div key={lineIdx} className={lineIdx > 0 ? 'mt-2' : ''}>
-                              {parts.map((part, j) => {
-                                if (part.startsWith('**') && part.endsWith('**')) {
-                                  return <strong key={j}>{part.slice(2, -2)}</strong>
-                                }
-                                return <span key={j}>{part}</span>
-                              })}
-                            </div>
-                          )
-                        })}
-                      </div>
-                    )
-                  })}
+              }`} style={{ wordWrap: 'break-word', overflowWrap: 'break-word' }}>
+                <div className="text-lg leading-relaxed break-words whitespace-pre-wrap">
+                  {m.content}
                 </div>
               </div>
             </div>
