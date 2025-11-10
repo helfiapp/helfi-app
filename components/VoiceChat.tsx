@@ -158,43 +158,93 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
   }
 
   function speakText(text: string) {
-    if (!synthRef.current || !voiceEnabled) return
+    if (!synthRef.current || !voiceEnabled) {
+      console.log('[VoiceChat] TTS disabled or not available')
+      return
+    }
+    
+    // Clean text - remove markdown formatting for speech
+    const cleanText = text
+      .replace(/\*\*/g, '')
+      .replace(/#{1,6}\s/g, '')
+      .replace(/\n\n+/g, '. ')
+      .replace(/\n/g, '. ')
+      .trim()
+    
+    if (!cleanText) {
+      console.log('[VoiceChat] No text to speak')
+      return
+    }
+    
+    console.log('[VoiceChat] Starting TTS for:', cleanText.substring(0, 50) + '...')
     
     // Cancel any ongoing speech
     synthRef.current.cancel()
     
-    const utterance = new SpeechSynthesisUtterance(text)
-    
-    // Use a high-quality voice if available (similar to ChatGPT)
+    // Wait a bit for voices to load if needed
     const voices = synthRef.current.getVoices()
+    if (voices.length === 0) {
+      // Voices might not be loaded yet, wait and retry
+      setTimeout(() => {
+        const retryVoices = synthRef.current?.getVoices() || []
+        if (retryVoices.length > 0) {
+          speakText(text)
+        } else {
+          console.warn('[VoiceChat] No voices available')
+        }
+      }, 100)
+      return
+    }
+    
+    const utterance = new SpeechSynthesisUtterance(cleanText)
+    
+    // Use a high-quality voice if available
     const preferredVoices = voices.filter((v) => 
       v.name.includes('Google') || 
       v.name.includes('Microsoft') || 
       v.name.includes('Samantha') || 
       v.name.includes('Alex') ||
+      v.name.includes('Karen') ||
+      v.name.includes('Victoria') ||
       v.lang.startsWith('en')
     )
     
     if (preferredVoices.length > 0) {
       // Prefer female voices (more natural sounding)
-      const femaleVoice = preferredVoices.find((v) => 
+      const femaleVoices = preferredVoices.filter((v) => 
         v.name.toLowerCase().includes('female') || 
         v.name.includes('Samantha') ||
-        v.name.includes('Google UK English Female')
-      ) || preferredVoices[0]
-      
-      utterance.voice = femaleVoice
+        v.name.includes('Karen') ||
+        v.name.includes('Victoria')
+      )
+      utterance.voice = (femaleVoices.length > 0 ? femaleVoices : preferredVoices)[0]
+      console.log('[VoiceChat] Using voice:', utterance.voice?.name)
     }
     
     utterance.rate = 1.0
     utterance.pitch = 1.0
     utterance.volume = 1.0
     
-    utterance.onstart = () => setIsSpeaking(true)
-    utterance.onend = () => setIsSpeaking(false)
-    utterance.onerror = () => setIsSpeaking(false)
+    utterance.onstart = () => {
+      console.log('[VoiceChat] TTS started')
+      setIsSpeaking(true)
+    }
+    utterance.onend = () => {
+      console.log('[VoiceChat] TTS ended')
+      setIsSpeaking(false)
+    }
+    utterance.onerror = (e) => {
+      console.error('[VoiceChat] TTS error:', e)
+      setIsSpeaking(false)
+    }
     
-    synthRef.current.speak(utterance)
+    try {
+      synthRef.current.speak(utterance)
+      console.log('[VoiceChat] speak() called')
+    } catch (err) {
+      console.error('[VoiceChat] Failed to speak:', err)
+      setIsSpeaking(false)
+    }
   }
 
   function stopSpeaking() {
