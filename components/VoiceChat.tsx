@@ -108,7 +108,27 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
     }
 
     recognitionRef.current = recognition
-    synthRef.current = window.speechSynthesis
+    
+    // Initialize speech synthesis
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      synthRef.current = window.speechSynthesis
+      
+      // iOS Safari needs voices to be loaded first - trigger load
+      if (synthRef.current.getVoices().length === 0) {
+        // Force voice loading on iOS
+        const loadVoices = () => {
+          const voices = synthRef.current?.getVoices() || []
+          if (voices.length > 0) {
+            console.log('[VoiceChat] Voices loaded:', voices.length)
+          }
+        }
+        synthRef.current.addEventListener('voiceschanged', loadVoices)
+        // Trigger voiceschanged event on iOS
+        const dummyUtterance = new SpeechSynthesisUtterance('')
+        synthRef.current.speak(dummyUtterance)
+        synthRef.current.cancel()
+      }
+    }
 
     return () => {
       if (recognitionRef.current) {
@@ -337,10 +357,9 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
                 })
               }
             } else if (chunk.startsWith('event: end')) {
-              // Speak the response if voice is enabled
-              if (voiceEnabled && fullResponse) {
-                speakText(fullResponse)
-              }
+              // On iOS, we can't autoplay speech - user must click speak button
+              // Store the response for manual playback
+              console.log('[VoiceChat] Response complete, ready for voice playback')
             }
           }
         }
