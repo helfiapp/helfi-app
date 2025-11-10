@@ -313,51 +313,83 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
                   ? 'bg-gray-900 text-white' 
                   : 'bg-gray-100 text-gray-900'
               }`} style={{ wordWrap: 'break-word', overflowWrap: 'break-word' }}>
-                <div className="text-lg leading-relaxed break-words" style={{ whiteSpace: 'pre-wrap' }}>
-                  {m.content.split('\n').map((line, idx) => {
-                    const trimmed = line.trim()
-                    if (!trimmed) {
-                      return <div key={idx} className="h-3" />
-                    }
-                    
-                    if (trimmed.startsWith('**') && trimmed.endsWith('**') && trimmed.length > 4) {
+                <div className="text-lg leading-relaxed break-words">
+                  {(() => {
+                    // Split by double newlines first to get paragraphs
+                    const paragraphs = m.content.split(/\n\n+/)
+                    return paragraphs.map((para, paraIdx) => {
+                      const trimmed = para.trim()
+                      if (!trimmed) return null
+                      
+                      // Split paragraph into lines
+                      const lines = trimmed.split('\n')
+                      
                       return (
-                        <div key={idx} className="font-bold text-gray-900 mb-2 mt-3 first:mt-0">
-                          {trimmed.slice(2, -2)}
+                        <div key={paraIdx} className={paraIdx > 0 ? 'mt-4' : ''}>
+                          {lines.map((line, lineIdx) => {
+                            const lineTrimmed = line.trim()
+                            if (!lineTrimmed) return <div key={lineIdx} className="h-2" />
+                            
+                            // Check for bold heading (entire line is bold)
+                            if (lineTrimmed.startsWith('**') && lineTrimmed.endsWith('**') && lineTrimmed.length > 4) {
+                              return (
+                                <div key={lineIdx} className="font-bold text-gray-900 mb-2 mt-3 first:mt-0">
+                                  {lineTrimmed.slice(2, -2)}
+                                </div>
+                              )
+                            }
+                            
+                            // Check for numbered list
+                            const numberedMatch = lineTrimmed.match(/^(\d+)\.\s+(.+)$/)
+                            if (numberedMatch) {
+                              const parts = numberedMatch[2].split(/(\*\*.*?\*\*)/g)
+                              return (
+                                <div key={lineIdx} className="ml-4 mb-1.5">
+                                  <span className="font-medium">{numberedMatch[1]}.</span>{' '}
+                                  {parts.map((part, j) => {
+                                    if (part.startsWith('**') && part.endsWith('**')) {
+                                      return <strong key={j} className="font-semibold">{part.slice(2, -2)}</strong>
+                                    }
+                                    return <span key={j}>{part}</span>
+                                  })}
+                                </div>
+                              )
+                            }
+                            
+                            // Check for bullet point
+                            const bulletMatch = lineTrimmed.match(/^[-•*]\s+(.+)$/)
+                            if (bulletMatch) {
+                              const parts = bulletMatch[1].split(/(\*\*.*?\*\*)/g)
+                              return (
+                                <div key={lineIdx} className="ml-4 mb-1.5">
+                                  <span className="mr-2">•</span>
+                                  {parts.map((part, j) => {
+                                    if (part.startsWith('**') && part.endsWith('**')) {
+                                      return <strong key={j} className="font-semibold">{part.slice(2, -2)}</strong>
+                                    }
+                                    return <span key={j}>{part}</span>
+                                  })}
+                                </div>
+                              )
+                            }
+                            
+                            // Regular paragraph line - parse inline bold
+                            const parts = lineTrimmed.split(/(\*\*.*?\*\*)/g)
+                            return (
+                              <div key={lineIdx} className={lineIdx > 0 ? 'mt-2' : ''}>
+                                {parts.map((part, j) => {
+                                  if (part.startsWith('**') && part.endsWith('**')) {
+                                    return <strong key={j} className="font-semibold">{part.slice(2, -2)}</strong>
+                                  }
+                                  return <span key={j}>{part}</span>
+                                })}
+                              </div>
+                            )
+                          })}
                         </div>
                       )
-                    }
-                    
-                    const numberedMatch = trimmed.match(/^(\d+)\.\s+(.+)$/)
-                    if (numberedMatch) {
-                      return (
-                        <div key={idx} className="ml-4 mb-1.5">
-                          <span className="font-medium">{numberedMatch[1]}.</span> {numberedMatch[2]}
-                        </div>
-                      )
-                    }
-                    
-                    const bulletMatch = trimmed.match(/^[-•*]\s+(.+)$/)
-                    if (bulletMatch) {
-                      return (
-                        <div key={idx} className="ml-4 mb-1.5">
-                          <span className="mr-2">•</span> {bulletMatch[1]}
-                        </div>
-                      )
-                    }
-                    
-                    const parts = trimmed.split(/(\*\*.*?\*\*)/g)
-                    return (
-                      <div key={idx} className="mb-2">
-                        {parts.map((part, j) => {
-                          if (part.startsWith('**') && part.endsWith('**')) {
-                            return <strong key={j} className="font-semibold">{part.slice(2, -2)}</strong>
-                          }
-                          return <span key={j}>{part}</span>
-                        })}
-                      </div>
-                    )
-                  })}
+                    })
+                  })()}
                 </div>
               </div>
             </div>
