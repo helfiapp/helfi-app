@@ -345,11 +345,11 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
         )}
         <form className="px-4 py-3" onSubmit={handleSubmit}>
           <div className="max-w-3xl mx-auto flex items-center gap-2">
-            {voiceEnabled && (
+            {recognitionRef.current && (
               <button
                 type="button"
                 onClick={isListening ? stopListening : startListening}
-                disabled={loading || isSpeaking}
+                disabled={loading}
                 className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
                   isListening
                     ? 'bg-red-500 text-white'
@@ -369,7 +369,7 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
                 )}
               </button>
             )}
-            <div className="flex-1 relative flex items-center">
+            <div className="flex-1 relative flex items-center min-w-0">
               <textarea
                 ref={textareaRef}
                 value={input}
@@ -380,22 +380,9 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
                 onKeyDown={onComposerKeyDown}
                 placeholder="Ask anything"
                 rows={1}
-                className="w-full rounded-2xl border-0 bg-gray-100 px-4 py-3 pr-12 text-[15px] leading-6 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-0 resize-none transition-all duration-200 min-h-[52px] max-h-[200px]"
+                className="w-full rounded-2xl border-0 bg-gray-100 px-4 py-3 pr-12 text-base leading-6 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-0 resize-none transition-all duration-200 min-h-[52px] max-h-[200px]"
                 style={{ height: '52px' }}
               />
-              {isSpeaking && (
-                <button
-                  type="button"
-                  onClick={stopSpeaking}
-                  className="absolute right-2 w-8 h-8 rounded-full bg-orange-500 text-white flex items-center justify-center hover:bg-orange-600"
-                  aria-label="Stop speaking"
-                  style={{ top: '50%', transform: 'translateY(-50%)' }}
-                >
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M6 6h12v12H6z"/>
-                  </svg>
-                </button>
-              )}
             </div>
             <button
               type="submit"
