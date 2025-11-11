@@ -1,14 +1,13 @@
 import './globals.css'
-import { Poppins } from 'next/font/google'
+import { Inter } from 'next/font/google'
 import { AuthProvider } from '@/components/providers/AuthProvider'
 import { UserDataProvider } from '@/components/providers/UserDataProvider'
 import LayoutWrapper from '@/components/LayoutWrapper'
 import type { Metadata } from 'next'
 
-const poppins = Poppins({ 
+const inter = Inter({ 
   subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
-  variable: '--font-poppins',
+  variable: '--font-inter',
 })
 
 export const metadata: Metadata = {
@@ -63,7 +62,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className={poppins.className}>
+      <body className={inter.className}>
         <AuthProvider>
           <UserDataProvider>
             <LayoutWrapper>

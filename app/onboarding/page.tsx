@@ -1566,11 +1566,18 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
   
   // Populate form fields when editing starts
   useEffect(() => {
-    if (editingIndex !== null) {
+    if (editingIndex !== null && editingIndex >= 0 && editingIndex < supplements.length) {
       const supplement = supplements[editingIndex];
-      if (!supplement) return;
+      if (!supplement) {
+        console.warn('Supplement not found at index:', editingIndex);
+        return;
+      }
       
       console.log('Populating form for edit:', supplement);
+      
+      // Clear any existing form state first
+      setFrontImage(null);
+      setBackImage(null);
       
       if (supplement.method === 'manual') {
         setUploadMethod('manual');
@@ -1598,12 +1605,13 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
           setSelectedDays([]);
         }
       } else {
+        // Default to photo method if method is not specified
         setUploadMethod('photo');
         
         const dosageStr = supplement.dosage || '';
         const dosageParts = dosageStr.split(' ');
         const baseDosage = dosageParts[0] || '';
-        const baseUnit = dosageParts[1] || 'mg';
+        const baseUnit = dosageParts.length > 1 ? dosageParts[1] : 'mg';
         
         setPhotoDosage(baseDosage);
         setPhotoDosageUnit(baseUnit);
@@ -1657,8 +1665,11 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
           setPhotoSelectedDays([]);
         }
       }
+    } else if (editingIndex === null) {
+      // Clear form when not editing
+      clearPhotoForm();
     }
-  }, [editingIndex]);
+  }, [editingIndex, supplements]);
 
   // Validate image quality
   const validateImageQuality = async (file: File, type: 'front' | 'back') => {
@@ -2074,14 +2085,22 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Front of supplement bottle/packet {editingIndex === null ? '*' : '(optional when editing)'}
               </label>
-              {editingIndex !== null && supplements[editingIndex]?.frontImage && !frontImage && (
+              {editingIndex !== null && supplements[editingIndex]?.frontImage && (
                 <div className="mb-2 p-3 bg-gray-50 border border-gray-200 rounded-lg">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <div className="w-16 h-16 bg-gray-200 rounded flex items-center justify-center">
-                        <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
+                      <div className="w-16 h-16 bg-gray-200 rounded flex items-center justify-center overflow-hidden">
+                        {supplements[editingIndex].frontImageUrl ? (
+                          <img 
+                            src={supplements[editingIndex].frontImageUrl} 
+                            alt="Front" 
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                        )}
                       </div>
                       <div>
                         <div className="text-sm font-medium text-gray-700">Current image</div>
@@ -2093,7 +2112,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
                       onClick={() => {
                         // Mark image for deletion by setting to null
                         const updatedSupplements = supplements.map((item: any, index: number) => 
-                          index === editingIndex ? { ...item, frontImage: null } : item
+                          index === editingIndex ? { ...item, frontImage: null, frontImageUrl: null } : item
                         );
                         setSupplements(updatedSupplements);
                       }}
@@ -2146,14 +2165,22 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Back of supplement bottle/packet {editingIndex === null ? '*' : '(optional when editing)'}
               </label>
-              {editingIndex !== null && supplements[editingIndex]?.backImage && !backImage && (
+              {editingIndex !== null && supplements[editingIndex]?.backImage && (
                 <div className="mb-2 p-3 bg-gray-50 border border-gray-200 rounded-lg">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <div className="w-16 h-16 bg-gray-200 rounded flex items-center justify-center">
-                        <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
+                      <div className="w-16 h-16 bg-gray-200 rounded flex items-center justify-center overflow-hidden">
+                        {supplements[editingIndex].backImageUrl ? (
+                          <img 
+                            src={supplements[editingIndex].backImageUrl} 
+                            alt="Back" 
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                        )}
                       </div>
                       <div>
                         <div className="text-sm font-medium text-gray-700">Current image</div>
@@ -2165,7 +2192,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
                       onClick={() => {
                         // Mark image for deletion by setting to null
                         const updatedSupplements = supplements.map((item: any, index: number) => 
-                          index === editingIndex ? { ...item, backImage: null } : item
+                          index === editingIndex ? { ...item, backImage: null, backImageUrl: null } : item
                         );
                         setSupplements(updatedSupplements);
                       }}
@@ -2585,11 +2612,18 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
   
   // Populate form fields when editing starts
   useEffect(() => {
-    if (editingIndex !== null) {
+    if (editingIndex !== null && editingIndex >= 0 && editingIndex < medications.length) {
       const medication = medications[editingIndex];
-      if (!medication) return;
+      if (!medication) {
+        console.warn('Medication not found at index:', editingIndex);
+        return;
+      }
       
       console.log('Populating form for edit:', medication);
+      
+      // Clear any existing form state first
+      setFrontImage(null);
+      setBackImage(null);
       
       if (medication.method === 'manual') {
         setUploadMethod('manual');
@@ -2617,12 +2651,13 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
           setSelectedDays([]);
         }
       } else {
+        // Default to photo method if method is not specified
         setUploadMethod('photo');
         
         const dosageStr = medication.dosage || '';
         const dosageParts = dosageStr.split(' ');
         const baseDosage = dosageParts[0] || '';
-        const baseUnit = dosageParts[1] || 'mg';
+        const baseUnit = dosageParts.length > 1 ? dosageParts[1] : 'mg';
         
         setPhotoDosage(baseDosage);
         setPhotoDosageUnit(baseUnit);
@@ -2676,8 +2711,11 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
           setPhotoSelectedDays([]);
         }
       }
+    } else if (editingIndex === null) {
+      // Clear form when not editing
+      clearMedPhotoForm();
     }
-  }, [editingIndex]);
+  }, [editingIndex, medications]);
 
   // Validate image quality
   const validateImageQuality = async (file: File, type: 'front' | 'back') => {
@@ -3059,14 +3097,22 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Front of medication bottle/packet {editingIndex === null ? '*' : '(optional when editing)'}
               </label>
-              {editingIndex !== null && medications[editingIndex]?.frontImage && !frontImage && (
+              {editingIndex !== null && medications[editingIndex]?.frontImage && (
                 <div className="mb-2 p-3 bg-gray-50 border border-gray-200 rounded-lg">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <div className="w-16 h-16 bg-gray-200 rounded flex items-center justify-center">
-                        <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
+                      <div className="w-16 h-16 bg-gray-200 rounded flex items-center justify-center overflow-hidden">
+                        {medications[editingIndex].frontImageUrl ? (
+                          <img 
+                            src={medications[editingIndex].frontImageUrl} 
+                            alt="Front" 
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                        )}
                       </div>
                       <div>
                         <div className="text-sm font-medium text-gray-700">Current image</div>
@@ -3078,7 +3124,7 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
                       onClick={() => {
                         // Mark image for deletion by setting to null
                         const updatedMedications = medications.map((item: any, index: number) => 
-                          index === editingIndex ? { ...item, frontImage: null } : item
+                          index === editingIndex ? { ...item, frontImage: null, frontImageUrl: null } : item
                         );
                         setMedications(updatedMedications);
                       }}
@@ -3131,14 +3177,22 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Back of medication bottle/packet {editingIndex === null ? '*' : '(optional when editing)'}
               </label>
-              {editingIndex !== null && medications[editingIndex]?.backImage && !backImage && (
+              {editingIndex !== null && medications[editingIndex]?.backImage && (
                 <div className="mb-2 p-3 bg-gray-50 border border-gray-200 rounded-lg">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <div className="w-16 h-16 bg-gray-200 rounded flex items-center justify-center">
-                        <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
+                      <div className="w-16 h-16 bg-gray-200 rounded flex items-center justify-center overflow-hidden">
+                        {medications[editingIndex].backImageUrl ? (
+                          <img 
+                            src={medications[editingIndex].backImageUrl} 
+                            alt="Back" 
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                        )}
                       </div>
                       <div>
                         <div className="text-sm font-medium text-gray-700">Current image</div>
@@ -3150,7 +3204,7 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
                       onClick={() => {
                         // Mark image for deletion by setting to null
                         const updatedMedications = medications.map((item: any, index: number) => 
-                          index === editingIndex ? { ...item, backImage: null } : item
+                          index === editingIndex ? { ...item, backImage: null, backImageUrl: null } : item
                         );
                         setMedications(updatedMedications);
                       }}
