@@ -16,6 +16,7 @@ interface VoiceChatProps {
 }
 
 type ChatMessage = { role: 'user' | 'assistant'; content: string }
+type ChatThread = { id: string; title: string | null; createdAt: string; updatedAt: string }
 
 export default function VoiceChat({ context, onCostEstimate, className = '' }: VoiceChatProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -25,6 +26,9 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
   const [isListening, setIsListening] = useState(false)
   const [estimatedCost, setEstimatedCost] = useState<number | null>(null)
   const [hasSpeechRecognition, setHasSpeechRecognition] = useState(false)
+  const [threads, setThreads] = useState<ChatThread[]>([])
+  const [currentThreadId, setCurrentThreadId] = useState<string | null>(null)
+  const [showThreadMenu, setShowThreadMenu] = useState(false)
   const storageKey = useMemo(() => 'helfi:chat:talk', [])
   
   const endRef = useRef<HTMLDivElement | null>(null)
@@ -49,8 +53,104 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
     }, 50) // Debounce resize by 50ms
   }, [])
 
+  // Load threads and current thread on mount
+  useEffect(() => {
+    async function loadThreads() {
+      try {
+        const res = await fetch('/api/chat/threads')
+        if (res.ok) {
+          const data = await res.json()
+          if (data.threads && Array.isArray(data.threads)) {
+            setThreads(data.threads)
+            if (data.threads.length > 0 && !currentThreadId) {
+              // Load most recent thread
+              const threadId = data.threads[0].id
+              setCurrentThreadId(threadId)
+              loadThreadMessages(threadId)
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load threads:', err)
+      }
+    }
+    loadThreads()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  async function loadThreadMessages(threadId: string) {
+    try {
+      const res = await fetch(`/api/chat/voice?threadId=${threadId}`)
+      if (res.ok) {
+        const data = await res.json()
+        if (data.messages && Array.isArray(data.messages)) {
+          setMessages(data.messages.map((m: any) => ({ role: m.role, content: m.content })))
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load thread messages:', err)
+    }
+  }
+
+  async function handleNewChat() {
+    try {
+      const res = await fetch('/api/chat/threads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        const newThreadId = data.threadId
+        setCurrentThreadId(newThreadId)
+        setMessages([])
+        // Reload threads
+        const threadsRes = await fetch('/api/chat/threads')
+        if (threadsRes.ok) {
+          const threadsData = await threadsRes.json()
+          if (threadsData.threads) setThreads(threadsData.threads)
+        }
+      }
+    } catch (err) {
+      console.error('Failed to create new thread:', err)
+    }
+  }
+
+  async function handleDeleteThread(threadId: string) {
+    if (!confirm('Delete this chat?')) return
+    try {
+      const res = await fetch('/api/chat/threads', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ threadId }),
+      })
+      if (res.ok) {
+        // Reload threads
+        const threadsRes = await fetch('/api/chat/threads')
+        if (threadsRes.ok) {
+          const threadsData = await threadsRes.json()
+          if (threadsData.threads) {
+            setThreads(threadsData.threads)
+            if (threadsData.threads.length > 0) {
+              const newThreadId = threadsData.threads[0].id
+              setCurrentThreadId(newThreadId)
+              loadThreadMessages(newThreadId)
+            } else {
+              setCurrentThreadId(null)
+              setMessages([])
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Failed to delete thread:', err)
+    }
+  }
+
   // Load saved conversation on mount
   useEffect(() => {
+    // Only load from localStorage if no thread is loaded from server
+    if (currentThreadId) return
     try {
       const saved = typeof window !== 'undefined' ? localStorage.getItem(storageKey) : null
       if (saved) {
@@ -61,16 +161,7 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
       }
     } catch {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  // Persist messages locally for continuity
-  useEffect(() => {
-    try {
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(storageKey, JSON.stringify(messages))
-      }
-    } catch {}
-  }, [messages, storageKey])
+  }, [currentThreadId])
 
   // Initialize speech recognition
   useEffect(() => {
@@ -221,7 +312,12 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
-        body: JSON.stringify({ message: text, ...context }),
+        body: JSON.stringify({ 
+          message: text, 
+          threadId: currentThreadId || undefined,
+          newThread: !currentThreadId,
+          ...context 
+        }),
       })
 
       if (res.status === 402) {
@@ -273,7 +369,18 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
                 })
               }
             } else if (chunk.startsWith('event: end')) {
-              // Response complete
+              // Response complete - reload threads to get updated title
+              const threadsRes = await fetch('/api/chat/threads')
+              if (threadsRes.ok) {
+                const threadsData = await threadsRes.json()
+                if (threadsData.threads) {
+                  setThreads(threadsData.threads)
+                  // Update currentThreadId if we created a new thread
+                  if (!currentThreadId && threadsData.threads.length > 0) {
+                    setCurrentThreadId(threadsData.threads[0].id)
+                  }
+                }
+              }
             }
           }
         }
@@ -307,6 +414,70 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
 
   return (
     <div className={`flex flex-col h-full ${className}`}>
+      {/* Thread Selector Header */}
+      <div className="border-b border-gray-200 bg-white px-4 py-2 flex items-center justify-between relative">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <button
+            type="button"
+            onClick={() => setShowThreadMenu(!showThreadMenu)}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors min-w-0 flex-1"
+          >
+            <span className="truncate text-sm font-medium text-gray-700">
+              {currentThreadId ? threads.find(t => t.id === currentThreadId)?.title || 'New Chat' : 'New Chat'}
+            </span>
+            <svg className="w-4 h-4 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {showThreadMenu && (
+            <div className="absolute left-4 top-12 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto min-w-[200px]">
+              <button
+                type="button"
+                onClick={() => {
+                  handleNewChat()
+                  setShowThreadMenu(false)
+                }}
+                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 border-b border-gray-100"
+              >
+                + New Chat
+              </button>
+              {threads.map((thread) => (
+                <div key={thread.id} className="flex items-center group">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCurrentThreadId(thread.id)
+                      loadThreadMessages(thread.id)
+                      setShowThreadMenu(false)
+                    }}
+                    className={`flex-1 px-4 py-2 text-left text-sm hover:bg-gray-100 truncate ${
+                      currentThreadId === thread.id ? 'bg-gray-50' : ''
+                    }`}
+                  >
+                    {thread.title || 'New Chat'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteThread(thread.id)}
+                    className="px-2 py-2 text-gray-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={handleNewChat}
+          className="px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+        >
+          + New
+        </button>
+      </div>
       {/* Messages Area - ChatGPT style */}
       <div ref={containerRef} className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-6 space-y-6 min-w-0" aria-live="polite" style={{ maxWidth: '100%', wordWrap: 'break-word' }}>
         {messages.length === 0 && !loading && (

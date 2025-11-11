@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { CreditManager } from '@/lib/credit-system'
 import { costCentsEstimateFromText } from '@/lib/cost-meter'
 import { chatCompletionWithCost } from '@/lib/metered-openai'
+import { ensureTalkToAITables, listMessages, appendMessage, createThread, updateThreadTitle, listThreads } from '@/lib/talk-to-ai-chat-store'
 
 function getOpenAIClient(): OpenAI | null {
   if (!process.env.OPENAI_API_KEY) return null
@@ -229,6 +230,29 @@ function buildSystemPrompt(context: Awaited<ReturnType<typeof loadFullUserContex
   return parts.join('\n')
 }
 
+export async function GET(req: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    await ensureTalkToAITables()
+    const url = new URL(req.url)
+    const threadId = url.searchParams.get('threadId')
+    
+    if (threadId) {
+      // Get specific thread messages
+      const messages = await listMessages(threadId, 60)
+      return NextResponse.json({ threadId, messages }, { status: 200 })
+    } else {
+      return NextResponse.json({ error: 'threadId required' }, { status: 400 })
+    }
+  } catch (error) {
+    console.error('[chat-voice.GET] error', error)
+    return NextResponse.json({ error: 'server_error' }, { status: 500 })
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -255,6 +279,31 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
+    // Get or create thread
+    await ensureTalkToAITables()
+    let threadId: string
+    if (body.newThread) {
+      // Create new thread
+      const thread = await createThread(session.user.id)
+      threadId = thread.id
+    } else if (body.threadId) {
+      // Use existing thread
+      threadId = body.threadId
+    } else {
+      // Get most recent thread or create new one
+      const threads = await listThreads(session.user.id)
+      if (threads.length > 0) {
+        threadId = threads[0].id
+      } else {
+        const thread = await createThread(session.user.id)
+        threadId = thread.id
+      }
+    }
+
+    // Load message history for context
+    const history = await listMessages(threadId, 30)
+    const historyMessages = history.map((m) => ({ role: m.role, content: m.content }))
+
     // Load full user context
     const context = await loadFullUserContext(session.user.id)
     const systemPrompt = buildSystemPrompt(context)
@@ -267,8 +316,20 @@ export async function POST(req: NextRequest) {
     const enhancedQuestion = `${question}\n\nPlease format your response with proper paragraphs, line breaks, and structure.`
     const chatMessages = [
       { role: 'system' as const, content: systemPrompt },
+      ...historyMessages,
       { role: 'user' as const, content: enhancedQuestion },
     ]
+
+    // Save user message
+    await appendMessage(threadId, 'user', question)
+
+    // Auto-generate title from first message if thread has no title
+    const threads = await listThreads(session.user.id)
+    const currentThread = threads.find(t => t.id === threadId)
+    if (currentThread && !currentThread.title) {
+      const title = question.length > 50 ? question.substring(0, 47) + '...' : question
+      await updateThreadTitle(threadId, title)
+    }
 
     // Estimate cost (2x for user)
     const estimateCents = costCentsEstimateFromText(model, `${systemPrompt}\n${question}`, 1000 * 4)
@@ -321,6 +382,9 @@ export async function POST(req: NextRequest) {
               }
             }
 
+            // Save assistant message
+            await appendMessage(threadId, 'assistant', full)
+
             // Charge actual cost (2x)
             try {
               const actualCents = costCentsEstimateFromText(model, `${systemPrompt}\n${question}`, full.length * 4)
@@ -363,9 +427,13 @@ export async function POST(req: NextRequest) {
 
       const assistantMessage = wrapped.completion.choices[0]?.message?.content || 'I apologize, but I could not generate a response.'
 
+      // Save assistant message
+      await appendMessage(threadId, 'assistant', assistantMessage)
+
       return NextResponse.json({
         assistant: assistantMessage,
         estimatedCost: userCostCents,
+        threadId,
       })
     }
   } catch (err: any) {

@@ -7,8 +7,12 @@ let tablesEnsured = false
 export async function ensureChatTables(): Promise<void> {
   if (tablesEnsured) return
   try {
+    // Add title column if it doesn't exist
     await prisma.$executeRawUnsafe(
-      'CREATE TABLE IF NOT EXISTS "InsightsChatThread" ("id" TEXT PRIMARY KEY, "userId" TEXT NOT NULL, "slug" TEXT NOT NULL, "section" TEXT NOT NULL, "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(), "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW())'
+      'ALTER TABLE "InsightsChatThread" ADD COLUMN IF NOT EXISTS "title" TEXT'
+    )
+    await prisma.$executeRawUnsafe(
+      'CREATE TABLE IF NOT EXISTS "InsightsChatThread" ("id" TEXT PRIMARY KEY, "userId" TEXT NOT NULL, "slug" TEXT NOT NULL, "section" TEXT NOT NULL, "title" TEXT, "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(), "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW())'
     )
     await prisma.$executeRawUnsafe(
       'CREATE TABLE IF NOT EXISTS "InsightsChatMessage" ("id" TEXT PRIMARY KEY, "threadId" TEXT NOT NULL, "role" TEXT NOT NULL, "content" TEXT NOT NULL, "tokenCount" INTEGER NULL, "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(), CONSTRAINT "InsightsChatMessage_threadId_fkey" FOREIGN KEY ("threadId") REFERENCES "InsightsChatThread"("id") ON DELETE CASCADE)'
@@ -35,10 +39,51 @@ function uuid(): string {
   })
 }
 
+export type ChatThread = { id: string; title: string | null; createdAt: string; updatedAt: string }
+
+export async function listThreads(userId: string, slug: string, section: string): Promise<ChatThread[]> {
+  await ensureChatTables()
+  const rows: Array<{ id: string; title: string | null; createdAt: Date; updatedAt: Date }> = await prisma.$queryRawUnsafe(
+    'SELECT "id","title","createdAt","updatedAt" FROM "InsightsChatThread" WHERE "userId" = $1 AND "slug" = $2 AND "section" = $3 ORDER BY "updatedAt" DESC LIMIT 50',
+    userId,
+    slug,
+    section
+  )
+  return rows.map((r) => ({ id: r.id, title: r.title, createdAt: r.createdAt.toISOString(), updatedAt: r.updatedAt.toISOString() }))
+}
+
+export async function createThread(userId: string, slug: string, section: string, title?: string): Promise<{ id: string }> {
+  await ensureChatTables()
+  const id = uuid()
+  await prisma.$executeRawUnsafe(
+    'INSERT INTO "InsightsChatThread" ("id","userId","slug","section","title") VALUES ($1,$2,$3,$4,$5)',
+    id,
+    userId,
+    slug,
+    section,
+    title || null
+  )
+  return { id }
+}
+
+export async function updateThreadTitle(threadId: string, title: string): Promise<void> {
+  await ensureChatTables()
+  await prisma.$executeRawUnsafe(
+    'UPDATE "InsightsChatThread" SET "title" = $1, "updatedAt" = NOW() WHERE "id" = $2',
+    title,
+    threadId
+  )
+}
+
+export async function deleteThread(threadId: string): Promise<void> {
+  await ensureChatTables()
+  await prisma.$executeRawUnsafe('DELETE FROM "InsightsChatThread" WHERE "id" = $1', threadId)
+}
+
 export async function getOrCreateThread(userId: string, slug: string, section: string): Promise<{ id: string }> {
   await ensureChatTables()
   const rows: Array<{ id: string }> = await prisma.$queryRawUnsafe(
-    'SELECT "id" FROM "InsightsChatThread" WHERE "userId" = $1 AND "slug" = $2 AND "section" = $3 LIMIT 1',
+    'SELECT "id" FROM "InsightsChatThread" WHERE "userId" = $1 AND "slug" = $2 AND "section" = $3 ORDER BY "updatedAt" DESC LIMIT 1',
     userId,
     slug,
     section

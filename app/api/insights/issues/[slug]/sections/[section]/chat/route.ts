@@ -8,6 +8,9 @@ import {
   appendMessage,
   getOpenAIClient,
   buildSystemPrompt,
+  listThreads,
+  createThread,
+  updateThreadTitle,
 } from '@/lib/insights/chat-store'
 import type { IssueSectionKey } from '@/lib/insights/issue-engine'
 import { prisma } from '@/lib/prisma'
@@ -27,18 +30,21 @@ export async function GET(
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-    const key = `${session.user.id}:${context.params.slug}:${context.params.section}`
-    const now = Date.now()
-    const last = rateMap.get(key) || 0
-    if (now - last < MIN_INTERVAL_MS) {
-      return NextResponse.json({ error: 'rate_limited' }, { status: 429 })
-    }
-    rateMap.set(key, now)
     const section = context.params.section as IssueSectionKey
     await ensureChatTables()
-    const thread = await getOrCreateThread(session.user.id, context.params.slug, section)
-    const messages = await listMessages(thread.id, 60)
-    return NextResponse.json({ threadId: thread.id, messages }, { status: 200 })
+    const url = new URL(_request.url)
+    const threadId = url.searchParams.get('threadId')
+    
+    if (threadId) {
+      // Get specific thread messages
+      const messages = await listMessages(threadId, 60)
+      return NextResponse.json({ threadId, messages }, { status: 200 })
+    } else {
+      // Get or create default thread (backward compatibility)
+      const thread = await getOrCreateThread(session.user.id, context.params.slug, section)
+      const messages = await listMessages(thread.id, 60)
+      return NextResponse.json({ threadId: thread.id, messages }, { status: 200 })
+    }
   } catch (error) {
     console.error('[chat.GET] error', error)
     return NextResponse.json({ error: 'server_error' }, { status: 500 })
@@ -76,7 +82,7 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     const contentType = request.headers.get('content-type') || ''
-    let body: { message?: string } = {}
+    let body: { message?: string; threadId?: string; newThread?: boolean } = {}
     if (contentType.includes('application/json')) {
       try {
         body = await request.json()
@@ -85,8 +91,30 @@ export async function POST(
     const question = String(body?.message || '').trim()
     const section = context.params.section as IssueSectionKey
     await ensureChatTables()
-    const thread = await getOrCreateThread(session.user.id, context.params.slug, section)
-    if (question) await appendMessage(thread.id, 'user', question)
+    
+    // Get or create thread
+    let thread: { id: string }
+    if (body.newThread) {
+      // Create new thread
+      thread = await createThread(session.user.id, context.params.slug, section)
+    } else if (body.threadId) {
+      // Use existing thread
+      thread = { id: body.threadId }
+    } else {
+      // Get or create default thread (backward compatibility)
+      thread = await getOrCreateThread(session.user.id, context.params.slug, section)
+    }
+    
+    if (question) {
+      await appendMessage(thread.id, 'user', question)
+      // Auto-generate title from first message if thread has no title
+      const threads = await listThreads(session.user.id, context.params.slug, section)
+      const currentThread = threads.find(t => t.id === thread.id)
+      if (currentThread && !currentThread.title) {
+        const title = question.length > 50 ? question.substring(0, 47) + '...' : question
+        await updateThreadTitle(thread.id, title)
+      }
+    }
 
     const accept = (request.headers.get('accept') || '').toLowerCase()
     const wantsStream = accept.includes('text/event-stream')
