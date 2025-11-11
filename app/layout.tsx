@@ -1,11 +1,15 @@
 import './globals.css'
-import { Inter } from 'next/font/google'
+import { DM_Sans } from 'next/font/google'
 import { AuthProvider } from '@/components/providers/AuthProvider'
 import { UserDataProvider } from '@/components/providers/UserDataProvider'
 import LayoutWrapper from '@/components/LayoutWrapper'
 import type { Metadata } from 'next'
 
-const inter = Inter({ subsets: ['latin'] })
+const dmSans = DM_Sans({ 
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-dm-sans',
+})
 
 export const metadata: Metadata = {
   title: 'Helfi - Your AI Health Intelligence Platform',
@@ -59,7 +63,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className={inter.className}>
+      <body className={dmSans.className}>
         <AuthProvider>
           <UserDataProvider>
             <LayoutWrapper>
