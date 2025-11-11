@@ -605,18 +605,7 @@ export default function Dashboard() {
                 {/* Mobile grouped list */}
                 <div className="md:hidden mb-4">
                   <div className="bg-white rounded-2xl border border-gray-100 shadow-sm divide-y divide-gray-100">
-                    {/* Apple Watch */}
-                    <div className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="text-2xl">⌚</div>
-                        <div>
-                          <div className="text-[15px] font-medium text-gray-900">Apple Watch</div>
-                          <div className="text-[12px] text-gray-500">Sync with Apple Health</div>
-                        </div>
-                      </div>
-                      <button onClick={() => toggleInterest('appleWatch')} className={`mt-3 w-full text-center text-[13px] px-3.5 py-2 rounded-full ${deviceInterest.appleWatch ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>{deviceInterest.appleWatch ? 'Interested ✓' : "I'm interested"}</button>
-                    </div>
-                    {/* Fitbit */}
+                    {/* Fitbit - First since it's the only working integration */}
                     <div className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <div className="text-2xl">🏃</div>
@@ -635,6 +624,17 @@ export default function Dashboard() {
                           {fitbitLoading ? 'Connecting...' : 'Connect Fitbit'}
                         </button>
                       )}
+                    </div>
+                    {/* Apple Watch */}
+                    <div className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="text-2xl">⌚</div>
+                        <div>
+                          <div className="text-[15px] font-medium text-gray-900">Apple Watch</div>
+                          <div className="text-[12px] text-gray-500">Sync with Apple Health</div>
+                        </div>
+                      </div>
+                      <button onClick={() => toggleInterest('appleWatch')} className={`mt-3 w-full text-center text-[13px] px-3.5 py-2 rounded-full ${deviceInterest.appleWatch ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>{deviceInterest.appleWatch ? 'Interested ✓' : "I'm interested"}</button>
                     </div>
                     {/* Garmin */}
                     <div className="px-4 py-3">
@@ -696,16 +696,7 @@ export default function Dashboard() {
 
                 {/* Desktop grid */}
                 <div className="hidden md:grid grid-cols-4 gap-4 mb-4">
-                  {/* Apple Watch */}
-                  <div className={`bg-white p-4 rounded-2xl border ${deviceInterest.appleWatch ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-gray-100'} shadow-sm transition-colors`}> 
-                    <div className="text-center">
-                      <div className="text-2xl mb-1">⌚</div>
-                      <div className="text-xs font-medium text-gray-700 mb-2">Apple Watch</div>
-                      <button onClick={() => toggleInterest('appleWatch')} className={`text-[12px] px-3.5 py-1.5 rounded-full ${deviceInterest.appleWatch ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>{deviceInterest.appleWatch ? 'Interested ✓' : "I'm interested"}</button>
-                    </div>
-                  </div>
-
-                  {/* Fitbit */}
+                  {/* Fitbit - First since it's the only working integration */}
                   <div className={`bg-white p-4 rounded-2xl border ${fitbitConnected ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-gray-100'} shadow-sm transition-colors`}>
                     <div className="text-center">
                       <div className="text-2xl mb-1">🏃</div>
@@ -720,6 +711,15 @@ export default function Dashboard() {
                           {fitbitLoading ? 'Connecting...' : 'Connect Fitbit'}
                         </button>
                       )}
+                    </div>
+                  </div>
+
+                  {/* Apple Watch */}
+                  <div className={`bg-white p-4 rounded-2xl border ${deviceInterest.appleWatch ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-gray-100'} shadow-sm transition-colors`}> 
+                    <div className="text-center">
+                      <div className="text-2xl mb-1">⌚</div>
+                      <div className="text-xs font-medium text-gray-700 mb-2">Apple Watch</div>
+                      <button onClick={() => toggleInterest('appleWatch')} className={`text-[12px] px-3.5 py-1.5 rounded-full ${deviceInterest.appleWatch ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>{deviceInterest.appleWatch ? 'Interested ✓' : "I'm interested"}</button>
                     </div>
                   </div>
 
