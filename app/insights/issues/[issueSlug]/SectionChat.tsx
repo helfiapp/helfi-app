@@ -368,24 +368,24 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
             }
           }
         }
-        } else {
-          // Fallback to non-streaming JSON
-          const data = await res.json().catch(() => null)
-          const textOut = data?.assistant as string | undefined
-          if (textOut) {
-            setMessages((prev) => [...prev, { role: 'assistant', content: textOut }])
-          }
-          // Update threadId if returned
-          if (data?.threadId) {
-            setThreadId(data.threadId)
-            // Reload threads to get updated titles
-            const threadsRes = await fetch(`/api/insights/issues/${issueSlug}/sections/${section}/threads`, { cache: 'no-store' })
-            if (threadsRes.ok) {
-              const threadsData = await threadsRes.json()
-              if (threadsData.threads) setThreads(threadsData.threads)
-            }
+      } else {
+        // Fallback to non-streaming JSON
+        const data = await res.json().catch(() => null)
+        const textOut = data?.assistant as string | undefined
+        if (textOut) {
+          setMessages((prev) => [...prev, { role: 'assistant', content: textOut }])
+        }
+        // Update threadId if returned
+        if (data?.threadId) {
+          setThreadId(data.threadId)
+          // Reload threads to get updated titles
+          const threadsRes = await fetch(`/api/insights/issues/${issueSlug}/sections/${section}/threads`, { cache: 'no-store' })
+          if (threadsRes.ok) {
+            const threadsData = await threadsRes.json()
+            if (threadsData.threads) setThreads(threadsData.threads)
           }
         }
+      }
     } catch (err) {
       setError((err as Error).message)
     } finally {
