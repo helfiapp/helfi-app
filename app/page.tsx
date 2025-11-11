@@ -45,6 +45,7 @@ function BackToTopButton() {
 export default function SplashPage() {
   const [showInfoModal, setShowInfoModal] = useState(false)
   const [showWaitlistModal, setShowWaitlistModal] = useState(false)
+  const [showDemoModal, setShowDemoModal] = useState(false)
 
   const handleWaitlistCta = () => {
     setShowInfoModal(true)
@@ -65,6 +66,10 @@ export default function SplashPage() {
 
   const handleWaitlistModalClose = () => {
     setShowWaitlistModal(false)
+  }
+
+  const handleDemoModalClose = () => {
+    setShowDemoModal(false)
   }
 
   const handleWaitlistSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -195,7 +200,7 @@ export default function SplashPage() {
                 Join the Waitlist
               </button>
               <button 
-                onClick={() => alert('Coming Soon! 🎬\n\nWe\'re working on an exciting demo video to show you all the amazing features of Helfi. Stay tuned!')}
+                onClick={() => setShowDemoModal(true)}
                 className="btn-secondary text-lg px-8 py-4"
               >
                 Watch Demo
@@ -1015,6 +1020,65 @@ export default function SplashPage() {
                 Join the Waitlist
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Demo Modal */}
+      {showDemoModal && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          onClick={handleDemoModalClose}
+        >
+          <div 
+            className="bg-white rounded-2xl max-w-md w-full p-8 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-start mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-gradient-to-br from-helfi-green/20 to-blue-100 rounded-full flex items-center justify-center">
+                  <svg className="w-6 h-6 text-helfi-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900">Coming Soon!</h3>
+              </div>
+              <button
+                onClick={handleDemoModalClose}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+                aria-label="Close"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="mb-6">
+              <p className="text-gray-600 text-lg leading-relaxed mb-4">
+                We're working on an exciting demo video to show you all the amazing features of Helfi.
+              </p>
+              <p className="text-gray-600 leading-relaxed">
+                Stay tuned for a comprehensive walkthrough of how our AI-powered health intelligence platform can transform your wellness journey!
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={handleDemoModalClose}
+                className="flex-1 bg-gray-100 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-200 transition-colors font-medium"
+              >
+                Got it
+              </button>
+              <button
+                onClick={() => {
+                  setShowDemoModal(false)
+                  setShowWaitlistModal(true)
+                }}
+                className="flex-1 bg-helfi-green text-white px-6 py-3 rounded-lg hover:bg-helfi-green/90 transition-colors font-medium"
+              >
+                Join Waitlist
+              </button>
+            </div>
           </div>
         </div>
       )}
