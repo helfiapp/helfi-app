@@ -1,14 +1,14 @@
 import './globals.css'
-import { DM_Sans } from 'next/font/google'
+import { Poppins } from 'next/font/google'
 import { AuthProvider } from '@/components/providers/AuthProvider'
 import { UserDataProvider } from '@/components/providers/UserDataProvider'
 import LayoutWrapper from '@/components/LayoutWrapper'
 import type { Metadata } from 'next'
 
-const dmSans = DM_Sans({ 
+const poppins = Poppins({ 
   subsets: ['latin'],
   weight: ['400', '500', '600', '700'],
-  variable: '--font-dm-sans',
+  variable: '--font-poppins',
 })
 
 export const metadata: Metadata = {
@@ -63,7 +63,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className={dmSans.className}>
+      <body className={poppins.className}>
         <AuthProvider>
           <UserDataProvider>
             <LayoutWrapper>

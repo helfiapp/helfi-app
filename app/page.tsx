@@ -131,25 +131,25 @@ export default function SplashPage() {
           <div className="hidden md:flex items-center space-x-8">
             <button 
               onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}
-              className="text-gray-700 hover:text-helfi-green transition-colors font-medium"
+              className="text-gray-700 hover:text-helfi-green transition-colors font-medium text-base"
             >
               Features
             </button>
             <button 
               onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}
-              className="text-gray-700 hover:text-helfi-green transition-colors font-medium"
+              className="text-gray-700 hover:text-helfi-green transition-colors font-medium text-base"
             >
               Pricing
             </button>
             <button 
               onClick={() => document.getElementById('why-helfi')?.scrollIntoView({ behavior: 'smooth' })}
-              className="text-gray-700 hover:text-helfi-green transition-colors font-medium"
+              className="text-gray-700 hover:text-helfi-green transition-colors font-medium text-base"
             >
               Why Helfi
             </button>
             <button 
               onClick={() => document.getElementById('faq')?.scrollIntoView({ behavior: 'smooth' })}
-              className="text-gray-700 hover:text-helfi-green transition-colors font-medium"
+              className="text-gray-700 hover:text-helfi-green transition-colors font-medium text-base"
             >
               FAQ
             </button>
