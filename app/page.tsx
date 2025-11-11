@@ -46,6 +46,10 @@ export default function SplashPage() {
   const [showInfoModal, setShowInfoModal] = useState(false)
   const [showWaitlistModal, setShowWaitlistModal] = useState(false)
   const [showDemoModal, setShowDemoModal] = useState(false)
+  const [showSuccessModal, setShowSuccessModal] = useState(false)
+  const [showErrorModal, setShowErrorModal] = useState(false)
+  const [successMessage, setSuccessMessage] = useState('')
+  const [errorMessage, setErrorMessage] = useState('')
 
   const handleWaitlistCta = () => {
     setShowInfoModal(true)
@@ -72,6 +76,16 @@ export default function SplashPage() {
     setShowDemoModal(false)
   }
 
+  const handleSuccessModalClose = () => {
+    setShowSuccessModal(false)
+    setSuccessMessage('')
+  }
+
+  const handleErrorModalClose = () => {
+    setShowErrorModal(false)
+    setErrorMessage('')
+  }
+
   const handleWaitlistSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     const formData = new FormData(e.currentTarget)
@@ -86,17 +100,21 @@ export default function SplashPage() {
       })
       const data = await res.json().catch(() => ({}))
       if (res.ok && data?.success) {
-        alert(data.message || 'Thanks for joining our waitlist! We\'ll be in touch soon.')
+        setSuccessMessage(data.message || 'Thanks for joining our waitlist! We\'ll be in touch soon.')
         setShowWaitlistModal(false)
+        setShowSuccessModal(true)
         ;(e.target as HTMLFormElement).reset()
       } else if (res.status === 409) {
-        alert('You\'re already on the waitlist. We\'ll notify you when we go live.')
+        setSuccessMessage('You\'re already on the waitlist. We\'ll notify you when we go live.')
         setShowWaitlistModal(false)
+        setShowSuccessModal(true)
       } else {
-        alert(data?.error || 'Something went wrong. Please try again.')
+        setErrorMessage(data?.error || 'Something went wrong. Please try again.')
+        setShowErrorModal(true)
       }
     } catch {
-      alert('Something went wrong. Please try again.')
+      setErrorMessage('Something went wrong. Please try again.')
+      setShowErrorModal(true)
     }
   }
   return (
@@ -824,16 +842,20 @@ export default function SplashPage() {
               }).then(async (res) => {
                 const data = await res.json().catch(() => ({}));
                 if (res.ok && data?.success) {
-                  alert(data.message || 'Thanks for joining our waitlist! We\'ll be in touch soon.');
+                  setSuccessMessage(data.message || 'Thanks for joining our waitlist! We\'ll be in touch soon.');
+                  setShowSuccessModal(true);
                   (e.target as HTMLFormElement).reset();
                 } else if (res.status === 409) {
                   // Fallback in case older deployments still return 409
-                  alert('You\'re already on the waitlist. We\'ll notify you when we go live.');
+                  setSuccessMessage('You\'re already on the waitlist. We\'ll notify you when we go live.');
+                  setShowSuccessModal(true);
                 } else {
-                  alert(data?.error || 'Something went wrong. Please try again.');
+                  setErrorMessage(data?.error || 'Something went wrong. Please try again.');
+                  setShowErrorModal(true);
                 }
               }).catch(() => {
-                alert('Something went wrong. Please try again.');
+                setErrorMessage('Something went wrong. Please try again.');
+                setShowErrorModal(true);
               });
             }}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1077,6 +1099,105 @@ export default function SplashPage() {
                 className="flex-1 bg-helfi-green text-white px-6 py-3 rounded-lg hover:bg-helfi-green/90 transition-colors font-medium"
               >
                 Join Waitlist
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Success Modal */}
+      {showSuccessModal && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          onClick={handleSuccessModalClose}
+        >
+          <div 
+            className="bg-white rounded-2xl max-w-md w-full p-8 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-start mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-gradient-to-br from-helfi-green/20 to-green-100 rounded-full flex items-center justify-center">
+                  <svg className="w-6 h-6 text-helfi-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900">Success!</h3>
+              </div>
+              <button
+                onClick={handleSuccessModalClose}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+                aria-label="Close"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="mb-6">
+              <p className="text-gray-600 text-lg leading-relaxed">
+                {successMessage}
+              </p>
+            </div>
+            <button
+              onClick={handleSuccessModalClose}
+              className="w-full bg-helfi-green text-white px-6 py-3 rounded-lg hover:bg-helfi-green/90 transition-colors font-medium"
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Error Modal */}
+      {showErrorModal && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          onClick={handleErrorModalClose}
+        >
+          <div 
+            className="bg-white rounded-2xl max-w-md w-full p-8 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-start mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-gradient-to-br from-red-100 to-orange-100 rounded-full flex items-center justify-center">
+                  <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900">Oops!</h3>
+              </div>
+              <button
+                onClick={handleErrorModalClose}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+                aria-label="Close"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="mb-6">
+              <p className="text-gray-600 text-lg leading-relaxed">
+                {errorMessage}
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={handleErrorModalClose}
+                className="flex-1 bg-gray-100 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-200 transition-colors font-medium"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  setShowErrorModal(false)
+                  setShowWaitlistModal(true)
+                }}
+                className="flex-1 bg-helfi-green text-white px-6 py-3 rounded-lg hover:bg-helfi-green/90 transition-colors font-medium"
+              >
+                Try Again
               </button>
             </div>
           </div>
