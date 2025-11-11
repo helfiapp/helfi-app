@@ -194,7 +194,7 @@ export default function FoodDiary() {
   }, [selectedDate, isViewingToday]);
 
   // Save food entries to database and update context (OPTIMIZED)
-  const saveFoodEntries = async (updatedFoods: any[]) => {
+  const saveFoodEntries = async (updatedFoods: any[], options?: { appendHistory?: boolean }) => {
     try {
       // Update context immediately for instant UI updates
       updateUserData({ todaysFoods: updatedFoods });
@@ -223,17 +223,19 @@ export default function FoodDiary() {
         setShowSavedToast(true);
         setTimeout(() => setShowSavedToast(false), 1500);
       } catch {}
-      // Fire-and-forget history append
-      try {
-        const last = updatedFoods[0];
-        if (last) {
-          fetch('/api/food-log', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ description: last.description, nutrition: last.nutrition, imageUrl: last.photo || null })
-          }).catch(() => {});
-        }
-      } catch {}
+      // Fire-and-forget history append (skip for edits/deletes)
+      if (options?.appendHistory !== false) {
+        try {
+          const last = updatedFoods[0];
+          if (last) {
+            fetch('/api/food-log', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ description: last.description, nutrition: last.nutrition, imageUrl: last.photo || null })
+            }).catch(() => {});
+          }
+        } catch {}
+      }
     } catch (error) {
       console.error('Error in saveFoodEntries:', error);
     }
@@ -1212,7 +1214,12 @@ Please add nutritional information manually if needed.`);
                   {/* Action Buttons */}
                   <div className="space-y-3">
                     <button
-                      onClick={() => editingEntry ? updateFoodEntry(aiDescription, 'photo') : addFoodEntry(aiDescription, 'photo')}
+                      onClick={() => editingEntry 
+                        ? updateFoodEntry(
+                            (isEditingDescription && editedDescription.trim() ? editedDescription.trim() : aiDescription),
+                            (editingEntry?.method === 'photo' ? 'photo' : 'text')
+                          )
+                        : addFoodEntry(aiDescription, 'photo')}
                       disabled={isAnalyzing}
                       className="w-full py-3 px-4 bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-300 text-white font-medium rounded-xl transition-colors duration-200 flex items-center justify-center shadow-lg"
                     >
@@ -1422,7 +1429,13 @@ Please add nutritional information manually if needed.`);
                             );
                             
                             setTodaysFoods(updatedFoods);
-                            await saveFoodEntries(updatedFoods);
+                            await saveFoodEntries(updatedFoods, { appendHistory: false });
+                            // Subtle insights notification
+                            setInsightsNotification({ show: true, message: 'Updating insights...', type: 'updating' });
+                            setTimeout(() => {
+                              setInsightsNotification({ show: true, message: 'Insights updated', type: 'updated' });
+                              setTimeout(() => setInsightsNotification(null), 3000);
+                            }, 2000);
                           } else {
                             addFoodEntry(editedDescription, 'photo');
                             setIsEditingDescription(false);
