@@ -8,6 +8,9 @@ import { usePathname } from 'next/navigation'
 import Image from 'next/image'
 import { useUserData } from '@/components/providers/UserDataProvider'
 import MobileMoreMenu from '@/components/MobileMoreMenu'
+import FitbitSummary from '@/components/devices/FitbitSummary'
+import FitbitCharts from '@/components/devices/FitbitCharts'
+import FitbitCorrelations from '@/components/devices/FitbitCorrelations'
 
 export default function HealthTracking() {
   const { data: session } = useSession()
@@ -15,6 +18,7 @@ export default function HealthTracking() {
   const { profileImage: providerProfileImage } = useUserData()
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [profileImage, setProfileImage] = useState<string>('')
+  const [fitbitConnected, setFitbitConnected] = useState(false)
 
   // Profile data - using consistent green avatar
   const defaultAvatar = 'data:image/svg+xml;base64,' + btoa(`
@@ -62,6 +66,19 @@ export default function HealthTracking() {
       loadProfileImage();
     }
   }, [session]);
+
+  useEffect(() => {
+    const checkFitbit = async () => {
+      try {
+        const res = await fetch('/api/fitbit/status')
+        if (res.ok) {
+          const j = await res.json()
+          setFitbitConnected(!!j.connected)
+        }
+      } catch {}
+    }
+    checkFitbit()
+  }, [])
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -225,64 +242,33 @@ export default function HealthTracking() {
       {/* Main Content */}
               <div className="max-w-7xl mx-auto px-4 py-8 pb-24 md:pb-8">
         <div className="bg-white rounded-lg shadow-sm p-8">
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-helfi-black mb-4">
-              Health Tracking
-            </h1>
-            <p className="text-gray-600">
-              Track your daily health metrics and monitor your progress over time.
-            </p>
+          <div className="mb-6">
+            <h1 className="text-2xl md:text-3xl font-bold text-helfi-black">Health Tracking</h1>
+            <p className="text-gray-600">Monitor your steps, heart rate, sleep, and more — alongside your check-ins.</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div className="bg-helfi-green/5 p-6 rounded-lg border-2 border-helfi-green/20">
-              <h3 className="font-semibold text-helfi-black mb-2">📊 Daily Metrics</h3>
-              <p className="text-sm text-gray-600 mb-4">Track weight, sleep, mood, and energy levels</p>
-              <div className="mt-4 text-center">
-                <span className="text-xl font-bold text-helfi-green">Coming Soon</span>
+          {fitbitConnected ? (
+            <div className="space-y-6">
+              <FitbitSummary rangeDays={7} />
+              <FitbitCharts rangeDays={30} />
+              <FitbitCorrelations rangeDays={30} />
+              <p className="text-xs text-gray-500">
+                Tip: For best results, sync your Fitbit daily so Helfi can align your activity and sleep with your check-ins.
+              </p>
+            </div>
+          ) : (
+            <div className="p-6 rounded-xl border bg-gray-50">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                <div>
+                  <div className="text-lg font-semibold text-gray-900">Connect your Fitbit</div>
+                  <div className="text-sm text-gray-600">See your steps, heart rate, sleep, and weight here once connected.</div>
+                </div>
+                <Link href="/devices" className="px-4 py-2 bg-helfi-green text-white rounded-lg hover:bg-green-600 transition-colors text-sm text-center">
+                  Connect Fitbit
+                </Link>
               </div>
             </div>
-
-            <div className="bg-blue-50 p-6 rounded-lg border-2 border-blue-200">
-              <h3 className="font-semibold text-helfi-black mb-2">💓 Vital Signs</h3>
-              <p className="text-sm text-gray-600 mb-4">Monitor heart rate, blood pressure, and more</p>
-              <div className="mt-4 text-center">
-                <span className="text-xl font-bold text-blue-600">Coming Soon</span>
-              </div>
-            </div>
-
-            <div className="bg-purple-50 p-6 rounded-lg border-2 border-purple-200">
-              <h3 className="font-semibold text-helfi-black mb-2">🏃 Activity</h3>
-              <p className="text-sm text-gray-600 mb-4">Track exercise, steps, and activity levels</p>
-              <div className="mt-4 text-center">
-                <span className="text-xl font-bold text-purple-600">Coming Soon</span>
-              </div>
-            </div>
-
-            <div className="bg-orange-50 p-6 rounded-lg border-2 border-orange-200">
-              <h3 className="font-semibold text-helfi-black mb-2">💊 Medications</h3>
-              <p className="text-sm text-gray-600 mb-4">Track medication adherence and effects</p>
-              <div className="mt-4 text-center">
-                <span className="text-xl font-bold text-orange-600">Coming Soon</span>
-              </div>
-            </div>
-
-            <div className="bg-green-50 p-6 rounded-lg border-2 border-green-200">
-              <h3 className="font-semibold text-helfi-black mb-2">🥗 Nutrition</h3>
-              <p className="text-sm text-gray-600 mb-4">Log meals and track nutritional intake</p>
-              <div className="mt-4 text-center">
-                <span className="text-xl font-bold text-green-600">Coming Soon</span>
-              </div>
-            </div>
-
-            <div className="bg-red-50 p-6 rounded-lg border-2 border-red-200">
-              <h3 className="font-semibold text-helfi-black mb-2">🩺 Symptoms</h3>
-              <p className="text-sm text-gray-600 mb-4">Track symptoms and health changes</p>
-              <div className="mt-4 text-center">
-                <span className="text-xl font-bold text-red-600">Coming Soon</span>
-              </div>
-            </div>
-          </div>
+          )}
         </div>
       </div>
 

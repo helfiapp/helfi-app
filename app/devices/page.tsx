@@ -5,6 +5,9 @@ import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import PageHeader from '@/components/PageHeader'
 import MobileMoreMenu from '@/components/MobileMoreMenu'
+import FitbitSummary from '@/components/devices/FitbitSummary'
+import FitbitCharts from '@/components/devices/FitbitCharts'
+import FitbitCorrelations from '@/components/devices/FitbitCorrelations'
 
 export default function DevicesPage() {
   const { data: session } = useSession()
@@ -314,13 +317,15 @@ export default function DevicesPage() {
           )}
 
           {fitbitConnected ? (
-            <div className="space-y-4">
+            <div className="space-y-6">
               <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
                 <p className="text-sm text-gray-700 dark:text-gray-300">
                   Your Fitbit account is connected. Data will sync automatically, or you can manually sync below.
                 </p>
               </div>
               
+              <FitbitSummary rangeDays={7} />
+
               <div className="flex gap-3">
                 <button
                   onClick={handleSyncFitbit}
@@ -337,6 +342,9 @@ export default function DevicesPage() {
                   Disconnect
                 </button>
               </div>
+
+              <FitbitCharts rangeDays={30} />
+              <FitbitCorrelations rangeDays={30} />
             </div>
           ) : (
             <div className="space-y-4">

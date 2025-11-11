@@ -9,6 +9,7 @@ import { usePathname } from 'next/navigation'
 import { useUserData } from '@/components/providers/UserDataProvider'
 import MobileMoreMenu from '@/components/MobileMoreMenu'
 import UsageMeter from '@/components/UsageMeter'
+import FitbitSummary from '@/components/devices/FitbitSummary'
 
 export default function Dashboard() {
   const { data: session } = useSession()
@@ -584,6 +585,13 @@ export default function Dashboard() {
               </div>
               </Link>
             </div>
+
+            {/* Fitbit Mini Summary */}
+            {fitbitConnected && (
+              <div className="mb-6">
+                <FitbitSummary rangeDays={7} />
+              </div>
+            )}
 
             {/* Device Integration Section */}
             {onboardingData && (
