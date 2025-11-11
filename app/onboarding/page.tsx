@@ -1913,6 +1913,13 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
 
   const editSupplement = (index: number) => {
     const supplement = supplements[index];
+    if (!supplement) {
+      console.error('Supplement not found at index:', index);
+      return;
+    }
+    
+    console.log('Editing supplement:', supplement);
+    
     setEditingIndex(index);
     setShowDropdown(null);
     
@@ -1921,55 +1928,81 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
     
     if (supplement.method === 'manual') {
       setUploadMethod('manual');
-      setName(supplement.name);
+      setName(supplement.name || '');
       
       // Parse dosage and unit
-      const dosageParts = supplement.dosage.split(' ');
-      setDosage(dosageParts[0]);
+      const dosageStr = supplement.dosage || '';
+      const dosageParts = dosageStr.split(' ');
+      setDosage(dosageParts[0] || '');
       setDosageUnit(dosageParts[1] || 'mg');
       
       // Parse timing data
-      const timingArray = supplement.timing.map((t: string) => t.split(':')[0]);
+      const timingArray = Array.isArray(supplement.timing) 
+        ? supplement.timing.map((t: string) => {
+            if (typeof t === 'string' && t.includes(':')) {
+              return t.split(':')[0].trim();
+            }
+            return String(t).trim();
+          })
+        : [];
       setTiming(timingArray);
       
       // Set schedule
       setDosageSchedule(supplement.scheduleInfo === 'Daily' ? 'daily' : 'specific');
-      if (supplement.scheduleInfo !== 'Daily') {
-        setSelectedDays(supplement.scheduleInfo.split(', '));
+      if (supplement.scheduleInfo && supplement.scheduleInfo !== 'Daily') {
+        setSelectedDays(supplement.scheduleInfo.split(', ').filter(Boolean));
+      } else {
+        setSelectedDays([]);
       }
     } else {
       setUploadMethod('photo');
-      // Parse dosage and unit from the main dosage field
-      const dosageParts = supplement.dosage.split(' ');
-      setPhotoDosage(dosageParts[0]);
-      setPhotoDosageUnit(dosageParts[1] || 'mg');
       
-      // Parse timing array - format is ["Morning: 22 mg", "Afternoon: 15 mg"]
+      // Parse dosage and unit from the main dosage field
+      const dosageStr = supplement.dosage || '';
+      const dosageParts = dosageStr.split(' ');
+      const baseDosage = dosageParts[0] || '';
+      const baseUnit = dosageParts[1] || 'mg';
+      
+      setPhotoDosage(baseDosage);
+      setPhotoDosageUnit(baseUnit);
+      
+      // Parse timing array - format can be ["Morning: 22 mg", "Afternoon: 15 mg"] or ["Morning", "Afternoon"]
       const timingArray: string[] = [];
       const timingDosagesObj: {[key: string]: string} = {};
       const timingDosageUnitsObj: {[key: string]: string} = {};
       
-      if (Array.isArray(supplement.timing)) {
+      if (Array.isArray(supplement.timing) && supplement.timing.length > 0) {
         supplement.timing.forEach((timingStr: string) => {
+          if (typeof timingStr !== 'string') {
+            timingStr = String(timingStr);
+          }
+          
           // Parse "Morning: 22 mg" format
-          const parts = timingStr.split(':');
-          if (parts.length >= 2) {
-            const timeName = parts[0].trim();
-            const dosagePart = parts[1].trim();
-            timingArray.push(timeName);
-            
-            // Parse dosage and unit (e.g., "22 mg")
-            const dosageParts = dosagePart.split(' ');
-            if (dosageParts.length >= 2) {
-              timingDosagesObj[timeName] = dosageParts[0];
-              timingDosageUnitsObj[timeName] = dosageParts[1];
-            } else if (dosageParts.length === 1) {
-              timingDosagesObj[timeName] = dosageParts[0];
-              timingDosageUnitsObj[timeName] = photoDosageUnit;
+          if (timingStr.includes(':')) {
+            const parts = timingStr.split(':');
+            if (parts.length >= 2) {
+              const timeName = parts[0].trim();
+              const dosagePart = parts[1].trim();
+              timingArray.push(timeName);
+              
+              // Parse dosage and unit (e.g., "22 mg")
+              const dosageParts = dosagePart.split(' ');
+              if (dosageParts.length >= 2) {
+                timingDosagesObj[timeName] = dosageParts[0];
+                timingDosageUnitsObj[timeName] = dosageParts[1];
+              } else if (dosageParts.length === 1 && dosageParts[0]) {
+                timingDosagesObj[timeName] = dosageParts[0];
+                timingDosageUnitsObj[timeName] = baseUnit;
+              }
             }
           } else {
-            // Fallback: treat entire string as timing name
-            timingArray.push(timingStr.trim());
+            // Fallback: treat entire string as timing name (use base dosage)
+            const timeName = timingStr.trim();
+            if (timeName) {
+              timingArray.push(timeName);
+              timingDosagesObj[timeName] = baseDosage;
+              timingDosageUnitsObj[timeName] = baseUnit;
+            }
           }
         });
       }
@@ -1979,9 +2012,12 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
       setPhotoTimingDosageUnits(timingDosageUnitsObj);
       
       // Set schedule
-      setPhotoDosageSchedule(supplement.scheduleInfo === 'Daily' ? 'daily' : 'specific');
-      if (supplement.scheduleInfo !== 'Daily') {
-        setPhotoSelectedDays(supplement.scheduleInfo.split(', '));
+      const scheduleInfo = supplement.scheduleInfo || 'Daily';
+      setPhotoDosageSchedule(scheduleInfo === 'Daily' ? 'daily' : 'specific');
+      if (scheduleInfo !== 'Daily' && scheduleInfo) {
+        setPhotoSelectedDays(scheduleInfo.split(', ').filter(Boolean));
+      } else {
+        setPhotoSelectedDays([]);
       }
       
       // Note: We can't restore File objects from saved data, so images will need to be re-uploaded if user wants to change them
@@ -2040,6 +2076,11 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Front of supplement bottle/packet {editingIndex === null ? '*' : '(optional when editing)'}
               </label>
+              {editingIndex !== null && supplements[editingIndex]?.frontImage && !frontImage && (
+                <div className="mb-2 p-2 bg-gray-50 border border-gray-200 rounded text-xs text-gray-600">
+                  Current image: {supplements[editingIndex].frontImage}
+                </div>
+              )}
               <div className="relative">
                 <input
                   type="file"
@@ -2082,6 +2123,11 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Back of supplement bottle/packet {editingIndex === null ? '*' : '(optional when editing)'}
               </label>
+              {editingIndex !== null && supplements[editingIndex]?.backImage && !backImage && (
+                <div className="mb-2 p-2 bg-gray-50 border border-gray-200 rounded text-xs text-gray-600">
+                  Current image: {supplements[editingIndex].backImage}
+                </div>
+              )}
               <div className="relative">
                 <input
                   type="file"
@@ -2804,6 +2850,13 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
 
   const editMedication = (index: number) => {
     const medication = medications[index];
+    if (!medication) {
+      console.error('Medication not found at index:', index);
+      return;
+    }
+    
+    console.log('Editing medication:', medication);
+    
     setEditingIndex(index);
     setShowDropdown(null);
     
@@ -2812,55 +2865,81 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
     
     if (medication.method === 'manual') {
       setUploadMethod('manual');
-      setName(medication.name);
+      setName(medication.name || '');
       
       // Parse dosage and unit
-      const dosageParts = medication.dosage.split(' ');
-      setDosage(dosageParts[0]);
+      const dosageStr = medication.dosage || '';
+      const dosageParts = dosageStr.split(' ');
+      setDosage(dosageParts[0] || '');
       setDosageUnit(dosageParts[1] || 'mg');
       
       // Parse timing data
-      const timingArray = medication.timing.map((t: string) => t.split(':')[0]);
+      const timingArray = Array.isArray(medication.timing) 
+        ? medication.timing.map((t: string) => {
+            if (typeof t === 'string' && t.includes(':')) {
+              return t.split(':')[0].trim();
+            }
+            return String(t).trim();
+          })
+        : [];
       setTiming(timingArray);
       
       // Set schedule
       setDosageSchedule(medication.scheduleInfo === 'Daily' ? 'daily' : 'specific');
-      if (medication.scheduleInfo !== 'Daily') {
-        setSelectedDays(medication.scheduleInfo.split(', '));
+      if (medication.scheduleInfo && medication.scheduleInfo !== 'Daily') {
+        setSelectedDays(medication.scheduleInfo.split(', ').filter(Boolean));
+      } else {
+        setSelectedDays([]);
       }
     } else {
       setUploadMethod('photo');
-      // Parse dosage and unit from the main dosage field
-      const dosageParts = medication.dosage.split(' ');
-      setPhotoDosage(dosageParts[0]);
-      setPhotoDosageUnit(dosageParts[1] || 'mg');
       
-      // Parse timing array - format is ["Morning: 22 mg", "Afternoon: 15 mg"]
+      // Parse dosage and unit from the main dosage field
+      const dosageStr = medication.dosage || '';
+      const dosageParts = dosageStr.split(' ');
+      const baseDosage = dosageParts[0] || '';
+      const baseUnit = dosageParts[1] || 'mg';
+      
+      setPhotoDosage(baseDosage);
+      setPhotoDosageUnit(baseUnit);
+      
+      // Parse timing array - format can be ["Morning: 22 mg", "Afternoon: 15 mg"] or ["Morning", "Afternoon"]
       const timingArray: string[] = [];
       const timingDosagesObj: {[key: string]: string} = {};
       const timingDosageUnitsObj: {[key: string]: string} = {};
       
-      if (Array.isArray(medication.timing)) {
+      if (Array.isArray(medication.timing) && medication.timing.length > 0) {
         medication.timing.forEach((timingStr: string) => {
+          if (typeof timingStr !== 'string') {
+            timingStr = String(timingStr);
+          }
+          
           // Parse "Morning: 22 mg" format
-          const parts = timingStr.split(':');
-          if (parts.length >= 2) {
-            const timeName = parts[0].trim();
-            const dosagePart = parts[1].trim();
-            timingArray.push(timeName);
-            
-            // Parse dosage and unit (e.g., "22 mg")
-            const dosageParts = dosagePart.split(' ');
-            if (dosageParts.length >= 2) {
-              timingDosagesObj[timeName] = dosageParts[0];
-              timingDosageUnitsObj[timeName] = dosageParts[1];
-            } else if (dosageParts.length === 1) {
-              timingDosagesObj[timeName] = dosageParts[0];
-              timingDosageUnitsObj[timeName] = photoDosageUnit;
+          if (timingStr.includes(':')) {
+            const parts = timingStr.split(':');
+            if (parts.length >= 2) {
+              const timeName = parts[0].trim();
+              const dosagePart = parts[1].trim();
+              timingArray.push(timeName);
+              
+              // Parse dosage and unit (e.g., "22 mg")
+              const dosageParts = dosagePart.split(' ');
+              if (dosageParts.length >= 2) {
+                timingDosagesObj[timeName] = dosageParts[0];
+                timingDosageUnitsObj[timeName] = dosageParts[1];
+              } else if (dosageParts.length === 1 && dosageParts[0]) {
+                timingDosagesObj[timeName] = dosageParts[0];
+                timingDosageUnitsObj[timeName] = baseUnit;
+              }
             }
           } else {
-            // Fallback: treat entire string as timing name
-            timingArray.push(timingStr.trim());
+            // Fallback: treat entire string as timing name (use base dosage)
+            const timeName = timingStr.trim();
+            if (timeName) {
+              timingArray.push(timeName);
+              timingDosagesObj[timeName] = baseDosage;
+              timingDosageUnitsObj[timeName] = baseUnit;
+            }
           }
         });
       }
@@ -2870,9 +2949,12 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
       setPhotoTimingDosageUnits(timingDosageUnitsObj);
       
       // Set schedule
-      setPhotoDosageSchedule(medication.scheduleInfo === 'Daily' ? 'daily' : 'specific');
-      if (medication.scheduleInfo !== 'Daily') {
-        setPhotoSelectedDays(medication.scheduleInfo.split(', '));
+      const scheduleInfo = medication.scheduleInfo || 'Daily';
+      setPhotoDosageSchedule(scheduleInfo === 'Daily' ? 'daily' : 'specific');
+      if (scheduleInfo !== 'Daily' && scheduleInfo) {
+        setPhotoSelectedDays(scheduleInfo.split(', ').filter(Boolean));
+      } else {
+        setPhotoSelectedDays([]);
       }
       
       // Note: We can't restore File objects from saved data, so images will need to be re-uploaded if user wants to change them
@@ -2931,6 +3013,11 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Front of medication bottle/packet {editingIndex === null ? '*' : '(optional when editing)'}
               </label>
+              {editingIndex !== null && medications[editingIndex]?.frontImage && !frontImage && (
+                <div className="mb-2 p-2 bg-gray-50 border border-gray-200 rounded text-xs text-gray-600">
+                  Current image: {medications[editingIndex].frontImage}
+                </div>
+              )}
               <div className="relative">
                 <input
                   type="file"
@@ -2973,6 +3060,11 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Back of medication bottle/packet {editingIndex === null ? '*' : '(optional when editing)'}
               </label>
+              {editingIndex !== null && medications[editingIndex]?.backImage && !backImage && (
+                <div className="mb-2 p-2 bg-gray-50 border border-gray-200 rounded text-xs text-gray-600">
+                  Current image: {medications[editingIndex].backImage}
+                </div>
+              )}
               <div className="relative">
                 <input
                   type="file"
