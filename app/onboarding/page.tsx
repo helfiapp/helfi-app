@@ -44,7 +44,7 @@ function UpdateInsightsPopup({
         
         <div className="mb-6">
           <p className="text-sm text-gray-600 mb-4">
-            You've added new health information. Would you like to update your insights now?
+            You've changed your health information. Would you like to update your insights now? This will regenerate AI insights, update Talk to AI, and refresh all AI-powered sections with your latest data.
           </p>
           {isGenerating && (
             <div className="mb-4">
@@ -1936,22 +1936,12 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
     const updatedSupplements = supplements.filter((_: any, i: number) => i !== index);
     setSupplements(updatedSupplements);
     
-    // CRITICAL FIX: Save to database immediately when deleting
-    try {
-      const response = await fetch('/api/user-data', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ supplements: updatedSupplements })
-      });
-      
-      if (response.ok) {
-        console.log('✅ Supplement deleted and saved to database');
-      } else {
-        console.error('❌ Failed to save supplement deletion:', response.status);
-      }
-    } catch (error) {
-      console.error('❌ Error saving supplement deletion:', error);
-    }
+    // Store updated supplements for potential update action
+    setSupplementsToSave(updatedSupplements);
+    
+    // Mark as having unsaved changes and show update popup
+    setHasUnsavedChanges(true);
+    setShowUpdatePopup(true);
   };
 
   return (
@@ -2747,22 +2737,12 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
     const updatedMedications = medications.filter((_: any, i: number) => i !== index);
     setMedications(updatedMedications);
     
-    // CRITICAL FIX: Save to database immediately when deleting
-    try {
-      const response = await fetch('/api/user-data', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ medications: updatedMedications })
-      });
-      
-      if (response.ok) {
-        console.log('✅ Medication deleted and saved to database');
-      } else {
-        console.error('❌ Failed to save medication deletion:', response.status);
-      }
-    } catch (error) {
-      console.error('❌ Error saving medication deletion:', error);
-    }
+    // Store updated medications for potential update action
+    setMedicationsToSave(updatedMedications);
+    
+    // Mark as having unsaved changes and show update popup
+    setHasUnsavedChanges(true);
+    setShowUpdatePopup(true);
   };
 
   return (
