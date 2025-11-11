@@ -82,29 +82,10 @@ async function sendWaitlistAcknowledgmentEmail(email: string, name: string) {
       `
     })
 
-    // Log full response for debugging
-    console.log(`📧 [WAITLIST ACK] Full Resend response:`, JSON.stringify({
-      hasData: !!emailResponse.data,
-      hasError: !!emailResponse.error,
-      dataId: emailResponse.data?.id,
-      error: emailResponse.error
-    }))
-
-    // Check for errors in Resend response
-    if (emailResponse.error) {
-      console.error(`❌ [WAITLIST ACK EMAIL] Resend error for ${email}:`, emailResponse.error)
-      throw new Error(`Resend error: ${JSON.stringify(emailResponse.error)}`)
-    }
-
-    if (emailResponse.data?.id) {
-      console.log(`✅ [WAITLIST ACK EMAIL] Sent to ${email} with ID: ${emailResponse.data.id}`)
-    } else {
-      console.error(`❌ [WAITLIST ACK EMAIL] No message ID returned for ${email}`)
-      console.error(`❌ [WAITLIST ACK EMAIL] Full response:`, emailResponse)
-      throw new Error('No message ID returned from Resend')
-    }
+    // Log response - match the pattern used in working notification email
+    console.log(`✅ [WAITLIST ACK EMAIL] Sent to ${email} with ID: ${emailResponse.data?.id}`)
   } catch (error: any) {
-    console.error(`❌ [WAITLIST ACK EMAIL] Exception caught for ${email}:`, error)
+    console.error(`❌ [WAITLIST ACK EMAIL] Failed to send to ${email}:`, error)
     console.error(`❌ [WAITLIST ACK EMAIL] Error details:`, {
       message: error?.message,
       stack: error?.stack,
@@ -112,8 +93,6 @@ async function sendWaitlistAcknowledgmentEmail(email: string, name: string) {
       email: email,
       userName: name
     })
-    // Re-throw so the catch handler in POST can log it
-    throw error
   }
 }
 
@@ -202,20 +181,10 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    // Send acknowledgment email to user - await it to ensure it completes
-    try {
-      await sendWaitlistAcknowledgmentEmail(normalizedEmail, normalizedName)
-      console.log(`✅ [WAITLIST] Acknowledgment email sent successfully to ${normalizedEmail}`)
-    } catch (error: any) {
-      console.error('❌ [WAITLIST] Acknowledgment email failed:', error)
-      console.error('❌ [WAITLIST] Error details:', {
-        email: normalizedEmail,
-        name: normalizedName,
-        error: error?.message || error,
-        stack: error?.stack
-      })
-      // Don't fail the API response - email failure shouldn't prevent signup
-    }
+    // Send acknowledgment email to user (don't await to match notification pattern)
+    sendWaitlistAcknowledgmentEmail(normalizedEmail, normalizedName).catch(error => {
+      console.error('❌ [WAITLIST] Acknowledgment email failed (non-blocking):', error)
+    })
 
     // Send notification email to support team (don't await to avoid blocking response)
     sendWaitlistNotificationEmail(normalizedEmail, normalizedName).catch(error => {
