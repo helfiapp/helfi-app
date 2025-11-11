@@ -1793,30 +1793,31 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
       };
       
       if (editingIndex !== null) {
-        // Update existing supplement - don't show popup, just update silently
-        setSupplements((prev: any[]) => {
-          const updatedSupplements = prev.map((item: any, index: number) => 
-            index === editingIndex ? supplementData : item
-          );
-          setSupplementsToSave(updatedSupplements);
-          // Save immediately without showing popup for edits
-          (async () => {
-            try {
-              const response = await fetch('/api/user-data', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ supplements: updatedSupplements })
-              });
-              if (!response.ok) {
-                console.error('Failed to save supplement edit');
-              }
-            } catch (error) {
-              console.error('Error saving supplement edit:', error);
-            }
-          })();
-          return updatedSupplements;
-        });
+        // Update existing supplement - show popup after saving
+        const updatedSupplements = supplements.map((item: any, index: number) => 
+          index === editingIndex ? supplementData : item
+        );
+        setSupplements(updatedSupplements);
+        setSupplementsToSave(updatedSupplements);
         setEditingIndex(null);
+        
+        // Save immediately and then show popup
+        try {
+          const response = await fetch('/api/user-data', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ supplements: updatedSupplements })
+          });
+          if (response.ok) {
+            // After successful save, show update insights popup
+            setHasUnsavedChanges(true);
+            setShowUpdatePopup(true);
+          } else {
+            console.error('Failed to save supplement edit');
+          }
+        } catch (error) {
+          console.error('Error saving supplement edit:', error);
+        }
       } else {
         // Add new supplement - show popup
         setSupplements((prev: any[]) => {
@@ -2730,30 +2731,31 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
       };
       
       if (editingIndex !== null) {
-        // Update existing medication - don't show popup, just update silently
-        setMedications((prev: any[]) => {
-          const updatedMedications = prev.map((item: any, index: number) => 
-            index === editingIndex ? medicationData : item
-          );
-          setMedicationsToSave(updatedMedications);
-          // Save immediately without showing popup for edits
-          (async () => {
-            try {
-              const response = await fetch('/api/user-data', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ medications: updatedMedications })
-              });
-              if (!response.ok) {
-                console.error('Failed to save medication edit');
-              }
-            } catch (error) {
-              console.error('Error saving medication edit:', error);
-            }
-          })();
-          return updatedMedications;
-        });
+        // Update existing medication - show popup after saving
+        const updatedMedications = medications.map((item: any, index: number) => 
+          index === editingIndex ? medicationData : item
+        );
+        setMedications(updatedMedications);
+        setMedicationsToSave(updatedMedications);
         setEditingIndex(null);
+        
+        // Save immediately and then show popup
+        try {
+          const response = await fetch('/api/user-data', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ medications: updatedMedications })
+          });
+          if (response.ok) {
+            // After successful save, show update insights popup
+            setHasUnsavedChanges(true);
+            setShowUpdatePopup(true);
+          } else {
+            console.error('Failed to save medication edit');
+          }
+        } catch (error) {
+          console.error('Error saving medication edit:', error);
+        }
       } else {
         // Add new medication - show popup
         setMedications((prev: any[]) => {

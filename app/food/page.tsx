@@ -48,6 +48,7 @@ export default function FoodDiary() {
 
   const [foodImagesLoading, setFoodImagesLoading] = useState<{[key: string]: boolean}>({})
   const [expandedEntries, setExpandedEntries] = useState<{[key: string]: boolean}>({})
+  const [insightsNotification, setInsightsNotification] = useState<{show: boolean, message: string, type: 'updating' | 'updated'} | null>(null)
   const [fullSizeImage, setFullSizeImage] = useState<string | null>(null)
   const [showSavedToast, setShowSavedToast] = useState<boolean>(false)
   const [selectedDate, setSelectedDate] = useState<string>(() => {
@@ -568,8 +569,29 @@ Please add nutritional information manually if needed.`);
     const updatedFoods = [newEntry, ...todaysFoods];
     setTodaysFoods(updatedFoods);
     
-    // Save to database
+    // Save to database (this triggers background insight regeneration)
     await saveFoodEntries(updatedFoods);
+    
+    // Show subtle notification that insights are updating
+    setInsightsNotification({
+      show: true,
+      message: 'Updating insights...',
+      type: 'updating'
+    });
+    
+    // After a delay, show that insights have been updated
+    setTimeout(() => {
+      setInsightsNotification({
+        show: true,
+        message: 'Insights updated',
+        type: 'updated'
+      });
+      
+      // Auto-hide after 3 seconds
+      setTimeout(() => {
+        setInsightsNotification(null);
+      }, 3000);
+    }, 2000);
     
     // Reset all form states
     setNewFoodText('');
@@ -753,6 +775,29 @@ Please add nutritional information manually if needed.`);
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[10000]">
           <div className="px-4 py-2 bg-emerald-600 text-white rounded-full shadow-lg text-sm">
             Saved
+          </div>
+        </div>
+      )}
+      
+      {/* Insights Update Notification - Subtle and non-intrusive */}
+      {insightsNotification && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[10000] transition-opacity duration-300">
+          <div className={`px-4 py-2 rounded-full shadow-lg text-sm flex items-center gap-2 ${
+            insightsNotification.type === 'updating' 
+              ? 'bg-blue-500 text-white' 
+              : 'bg-green-500 text-white'
+          }`}>
+            {insightsNotification.type === 'updating' && (
+              <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            )}
+            {insightsNotification.type === 'updated' && (
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            )}
+            <span>{insightsNotification.message}</span>
           </div>
         </div>
       )}
