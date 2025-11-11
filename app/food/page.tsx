@@ -626,8 +626,10 @@ Please add nutritional information manually if needed.`);
         },
         body: JSON.stringify({
           textDescription: description,
-          foodType: 'single',
-          isReanalysis: true
+          foodType: 'meal',
+          isReanalysis: true,
+          multi: true,
+          returnItems: true
         }),
       });
 
@@ -1366,7 +1368,9 @@ Please add nutritional information manually if needed.`);
                               },
                               body: JSON.stringify({
                                 textDescription: editedDescription,
-                                foodType: 'single'
+                                foodType: 'meal',
+                                multi: true,
+                                returnItems: true
                               }),
                             });
 
