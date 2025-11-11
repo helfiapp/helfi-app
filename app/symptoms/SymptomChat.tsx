@@ -18,7 +18,7 @@ interface SymptomChatProps {
 type ChatMessage = { role: 'user' | 'assistant'; content: string }
 
 export default function SymptomChat({ analysisResult, symptoms, duration, notes }: SymptomChatProps) {
-  const storageKey = useMemo(() => `helfi:symptoms:chat:${Date.now()}`, [])
+  const storageKey = useMemo(() => `helfi:symptoms:chat`, [])
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)

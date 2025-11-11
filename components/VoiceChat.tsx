@@ -25,6 +25,7 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
   const [isListening, setIsListening] = useState(false)
   const [estimatedCost, setEstimatedCost] = useState<number | null>(null)
   const [hasSpeechRecognition, setHasSpeechRecognition] = useState(false)
+  const storageKey = useMemo(() => 'helfi:chat:talk', [])
   
   const endRef = useRef<HTMLDivElement | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -47,6 +48,29 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
       textarea.style.overflowY = textarea.scrollHeight > maxHeight ? 'auto' : 'hidden'
     }, 50) // Debounce resize by 50ms
   }, [])
+
+  // Load saved conversation on mount
+  useEffect(() => {
+    try {
+      const saved = typeof window !== 'undefined' ? localStorage.getItem(storageKey) : null
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (Array.isArray(parsed)) {
+          setMessages(parsed.filter((m) => m && typeof m.content === 'string' && (m.role === 'user' || m.role === 'assistant')).slice(-50))
+        }
+      }
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Persist messages locally for continuity
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(storageKey, JSON.stringify(messages))
+      }
+    } catch {}
+  }, [messages, storageKey])
 
   // Initialize speech recognition
   useEffect(() => {
@@ -273,6 +297,7 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
       setError(null)
       setMessages([])
       stopListening()
+      try { localStorage.removeItem(storageKey) } catch {}
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -437,6 +462,17 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
         )}
         <form className="px-4 py-3" onSubmit={handleSubmit}>
           <div className="max-w-3xl mx-auto flex items-center gap-2">
+            {messages.length > 0 && (
+              <button
+                type="button"
+                onClick={handleClear}
+                disabled={loading}
+                className="px-3 h-10 rounded-full text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors"
+                aria-label="Clear chat"
+              >
+                Reset
+              </button>
+            )}
             {hasSpeechRecognition && (
               <button
                 type="button"
