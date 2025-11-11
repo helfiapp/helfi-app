@@ -131,31 +131,31 @@ export default function SplashPage() {
           <div className="hidden md:flex items-center space-x-8">
             <button 
               onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}
-              className="text-gray-700 hover:text-helfi-green transition-colors font-medium text-base"
+              className="text-gray-700 hover:text-helfi-green transition-colors font-medium text-lg"
             >
               Features
             </button>
             <button 
               onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}
-              className="text-gray-700 hover:text-helfi-green transition-colors font-medium text-base"
+              className="text-gray-700 hover:text-helfi-green transition-colors font-medium text-lg"
             >
               Pricing
             </button>
             <button 
               onClick={() => document.getElementById('why-helfi')?.scrollIntoView({ behavior: 'smooth' })}
-              className="text-gray-700 hover:text-helfi-green transition-colors font-medium text-base"
+              className="text-gray-700 hover:text-helfi-green transition-colors font-medium text-lg"
             >
               Why Helfi
             </button>
             <button 
               onClick={() => document.getElementById('faq')?.scrollIntoView({ behavior: 'smooth' })}
-              className="text-gray-700 hover:text-helfi-green transition-colors font-medium text-base"
+              className="text-gray-700 hover:text-helfi-green transition-colors font-medium text-lg"
             >
               FAQ
             </button>
             <button 
-              onClick={() => document.getElementById('waitlist-signup')?.scrollIntoView({ behavior: 'smooth' })}
-              className="btn-secondary hover:bg-gray-100 transition-colors"
+              onClick={() => setShowWaitlistModal(true)}
+              className="btn-secondary hover:bg-gray-100 transition-colors text-lg"
             >
               Join Waitlist
             </button>
@@ -164,8 +164,8 @@ export default function SplashPage() {
           {/* Mobile Menu */}
           <div className="md:hidden flex items-center space-x-3">
             <button 
-              onClick={() => document.getElementById('waitlist-signup')?.scrollIntoView({ behavior: 'smooth' })}
-              className="btn-secondary hover:bg-gray-100 transition-colors text-sm px-3 py-2"
+              onClick={() => setShowWaitlistModal(true)}
+              className="btn-secondary hover:bg-gray-100 transition-colors text-base px-3 py-2"
             >
               Join Waitlist
             </button>
@@ -189,7 +189,7 @@ export default function SplashPage() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 sm:space-x-4 sm:gap-0 justify-center">
               <button 
-                onClick={() => document.getElementById('waitlist-signup')?.scrollIntoView({ behavior: 'smooth' })}
+                onClick={() => setShowWaitlistModal(true)}
                 className="btn-primary text-lg px-8 py-4"
               >
                 Join the Waitlist
