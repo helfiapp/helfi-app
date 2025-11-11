@@ -1734,9 +1734,14 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
 
   const addSupplement = async () => {
     const currentDate = new Date().toISOString();
+    const isEditing = editingIndex !== null;
     
-    // Only photo method now - require both images
-    if (frontImage && backImage && photoDosage && photoTiming.length > 0) {
+    // For new supplements, require both images. For editing, images are optional.
+    const hasRequiredData = isEditing 
+      ? (photoDosage && photoTiming.length > 0)
+      : (frontImage && backImage && photoDosage && photoTiming.length > 0);
+    
+    if (hasRequiredData) {
       // Combine timing and individual dosages with units for photos
       const timingWithDosages = photoTiming.map(time => {
         const timeSpecificDosage = photoTimingDosages[time];
@@ -1748,40 +1753,43 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
       
       const scheduleInfo = photoDosageSchedule === 'daily' ? 'Daily' : photoSelectedDays.join(', ');
       
-      // CRITICAL FIX: Analyze image to extract supplement name instead of using filename
-      let supplementName = 'Analyzing...';
-      try {
-        // Create FormData for image analysis
-        const formData = new FormData();
-        formData.append('image', frontImage);
-        
-        // Call vision API to extract supplement name
-        const visionResponse = await fetch('/api/analyze-supplement-image', {
-          method: 'POST',
-          body: formData
-        });
-        
-        if (visionResponse.ok) {
-          const visionResult = await visionResponse.json();
-          supplementName = visionResult.supplementName || 'Unknown Supplement';
-        } else {
-          supplementName = 'Image Analysis Failed';
+      // Only analyze image if it's a new supplement or if new images are provided
+      let supplementName = isEditing ? supplements[editingIndex].name : 'Analyzing...';
+      
+      if (!isEditing || (frontImage && backImage)) {
+        // CRITICAL FIX: Analyze image to extract supplement name instead of using filename
+        if (frontImage) {
+          try {
+            // Create FormData for image analysis
+            const formData = new FormData();
+            formData.append('image', frontImage);
+            
+            // Call vision API to extract supplement name
+            const visionResponse = await fetch('/api/analyze-supplement-image', {
+              method: 'POST',
+              body: formData
+            });
+            
+            if (visionResponse.ok) {
+              const visionResult = await visionResponse.json();
+              supplementName = visionResult.supplementName || supplementName;
+            }
+          } catch (error) {
+            console.error('Error analyzing supplement image:', error);
+          }
         }
-      } catch (error) {
-        console.error('Error analyzing supplement image:', error);
-        supplementName = 'Analysis Error';
       }
 
       const supplementData = { 
-        id: Date.now().toString(), // Unique ID for editing
-        frontImage: frontImage.name, 
-        backImage: backImage?.name, 
+        id: isEditing ? supplements[editingIndex].id : Date.now().toString(),
+        frontImage: frontImage ? frontImage.name : (isEditing ? supplements[editingIndex].frontImage : ''), 
+        backImage: backImage ? backImage.name : (isEditing ? supplements[editingIndex].backImage : ''), 
         method: 'photo',
-        name: supplementName, // Use AI-extracted name instead of filename
+        name: supplementName,
         dosage: `${photoDosage} ${photoDosageUnit}`,
         timing: timingWithDosages,
         scheduleInfo: scheduleInfo,
-        dateAdded: currentDate
+        dateAdded: isEditing ? supplements[editingIndex].dateAdded : currentDate
       };
       
       if (editingIndex !== null) {
@@ -1931,15 +1939,62 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
       }
     } else {
       setUploadMethod('photo');
-      // For photo method, we'll need to handle this differently
-      // For now, we'll just set the basic info
-      setPhotoDosage(supplement.dosage.split(' ')[0]);
-      setPhotoDosageUnit(supplement.dosage.split(' ')[1] || 'mg');
+      // Parse dosage and unit from the main dosage field
+      const dosageParts = supplement.dosage.split(' ');
+      setPhotoDosage(dosageParts[0]);
+      setPhotoDosageUnit(dosageParts[1] || 'mg');
+      
+      // Parse timing array - format is ["Morning: 22 mg", "Afternoon: 15 mg"]
+      const timingArray: string[] = [];
+      const timingDosagesObj: {[key: string]: string} = {};
+      const timingDosageUnitsObj: {[key: string]: string} = {};
+      
+      if (Array.isArray(supplement.timing)) {
+        supplement.timing.forEach((timingStr: string) => {
+          // Parse "Morning: 22 mg" format
+          const parts = timingStr.split(':');
+          if (parts.length >= 2) {
+            const timeName = parts[0].trim();
+            const dosagePart = parts[1].trim();
+            timingArray.push(timeName);
+            
+            // Parse dosage and unit (e.g., "22 mg")
+            const dosageParts = dosagePart.split(' ');
+            if (dosageParts.length >= 2) {
+              timingDosagesObj[timeName] = dosageParts[0];
+              timingDosageUnitsObj[timeName] = dosageParts[1];
+            } else if (dosageParts.length === 1) {
+              timingDosagesObj[timeName] = dosageParts[0];
+              timingDosageUnitsObj[timeName] = photoDosageUnit;
+            }
+          } else {
+            // Fallback: treat entire string as timing name
+            timingArray.push(timingStr.trim());
+          }
+        });
+      }
+      
+      setPhotoTiming(timingArray);
+      setPhotoTimingDosages(timingDosagesObj);
+      setPhotoTimingDosageUnits(timingDosageUnitsObj);
+      
+      // Set schedule
       setPhotoDosageSchedule(supplement.scheduleInfo === 'Daily' ? 'daily' : 'specific');
       if (supplement.scheduleInfo !== 'Daily') {
         setPhotoSelectedDays(supplement.scheduleInfo.split(', '));
       }
+      
+      // Note: We can't restore File objects from saved data, so images will need to be re-uploaded if user wants to change them
+      // But we'll make images optional when editing
     }
+    
+    // Scroll to form when editing
+    setTimeout(() => {
+      const formElement = document.querySelector('.max-w-md.mx-auto');
+      if (formElement) {
+        formElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 100);
   };
 
   const removeSupplement = async (index: number) => {
@@ -1958,13 +2013,32 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
     <div className="max-w-md mx-auto">
       <div className="bg-white rounded-lg shadow-sm p-6">
         <h2 className="text-2xl font-bold mb-4">Upload your supplements</h2>
+        {editingIndex !== null && (
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center space-x-2">
+              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              <span className="text-blue-900 font-medium">Editing: {supplements[editingIndex]?.name || 'Supplement'}</span>
+              <button
+                onClick={() => {
+                  setEditingIndex(null);
+                  clearPhotoForm();
+                }}
+                className="ml-auto text-blue-600 hover:text-blue-800 text-sm"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
         <p className="mb-6 text-gray-600">Add photos of both the front and back of your supplement bottles/packets to get accurate AI guidance on interactions and optimizations.</p>
         
         {/* Photo Upload Method - Only Option */}
         <div className="mb-6 space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Front of supplement bottle/packet *
+                Front of supplement bottle/packet {editingIndex === null ? '*' : '(optional when editing)'}
               </label>
               <div className="relative">
                 <input
@@ -2006,7 +2080,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Back of supplement bottle/packet *
+                Back of supplement bottle/packet {editingIndex === null ? '*' : '(optional when editing)'}
               </label>
               <div className="relative">
                 <input
@@ -2188,7 +2262,11 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
             <button 
               className="w-full bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-300" 
               onClick={addSupplement}
-              disabled={!frontImage || !backImage || !photoDosage || photoTiming.length === 0 || (photoDosageSchedule === 'specific' && photoSelectedDays.length === 0)}
+              disabled={
+                editingIndex !== null 
+                  ? (!photoDosage || photoTiming.length === 0 || (photoDosageSchedule === 'specific' && photoSelectedDays.length === 0))
+                  : (!frontImage || !backImage || !photoDosage || photoTiming.length === 0 || (photoDosageSchedule === 'specific' && photoSelectedDays.length === 0))
+              }
             >
               {editingIndex !== null ? 'Update Supplement' : 'Add Supplement'}
             </button>
@@ -2547,9 +2625,14 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
 
   const addMedication = async () => {
     const currentDate = new Date().toISOString();
+    const isEditing = editingIndex !== null;
     
-    // Only photo method now - require both images
-    if (frontImage && backImage && photoDosage && photoTiming.length > 0) {
+    // For new medications, require both images. For editing, images are optional.
+    const hasRequiredData = isEditing 
+      ? (photoDosage && photoTiming.length > 0)
+      : (frontImage && backImage && photoDosage && photoTiming.length > 0);
+    
+    if (hasRequiredData) {
       // Combine timing and individual dosages with units for photos
       const timingWithDosages = photoTiming.map(time => {
         const timeSpecificDosage = photoTimingDosages[time];
@@ -2561,40 +2644,43 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
       
       const scheduleInfo = photoDosageSchedule === 'daily' ? 'Daily' : photoSelectedDays.join(', ');
       
-      // CRITICAL FIX: Analyze image to extract medication name instead of using filename
-      let medicationName = 'Analyzing...';
-      try {
-        // Create FormData for image analysis
-        const formData = new FormData();
-        formData.append('image', frontImage);
-        
-        // Call vision API to extract medication name
-        const visionResponse = await fetch('/api/analyze-supplement-image', {
-          method: 'POST',
-          body: formData
-        });
-        
-        if (visionResponse.ok) {
-          const visionResult = await visionResponse.json();
-          medicationName = visionResult.supplementName || 'Unknown Medication';
-        } else {
-          medicationName = 'Image Analysis Failed';
+      // Only analyze image if it's a new medication or if new images are provided
+      let medicationName = isEditing ? medications[editingIndex].name : 'Analyzing...';
+      
+      if (!isEditing || (frontImage && backImage)) {
+        // CRITICAL FIX: Analyze image to extract medication name instead of using filename
+        if (frontImage) {
+          try {
+            // Create FormData for image analysis
+            const formData = new FormData();
+            formData.append('image', frontImage);
+            
+            // Call vision API to extract medication name
+            const visionResponse = await fetch('/api/analyze-supplement-image', {
+              method: 'POST',
+              body: formData
+            });
+            
+            if (visionResponse.ok) {
+              const visionResult = await visionResponse.json();
+              medicationName = visionResult.supplementName || medicationName;
+            }
+          } catch (error) {
+            console.error('Error analyzing medication image:', error);
+          }
         }
-      } catch (error) {
-        console.error('Error analyzing medication image:', error);
-        medicationName = 'Analysis Error';
       }
 
       const medicationData = { 
-        id: Date.now().toString(), // Unique ID for editing
-        frontImage: frontImage.name, 
-        backImage: backImage?.name, 
+        id: isEditing ? medications[editingIndex].id : Date.now().toString(),
+        frontImage: frontImage ? frontImage.name : (isEditing ? medications[editingIndex].frontImage : ''), 
+        backImage: backImage ? backImage.name : (isEditing ? medications[editingIndex].backImage : ''), 
         method: 'photo',
-        name: medicationName, // Use AI-extracted name instead of filename
+        name: medicationName,
         dosage: `${photoDosage} ${photoDosageUnit}`,
         timing: timingWithDosages,
         scheduleInfo: scheduleInfo,
-        dateAdded: currentDate
+        dateAdded: isEditing ? medications[editingIndex].dateAdded : currentDate
       };
       
       if (editingIndex !== null) {
@@ -2744,13 +2830,62 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
       }
     } else {
       setUploadMethod('photo');
-      setPhotoDosage(medication.dosage.split(' ')[0]);
-      setPhotoDosageUnit(medication.dosage.split(' ')[1] || 'mg');
+      // Parse dosage and unit from the main dosage field
+      const dosageParts = medication.dosage.split(' ');
+      setPhotoDosage(dosageParts[0]);
+      setPhotoDosageUnit(dosageParts[1] || 'mg');
+      
+      // Parse timing array - format is ["Morning: 22 mg", "Afternoon: 15 mg"]
+      const timingArray: string[] = [];
+      const timingDosagesObj: {[key: string]: string} = {};
+      const timingDosageUnitsObj: {[key: string]: string} = {};
+      
+      if (Array.isArray(medication.timing)) {
+        medication.timing.forEach((timingStr: string) => {
+          // Parse "Morning: 22 mg" format
+          const parts = timingStr.split(':');
+          if (parts.length >= 2) {
+            const timeName = parts[0].trim();
+            const dosagePart = parts[1].trim();
+            timingArray.push(timeName);
+            
+            // Parse dosage and unit (e.g., "22 mg")
+            const dosageParts = dosagePart.split(' ');
+            if (dosageParts.length >= 2) {
+              timingDosagesObj[timeName] = dosageParts[0];
+              timingDosageUnitsObj[timeName] = dosageParts[1];
+            } else if (dosageParts.length === 1) {
+              timingDosagesObj[timeName] = dosageParts[0];
+              timingDosageUnitsObj[timeName] = photoDosageUnit;
+            }
+          } else {
+            // Fallback: treat entire string as timing name
+            timingArray.push(timingStr.trim());
+          }
+        });
+      }
+      
+      setPhotoTiming(timingArray);
+      setPhotoTimingDosages(timingDosagesObj);
+      setPhotoTimingDosageUnits(timingDosageUnitsObj);
+      
+      // Set schedule
       setPhotoDosageSchedule(medication.scheduleInfo === 'Daily' ? 'daily' : 'specific');
       if (medication.scheduleInfo !== 'Daily') {
         setPhotoSelectedDays(medication.scheduleInfo.split(', '));
       }
+      
+      // Note: We can't restore File objects from saved data, so images will need to be re-uploaded if user wants to change them
+      // But we'll make images optional when editing
     }
+    
+    // Scroll to form when editing
+    setTimeout(() => {
+      const formElement = document.querySelector('.max-w-md.mx-auto');
+      if (formElement) {
+        formElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 100);
   };
 
   const removeMedication = async (index: number) => {
@@ -2769,13 +2904,32 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
     <div className="max-w-md mx-auto">
       <div className="bg-white rounded-lg shadow-sm p-6">
         <h2 className="text-2xl font-bold mb-4">Add your medications</h2>
+        {editingIndex !== null && (
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center space-x-2">
+              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              <span className="text-blue-900 font-medium">Editing: {medications[editingIndex]?.name || 'Medication'}</span>
+              <button
+                onClick={() => {
+                  setEditingIndex(null);
+                  clearMedPhotoForm();
+                }}
+                className="ml-auto text-blue-600 hover:text-blue-800 text-sm"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
         <p className="mb-6 text-gray-600">Upload photos of both the front and back of your medication bottles/packets to check for supplement-medication interactions.</p>
         
         {/* Photo Upload Method - Only Option */}
         <div className="mb-6 space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Front of medication bottle/packet *
+                Front of medication bottle/packet {editingIndex === null ? '*' : '(optional when editing)'}
               </label>
               <div className="relative">
                 <input
@@ -2817,7 +2971,7 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Back of medication bottle/packet *
+                Back of medication bottle/packet {editingIndex === null ? '*' : '(optional when editing)'}
               </label>
               <div className="relative">
                 <input
@@ -2995,7 +3149,11 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
             <button 
               className="w-full bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-300" 
               onClick={addMedication}
-              disabled={!frontImage || !backImage || !photoDosage || photoTiming.length === 0 || (photoDosageSchedule === 'specific' && photoSelectedDays.length === 0)}
+              disabled={
+                editingIndex !== null 
+                  ? (!photoDosage || photoTiming.length === 0 || (photoDosageSchedule === 'specific' && photoSelectedDays.length === 0))
+                  : (!frontImage || !backImage || !photoDosage || photoTiming.length === 0 || (photoDosageSchedule === 'specific' && photoSelectedDays.length === 0))
+              }
             >
               {editingIndex !== null ? 'Update Medication' : 'Add Medication'}
             </button>
