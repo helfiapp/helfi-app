@@ -28,7 +28,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       connected: !!fitbitAccount,
       fitbitUserId: fitbitAccount?.providerAccountId || null,
-      connectedAt: fitbitAccount?.createdAt || null,
     })
   } catch (error) {
     console.error('❌ Error checking Fitbit status:', error)
