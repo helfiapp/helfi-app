@@ -315,7 +315,7 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
         body: JSON.stringify({ 
           message: text, 
           threadId: currentThreadId || undefined,
-          newThread: !currentThreadId,
+          newThread: false, // Never create a new thread automatically - user must click "+ New Chat"
           ...context 
         }),
       })

@@ -283,18 +283,19 @@ export async function POST(req: NextRequest) {
     await ensureTalkToAITables()
     let threadId: string
     if (body.newThread) {
-      // Create new thread
+      // Create new thread only if explicitly requested
       const thread = await createThread(session.user.id)
       threadId = thread.id
     } else if (body.threadId) {
       // Use existing thread
       threadId = body.threadId
     } else {
-      // Get most recent thread or create new one
+      // Get most recent thread or create new one ONLY if no threads exist
       const threads = await listThreads(session.user.id)
       if (threads.length > 0) {
         threadId = threads[0].id
       } else {
+        // Only create if truly no threads exist
         const thread = await createThread(session.user.id)
         threadId = thread.id
       }

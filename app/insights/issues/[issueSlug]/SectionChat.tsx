@@ -132,7 +132,7 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
           }
         }
         // Only try backward compatibility if we have NO threads (to avoid creating duplicates)
-        if (!cancelled && threads.length === 0 && !threadId) {
+        if (!cancelled && threadsData.threads && threadsData.threads.length === 0 && !threadId) {
           const res = await fetch(`/api/insights/issues/${issueSlug}/sections/${section}/chat`, { cache: 'no-store' })
           if (res.ok) {
             const data = await res.json()
