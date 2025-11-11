@@ -11,8 +11,11 @@ export default function DevicesPage() {
   const [fitbitConnected, setFitbitConnected] = useState(false)
   const [fitbitLoading, setFitbitLoading] = useState(false)
   const [syncingFitbit, setSyncingFitbit] = useState(false)
+  const [popupOpen, setPopupOpen] = useState(false)
+  const [checkingStatus, setCheckingStatus] = useState(false)
   const popupRef = useRef<Window | null>(null)
   const checkIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const closedCheckRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     checkFitbitStatus()
@@ -60,6 +63,8 @@ export default function DevicesPage() {
 
   const handleConnectFitbit = async () => {
     setFitbitLoading(true)
+    setPopupOpen(true)
+    setCheckingStatus(true)
     try {
       // Open Fitbit OAuth in a popup window so users can still see Helfi
       const width = 600
@@ -76,30 +81,41 @@ export default function DevicesPage() {
       if (!popup) {
         alert('Please allow popups for this site to connect Fitbit')
         setFitbitLoading(false)
+        setPopupOpen(false)
+        setCheckingStatus(false)
         return
       }
 
       popupRef.current = popup
 
       // Check if popup is closed (user cancelled)
-      const checkClosed = setInterval(() => {
+      closedCheckRef.current = setInterval(() => {
         if (popup.closed) {
-          clearInterval(checkClosed)
+          if (closedCheckRef.current) {
+            clearInterval(closedCheckRef.current)
+            closedCheckRef.current = null
+          }
           if (checkIntervalRef.current) {
             clearInterval(checkIntervalRef.current)
             checkIntervalRef.current = null
           }
           setFitbitLoading(false)
+          setPopupOpen(false)
+          setCheckingStatus(false)
           // Check status in case they completed it quickly
           setTimeout(() => checkFitbitStatus(), 1000)
         }
       }, 500)
 
-      // Poll for connection status - check every 2 seconds
+      // Poll for connection status - check every 1 second (more frequent)
       checkIntervalRef.current = setInterval(async () => {
+        setCheckingStatus(true)
         const connected = await checkFitbitStatus()
         if (connected) {
-          clearInterval(checkClosed)
+          if (closedCheckRef.current) {
+            clearInterval(closedCheckRef.current)
+            closedCheckRef.current = null
+          }
           if (checkIntervalRef.current) {
             clearInterval(checkIntervalRef.current)
             checkIntervalRef.current = null
@@ -113,22 +129,66 @@ export default function DevicesPage() {
             }
           }
           setFitbitLoading(false)
+          setPopupOpen(false)
+          setCheckingStatus(false)
         }
-      }, 2000)
+      }, 1000)
 
-      // Cleanup after 5 minutes
+      // Cleanup after 3 minutes
       setTimeout(() => {
-        clearInterval(checkClosed)
+        if (closedCheckRef.current) {
+          clearInterval(closedCheckRef.current)
+          closedCheckRef.current = null
+        }
         if (checkIntervalRef.current) {
           clearInterval(checkIntervalRef.current)
           checkIntervalRef.current = null
         }
         setFitbitLoading(false)
-      }, 300000)
+        setPopupOpen(false)
+        setCheckingStatus(false)
+      }, 180000)
     } catch (error) {
       console.error('Error connecting Fitbit:', error)
       alert('Failed to connect Fitbit. Please try again.')
       setFitbitLoading(false)
+      setPopupOpen(false)
+      setCheckingStatus(false)
+    }
+  }
+
+  const handleClosePopupAndCheck = async () => {
+    // Close popup if still open
+    if (popupRef.current && !popupRef.current.closed) {
+      try {
+        popupRef.current.close()
+      } catch (e) {
+        // Ignore errors
+      }
+    }
+    
+    // Clean up intervals
+    if (closedCheckRef.current) {
+      clearInterval(closedCheckRef.current)
+      closedCheckRef.current = null
+    }
+    if (checkIntervalRef.current) {
+      clearInterval(checkIntervalRef.current)
+      checkIntervalRef.current = null
+    }
+    
+    setPopupOpen(false)
+    setCheckingStatus(true)
+    
+    // Check status
+    const connected = await checkFitbitStatus()
+    if (connected) {
+      setFitbitLoading(false)
+      setCheckingStatus(false)
+    } else {
+      setFitbitLoading(false)
+      setCheckingStatus(false)
+      alert('Fitbit connection not detected. Please try connecting again.')
     }
   }
 
@@ -137,6 +197,9 @@ export default function DevicesPage() {
     return () => {
       if (checkIntervalRef.current) {
         clearInterval(checkIntervalRef.current)
+      }
+      if (closedCheckRef.current) {
+        clearInterval(closedCheckRef.current)
       }
     }
   }, [])
@@ -217,6 +280,38 @@ export default function DevicesPage() {
               </div>
             )}
           </div>
+
+          {popupOpen && (
+            <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0">
+                  {checkingStatus ? (
+                    <svg className="animate-spin h-5 w-5 text-blue-600 dark:text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  ) : (
+                    <div className="w-5 h-5 bg-blue-600 dark:bg-blue-400 rounded-full"></div>
+                  )}
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-1">
+                    {checkingStatus ? 'Checking connection status...' : 'Popup window is open'}
+                  </p>
+                  <p className="text-xs text-blue-700 dark:text-blue-300 mb-3">
+                    Complete the Fitbit login in the popup window. If the popup gets stuck, click the button below to close it and check your connection status.
+                  </p>
+                  <button
+                    onClick={handleClosePopupAndCheck}
+                    disabled={checkingStatus}
+                    className="text-xs px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {checkingStatus ? 'Checking...' : 'Close Popup & Check Status'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {fitbitConnected ? (
             <div className="space-y-4">
