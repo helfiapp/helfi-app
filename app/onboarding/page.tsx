@@ -1785,31 +1785,43 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
       };
       
       if (editingIndex !== null) {
-        // Update existing supplement
-        setSupplements((prev: any[]) => prev.map((item: any, index: number) => 
-          index === editingIndex ? supplementData : item
-        ));
+        // Update existing supplement - don't show popup, just update silently
+        setSupplements((prev: any[]) => {
+          const updatedSupplements = prev.map((item: any, index: number) => 
+            index === editingIndex ? supplementData : item
+          );
+          setSupplementsToSave(updatedSupplements);
+          // Save immediately without showing popup for edits
+          (async () => {
+            try {
+              const response = await fetch('/api/user-data', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ supplements: updatedSupplements })
+              });
+              if (!response.ok) {
+                console.error('Failed to save supplement edit');
+              }
+            } catch (error) {
+              console.error('Error saving supplement edit:', error);
+            }
+          })();
+          return updatedSupplements;
+        });
         setEditingIndex(null);
       } else {
-        // Add new supplement
-        setSupplements((prev: any[]) => [...prev, supplementData]);
+        // Add new supplement - show popup
+        setSupplements((prev: any[]) => {
+          const updatedSupplements = [...prev, supplementData];
+          setSupplementsToSave(updatedSupplements);
+          // Mark as having unsaved changes and show popup for new additions
+          setHasUnsavedChanges(true);
+          setShowUpdatePopup(true);
+          return updatedSupplements;
+        });
       }
       
       clearPhotoForm();
-      
-      // Store data for potential popup action, but don't save immediately
-      const updatedSupplements = editingIndex !== null 
-        ? supplements.map((item: any, index: number) => 
-            index === editingIndex ? supplementData : item
-          )
-        : [...supplements, supplementData];
-      setSupplementsToSave(updatedSupplements);
-      
-      // Mark as having unsaved changes
-      setHasUnsavedChanges(true);
-      
-      // Show popup and wait for user decision - no automatic actions
-      setShowUpdatePopup(true);
     }
   };
   
@@ -1896,10 +1908,8 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
     setEditingIndex(index);
     setShowDropdown(null);
     
-    // Show popup if there's an existing analysis (editing will trigger update)
-    if (hasExistingAnalysis) {
-      setShowUpdatePopup(true);
-    }
+    // Don't show popup on edit - only show when user saves changes or deletes
+    // The popup will be shown in addSupplement() when editingIndex !== null and user clicks "Update Supplement"
     
     if (supplement.method === 'manual') {
       setUploadMethod('manual');
@@ -2588,31 +2598,43 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
       };
       
       if (editingIndex !== null) {
-        // Update existing medication
-        setMedications((prev: any[]) => prev.map((item: any, index: number) => 
-          index === editingIndex ? medicationData : item
-        ));
+        // Update existing medication - don't show popup, just update silently
+        setMedications((prev: any[]) => {
+          const updatedMedications = prev.map((item: any, index: number) => 
+            index === editingIndex ? medicationData : item
+          );
+          setMedicationsToSave(updatedMedications);
+          // Save immediately without showing popup for edits
+          (async () => {
+            try {
+              const response = await fetch('/api/user-data', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ medications: updatedMedications })
+              });
+              if (!response.ok) {
+                console.error('Failed to save medication edit');
+              }
+            } catch (error) {
+              console.error('Error saving medication edit:', error);
+            }
+          })();
+          return updatedMedications;
+        });
         setEditingIndex(null);
       } else {
-        // Add new medication
-        setMedications((prev: any[]) => [...prev, medicationData]);
+        // Add new medication - show popup
+        setMedications((prev: any[]) => {
+          const updatedMedications = [...prev, medicationData];
+          setMedicationsToSave(updatedMedications);
+          // Mark as having unsaved changes and show popup for new additions
+          setHasUnsavedChanges(true);
+          setShowUpdatePopup(true);
+          return updatedMedications;
+        });
       }
       
       clearMedPhotoForm();
-      
-      // Store data for potential popup action, but don't save immediately
-      const updatedMedications = editingIndex !== null 
-        ? medications.map((item: any, index: number) => 
-            index === editingIndex ? medicationData : item
-          )
-        : [...medications, medicationData];
-      setMedicationsToSave(updatedMedications);
-      
-      // Mark as having unsaved changes
-      setHasUnsavedChanges(true);
-      
-      // Show popup and wait for user decision - no automatic actions
-      setShowUpdatePopup(true);
     }
   };
   
@@ -2699,10 +2721,8 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
     setEditingIndex(index);
     setShowDropdown(null);
     
-    // Show popup if there's an existing analysis (editing will trigger update)
-    if (hasExistingAnalysis) {
-      setShowUpdatePopup(true);
-    }
+    // Don't show popup on edit - only show when user saves changes or deletes
+    // The popup will be shown in addMedication() when editingIndex !== null and user clicks "Update Medication"
     
     if (medication.method === 'manual') {
       setUploadMethod('manual');
