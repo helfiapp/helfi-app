@@ -166,6 +166,10 @@ After your explanation and the one-line totals above, also include a compact JSO
         dataUrlPrefix: imageDataUrl.substring(0, 50) + '...'
       });
 
+      // For image analysis, request structured items and multi-detect by default
+      wantStructured = true;
+      preferMultiDetect = true;
+
       messages = [
         {
           role: "user",
@@ -186,6 +190,23 @@ CRITICAL FOR MEALS WITH MULTIPLE COMPONENTS:
 - Estimate portions realistically based on what's visible in the image
 - If unsure about a component, estimate conservatively but include it in your totals
 - For mixed dishes (salads, soups, stews), break down the main ingredients and sum them
+
+COMMON MEAL PATTERNS TO RECOGNIZE (DO NOT MISS):
+- Burgers/wraps/sandwiches/tacos: bun/wrap + protein + cheese + sauces + salad/veg
+- Bowls/salads: base (rice/greens) + protein + toppings + dressing/sauce
+- Plates: protein + starch (rice/pasta/potato/bread) + vegetables + sauces
+- Pizzas/flatbreads: base + cheese + toppings (count visible slices as portion)
+- Breakfasts: eggs + toast + spreads + bacon/sausage + sides (tomatoes, mushrooms)
+- Soups/stews/curries: liquid base + visible solids (meat/veg) + rice/bread
+
+PORTION CUES:
+- Use plate size, utensil size, and hand-size cues to estimate grams or household measures
+- Do not double count overlapping items; base your estimate on visible evidence
+- Ignore inedible items. Only include a drink if clearly visible as part of the meal
+
+OUTPUT REQUIREMENTS:
+- Keep explanation to 2-3 sentences
+- ALWAYS end with a single nutrition line in this exact format:
 
 Keep your explanation concise (2-3 sentences) and ALWAYS include a single nutrition line at the end in this exact format:
 
@@ -295,7 +316,7 @@ After your explanation and the one-line totals above, also include a compact JSO
     }
 
     const model = isReanalysis ? 'gpt-4o-mini' : 'gpt-4o';
-    const maxTokens = 500;
+    const maxTokens = 600;
 
     // Wallet pre-check (skip if allowed via free use)
     if (!allowViaFreeUse) {
@@ -335,7 +356,7 @@ After your explanation and the one-line totals above, also include a compact JSO
       model,
       messages,
       max_tokens: maxTokens,
-      temperature: 0.3,
+      temperature: 0.2,
     } as any);
 
     const response = primary.completion;

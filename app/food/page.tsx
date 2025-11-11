@@ -245,8 +245,8 @@ export default function FoodDiary() {
     const file = e.target.files?.[0];
     if (file) {
       try {
-        // Compress the uploaded file to reduce API costs
-        const compressedFile = await compressImage(file, 800, 0.8);
+        // Compress the uploaded file to balance quality and cost (higher quality for better detection)
+        const compressedFile = await compressImage(file, 1024, 0.85);
         setPhotoFile(compressedFile);
         const reader = new FileReader();
         reader.onload = (e) => setPhotoPreview(e.target?.result as string);
