@@ -268,6 +268,53 @@ export default function AdminPanel() {
     }
   }
 
+  const handleBulkDeleteWaitlistEntries = async () => {
+    if (selectedEmails.length === 0) {
+      alert('Please select at least one entry to delete')
+      return
+    }
+
+    const selectedEntries = waitlistData.filter(entry => selectedEmails.includes(entry.email))
+    const emailList = selectedEntries.map(e => e.email).join(', ')
+    
+    if (!confirm(`Are you sure you want to delete ${selectedEmails.length} waitlist ${selectedEmails.length === 1 ? 'entry' : 'entries'}?\n\n${emailList}`)) {
+      return
+    }
+
+    try {
+      // Delete all selected entries
+      const deletePromises = selectedEntries.map(entry =>
+        fetch('/api/waitlist', {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${adminToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ id: entry.id })
+        })
+      )
+
+      const results = await Promise.all(deletePromises)
+      const failed = results.filter(r => !r.ok)
+      
+      if (failed.length === 0) {
+        // Store count before clearing
+        const deletedCount = selectedEmails.length
+        // Remove all deleted entries from local state
+        const deletedIds = selectedEntries.map(e => e.id)
+        setWaitlistData(prev => prev.filter(entry => !deletedIds.includes(entry.id)))
+        // Clear selected emails
+        setSelectedEmails([])
+        alert(`✅ Successfully deleted ${deletedCount} waitlist ${deletedCount === 1 ? 'entry' : 'entries'}`)
+      } else {
+        alert(`Failed to delete ${failed.length} of ${selectedEmails.length} entries. Please try again.`)
+      }
+    } catch (error) {
+      console.error('Error bulk deleting waitlist entries:', error)
+      alert('Failed to delete waitlist entries. Please try again.')
+    }
+  }
+
   const loadUserStats = async (token?: string) => {
     setIsLoadingUsers(true)
     try {
@@ -1674,12 +1721,25 @@ The Helfi Team`,
                     </p>
                   </div>
                   {waitlistData.length > 0 && (
-                    <button
-                      onClick={handleSelectAll}
-                      className="text-sm text-emerald-600 hover:text-emerald-700 font-medium"
-                    >
-                      {selectedEmails.length === waitlistData.length ? 'Deselect All' : 'Select All'}
-                    </button>
+                    <div className="flex items-center gap-3">
+                      {selectedEmails.length > 0 && (
+                        <button
+                          onClick={handleBulkDeleteWaitlistEntries}
+                          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium text-sm flex items-center gap-2"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                          Delete Selected ({selectedEmails.length})
+                        </button>
+                      )}
+                      <button
+                        onClick={handleSelectAll}
+                        className="text-sm text-emerald-600 hover:text-emerald-700 font-medium"
+                      >
+                        {selectedEmails.length === waitlistData.length ? 'Deselect All' : 'Select All'}
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
