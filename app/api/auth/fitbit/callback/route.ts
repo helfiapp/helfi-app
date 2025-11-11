@@ -16,15 +16,61 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       console.error('❌ Fitbit OAuth error:', error)
-      return NextResponse.redirect(
-        new URL('/devices?fitbit_error=' + encodeURIComponent(error), request.nextUrl.origin)
-      )
+      const errorHtml = `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Fitbit Connection Failed</title>
+          </head>
+          <body>
+            <script>
+              if (window.opener) {
+                window.opener.postMessage({ type: 'FITBIT_ERROR', error: '${error}' }, '*')
+                setTimeout(() => window.close(), 2000)
+              } else {
+                window.location.href = '/devices?fitbit_error=${encodeURIComponent(error)}'
+              }
+            </script>
+            <div style="text-align: center; padding: 40px; font-family: Arial, sans-serif;">
+              <h2>❌ Connection Failed</h2>
+              <p>Error: ${error}</p>
+              <p>This window will close automatically.</p>
+            </div>
+          </body>
+        </html>
+      `
+      return new NextResponse(errorHtml, {
+        headers: { 'Content-Type': 'text/html' },
+      })
     }
 
     if (!code || !state) {
-      return NextResponse.redirect(
-        new URL('/devices?fitbit_error=missing_params', request.nextUrl.origin)
-      )
+      const errorHtml = `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Fitbit Connection Failed</title>
+          </head>
+          <body>
+            <script>
+              if (window.opener) {
+                window.opener.postMessage({ type: 'FITBIT_ERROR', error: 'missing_params' }, '*')
+                setTimeout(() => window.close(), 2000)
+              } else {
+                window.location.href = '/devices?fitbit_error=missing_params'
+              }
+            </script>
+            <div style="text-align: center; padding: 40px; font-family: Arial, sans-serif;">
+              <h2>❌ Connection Failed</h2>
+              <p>Missing required parameters.</p>
+              <p>This window will close automatically.</p>
+            </div>
+          </body>
+        </html>
+      `
+      return new NextResponse(errorHtml, {
+        headers: { 'Content-Type': 'text/html' },
+      })
     }
 
     // Verify state and get userId
@@ -133,9 +179,39 @@ export async function GET(request: NextRequest) {
 
     console.log('✅ Fitbit account linked successfully:', { userId: session.user.id, fitbitUserId })
 
-    return NextResponse.redirect(
-      new URL('/devices?fitbit_connected=true', request.nextUrl.origin)
-    )
+    // Check if this is a popup window (via referer or window.opener)
+    // If opened in popup, close it and notify parent
+    const html = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Fitbit Connected</title>
+        </head>
+        <body>
+          <script>
+            // Notify parent window that connection succeeded
+            if (window.opener) {
+              window.opener.postMessage({ type: 'FITBIT_CONNECTED', success: true }, '*')
+              // Close popup after a brief delay
+              setTimeout(() => {
+                window.close()
+              }, 500)
+            } else {
+              // Not a popup, redirect normally
+              window.location.href = '/devices?fitbit_connected=true'
+            }
+          </script>
+          <div style="text-align: center; padding: 40px; font-family: Arial, sans-serif;">
+            <h2>✅ Fitbit Connected Successfully!</h2>
+            <p>You can close this window.</p>
+          </div>
+        </body>
+      </html>
+    `
+
+    return new NextResponse(html, {
+      headers: { 'Content-Type': 'text/html' },
+    })
   } catch (error) {
     console.error('❌ Fitbit callback error:', error)
     return NextResponse.redirect(

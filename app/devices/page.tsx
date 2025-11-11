@@ -25,6 +25,20 @@ export default function DevicesPage() {
       alert('Fitbit connection failed: ' + params.get('fitbit_error'))
       window.history.replaceState({}, '', '/devices')
     }
+
+    // Listen for messages from popup window
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'FITBIT_CONNECTED' && event.data.success) {
+        checkFitbitStatus()
+        setFitbitLoading(false)
+      } else if (event.data?.type === 'FITBIT_ERROR') {
+        alert('Fitbit connection failed: ' + event.data.error)
+        setFitbitLoading(false)
+      }
+    }
+
+    window.addEventListener('message', handleMessage)
+    return () => window.removeEventListener('message', handleMessage)
   }, [])
 
   const checkFitbitStatus = async () => {
@@ -33,16 +47,63 @@ export default function DevicesPage() {
       if (response.ok) {
         const data = await response.json()
         setFitbitConnected(data.connected)
+        return data.connected
       }
+      return false
     } catch (error) {
       console.error('Error checking Fitbit status:', error)
+      return false
     }
   }
 
   const handleConnectFitbit = async () => {
     setFitbitLoading(true)
     try {
-      window.location.href = '/api/auth/fitbit/authorize'
+      // Open Fitbit OAuth in a popup window so users can still see Helfi
+      const width = 600
+      const height = 700
+      const left = window.screen.width / 2 - width / 2
+      const top = window.screen.height / 2 - height / 2
+      
+      const popup = window.open(
+        '/api/auth/fitbit/authorize',
+        'Fitbit Authorization',
+        `width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no,scrollbars=yes,resizable=yes`
+      )
+
+      if (!popup) {
+        alert('Please allow popups for this site to connect Fitbit')
+        setFitbitLoading(false)
+        return
+      }
+
+      // Check if popup is closed (user cancelled)
+      const checkClosed = setInterval(() => {
+        if (popup.closed) {
+          clearInterval(checkClosed)
+          setFitbitLoading(false)
+          // Check status in case they completed it quickly
+          setTimeout(() => checkFitbitStatus(), 1000)
+        }
+      }, 500)
+
+      // Listen for postMessage from callback
+      const checkStatus = setInterval(async () => {
+        const connected = await checkFitbitStatus()
+        if (connected) {
+          clearInterval(checkStatus)
+          clearInterval(checkClosed)
+          popup.close()
+          setFitbitLoading(false)
+        }
+      }, 2000)
+
+      // Cleanup after 5 minutes
+      setTimeout(() => {
+        clearInterval(checkClosed)
+        clearInterval(checkStatus)
+        setFitbitLoading(false)
+      }, 300000)
     } catch (error) {
       console.error('Error connecting Fitbit:', error)
       alert('Failed to connect Fitbit. Please try again.')
