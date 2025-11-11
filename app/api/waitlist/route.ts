@@ -16,6 +16,7 @@ function getResend() {
 async function sendWaitlistAcknowledgmentEmail(email: string, name: string) {
   const resend = getResend()
   if (!resend) {
+    console.log('📧 [WAITLIST ACK] Resend not configured, skipping email to', email)
     return
   }
 
@@ -79,9 +80,24 @@ async function sendWaitlistAcknowledgmentEmail(email: string, name: string) {
       `
     })
 
-    console.log(`✅ [WAITLIST ACK EMAIL] Sent to ${email} with ID: ${emailResponse.data?.id}`)
-  } catch (error) {
+    // Check for errors in Resend response
+    if (emailResponse.error) {
+      console.error(`❌ [WAITLIST ACK EMAIL] Resend error for ${email}:`, emailResponse.error)
+      throw new Error(`Resend error: ${JSON.stringify(emailResponse.error)}`)
+    }
+
+    if (emailResponse.data?.id) {
+      console.log(`✅ [WAITLIST ACK EMAIL] Sent to ${email} with ID: ${emailResponse.data.id}`)
+    } else {
+      console.warn(`⚠️ [WAITLIST ACK EMAIL] No message ID returned for ${email}, response:`, emailResponse)
+    }
+  } catch (error: any) {
     console.error(`❌ [WAITLIST ACK EMAIL] Failed to send to ${email}:`, error)
+    console.error(`❌ [WAITLIST ACK EMAIL] Error details:`, {
+      message: error?.message,
+      stack: error?.stack,
+      name: error?.name
+    })
   }
 }
 
@@ -172,12 +188,17 @@ export async function POST(request: NextRequest) {
 
     // Send acknowledgment email to user (don't await to avoid blocking response)
     sendWaitlistAcknowledgmentEmail(normalizedEmail, normalizedName).catch(error => {
-      console.error('❌ Waitlist acknowledgment email failed (non-blocking):', error)
+      console.error('❌ [WAITLIST] Acknowledgment email failed (non-blocking):', error)
+      console.error('❌ [WAITLIST] Error details:', {
+        email: normalizedEmail,
+        name: normalizedName,
+        error: error?.message || error
+      })
     })
 
     // Send notification email to support team (don't await to avoid blocking response)
     sendWaitlistNotificationEmail(normalizedEmail, normalizedName).catch(error => {
-      console.error('❌ Waitlist notification email failed (non-blocking):', error)
+      console.error('❌ [WAITLIST] Notification email failed (non-blocking):', error)
     })
 
     return NextResponse.json({ 
