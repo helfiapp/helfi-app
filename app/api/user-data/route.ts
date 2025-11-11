@@ -201,7 +201,8 @@ export async function GET(request: NextRequest) {
         timing: supp.timing,
         dateAdded: supp.dateAdded || supp.createdAt || new Date().toISOString(),
         method: supp.method || 'manual',
-        scheduleInfo: supp.scheduleInfo || 'Daily'
+        scheduleInfo: supp.scheduleInfo || 'Daily',
+        imageUrl: supp.imageUrl || null
       })),
       medications: user.medications.map((med: any) => ({
         name: med.name,
@@ -209,7 +210,8 @@ export async function GET(request: NextRequest) {
         timing: med.timing,
         dateAdded: med.dateAdded || med.createdAt || new Date().toISOString(),
         method: med.method || 'manual',
-        scheduleInfo: med.scheduleInfo || 'Daily'
+        scheduleInfo: med.scheduleInfo || 'Daily',
+        imageUrl: med.imageUrl || null
       })),
       profileImage: user.image || null,
       todaysFoods: todaysFoods,
@@ -520,6 +522,7 @@ export async function POST(request: NextRequest) {
               name: supp.name,
               dosage: supp.dosage || '',
               timing: Array.isArray(supp.timing) ? supp.timing : [supp.timing || 'morning'],
+              imageUrl: supp.imageUrl || null
             }))
           })
         ])
@@ -618,6 +621,7 @@ export async function POST(request: NextRequest) {
               name: med.name,
               dosage: med.dosage || '',
               timing: Array.isArray(med.timing) ? med.timing : [med.timing || 'morning'],
+              imageUrl: med.imageUrl || null
             }))
           })
         ])

@@ -1578,92 +1578,64 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
       // Clear any existing form state first
       setFrontImage(null);
       setBackImage(null);
+      // Always use photo-style fields in the UI, regardless of stored method
+      setUploadMethod('photo');
       
-      if (supplement.method === 'manual') {
-        setUploadMethod('manual');
-        setName(supplement.name || '');
-        
-        const dosageStr = supplement.dosage || '';
-        const dosageParts = dosageStr.split(' ');
-        setDosage(dosageParts[0] || '');
-        setDosageUnit(dosageParts[1] || 'mg');
-        
-        const timingArray = Array.isArray(supplement.timing) 
-          ? supplement.timing.map((t: string) => {
-              if (typeof t === 'string' && t.includes(':')) {
-                return t.split(':')[0].trim();
-              }
-              return String(t).trim();
-            })
-          : [];
-        setTiming(timingArray);
-        
-        setDosageSchedule(supplement.scheduleInfo === 'Daily' ? 'daily' : 'specific');
-        if (supplement.scheduleInfo && supplement.scheduleInfo !== 'Daily') {
-          setSelectedDays(supplement.scheduleInfo.split(', ').filter(Boolean));
-        } else {
-          setSelectedDays([]);
-        }
-      } else {
-        // Default to photo method if method is not specified
-        setUploadMethod('photo');
-        
-        const dosageStr = supplement.dosage || '';
-        const dosageParts = dosageStr.split(' ');
-        const baseDosage = dosageParts[0] || '';
-        const baseUnit = dosageParts.length > 1 ? dosageParts[1] : 'mg';
-        
-        setPhotoDosage(baseDosage);
-        setPhotoDosageUnit(baseUnit);
-        
-        const timingArray: string[] = [];
-        const timingDosagesObj: {[key: string]: string} = {};
-        const timingDosageUnitsObj: {[key: string]: string} = {};
-        
-        if (Array.isArray(supplement.timing) && supplement.timing.length > 0) {
-          supplement.timing.forEach((timingStr: string) => {
-            if (typeof timingStr !== 'string') {
-              timingStr = String(timingStr);
-            }
-            
-            if (timingStr.includes(':')) {
-              const parts = timingStr.split(':');
-              if (parts.length >= 2) {
-                const timeName = parts[0].trim();
-                const dosagePart = parts[1].trim();
-                timingArray.push(timeName);
-                
-                const dosageParts = dosagePart.split(' ');
-                if (dosageParts.length >= 2) {
-                  timingDosagesObj[timeName] = dosageParts[0];
-                  timingDosageUnitsObj[timeName] = dosageParts[1];
-                } else if (dosageParts.length === 1 && dosageParts[0]) {
-                  timingDosagesObj[timeName] = dosageParts[0];
-                  timingDosageUnitsObj[timeName] = baseUnit;
-                }
-              }
-            } else {
-              const timeName = timingStr.trim();
-              if (timeName) {
-                timingArray.push(timeName);
-                timingDosagesObj[timeName] = baseDosage;
+      const dosageStr = supplement.dosage || '';
+      const dosageParts = dosageStr.split(' ');
+      const baseDosage = dosageParts[0] || '';
+      const baseUnit = dosageParts.length > 1 ? dosageParts[1] : 'mg';
+      
+      setPhotoDosage(baseDosage);
+      setPhotoDosageUnit(baseUnit);
+      
+      const timingArray: string[] = [];
+      const timingDosagesObj: {[key: string]: string} = {};
+      const timingDosageUnitsObj: {[key: string]: string} = {};
+      
+      if (Array.isArray(supplement.timing) && supplement.timing.length > 0) {
+        supplement.timing.forEach((timingStr: string) => {
+          if (typeof timingStr !== 'string') {
+            timingStr = String(timingStr);
+          }
+          
+          if (timingStr.includes(':')) {
+            const parts = timingStr.split(':');
+            if (parts.length >= 2) {
+              const timeName = parts[0].trim();
+              const dosagePart = parts[1].trim();
+              timingArray.push(timeName);
+              
+              const dp = dosagePart.split(' ');
+              if (dp.length >= 2) {
+                timingDosagesObj[timeName] = dp[0];
+                timingDosageUnitsObj[timeName] = dp[1];
+              } else if (dp.length === 1 && dp[0]) {
+                timingDosagesObj[timeName] = dp[0];
                 timingDosageUnitsObj[timeName] = baseUnit;
               }
             }
-          });
-        }
-        
-        setPhotoTiming(timingArray);
-        setPhotoTimingDosages(timingDosagesObj);
-        setPhotoTimingDosageUnits(timingDosageUnitsObj);
-        
-        const scheduleInfo = supplement.scheduleInfo || 'Daily';
-        setPhotoDosageSchedule(scheduleInfo === 'Daily' ? 'daily' : 'specific');
-        if (scheduleInfo !== 'Daily' && scheduleInfo) {
-          setPhotoSelectedDays(scheduleInfo.split(', ').filter(Boolean));
-        } else {
-          setPhotoSelectedDays([]);
-        }
+          } else {
+            const timeName = timingStr.trim();
+            if (timeName) {
+              timingArray.push(timeName);
+              timingDosagesObj[timeName] = baseDosage;
+              timingDosageUnitsObj[timeName] = baseUnit;
+            }
+          }
+        });
+      }
+      
+      setPhotoTiming(timingArray);
+      setPhotoTimingDosages(timingDosagesObj);
+      setPhotoTimingDosageUnits(timingDosageUnitsObj);
+      
+      const scheduleInfo = supplement.scheduleInfo || 'Daily';
+      setPhotoDosageSchedule(scheduleInfo === 'Daily' ? 'daily' : 'specific');
+      if (scheduleInfo !== 'Daily' && scheduleInfo) {
+        setPhotoSelectedDays(scheduleInfo.split(', ').filter(Boolean));
+      } else {
+        setPhotoSelectedDays([]);
       }
     } else if (editingIndex === null) {
       // Clear form when not editing
@@ -1890,8 +1862,8 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
 
       const supplementData = { 
         id: isEditing ? supplements[editingIndex].id : Date.now().toString(),
-        frontImage: frontImage ? frontImage.name : (isEditing ? supplements[editingIndex].frontImage : ''), 
-        backImage: backImage ? backImage.name : (isEditing ? supplements[editingIndex].backImage : ''), 
+        // Persist existing saved image URL if any (no re-upload required for edits)
+        imageUrl: isEditing ? (supplements[editingIndex].imageUrl || null) : null,
         method: 'photo',
         name: supplementName,
         dosage: `${photoDosage} ${photoDosageUnit}`,
@@ -2085,14 +2057,14 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Front of supplement bottle/packet {editingIndex === null ? '*' : '(optional when editing)'}
               </label>
-              {editingIndex !== null && supplements[editingIndex]?.frontImage && (
+              {editingIndex !== null && (supplements[editingIndex]?.imageUrl) && (
                 <div className="mb-2 p-3 bg-gray-50 border border-gray-200 rounded-lg">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="w-16 h-16 bg-gray-200 rounded flex items-center justify-center overflow-hidden">
-                        {supplements[editingIndex].frontImageUrl ? (
+                        {supplements[editingIndex].imageUrl ? (
                           <img 
-                            src={supplements[editingIndex].frontImageUrl} 
+                            src={supplements[editingIndex].imageUrl} 
                             alt="Front" 
                             className="w-full h-full object-cover"
                           />
@@ -2104,7 +2076,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
                       </div>
                       <div>
                         <div className="text-sm font-medium text-gray-700">Current image</div>
-                        <div className="text-xs text-gray-500">{supplements[editingIndex].frontImage}</div>
+                        <div className="text-xs text-gray-500">{supplements[editingIndex].imageUrl}</div>
                       </div>
                     </div>
                     <button
@@ -2112,7 +2084,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
                       onClick={() => {
                         // Mark image for deletion by setting to null
                         const updatedSupplements = supplements.map((item: any, index: number) => 
-                          index === editingIndex ? { ...item, frontImage: null, frontImageUrl: null } : item
+                          index === editingIndex ? { ...item, imageUrl: null } : item
                         );
                         setSupplements(updatedSupplements);
                       }}
@@ -2165,14 +2137,14 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Back of supplement bottle/packet {editingIndex === null ? '*' : '(optional when editing)'}
               </label>
-              {editingIndex !== null && supplements[editingIndex]?.backImage && (
+              {editingIndex !== null && (supplements[editingIndex]?.imageUrl) && (
                 <div className="mb-2 p-3 bg-gray-50 border border-gray-200 rounded-lg">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="w-16 h-16 bg-gray-200 rounded flex items-center justify-center overflow-hidden">
-                        {supplements[editingIndex].backImageUrl ? (
+                        {supplements[editingIndex].imageUrl ? (
                           <img 
-                            src={supplements[editingIndex].backImageUrl} 
+                            src={supplements[editingIndex].imageUrl} 
                             alt="Back" 
                             className="w-full h-full object-cover"
                           />
@@ -2184,7 +2156,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
                       </div>
                       <div>
                         <div className="text-sm font-medium text-gray-700">Current image</div>
-                        <div className="text-xs text-gray-500">{supplements[editingIndex].backImage}</div>
+                        <div className="text-xs text-gray-500">{supplements[editingIndex].imageUrl}</div>
                       </div>
                     </div>
                     <button
@@ -2192,7 +2164,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
                       onClick={() => {
                         // Mark image for deletion by setting to null
                         const updatedSupplements = supplements.map((item: any, index: number) => 
-                          index === editingIndex ? { ...item, backImage: null, backImageUrl: null } : item
+                          index === editingIndex ? { ...item, imageUrl: null } : item
                         );
                         setSupplements(updatedSupplements);
                       }}
@@ -2624,92 +2596,64 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
       // Clear any existing form state first
       setFrontImage(null);
       setBackImage(null);
+      // Always use photo-style fields in the UI, regardless of stored method
+      setUploadMethod('photo');
       
-      if (medication.method === 'manual') {
-        setUploadMethod('manual');
-        setName(medication.name || '');
-        
-        const dosageStr = medication.dosage || '';
-        const dosageParts = dosageStr.split(' ');
-        setDosage(dosageParts[0] || '');
-        setDosageUnit(dosageParts[1] || 'mg');
-        
-        const timingArray = Array.isArray(medication.timing) 
-          ? medication.timing.map((t: string) => {
-              if (typeof t === 'string' && t.includes(':')) {
-                return t.split(':')[0].trim();
-              }
-              return String(t).trim();
-            })
-          : [];
-        setTiming(timingArray);
-        
-        setDosageSchedule(medication.scheduleInfo === 'Daily' ? 'daily' : 'specific');
-        if (medication.scheduleInfo && medication.scheduleInfo !== 'Daily') {
-          setSelectedDays(medication.scheduleInfo.split(', ').filter(Boolean));
-        } else {
-          setSelectedDays([]);
-        }
-      } else {
-        // Default to photo method if method is not specified
-        setUploadMethod('photo');
-        
-        const dosageStr = medication.dosage || '';
-        const dosageParts = dosageStr.split(' ');
-        const baseDosage = dosageParts[0] || '';
-        const baseUnit = dosageParts.length > 1 ? dosageParts[1] : 'mg';
-        
-        setPhotoDosage(baseDosage);
-        setPhotoDosageUnit(baseUnit);
-        
-        const timingArray: string[] = [];
-        const timingDosagesObj: {[key: string]: string} = {};
-        const timingDosageUnitsObj: {[key: string]: string} = {};
-        
-        if (Array.isArray(medication.timing) && medication.timing.length > 0) {
-          medication.timing.forEach((timingStr: string) => {
-            if (typeof timingStr !== 'string') {
-              timingStr = String(timingStr);
-            }
-            
-            if (timingStr.includes(':')) {
-              const parts = timingStr.split(':');
-              if (parts.length >= 2) {
-                const timeName = parts[0].trim();
-                const dosagePart = parts[1].trim();
-                timingArray.push(timeName);
-                
-                const dosageParts = dosagePart.split(' ');
-                if (dosageParts.length >= 2) {
-                  timingDosagesObj[timeName] = dosageParts[0];
-                  timingDosageUnitsObj[timeName] = dosageParts[1];
-                } else if (dosageParts.length === 1 && dosageParts[0]) {
-                  timingDosagesObj[timeName] = dosageParts[0];
-                  timingDosageUnitsObj[timeName] = baseUnit;
-                }
-              }
-            } else {
-              const timeName = timingStr.trim();
-              if (timeName) {
-                timingArray.push(timeName);
-                timingDosagesObj[timeName] = baseDosage;
+      const dosageStr = medication.dosage || '';
+      const dosageParts = dosageStr.split(' ');
+      const baseDosage = dosageParts[0] || '';
+      const baseUnit = dosageParts.length > 1 ? dosageParts[1] : 'mg';
+      
+      setPhotoDosage(baseDosage);
+      setPhotoDosageUnit(baseUnit);
+      
+      const timingArray: string[] = [];
+      const timingDosagesObj: {[key: string]: string} = {};
+      const timingDosageUnitsObj: {[key: string]: string} = {};
+      
+      if (Array.isArray(medication.timing) && medication.timing.length > 0) {
+        medication.timing.forEach((timingStr: string) => {
+          if (typeof timingStr !== 'string') {
+            timingStr = String(timingStr);
+          }
+          
+          if (timingStr.includes(':')) {
+            const parts = timingStr.split(':');
+            if (parts.length >= 2) {
+              const timeName = parts[0].trim();
+              const dosagePart = parts[1].trim();
+              timingArray.push(timeName);
+              
+              const dp = dosagePart.split(' ');
+              if (dp.length >= 2) {
+                timingDosagesObj[timeName] = dp[0];
+                timingDosageUnitsObj[timeName] = dp[1];
+              } else if (dp.length === 1 && dp[0]) {
+                timingDosagesObj[timeName] = dp[0];
                 timingDosageUnitsObj[timeName] = baseUnit;
               }
             }
-          });
-        }
-        
-        setPhotoTiming(timingArray);
-        setPhotoTimingDosages(timingDosagesObj);
-        setPhotoTimingDosageUnits(timingDosageUnitsObj);
-        
-        const scheduleInfo = medication.scheduleInfo || 'Daily';
-        setPhotoDosageSchedule(scheduleInfo === 'Daily' ? 'daily' : 'specific');
-        if (scheduleInfo !== 'Daily' && scheduleInfo) {
-          setPhotoSelectedDays(scheduleInfo.split(', ').filter(Boolean));
-        } else {
-          setPhotoSelectedDays([]);
-        }
+          } else {
+            const timeName = timingStr.trim();
+            if (timeName) {
+              timingArray.push(timeName);
+              timingDosagesObj[timeName] = baseDosage;
+              timingDosageUnitsObj[timeName] = baseUnit;
+            }
+          }
+        });
+      }
+      
+      setPhotoTiming(timingArray);
+      setPhotoTimingDosages(timingDosagesObj);
+      setPhotoTimingDosageUnits(timingDosageUnitsObj);
+      
+      const scheduleInfo = medication.scheduleInfo || 'Daily';
+      setPhotoDosageSchedule(scheduleInfo === 'Daily' ? 'daily' : 'specific');
+      if (scheduleInfo !== 'Daily' && scheduleInfo) {
+        setPhotoSelectedDays(scheduleInfo.split(', ').filter(Boolean));
+      } else {
+        setPhotoSelectedDays([]);
       }
     } else if (editingIndex === null) {
       // Clear form when not editing
@@ -2902,8 +2846,7 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
 
       const medicationData = { 
         id: isEditing ? medications[editingIndex].id : Date.now().toString(),
-        frontImage: frontImage ? frontImage.name : (isEditing ? medications[editingIndex].frontImage : ''), 
-        backImage: backImage ? backImage.name : (isEditing ? medications[editingIndex].backImage : ''), 
+        imageUrl: isEditing ? (medications[editingIndex].imageUrl || null) : null,
         method: 'photo',
         name: medicationName,
         dosage: `${photoDosage} ${photoDosageUnit}`,
@@ -3097,14 +3040,14 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Front of medication bottle/packet {editingIndex === null ? '*' : '(optional when editing)'}
               </label>
-              {editingIndex !== null && medications[editingIndex]?.frontImage && (
+              {editingIndex !== null && (medications[editingIndex]?.imageUrl) && (
                 <div className="mb-2 p-3 bg-gray-50 border border-gray-200 rounded-lg">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="w-16 h-16 bg-gray-200 rounded flex items-center justify-center overflow-hidden">
-                        {medications[editingIndex].frontImageUrl ? (
+                        {medications[editingIndex].imageUrl ? (
                           <img 
-                            src={medications[editingIndex].frontImageUrl} 
+                            src={medications[editingIndex].imageUrl} 
                             alt="Front" 
                             className="w-full h-full object-cover"
                           />
@@ -3116,7 +3059,7 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
                       </div>
                       <div>
                         <div className="text-sm font-medium text-gray-700">Current image</div>
-                        <div className="text-xs text-gray-500">{medications[editingIndex].frontImage}</div>
+                        <div className="text-xs text-gray-500">{medications[editingIndex].imageUrl}</div>
                       </div>
                     </div>
                     <button
@@ -3124,7 +3067,7 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
                       onClick={() => {
                         // Mark image for deletion by setting to null
                         const updatedMedications = medications.map((item: any, index: number) => 
-                          index === editingIndex ? { ...item, frontImage: null, frontImageUrl: null } : item
+                          index === editingIndex ? { ...item, imageUrl: null } : item
                         );
                         setMedications(updatedMedications);
                       }}
@@ -3177,14 +3120,14 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Back of medication bottle/packet {editingIndex === null ? '*' : '(optional when editing)'}
               </label>
-              {editingIndex !== null && medications[editingIndex]?.backImage && (
+              {editingIndex !== null && (medications[editingIndex]?.imageUrl) && (
                 <div className="mb-2 p-3 bg-gray-50 border border-gray-200 rounded-lg">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="w-16 h-16 bg-gray-200 rounded flex items-center justify-center overflow-hidden">
-                        {medications[editingIndex].backImageUrl ? (
+                        {medications[editingIndex].imageUrl ? (
                           <img 
-                            src={medications[editingIndex].backImageUrl} 
+                            src={medications[editingIndex].imageUrl} 
                             alt="Back" 
                             className="w-full h-full object-cover"
                           />
@@ -3196,7 +3139,7 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
                       </div>
                       <div>
                         <div className="text-sm font-medium text-gray-700">Current image</div>
-                        <div className="text-xs text-gray-500">{medications[editingIndex].backImage}</div>
+                        <div className="text-xs text-gray-500">{medications[editingIndex].imageUrl}</div>
                       </div>
                     </div>
                     <button
@@ -3204,7 +3147,7 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
                       onClick={() => {
                         // Mark image for deletion by setting to null
                         const updatedMedications = medications.map((item: any, index: number) => 
-                          index === editingIndex ? { ...item, backImage: null, backImageUrl: null } : item
+                          index === editingIndex ? { ...item, imageUrl: null } : item
                         );
                         setMedications(updatedMedications);
                       }}
