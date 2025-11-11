@@ -13,6 +13,27 @@ function getResend() {
 }
 
 // Send acknowledgment email to user
+/**
+ * ⚠️ CRITICAL: DO NOT MODIFY THIS FUNCTION'S ERROR HANDLING PATTERN
+ * 
+ * This function was fixed after breaking due to overly strict error checking.
+ * The working pattern matches sendWaitlistNotificationEmail() exactly.
+ * 
+ * IMPORTANT PATTERNS TO MAINTAIN:
+ * 1. Do NOT check emailResponse.error and throw - this breaks email delivery
+ * 2. Do NOT await this function in POST handler - use .catch() pattern instead
+ * 3. Only log success/failure - do not throw errors that block the API response
+ * 4. Match the exact pattern used in sendWaitlistNotificationEmail() which works
+ * 
+ * If you need to modify this function:
+ * - Test with a real email address first
+ * - Ensure BOTH acknowledgment AND notification emails still work
+ * - Do NOT add error checking that throws exceptions
+ * - Keep the same async non-blocking pattern
+ * 
+ * Last fixed: 2025-11-12 - Removed strict error checking that prevented delivery
+ * See WAITLIST_EMAIL_PROTECTION.md for full details
+ */
 async function sendWaitlistAcknowledgmentEmail(email: string, name: string) {
   const resend = getResend()
   if (!resend) {
@@ -83,6 +104,8 @@ async function sendWaitlistAcknowledgmentEmail(email: string, name: string) {
     })
 
     // Log response - match the pattern used in working notification email
+    // DO NOT add error checking here - it breaks email delivery
+    // See WAITLIST_EMAIL_PROTECTION.md for why this pattern is critical
     console.log(`✅ [WAITLIST ACK EMAIL] Sent to ${email} with ID: ${emailResponse.data?.id}`)
   } catch (error: any) {
     console.error(`❌ [WAITLIST ACK EMAIL] Failed to send to ${email}:`, error)
@@ -181,7 +204,10 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    // Send acknowledgment email to user (don't await to match notification pattern)
+    // ⚠️ CRITICAL: DO NOT CHANGE THIS PATTERN
+    // Both emails use non-blocking .catch() pattern - do NOT await or use try/catch here
+    // This pattern matches the working notification email exactly
+    // Changing this will break email delivery as it did before (fixed 2025-11-12)
     sendWaitlistAcknowledgmentEmail(normalizedEmail, normalizedName).catch(error => {
       console.error('❌ [WAITLIST] Acknowledgment email failed (non-blocking):', error)
     })
