@@ -1537,6 +1537,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
       setSupplements(initial.supplements);
     }
   }, [initial?.supplements]);
+  
   const [name, setName] = useState('');
   const [dosage, setDosage] = useState('');
   const [dosageUnit, setDosageUnit] = useState('mg');
@@ -1559,9 +1560,105 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
   const [hasExistingAnalysis, setHasExistingAnalysis] = useState(false);
   const [supplementsToSave, setSupplementsToSave] = useState<any[]>([]);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false); // Track if user added but didn't update insights
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
   const [imageQualityWarning, setImageQualityWarning] = useState<{front?: string, back?: string}>({});
+  
+  // Populate form fields when editing starts
+  useEffect(() => {
+    if (editingIndex !== null) {
+      const supplement = supplements[editingIndex];
+      if (!supplement) return;
+      
+      console.log('Populating form for edit:', supplement);
+      
+      if (supplement.method === 'manual') {
+        setUploadMethod('manual');
+        setName(supplement.name || '');
+        
+        const dosageStr = supplement.dosage || '';
+        const dosageParts = dosageStr.split(' ');
+        setDosage(dosageParts[0] || '');
+        setDosageUnit(dosageParts[1] || 'mg');
+        
+        const timingArray = Array.isArray(supplement.timing) 
+          ? supplement.timing.map((t: string) => {
+              if (typeof t === 'string' && t.includes(':')) {
+                return t.split(':')[0].trim();
+              }
+              return String(t).trim();
+            })
+          : [];
+        setTiming(timingArray);
+        
+        setDosageSchedule(supplement.scheduleInfo === 'Daily' ? 'daily' : 'specific');
+        if (supplement.scheduleInfo && supplement.scheduleInfo !== 'Daily') {
+          setSelectedDays(supplement.scheduleInfo.split(', ').filter(Boolean));
+        } else {
+          setSelectedDays([]);
+        }
+      } else {
+        setUploadMethod('photo');
+        
+        const dosageStr = supplement.dosage || '';
+        const dosageParts = dosageStr.split(' ');
+        const baseDosage = dosageParts[0] || '';
+        const baseUnit = dosageParts[1] || 'mg';
+        
+        setPhotoDosage(baseDosage);
+        setPhotoDosageUnit(baseUnit);
+        
+        const timingArray: string[] = [];
+        const timingDosagesObj: {[key: string]: string} = {};
+        const timingDosageUnitsObj: {[key: string]: string} = {};
+        
+        if (Array.isArray(supplement.timing) && supplement.timing.length > 0) {
+          supplement.timing.forEach((timingStr: string) => {
+            if (typeof timingStr !== 'string') {
+              timingStr = String(timingStr);
+            }
+            
+            if (timingStr.includes(':')) {
+              const parts = timingStr.split(':');
+              if (parts.length >= 2) {
+                const timeName = parts[0].trim();
+                const dosagePart = parts[1].trim();
+                timingArray.push(timeName);
+                
+                const dosageParts = dosagePart.split(' ');
+                if (dosageParts.length >= 2) {
+                  timingDosagesObj[timeName] = dosageParts[0];
+                  timingDosageUnitsObj[timeName] = dosageParts[1];
+                } else if (dosageParts.length === 1 && dosageParts[0]) {
+                  timingDosagesObj[timeName] = dosageParts[0];
+                  timingDosageUnitsObj[timeName] = baseUnit;
+                }
+              }
+            } else {
+              const timeName = timingStr.trim();
+              if (timeName) {
+                timingArray.push(timeName);
+                timingDosagesObj[timeName] = baseDosage;
+                timingDosageUnitsObj[timeName] = baseUnit;
+              }
+            }
+          });
+        }
+        
+        setPhotoTiming(timingArray);
+        setPhotoTimingDosages(timingDosagesObj);
+        setPhotoTimingDosageUnits(timingDosageUnitsObj);
+        
+        const scheduleInfo = supplement.scheduleInfo || 'Daily';
+        setPhotoDosageSchedule(scheduleInfo === 'Daily' ? 'daily' : 'specific');
+        if (scheduleInfo !== 'Daily' && scheduleInfo) {
+          setPhotoSelectedDays(scheduleInfo.split(', ').filter(Boolean));
+        } else {
+          setPhotoSelectedDays([]);
+        }
+      }
+    }
+  }, [editingIndex]);
 
   // Validate image quality
   const validateImageQuality = async (file: File, type: 'front' | 'back') => {
@@ -1924,107 +2021,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
     setEditingIndex(index);
     setShowDropdown(null);
     
-    // Don't show popup on edit - only show when user saves changes or deletes
-    // The popup will be shown in addSupplement() when editingIndex !== null and user clicks "Update Supplement"
-    
-    if (supplement.method === 'manual') {
-      setUploadMethod('manual');
-      setName(supplement.name || '');
-      
-      // Parse dosage and unit
-      const dosageStr = supplement.dosage || '';
-      const dosageParts = dosageStr.split(' ');
-      setDosage(dosageParts[0] || '');
-      setDosageUnit(dosageParts[1] || 'mg');
-      
-      // Parse timing data
-      const timingArray = Array.isArray(supplement.timing) 
-        ? supplement.timing.map((t: string) => {
-            if (typeof t === 'string' && t.includes(':')) {
-              return t.split(':')[0].trim();
-            }
-            return String(t).trim();
-          })
-        : [];
-      setTiming(timingArray);
-      
-      // Set schedule
-      setDosageSchedule(supplement.scheduleInfo === 'Daily' ? 'daily' : 'specific');
-      if (supplement.scheduleInfo && supplement.scheduleInfo !== 'Daily') {
-        setSelectedDays(supplement.scheduleInfo.split(', ').filter(Boolean));
-      } else {
-        setSelectedDays([]);
-      }
-    } else {
-      setUploadMethod('photo');
-      
-      // Parse dosage and unit from the main dosage field
-      const dosageStr = supplement.dosage || '';
-      const dosageParts = dosageStr.split(' ');
-      const baseDosage = dosageParts[0] || '';
-      const baseUnit = dosageParts[1] || 'mg';
-      
-      setPhotoDosage(baseDosage);
-      setPhotoDosageUnit(baseUnit);
-      
-      // Parse timing array - format can be ["Morning: 22 mg", "Afternoon: 15 mg"] or ["Morning", "Afternoon"]
-      const timingArray: string[] = [];
-      const timingDosagesObj: {[key: string]: string} = {};
-      const timingDosageUnitsObj: {[key: string]: string} = {};
-      
-      if (Array.isArray(supplement.timing) && supplement.timing.length > 0) {
-        supplement.timing.forEach((timingStr: string) => {
-          if (typeof timingStr !== 'string') {
-            timingStr = String(timingStr);
-          }
-          
-          // Parse "Morning: 22 mg" format
-          if (timingStr.includes(':')) {
-            const parts = timingStr.split(':');
-            if (parts.length >= 2) {
-              const timeName = parts[0].trim();
-              const dosagePart = parts[1].trim();
-              timingArray.push(timeName);
-              
-              // Parse dosage and unit (e.g., "22 mg")
-              const dosageParts = dosagePart.split(' ');
-              if (dosageParts.length >= 2) {
-                timingDosagesObj[timeName] = dosageParts[0];
-                timingDosageUnitsObj[timeName] = dosageParts[1];
-              } else if (dosageParts.length === 1 && dosageParts[0]) {
-                timingDosagesObj[timeName] = dosageParts[0];
-                timingDosageUnitsObj[timeName] = baseUnit;
-              }
-            }
-          } else {
-            // Fallback: treat entire string as timing name (use base dosage)
-            const timeName = timingStr.trim();
-            if (timeName) {
-              timingArray.push(timeName);
-              timingDosagesObj[timeName] = baseDosage;
-              timingDosageUnitsObj[timeName] = baseUnit;
-            }
-          }
-        });
-      }
-      
-      setPhotoTiming(timingArray);
-      setPhotoTimingDosages(timingDosagesObj);
-      setPhotoTimingDosageUnits(timingDosageUnitsObj);
-      
-      // Set schedule
-      const scheduleInfo = supplement.scheduleInfo || 'Daily';
-      setPhotoDosageSchedule(scheduleInfo === 'Daily' ? 'daily' : 'specific');
-      if (scheduleInfo !== 'Daily' && scheduleInfo) {
-        setPhotoSelectedDays(scheduleInfo.split(', ').filter(Boolean));
-      } else {
-        setPhotoSelectedDays([]);
-      }
-      
-      // Note: We can't restore File objects from saved data, so images will need to be re-uploaded if user wants to change them
-      // But we'll make images optional when editing
-    }
-    
+    // Form fields will be populated by useEffect when editingIndex changes
     // Scroll to form when editing
     setTimeout(() => {
       const formElement = document.querySelector('.max-w-md.mx-auto');
@@ -2078,8 +2075,33 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
                 Front of supplement bottle/packet {editingIndex === null ? '*' : '(optional when editing)'}
               </label>
               {editingIndex !== null && supplements[editingIndex]?.frontImage && !frontImage && (
-                <div className="mb-2 p-2 bg-gray-50 border border-gray-200 rounded text-xs text-gray-600">
-                  Current image: {supplements[editingIndex].frontImage}
+                <div className="mb-2 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-16 h-16 bg-gray-200 rounded flex items-center justify-center">
+                        <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <div className="text-sm font-medium text-gray-700">Current image</div>
+                        <div className="text-xs text-gray-500">{supplements[editingIndex].frontImage}</div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Mark image for deletion by setting to null
+                        const updatedSupplements = supplements.map((item: any, index: number) => 
+                          index === editingIndex ? { ...item, frontImage: null } : item
+                        );
+                        setSupplements(updatedSupplements);
+                      }}
+                      className="px-3 py-1 text-xs text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
               )}
               <div className="relative">
@@ -2125,8 +2147,33 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
                 Back of supplement bottle/packet {editingIndex === null ? '*' : '(optional when editing)'}
               </label>
               {editingIndex !== null && supplements[editingIndex]?.backImage && !backImage && (
-                <div className="mb-2 p-2 bg-gray-50 border border-gray-200 rounded text-xs text-gray-600">
-                  Current image: {supplements[editingIndex].backImage}
+                <div className="mb-2 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-16 h-16 bg-gray-200 rounded flex items-center justify-center">
+                        <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <div className="text-sm font-medium text-gray-700">Current image</div>
+                        <div className="text-xs text-gray-500">{supplements[editingIndex].backImage}</div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Mark image for deletion by setting to null
+                        const updatedSupplements = supplements.map((item: any, index: number) => 
+                          index === editingIndex ? { ...item, backImage: null } : item
+                        );
+                        setSupplements(updatedSupplements);
+                      }}
+                      className="px-3 py-1 text-xs text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
               )}
               <div className="relative">
@@ -2500,6 +2547,7 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
       setMedications(initial.medications);
     }
   }, [initial?.medications]);
+  
   const [name, setName] = useState('');
   const [dosage, setDosage] = useState('');
   const [dosageUnit, setDosageUnit] = useState('mg');
@@ -2531,9 +2579,105 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
   const [hasExistingAnalysis, setHasExistingAnalysis] = useState(false);
   const [medicationsToSave, setMedicationsToSave] = useState<any[]>([]);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false); // Track if user added but didn't update insights
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
   const [imageQualityWarning, setImageQualityWarning] = useState<{front?: string, back?: string}>({});
+  
+  // Populate form fields when editing starts
+  useEffect(() => {
+    if (editingIndex !== null) {
+      const medication = medications[editingIndex];
+      if (!medication) return;
+      
+      console.log('Populating form for edit:', medication);
+      
+      if (medication.method === 'manual') {
+        setUploadMethod('manual');
+        setName(medication.name || '');
+        
+        const dosageStr = medication.dosage || '';
+        const dosageParts = dosageStr.split(' ');
+        setDosage(dosageParts[0] || '');
+        setDosageUnit(dosageParts[1] || 'mg');
+        
+        const timingArray = Array.isArray(medication.timing) 
+          ? medication.timing.map((t: string) => {
+              if (typeof t === 'string' && t.includes(':')) {
+                return t.split(':')[0].trim();
+              }
+              return String(t).trim();
+            })
+          : [];
+        setTiming(timingArray);
+        
+        setDosageSchedule(medication.scheduleInfo === 'Daily' ? 'daily' : 'specific');
+        if (medication.scheduleInfo && medication.scheduleInfo !== 'Daily') {
+          setSelectedDays(medication.scheduleInfo.split(', ').filter(Boolean));
+        } else {
+          setSelectedDays([]);
+        }
+      } else {
+        setUploadMethod('photo');
+        
+        const dosageStr = medication.dosage || '';
+        const dosageParts = dosageStr.split(' ');
+        const baseDosage = dosageParts[0] || '';
+        const baseUnit = dosageParts[1] || 'mg';
+        
+        setPhotoDosage(baseDosage);
+        setPhotoDosageUnit(baseUnit);
+        
+        const timingArray: string[] = [];
+        const timingDosagesObj: {[key: string]: string} = {};
+        const timingDosageUnitsObj: {[key: string]: string} = {};
+        
+        if (Array.isArray(medication.timing) && medication.timing.length > 0) {
+          medication.timing.forEach((timingStr: string) => {
+            if (typeof timingStr !== 'string') {
+              timingStr = String(timingStr);
+            }
+            
+            if (timingStr.includes(':')) {
+              const parts = timingStr.split(':');
+              if (parts.length >= 2) {
+                const timeName = parts[0].trim();
+                const dosagePart = parts[1].trim();
+                timingArray.push(timeName);
+                
+                const dosageParts = dosagePart.split(' ');
+                if (dosageParts.length >= 2) {
+                  timingDosagesObj[timeName] = dosageParts[0];
+                  timingDosageUnitsObj[timeName] = dosageParts[1];
+                } else if (dosageParts.length === 1 && dosageParts[0]) {
+                  timingDosagesObj[timeName] = dosageParts[0];
+                  timingDosageUnitsObj[timeName] = baseUnit;
+                }
+              }
+            } else {
+              const timeName = timingStr.trim();
+              if (timeName) {
+                timingArray.push(timeName);
+                timingDosagesObj[timeName] = baseDosage;
+                timingDosageUnitsObj[timeName] = baseUnit;
+              }
+            }
+          });
+        }
+        
+        setPhotoTiming(timingArray);
+        setPhotoTimingDosages(timingDosagesObj);
+        setPhotoTimingDosageUnits(timingDosageUnitsObj);
+        
+        const scheduleInfo = medication.scheduleInfo || 'Daily';
+        setPhotoDosageSchedule(scheduleInfo === 'Daily' ? 'daily' : 'specific');
+        if (scheduleInfo !== 'Daily' && scheduleInfo) {
+          setPhotoSelectedDays(scheduleInfo.split(', ').filter(Boolean));
+        } else {
+          setPhotoSelectedDays([]);
+        }
+      }
+    }
+  }, [editingIndex]);
 
   // Validate image quality
   const validateImageQuality = async (file: File, type: 'front' | 'back') => {
@@ -2862,107 +3006,7 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
     setEditingIndex(index);
     setShowDropdown(null);
     
-    // Don't show popup on edit - only show when user saves changes or deletes
-    // The popup will be shown in addMedication() when editingIndex !== null and user clicks "Update Medication"
-    
-    if (medication.method === 'manual') {
-      setUploadMethod('manual');
-      setName(medication.name || '');
-      
-      // Parse dosage and unit
-      const dosageStr = medication.dosage || '';
-      const dosageParts = dosageStr.split(' ');
-      setDosage(dosageParts[0] || '');
-      setDosageUnit(dosageParts[1] || 'mg');
-      
-      // Parse timing data
-      const timingArray = Array.isArray(medication.timing) 
-        ? medication.timing.map((t: string) => {
-            if (typeof t === 'string' && t.includes(':')) {
-              return t.split(':')[0].trim();
-            }
-            return String(t).trim();
-          })
-        : [];
-      setTiming(timingArray);
-      
-      // Set schedule
-      setDosageSchedule(medication.scheduleInfo === 'Daily' ? 'daily' : 'specific');
-      if (medication.scheduleInfo && medication.scheduleInfo !== 'Daily') {
-        setSelectedDays(medication.scheduleInfo.split(', ').filter(Boolean));
-      } else {
-        setSelectedDays([]);
-      }
-    } else {
-      setUploadMethod('photo');
-      
-      // Parse dosage and unit from the main dosage field
-      const dosageStr = medication.dosage || '';
-      const dosageParts = dosageStr.split(' ');
-      const baseDosage = dosageParts[0] || '';
-      const baseUnit = dosageParts[1] || 'mg';
-      
-      setPhotoDosage(baseDosage);
-      setPhotoDosageUnit(baseUnit);
-      
-      // Parse timing array - format can be ["Morning: 22 mg", "Afternoon: 15 mg"] or ["Morning", "Afternoon"]
-      const timingArray: string[] = [];
-      const timingDosagesObj: {[key: string]: string} = {};
-      const timingDosageUnitsObj: {[key: string]: string} = {};
-      
-      if (Array.isArray(medication.timing) && medication.timing.length > 0) {
-        medication.timing.forEach((timingStr: string) => {
-          if (typeof timingStr !== 'string') {
-            timingStr = String(timingStr);
-          }
-          
-          // Parse "Morning: 22 mg" format
-          if (timingStr.includes(':')) {
-            const parts = timingStr.split(':');
-            if (parts.length >= 2) {
-              const timeName = parts[0].trim();
-              const dosagePart = parts[1].trim();
-              timingArray.push(timeName);
-              
-              // Parse dosage and unit (e.g., "22 mg")
-              const dosageParts = dosagePart.split(' ');
-              if (dosageParts.length >= 2) {
-                timingDosagesObj[timeName] = dosageParts[0];
-                timingDosageUnitsObj[timeName] = dosageParts[1];
-              } else if (dosageParts.length === 1 && dosageParts[0]) {
-                timingDosagesObj[timeName] = dosageParts[0];
-                timingDosageUnitsObj[timeName] = baseUnit;
-              }
-            }
-          } else {
-            // Fallback: treat entire string as timing name (use base dosage)
-            const timeName = timingStr.trim();
-            if (timeName) {
-              timingArray.push(timeName);
-              timingDosagesObj[timeName] = baseDosage;
-              timingDosageUnitsObj[timeName] = baseUnit;
-            }
-          }
-        });
-      }
-      
-      setPhotoTiming(timingArray);
-      setPhotoTimingDosages(timingDosagesObj);
-      setPhotoTimingDosageUnits(timingDosageUnitsObj);
-      
-      // Set schedule
-      const scheduleInfo = medication.scheduleInfo || 'Daily';
-      setPhotoDosageSchedule(scheduleInfo === 'Daily' ? 'daily' : 'specific');
-      if (scheduleInfo !== 'Daily' && scheduleInfo) {
-        setPhotoSelectedDays(scheduleInfo.split(', ').filter(Boolean));
-      } else {
-        setPhotoSelectedDays([]);
-      }
-      
-      // Note: We can't restore File objects from saved data, so images will need to be re-uploaded if user wants to change them
-      // But we'll make images optional when editing
-    }
-    
+    // Form fields will be populated by useEffect when editingIndex changes
     // Scroll to form when editing
     setTimeout(() => {
       const formElement = document.querySelector('.max-w-md.mx-auto');
@@ -3016,8 +3060,33 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
                 Front of medication bottle/packet {editingIndex === null ? '*' : '(optional when editing)'}
               </label>
               {editingIndex !== null && medications[editingIndex]?.frontImage && !frontImage && (
-                <div className="mb-2 p-2 bg-gray-50 border border-gray-200 rounded text-xs text-gray-600">
-                  Current image: {medications[editingIndex].frontImage}
+                <div className="mb-2 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-16 h-16 bg-gray-200 rounded flex items-center justify-center">
+                        <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <div className="text-sm font-medium text-gray-700">Current image</div>
+                        <div className="text-xs text-gray-500">{medications[editingIndex].frontImage}</div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Mark image for deletion by setting to null
+                        const updatedMedications = medications.map((item: any, index: number) => 
+                          index === editingIndex ? { ...item, frontImage: null } : item
+                        );
+                        setMedications(updatedMedications);
+                      }}
+                      className="px-3 py-1 text-xs text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
               )}
               <div className="relative">
@@ -3063,8 +3132,33 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
                 Back of medication bottle/packet {editingIndex === null ? '*' : '(optional when editing)'}
               </label>
               {editingIndex !== null && medications[editingIndex]?.backImage && !backImage && (
-                <div className="mb-2 p-2 bg-gray-50 border border-gray-200 rounded text-xs text-gray-600">
-                  Current image: {medications[editingIndex].backImage}
+                <div className="mb-2 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-16 h-16 bg-gray-200 rounded flex items-center justify-center">
+                        <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <div className="text-sm font-medium text-gray-700">Current image</div>
+                        <div className="text-xs text-gray-500">{medications[editingIndex].backImage}</div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Mark image for deletion by setting to null
+                        const updatedMedications = medications.map((item: any, index: number) => 
+                          index === editingIndex ? { ...item, backImage: null } : item
+                        );
+                        setMedications(updatedMedications);
+                      }}
+                      className="px-3 py-1 text-xs text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </div>
               )}
               <div className="relative">
