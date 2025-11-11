@@ -9,6 +9,7 @@ interface SectionChatProps {
 }
 
 type ChatMessage = { role: 'user' | 'assistant'; content: string }
+type ChatThread = { id: string; title: string | null; createdAt: string; updatedAt: string }
 
 export default function SectionChat({ issueSlug, section, issueName }: SectionChatProps) {
   const storageKey = useMemo(() => `helfi:insights:thread:${issueSlug}:${section}`, [issueSlug, section])
@@ -17,9 +18,11 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isListening, setIsListening] = useState(false)
+  const [threads, setThreads] = useState<ChatThread[]>([])
+  const [threadId, setThreadId] = useState<string | null>(null)
+  const [showThreadMenu, setShowThreadMenu] = useState(false)
   const endRef = useRef<HTMLDivElement | null>(null)
   const enabled = (process.env.NEXT_PUBLIC_INSIGHTS_CHAT || 'true').toLowerCase() === 'true' || (process.env.NEXT_PUBLIC_INSIGHTS_CHAT || '') === '1'
-  const [threadId, setThreadId] = useState<string | null>(null)
   const recognitionRef = useRef<any>(null)
   const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -108,20 +111,37 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
     }
   }
 
-  // Initial load from server (persistent thread). Falls back to localStorage if server unavailable
+  // Load threads and current thread on mount
   useEffect(() => {
     if (!enabled) return
     let cancelled = false
     ;(async () => {
       try {
+        // Load threads
+        const threadsRes = await fetch(`/api/insights/issues/${issueSlug}/sections/${section}/threads`, { cache: 'no-store' })
+        if (threadsRes.ok) {
+          const threadsData = await threadsRes.json()
+          if (!cancelled && threadsData.threads && Array.isArray(threadsData.threads)) {
+            setThreads(threadsData.threads)
+            if (threadsData.threads.length > 0 && !threadId) {
+              // Load most recent thread
+              const latestThreadId = threadsData.threads[0].id
+              setThreadId(latestThreadId)
+              loadThreadMessages(latestThreadId)
+            }
+          }
+        }
+        // Also try loading default thread (backward compatibility)
         const res = await fetch(`/api/insights/issues/${issueSlug}/sections/${section}/chat`, { cache: 'no-store' })
         if (res.ok) {
           const data = await res.json()
-          if (!cancelled && typeof data?.threadId === 'string') setThreadId(data.threadId)
-          const serverMessages = Array.isArray(data?.messages)
-            ? data.messages.map((m: any) => ({ role: m.role, content: m.content })).filter((m: any) => m?.content)
-            : []
-          if (!cancelled && serverMessages.length) setMessages(serverMessages)
+          if (!cancelled && typeof data?.threadId === 'string' && !threadId) {
+            setThreadId(data.threadId)
+            const serverMessages = Array.isArray(data?.messages)
+              ? data.messages.map((m: any) => ({ role: m.role, content: m.content })).filter((m: any) => m?.content)
+              : []
+            if (!cancelled && serverMessages.length) setMessages(serverMessages)
+          }
         }
       } catch {}
       // Also hydrate from localStorage if server has nothing yet
@@ -140,6 +160,76 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, issueSlug, section])
+
+  async function loadThreadMessages(threadIdToLoad: string) {
+    try {
+      const res = await fetch(`/api/insights/issues/${issueSlug}/sections/${section}/chat?threadId=${threadIdToLoad}`, { cache: 'no-store' })
+      if (res.ok) {
+        const data = await res.json()
+        const serverMessages = Array.isArray(data?.messages)
+          ? data.messages.map((m: any) => ({ role: m.role, content: m.content })).filter((m: any) => m?.content)
+          : []
+        setMessages(serverMessages)
+      }
+    } catch (err) {
+      console.error('Failed to load thread messages:', err)
+    }
+  }
+
+  async function handleNewChat() {
+    try {
+      const res = await fetch(`/api/insights/issues/${issueSlug}/sections/${section}/threads`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        const newThreadId = data.threadId
+        setThreadId(newThreadId)
+        setMessages([])
+        // Reload threads
+        const threadsRes = await fetch(`/api/insights/issues/${issueSlug}/sections/${section}/threads`, { cache: 'no-store' })
+        if (threadsRes.ok) {
+          const threadsData = await threadsRes.json()
+          if (threadsData.threads) setThreads(threadsData.threads)
+        }
+      }
+    } catch (err) {
+      console.error('Failed to create new thread:', err)
+    }
+  }
+
+  async function handleDeleteThread(threadIdToDelete: string) {
+    if (!confirm('Delete this chat?')) return
+    try {
+      const res = await fetch(`/api/insights/issues/${issueSlug}/sections/${section}/threads`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ threadId: threadIdToDelete }),
+      })
+      if (res.ok) {
+        // Reload threads
+        const threadsRes = await fetch(`/api/insights/issues/${issueSlug}/sections/${section}/threads`, { cache: 'no-store' })
+        if (threadsRes.ok) {
+          const threadsData = await threadsRes.json()
+          if (threadsData.threads) {
+            setThreads(threadsData.threads)
+            if (threadsData.threads.length > 0) {
+              const newThreadId = threadsData.threads[0].id
+              setThreadId(newThreadId)
+              loadThreadMessages(newThreadId)
+            } else {
+              setThreadId(null)
+              setMessages([])
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Failed to delete thread:', err)
+    }
+  }
 
   // Persist a lightweight copy locally for UX continuity
   useEffect(() => {
@@ -206,7 +296,11 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
-        body: JSON.stringify({ message: text }),
+        body: JSON.stringify({ 
+          message: text,
+          threadId: threadId || undefined,
+          newThread: !threadId,
+        }),
       })
       if (res.ok && (res.headers.get('content-type') || '').includes('text/event-stream') && res.body) {
         const reader = res.body.getReader()
@@ -251,13 +345,74 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
   if (!enabled) return null
   return (
     <section className="bg-white border border-gray-200 rounded-2xl shadow-sm p-0 overflow-hidden">
-      <header className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
-        <div>
+      <header className="flex items-center justify-between px-5 py-3 border-b border-gray-200 relative">
+        <div className="flex-1 min-w-0">
           <h3 className="text-sm font-semibold text-gray-900">Chat about {issueName} ({section})</h3>
-          <p className="text-xs text-gray-500">{threadId ? 'History saved for this section' : 'Start a conversation – it will be saved here'}</p>
+          <div className="flex items-center gap-2 mt-1">
+            <button
+              type="button"
+              onClick={() => setShowThreadMenu(!showThreadMenu)}
+              className="flex items-center gap-1 px-2 py-0.5 rounded text-xs hover:bg-gray-100 transition-colors min-w-0"
+            >
+              <span className="truncate text-gray-600">
+                {threadId ? threads.find(t => t.id === threadId)?.title || 'New Chat' : 'New Chat'}
+              </span>
+              <svg className="w-3 h-3 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {showThreadMenu && (
+              <div className="absolute left-5 top-12 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-96 overflow-y-auto min-w-[200px]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleNewChat()
+                    setShowThreadMenu(false)
+                  }}
+                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 border-b border-gray-100"
+                >
+                  + New Chat
+                </button>
+                {threads.map((thread) => (
+                  <div key={thread.id} className="flex items-center group">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setThreadId(thread.id)
+                        loadThreadMessages(thread.id)
+                        setShowThreadMenu(false)
+                      }}
+                      className={`flex-1 px-4 py-2 text-left text-sm hover:bg-gray-100 truncate ${
+                        threadId === thread.id ? 'bg-gray-50' : ''
+                      }`}
+                    >
+                      {thread.title || 'New Chat'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteThread(thread.id)}
+                      className="px-2 py-2 text-gray-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <p className="text-xs text-gray-500">{threadId ? 'History saved' : 'Start a conversation'}</p>
+          </div>
           <p className="text-[11px] text-gray-400 mt-0.5">Typical cost: ~1–2 credits</p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={handleNewChat}
+            disabled={loading}
+            className="text-xs rounded-md border border-gray-300 px-2 py-1 text-gray-600 hover:bg-gray-50 disabled:opacity-60"
+          >
+            + New
+          </button>
           <button
             onClick={handleClear}
             disabled={loading}
