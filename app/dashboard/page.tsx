@@ -20,6 +20,8 @@ export default function Dashboard() {
   const [profileImage, setProfileImage] = useState<string | null>(null)
   const [deviceInterest, setDeviceInterest] = useState<{ appleWatch?: boolean; fitbit?: boolean; garmin?: boolean; samsung?: boolean; googleFit?: boolean; oura?: boolean; polar?: boolean }>({})
   const [savingInterest, setSavingInterest] = useState<string | null>(null)
+  const [fitbitConnected, setFitbitConnected] = useState(false)
+  const [fitbitLoading, setFitbitLoading] = useState(false)
 
   // Profile data - using consistent green avatar
   const defaultAvatar = 'data:image/svg+xml;base64,' + btoa(`
@@ -103,6 +105,9 @@ export default function Dashboard() {
             if (result.data.deviceInterest && typeof result.data.deviceInterest === 'object') {
               setDeviceInterest(result.data.deviceInterest)
             }
+            
+            // Check Fitbit connection status
+            checkFitbitStatus()
             // Load profile image from database and cache it
             if (result.data.profileImage) {
               setProfileImage(result.data.profileImage);
@@ -211,7 +216,34 @@ export default function Dashboard() {
     }
   }
 
+  const checkFitbitStatus = async () => {
+    try {
+      const response = await fetch('/api/fitbit/status')
+      if (response.ok) {
+        const data = await response.json()
+        setFitbitConnected(data.connected)
+      }
+    } catch (error) {
+      console.error('Error checking Fitbit status:', error)
+    }
+  }
+
+  const handleConnectFitbit = async () => {
+    setFitbitLoading(true)
+    try {
+      window.location.href = '/api/auth/fitbit/authorize'
+    } catch (error) {
+      console.error('Error connecting Fitbit:', error)
+      alert('Failed to connect Fitbit. Please try again.')
+      setFitbitLoading(false)
+    }
+  }
+
   const toggleInterest = (key: 'appleWatch' | 'fitbit' | 'garmin' | 'samsung' | 'googleFit' | 'oura' | 'polar') => {
+    // Don't toggle Fitbit interest if it's already connected
+    if (key === 'fitbit' && fitbitConnected) {
+      return
+    }
     setDeviceInterest((prev) => {
       const next = { ...prev, [key]: !prev?.[key] }
       // Fire-and-forget save; keep UI responsive even if request is slow
@@ -494,12 +526,21 @@ export default function Dashboard() {
                     <div className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <div className="text-2xl">🏃</div>
-                        <div>
+                        <div className="flex-1">
                           <div className="text-[15px] font-medium text-gray-900">Fitbit</div>
                           <div className="text-[12px] text-gray-500">Activity & sleep</div>
                         </div>
+                        {fitbitConnected && (
+                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        )}
                       </div>
-                      <button onClick={() => toggleInterest('fitbit')} className={`mt-3 w-full text-center text-[13px] px-3.5 py-2 rounded-full ${deviceInterest.fitbit ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>{deviceInterest.fitbit ? 'Interested ✓' : "I'm interested"}</button>
+                      {fitbitConnected ? (
+                        <Link href="/devices" className="mt-3 w-full text-center text-[13px] px-3.5 py-2 rounded-full bg-emerald-600 text-white block">Connected ✓</Link>
+                      ) : (
+                        <button onClick={handleConnectFitbit} className={`mt-3 w-full text-center text-[13px] px-3.5 py-2 rounded-full bg-helfi-green text-white hover:bg-green-600 transition-colors`} disabled={fitbitLoading}>
+                          {fitbitLoading ? 'Connecting...' : 'Connect Fitbit'}
+                        </button>
+                      )}
                     </div>
                     {/* Garmin */}
                     <div className="px-4 py-3">
@@ -571,11 +612,20 @@ export default function Dashboard() {
                   </div>
 
                   {/* Fitbit */}
-                  <div className={`bg-white p-4 rounded-2xl border ${deviceInterest.fitbit ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-gray-100'} shadow-sm transition-colors`}>
+                  <div className={`bg-white p-4 rounded-2xl border ${fitbitConnected ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-gray-100'} shadow-sm transition-colors`}>
                     <div className="text-center">
                       <div className="text-2xl mb-1">🏃</div>
-                      <div className="text-xs font-medium text-gray-700 mb-2">Fitbit</div>
-                      <button onClick={() => toggleInterest('fitbit')} className={`text-[12px] px-3.5 py-1.5 rounded-full ${deviceInterest.fitbit ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>{deviceInterest.fitbit ? 'Interested ✓' : "I'm interested"}</button>
+                      <div className="text-xs font-medium text-gray-700 mb-2 flex items-center justify-center gap-1">
+                        Fitbit
+                        {fitbitConnected && <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>}
+                      </div>
+                      {fitbitConnected ? (
+                        <Link href="/devices" className="text-[12px] px-3.5 py-1.5 rounded-full bg-emerald-600 text-white block">Connected ✓</Link>
+                      ) : (
+                        <button onClick={handleConnectFitbit} className={`text-[12px] px-3.5 py-1.5 rounded-full bg-helfi-green text-white hover:bg-green-600 transition-colors`} disabled={fitbitLoading}>
+                          {fitbitLoading ? 'Connecting...' : 'Connect Fitbit'}
+                        </button>
+                      )}
                     </div>
                   </div>
 

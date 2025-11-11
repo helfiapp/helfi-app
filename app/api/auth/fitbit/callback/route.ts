@@ -17,13 +17,13 @@ export async function GET(request: NextRequest) {
     if (error) {
       console.error('❌ Fitbit OAuth error:', error)
       return NextResponse.redirect(
-        new URL('/settings?fitbit_error=' + encodeURIComponent(error), request.nextUrl.origin)
+        new URL('/devices?fitbit_error=' + encodeURIComponent(error), request.nextUrl.origin)
       )
     }
 
     if (!code || !state) {
       return NextResponse.redirect(
-        new URL('/settings?fitbit_error=missing_params', request.nextUrl.origin)
+        new URL('/devices?fitbit_error=missing_params', request.nextUrl.origin)
       )
     }
 
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
     } catch (e) {
       console.error('❌ Invalid state parameter:', e)
       return NextResponse.redirect(
-        new URL('/settings?fitbit_error=invalid_state', request.nextUrl.origin)
+        new URL('/devices?fitbit_error=invalid_state', request.nextUrl.origin)
       )
     }
 
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id || session.user.id !== userId) {
       return NextResponse.redirect(
-        new URL('/settings?fitbit_error=session_mismatch', request.nextUrl.origin)
+        new URL('/devices?fitbit_error=session_mismatch', request.nextUrl.origin)
       )
     }
 
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
     if (!clientId || !clientSecret) {
       console.error('❌ Fitbit credentials not configured')
       return NextResponse.redirect(
-        new URL('/settings?fitbit_error=config_missing', request.nextUrl.origin)
+        new URL('/devices?fitbit_error=config_missing', request.nextUrl.origin)
       )
     }
 
@@ -76,7 +76,7 @@ export async function GET(request: NextRequest) {
       const errorData = await tokenResponse.text()
       console.error('❌ Fitbit token exchange failed:', errorData)
       return NextResponse.redirect(
-        new URL('/settings?fitbit_error=token_exchange_failed', request.nextUrl.origin)
+        new URL('/devices?fitbit_error=token_exchange_failed', request.nextUrl.origin)
       )
     }
 
@@ -92,7 +92,7 @@ export async function GET(request: NextRequest) {
     if (!profileResponse.ok) {
       console.error('❌ Failed to fetch Fitbit profile')
       return NextResponse.redirect(
-        new URL('/settings?fitbit_error=profile_fetch_failed', request.nextUrl.origin)
+        new URL('/devices?fitbit_error=profile_fetch_failed', request.nextUrl.origin)
       )
     }
 
@@ -134,12 +134,12 @@ export async function GET(request: NextRequest) {
     console.log('✅ Fitbit account linked successfully:', { userId: session.user.id, fitbitUserId })
 
     return NextResponse.redirect(
-      new URL('/settings?fitbit_connected=true', request.nextUrl.origin)
+      new URL('/devices?fitbit_connected=true', request.nextUrl.origin)
     )
   } catch (error) {
     console.error('❌ Fitbit callback error:', error)
     return NextResponse.redirect(
-      new URL('/settings?fitbit_error=callback_failed', request.nextUrl.origin)
+      new URL('/devices?fitbit_error=callback_failed', request.nextUrl.origin)
     )
   }
 }
