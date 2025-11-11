@@ -1,7 +1,7 @@
 'use client'
 import { Cog6ToothIcon } from '@heroicons/react/24/outline'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -22,6 +22,8 @@ export default function Dashboard() {
   const [savingInterest, setSavingInterest] = useState<string | null>(null)
   const [fitbitConnected, setFitbitConnected] = useState(false)
   const [fitbitLoading, setFitbitLoading] = useState(false)
+  const popupRef = useRef<Window | null>(null)
+  const checkIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   // Profile data - using consistent green avatar
   const defaultAvatar = 'data:image/svg+xml;base64,' + btoa(`
@@ -269,23 +271,39 @@ export default function Dashboard() {
         return
       }
 
+      popupRef.current = popup
+
       // Check if popup is closed (user cancelled)
       const checkClosed = setInterval(() => {
         if (popup.closed) {
           clearInterval(checkClosed)
+          if (checkIntervalRef.current) {
+            clearInterval(checkIntervalRef.current)
+            checkIntervalRef.current = null
+          }
           setFitbitLoading(false)
           // Check status in case they completed it quickly
           setTimeout(() => checkFitbitStatus(), 1000)
         }
       }, 500)
 
-      // Listen for postMessage from callback
-      const checkStatus = setInterval(async () => {
+      // Poll for connection status - check every 2 seconds
+      checkIntervalRef.current = setInterval(async () => {
         const connected = await checkFitbitStatus()
         if (connected) {
-          clearInterval(checkStatus)
           clearInterval(checkClosed)
-          popup.close()
+          if (checkIntervalRef.current) {
+            clearInterval(checkIntervalRef.current)
+            checkIntervalRef.current = null
+          }
+          // Try to close popup if still open
+          if (popup && !popup.closed) {
+            try {
+              popup.close()
+            } catch (e) {
+              // Popup might be on different origin, ignore
+            }
+          }
           setFitbitLoading(false)
         }
       }, 2000)
@@ -293,7 +311,10 @@ export default function Dashboard() {
       // Cleanup after 5 minutes
       setTimeout(() => {
         clearInterval(checkClosed)
-        clearInterval(checkStatus)
+        if (checkIntervalRef.current) {
+          clearInterval(checkIntervalRef.current)
+          checkIntervalRef.current = null
+        }
         setFitbitLoading(false)
       }, 300000)
     } catch (error) {
@@ -302,6 +323,15 @@ export default function Dashboard() {
       setFitbitLoading(false)
     }
   }
+
+  // Cleanup intervals on unmount
+  useEffect(() => {
+    return () => {
+      if (checkIntervalRef.current) {
+        clearInterval(checkIntervalRef.current)
+      }
+    }
+  }, [])
 
   const toggleInterest = (key: 'appleWatch' | 'fitbit' | 'garmin' | 'samsung' | 'googleFit' | 'oura' | 'polar') => {
     // Don't toggle Fitbit interest if it's already connected

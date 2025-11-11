@@ -179,32 +179,51 @@ export async function GET(request: NextRequest) {
 
     console.log('✅ Fitbit account linked successfully:', { userId: session.user.id, fitbitUserId })
 
-    // Check if this is a popup window (via referer or window.opener)
-    // If opened in popup, close it and notify parent
+    // Return a page that will redirect and close popup
+    // Since window.opener might be lost after Fitbit redirects, we'll use a redirect approach
+    // The parent window will poll for connection status
     const html = `
       <!DOCTYPE html>
       <html>
         <head>
           <title>Fitbit Connected</title>
+          <meta http-equiv="refresh" content="2;url=/devices?fitbit_connected=true">
         </head>
-        <body>
+        <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background: linear-gradient(135deg, #10b981 0%, #059669 100%); display: flex; align-items: center; justify-content: center; min-height: 100vh;">
+          <div style="text-align: center; padding: 40px; color: white;">
+            <div style="font-size: 48px; margin-bottom: 20px;">✅</div>
+            <h2 style="margin: 0 0 10px 0; font-size: 24px;">Fitbit Connected Successfully!</h2>
+            <p style="margin: 0; opacity: 0.9;">Redirecting you back to Helfi...</p>
+            <p style="margin-top: 20px; font-size: 14px; opacity: 0.8;">You can close this window if it doesn't close automatically.</p>
+          </div>
           <script>
-            // Notify parent window that connection succeeded
-            if (window.opener) {
-              window.opener.postMessage({ type: 'FITBIT_CONNECTED', success: true }, '*')
-              // Close popup after a brief delay
+            // Try to notify parent and close popup
+            try {
+              if (window.opener && !window.opener.closed) {
+                window.opener.postMessage({ type: 'FITBIT_CONNECTED', success: true }, '*')
+                setTimeout(() => {
+                  try {
+                    window.close()
+                  } catch (e) {
+                    // If we can't close, redirect parent
+                    if (window.opener) {
+                      window.opener.location.href = '/devices?fitbit_connected=true'
+                    }
+                  }
+                }, 1000)
+              } else {
+                // Not a popup or opener lost, redirect this window
+                setTimeout(() => {
+                  window.location.href = '/devices?fitbit_connected=true'
+                }, 2000)
+              }
+            } catch (e) {
+              // Fallback: redirect this window
               setTimeout(() => {
-                window.close()
-              }, 500)
-            } else {
-              // Not a popup, redirect normally
-              window.location.href = '/devices?fitbit_connected=true'
+                window.location.href = '/devices?fitbit_connected=true'
+              }, 2000)
             }
           </script>
-          <div style="text-align: center; padding: 40px; font-family: Arial, sans-serif;">
-            <h2>✅ Fitbit Connected Successfully!</h2>
-            <p>You can close this window.</p>
-          </div>
         </body>
       </html>
     `

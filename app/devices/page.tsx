@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import PageHeader from '@/components/PageHeader'
@@ -11,6 +11,8 @@ export default function DevicesPage() {
   const [fitbitConnected, setFitbitConnected] = useState(false)
   const [fitbitLoading, setFitbitLoading] = useState(false)
   const [syncingFitbit, setSyncingFitbit] = useState(false)
+  const popupRef = useRef<Window | null>(null)
+  const checkIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     checkFitbitStatus()
@@ -77,23 +79,39 @@ export default function DevicesPage() {
         return
       }
 
+      popupRef.current = popup
+
       // Check if popup is closed (user cancelled)
       const checkClosed = setInterval(() => {
         if (popup.closed) {
           clearInterval(checkClosed)
+          if (checkIntervalRef.current) {
+            clearInterval(checkIntervalRef.current)
+            checkIntervalRef.current = null
+          }
           setFitbitLoading(false)
           // Check status in case they completed it quickly
           setTimeout(() => checkFitbitStatus(), 1000)
         }
       }, 500)
 
-      // Listen for postMessage from callback
-      const checkStatus = setInterval(async () => {
+      // Poll for connection status - check every 2 seconds
+      checkIntervalRef.current = setInterval(async () => {
         const connected = await checkFitbitStatus()
         if (connected) {
-          clearInterval(checkStatus)
           clearInterval(checkClosed)
-          popup.close()
+          if (checkIntervalRef.current) {
+            clearInterval(checkIntervalRef.current)
+            checkIntervalRef.current = null
+          }
+          // Try to close popup if still open
+          if (popup && !popup.closed) {
+            try {
+              popup.close()
+            } catch (e) {
+              // Popup might be on different origin, ignore
+            }
+          }
           setFitbitLoading(false)
         }
       }, 2000)
@@ -101,7 +119,10 @@ export default function DevicesPage() {
       // Cleanup after 5 minutes
       setTimeout(() => {
         clearInterval(checkClosed)
-        clearInterval(checkStatus)
+        if (checkIntervalRef.current) {
+          clearInterval(checkIntervalRef.current)
+          checkIntervalRef.current = null
+        }
         setFitbitLoading(false)
       }, 300000)
     } catch (error) {
@@ -110,6 +131,15 @@ export default function DevicesPage() {
       setFitbitLoading(false)
     }
   }
+
+  // Cleanup intervals on unmount
+  useEffect(() => {
+    return () => {
+      if (checkIntervalRef.current) {
+        clearInterval(checkIntervalRef.current)
+      }
+    }
+  }, [])
 
   const handleDisconnectFitbit = async () => {
     if (!confirm('Are you sure you want to disconnect your Fitbit account? This will also delete all synced Fitbit data.')) {
