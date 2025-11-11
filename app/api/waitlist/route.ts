@@ -78,4 +78,46 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     )
   }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    // JWT authentication check (with temporary token support)
+    const authHeader = request.headers.get('authorization')
+    const admin = extractAdminFromHeaders(authHeader)
+    
+    // Allow temporary admin token during transition
+    if (!admin && authHeader !== 'Bearer temp-admin-token') {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+
+    const { id } = await request.json()
+
+    if (!id) {
+      return NextResponse.json(
+        { error: 'Waitlist entry ID is required' },
+        { status: 400 }
+      )
+    }
+
+    // Delete the waitlist entry
+    await prisma.waitlist.delete({
+      where: { id }
+    })
+
+    return NextResponse.json({ 
+      success: true,
+      message: 'Waitlist entry deleted successfully'
+    })
+
+  } catch (error) {
+    console.error('Error deleting waitlist entry:', error)
+    return NextResponse.json(
+      { error: 'Failed to delete waitlist entry' },
+      { status: 500 }
+    )
+  }
 } 

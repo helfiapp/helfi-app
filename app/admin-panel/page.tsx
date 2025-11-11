@@ -225,11 +225,47 @@ export default function AdminPanel() {
       if (response.ok) {
         const result = await response.json()
         setWaitlistData(result.waitlist || [])
+        // Clear selected emails if they no longer exist
+        setSelectedEmails(prev => prev.filter(email => 
+          result.waitlist?.some((entry: any) => entry.email === email)
+        ))
       }
     } catch (error) {
       console.error('Error loading waitlist:', error)
     }
     setIsLoadingWaitlist(false)
+  }
+
+  const handleDeleteWaitlistEntry = async (entryId: string, email: string) => {
+    if (!confirm(`Are you sure you want to delete ${email} from the waitlist?`)) {
+      return
+    }
+
+    try {
+      const response = await fetch('/api/waitlist', {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${adminToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ id: entryId })
+      })
+
+      const result = await response.json()
+      
+      if (response.ok) {
+        // Remove from local state
+        setWaitlistData(prev => prev.filter(entry => entry.id !== entryId))
+        // Remove from selected emails if it was selected
+        setSelectedEmails(prev => prev.filter(e => e !== email))
+        alert('Waitlist entry deleted successfully')
+      } else {
+        alert(result.error || 'Failed to delete waitlist entry')
+      }
+    } catch (error) {
+      console.error('Error deleting waitlist entry:', error)
+      alert('Failed to delete waitlist entry. Please try again.')
+    }
   }
 
   const loadUserStats = async (token?: string) => {
@@ -1675,12 +1711,15 @@ The Helfi Team`,
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Signed Up
                         </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Actions
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {waitlistData.length === 0 ? (
                         <tr>
-                          <td colSpan={4} className="px-6 py-4 text-center text-gray-500">
+                          <td colSpan={5} className="px-6 py-4 text-center text-gray-500">
                             No waitlist signups yet.
                           </td>
                         </tr>
@@ -1703,6 +1742,15 @@ The Helfi Team`,
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                               {new Date(entry.createdAt).toLocaleDateString()}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm">
+                              <button
+                                onClick={() => handleDeleteWaitlistEntry(entry.id, entry.email)}
+                                className="text-red-600 hover:text-red-800 font-medium transition-colors"
+                                title="Delete entry"
+                              >
+                                Delete
+                              </button>
                             </td>
                           </tr>
                         ))
