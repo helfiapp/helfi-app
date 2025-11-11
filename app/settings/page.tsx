@@ -32,6 +32,10 @@ export default function Settings() {
   const [showPdf, setShowPdf] = useState(false)
   const [pdfUrl, setPdfUrl] = useState<string>('')
   const [exporting, setExporting] = useState(false)
+  // Fitbit integration state
+  const [fitbitConnected, setFitbitConnected] = useState(false)
+  const [fitbitLoading, setFitbitLoading] = useState(false)
+  const [syncingFitbit, setSyncingFitbit] = useState(false)
   // Reminder settings (simplified to single daily reminder)
   const [time1, setTime1] = useState('21:00')
   const [tz, setTz] = useState('Australia/Melbourne')
@@ -134,6 +138,96 @@ export default function Settings() {
     localStorage.setItem('pushNotifications', pushNotifications.toString())
     // TODO: Send to backend API to update user preferences
   }, [pushNotifications])
+
+  // Check Fitbit connection status on load
+  useEffect(() => {
+    const checkFitbitStatus = async () => {
+      try {
+        const response = await fetch('/api/fitbit/status')
+        if (response.ok) {
+          const data = await response.json()
+          setFitbitConnected(data.connected)
+        }
+      } catch (error) {
+        console.error('Error checking Fitbit status:', error)
+      }
+    }
+    checkFitbitStatus()
+    
+    // Check URL params for Fitbit connection result
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('fitbit_connected') === 'true') {
+      setFitbitConnected(true)
+      // Clean URL
+      window.history.replaceState({}, '', '/settings')
+    }
+    if (params.get('fitbit_error')) {
+      alert('Fitbit connection failed: ' + params.get('fitbit_error'))
+      window.history.replaceState({}, '', '/settings')
+    }
+  }, [])
+
+  // Handle Fitbit connection
+  const handleConnectFitbit = async () => {
+    setFitbitLoading(true)
+    try {
+      window.location.href = '/api/auth/fitbit/authorize'
+    } catch (error) {
+      console.error('Error connecting Fitbit:', error)
+      alert('Failed to connect Fitbit. Please try again.')
+      setFitbitLoading(false)
+    }
+  }
+
+  // Handle Fitbit disconnection
+  const handleDisconnectFitbit = async () => {
+    if (!confirm('Are you sure you want to disconnect your Fitbit account? This will also delete all synced Fitbit data.')) {
+      return
+    }
+    
+    setFitbitLoading(true)
+    try {
+      const response = await fetch('/api/fitbit/status', { method: 'DELETE' })
+      if (response.ok) {
+        setFitbitConnected(false)
+        alert('Fitbit account disconnected successfully')
+      } else {
+        throw new Error('Failed to disconnect')
+      }
+    } catch (error) {
+      console.error('Error disconnecting Fitbit:', error)
+      alert('Failed to disconnect Fitbit. Please try again.')
+    } finally {
+      setFitbitLoading(false)
+    }
+  }
+
+  // Handle Fitbit data sync
+  const handleSyncFitbit = async () => {
+    setSyncingFitbit(true)
+    try {
+      const response = await fetch('/api/fitbit/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date: new Date().toISOString().split('T')[0],
+          dataTypes: ['steps', 'heartrate', 'sleep', 'weight'],
+        }),
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        alert('Fitbit data synced successfully!')
+      } else {
+        throw new Error('Sync failed')
+      }
+    } catch (error) {
+      console.error('Error syncing Fitbit:', error)
+      alert('Failed to sync Fitbit data. Please try again.')
+    } finally {
+      setSyncingFitbit(false)
+    }
+  }
 
   // Detect existing subscription on load and reflect in UI
   useEffect(() => {
@@ -665,6 +759,80 @@ export default function Settings() {
                 </label>
               </div>
             </div>
+          </div>
+
+          {/* Fitbit Integration */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Fitbit Integration</h2>
+            
+            {fitbitConnected ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center">
+                      <svg className="w-6 h-6 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-gray-900 dark:text-white">Fitbit Connected</h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">Your Fitbit account is connected</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleSyncFitbit}
+                    disabled={syncingFitbit}
+                    className="flex-1 px-4 py-2 bg-helfi-green text-white rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                  >
+                    {syncingFitbit ? 'Syncing...' : 'Sync Data Now'}
+                  </button>
+                  <button
+                    onClick={handleDisconnectFitbit}
+                    disabled={fitbitLoading}
+                    className="px-4 py-2 border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                  >
+                    Disconnect
+                  </button>
+                </div>
+                
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  Sync your steps, heart rate, sleep, and weight data from Fitbit to Helfi.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="p-4 bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-700 rounded-lg">
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                    Connect your Fitbit account to automatically sync your activity, heart rate, sleep, and weight data.
+                  </p>
+                  <button
+                    onClick={handleConnectFitbit}
+                    disabled={fitbitLoading}
+                    className="w-full px-4 py-3 bg-helfi-green text-white rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium flex items-center justify-center gap-2"
+                  >
+                    {fitbitLoading ? (
+                      <>
+                        <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Connecting...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                        </svg>
+                        Connect Fitbit
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Account Actions */}
