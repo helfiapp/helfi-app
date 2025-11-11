@@ -117,12 +117,14 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
     let cancelled = false
     ;(async () => {
       try {
+        let hasThreads = false
         // Load threads
         const threadsRes = await fetch(`/api/insights/issues/${issueSlug}/sections/${section}/threads`, { cache: 'no-store' })
         if (threadsRes.ok) {
           const threadsData = await threadsRes.json()
           if (!cancelled && threadsData.threads && Array.isArray(threadsData.threads)) {
             setThreads(threadsData.threads)
+            hasThreads = threadsData.threads.length > 0
             if (threadsData.threads.length > 0 && !threadId) {
               // Load most recent thread
               const latestThreadId = threadsData.threads[0].id
@@ -132,7 +134,7 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
           }
         }
         // Only try backward compatibility if we have NO threads (to avoid creating duplicates)
-        if (!cancelled && threadsData.threads && threadsData.threads.length === 0 && !threadId) {
+        if (!cancelled && !hasThreads && !threadId) {
           const res = await fetch(`/api/insights/issues/${issueSlug}/sections/${section}/chat`, { cache: 'no-store' })
           if (res.ok) {
             const data = await res.json()
