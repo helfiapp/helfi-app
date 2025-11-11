@@ -95,14 +95,20 @@ export async function POST(
     // Get or create thread
     let thread: { id: string }
     if (body.newThread) {
-      // Create new thread
+      // Create new thread only if explicitly requested
       thread = await createThread(session.user.id, context.params.slug, section)
     } else if (body.threadId) {
       // Use existing thread
       thread = { id: body.threadId }
     } else {
-      // Get or create default thread (backward compatibility)
-      thread = await getOrCreateThread(session.user.id, context.params.slug, section)
+      // Get most recent thread or create new one ONLY if no threads exist
+      const existingThreads = await listThreads(session.user.id, context.params.slug, section)
+      if (existingThreads.length > 0) {
+        thread = { id: existingThreads[0].id }
+      } else {
+        // Only create if truly no threads exist
+        thread = await getOrCreateThread(session.user.id, context.params.slug, section)
+      }
     }
     
     if (question) {

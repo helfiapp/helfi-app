@@ -301,7 +301,7 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
         body: JSON.stringify({ 
           message: text,
           threadId: threadId || undefined,
-          newThread: !threadId,
+          newThread: false, // Never create a new thread automatically - user must click "+ New"
         }),
       })
       if (res.ok && (res.headers.get('content-type') || '').includes('text/event-stream') && res.body) {
