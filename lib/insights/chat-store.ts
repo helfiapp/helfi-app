@@ -82,19 +82,17 @@ export async function deleteThread(threadId: string): Promise<void> {
 
 export async function getOrCreateThread(userId: string, slug: string, section: string): Promise<{ id: string }> {
   await ensureChatTables()
-  const rows: Array<{ id: string }> = await prisma.$queryRawUnsafe(
-    'SELECT "id" FROM "InsightsChatThread" WHERE "userId" = $1 AND "slug" = $2 AND "section" = $3 ORDER BY "updatedAt" DESC LIMIT 1',
-    userId,
-    slug,
-    section
-  )
-  if (rows && rows[0]) {
+  // First check if there are any existing threads for this user/slug/section
+  const existingThreads = await listThreads(userId, slug, section)
+  if (existingThreads.length > 0) {
+    // Return the most recently updated thread instead of creating a new one
     await prisma.$executeRawUnsafe(
       'UPDATE "InsightsChatThread" SET "updatedAt" = NOW() WHERE "id" = $1',
-      rows[0].id
+      existingThreads[0].id
     )
-    return { id: rows[0].id }
+    return { id: existingThreads[0].id }
   }
+  // Only create a new thread if none exist
   const id = uuid()
   await prisma.$executeRawUnsafe(
     'INSERT INTO "InsightsChatThread" ("id","userId","slug","section") VALUES ($1,$2,$3,$4)',

@@ -131,16 +131,18 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
             }
           }
         }
-        // Also try loading default thread (backward compatibility)
-        const res = await fetch(`/api/insights/issues/${issueSlug}/sections/${section}/chat`, { cache: 'no-store' })
-        if (res.ok) {
-          const data = await res.json()
-          if (!cancelled && typeof data?.threadId === 'string' && !threadId) {
-            setThreadId(data.threadId)
-            const serverMessages = Array.isArray(data?.messages)
-              ? data.messages.map((m: any) => ({ role: m.role, content: m.content })).filter((m: any) => m?.content)
-              : []
-            if (!cancelled && serverMessages.length) setMessages(serverMessages)
+        // Only try backward compatibility if we have NO threads (to avoid creating duplicates)
+        if (!cancelled && threads.length === 0 && !threadId) {
+          const res = await fetch(`/api/insights/issues/${issueSlug}/sections/${section}/chat`, { cache: 'no-store' })
+          if (res.ok) {
+            const data = await res.json()
+            if (!cancelled && typeof data?.threadId === 'string') {
+              setThreadId(data.threadId)
+              const serverMessages = Array.isArray(data?.messages)
+                ? data.messages.map((m: any) => ({ role: m.role, content: m.content })).filter((m: any) => m?.content)
+                : []
+              if (!cancelled && serverMessages.length) setMessages(serverMessages)
+            }
           }
         }
       } catch {}
