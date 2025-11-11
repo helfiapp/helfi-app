@@ -114,13 +114,13 @@ export default function SplashPage() {
           <div className="flex items-center">
             <button 
               onClick={() => window.location.reload()}
-              className="w-24 h-24 md:w-32 md:h-32 cursor-pointer hover:opacity-80 transition-opacity"
+              className="w-28 h-28 md:w-40 md:h-40 cursor-pointer hover:opacity-80 transition-opacity"
             >
               <Image
                 src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/HELFI_TRANSPARENT_rmssry.png"
                 alt="Helfi Logo"
-                width={128}
-                height={128}
+                width={160}
+                height={160}
                 className="w-full h-full object-contain"
                 priority
               />
