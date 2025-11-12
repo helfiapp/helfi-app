@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import type { IssueSectionKey, IssueSectionResult } from '@/lib/insights/issue-engine'
 import SectionChat from './SectionChat'
 
@@ -75,7 +76,17 @@ export default function SectionRenderer({ issueSlug, section, initialResult }: S
 
       {result.recommendations.length > 0 && (
         <section className="bg-white border border-gray-200 rounded-2xl shadow-sm p-6">
-          <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide mb-3">Recommendations</h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Recommendations</h3>
+            {section === 'labs' && (
+              <Link
+                href="/onboarding?step=8"
+                className="px-4 py-2 bg-helfi-green hover:bg-helfi-green/90 text-white rounded-lg text-sm font-medium transition-colors"
+              >
+                Upload Blood Results
+              </Link>
+            )}
+          </div>
           <div className="space-y-4">
             {result.recommendations.map((recommendation, idx) => (
               <div key={`${recommendation.title}-${idx}`} className="border border-gray-200 rounded-xl p-4">
