@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { getEmailFooter } from '@/lib/email-footer'
 
 // This API route uses dynamic data and should not be statically generated
 export const runtime = 'nodejs'
@@ -64,13 +65,7 @@ async function sendVerificationEmail(email: string, token: string) {
               If you didn't create a Helfi account, please ignore this email or contact our support team.
             </p>
             
-            <div style="margin-top: 40px; padding-top: 30px; border-top: 1px solid #e5e7eb; font-size: 14px; color: #6b7280; text-align: center;">
-              <p style="margin: 0 0 16px 0; font-size: 16px; color: #374151;"><strong>Best regards,<br>The Helfi Team</strong></p>
-              <p style="margin: 20px 0 0 0; font-size: 14px;">
-                <a href="https://helfi.ai" style="color: #10b981; text-decoration: none; font-weight: 500;">🌐 helfi.ai</a> | 
-                <a href="mailto:support@helfi.ai" style="color: #10b981; text-decoration: none; font-weight: 500;">📧 support@helfi.ai</a>
-              </p>
-            </div>
+            ${getEmailFooter({ recipientEmail: email, emailType: 'verification' })}
           </div>
         </div>
       `

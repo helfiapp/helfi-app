@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
 import { extractAdminFromHeaders } from '@/lib/admin-auth'
+import { getEmailFooter } from '@/lib/email-footer'
+import { prisma } from '@/lib/prisma'
 
 // Initialize Resend only when needed to avoid build-time errors
 function getResend() {
@@ -40,6 +42,21 @@ export async function POST(request: NextRequest) {
     
     for (const email of emails) {
       try {
+        // Check if email is unsubscribed
+        const waitlistEntry = await prisma.waitlist.findUnique({
+          where: { email: email.toLowerCase() }
+        })
+        
+        if (waitlistEntry?.unsubscribed) {
+          results.push({
+            email,
+            status: 'skipped',
+            reason: 'Email address has unsubscribed from marketing emails'
+          })
+          console.log(`⏭️ [EMAIL SKIPPED] ${email} has unsubscribed`)
+          continue
+        }
+        
         // Find the corresponding waitlist entry to get the name
         const recipient = waitlistData?.find((entry: any) => entry.email === email)
         const name = recipient?.name || 'there'
@@ -73,17 +90,7 @@ export async function POST(request: NextRequest) {
                   <a href="https://helfi.ai" style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; text-decoration: none; padding: 16px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; margin: 10px 0; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);">🚀 Get Started with Helfi</a>
                 </div>
                 
-                <div style="margin-top: 40px; padding-top: 30px; border-top: 1px solid #e5e7eb; font-size: 14px; color: #6b7280; text-align: center;">
-                  <p style="margin: 0 0 16px 0; font-size: 16px; color: #374151;"><strong>Best regards,<br>The Helfi Team</strong></p>
-                  <p style="margin: 20px 0 0 0; font-size: 14px;">
-                    <a href="https://helfi.ai" style="color: #10b981; text-decoration: none; font-weight: 500;">🌐 helfi.ai</a> | 
-                    <a href="mailto:support@helfi.ai" style="color: #10b981; text-decoration: none; font-weight: 500;">📧 support@helfi.ai</a>
-                  </p>
-                  <p style="margin: 16px 0 0 0; font-size: 12px; color: #9ca3af;">
-                    You received this email because you joined our waitlist. 
-                    <a href="#" style="color: #10b981; text-decoration: none;">Unsubscribe</a>
-                  </p>
-                </div>
+                ${getEmailFooter({ recipientEmail: email, emailType: 'marketing', reasonText: 'You received this email because you joined our waitlist.' })}
               </div>
             </div>
           `

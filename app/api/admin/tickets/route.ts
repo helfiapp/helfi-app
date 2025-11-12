@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
 import { extractAdminFromHeaders } from '@/lib/admin-auth'
 import { Resend } from 'resend'
+import { getEmailFooter } from '@/lib/email-footer'
 
 const prisma = new PrismaClient()
 
@@ -256,10 +257,7 @@ export async function POST(request: NextRequest) {
                     </a>
                   </div>
 
-                  <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
-                  <p style="color: #6b7280; font-size: 14px; text-align: center;">
-                    This is an automated notification from the Helfi support system.
-                  </p>
+                  ${getEmailFooter({ recipientEmail: 'support@helfi.ai', emailType: 'support', reasonText: 'This is an automated notification from the Helfi support system.' })}
                 </div>
               `
             })

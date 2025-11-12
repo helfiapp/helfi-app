@@ -190,15 +190,15 @@ model ExerciseLog {
 
 // Fitbit Data Sync - stores synced data from Fitbit API
 model FitbitData {
-  id            String   @id @default(cuid())
-  userId        String
-  date          DateTime @db.Date // Date of the data (YYYY-MM-DD)
-  dataType      String   // 'steps', 'heartrate', 'sleep', 'weight', 'activity'
-  value         Json     // Flexible JSON storage for different data types
-  syncedAt      DateTime @default(now())
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id        String   @id @default(cuid())
+  userId    String
+  date      DateTime @db.Date // Date of the data (YYYY-MM-DD)
+  dataType  String // 'steps', 'heartrate', 'sleep', 'weight', 'activity'
+  value     Json // Flexible JSON storage for different data types
+  syncedAt  DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, date, dataType])
   @@index([userId, date])
@@ -245,10 +245,12 @@ enum Plan {
 }
 
 model Waitlist {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String
-  createdAt DateTime @default(now())
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  unsubscribed Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
 
 model AdminUser {

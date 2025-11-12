@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { extractAdminFromHeaders } from '@/lib/admin-auth'
 import { Resend } from 'resend'
+import { getEmailFooter } from '@/lib/email-footer'
 
 // Initialize Resend for emails
 function getResend() {
@@ -87,17 +88,7 @@ async function sendWaitlistAcknowledgmentEmail(email: string, name: string) {
               <a href="https://helfi.ai" style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; text-decoration: none; padding: 16px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; margin: 10px 0; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);">🌐 Visit Helfi.ai</a>
             </div>
             
-            <div style="margin-top: 40px; padding-top: 30px; border-top: 1px solid #e5e7eb; font-size: 14px; color: #6b7280; text-align: center;">
-              <p style="margin: 0 0 16px 0; font-size: 16px; color: #374151;"><strong>Best regards,<br>The Helfi Team</strong></p>
-              <p style="margin: 20px 0 0 0; font-size: 14px;">
-                <a href="https://helfi.ai" style="color: #10b981; text-decoration: none; font-weight: 500;">🌐 helfi.ai</a> | 
-                <a href="mailto:support@helfi.ai" style="color: #10b981; text-decoration: none; font-weight: 500;">📧 support@helfi.ai</a>
-              </p>
-              <p style="margin: 16px 0 0 0; font-size: 12px; color: #9ca3af;">
-                You received this email because you joined our waitlist. 
-                If you didn't sign up, please ignore this email or contact our support team.
-              </p>
-            </div>
+            ${getEmailFooter({ recipientEmail: email, emailType: 'waitlist' })}
           </div>
         </div>
       `
@@ -189,6 +180,13 @@ export async function POST(request: NextRequest) {
     })
 
     if (existingEntry) {
+      // If user was unsubscribed, don't re-add them
+      if (existingEntry.unsubscribed) {
+        return NextResponse.json({
+          success: false,
+          message: 'This email has been unsubscribed from waitlist emails.'
+        }, { status: 400 })
+      }
       // Return a friendly success message to avoid alarming users
       return NextResponse.json({
         success: true,
@@ -208,9 +206,12 @@ export async function POST(request: NextRequest) {
     // Both emails use non-blocking .catch() pattern - do NOT await or use try/catch here
     // This pattern matches the working notification email exactly
     // Changing this will break email delivery as it did before (fixed 2025-11-12)
-    sendWaitlistAcknowledgmentEmail(normalizedEmail, normalizedName).catch(error => {
-      console.error('❌ [WAITLIST] Acknowledgment email failed (non-blocking):', error)
-    })
+    // Only send email if not unsubscribed
+    if (!waitlistEntry.unsubscribed) {
+      sendWaitlistAcknowledgmentEmail(normalizedEmail, normalizedName).catch(error => {
+        console.error('❌ [WAITLIST] Acknowledgment email failed (non-blocking):', error)
+      })
+    }
 
     // Send notification email to support team (don't await to avoid blocking response)
     sendWaitlistNotificationEmail(normalizedEmail, normalizedName).catch(error => {
