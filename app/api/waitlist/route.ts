@@ -306,30 +306,22 @@ export async function GET(request: NextRequest) {
     }
 
     // IMPORTANT: Filter out unsubscribed entries - they should not appear in active waitlist
-    // Use raw query to ensure we filter properly even during migration
+    // Use raw query with proper column check to ensure filtering works
     try {
+      // Check if unsubscribed column exists by trying to query it
       const rawEntries = await prisma.$queryRawUnsafe(`
         SELECT id, email, name, "createdAt"
         FROM "Waitlist" 
-        WHERE COALESCE(unsubscribed, false) = false
+        WHERE (unsubscribed IS NULL OR unsubscribed = false)
         ORDER BY "createdAt" DESC
       `) as Array<{ id: string; email: string; name: string; createdAt: Date }>
       
+      console.log(`📋 Returning ${rawEntries.length} active waitlist entries (filtered out unsubscribed)`)
       return NextResponse.json({ waitlist: rawEntries })
     } catch (rawError: any) {
-      // Fallback: try Prisma query
-      console.warn('Raw query failed, trying Prisma:', rawError?.message)
+      // If column doesn't exist, the WHERE clause will fail - return all entries
+      console.warn('Unsubscribed column may not exist yet:', rawError?.message)
       try {
-        const waitlistEntries = await prisma.waitlist.findMany({
-          where: {
-            unsubscribed: false  // Only show active subscribers
-          },
-          orderBy: { createdAt: 'desc' }
-        })
-        return NextResponse.json({ waitlist: waitlistEntries })
-      } catch (prismaError: any) {
-        // Last resort: return all entries if column doesn't exist yet
-        console.warn('Both queries failed, returning all entries:', prismaError?.message)
         const rawEntries = await prisma.$queryRawUnsafe(`
           SELECT id, email, name, "createdAt" 
           FROM "Waitlist" 
@@ -337,6 +329,9 @@ export async function GET(request: NextRequest) {
         `) as Array<{ id: string; email: string; name: string; createdAt: Date }>
         
         return NextResponse.json({ waitlist: rawEntries })
+      } catch (fallbackError: any) {
+        console.error('Failed to fetch waitlist:', fallbackError)
+        return NextResponse.json({ waitlist: [] })
       }
     }
 

@@ -98,23 +98,30 @@ export async function GET(request: NextRequest) {
     }
 
     // Update waitlist entry to mark as unsubscribed
+    // Use raw SQL to ensure it works even if Prisma schema is out of sync
     try {
-      // Try Prisma first
+      const escapedEmail = normalizedEmail.replace(/'/g, "''")
+      
+      // First ensure column exists
+      await prisma.$executeRawUnsafe(`
+        ALTER TABLE "Waitlist" 
+        ADD COLUMN IF NOT EXISTS "unsubscribed" BOOLEAN NOT NULL DEFAULT false
+      `).catch(() => {}) // Ignore if column already exists
+      
+      // Now update the record - use raw SQL to guarantee it works
+      const updateResult = await prisma.$executeRawUnsafe(`
+        UPDATE "Waitlist" 
+        SET unsubscribed = true 
+        WHERE LOWER(email) = LOWER('${escapedEmail}')
+      `)
+      
+      console.log(`✅ Marked ${normalizedEmail} as unsubscribed`)
+      
+      // Also try Prisma as backup (but raw SQL should have worked)
       await prisma.waitlist.updateMany({
         where: { email: normalizedEmail },
-        data: { 
-          unsubscribed: true
-        }
-      }).catch(async (e) => {
-        // If Prisma fails (column doesn't exist), use raw SQL
-        console.warn('Prisma update failed, using raw SQL:', e)
-        const escapedEmail = normalizedEmail.replace(/'/g, "''")
-        await prisma.$executeRawUnsafe(`
-          UPDATE "Waitlist" 
-          SET unsubscribed = true 
-          WHERE email = '${escapedEmail}'
-        `)
-      })
+        data: { unsubscribed: true }
+      }).catch(() => {}) // Ignore if Prisma fails
 
       // Also check if user exists and could track preferences there
       const user = await prisma.user.findUnique({
