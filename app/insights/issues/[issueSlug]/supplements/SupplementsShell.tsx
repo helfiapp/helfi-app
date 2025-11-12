@@ -331,7 +331,9 @@ export default function SupplementsShell({ children, initialResult, issueSlug }:
               <div className="flex-1">
                 <h2 className="text-lg font-semibold text-gray-900 mb-2">Supplements report</h2>
                 <p className="text-sm text-gray-700 leading-relaxed mb-3">Preparing initial guidance...</p>
-                <ProgressBar />
+                <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                  <div className="bg-helfi-green h-2 rounded-full animate-pulse" style={{ width: '60%' }}></div>
+                </div>
               </div>
             </div>
           </section>

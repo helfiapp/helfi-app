@@ -23,13 +23,25 @@ export default function HeroCarousel() {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const [isPaused, setIsPaused] = useState(false)
   const scrollPositionRef = useRef(0)
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const [isMobile, setIsMobile] = useState(false)
+
+  // Detect mobile on mount and resize
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
 
   const scrollLeft = () => {
     const container = scrollContainerRef.current
     if (!container) return
     
     // Calculate scroll amount - scroll by 1 image width
-    const imageWidth = 250 + 24 // width + gap
+    const imageWidth = isMobile ? 320 + 24 : 250 + 24 // width + gap
     const newScrollLeft = Math.max(0, container.scrollLeft - imageWidth)
     
     container.scrollTo({ left: newScrollLeft, behavior: 'smooth' })
@@ -45,7 +57,7 @@ export default function HeroCarousel() {
     if (!container) return
     
     // Calculate scroll amount - scroll by 1 image width
-    const imageWidth = 250 + 24 // width + gap
+    const imageWidth = isMobile ? 320 + 24 : 250 + 24 // width + gap
     const maxScroll = container.scrollWidth - container.clientWidth
     const newScrollLeft = Math.min(maxScroll, container.scrollLeft + imageWidth)
     
@@ -57,16 +69,94 @@ export default function HeroCarousel() {
     setTimeout(() => setIsPaused(false), 3000)
   }
 
-  // Auto-scroll from right to left
+  // Mobile: Snap animation - hold for 3 seconds, then quickly flash to next
   useEffect(() => {
+    if (!isMobile) return
+
     const container = scrollContainerRef.current
     if (!container) return
 
-    // Check if mobile - show one image at a time on mobile
-    const isMobile = window.innerWidth < 768
+    let advanceTimeoutId: NodeJS.Timeout
+    let resumeTimeoutId: NodeJS.Timeout
+    let currentSlideIndex = 0
+    let isUserScrolling = false
+    const imageWidth = 320 + 24 // width + gap for mobile
+
+    const advanceSlide = () => {
+      if (isPaused || isUserScrolling) {
+        advanceTimeoutId = setTimeout(advanceSlide, 100) // Check again in 100ms
+        return
+      }
+
+      // Move to next slide
+      currentSlideIndex = (currentSlideIndex + 1) % screenshots.length
+      
+      // Quickly snap to next position (right to left) - instant transition
+      const scrollPosition = currentSlideIndex * imageWidth
+      container.scrollLeft = scrollPosition
+      scrollPositionRef.current = scrollPosition
+      setCurrentIndex(currentSlideIndex)
+
+      // Hold for 3 seconds before next transition
+      advanceTimeoutId = setTimeout(advanceSlide, 3000)
+    }
+
+    // Pause auto-advance when user manually scrolls
+    const handleScroll = () => {
+      isUserScrolling = true
+      setIsPaused(true)
+      
+      // Clear any pending advance
+      if (advanceTimeoutId) {
+        clearTimeout(advanceTimeoutId)
+      }
+      
+      // Clear any existing resume timeout
+      if (resumeTimeoutId) {
+        clearTimeout(resumeTimeoutId)
+      }
+      
+      // Resume auto-advance after user stops scrolling for 5 seconds
+      resumeTimeoutId = setTimeout(() => {
+        isUserScrolling = false
+        setIsPaused(false)
+        // Sync currentSlideIndex with actual scroll position
+        const scrollPos = container.scrollLeft
+        currentSlideIndex = Math.round(scrollPos / imageWidth) % screenshots.length
+        advanceTimeoutId = setTimeout(advanceSlide, 3000)
+      }, 5000)
+    }
+
+    // Initialize to first slide
+    container.scrollLeft = 0
+    scrollPositionRef.current = 0
+    
+    // Listen for manual scroll events
+    container.addEventListener('scroll', handleScroll, { passive: true })
+    
+    // Start the cycle after 3 seconds (hold first slide for 3 seconds)
+    advanceTimeoutId = setTimeout(advanceSlide, 3000)
+
+    return () => {
+      container.removeEventListener('scroll', handleScroll)
+      if (advanceTimeoutId) {
+        clearTimeout(advanceTimeoutId)
+      }
+      if (resumeTimeoutId) {
+        clearTimeout(resumeTimeoutId)
+      }
+    }
+  }, [isMobile, isPaused])
+
+  // Desktop: Continuous smooth scroll
+  useEffect(() => {
+    if (isMobile) return
+
+    const container = scrollContainerRef.current
+    if (!container) return
 
     let animationFrameId: number
-    const scrollSpeed = isMobile ? 0.3 : 0.5 // Slower on mobile
+    const scrollSpeed = 0.5
 
     const scroll = () => {
       if (!isPaused) {
@@ -89,19 +179,19 @@ export default function HeroCarousel() {
         cancelAnimationFrame(animationFrameId)
       }
     }
-  }, [isPaused])
+  }, [isMobile, isPaused])
 
   return (
     <div 
-      className="relative w-full px-16 md:px-20"
+      className="relative w-full px-4 md:px-16 lg:px-20"
       style={{ paddingTop: '2rem', paddingBottom: '2rem' }}
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
     >
-      {/* Left Scroll Button */}
+      {/* Left Scroll Button - Hidden on mobile */}
       <button
         onClick={scrollLeft}
-        className="absolute left-0 top-1/2 -translate-y-1/2 z-50 bg-black/20 hover:bg-black/30 backdrop-blur-sm rounded-full p-2 md:p-3 transition-all duration-200 opacity-60 hover:opacity-100"
+        className="hidden md:block absolute left-0 top-1/2 -translate-y-1/2 z-50 bg-black/20 hover:bg-black/30 backdrop-blur-sm rounded-full p-2 md:p-3 transition-all duration-200 opacity-60 hover:opacity-100"
         aria-label="Scroll left"
       >
         <svg 
@@ -115,10 +205,10 @@ export default function HeroCarousel() {
         </svg>
       </button>
 
-      {/* Right Scroll Button */}
+      {/* Right Scroll Button - Hidden on mobile */}
       <button
         onClick={scrollRight}
-        className="absolute right-0 top-1/2 -translate-y-1/2 z-50 bg-black/20 hover:bg-black/30 backdrop-blur-sm rounded-full p-2 md:p-3 transition-all duration-200 opacity-60 hover:opacity-100"
+        className="hidden md:block absolute right-0 top-1/2 -translate-y-1/2 z-50 bg-black/20 hover:bg-black/30 backdrop-blur-sm rounded-full p-2 md:p-3 transition-all duration-200 opacity-60 hover:opacity-100"
         aria-label="Scroll right"
       >
         <svg 
@@ -132,21 +222,23 @@ export default function HeroCarousel() {
         </svg>
       </button>
 
-      {/* Horizontal Scrolling Container - sized to show exactly 5 images */}
+      {/* Horizontal Scrolling Container */}
       <div
         ref={scrollContainerRef}
-        className="flex gap-6 overflow-x-hidden items-center mx-auto"
+        className="flex gap-6 overflow-x-auto items-center mx-auto scrollbar-hide"
         style={{ 
           scrollBehavior: 'auto',
-          width: 'calc(5 * (250px + 24px))', // Exactly 5 images: 5 * (width + gap)
-          maxWidth: '100%'
+          width: isMobile ? '100%' : 'calc(5 * (250px + 24px))', // Mobile: full width, Desktop: exactly 5 images
+          maxWidth: '100%',
+          scrollSnapType: isMobile ? 'x mandatory' : 'none',
         }}
       >
         {/* Duplicate images for seamless loop */}
         {[...screenshots, ...screenshots].map((screenshot, index) => (
           <div
             key={`${screenshot}-${index}`}
-            className="flex-shrink-0 w-[250px] h-auto relative"
+            className={`flex-shrink-0 relative ${isMobile ? 'w-[320px]' : 'w-[250px]'} h-auto`}
+            style={isMobile ? { scrollSnapAlign: 'center' } : {}}
           >
             <div className="relative aspect-[9/16] rounded-2xl overflow-hidden shadow-xl">
               <Image
@@ -156,7 +248,7 @@ export default function HeroCarousel() {
                 className="object-contain"
                 priority={index < 2}
                 loading={index < 3 ? 'eager' : 'lazy'}
-                sizes="250px"
+                sizes={isMobile ? "320px" : "250px"}
               />
             </div>
           </div>

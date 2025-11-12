@@ -1,7 +1,7 @@
 import { getServerSession } from 'next-auth'
 import { redirect } from 'next/navigation'
 import { authOptions } from '@/lib/auth'
-import { getIssueSummaries } from '@/lib/insights/issue-engine'
+import { getIssueSummaries, ISSUE_SECTION_ORDER } from '@/lib/insights/issue-engine'
 import type { IssueSummary } from '@/lib/insights/issue-engine'
 import dynamic from 'next/dynamic'
 const SectionPrefetcher = dynamic(() => import('./SectionPrefetcher'), { ssr: false })
@@ -57,10 +57,12 @@ export default async function IssueOverviewPage({ params }: IssueOverviewPagePro
     lifestyle: 'Sleep, stress, and daily habits that influence this issue.',
   }
 
+  const sectionsToPrefetch = ISSUE_SECTION_ORDER.filter((s) => s !== 'overview')
+
   return (
     <div className="space-y-6">
       {/* Prefetch all sections in the background so opening is instant */}
-      <SectionPrefetcher issueSlug={issue.slug} sections={['overview', 'supplements', 'medications', 'interactions', 'labs', 'nutrition', 'exercise', 'lifestyle'].filter((s)=>s!=='overview')} />
+      <SectionPrefetcher issueSlug={issue.slug} sections={sectionsToPrefetch} />
       <IssueOverviewClient issue={issue} issueSlug={issue.slug} />
     </div>
   )

@@ -71,3 +71,14 @@
   from { opacity: 0.35; transform: translate(-50%, -50%) scale(0.2); }
   to { opacity: 0; transform: translate(-50%, -50%) scale(1); }
 }
+
+/* Hide scrollbar but maintain scroll functionality */
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;  /* Chrome, Safari and Opera */
+  }
+}

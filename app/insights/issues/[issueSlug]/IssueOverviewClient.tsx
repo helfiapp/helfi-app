@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import type { IssueSummary } from '@/lib/insights/issue-engine'
+import type { IssueSummary, IssueSectionKey } from '@/lib/insights/issue-engine'
 import { ISSUE_SECTION_ORDER } from '@/lib/insights/issue-engine'
 
 interface IssueOverviewClientProps {
@@ -13,7 +13,7 @@ interface IssueOverviewClientProps {
 // Progress bar that tracks regeneration of all sections
 function AllSectionsProgressBar({ issueSlug, sections, onComplete }: { 
   issueSlug: string
-  sections: string[]
+  sections: IssueSectionKey[]
   onComplete: () => void 
 }) {
   const [progress, setProgress] = useState(0)
@@ -154,7 +154,7 @@ export default function IssueOverviewClient({ issue, issueSlug }: IssueOverviewC
     lifestyle: 'Sleep, stress, and daily habits that influence this issue.',
   }
 
-  const navigationOrder = ISSUE_SECTION_ORDER.filter((section) => section !== 'overview') as string[]
+  const navigationOrder = ISSUE_SECTION_ORDER.filter((section) => section !== 'overview') as IssueSectionKey[]
   
   async function handleRegenerateAll() {
     try {
