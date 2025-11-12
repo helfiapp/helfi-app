@@ -401,21 +401,6 @@ export default function SupplementsShell({ children, initialResult, issueSlug }:
                 Generated {new Date(result.generatedAt).toLocaleString()} • Confidence {(result.confidence * 100).toFixed(0)}%
               </p>
             </div>
-            <div className="flex-shrink-0">
-              {isRegenerating ? (
-                <div className="w-full max-w-md">
-                  <RegenerationProgressBar issueSlug={issueSlug} onComplete={handleRegenerationComplete} />
-                </div>
-              ) : (
-                <button
-                  onClick={() => handleGenerate('daily')}
-                  disabled={loading}
-                  className="px-4 py-2 bg-helfi-green hover:bg-helfi-green/90 disabled:bg-gray-300 text-white rounded-lg text-sm font-medium transition-colors"
-                >
-                  {loading ? 'Loading...' : '🔄 Regenerate'}
-                </button>
-              )}
-            </div>
           </div>
         </section>
 

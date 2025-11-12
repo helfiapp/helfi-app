@@ -1,12 +1,11 @@
-import Link from 'next/link'
 import { getServerSession } from 'next-auth'
 import { redirect } from 'next/navigation'
 import { authOptions } from '@/lib/auth'
-import { getIssueSummaries, ISSUE_SECTION_ORDER } from '@/lib/insights/issue-engine'
+import { getIssueSummaries } from '@/lib/insights/issue-engine'
 import type { IssueSummary } from '@/lib/insights/issue-engine'
-import { ISSUE_SECTION_ORDER as ORDER } from '@/lib/insights/issue-engine'
 import dynamic from 'next/dynamic'
 const SectionPrefetcher = dynamic(() => import('./SectionPrefetcher'), { ssr: false })
+const IssueOverviewClient = dynamic(() => import('./IssueOverviewClient'), { ssr: false })
 
 interface IssueOverviewPageProps {
   params: { issueSlug: string }
@@ -58,45 +57,11 @@ export default async function IssueOverviewPage({ params }: IssueOverviewPagePro
     lifestyle: 'Sleep, stress, and daily habits that influence this issue.',
   }
 
-  const navigationOrder = ISSUE_SECTION_ORDER.filter((section) => section !== 'overview')
-
   return (
     <div className="space-y-6">
       {/* Prefetch all sections in the background so opening is instant */}
-      <SectionPrefetcher issueSlug={issue.slug} sections={ORDER.filter((s)=>s!=='overview')} />
-      <section className="bg-white border border-gray-200 rounded-2xl shadow-sm">
-        <Link
-          href={`/insights/issues/${issue.slug}/overview`}
-          className="block px-5 py-4 border-b last:border-b-0 hover:bg-gray-50 transition-colors"
-        >
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">Overview report</h2>
-              <p className="text-sm text-gray-600 mt-1">Generate a full summary across all data points for {issue.name}.</p>
-            </div>
-            <span className="text-2xl text-gray-400">›</span>
-          </div>
-        </Link>
-        {navigationOrder.map((section) => (
-          <Link
-            key={section}
-            href={`/insights/issues/${issue.slug}/${section}`}
-            className="block px-5 py-4 border-b last:border-b-0 hover:bg-gray-50 transition-colors"
-          >
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 capitalize">
-                  {section === 'interactions' ? 'Supplements × Medications' : section}
-                </h3>
-                <p className="text-sm text-gray-600 mt-1">
-                  {sectionDescriptions[section] || 'Open detailed insights for this area.'}
-                </p>
-              </div>
-              <span className="text-2xl text-gray-400">›</span>
-            </div>
-          </Link>
-        ))}
-      </section>
+      <SectionPrefetcher issueSlug={issue.slug} sections={['overview', 'supplements', 'medications', 'interactions', 'labs', 'nutrition', 'exercise', 'lifestyle'].filter((s)=>s!=='overview')} />
+      <IssueOverviewClient issue={issue} issueSlug={issue.slug} />
     </div>
   )
 }
