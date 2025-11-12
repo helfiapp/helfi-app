@@ -53,11 +53,11 @@ export default function HeroCarousel() {
   }, [])
 
   return (
-    <div className="relative w-full overflow-hidden">
+    <div className="relative w-full h-full overflow-hidden">
       {/* Horizontal Scrolling Container */}
       <div
         ref={scrollContainerRef}
-        className="flex gap-6 overflow-x-hidden"
+        className="flex gap-6 overflow-x-hidden h-full items-center"
         style={{ scrollBehavior: 'auto' }}
       >
         {/* Duplicate images for seamless loop */}
@@ -66,7 +66,7 @@ export default function HeroCarousel() {
             key={`${screenshot}-${index}`}
             className="flex-shrink-0 w-[300px] md:w-[400px] h-auto"
           >
-            <div className="relative aspect-[9/16] rounded-2xl overflow-hidden shadow-xl bg-gray-900">
+            <div className="relative aspect-[9/16] rounded-2xl overflow-hidden shadow-xl">
               <Image
                 src={`/screenshots/hero/${screenshot}`}
                 alt={`Helfi ${screenshot.replace('.png', '').replace(/_/g, ' ')}`}

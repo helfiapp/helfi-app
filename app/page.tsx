@@ -200,7 +200,7 @@ export default function SplashPage() {
       </nav>
 
       {/* Hero Section */}
-      <section className="relative w-full min-h-screen flex flex-col items-center justify-center py-24 md:py-32 overflow-hidden">
+      <section className="relative w-full min-h-screen flex flex-col overflow-hidden bg-gray-900">
         {/* Full-Width Background Video */}
         <div className="absolute inset-0 z-0">
           <video
@@ -218,15 +218,12 @@ export default function SplashPage() {
           >
             <source src="/screenshots/hero/hero-background.mp4" type="video/mp4" />
           </video>
-          {!videoLoaded && (
-            <div className="absolute inset-0 bg-gradient-to-br from-helfi-green/30 via-blue-500/30 to-purple-500/30" />
-          )}
-          {/* Dark overlay for text readability */}
-          <div className="absolute inset-0 bg-black/20" />
+          {/* Dark background fallback - same color as screenshot background */}
+          <div className="absolute inset-0 bg-gray-900" />
         </div>
 
         {/* Content Container */}
-        <div className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 md:py-32">
           {/* Text Content */}
           <div className="text-center mb-12">
             <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-bold text-white mb-6 leading-tight">
@@ -252,11 +249,11 @@ export default function SplashPage() {
               </button>
             </div>
           </div>
+        </div>
 
-          {/* Horizontal Scrolling Carousel */}
-          <div className="mt-16">
-            <HeroCarousel />
-          </div>
+        {/* Full-Screen Horizontal Scrolling Carousel */}
+        <div className="relative z-10 w-full flex-1 flex items-center">
+          <HeroCarousel />
         </div>
       </section>
 
