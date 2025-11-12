@@ -67,7 +67,9 @@ export async function POST(request: NextRequest) {
     for (let i = 0; i < 30; i++) {
       const date = new Date(today)
       date.setDate(date.getDate() - i)
+      date.setHours(0, 0, 0, 0) // Normalize to midnight
       const dateStr = date.toISOString().split('T')[0]
+      const dateForDb = new Date(dateStr + 'T00:00:00.000Z') // Ensure UTC midnight
 
       // Steps data - varies between 5000-15000 steps
       const steps = Math.floor(Math.random() * 10000) + 5000
@@ -75,7 +77,7 @@ export async function POST(request: NextRequest) {
         where: {
           userId_date_dataType: {
             userId,
-            date: new Date(dateStr),
+            date: dateForDb,
             dataType: 'steps',
           },
         },
@@ -95,7 +97,7 @@ export async function POST(request: NextRequest) {
         },
         create: {
           userId,
-          date: new Date(dateStr),
+          date: dateForDb,
           dataType: 'steps',
           value: {
             summary: {
@@ -118,7 +120,7 @@ export async function POST(request: NextRequest) {
         where: {
           userId_date_dataType: {
             userId,
-            date: new Date(dateStr),
+            date: dateForDb,
             dataType: 'heartrate',
           },
         },
@@ -143,7 +145,7 @@ export async function POST(request: NextRequest) {
         },
         create: {
           userId,
-          date: new Date(dateStr),
+          date: dateForDb,
           dataType: 'heartrate',
           value: {
             'activities-heart': [
@@ -176,7 +178,7 @@ export async function POST(request: NextRequest) {
         where: {
           userId_date_dataType: {
             userId,
-            date: new Date(dateStr),
+            date: dateForDb,
             dataType: 'sleep',
           },
         },
@@ -213,7 +215,7 @@ export async function POST(request: NextRequest) {
         },
         create: {
           userId,
-          date: new Date(dateStr),
+          date: dateForDb,
           dataType: 'sleep',
           value: {
             sleep: [
@@ -254,7 +256,7 @@ export async function POST(request: NextRequest) {
           where: {
             userId_date_dataType: {
               userId,
-              date: new Date(dateStr),
+              date: dateForDb,
               dataType: 'weight',
             },
           },
@@ -275,7 +277,7 @@ export async function POST(request: NextRequest) {
           },
           create: {
             userId,
-            date: new Date(dateStr),
+            date: dateForDb,
             dataType: 'weight',
             value: {
               weight: [
@@ -304,10 +306,17 @@ export async function POST(request: NextRequest) {
         end: today.toISOString().split('T')[0],
       },
     })
-  } catch (error) {
-    console.error('Error seeding demo Fitbit data:', error)
+  } catch (error: any) {
+    console.error('❌ Error seeding demo Fitbit data:', error)
+    const errorMessage = error?.message || 'Unknown error'
+    const errorDetails = error?.stack || String(error)
+    console.error('Error details:', errorDetails)
+    
     return NextResponse.json(
-      { error: 'Failed to seed demo data' },
+      { 
+        error: 'Failed to seed demo data',
+        details: process.env.NODE_ENV === 'development' ? errorMessage : undefined
+      },
       { status: 500 }
     )
   }

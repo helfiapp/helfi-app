@@ -280,12 +280,15 @@ export default function DevicesPage() {
         // Refresh page to show demo data
         window.location.reload()
       } else {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to load demo data')
+        const errorData = await response.json()
+        const errorMsg = errorData.details 
+          ? `${errorData.error}: ${errorData.details}` 
+          : errorData.error || 'Failed to load demo data'
+        throw new Error(errorMsg)
       }
     } catch (error: any) {
       console.error('Error loading demo data:', error)
-      alert(`Failed to load demo data: ${error.message}`)
+      alert(`Failed to load demo data: ${error.message || 'Unknown error'}`)
     } finally {
       setLoadingDemo(false)
     }
