@@ -46,9 +46,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Ensure FitbitData table exists (idempotent)
-    await ensureFitbitDataSchema()
-
     const searchParams = request.nextUrl.searchParams
     const dataTypesParam = (searchParams.get('dataTypes') || '').trim()
     const requestedTypes = dataTypesParam
@@ -68,14 +65,34 @@ export async function GET(request: NextRequest) {
     const start = new Date(Date.UTC(startDate.getUTCFullYear(), startDate.getUTCMonth(), startDate.getUTCDate()))
     const end = new Date(Date.UTC(endDate.getUTCFullYear(), endDate.getUTCMonth(), endDate.getUTCDate()))
 
-    const data = await prisma.fitbitData.findMany({
-      where: {
-        userId: session.user.id,
-        date: { gte: start, lte: end },
-        dataType: { in: requestedTypes },
-      },
-      orderBy: [{ date: 'asc' }, { dataType: 'asc' }],
-    })
+    let data
+    try {
+      data = await prisma.fitbitData.findMany({
+        where: {
+          userId: session.user.id,
+          date: { gte: start, lte: end },
+          dataType: { in: requestedTypes },
+        },
+        orderBy: [{ date: 'asc' }, { dataType: 'asc' }],
+      })
+    } catch (dbError: any) {
+      // If table doesn't exist, create it and retry
+      if (dbError?.code === 'P2021' || dbError?.message?.includes('does not exist') || dbError?.message?.includes('relation')) {
+        console.log('FitbitData table not found, creating it...')
+        await ensureFitbitDataSchema()
+        // Retry the query
+        data = await prisma.fitbitData.findMany({
+          where: {
+            userId: session.user.id,
+            date: { gte: start, lte: end },
+            dataType: { in: requestedTypes },
+          },
+          orderBy: [{ date: 'asc' }, { dataType: 'asc' }],
+        })
+      } else {
+        throw dbError
+      }
+    }
 
     // Initialize series scaffolding by date
     const series: {
