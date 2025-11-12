@@ -83,6 +83,7 @@ export default function HeroCarousel() {
     let isAutoScrolling = false // Track when we're auto-scrolling
     let scrollAnimationFrameId: number
     const imageWidth = 320 + 24 // width + gap for mobile
+    const totalSlides = screenshots.length // Total unique slides to show
 
     const advanceSlide = () => {
       // Check if paused or user is scrolling
@@ -91,8 +92,20 @@ export default function HeroCarousel() {
         return
       }
 
-      // Move to next slide
-      currentSlideIndex = (currentSlideIndex + 1) % screenshots.length
+      // Move to next slide - only loop back after showing all unique images
+      currentSlideIndex = currentSlideIndex + 1
+      
+      // If we've shown all unique images, loop back to start
+      if (currentSlideIndex >= totalSlides) {
+        currentSlideIndex = 0
+        // Reset scroll position to start for seamless loop
+        container.scrollLeft = 0
+        scrollPositionRef.current = 0
+        setCurrentIndex(0)
+        // Hold for 5 seconds before next transition
+        advanceTimeoutId = setTimeout(advanceSlide, 5000)
+        return
+      }
       
       // Mark that we're auto-scrolling
       isAutoScrolling = true
@@ -176,7 +189,10 @@ export default function HeroCarousel() {
         setIsPaused(false)
         // Sync currentSlideIndex with actual scroll position
         const scrollPos = container.scrollLeft
-        currentSlideIndex = Math.round(scrollPos / imageWidth) % screenshots.length
+        // Calculate which slide we're on, but don't use modulo - allow going through all slides
+        const calculatedIndex = Math.round(scrollPos / imageWidth)
+        // Clamp to valid range (0 to totalSlides-1)
+        currentSlideIndex = Math.max(0, Math.min(calculatedIndex, totalSlides - 1))
         advanceTimeoutId = setTimeout(advanceSlide, 5000)
       }, 5000)
     }
@@ -240,7 +256,7 @@ export default function HeroCarousel() {
 
   return (
     <div 
-      className="relative w-full px-4 md:px-16 lg:px-20"
+      className="relative w-full px-2 md:px-12 lg:px-14"
       style={{ paddingTop: '2rem', paddingBottom: '2rem' }}
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
