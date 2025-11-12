@@ -86,13 +86,34 @@ export async function GET(request: NextRequest) {
 
     const normalizedEmail = email.trim().toLowerCase()
 
+    // Ensure unsubscribed column exists (for migration period)
+    try {
+      await prisma.$executeRawUnsafe(`
+        ALTER TABLE "Waitlist" 
+        ADD COLUMN IF NOT EXISTS "unsubscribed" BOOLEAN NOT NULL DEFAULT false
+      `)
+    } catch (e) {
+      // Column might already exist, ignore error
+      console.log('Column check result:', e)
+    }
+
     // Update waitlist entry to mark as unsubscribed
     try {
+      // Try Prisma first
       await prisma.waitlist.updateMany({
         where: { email: normalizedEmail },
         data: { 
           unsubscribed: true
         }
+      }).catch(async (e) => {
+        // If Prisma fails (column doesn't exist), use raw SQL
+        console.warn('Prisma update failed, using raw SQL:', e)
+        const escapedEmail = normalizedEmail.replace(/'/g, "''")
+        await prisma.$executeRawUnsafe(`
+          UPDATE "Waitlist" 
+          SET unsubscribed = true 
+          WHERE email = '${escapedEmail}'
+        `)
       })
 
       // Also check if user exists and could track preferences there

@@ -295,35 +295,41 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Use raw query to be resilient to schema changes during migration
-    // This ensures we can still fetch data even if new columns don't exist yet
-    // IMPORTANT: Filter out unsubscribed entries - they should not appear in active waitlist
+    // Ensure unsubscribed column exists (for migration period)
     try {
-      const waitlistEntries = await prisma.waitlist.findMany({
-        where: {
-          unsubscribed: false  // Only show active subscribers
-        },
-        orderBy: { createdAt: 'desc' }
-      })
-      return NextResponse.json({ waitlist: waitlistEntries })
-    } catch (schemaError: any) {
-      // If schema error (missing columns), try raw query as fallback
-      // Check if unsubscribed column exists, if not, return all entries
-      console.warn('Schema error, trying raw query fallback:', schemaError?.message)
+      await prisma.$executeRawUnsafe(`
+        ALTER TABLE "Waitlist" 
+        ADD COLUMN IF NOT EXISTS "unsubscribed" BOOLEAN NOT NULL DEFAULT false
+      `)
+    } catch (e) {
+      // Column might already exist, ignore error
+    }
+
+    // IMPORTANT: Filter out unsubscribed entries - they should not appear in active waitlist
+    // Use raw query to ensure we filter properly even during migration
+    try {
+      const rawEntries = await prisma.$queryRawUnsafe(`
+        SELECT id, email, name, "createdAt"
+        FROM "Waitlist" 
+        WHERE COALESCE(unsubscribed, false) = false
+        ORDER BY "createdAt" DESC
+      `) as Array<{ id: string; email: string; name: string; createdAt: Date }>
       
-      // Try to check if unsubscribed column exists
+      return NextResponse.json({ waitlist: rawEntries })
+    } catch (rawError: any) {
+      // Fallback: try Prisma query
+      console.warn('Raw query failed, trying Prisma:', rawError?.message)
       try {
-        const rawEntries = await prisma.$queryRawUnsafe(`
-          SELECT id, email, name, "createdAt", COALESCE(unsubscribed, false) as unsubscribed
-          FROM "Waitlist" 
-          WHERE COALESCE(unsubscribed, false) = false
-          ORDER BY "createdAt" DESC
-        `) as Array<{ id: string; email: string; name: string; createdAt: Date; unsubscribed: boolean }>
-        
-        return NextResponse.json({ waitlist: rawEntries })
-      } catch (rawError: any) {
-        // If unsubscribed column doesn't exist yet, return all entries
-        console.warn('Unsubscribed column may not exist, returning all entries:', rawError?.message)
+        const waitlistEntries = await prisma.waitlist.findMany({
+          where: {
+            unsubscribed: false  // Only show active subscribers
+          },
+          orderBy: { createdAt: 'desc' }
+        })
+        return NextResponse.json({ waitlist: waitlistEntries })
+      } catch (prismaError: any) {
+        // Last resort: return all entries if column doesn't exist yet
+        console.warn('Both queries failed, returning all entries:', prismaError?.message)
         const rawEntries = await prisma.$queryRawUnsafe(`
           SELECT id, email, name, "createdAt" 
           FROM "Waitlist" 
