@@ -83,6 +83,20 @@ export default function FitbitSummary({ rangeDays = 7 }: { rangeDays?: number })
 
   if (!data) return null
 
+  // Check if we have any data at all
+  const hasData = data.series.steps.some(s => s.steps != null) ||
+                  data.series.heartrate.some(h => h.restingHeartRate != null) ||
+                  data.series.sleep.some(s => s.minutes != null) ||
+                  data.series.weight.some(w => w.weightKg != null)
+
+  if (!hasData) {
+    return (
+      <div className="p-4 rounded-xl border bg-gray-50 border-gray-200 text-gray-600 text-sm">
+        No Fitbit data available yet. Connect your Fitbit and sync data, or load demo data to see how it looks.
+      </div>
+    )
+  }
+
   const km = today?.distanceKm != null ? today.distanceKm.toFixed(2) : '—'
   const steps = today?.steps != null ? today.steps.toLocaleString() : '—'
   const rhr = today?.rhr != null ? `${today.rhr} bpm` : '—'

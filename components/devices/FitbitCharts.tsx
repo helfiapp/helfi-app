@@ -114,6 +114,20 @@ export default function FitbitCharts({ rangeDays = 30 }: { rangeDays?: number })
   }
   if (!data) return null
 
+  // Check if we have any data at all
+  const hasData = data.series.steps.some(s => s.steps != null) ||
+                  data.series.heartrate.some(h => h.restingHeartRate != null) ||
+                  data.series.sleep.some(s => s.minutes != null) ||
+                  data.series.weight.some(w => w.weightKg != null)
+
+  if (!hasData) {
+    return (
+      <div className="p-4 rounded-xl border bg-gray-50 border-gray-200 text-gray-600 text-sm">
+        No Fitbit data available yet. Connect your Fitbit and sync data, or load demo data to see charts.
+      </div>
+    )
+  }
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <div className="p-4 rounded-xl border bg-white h-72">

@@ -135,6 +135,18 @@ export default function FitbitCorrelations({ rangeDays = 30 }: { rangeDays?: num
   }
   if (!fitbit || !series) return null
 
+  // Check if we have any Fitbit data
+  const hasFitbitData = fitbit.series.steps.some(s => s.steps != null) ||
+                        fitbit.series.sleep.some(s => s.minutes != null)
+  
+  if (!hasFitbitData) {
+    return (
+      <div className="p-4 rounded-xl border bg-gray-50 border-gray-200 text-gray-600 text-sm">
+        No Fitbit data available yet. Connect your Fitbit and sync data, or load demo data to see correlations.
+      </div>
+    )
+  }
+
   return (
     <div className="rounded-xl border bg-white p-4">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
