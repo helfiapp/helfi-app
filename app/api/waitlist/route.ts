@@ -174,6 +174,16 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Ensure unsubscribed column exists
+    try {
+      await prisma.$executeRawUnsafe(`
+        ALTER TABLE "Waitlist" 
+        ADD COLUMN IF NOT EXISTS "unsubscribed" BOOLEAN NOT NULL DEFAULT false
+      `)
+    } catch (e) {
+      // Column might already exist, ignore error
+    }
+
     // Check if email already exists
     // Use try-catch to handle schema migration period gracefully
     let existingEntry = null
@@ -184,12 +194,13 @@ export async function POST(request: NextRequest) {
     } catch (schemaError: any) {
       // If schema error (missing columns), try raw query as fallback
       console.warn('Schema error checking existing entry, trying raw query:', schemaError?.message)
+      const escapedEmail = normalizedEmail.replace(/'/g, "''")
       const rawEntries = await prisma.$queryRawUnsafe(`
-        SELECT id, email, name, "createdAt" 
+        SELECT id, email, name, "createdAt", COALESCE(unsubscribed, false) as unsubscribed
         FROM "Waitlist" 
-        WHERE email = '${normalizedEmail.replace(/'/g, "''")}'
+        WHERE LOWER(email) = LOWER('${escapedEmail}')
         LIMIT 1
-      `) as Array<{ id: string; email: string; name: string; createdAt: Date }>
+      `) as Array<{ id: string; email: string; name: string; createdAt: Date; unsubscribed: boolean }>
       
       if (rawEntries.length > 0) {
         existingEntry = rawEntries[0] as any
@@ -197,15 +208,41 @@ export async function POST(request: NextRequest) {
     }
 
     if (existingEntry) {
-      // Check if unsubscribed (only if field exists)
+      // If they previously unsubscribed but are signing up again, re-subscribe them
       const isUnsubscribed = existingEntry.unsubscribed === true
       if (isUnsubscribed) {
+        // Re-subscribe them - update the existing entry
+        try {
+          await prisma.waitlist.update({
+            where: { id: existingEntry.id },
+            data: {
+              unsubscribed: false,
+              name: normalizedName // Update name in case it changed
+            }
+          })
+        } catch (updateError: any) {
+          // If Prisma fails, use raw SQL
+          console.warn('Prisma update failed, using raw SQL:', updateError?.message)
+          const escapedEmail = normalizedEmail.replace(/'/g, "''")
+          const escapedName = normalizedName.replace(/'/g, "''")
+          await prisma.$executeRawUnsafe(`
+            UPDATE "Waitlist" 
+            SET unsubscribed = false, name = '${escapedName}'
+            WHERE LOWER(email) = LOWER('${escapedEmail}')
+          `)
+        }
+        
+        // Send welcome email since they're re-subscribing
+        sendWaitlistAcknowledgmentEmail(normalizedEmail, normalizedName).catch(error => {
+          console.error('❌ [WAITLIST] Re-subscription email failed (non-blocking):', error)
+        })
+        
         return NextResponse.json({
-          success: false,
-          message: 'This email has been unsubscribed from waitlist emails.'
-        }, { status: 400 })
+          success: true,
+          message: 'Welcome back! You\'ve been re-added to the waitlist.'
+        })
       }
-      // Return a friendly success message to avoid alarming users
+      // Already on waitlist and not unsubscribed - return friendly message
       return NextResponse.json({
         success: true,
         message: 'You\'re already on the waitlist. We\'ll notify you when we go live.'
