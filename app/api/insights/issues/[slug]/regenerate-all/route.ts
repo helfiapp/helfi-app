@@ -86,47 +86,54 @@ export async function POST(
       console.warn('[insights.api] Failed to mark sections as generating', error)
     }
     
-    // Start regeneration for all sections in parallel (non-blocking, much faster!)
-    setTimeout(async () => {
+    // Compute fingerprint once
+    const fingerprint = await getCurrentDataFingerprint(session.user.id)
+    
+    // Start regeneration immediately - process sections in parallel and update status as each completes
+    // Don't wait for completion - return immediately so user sees progress bar
+    Promise.all(sections.map(async (section) => {
       try {
-        // Use the fast quick path which generates insights much faster
-        // This uses degraded/quick generation instead of full LLM calls
-        await precomputeQuickSectionsForUser(session.user.id, {
-          concurrency: 4, // Process 4 sections in parallel
-          sections: sections, // Filter to only regenerate requested sections
-          slugs: [context.params.slug], // Only regenerate for this specific issue
+        // Force regeneration using quick path - clear cache first, then regenerate
+        // Delete cached result to force regeneration
+        try {
+          await prisma.$executeRawUnsafe(`
+            DELETE FROM "InsightsCache" 
+            WHERE "userId" = $1 AND "slug" = $2 AND "section" = $3 AND "mode" = $4
+          `, session.user.id, context.params.slug, section, 'latest')
+        } catch (error) {
+          // Cache might not exist, that's fine
+        }
+        
+        // Now regenerate - this will use quick path since cache is cleared
+        const result = await getIssueSection(session.user.id, context.params.slug, section, {
+          mode: 'latest',
+          force: false, // Will use quick path since cache is cleared
         })
-        // Compute the latest fingerprint so status does not show as "stale"
-        const fingerprint = await getCurrentDataFingerprint(session.user.id)
         
-        // Mark all sections as fresh after quick generation completes
-        for (const section of sections) {
-          try {
-            await prisma.$executeRawUnsafe(`
-              INSERT INTO "InsightsMetadata" ("userId", "issueSlug", "section", "status", "dataFingerprint", "lastGeneratedAt", "updatedAt")
-              VALUES ($1, $2, $3, 'fresh', $4, NOW(), NOW())
-              ON CONFLICT ("userId", "issueSlug", "section")
-              DO UPDATE SET "status" = 'fresh', "dataFingerprint" = $4, "lastGeneratedAt" = NOW(), "updatedAt" = NOW()
-            `, session.user.id, context.params.slug, section, fingerprint)
-          } catch (error) {
-            console.warn(`[insights.api] Failed to mark ${section} as fresh`, error)
-          }
+        if (result) {
+          // Mark as fresh immediately after regeneration
+          await prisma.$executeRawUnsafe(`
+            INSERT INTO "InsightsMetadata" ("userId", "issueSlug", "section", "status", "dataFingerprint", "lastGeneratedAt", "updatedAt")
+            VALUES ($1, $2, $3, 'fresh', $4, NOW(), NOW())
+            ON CONFLICT ("userId", "issueSlug", "section")
+            DO UPDATE SET "status" = 'fresh', "dataFingerprint" = $4, "lastGeneratedAt" = NOW(), "updatedAt" = NOW()
+          `, session.user.id, context.params.slug, section, fingerprint)
+          
+          console.log(`[insights.api] ✅ Regenerated ${section} for ${context.params.slug}`)
         }
-        
-        console.log(`[insights.api] Quick regeneration complete for ${sections.length} sections`)
       } catch (error) {
-        console.error('[insights.api] Background regeneration failed', error)
-        // Mark as stale on error so it can retry
-        for (const section of sections) {
-          try {
-            await prisma.$executeRawUnsafe(`
-              UPDATE "InsightsMetadata" SET "status" = 'stale', "updatedAt" = NOW()
-              WHERE "userId" = $1 AND "issueSlug" = $2 AND "section" = $3
-            `, session.user.id, context.params.slug, section)
-          } catch {}
-        }
+        console.error(`[insights.api] ❌ Failed to regenerate ${section}:`, error)
+        // Mark as stale on error
+        try {
+          await prisma.$executeRawUnsafe(`
+            UPDATE "InsightsMetadata" SET "status" = 'stale', "updatedAt" = NOW()
+            WHERE "userId" = $1 AND "issueSlug" = $2 AND "section" = $3
+          `, session.user.id, context.params.slug, section)
+        } catch {}
       }
-    }, 0)
+    })).catch((error) => {
+      console.error('[insights.api] Regeneration error:', error)
+    })
     
     return NextResponse.json({ 
       success: true,
