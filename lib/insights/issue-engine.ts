@@ -2068,6 +2068,28 @@ async function computeIssueSection(
         }
       }
       
+      // CRITICAL: Always deduplicate supportiveDetails from cache (even if no fiber injection happened)
+      // This fixes duplicates that existed in cached results generated before deduplication was added
+      if (section === 'supplements' && extrasIn.supportiveDetails) {
+        const cachedSupportive = (extrasIn.supportiveDetails as Array<{ name: string; reason?: string; dosage?: string | null; timing?: string[] | null }> | undefined) ?? []
+        if (cachedSupportive.length > 0) {
+          const seenCached = new Set<string>()
+          const deduplicatedCached = cachedSupportive.filter((item) => {
+            const key = canonical(item.name)
+            if (seenCached.has(key)) {
+              console.warn(`[supplements.cache] Removing duplicate from cached result: "${item.name}" (canonical: "${key}")`)
+              return false
+            }
+            seenCached.add(key)
+            return true
+          })
+          if (deduplicatedCached.length !== cachedSupportive.length) {
+            console.log(`[supplements.cache] Deduplicated cached supportiveDetails: ${cachedSupportive.length} → ${deduplicatedCached.length} items`)
+            extrasIn.supportiveDetails = deduplicatedCached
+          }
+        }
+      }
+      
       const enriched: IssueSectionResult = {
         ...cached.result,
         extras: {
@@ -3444,8 +3466,16 @@ async function buildSupplementsSection(
     { minWorking: Math.min(3, Math.max(0, normalizedSupplements.length)), minSuggested: 4, minAvoid: 4 }
   )
   console.timeEnd(`[insights.llm] supplements:${issue.slug}`)
+  
+  console.log(`[supplements] LLM result:`, {
+    hasResult: !!llmResult,
+    workingCount: llmResult?.working?.length ?? 0,
+    suggestedCount: llmResult?.suggested?.length ?? 0,
+    avoidCount: llmResult?.avoid?.length ?? 0,
+  })
 
   if (!llmResult) {
+    console.warn(`[supplements] LLM returned null, trying degraded fallback`)
     const degraded = await generateDegradedSection(
       {
         issueName: issue.name,
@@ -3457,7 +3487,23 @@ async function buildSupplementsSection(
       },
       { minSuggested: 4, minAvoid: 4 }
     )
-    if (degraded) llmResult = degraded
+    if (degraded) {
+      llmResult = degraded
+      console.log(`[supplements] Degraded fallback succeeded:`, {
+        workingCount: degraded.working?.length ?? 0,
+        suggestedCount: degraded.suggested?.length ?? 0,
+        avoidCount: degraded.avoid?.length ?? 0,
+      })
+    } else {
+      console.error(`[supplements] Both LLM and degraded fallback failed`)
+    }
+  }
+  
+  // Ensure llmResult has arrays even if empty
+  if (llmResult) {
+    if (!Array.isArray(llmResult.working)) llmResult.working = []
+    if (!Array.isArray(llmResult.suggested)) llmResult.suggested = []
+    if (!Array.isArray(llmResult.avoid)) llmResult.avoid = []
   }
 
   if (!llmResult) {
@@ -3533,6 +3579,16 @@ async function buildSupplementsSection(
       if (Array.isArray(kb.avoidSupplements)) kbAvoidLocal.push(...kb.avoidSupplements)
     }
   } catch {}
+
+  // Safety check: ensure llmResult has arrays (it should exist at this point due to check above)
+  if (!llmResult) {
+    throw new Error(`[supplements] CRITICAL: llmResult is null after all fallbacks - this should not happen`)
+  }
+  
+  // Ensure arrays exist even if empty
+  if (!Array.isArray(llmResult.working)) llmResult.working = []
+  if (!Array.isArray(llmResult.suggested)) llmResult.suggested = []
+  if (!Array.isArray(llmResult.avoid)) llmResult.avoid = []
 
   const supportiveDetails = llmResult.working
     .map((item) => {
@@ -3645,7 +3701,7 @@ async function buildSupplementsSection(
     }
   }
 
-  const novelSuggestions = llmResult.suggested.filter((item) => !supplementMap.has(canonical(item.name)))
+  const novelSuggestions = (llmResult.suggested ?? []).filter((item) => !supplementMap.has(canonical(item.name)))
 
   let suggestedAdditions = novelSuggestions.map((item) => ({
     title: item.name,
@@ -3685,7 +3741,7 @@ async function buildSupplementsSection(
   const coveredSuggestions = kbSuggestionCandidates.filter((item) => item.alreadyCovered)
   suggestedAdditions = ensureMin(suggestedAdditions, [...fallbackSuggestions, ...coveredSuggestions], 4)
 
-  const avoidFromLLM = llmResult.avoid
+  const avoidFromLLM = (llmResult.avoid ?? [])
     .map((item) => {
       const match = supplementMap.get(canonical(item.name))
       return {
@@ -3709,6 +3765,19 @@ async function buildSupplementsSection(
   }))
 
   const avoidList = ensureMin(avoidFromLLM, avoidFallback, 4)
+  
+  // Log final counts for debugging
+  console.log(`[supplements] Final counts before deduplication:`, {
+    supportiveDetails: supportiveDetails.length,
+    suggestedAdditions: suggestedAdditions.length,
+    avoidList: avoidList.length,
+    llmSuggestedCount: llmResult?.suggested?.length ?? 0,
+    llmAvoidCount: llmResult?.avoid?.length ?? 0,
+    kbFallbackCount: kbSuggestionCandidates.length,
+    kbAvoidFallbackCount: kbAvoidLocal.length,
+    avoidFromLLMCount: avoidFromLLM.length,
+    avoidFallbackCount: avoidFallback.length,
+  })
 
   const validated = suggestedAdditions.length >= 4 && avoidList.length >= 4
 
