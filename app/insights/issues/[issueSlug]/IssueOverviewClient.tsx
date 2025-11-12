@@ -154,7 +154,7 @@ export default function IssueOverviewClient({ issue, issueSlug }: IssueOverviewC
     lifestyle: 'Sleep, stress, and daily habits that influence this issue.',
   }
 
-  const navigationOrder = ISSUE_SECTION_ORDER.filter((section) => section !== 'overview')
+  const navigationOrder = ISSUE_SECTION_ORDER.filter((section) => section !== 'overview') as string[]
   
   async function handleRegenerateAll() {
     try {
