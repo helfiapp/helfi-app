@@ -44,32 +44,43 @@ export async function POST(request: NextRequest) {
 
     // If no Fitbit account exists, create a demo one
     if (!existingAccount) {
-      await prisma.account.create({
-        data: {
-          userId,
-          type: 'oauth',
-          provider: 'fitbit',
-          providerAccountId: 'demo-user-' + userId.substring(0, 8),
-          access_token: 'demo-token',
-          refresh_token: 'demo-refresh-token',
-          expires_at: Math.floor(Date.now() / 1000) + 86400 * 365, // 1 year from now
-          token_type: 'Bearer',
-          scope: 'activity heartrate sleep profile weight',
-        },
-      })
+      try {
+        await prisma.account.create({
+          data: {
+            userId,
+            type: 'oauth',
+            provider: 'fitbit',
+            providerAccountId: 'demo-user-' + userId.substring(0, 8),
+            access_token: 'demo-token',
+            refresh_token: 'demo-refresh-token',
+            expires_at: Math.floor(Date.now() / 1000) + 86400 * 365, // 1 year from now
+            token_type: 'Bearer',
+            scope: 'activity heartrate sleep profile weight',
+          },
+        })
+      } catch (accountError: any) {
+        console.error('❌ Error creating demo Fitbit account:', accountError)
+        // If account creation fails but it's a unique constraint error, continue
+        // (account might have been created between check and create)
+        if (!accountError?.code?.includes('P2002')) {
+          throw accountError
+        }
+      }
     }
 
     // Generate 30 days of demo data
     const today = new Date()
+    today.setHours(0, 0, 0, 0) // Normalize today to midnight
     const dataTypes = ['steps', 'heartrate', 'sleep', 'weight']
     const created: string[] = []
 
     for (let i = 0; i < 30; i++) {
       const date = new Date(today)
       date.setDate(date.getDate() - i)
-      date.setHours(0, 0, 0, 0) // Normalize to midnight
       const dateStr = date.toISOString().split('T')[0]
       const dateForDb = new Date(dateStr + 'T00:00:00.000Z') // Ensure UTC midnight
+      
+      try {
 
       // Steps data - varies between 5000-15000 steps
       const steps = Math.floor(Math.random() * 10000) + 5000
@@ -295,6 +306,12 @@ export async function POST(request: NextRequest) {
         })
         created.push(`weight-${dateStr}`)
       }
+      } catch (dayError: any) {
+        console.error(`❌ Error creating demo data for date ${dateStr}:`, dayError)
+        // Continue with other days even if one fails
+        // But log the error for debugging
+        throw new Error(`Failed to create demo data for ${dateStr}: ${dayError?.message || 'Unknown error'}`)
+      }
     }
 
     return NextResponse.json({
@@ -309,13 +326,23 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('❌ Error seeding demo Fitbit data:', error)
     const errorMessage = error?.message || 'Unknown error'
+    const errorCode = error?.code || 'UNKNOWN'
     const errorDetails = error?.stack || String(error)
+    console.error('Error code:', errorCode)
+    console.error('Error message:', errorMessage)
     console.error('Error details:', errorDetails)
+    
+    // Return detailed error in development, generic in production
+    const details = process.env.NODE_ENV === 'development' 
+      ? `${errorMessage} (Code: ${errorCode})`
+      : errorMessage.includes('Unique constraint') 
+        ? 'Data already exists. Try clearing demo data first.'
+        : 'Failed to seed demo data'
     
     return NextResponse.json(
       { 
         error: 'Failed to seed demo data',
-        details: process.env.NODE_ENV === 'development' ? errorMessage : undefined
+        details
       },
       { status: 500 }
     )
