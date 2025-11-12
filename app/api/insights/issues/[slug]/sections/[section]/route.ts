@@ -119,7 +119,7 @@ export async function POST(
       
       // Start regeneration in background (non-blocking)
       // Return immediately so user sees progress bar
-      setImmediate(async () => {
+      setTimeout(async () => {
         try {
           const result = await getIssueSection(session.user.id, context.params.slug, sectionParam, {
             mode,
