@@ -175,13 +175,31 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if email already exists
-    const existingEntry = await prisma.waitlist.findUnique({
-      where: { email: normalizedEmail }
-    })
+    // Use try-catch to handle schema migration period gracefully
+    let existingEntry = null
+    try {
+      existingEntry = await prisma.waitlist.findUnique({
+        where: { email: normalizedEmail }
+      })
+    } catch (schemaError: any) {
+      // If schema error (missing columns), try raw query as fallback
+      console.warn('Schema error checking existing entry, trying raw query:', schemaError?.message)
+      const rawEntries = await prisma.$queryRawUnsafe(`
+        SELECT id, email, name, "createdAt" 
+        FROM "Waitlist" 
+        WHERE email = '${normalizedEmail.replace(/'/g, "''")}'
+        LIMIT 1
+      `) as Array<{ id: string; email: string; name: string; createdAt: Date }>
+      
+      if (rawEntries.length > 0) {
+        existingEntry = rawEntries[0] as any
+      }
+    }
 
     if (existingEntry) {
-      // If user was unsubscribed, don't re-add them
-      if (existingEntry.unsubscribed) {
+      // Check if unsubscribed (only if field exists)
+      const isUnsubscribed = existingEntry.unsubscribed === true
+      if (isUnsubscribed) {
         return NextResponse.json({
           success: false,
           message: 'This email has been unsubscribed from waitlist emails.'
@@ -195,19 +213,49 @@ export async function POST(request: NextRequest) {
     }
 
     // Add to waitlist
-    const waitlistEntry = await prisma.waitlist.create({
-      data: {
-        email: normalizedEmail,
-        name: normalizedName
+    // Handle schema migration period - only include fields that exist
+    let waitlistEntry
+    try {
+      waitlistEntry = await prisma.waitlist.create({
+        data: {
+          email: normalizedEmail,
+          name: normalizedName
+        }
+      })
+    } catch (createError: any) {
+      // If create fails due to schema mismatch, try raw insert
+      console.warn('Schema error creating entry, trying raw insert:', createError?.message)
+      const escapedEmail = normalizedEmail.replace(/'/g, "''")
+      const escapedName = normalizedName.replace(/'/g, "''")
+      
+      await prisma.$executeRawUnsafe(`
+        INSERT INTO "Waitlist" (id, email, name, "createdAt")
+        VALUES (gen_random_uuid()::text, '${escapedEmail}', '${escapedName}', NOW())
+      `)
+      
+      // Get the created entry
+      const rawEntries = await prisma.$queryRawUnsafe(`
+        SELECT id, email, name, "createdAt" 
+        FROM "Waitlist" 
+        WHERE email = '${escapedEmail}'
+        ORDER BY "createdAt" DESC
+        LIMIT 1
+      `) as Array<{ id: string; email: string; name: string; createdAt: Date }>
+      
+      if (rawEntries.length === 0) {
+        throw new Error('Failed to create waitlist entry')
       }
-    })
+      
+      waitlistEntry = rawEntries[0] as any
+    }
 
     // ⚠️ CRITICAL: DO NOT CHANGE THIS PATTERN
     // Both emails use non-blocking .catch() pattern - do NOT await or use try/catch here
     // This pattern matches the working notification email exactly
     // Changing this will break email delivery as it did before (fixed 2025-11-12)
-    // Only send email if not unsubscribed
-    if (!waitlistEntry.unsubscribed) {
+    // Only send email if not unsubscribed (check safely)
+    const isUnsubscribed = waitlistEntry?.unsubscribed === true
+    if (!isUnsubscribed) {
       sendWaitlistAcknowledgmentEmail(normalizedEmail, normalizedName).catch(error => {
         console.error('❌ [WAITLIST] Acknowledgment email failed (non-blocking):', error)
       })
