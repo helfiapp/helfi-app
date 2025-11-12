@@ -297,21 +297,41 @@ export async function GET(request: NextRequest) {
 
     // Use raw query to be resilient to schema changes during migration
     // This ensures we can still fetch data even if new columns don't exist yet
+    // IMPORTANT: Filter out unsubscribed entries - they should not appear in active waitlist
     try {
       const waitlistEntries = await prisma.waitlist.findMany({
+        where: {
+          unsubscribed: false  // Only show active subscribers
+        },
         orderBy: { createdAt: 'desc' }
       })
       return NextResponse.json({ waitlist: waitlistEntries })
     } catch (schemaError: any) {
       // If schema error (missing columns), try raw query as fallback
+      // Check if unsubscribed column exists, if not, return all entries
       console.warn('Schema error, trying raw query fallback:', schemaError?.message)
-      const rawEntries = await prisma.$queryRawUnsafe(`
-        SELECT id, email, name, "createdAt" 
-        FROM "Waitlist" 
-        ORDER BY "createdAt" DESC
-      `) as Array<{ id: string; email: string; name: string; createdAt: Date }>
       
-      return NextResponse.json({ waitlist: rawEntries })
+      // Try to check if unsubscribed column exists
+      try {
+        const rawEntries = await prisma.$queryRawUnsafe(`
+          SELECT id, email, name, "createdAt", COALESCE(unsubscribed, false) as unsubscribed
+          FROM "Waitlist" 
+          WHERE COALESCE(unsubscribed, false) = false
+          ORDER BY "createdAt" DESC
+        `) as Array<{ id: string; email: string; name: string; createdAt: Date; unsubscribed: boolean }>
+        
+        return NextResponse.json({ waitlist: rawEntries })
+      } catch (rawError: any) {
+        // If unsubscribed column doesn't exist yet, return all entries
+        console.warn('Unsubscribed column may not exist, returning all entries:', rawError?.message)
+        const rawEntries = await prisma.$queryRawUnsafe(`
+          SELECT id, email, name, "createdAt" 
+          FROM "Waitlist" 
+          ORDER BY "createdAt" DESC
+        `) as Array<{ id: string; email: string; name: string; createdAt: Date }>
+        
+        return NextResponse.json({ waitlist: rawEntries })
+      }
     }
 
   } catch (error: any) {
