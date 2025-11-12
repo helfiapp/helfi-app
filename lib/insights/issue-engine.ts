@@ -2040,8 +2040,24 @@ async function computeIssueSection(
                     timing: parseTiming(supp.timing),
                   })
                 }
-                extrasIn.supportiveDetails = supportiveDetails
-                console.log(`[supplements.cache] FINAL supportiveDetails after injection:`, supportiveDetails.map(s => s.name).join(', '))
+                
+                // CRITICAL: Deduplicate before assigning to cache
+                const seenCache = new Set<string>()
+                const deduplicatedCacheSupportive = supportiveDetails.filter((item) => {
+                  const key = canonical(item.name)
+                  if (seenCache.has(key)) {
+                    console.warn(`[supplements.cache] Removing duplicate supplement: "${item.name}" (canonical: "${key}")`)
+                    return false
+                  }
+                  seenCache.add(key)
+                  return true
+                })
+                if (deduplicatedCacheSupportive.length !== supportiveDetails.length) {
+                  console.log(`[supplements.cache] Deduplicated: ${supportiveDetails.length} → ${deduplicatedCacheSupportive.length} items`)
+                }
+                
+                extrasIn.supportiveDetails = deduplicatedCacheSupportive
+                console.log(`[supplements.cache] FINAL supportiveDetails after injection:`, deduplicatedCacheSupportive.map(s => s.name).join(', '))
               } else {
                 console.log(`[supplements.cache] No fiber supplements to inject`)
               }
@@ -2176,9 +2192,25 @@ async function computeIssueSection(
                   timing: parseTiming(supp.timing),
                 })
               }
-              extrasQuick.supportiveDetails = supportiveDetails
+              
+              // CRITICAL: Deduplicate before assigning
+              const seenQuickCompute = new Set<string>()
+              const deduplicatedQuickComputeSupportive = supportiveDetails.filter((item) => {
+                const key = canonical(item.name)
+                if (seenQuickCompute.has(key)) {
+                  console.warn(`[supplements.quick.compute] Removing duplicate supplement: "${item.name}" (canonical: "${key}")`)
+                  return false
+                }
+                seenQuickCompute.add(key)
+                return true
+              })
+              if (deduplicatedQuickComputeSupportive.length !== supportiveDetails.length) {
+                console.log(`[supplements.quick.compute] Deduplicated: ${supportiveDetails.length} → ${deduplicatedQuickComputeSupportive.length} items`)
+              }
+              
+              extrasQuick.supportiveDetails = deduplicatedQuickComputeSupportive
               quick.extras = extrasQuick
-              console.log(`[supplements.quick.compute] FINAL supportiveDetails after injection:`, supportiveDetails.map(s => s.name).join(', '))
+              console.log(`[supplements.quick.compute] FINAL supportiveDetails after injection:`, deduplicatedQuickComputeSupportive.map(s => s.name).join(', '))
             } else {
               console.log(`[supplements.quick.compute] No fiber supplements to inject`)
             }
@@ -2476,6 +2508,21 @@ async function buildQuickSection(
           // Continue with empty supportiveDetails - don't fail the quick path
         }
         
+        // CRITICAL: Deduplicate supportiveDetails before finalizing (quick path)
+        const seenQuick = new Set<string>()
+        const deduplicatedQuickSupportive = supportiveDetails.filter((item) => {
+          const key = canonical(item.name)
+          if (seenQuick.has(key)) {
+            console.warn(`[supplements.quick] Removing duplicate supplement: "${item.name}" (canonical: "${key}")`)
+            return false
+          }
+          seenQuick.add(key)
+          return true
+        })
+        if (deduplicatedQuickSupportive.length !== supportiveDetails.length) {
+          console.log(`[supplements.quick] Deduplicated: ${supportiveDetails.length} → ${deduplicatedQuickSupportive.length} items`)
+        }
+        
         quick = {
           issue: summary,
           section: 'supplements',
@@ -2487,7 +2534,7 @@ async function buildQuickSection(
           recommendations: [],
           mode,
           extras: {
-            supportiveDetails,
+            supportiveDetails: deduplicatedQuickSupportive, // Use deduplicated version
             suggestedAdditions: r.suggested.map((s) => ({ title: s.name, reason: s.reason, suggestion: s.protocol ?? null })),
             avoidList: r.avoid.map((a) => ({ name: a.name, reason: a.reason })),
             source: 'quick',
@@ -3665,6 +3712,24 @@ async function buildSupplementsSection(
 
   const validated = suggestedAdditions.length >= 4 && avoidList.length >= 4
 
+  // CRITICAL: Deduplicate supportiveDetails before finalizing
+  // This prevents duplicates that might come from LLM returning same supplement twice,
+  // or from multiple augmentation steps adding the same supplement
+  const seenSupportive = new Set<string>()
+  const deduplicatedSupportiveDetails = supportiveDetails.filter((item) => {
+    const key = canonical(item.name)
+    if (seenSupportive.has(key)) {
+      console.warn(`[supplements] Removing duplicate supplement from supportiveDetails: "${item.name}" (canonical: "${key}")`)
+      return false
+    }
+    seenSupportive.add(key)
+    return true
+  })
+  
+  if (deduplicatedSupportiveDetails.length !== supportiveDetails.length) {
+    console.log(`[supplements] Deduplicated supportiveDetails: ${supportiveDetails.length} → ${deduplicatedSupportiveDetails.length} items`)
+  }
+
   let summary: string
   if (llmResult.summary?.trim().length) {
     summary = llmResult.summary
@@ -3672,8 +3737,8 @@ async function buildSupplementsSection(
     summary = 'No supplements are logged yet—use the suggested additions below to speak with your clinician about next steps.'
   } else if (!hasRecentSupplements) {
     summary = 'No recent supplement updates—log dose or timing changes and review the suggestions below to keep your plan dialled in.'
-  } else if (supportiveDetails.length) {
-    summary = `You have ${supportiveDetails.length} supplement${supportiveDetails.length === 1 ? '' : 's'} supporting ${issue.name}.`
+  } else if (deduplicatedSupportiveDetails.length) {
+    summary = `You have ${deduplicatedSupportiveDetails.length} supplement${deduplicatedSupportiveDetails.length === 1 ? '' : 's'} supporting ${issue.name}.`
   } else {
     summary = 'AI-generated guidance ready below.'
   }
@@ -3706,10 +3771,10 @@ async function buildSupplementsSection(
   const highlights: SectionHighlight[] = [
     {
       title: "What's working",
-      detail: supportiveDetails.length
-        ? supportiveDetails.map((item) => `${item.name}: ${item.reason}`).join('; ')
+      detail: deduplicatedSupportiveDetails.length
+        ? deduplicatedSupportiveDetails.map((item) => `${item.name}: ${item.reason}`).join('; ')
         : 'No supplements clearly supporting this issue yet.',
-      tone: supportiveDetails.length ? 'positive' : 'neutral',
+      tone: deduplicatedSupportiveDetails.length ? 'positive' : 'neutral',
     },
     {
       title: 'Opportunities',
@@ -3755,7 +3820,7 @@ async function buildSupplementsSection(
     })),
     recommendations,
     extras: {
-      supportiveDetails,
+      supportiveDetails: deduplicatedSupportiveDetails, // Use deduplicated version to prevent duplicates
       suggestedAdditions,
       avoidList,
       missingDose: supplements.filter((supp) => !supp.dosage).map((supp) => supp.name),
