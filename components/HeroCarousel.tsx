@@ -27,15 +27,34 @@ export default function HeroCarousel() {
   const scrollLeft = () => {
     const container = scrollContainerRef.current
     if (!container) return
-    const scrollAmount = container.clientWidth * 0.8
-    container.scrollBy({ left: -scrollAmount, behavior: 'smooth' })
+    
+    // Calculate scroll amount - scroll by 1 image width
+    const imageWidth = 250 + 24 // width + gap
+    const newScrollLeft = Math.max(0, container.scrollLeft - imageWidth)
+    
+    container.scrollTo({ left: newScrollLeft, behavior: 'smooth' })
+    scrollPositionRef.current = newScrollLeft
+    setIsPaused(true) // Pause auto-scroll when manually scrolling
+    
+    // Resume auto-scroll after a delay
+    setTimeout(() => setIsPaused(false), 3000)
   }
 
   const scrollRight = () => {
     const container = scrollContainerRef.current
     if (!container) return
-    const scrollAmount = container.clientWidth * 0.8
-    container.scrollBy({ left: scrollAmount, behavior: 'smooth' })
+    
+    // Calculate scroll amount - scroll by 1 image width
+    const imageWidth = 250 + 24 // width + gap
+    const maxScroll = container.scrollWidth - container.clientWidth
+    const newScrollLeft = Math.min(maxScroll, container.scrollLeft + imageWidth)
+    
+    container.scrollTo({ left: newScrollLeft, behavior: 'smooth' })
+    scrollPositionRef.current = newScrollLeft
+    setIsPaused(true) // Pause auto-scroll when manually scrolling
+    
+    // Resume auto-scroll after a delay
+    setTimeout(() => setIsPaused(false), 3000)
   }
 
   // Auto-scroll from right to left
@@ -74,15 +93,15 @@ export default function HeroCarousel() {
 
   return (
     <div 
-      className="relative w-full"
-      style={{ overflow: 'visible', paddingTop: '6rem', paddingBottom: '6rem', position: 'relative' }}
+      className="relative w-full px-16 md:px-20"
+      style={{ paddingTop: '2rem', paddingBottom: '2rem' }}
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
     >
       {/* Left Scroll Button */}
       <button
         onClick={scrollLeft}
-        className="absolute left-2 md:left-4 top-1/2 -translate-y-1/2 z-50 bg-black/20 hover:bg-black/30 backdrop-blur-sm rounded-full p-2 md:p-3 transition-all duration-200 opacity-60 hover:opacity-100"
+        className="absolute left-0 top-1/2 -translate-y-1/2 z-50 bg-black/20 hover:bg-black/30 backdrop-blur-sm rounded-full p-2 md:p-3 transition-all duration-200 opacity-60 hover:opacity-100"
         aria-label="Scroll left"
       >
         <svg 
@@ -99,7 +118,7 @@ export default function HeroCarousel() {
       {/* Right Scroll Button */}
       <button
         onClick={scrollRight}
-        className="absolute right-2 md:right-4 top-1/2 -translate-y-1/2 z-50 bg-black/20 hover:bg-black/30 backdrop-blur-sm rounded-full p-2 md:p-3 transition-all duration-200 opacity-60 hover:opacity-100"
+        className="absolute right-0 top-1/2 -translate-y-1/2 z-50 bg-black/20 hover:bg-black/30 backdrop-blur-sm rounded-full p-2 md:p-3 transition-all duration-200 opacity-60 hover:opacity-100"
         aria-label="Scroll right"
       >
         <svg 
@@ -113,24 +132,21 @@ export default function HeroCarousel() {
         </svg>
       </button>
 
-      {/* Horizontal Scrolling Container */}
+      {/* Horizontal Scrolling Container - sized to show exactly 5 images */}
       <div
         ref={scrollContainerRef}
-        className="flex gap-4 md:gap-6 overflow-x-hidden overflow-y-visible items-center snap-x snap-mandatory md:snap-none"
-        style={{ scrollBehavior: 'auto', overflowY: 'visible' }}
+        className="flex gap-6 overflow-x-hidden items-center mx-auto"
+        style={{ 
+          scrollBehavior: 'auto',
+          width: 'calc(5 * (250px + 24px))', // Exactly 5 images: 5 * (width + gap)
+          maxWidth: '100%'
+        }}
       >
         {/* Duplicate images for seamless loop */}
         {[...screenshots, ...screenshots].map((screenshot, index) => (
           <div
             key={`${screenshot}-${index}`}
-            className="flex-shrink-0 w-[280px] md:w-[220px] lg:w-[250px] h-auto transition-transform duration-300 ease-out hover:scale-125 relative mx-auto md:mx-0"
-            style={{ zIndex: 1 }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.zIndex = '100'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.zIndex = '1'
-            }}
+            className="flex-shrink-0 w-[250px] h-auto relative"
           >
             <div className="relative aspect-[9/16] rounded-2xl overflow-hidden shadow-xl">
               <Image
@@ -138,9 +154,9 @@ export default function HeroCarousel() {
                 alt={`Helfi ${screenshot.replace('.png', '').replace(/_/g, ' ')}`}
                 fill
                 className="object-contain"
-                priority={index < 2} // Prioritize first two images
+                priority={index < 2}
                 loading={index < 3 ? 'eager' : 'lazy'}
-                sizes="(max-width: 768px) 280px, (max-width: 1024px) 220px, 250px"
+                sizes="250px"
               />
             </div>
           </div>

@@ -261,7 +261,7 @@ export default function SplashPage() {
         </div>
 
         {/* Full-Screen Horizontal Scrolling Carousel */}
-        <div className="relative z-10 w-full" style={{ overflow: 'visible', paddingTop: '6rem', paddingBottom: '6rem', minHeight: 'auto' }}>
+        <div className="relative z-10 w-full">
           <HeroCarousel />
         </div>
       </section>
