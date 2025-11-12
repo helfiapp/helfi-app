@@ -24,6 +24,20 @@ export default function HeroCarousel() {
   const [isPaused, setIsPaused] = useState(false)
   const scrollPositionRef = useRef(0)
 
+  const scrollLeft = () => {
+    const container = scrollContainerRef.current
+    if (!container) return
+    const scrollAmount = container.clientWidth * 0.8
+    container.scrollBy({ left: -scrollAmount, behavior: 'smooth' })
+  }
+
+  const scrollRight = () => {
+    const container = scrollContainerRef.current
+    if (!container) return
+    const scrollAmount = container.clientWidth * 0.8
+    container.scrollBy({ left: scrollAmount, behavior: 'smooth' })
+  }
+
   // Auto-scroll from right to left
   useEffect(() => {
     const container = scrollContainerRef.current
@@ -60,22 +74,63 @@ export default function HeroCarousel() {
 
   return (
     <div 
-      className="relative w-full overflow-visible"
-      style={{ paddingTop: '5rem', paddingBottom: '5rem' }}
+      className="relative w-full"
+      style={{ overflow: 'visible', paddingTop: '6rem', paddingBottom: '6rem', position: 'relative' }}
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
     >
+      {/* Left Scroll Button */}
+      <button
+        onClick={scrollLeft}
+        className="absolute left-2 md:left-4 top-1/2 -translate-y-1/2 z-50 bg-black/20 hover:bg-black/30 backdrop-blur-sm rounded-full p-2 md:p-3 transition-all duration-200 opacity-60 hover:opacity-100"
+        aria-label="Scroll left"
+      >
+        <svg 
+          className="w-5 h-5 md:w-6 md:h-6 text-white" 
+          fill="none" 
+          stroke="currentColor" 
+          viewBox="0 0 24 24"
+          strokeWidth={1.5}
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+        </svg>
+      </button>
+
+      {/* Right Scroll Button */}
+      <button
+        onClick={scrollRight}
+        className="absolute right-2 md:right-4 top-1/2 -translate-y-1/2 z-50 bg-black/20 hover:bg-black/30 backdrop-blur-sm rounded-full p-2 md:p-3 transition-all duration-200 opacity-60 hover:opacity-100"
+        aria-label="Scroll right"
+      >
+        <svg 
+          className="w-5 h-5 md:w-6 md:h-6 text-white" 
+          fill="none" 
+          stroke="currentColor" 
+          viewBox="0 0 24 24"
+          strokeWidth={1.5}
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+        </svg>
+      </button>
+
       {/* Horizontal Scrolling Container */}
       <div
         ref={scrollContainerRef}
         className="flex gap-4 md:gap-6 overflow-x-hidden overflow-y-visible items-center snap-x snap-mandatory md:snap-none"
-        style={{ scrollBehavior: 'auto' }}
+        style={{ scrollBehavior: 'auto', overflowY: 'visible' }}
       >
         {/* Duplicate images for seamless loop */}
         {[...screenshots, ...screenshots].map((screenshot, index) => (
           <div
             key={`${screenshot}-${index}`}
-            className="flex-shrink-0 w-[280px] md:w-[220px] lg:w-[250px] h-auto transition-transform duration-300 ease-out hover:scale-125 hover:z-50 relative mx-auto md:mx-0"
+            className="flex-shrink-0 w-[280px] md:w-[220px] lg:w-[250px] h-auto transition-transform duration-300 ease-out hover:scale-125 relative mx-auto md:mx-0"
+            style={{ zIndex: 1 }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.zIndex = '100'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.zIndex = '1'
+            }}
           >
             <div className="relative aspect-[9/16] rounded-2xl overflow-hidden shadow-xl">
               <Image

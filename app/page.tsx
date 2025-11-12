@@ -135,7 +135,7 @@ export default function SplashPage() {
       </div>
 
       {/* Navigation */}
-      <nav className="relative z-10 px-6 py-2">
+      <nav className="relative z-10 px-6 py-1">
         <div className="max-w-6xl mx-auto flex justify-between items-center">
           <div className="flex items-center">
             <button 
@@ -261,7 +261,7 @@ export default function SplashPage() {
         </div>
 
         {/* Full-Screen Horizontal Scrolling Carousel */}
-        <div className="relative z-10 w-full overflow-visible" style={{ paddingTop: '4rem', paddingBottom: '4rem' }}>
+        <div className="relative z-10 w-full" style={{ overflow: 'visible', paddingTop: '6rem', paddingBottom: '6rem', minHeight: 'auto' }}>
           <HeroCarousel />
         </div>
       </section>
