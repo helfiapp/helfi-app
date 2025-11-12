@@ -209,13 +209,19 @@ export default function SplashPage() {
             loop
             muted
             playsInline
-            preload="metadata"
+            preload="auto"
             poster="/screenshots/hero/hero-poster.jpg"
             className="absolute inset-0 w-full h-full object-cover z-0"
             onCanPlay={() => setVideoLoaded(true)}
-            onError={() => setVideoLoaded(false)}
+            onLoadedData={() => setVideoLoaded(true)}
+            onError={(e) => {
+              console.error('Video error:', e)
+              setVideoLoaded(false)
+            }}
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
           >
             <source src="/screenshots/hero/hero-background.mp4" type="video/mp4" />
+            Your browser does not support the video tag.
           </video>
           {/* Dark overlay on video */}
           <div className="absolute inset-0 bg-black/60 z-[1]" />
