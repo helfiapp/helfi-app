@@ -60,14 +60,14 @@ export default function HeroCarousel() {
 
   return (
     <div 
-      className="relative w-full h-full overflow-visible"
+      className="relative w-full overflow-visible py-16"
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
     >
       {/* Horizontal Scrolling Container */}
       <div
         ref={scrollContainerRef}
-        className="flex gap-4 md:gap-6 overflow-x-hidden overflow-y-visible h-full items-center snap-x snap-mandatory md:snap-none"
+        className="flex gap-4 md:gap-6 overflow-x-hidden overflow-y-visible items-center snap-x snap-mandatory md:snap-none"
         style={{ scrollBehavior: 'auto' }}
       >
         {/* Duplicate images for seamless loop */}

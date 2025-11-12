@@ -232,9 +232,9 @@ export default function SplashPage() {
         </div>
 
         {/* Content Container */}
-        <div className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8">
+        <div className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 md:pt-8 pb-2 md:pb-4">
           {/* Text Content */}
-          <div className="text-center mb-12">
+          <div className="text-center mb-6">
             <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-bold text-white mb-6 leading-tight">
               Your Personal <span className="text-helfi-green">Health Intelligence Platform</span>
             </h1>
@@ -261,7 +261,7 @@ export default function SplashPage() {
         </div>
 
         {/* Full-Screen Horizontal Scrolling Carousel */}
-        <div className="relative z-10 w-full flex-1 flex items-center pb-4 md:pb-8 overflow-visible">
+        <div className="relative z-10 w-full flex-1 flex items-center overflow-visible">
           <HeroCarousel />
         </div>
       </section>
