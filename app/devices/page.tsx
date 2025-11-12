@@ -463,6 +463,30 @@ export default function DevicesPage() {
                   )}
                 </button>
               </div>
+
+              {/* Developer Demo Data Section - Show even when not connected */}
+              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Developer Tools (Test UI without connecting):</p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleLoadDemoData}
+                    disabled={loadingDemo}
+                    className="flex-1 px-3 py-1.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-md hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                  >
+                    {loadingDemo ? 'Loading...' : 'Load Demo Data'}
+                  </button>
+                  <button
+                    onClick={handleClearDemoData}
+                    disabled={clearingDemo}
+                    className="flex-1 px-3 py-1.5 text-xs bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-md hover:bg-orange-200 dark:hover:bg-orange-900/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                  >
+                    {clearingDemo ? 'Clearing...' : 'Clear Demo Data'}
+                  </button>
+                </div>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
+                  💡 Tip: Load demo data to see how Fitbit data displays without connecting a real account.
+                </p>
+              </div>
             </div>
           )}
         </div>
