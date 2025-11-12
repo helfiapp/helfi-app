@@ -5,6 +5,61 @@ import { ISSUE_SECTION_ORDER, type IssueSectionKey, precomputeQuickSectionsForUs
 import { getIssueSection } from '@/lib/insights/issue-engine'
 import { prisma } from '@/lib/prisma'
 
+// Lightweight fingerprint generator (mirrors logic in regeneration-service)
+function createDataFingerprint(data: any): string {
+  const json = JSON.stringify(data)
+  let hash = 0
+  for (let i = 0; i < json.length; i += 1) {
+    const char = json.charCodeAt(i)
+    hash = (hash << 5) - hash + char
+    hash = hash & hash
+  }
+  return hash.toString(36)
+}
+
+async function getCurrentDataFingerprint(userId: string): Promise<string> {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        healthGoals: { select: { name: true, currentRating: true } },
+        supplements: { select: { name: true, dosage: true, timing: true } },
+        medications: { select: { name: true, dosage: true, timing: true } },
+        foodLogs: {
+          where: {
+            createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
+          },
+          select: { name: true, nutrients: true },
+        },
+        exerciseLogs: {
+          where: {
+            createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
+          },
+          select: { type: true, duration: true },
+        },
+      },
+    })
+    if (!user) return ''
+    const relevantData = {
+      profile: {
+        gender: user.gender,
+        weight: user.weight,
+        height: user.height,
+        bodyType: user.bodyType,
+        exerciseFrequency: user.exerciseFrequency,
+      },
+      goals: user.healthGoals.map((g) => ({ name: g.name, rating: g.currentRating })),
+      supplements: user.supplements.map((s) => ({ name: s.name, dosage: s.dosage, timing: s.timing })),
+      medications: user.medications.map((m) => ({ name: m.name, dosage: m.dosage, timing: m.timing })),
+      recentFoods: user.foodLogs.length,
+      recentExercise: user.exerciseLogs.length,
+    }
+    return createDataFingerprint(relevantData)
+  } catch {
+    return ''
+  }
+}
+
 export async function POST(
   _request: Request,
   context: { params: { slug: string } }
@@ -41,16 +96,18 @@ export async function POST(
           sections: sections, // Filter to only regenerate requested sections
           slugs: [context.params.slug], // Only regenerate for this specific issue
         })
+        // Compute the latest fingerprint so status does not show as "stale"
+        const fingerprint = await getCurrentDataFingerprint(session.user.id)
         
         // Mark all sections as fresh after quick generation completes
         for (const section of sections) {
           try {
             await prisma.$executeRawUnsafe(`
               INSERT INTO "InsightsMetadata" ("userId", "issueSlug", "section", "status", "dataFingerprint", "lastGeneratedAt", "updatedAt")
-              VALUES ($1, $2, $3, 'fresh', '', NOW(), NOW())
+              VALUES ($1, $2, $3, 'fresh', $4, NOW(), NOW())
               ON CONFLICT ("userId", "issueSlug", "section")
-              DO UPDATE SET "status" = 'fresh', "lastGeneratedAt" = NOW(), "updatedAt" = NOW()
-            `, session.user.id, context.params.slug, section)
+              DO UPDATE SET "status" = 'fresh', "dataFingerprint" = $4, "lastGeneratedAt" = NOW(), "updatedAt" = NOW()
+            `, session.user.id, context.params.slug, section, fingerprint)
           } catch (error) {
             console.warn(`[insights.api] Failed to mark ${section} as fresh`, error)
           }
