@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { extractAdminFromHeaders } from '@/lib/admin-auth'
+import { ensureFitbitDataSchema } from '@/lib/fitbit-db'
 
 /**
  * Seed demo Fitbit data for testing
@@ -11,6 +12,9 @@ import { extractAdminFromHeaders } from '@/lib/admin-auth'
  */
 export async function POST(request: NextRequest) {
   try {
+    // Ensure FitbitData schema exists (idempotent)
+    await ensureFitbitDataSchema()
+
     // Check admin authentication
     const authHeader = request.headers.get('authorization')
     const admin = extractAdminFromHeaders(authHeader)
@@ -356,6 +360,9 @@ export async function POST(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
+    // Ensure FitbitData schema exists (idempotent)
+    await ensureFitbitDataSchema()
+
     // Check admin authentication
     const authHeader = request.headers.get('authorization')
     const admin = extractAdminFromHeaders(authHeader)

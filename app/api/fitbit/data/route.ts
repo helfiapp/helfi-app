@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { ensureFitbitDataSchema } from '@/lib/fitbit-db'
 
 type DataType = 'steps' | 'heartrate' | 'sleep' | 'weight'
 
@@ -44,6 +45,9 @@ export async function GET(request: NextRequest) {
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
+    // Ensure FitbitData table exists (idempotent)
+    await ensureFitbitDataSchema()
 
     const searchParams = request.nextUrl.searchParams
     const dataTypesParam = (searchParams.get('dataTypes') || '').trim()
