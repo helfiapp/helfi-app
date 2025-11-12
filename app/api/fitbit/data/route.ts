@@ -190,10 +190,40 @@ export async function GET(request: NextRequest) {
     console.error('Error message:', error?.message)
     console.error('Error stack:', error?.stack)
     console.error('Error code:', error?.code)
+    console.error('Error name:', error?.name)
+    
+    // Try to create table if it's a missing table error
+    if (error?.code === 'P2021' || error?.message?.includes('does not exist') || error?.message?.includes('relation') || error?.message?.includes('table')) {
+      try {
+        console.log('Attempting to create FitbitData table...')
+        await ensureFitbitDataSchema()
+        // Return empty data instead of error - table will be ready for next request
+        // Parse dates from request params again since they're not in scope
+        const searchParams = request.nextUrl.searchParams
+        const endParam = parseDate(searchParams.get('end'))
+        const startParam = parseDate(searchParams.get('start'))
+        const endDate = endParam || new Date()
+        const startDate = startParam || new Date(Date.UTC(endDate.getUTCFullYear(), endDate.getUTCMonth(), endDate.getUTCDate() - 29))
+        return NextResponse.json({
+          success: true,
+          range: { start: formatYmd(startDate), end: formatYmd(endDate) },
+          series: { steps: [], heartrate: [], sleep: [], weight: [] },
+        })
+      } catch (schemaError: any) {
+        console.error('❌ Failed to create FitbitData schema:', schemaError)
+        return NextResponse.json(
+          { 
+            error: 'Failed to load Fitbit data',
+            details: `Schema creation failed: ${schemaError?.message || 'Unknown error'}`
+          }, 
+          { status: 500 }
+        )
+      }
+    }
     
     const errorMessage = error?.message || 'Unknown error'
     const errorDetails = process.env.NODE_ENV === 'development' 
-      ? `${errorMessage} (${error?.code || 'no code'})`
+      ? `${errorMessage} (Code: ${error?.code || 'no code'})`
       : 'Failed to load Fitbit data'
     
     return NextResponse.json(

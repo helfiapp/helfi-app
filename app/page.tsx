@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import HeroCarousel from '@/components/HeroCarousel'
 // Back to Top Button Component
 function BackToTopButton() {
   const [isVisible, setIsVisible] = useState(false)
@@ -198,31 +199,42 @@ export default function SplashPage() {
 
       {/* Hero Section */}
       <section className="px-4 sm:px-6 lg:px-10 xl:px-16 py-16 lg:py-20">
-        <div className="max-w-6xl mx-auto text-center">
-          <div className="max-w-4xl mx-auto">
-            <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold text-helfi-black mb-6 leading-tight">
-              <span className="block">Your Personal</span>
-              <span className="text-helfi-green block">Health Intelligence</span>
-              <span className="block">Platform</span>
-            </h1>
-            <p className="text-xl md:text-2xl text-gray-600 mb-8 leading-relaxed max-w-3xl mx-auto">
-              Track your health metrics, supplements, and medications. Get AI-powered insights 
-              and personalized recommendations to optimize your wellbeing. Analyze food photos, 
-              lab reports, and medical images—all in one intelligent platform.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 sm:space-x-4 sm:gap-0 justify-center">
-              <button 
-                onClick={() => setShowWaitlistModal(true)}
-                className="btn-primary text-lg px-8 py-4"
-              >
-                Join the Waitlist
-              </button>
-              <button 
-                onClick={() => setShowDemoModal(true)}
-                className="btn-secondary text-lg px-8 py-4"
-              >
-                Watch Demo
-              </button>
+        <div className="max-w-7xl mx-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+            {/* Left Column - Text Content */}
+            <div className="text-center lg:text-left">
+              <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-helfi-black mb-6 leading-tight">
+                <span className="block">Your Personal</span>
+                <span className="text-helfi-green block">Health Intelligence</span>
+                <span className="block">Platform</span>
+              </h1>
+              <p className="text-xl md:text-2xl text-gray-600 mb-8 leading-relaxed">
+                Track your health metrics, supplements, and medications. Get AI-powered insights 
+                and personalized recommendations to optimize your wellbeing. Analyze food photos, 
+                lab reports, and medical images—all in one intelligent platform.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4 sm:space-x-4 sm:gap-0 justify-center lg:justify-start">
+                <button 
+                  onClick={() => setShowWaitlistModal(true)}
+                  className="btn-primary text-lg px-8 py-4"
+                >
+                  Join the Waitlist
+                </button>
+                <button 
+                  onClick={() => setShowDemoModal(true)}
+                  className="btn-secondary text-lg px-8 py-4"
+                >
+                  Watch Demo
+                </button>
+              </div>
+            </div>
+
+            {/* Right Column - Mobile Screenshot Carousel */}
+            <div className="flex justify-center lg:justify-end">
+              <HeroCarousel 
+                videoSrc="/screenshots/hero/hero-background.mp4"
+                videoPoster="/screenshots/hero/hero-poster.jpg"
+              />
             </div>
           </div>
         </div>
