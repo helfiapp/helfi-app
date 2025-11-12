@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
 
 // Optimal order for maximum impact - tells a story from onboarding to advanced features
@@ -21,6 +21,8 @@ const screenshots = [
 
 export default function HeroCarousel() {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const [isPaused, setIsPaused] = useState(false)
+  const scrollPositionRef = useRef(0)
 
   // Auto-scroll from right to left
   useEffect(() => {
@@ -28,18 +30,19 @@ export default function HeroCarousel() {
     if (!container) return
 
     let animationFrameId: number
-    let scrollPosition = 0
     const scrollSpeed = 0.5 // pixels per frame
 
     const scroll = () => {
-      scrollPosition += scrollSpeed
-      const maxScroll = container.scrollWidth - container.clientWidth
-      
-      if (scrollPosition >= maxScroll) {
-        scrollPosition = 0 // Reset to start for seamless loop
+      if (!isPaused) {
+        scrollPositionRef.current += scrollSpeed
+        const maxScroll = container.scrollWidth - container.clientWidth
+        
+        if (scrollPositionRef.current >= maxScroll) {
+          scrollPositionRef.current = 0 // Reset to start for seamless loop
+        }
+        
+        container.scrollLeft = scrollPositionRef.current
       }
-      
-      container.scrollLeft = scrollPosition
       animationFrameId = requestAnimationFrame(scroll)
     }
 
@@ -50,10 +53,14 @@ export default function HeroCarousel() {
         cancelAnimationFrame(animationFrameId)
       }
     }
-  }, [])
+  }, [isPaused])
 
   return (
-    <div className="relative w-full h-full overflow-hidden">
+    <div 
+      className="relative w-full h-full overflow-hidden"
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
+    >
       {/* Horizontal Scrolling Container */}
       <div
         ref={scrollContainerRef}
@@ -64,7 +71,7 @@ export default function HeroCarousel() {
         {[...screenshots, ...screenshots].map((screenshot, index) => (
           <div
             key={`${screenshot}-${index}`}
-            className="flex-shrink-0 w-[180px] md:w-[220px] lg:w-[250px] h-auto"
+            className="flex-shrink-0 w-[180px] md:w-[220px] lg:w-[250px] h-auto transition-transform duration-300 ease-out hover:scale-125 hover:z-20"
           >
             <div className="relative aspect-[9/16] rounded-2xl overflow-hidden shadow-xl">
               <Image
