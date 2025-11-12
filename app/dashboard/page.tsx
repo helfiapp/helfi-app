@@ -363,12 +363,12 @@ export default function Dashboard() {
         <div className="max-w-7xl mx-auto">
           {/* Mobile: Logo and Profile Row */}
           <div className="md:hidden flex items-center justify-between mb-3">
-            <Link href="/" className="w-14 h-14 cursor-pointer hover:opacity-80 transition-opacity">
+            <Link href="/" className="w-20 h-20 cursor-pointer hover:opacity-80 transition-opacity">
               <Image
                 src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/HELFI_TRANSPARENT_rmssry.png"
                 alt="Helfi Logo"
-                width={56}
-                height={56}
+                width={72}
+                height={72}
                 className="w-full h-full object-contain"
                 priority
               />
@@ -436,16 +436,16 @@ export default function Dashboard() {
           {/* Desktop: Logo + Actions Row */}
           <div className="hidden md:flex justify-between items-center">
             <div className="flex items-center">
-              <Link href="/" className="w-16 h-16 lg:w-20 lg:h-20 cursor-pointer hover:opacity-80 transition-opacity">
-                <Image
-                  src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/HELFI_TRANSPARENT_rmssry.png"
-                  alt="Helfi Logo"
-                  width={80}
-                  height={80}
-                  className="w-full h-full object-contain"
-                  priority
-                />
-              </Link>
+            <Link href="/" className="w-20 h-20 md:w-24 md:h-24 cursor-pointer hover:opacity-80 transition-opacity">
+              <Image
+                src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/HELFI_TRANSPARENT_rmssry.png"
+                alt="Helfi Logo"
+                width={96}
+                height={96}
+                className="w-full h-full object-contain"
+                priority
+              />
+            </Link>
             </div>
             
             <div className="flex items-center gap-3">

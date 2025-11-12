@@ -16,6 +16,8 @@ export default function DevicesPage() {
   const [syncingFitbit, setSyncingFitbit] = useState(false)
   const [popupOpen, setPopupOpen] = useState(false)
   const [checkingStatus, setCheckingStatus] = useState(false)
+  const [loadingDemo, setLoadingDemo] = useState(false)
+  const [clearingDemo, setClearingDemo] = useState(false)
   const popupRef = useRef<Window | null>(null)
   const checkIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const closedCheckRef = useRef<NodeJS.Timeout | null>(null)
@@ -244,6 +246,8 @@ export default function DevicesPage() {
       if (response.ok) {
         const data = await response.json()
         alert('Fitbit data synced successfully!')
+        // Refresh page to show new data
+        window.location.reload()
       } else {
         throw new Error('Sync failed')
       }
@@ -252,6 +256,69 @@ export default function DevicesPage() {
       alert('Failed to sync Fitbit data. Please try again.')
     } finally {
       setSyncingFitbit(false)
+    }
+  }
+
+  const handleLoadDemoData = async () => {
+    if (!confirm('This will create 30 days of demo Fitbit data for testing. Continue?')) {
+      return
+    }
+    
+    setLoadingDemo(true)
+    try {
+      const response = await fetch('/api/fitbit/demo/seed', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer temp-admin-token',
+        },
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        alert(`✅ ${data.message}\n\n${data.recordsCreated} records created for dates ${data.dateRange.start} to ${data.dateRange.end}`)
+        // Refresh page to show demo data
+        window.location.reload()
+      } else {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to load demo data')
+      }
+    } catch (error: any) {
+      console.error('Error loading demo data:', error)
+      alert(`Failed to load demo data: ${error.message}`)
+    } finally {
+      setLoadingDemo(false)
+    }
+  }
+
+  const handleClearDemoData = async () => {
+    if (!confirm('This will delete all Fitbit demo data. Continue?')) {
+      return
+    }
+    
+    setClearingDemo(true)
+    try {
+      const response = await fetch('/api/fitbit/demo/seed', {
+        method: 'DELETE',
+        headers: {
+          'Authorization': 'Bearer temp-admin-token',
+        },
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        alert(`✅ Demo data cleared successfully\n\n${data.recordsDeleted} records deleted`)
+        // Refresh page
+        window.location.reload()
+      } else {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to clear demo data')
+      }
+    } catch (error: any) {
+      console.error('Error clearing demo data:', error)
+      alert(`Failed to clear demo data: ${error.message}`)
+    } finally {
+      setClearingDemo(false)
     }
   }
 
@@ -341,6 +408,27 @@ export default function DevicesPage() {
                 >
                   Disconnect
                 </button>
+              </div>
+
+              {/* Developer Demo Data Section */}
+              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Developer Tools:</p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleLoadDemoData}
+                    disabled={loadingDemo}
+                    className="flex-1 px-3 py-1.5 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-md hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                  >
+                    {loadingDemo ? 'Loading...' : 'Load Demo Data'}
+                  </button>
+                  <button
+                    onClick={handleClearDemoData}
+                    disabled={clearingDemo}
+                    className="flex-1 px-3 py-1.5 text-xs bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-md hover:bg-orange-200 dark:hover:bg-orange-900/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                  >
+                    {clearingDemo ? 'Clearing...' : 'Clear Demo Data'}
+                  </button>
+                </div>
               </div>
 
               <FitbitCharts rangeDays={30} />
