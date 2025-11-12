@@ -45,28 +45,28 @@ function AllSectionsProgressBar({ issueSlug, sections, onComplete }: {
         const freshCount = statuses.filter(s => s.status === 'fresh').length
         const generatingCount = statuses.filter(s => s.status === 'generating' || s.status === 'stale').length
         
-        // Calculate progress based on completed sections
+        // Calculate progress based on completed sections (primary metric)
         const sectionProgress = (freshCount / sections.length) * 100
         
-        // Also factor in elapsed time for smoother progress
+        // Also factor in elapsed time for smoother progress updates
         const elapsed = Date.now() - startTime
         const elapsedSeconds = elapsed / 1000
         
-        // Time-based progress estimate (similar to single section)
+        // Faster time-based progress estimate (quick path should be much faster - 10-30 seconds)
         let timeBasedProgress = 0
-        if (elapsedSeconds < 10) {
-          timeBasedProgress = (elapsedSeconds / 10) * 10 // 0-10%
-        } else if (elapsedSeconds < 60) {
-          timeBasedProgress = 10 + ((elapsedSeconds - 10) / 50) * 70 // 10-80%
-        } else if (elapsedSeconds < 120) {
-          timeBasedProgress = 80 + ((elapsedSeconds - 60) / 60) * 15 // 80-95%
+        if (elapsedSeconds < 5) {
+          timeBasedProgress = (elapsedSeconds / 5) * 30 // 0-30% in first 5 seconds
+        } else if (elapsedSeconds < 15) {
+          timeBasedProgress = 30 + ((elapsedSeconds - 5) / 10) * 50 // 30-80% in next 10 seconds
+        } else if (elapsedSeconds < 30) {
+          timeBasedProgress = 80 + ((elapsedSeconds - 15) / 15) * 15 // 80-95% in next 15 seconds
         } else {
-          timeBasedProgress = 95
+          timeBasedProgress = 95 // Cap at 95% until all complete
         }
         
-        // Use the higher of section-based or time-based progress, but cap at 95% until all complete
-        const combinedProgress = Math.max(sectionProgress, timeBasedProgress)
-        const finalProgress = freshCount === sections.length ? 100 : Math.min(combinedProgress, 95)
+        // Use section-based progress as primary, but show time-based progress if higher (for smoother updates)
+        // This ensures progress bar moves even while waiting for status updates
+        const finalProgress = freshCount === sections.length ? 100 : Math.max(sectionProgress, Math.min(timeBasedProgress, 95))
         
         setProgress(finalProgress)
         

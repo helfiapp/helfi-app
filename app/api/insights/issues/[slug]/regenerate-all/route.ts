@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { ISSUE_SECTION_ORDER, type IssueSectionKey } from '@/lib/insights/issue-engine'
+import { ISSUE_SECTION_ORDER, type IssueSectionKey, precomputeQuickSectionsForUser } from '@/lib/insights/issue-engine'
 import { getIssueSection } from '@/lib/insights/issue-engine'
 import { prisma } from '@/lib/prisma'
 
@@ -31,42 +31,43 @@ export async function POST(
       console.warn('[insights.api] Failed to mark sections as generating', error)
     }
     
-    // Start regeneration for all sections in background (non-blocking)
+    // Start regeneration for all sections in parallel (non-blocking, much faster!)
     setTimeout(async () => {
       try {
+        // Use the fast quick path which generates insights much faster
+        // This uses degraded/quick generation instead of full LLM calls
+        await precomputeQuickSectionsForUser(session.user.id, {
+          concurrency: 4, // Process 4 sections in parallel
+          sections: sections, // Filter to only regenerate requested sections
+          slugs: [context.params.slug], // Only regenerate for this specific issue
+        })
+        
+        // Mark all sections as fresh after quick generation completes
         for (const section of sections) {
           try {
-            const result = await getIssueSection(session.user.id, context.params.slug, section, {
-              mode: 'latest',
-              force: true,
-            })
-            
-            // Mark as fresh after completion
-            if (result) {
-              try {
-                await prisma.$executeRawUnsafe(`
-                  INSERT INTO "InsightsMetadata" ("userId", "issueSlug", "section", "status", "dataFingerprint", "lastGeneratedAt", "updatedAt")
-                  VALUES ($1, $2, $3, 'fresh', '', NOW(), NOW())
-                  ON CONFLICT ("userId", "issueSlug", "section")
-                  DO UPDATE SET "status" = 'fresh', "lastGeneratedAt" = NOW(), "updatedAt" = NOW()
-                `, session.user.id, context.params.slug, section)
-              } catch (error) {
-                console.warn(`[insights.api] Failed to mark ${section} as fresh`, error)
-              }
-            }
+            await prisma.$executeRawUnsafe(`
+              INSERT INTO "InsightsMetadata" ("userId", "issueSlug", "section", "status", "dataFingerprint", "lastGeneratedAt", "updatedAt")
+              VALUES ($1, $2, $3, 'fresh', '', NOW(), NOW())
+              ON CONFLICT ("userId", "issueSlug", "section")
+              DO UPDATE SET "status" = 'fresh', "lastGeneratedAt" = NOW(), "updatedAt" = NOW()
+            `, session.user.id, context.params.slug, section)
           } catch (error) {
-            console.error(`[insights.api] Failed to regenerate ${section}`, error)
-            // Mark as stale on error so it can retry
-            try {
-              await prisma.$executeRawUnsafe(`
-                UPDATE "InsightsMetadata" SET "status" = 'stale', "updatedAt" = NOW()
-                WHERE "userId" = $1 AND "issueSlug" = $2 AND "section" = $3
-              `, session.user.id, context.params.slug, section)
-            } catch {}
+            console.warn(`[insights.api] Failed to mark ${section} as fresh`, error)
           }
         }
+        
+        console.log(`[insights.api] Quick regeneration complete for ${sections.length} sections`)
       } catch (error) {
         console.error('[insights.api] Background regeneration failed', error)
+        // Mark as stale on error so it can retry
+        for (const section of sections) {
+          try {
+            await prisma.$executeRawUnsafe(`
+              UPDATE "InsightsMetadata" SET "status" = 'stale', "updatedAt" = NOW()
+              WHERE "userId" = $1 AND "issueSlug" = $2 AND "section" = $3
+            `, session.user.id, context.params.slug, section)
+          } catch {}
+        }
       }
     }, 0)
     
