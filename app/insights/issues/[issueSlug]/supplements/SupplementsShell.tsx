@@ -162,8 +162,27 @@ export default function SupplementsShell({ children, initialResult, issueSlug }:
   }, [result, loading, issueSlug])
 
   async function handleGenerate(mode: 'daily' | 'weekly' | 'custom', range?: { from?: string; to?: string }) {
-    // This function is kept for backward compatibility but is no longer used
-    // Insights are now updated via Update button on health data pages
+    try {
+      setLoading(true)
+      setError(null)
+      const response = await fetch(`/api/insights/issues/${issueSlug}/sections/supplements`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ mode, range, force: true }),
+      })
+      if (response.status === 200) {
+        const data = await response.json()
+        setResult(data?.result ?? data)
+      } else {
+        throw new Error('Unable to regenerate report right now.')
+      }
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setLoading(false)
+    }
   }
 
   const extras = useMemo<SupplementsExtras>(() => {
@@ -297,6 +316,15 @@ export default function SupplementsShell({ children, initialResult, issueSlug }:
               <p className="text-xs text-gray-500 mt-3">
                 Generated {new Date(result.generatedAt).toLocaleString()} • Confidence {(result.confidence * 100).toFixed(0)}%
               </p>
+            </div>
+            <div className="flex-shrink-0">
+              <button
+                onClick={() => handleGenerate('latest')}
+                disabled={loading}
+                className="px-4 py-2 bg-helfi-green hover:bg-helfi-green/90 disabled:bg-gray-300 text-white rounded-lg text-sm font-medium transition-colors"
+              >
+                {loading ? 'Regenerating...' : '🔄 Regenerate'}
+              </button>
             </div>
           </div>
         </section>

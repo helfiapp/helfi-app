@@ -92,13 +92,27 @@ export async function POST(
       return NextResponse.json({ error: 'Invalid section' }, { status: 400 })
     }
 
-    let body: { mode?: string; range?: { from?: string; to?: string } } = {}
+    let body: { mode?: string; range?: { from?: string; to?: string }; force?: boolean } = {}
     try {
       body = await _request.json()
     } catch {}
 
     const mode = (body?.mode === 'weekly' || body?.mode === 'daily' || body?.mode === 'custom') ? body.mode : 'latest'
     const range = body?.range && (body.range.from || body.range.to) ? body.range : undefined
+    const forceRefresh = body?.force === true
+
+    // If force refresh requested, skip cache and regenerate
+    if (forceRefresh) {
+      const result = await getIssueSection(session.user.id, context.params.slug, sectionParam, {
+        mode,
+        range,
+        force: true,
+      })
+      if (!result) {
+        return NextResponse.json({ error: 'Not found' }, { status: 404 })
+      }
+      return NextResponse.json({ result, upgraded: true, forceRefreshed: true }, { status: 200 })
+    }
 
     // Fast path: Return quick result immediately, then upgrade in background
     // This prevents users from waiting a minute for generation
