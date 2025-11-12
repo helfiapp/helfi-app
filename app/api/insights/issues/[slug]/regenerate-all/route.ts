@@ -101,28 +101,32 @@ export async function POST(
       console.warn('[insights.api] Failed to clear cache', error)
     }
     
-    // Regenerate sections in parallel, updating status immediately after each completes
-    // This allows progress bar to show real-time progress
-    Promise.all(sections.map(async (section) => {
+    // Regenerate sections using the ORIGINAL WORKING APPROACH: force: true with getIssueSection
+    // This was working before - don't try to optimize it, just make it work
+    // Process in parallel and update status incrementally
+    const regenerationPromises = sections.map(async (section) => {
       try {
-        // Use precomputeQuickSectionsForUser for just this one section
-        // This will generate and cache the result
-        await precomputeQuickSectionsForUser(session.user.id, {
-          concurrency: 1,
-          sections: [section],
-          slugs: [context.params.slug],
+        console.log(`[insights.api] Starting regeneration for ${section}`)
+        
+        // Use force: true - this was working before
+        const result = await getIssueSection(session.user.id, context.params.slug, section, {
           mode: 'latest',
+          force: true, // Force regeneration - this is what was working
         })
         
-        // Mark as fresh immediately after this section completes
-        await prisma.$executeRawUnsafe(`
-          INSERT INTO "InsightsMetadata" ("userId", "issueSlug", "section", "status", "dataFingerprint", "lastGeneratedAt", "updatedAt")
-          VALUES ($1, $2, $3, 'fresh', $4, NOW(), NOW())
-          ON CONFLICT ("userId", "issueSlug", "section")
-          DO UPDATE SET "status" = 'fresh', "dataFingerprint" = $4, "lastGeneratedAt" = NOW(), "updatedAt" = NOW()
-        `, session.user.id, context.params.slug, section, fingerprint)
-        
-        console.log(`[insights.api] ✅ Regenerated and marked ${section} as fresh`)
+        if (result) {
+          // Mark as fresh immediately after this section completes
+          await prisma.$executeRawUnsafe(`
+            INSERT INTO "InsightsMetadata" ("userId", "issueSlug", "section", "status", "dataFingerprint", "lastGeneratedAt", "updatedAt")
+            VALUES ($1, $2, $3, 'fresh', $4, NOW(), NOW())
+            ON CONFLICT ("userId", "issueSlug", "section")
+            DO UPDATE SET "status" = 'fresh', "dataFingerprint" = $4, "lastGeneratedAt" = NOW(), "updatedAt" = NOW()
+          `, session.user.id, context.params.slug, section, fingerprint)
+          
+          console.log(`[insights.api] ✅ Regenerated and marked ${section} as fresh`)
+        } else {
+          throw new Error(`No result returned for ${section}`)
+        }
       } catch (error) {
         console.error(`[insights.api] ❌ Failed to regenerate ${section}:`, error)
         // Mark as stale on error
@@ -133,7 +137,10 @@ export async function POST(
           `, session.user.id, context.params.slug, section)
         } catch {}
       }
-    })).catch((error) => {
+    })
+    
+    // Don't await - let it run in background, but keep reference so it doesn't get GC'd
+    Promise.all(regenerationPromises).catch((error) => {
       console.error('[insights.api] Regeneration error:', error)
     })
     
