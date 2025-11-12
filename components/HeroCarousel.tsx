@@ -57,21 +57,21 @@ export default function HeroCarousel() {
 
   return (
     <div 
-      className="relative w-full h-full overflow-hidden"
+      className="relative w-full h-full overflow-visible"
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
     >
       {/* Horizontal Scrolling Container */}
       <div
         ref={scrollContainerRef}
-        className="flex gap-6 overflow-x-hidden h-full items-center"
+        className="flex gap-6 overflow-x-hidden overflow-y-visible h-full items-center"
         style={{ scrollBehavior: 'auto' }}
       >
         {/* Duplicate images for seamless loop */}
         {[...screenshots, ...screenshots].map((screenshot, index) => (
           <div
             key={`${screenshot}-${index}`}
-            className="flex-shrink-0 w-[180px] md:w-[220px] lg:w-[250px] h-auto transition-transform duration-300 ease-out hover:scale-125 hover:z-20"
+            className="flex-shrink-0 w-[180px] md:w-[220px] lg:w-[250px] h-auto transition-transform duration-300 ease-out hover:scale-125 hover:z-50 relative"
           >
             <div className="relative aspect-[9/16] rounded-2xl overflow-hidden shadow-xl">
               <Image

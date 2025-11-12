@@ -232,7 +232,7 @@ export default function SplashPage() {
         </div>
 
         {/* Content Container */}
-        <div className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 md:py-32">
+        <div className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
           {/* Text Content */}
           <div className="text-center mb-12">
             <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-bold text-white mb-6 leading-tight">
@@ -261,7 +261,7 @@ export default function SplashPage() {
         </div>
 
         {/* Full-Screen Horizontal Scrolling Carousel */}
-        <div className="relative z-10 w-full flex-1 flex items-center pb-24 md:pb-32">
+        <div className="relative z-10 w-full flex-1 flex items-center pb-8 md:pb-12 overflow-visible">
           <HeroCarousel />
         </div>
       </section>
