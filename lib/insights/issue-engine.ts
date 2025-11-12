@@ -4385,7 +4385,6 @@ async function buildLabsSection(
           priority: 'now',
         },
       ],
-      mode: 'latest',
       extras: {
         suggestedLabs: [],
         avoidLabs: [],
