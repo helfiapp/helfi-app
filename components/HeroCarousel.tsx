@@ -80,8 +80,7 @@ export default function HeroCarousel() {
     let resumeTimeoutId: NodeJS.Timeout
     let currentSlideIndex = 0
     let isUserScrolling = false
-    let isProgrammaticScroll = false // Flag to ignore programmatic scrolls
-    const imageWidth = 320 + 24 // width + gap for mobile
+        const imageWidth = 320 + 24 // width + gap for mobile
 
     const advanceSlide = () => {
       // Check if paused or user is scrolling
@@ -93,8 +92,8 @@ export default function HeroCarousel() {
       // Move to next slide
       currentSlideIndex = (currentSlideIndex + 1) % screenshots.length
       
-      // Set flag to ignore the scroll event we're about to trigger
-      isProgrammaticScroll = true
+      // Temporarily remove scroll listener to prevent interference
+      container.removeEventListener('scroll', handleScroll)
       
       // Temporarily disable scroll snap for instant transition
       const originalScrollSnap = container.style.scrollSnapType
@@ -102,15 +101,18 @@ export default function HeroCarousel() {
       
       // Quickly snap to next position (right to left) - instant transition
       const scrollPosition = currentSlideIndex * imageWidth
-      container.scrollTo({ left: scrollPosition, behavior: 'auto' })
+      container.scrollLeft = scrollPosition
       scrollPositionRef.current = scrollPosition
       setCurrentIndex(currentSlideIndex)
       
-      // Re-enable scroll snap and reset flag after transition
-      setTimeout(() => {
+      // Re-enable scroll snap and re-add listener after transition
+      requestAnimationFrame(() => {
         container.style.scrollSnapType = originalScrollSnap || 'x mandatory'
-        isProgrammaticScroll = false
-      }, 150)
+        // Re-add listener after scroll events have settled
+        setTimeout(() => {
+          container.addEventListener('scroll', handleScroll, { passive: true })
+        }, 100)
+      })
 
       // Hold for 3 seconds before next transition
       advanceTimeoutId = setTimeout(advanceSlide, 3000)
@@ -118,11 +120,6 @@ export default function HeroCarousel() {
 
     // Pause auto-advance when user manually scrolls (not programmatic)
     const handleScroll = () => {
-      // Ignore programmatic scrolls
-      if (isProgrammaticScroll) {
-        return
-      }
-
       // This is a user-initiated scroll
       isUserScrolling = true
       setIsPaused(true)
@@ -149,15 +146,13 @@ export default function HeroCarousel() {
     }
 
     // Initialize to first slide
-    isProgrammaticScroll = true
-    container.scrollTo({ left: 0, behavior: 'auto' })
+    container.scrollLeft = 0
     scrollPositionRef.current = 0
-    setTimeout(() => {
-      isProgrammaticScroll = false
-    }, 200)
     
-    // Listen for manual scroll events
-    container.addEventListener('scroll', handleScroll, { passive: true })
+    // Wait a moment before adding listener to avoid initial scroll event
+    setTimeout(() => {
+      container.addEventListener('scroll', handleScroll, { passive: true })
+    }, 300)
     
     // Start the cycle after 3 seconds (hold first slide for 3 seconds)
     advanceTimeoutId = setTimeout(advanceSlide, 3000)
