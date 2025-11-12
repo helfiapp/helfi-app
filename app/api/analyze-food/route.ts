@@ -475,7 +475,7 @@ After your explanation and the one-line totals above, also include a compact JSO
     try {
       console.log('🏥 Starting health compatibility check...');
       
-      // Fetch user's health situations data
+      // Fetch user's health situations data (fresh from database, no cache)
       const healthSituationsGoal = await prisma.healthGoal.findFirst({
         where: {
           userId: currentUser.id,
@@ -483,7 +483,18 @@ After your explanation and the one-line totals above, also include a compact JSO
         }
       });
 
+      // Also fetch selected health goals/issues (current active health concerns)
+      const selectedIssuesGoal = await prisma.healthGoal.findFirst({
+        where: {
+          userId: currentUser.id,
+          name: '__SELECTED_ISSUES__'
+        }
+      });
+
       let healthData = null;
+      let selectedHealthGoals: string[] = [];
+      
+      // Parse health situations data
       if (healthSituationsGoal?.category) {
         try {
           const parsed = JSON.parse(healthSituationsGoal.category);
@@ -492,24 +503,70 @@ After your explanation and the one-line totals above, also include a compact JSO
             healthProblems: parsed.healthProblems || '',
             additionalInfo: parsed.additionalInfo || ''
           };
+          console.log('📋 Health situations data:', {
+            hasIssues: !!healthData.healthIssues,
+            hasProblems: !!healthData.healthProblems,
+            hasAdditionalInfo: !!healthData.additionalInfo
+          });
         } catch (e) {
           console.warn('Failed to parse health situations data:', e);
         }
       }
 
-      // Only perform health check if user has health data
-      if (healthData && (healthData.healthIssues.trim() || healthData.healthProblems.trim() || healthData.additionalInfo.trim())) {
-        console.log('✅ User has health data, performing compatibility check...');
+      // Parse selected health goals/issues
+      if (selectedIssuesGoal?.category) {
+        try {
+          const parsed = JSON.parse(selectedIssuesGoal.category);
+          if (Array.isArray(parsed)) {
+            selectedHealthGoals = parsed.map((name: any) => String(name || '').trim()).filter(Boolean);
+          }
+          console.log('📋 Selected health goals:', selectedHealthGoals);
+        } catch (e) {
+          console.warn('Failed to parse selected issues:', e);
+        }
+      }
+
+      // Build comprehensive health context from BOTH sources
+      const hasHealthSituations = healthData && (
+        healthData.healthIssues.trim() || 
+        healthData.healthProblems.trim() || 
+        healthData.additionalInfo.trim()
+      );
+      const hasHealthGoals = selectedHealthGoals.length > 0;
+
+      // Only perform health check if user has ANY health data
+      if (hasHealthSituations || hasHealthGoals) {
+        console.log('✅ User has health data, performing compatibility check...', {
+          hasHealthSituations,
+          hasHealthGoals,
+          goalsCount: selectedHealthGoals.length
+        });
         
         // Extract food name/description from analysis (first line or first sentence)
         const foodDescription = analysis.split('\n')[0].substring(0, 200);
         
-        // Build health context prompt
-        const healthContext = [
-          healthData.healthIssues ? `Current health issues: ${healthData.healthIssues}` : '',
-          healthData.healthProblems ? `Ongoing health problems: ${healthData.healthProblems}` : '',
-          healthData.additionalInfo ? `Additional health information: ${healthData.additionalInfo}` : ''
-        ].filter(Boolean).join('\n');
+        // Build health context prompt from BOTH health situations AND selected goals
+        const healthContextParts: string[] = [];
+        
+        if (healthData) {
+          if (healthData.healthIssues.trim()) {
+            healthContextParts.push(`Current health issues: ${healthData.healthIssues}`);
+          }
+          if (healthData.healthProblems.trim()) {
+            healthContextParts.push(`Ongoing health problems: ${healthData.healthProblems}`);
+          }
+          if (healthData.additionalInfo.trim()) {
+            healthContextParts.push(`Additional health information: ${healthData.additionalInfo}`);
+          }
+        }
+        
+        if (selectedHealthGoals.length > 0) {
+          healthContextParts.push(`Health goals/concerns being tracked: ${selectedHealthGoals.join(', ')}`);
+        }
+        
+        const healthContext = healthContextParts.join('\n');
+        
+        console.log('📝 Health context being sent to AI:', healthContext.substring(0, 200) + '...');
 
         // Perform health compatibility analysis
         const healthCheckPrompt = `You are a health advisor analyzing whether a food item is suitable for a person based ONLY on their specific health information.
@@ -520,12 +577,14 @@ ${healthContext}
 FOOD ITEM TO ANALYZE:
 ${foodDescription}
 
-INSTRUCTIONS:
+CRITICAL INSTRUCTIONS:
 1. Analyze if this food could be problematic or harmful based ONLY on the user's health information provided above
 2. If the food is NOT suitable, provide a clear, specific warning explaining why (e.g., "This contains peppers which can irritate ulcers" or "Black coffee can worsen ulcer symptoms")
 3. If the food IS suitable, respond with "SAFE" only
-4. Base your analysis ONLY on the health information provided - do not make assumptions beyond what is stated
-5. Be specific about which ingredient or component of the food is problematic and why
+4. CRITICAL: Base your analysis ONLY on the health information explicitly provided above. Do NOT infer, assume, or guess about health conditions that are NOT mentioned in the user's health information
+5. Do NOT mention health concerns that are not listed in the user's health information (e.g., if libido/hormones are not mentioned, do not reference them)
+6. Be specific about which ingredient or component of the food is problematic and why, but ONLY if it relates to the health information provided
+7. If the food does not conflict with any of the provided health information, respond with "SAFE"
 
 If the food is NOT suitable, format your response as:
 ⚠️ HEALTH WARNING: [specific reason why this food is problematic for their condition]
