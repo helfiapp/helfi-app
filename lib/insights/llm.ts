@@ -337,7 +337,7 @@ function modeGuidance(mode: SectionMode) {
     case 'lifestyle':
       return 'Evaluate lifestyle habits (sleep, stress, routines). CRITICAL: Analyze each logged habit or pattern in focusItems by understanding its physiological and psychological mechanisms. Always use the exact logged name/description from focusItems. Highlight habits that are helping, habits to add, and habits/behaviours to avoid for this issue.'
     case 'labs':
-      return 'Evaluate labs and biomarker monitoring. CRITICAL: Analyze each logged lab result in focusItems by understanding what the biomarker measures and its relationship to the issue. Always use the exact logged test name from focusItems. Highlight labs already supporting the issue, labs to order or review, and labs/testing patterns that require caution.'
+      return `Evaluate labs and biomarker monitoring for PERSONAL HEALTH. CRITICAL: The issue name refers to a PERSONAL HEALTH CONDITION (e.g., "Energy" means personal energy/fatigue levels, NOT environmental energy efficiency). Analyze each logged lab result in focusItems by understanding what the biomarker measures and its relationship to the PERSONAL HEALTH issue. Always use the exact logged test name from focusItems. ONLY suggest health-related lab tests (blood tests, biomarkers, medical diagnostics). NEVER suggest environmental audits, energy efficiency tests, or any non-medical tests. Highlight labs already supporting the issue, labs to order or review, and labs/testing patterns that require caution.`
     default:
       return ''
   }
@@ -365,7 +365,12 @@ function buildPrompt(
   }
 ) {
   const guidanceFocus = modeGuidance(mode)
-  const header = `You are a clinician-grade health assistant helping with the issue "${issueName}".`
+  // CRITICAL: Clarify that issue names refer to PERSONAL HEALTH, not environmental topics
+  const issueClarification = mode === 'labs' 
+    ? `\n\n⚠️ CRITICAL CONTEXT: The issue "${issueName}" refers to a PERSONAL HEALTH CONDITION. For example:\n- "Energy" means personal energy levels/fatigue, NOT environmental energy efficiency\n- "Sleep" means personal sleep quality, NOT sleep systems or sleep technology\n- "Libido" means personal sexual health, NOT libido in other contexts\n\nYou MUST ONLY generate health-related lab test recommendations (blood tests, biomarkers, medical diagnostics). NEVER suggest environmental audits, energy efficiency tests, sustainability assessments, or any non-medical tests.\n\n`
+    : ''
+  
+  const header = `You are a clinician-grade health assistant helping with the PERSONAL HEALTH issue "${issueName}".${issueClarification}`
 
   // CRITICAL: Explicit instruction for exercise mode - must appear early in prompt
   const exerciseTypesInstruction = mode === 'exercise'
@@ -422,7 +427,7 @@ STRICT RULES:
 - Nutrition mode: Analyze by nutritional profile and physiological effects but output exact logged name. Only mark foods as "working" if they appear in focusItems. Use suggested/avoid for novel foods.
 - Exercise mode: CRITICAL - You MUST check profile.exerciseTypes in the user context. If any exercises listed in profile.exerciseTypes are supportive for this issue, you MUST include them in the "working" bucket even if they don't appear in focusItems. Use the exact exercise name from profile.exerciseTypes and provide a mechanism-based reason explaining how it supports the issue. This is required when focusItems is empty or when intake exercises are relevant. For logged exercises, analyze physiological effects but use exact logged name.
 - Lifestyle mode: Analyze mechanisms but use exact logged habit/pattern name.
-- Labs mode: Analyze biomarker significance but use exact logged test name.
+- Labs mode: CRITICAL - ONLY generate health-related lab test recommendations (blood tests, biomarkers, medical diagnostics). The issue name refers to PERSONAL HEALTH (e.g., "Energy" = personal energy/fatigue, NOT environmental energy). NEVER suggest environmental audits, energy efficiency tests, or non-medical tests. Analyze biomarker significance but use exact logged test name.
 - Reasons must include mechanism + relevance; add dose/timing or execution guidance where appropriate.
 - If focusItems is empty but profile.exerciseTypes contains supportive exercises, those exercises MUST appear in "working" - do not leave working empty.
 - Even if user data is sparse, you MUST still populate "suggested" and "avoid" to the minimum counts using widely accepted best practice for ${issueName}. Never respond with "everything covered."

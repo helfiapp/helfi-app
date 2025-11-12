@@ -4360,6 +4360,44 @@ async function buildLabsSection(
     timing: marker.reference ? [marker.reference] : [],
   }))
 
+  // CRITICAL: If user has no bloodwork data, return early with a clear message
+  // DO NOT generate content - this causes irrelevant environmental/energy content to appear
+  if (!labItems.length) {
+    return {
+      issue,
+      section: 'labs',
+      generatedAt: now,
+      confidence: 0.8,
+      summary: 'There is no labs or bloodwork currently in your health information data. Upload your blood test results in Health Setup to receive personalized lab insights and recommendations.',
+      highlights: [
+        {
+          title: 'Upload recent labs',
+          detail: 'Add PDFs or enter markers so we can track progress and flag gaps.',
+          tone: 'warning',
+        },
+      ],
+      dataPoints: [],
+      recommendations: [
+        {
+          title: 'Add your latest labs',
+          description: 'Upload lab PDFs or enter key markers so we can track trends for this issue.',
+          actions: ['Open Labs workspace', 'Upload PDF or enter markers manually'],
+          priority: 'now',
+        },
+      ],
+      mode: 'latest',
+      extras: {
+        suggestedLabs: [],
+        avoidLabs: [],
+        source: 'empty',
+        pipelineVersion: CURRENT_PIPELINE_VERSION,
+        validated: false,
+        degraded: false,
+        cacheHit: false,
+      },
+    }
+  }
+
   console.time(`[insights.llm] labs:${issue.slug}`)
   let llmResult = await generateSectionInsightsFromLLM(
     {
