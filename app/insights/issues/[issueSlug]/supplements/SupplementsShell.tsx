@@ -319,7 +319,7 @@ export default function SupplementsShell({ children, initialResult, issueSlug }:
             </div>
             <div className="flex-shrink-0">
               <button
-                onClick={() => handleGenerate('latest')}
+                onClick={() => handleGenerate('daily')}
                 disabled={loading}
                 className="px-4 py-2 bg-helfi-green hover:bg-helfi-green/90 disabled:bg-gray-300 text-white rounded-lg text-sm font-medium transition-colors"
               >
