@@ -415,19 +415,7 @@ After your explanation and the one-line totals above, also include a compact JSO
       }
     }
     
-    // Charge wallet (skip if allowed via free use)
-    if (!allowViaFreeUse) {
-      try {
-        const cm = new CreditManager(currentUser.id);
-        const ok = await cm.chargeCents(totalCostCents);
-        if (!ok) {
-          return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
-        }
-      } catch (e) {
-        console.warn('Wallet charge failed:', e);
-        return NextResponse.json({ error: 'Billing error' }, { status: 402 });
-      }
-    }
+    // Note: Charging happens after health compatibility check to include all costs
 
     // Update counters and mark free use as used
     if (allowViaFreeUse && !isReanalysis) {
@@ -482,6 +470,144 @@ After your explanation and the one-line totals above, also include a compact JSO
         console.warn('ITEMS_JSON parse failed');
       }
     }
+
+    // HEALTH COMPATIBILITY CHECK: Analyze food against user's health data
+    try {
+      console.log('🏥 Starting health compatibility check...');
+      
+      // Fetch user's health situations data
+      const healthSituationsGoal = await prisma.healthGoal.findFirst({
+        where: {
+          userId: currentUser.id,
+          name: '__HEALTH_SITUATIONS_DATA__'
+        }
+      });
+
+      let healthData = null;
+      if (healthSituationsGoal?.category) {
+        try {
+          const parsed = JSON.parse(healthSituationsGoal.category);
+          healthData = {
+            healthIssues: parsed.healthIssues || '',
+            healthProblems: parsed.healthProblems || '',
+            additionalInfo: parsed.additionalInfo || ''
+          };
+        } catch (e) {
+          console.warn('Failed to parse health situations data:', e);
+        }
+      }
+
+      // Only perform health check if user has health data
+      if (healthData && (healthData.healthIssues.trim() || healthData.healthProblems.trim() || healthData.additionalInfo.trim())) {
+        console.log('✅ User has health data, performing compatibility check...');
+        
+        // Extract food name/description from analysis (first line or first sentence)
+        const foodDescription = analysis.split('\n')[0].substring(0, 200);
+        
+        // Build health context prompt
+        const healthContext = [
+          healthData.healthIssues ? `Current health issues: ${healthData.healthIssues}` : '',
+          healthData.healthProblems ? `Ongoing health problems: ${healthData.healthProblems}` : '',
+          healthData.additionalInfo ? `Additional health information: ${healthData.additionalInfo}` : ''
+        ].filter(Boolean).join('\n');
+
+        // Perform health compatibility analysis
+        const healthCheckPrompt = `You are a health advisor analyzing whether a food item is suitable for a person based ONLY on their specific health information.
+
+USER'S HEALTH INFORMATION:
+${healthContext}
+
+FOOD ITEM TO ANALYZE:
+${foodDescription}
+
+INSTRUCTIONS:
+1. Analyze if this food could be problematic or harmful based ONLY on the user's health information provided above
+2. If the food is NOT suitable, provide a clear, specific warning explaining why (e.g., "This contains peppers which can irritate ulcers" or "Black coffee can worsen ulcer symptoms")
+3. If the food IS suitable, respond with "SAFE" only
+4. Base your analysis ONLY on the health information provided - do not make assumptions beyond what is stated
+5. Be specific about which ingredient or component of the food is problematic and why
+
+If the food is NOT suitable, format your response as:
+⚠️ HEALTH WARNING: [specific reason why this food is problematic for their condition]
+
+If the food IS suitable, respond with:
+SAFE
+
+Your analysis:`;
+
+        const healthCheck = await chatCompletionWithCost(openai, {
+          model: 'gpt-4o-mini', // Use cheaper model for health check
+          messages: [
+            {
+              role: 'user',
+              content: healthCheckPrompt
+            }
+          ],
+          max_tokens: 200,
+          temperature: 0.3,
+        } as any);
+
+        const healthCheckResult = healthCheck.completion.choices?.[0]?.message?.content?.trim() || '';
+        totalCostCents += healthCheck.costCents;
+
+        // If food is not suitable, get alternative recommendations
+        if (healthCheckResult && !healthCheckResult.toUpperCase().includes('SAFE') && healthCheckResult.includes('⚠️')) {
+          console.log('⚠️ Food is not suitable for user, getting alternatives...');
+          
+          const alternativesPrompt = `A person with the following health information is about to eat: "${foodDescription}"
+
+However, this food is NOT suitable because: ${healthCheckResult.replace('⚠️ HEALTH WARNING:', '').trim()}
+
+USER'S HEALTH INFORMATION:
+${healthContext}
+
+Provide 2-3 specific alternative food recommendations that would be MORE suitable for their health condition. Be specific and practical. Format as a simple list.
+
+Your recommendations:`;
+
+          const alternativesCheck = await chatCompletionWithCost(openai, {
+            model: 'gpt-4o-mini',
+            messages: [
+              {
+                role: 'user',
+                content: alternativesPrompt
+              }
+            ],
+            max_tokens: 150,
+            temperature: 0.4,
+          } as any);
+
+          const alternativesResult = alternativesCheck.completion.choices?.[0]?.message?.content?.trim() || '';
+          totalCostCents += alternativesCheck.costCents;
+
+          resp.healthWarning = healthCheckResult;
+          resp.alternatives = alternativesResult;
+          console.log('✅ Health compatibility check complete - food is NOT suitable');
+        } else {
+          console.log('✅ Health compatibility check complete - food is suitable');
+        }
+      } else {
+        console.log('ℹ️ No health data found, skipping compatibility check');
+      }
+    } catch (healthError) {
+      console.warn('⚠️ Health compatibility check failed (non-blocking):', healthError);
+      // Don't fail the entire request if health check fails
+    }
+
+    // Charge wallet for all costs (food analysis + health checks) - skip if allowed via free use
+    if (!allowViaFreeUse) {
+      try {
+        const cm = new CreditManager(currentUser.id);
+        const ok = await cm.chargeCents(totalCostCents);
+        if (!ok) {
+          return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
+        }
+      } catch (e) {
+        console.warn('Wallet charge failed:', e);
+        return NextResponse.json({ error: 'Billing error' }, { status: 402 });
+      }
+    }
+
     // Fire-and-forget: generate updated insights in preview mode
     try {
       fetch('/api/insights/generate?preview=1', { method: 'POST' }).catch(() => {})
