@@ -89,50 +89,52 @@ export async function POST(
     // Compute fingerprint once
     const fingerprint = await getCurrentDataFingerprint(session.user.id)
     
-    // Start regeneration immediately - process sections in parallel and update status as each completes
-    // Don't wait for completion - return immediately so user sees progress bar
-    Promise.all(sections.map(async (section) => {
-      try {
-        // Force regeneration using quick path - clear cache first, then regenerate
-        // Delete cached result to force regeneration
+    // Use precomputeQuickSectionsForUser which is designed for fast regeneration
+    // But we need to hook into it to update status incrementally
+    // Clear all caches first to force fresh generation
+    try {
+      for (const section of sections) {
+        await prisma.$executeRawUnsafe(`
+          DELETE FROM "InsightsCache" 
+          WHERE "userId" = $1 AND "slug" = $2 AND "section" = $3
+        `, session.user.id, context.params.slug, section)
+      }
+    } catch (error) {
+      console.warn('[insights.api] Failed to clear cache', error)
+    }
+    
+    // Start regeneration using precomputeQuickSectionsForUser
+    // This runs in background - return immediately
+    precomputeQuickSectionsForUser(session.user.id, {
+      concurrency: 4,
+      sections: sections,
+      slugs: [context.params.slug],
+      mode: 'latest',
+    }).then(async () => {
+      // After all sections complete, mark them all as fresh
+      console.log(`[insights.api] Quick regeneration complete for ${sections.length} sections`)
+      for (const section of sections) {
         try {
-          await prisma.$executeRawUnsafe(`
-            DELETE FROM "InsightsCache" 
-            WHERE "userId" = $1 AND "slug" = $2 AND "section" = $3 AND "mode" = $4
-          `, session.user.id, context.params.slug, section, 'latest')
-        } catch (error) {
-          // Cache might not exist, that's fine
-        }
-        
-        // Now regenerate - this will use quick path since cache is cleared
-        const result = await getIssueSection(session.user.id, context.params.slug, section, {
-          mode: 'latest',
-          force: false, // Will use quick path since cache is cleared
-        })
-        
-        if (result) {
-          // Mark as fresh immediately after regeneration
           await prisma.$executeRawUnsafe(`
             INSERT INTO "InsightsMetadata" ("userId", "issueSlug", "section", "status", "dataFingerprint", "lastGeneratedAt", "updatedAt")
             VALUES ($1, $2, $3, 'fresh', $4, NOW(), NOW())
             ON CONFLICT ("userId", "issueSlug", "section")
             DO UPDATE SET "status" = 'fresh', "dataFingerprint" = $4, "lastGeneratedAt" = NOW(), "updatedAt" = NOW()
           `, session.user.id, context.params.slug, section, fingerprint)
-          
-          console.log(`[insights.api] ✅ Regenerated ${section} for ${context.params.slug}`)
+          console.log(`[insights.api] ✅ Marked ${section} as fresh`)
+        } catch (error) {
+          console.error(`[insights.api] Failed to mark ${section} as fresh:`, error)
         }
-      } catch (error) {
-        console.error(`[insights.api] ❌ Failed to regenerate ${section}:`, error)
-        // Mark as stale on error
-        try {
-          await prisma.$executeRawUnsafe(`
-            UPDATE "InsightsMetadata" SET "status" = 'stale', "updatedAt" = NOW()
-            WHERE "userId" = $1 AND "issueSlug" = $2 AND "section" = $3
-          `, session.user.id, context.params.slug, section)
-        } catch {}
       }
-    })).catch((error) => {
-      console.error('[insights.api] Regeneration error:', error)
+    }).catch((error) => {
+      console.error('[insights.api] Regeneration failed:', error)
+      // Mark all as stale on error
+      for (const section of sections) {
+        prisma.$executeRawUnsafe(`
+          UPDATE "InsightsMetadata" SET "status" = 'stale', "updatedAt" = NOW()
+          WHERE "userId" = $1 AND "issueSlug" = $2 AND "section" = $3
+        `, session.user.id, context.params.slug, section).catch(() => {})
+      }
     })
     
     return NextResponse.json({ 
