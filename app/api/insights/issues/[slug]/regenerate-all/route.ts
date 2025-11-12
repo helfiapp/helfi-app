@@ -101,9 +101,14 @@ export async function POST(
       console.warn('[insights.api] Failed to clear cache', error)
     }
     
-    // Regenerate sections using the ORIGINAL WORKING APPROACH: force: true with getIssueSection
-    // This was working before - don't try to optimize it, just make it work
-    // Process in parallel and update status incrementally
+    // CRITICAL FIX: In Vercel serverless, we need to use waitUntil to ensure background work completes
+    // Without this, the function terminates before promises finish
+    const waitUntil = (globalThis as any).waitUntil || ((promise: Promise<any>) => {
+      // Fallback: keep promise alive by attaching error handler
+      promise.catch(() => {})
+    })
+    
+    // Regenerate sections using force: true - process in parallel and update status incrementally
     const regenerationPromises = sections.map(async (section) => {
       try {
         console.log(`[insights.api] Starting regeneration for ${section}`)
@@ -116,6 +121,7 @@ export async function POST(
         
         if (result) {
           // Mark as fresh immediately after this section completes
+          // CRITICAL: Use the SAME fingerprint that was computed at start
           await prisma.$executeRawUnsafe(`
             INSERT INTO "InsightsMetadata" ("userId", "issueSlug", "section", "status", "dataFingerprint", "lastGeneratedAt", "updatedAt")
             VALUES ($1, $2, $3, 'fresh', $4, NOW(), NOW())
@@ -139,8 +145,10 @@ export async function POST(
       }
     })
     
-    // Don't await - let it run in background, but keep reference so it doesn't get GC'd
-    Promise.all(regenerationPromises).catch((error) => {
+    // Use waitUntil to ensure Vercel doesn't kill the function before promises complete
+    const allRegenerations = Promise.all(regenerationPromises)
+    waitUntil(allRegenerations)
+    allRegenerations.catch((error) => {
       console.error('[insights.api] Regeneration error:', error)
     })
     
