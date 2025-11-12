@@ -211,15 +211,18 @@ export default function SplashPage() {
             playsInline
             preload="metadata"
             poster="/screenshots/hero/hero-poster.jpg"
-            className="absolute inset-0 w-full h-full object-cover"
-            style={{ filter: 'brightness(0.4)' }}
+            className="absolute inset-0 w-full h-full object-cover z-0"
             onCanPlay={() => setVideoLoaded(true)}
             onError={() => setVideoLoaded(false)}
           >
             <source src="/screenshots/hero/hero-background.mp4" type="video/mp4" />
           </video>
-          {/* Dark background fallback - same color as screenshot background */}
-          <div className="absolute inset-0 bg-gray-900" />
+          {/* Dark overlay on video */}
+          <div className="absolute inset-0 bg-black/60 z-[1]" />
+          {/* Dark background fallback - only shown when video doesn't load */}
+          {!videoLoaded && (
+            <div className="absolute inset-0 bg-gray-900 z-0" />
+          )}
         </div>
 
         {/* Content Container */}
