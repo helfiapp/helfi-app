@@ -29,8 +29,11 @@ export default function HeroCarousel() {
     const container = scrollContainerRef.current
     if (!container) return
 
+    // Check if mobile - show one image at a time on mobile
+    const isMobile = window.innerWidth < 768
+
     let animationFrameId: number
-    const scrollSpeed = 0.5 // pixels per frame
+    const scrollSpeed = isMobile ? 0.3 : 0.5 // Slower on mobile
 
     const scroll = () => {
       if (!isPaused) {
@@ -64,14 +67,14 @@ export default function HeroCarousel() {
       {/* Horizontal Scrolling Container */}
       <div
         ref={scrollContainerRef}
-        className="flex gap-6 overflow-x-hidden overflow-y-visible h-full items-center"
+        className="flex gap-4 md:gap-6 overflow-x-hidden overflow-y-visible h-full items-center snap-x snap-mandatory md:snap-none"
         style={{ scrollBehavior: 'auto' }}
       >
         {/* Duplicate images for seamless loop */}
         {[...screenshots, ...screenshots].map((screenshot, index) => (
           <div
             key={`${screenshot}-${index}`}
-            className="flex-shrink-0 w-[180px] md:w-[220px] lg:w-[250px] h-auto transition-transform duration-300 ease-out hover:scale-125 hover:z-50 relative"
+            className="flex-shrink-0 w-[280px] md:w-[220px] lg:w-[250px] h-auto transition-transform duration-300 ease-out hover:scale-125 hover:z-50 relative mx-auto md:mx-0"
           >
             <div className="relative aspect-[9/16] rounded-2xl overflow-hidden shadow-xl">
               <Image
@@ -81,7 +84,7 @@ export default function HeroCarousel() {
                 className="object-contain"
                 priority={index < 2} // Prioritize first two images
                 loading={index < 3 ? 'eager' : 'lazy'}
-                sizes="(max-width: 768px) 180px, (max-width: 1024px) 220px, 250px"
+                sizes="(max-width: 768px) 280px, (max-width: 1024px) 220px, 250px"
               />
             </div>
           </div>
