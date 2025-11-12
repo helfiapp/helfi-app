@@ -1,3 +1,41 @@
+/**
+ * ⚠️ CRITICAL: DO NOT MODIFY THIS FILE WITHOUT EXTREME CAUTION ⚠️
+ * 
+ * This endpoint handles regeneration of ALL insight sections for a given issue.
+ * It was broken multiple times and took days to fix. The current implementation is WORKING.
+ * 
+ * CRITICAL REQUIREMENTS THAT MUST NOT BE CHANGED:
+ * 
+ * 1. **waitUntil is REQUIRED**: Vercel serverless functions terminate when response is sent.
+ *    Without waitUntil, background promises get killed before they can update database status.
+ *    This causes the progress bar to stay at 0/7 forever. DO NOT REMOVE waitUntil.
+ * 
+ * 2. **force: true is REQUIRED**: This uses the original working approach. Previous attempts
+ *    to "optimize" with precomputeQuickSectionsForUser broke the functionality. DO NOT CHANGE.
+ * 
+ * 3. **Incremental status updates**: Each section MUST update status immediately after completion.
+ *    This allows the progress bar to show real-time progress (1/7, 2/7, etc.). DO NOT batch updates.
+ * 
+ * 4. **Same fingerprint**: The fingerprint computed at the start MUST be used when marking sections
+ *    as 'fresh'. If fingerprints don't match, checkInsightsStatus will mark sections as 'stale'
+ *    even though they're fresh, breaking the progress bar.
+ * 
+ * 5. **Promise.all with waitUntil**: The Promise.all pattern with waitUntil ensures all sections
+ *    regenerate in parallel while Vercel waits for completion. DO NOT change this pattern.
+ * 
+ * IF YOU NEED TO MODIFY THIS FILE:
+ * - Test thoroughly with the actual progress bar UI
+ * - Verify status updates happen incrementally (check database after each section completes)
+ * - Ensure waitUntil is still being used
+ * - Do NOT "optimize" unless you have a proven working alternative
+ * - If regeneration breaks again, REVERT IMMEDIATELY to this version
+ * 
+ * LAST WORKING VERSION: Commit 5c3fd22 (CRITICAL FIX: Use waitUntil to prevent Vercel from killing background promises)
+ * 
+ * @author Original fix: 2024-11-13
+ * @warning DO NOT MODIFY WITHOUT USER APPROVAL
+ */
+
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -101,27 +139,35 @@ export async function POST(
       console.warn('[insights.api] Failed to clear cache', error)
     }
     
-    // CRITICAL FIX: In Vercel serverless, we need to use waitUntil to ensure background work completes
-    // Without this, the function terminates before promises finish
+    // ⚠️ CRITICAL: waitUntil is REQUIRED - DO NOT REMOVE OR MODIFY
+    // Vercel serverless functions terminate when response is sent.
+    // Without waitUntil, background promises get killed before updating database status.
+    // This causes progress bar to stay at 0/7 forever.
     const waitUntil = (globalThis as any).waitUntil || ((promise: Promise<any>) => {
       // Fallback: keep promise alive by attaching error handler
       promise.catch(() => {})
     })
     
-    // Regenerate sections using force: true - process in parallel and update status incrementally
+    // ⚠️ CRITICAL: Use force: true - this is the WORKING approach
+    // Previous attempts to "optimize" with precomputeQuickSectionsForUser broke functionality.
+    // DO NOT CHANGE THIS PATTERN without extensive testing.
     const regenerationPromises = sections.map(async (section) => {
       try {
         console.log(`[insights.api] Starting regeneration for ${section}`)
         
-        // Use force: true - this was working before
+        // Use force: true - this was working before and is still working
         const result = await getIssueSection(session.user.id, context.params.slug, section, {
           mode: 'latest',
-          force: true, // Force regeneration - this is what was working
+          force: true, // ⚠️ DO NOT CHANGE - this is what works
         })
         
         if (result) {
-          // Mark as fresh immediately after this section completes
-          // CRITICAL: Use the SAME fingerprint that was computed at start
+          // ⚠️ CRITICAL: Update status IMMEDIATELY after each section completes
+          // This allows progress bar to show real-time progress (1/7, 2/7, etc.)
+          // DO NOT batch these updates - they must happen incrementally
+          // ⚠️ CRITICAL: Use the SAME fingerprint computed at start
+          // If fingerprints don't match, checkInsightsStatus will mark sections as 'stale'
+          // even though they're fresh, breaking the progress bar
           await prisma.$executeRawUnsafe(`
             INSERT INTO "InsightsMetadata" ("userId", "issueSlug", "section", "status", "dataFingerprint", "lastGeneratedAt", "updatedAt")
             VALUES ($1, $2, $3, 'fresh', $4, NOW(), NOW())
@@ -145,9 +191,10 @@ export async function POST(
       }
     })
     
-    // Use waitUntil to ensure Vercel doesn't kill the function before promises complete
+    // ⚠️ CRITICAL: Promise.all with waitUntil ensures all sections regenerate in parallel
+    // while Vercel waits for completion. DO NOT change this pattern.
     const allRegenerations = Promise.all(regenerationPromises)
-    waitUntil(allRegenerations)
+    waitUntil(allRegenerations) // ⚠️ DO NOT REMOVE - this prevents Vercel from killing the function
     allRegenerations.catch((error) => {
       console.error('[insights.api] Regeneration error:', error)
     })

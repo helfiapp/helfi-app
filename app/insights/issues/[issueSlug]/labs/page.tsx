@@ -15,8 +15,21 @@ export default async function IssueLabsPage({ params }: IssueLabsPageProps) {
   }
 
   const result = await getIssueSection(session.user.id, params.issueSlug, 'labs')
+  
+  // Handle case where user has no bloodwork data
   if (!result) {
-    notFound()
+    // Return a friendly message instead of 404
+    return (
+      <div className="space-y-8">
+        <section className="bg-white border border-gray-200 rounded-2xl shadow-sm p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-2">Labs & Bloodwork Insights</h2>
+          <p className="text-sm text-gray-700 leading-relaxed">
+            There is no labs or bloodwork currently in your health information data. 
+            Upload your blood test results in Health Setup to receive personalized lab insights and recommendations.
+          </p>
+        </section>
+      </div>
+    )
   }
 
   return <SectionRenderer issueSlug={params.issueSlug} section="labs" initialResult={result} />
