@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getIssueSection, ISSUE_SECTION_ORDER, type IssueSectionKey, getCachedIssueSection } from '@/lib/insights/issue-engine'
 import { checkInsightsStatus, getStatusMessage } from '@/lib/insights/regeneration-service'
+import { prisma } from '@/lib/prisma'
 
 export async function GET(
   _request: Request,
@@ -103,15 +104,66 @@ export async function POST(
 
     // If force refresh requested, skip cache and regenerate
     if (forceRefresh) {
-      const result = await getIssueSection(session.user.id, context.params.slug, sectionParam, {
+      // Mark as generating in background (non-blocking)
+      try {
+        await prisma.$executeRawUnsafe(`
+          INSERT INTO "InsightsMetadata" ("userId", "issueSlug", "section", "status", "updatedAt")
+          VALUES ($1, $2, $3, 'generating', NOW())
+          ON CONFLICT ("userId", "issueSlug", "section")
+          DO UPDATE SET "status" = 'generating', "updatedAt" = NOW()
+        `, session.user.id, context.params.slug, sectionParam)
+      } catch (error) {
+        // Non-blocking - continue even if metadata update fails
+        console.warn('[insights.api] Failed to mark as generating', error)
+      }
+      
+      // Start regeneration in background (non-blocking)
+      // Return immediately so user sees progress bar
+      setImmediate(async () => {
+        try {
+          const result = await getIssueSection(session.user.id, context.params.slug, sectionParam, {
+            mode,
+            range,
+            force: true,
+          })
+          // Mark as fresh after completion
+          if (result) {
+            try {
+              await prisma.$executeRawUnsafe(`
+                INSERT INTO "InsightsMetadata" ("userId", "issueSlug", "section", "status", "dataFingerprint", "lastGeneratedAt", "updatedAt")
+                VALUES ($1, $2, $3, 'fresh', '', NOW(), NOW())
+                ON CONFLICT ("userId", "issueSlug", "section")
+                DO UPDATE SET "status" = 'fresh', "lastGeneratedAt" = NOW(), "updatedAt" = NOW()
+              `, session.user.id, context.params.slug, sectionParam)
+            } catch (error) {
+              console.warn('[insights.api] Failed to mark as fresh', error)
+            }
+          }
+        } catch (error) {
+          console.error('[insights.api] Background regeneration failed', error)
+          // Mark as stale on error so it can retry
+          try {
+            await prisma.$executeRawUnsafe(`
+              UPDATE "InsightsMetadata" SET "status" = 'stale', "updatedAt" = NOW()
+              WHERE "userId" = $1 AND "issueSlug" = $2 AND "section" = $3
+            `, session.user.id, context.params.slug, sectionParam)
+          } catch {}
+        }
+      })
+      
+      // Return immediately with current cached result (if available) or empty response
+      const quickResult = await getIssueSection(session.user.id, context.params.slug, sectionParam, {
         mode,
         range,
-        force: true,
+        force: false, // Try to get cached/quick result for immediate display
       })
-      if (!result) {
-        return NextResponse.json({ error: 'Not found' }, { status: 404 })
-      }
-      return NextResponse.json({ result, upgraded: true, forceRefreshed: true }, { status: 200 })
+      
+      return NextResponse.json({ 
+        result: quickResult || null, 
+        upgraded: false, 
+        forceRefreshed: true,
+        generating: true 
+      }, { status: 200 })
     }
 
     // Fast path: Return quick result immediately, then upgrade in background

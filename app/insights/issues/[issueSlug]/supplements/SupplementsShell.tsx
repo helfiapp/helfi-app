@@ -6,45 +6,109 @@ import { useSelectedLayoutSegments } from 'next/navigation'
 import SectionChat from '../SectionChat'
 import type { IssueSectionResult } from '@/lib/insights/issue-engine'
 
-// Progress bar component that animates smoothly to 100%
-function ProgressBar() {
+// Accurate progress bar that polls status endpoint
+function RegenerationProgressBar({ issueSlug, onComplete }: { issueSlug: string; onComplete: () => void }) {
   const [progress, setProgress] = useState(0)
+  const [status, setStatus] = useState<'starting' | 'generating' | 'complete'>('starting')
+  const [startTime] = useState(Date.now())
   
   useEffect(() => {
-    // Smooth animation: start at 0%, gradually increase to 100%
-    // Use a more realistic curve that slows down as it approaches 100%
-    let startTime: number | null = null
-    const duration = 3000 // 3 seconds total animation
-    const targetProgress = 100
+    let pollInterval: NodeJS.Timeout | null = null
+    let timeoutId: NodeJS.Timeout | null = null
+    let isComplete = false
     
-    const animate = (timestamp: number) => {
-      if (startTime === null) startTime = timestamp
-      const elapsed = timestamp - startTime
-      const progressRatio = Math.min(elapsed / duration, 1)
-      
-      // Ease-out curve: fast start, slow end
-      const eased = 1 - Math.pow(1 - progressRatio, 3)
-      const currentProgress = eased * targetProgress
-      
-      setProgress(currentProgress)
-      
-      if (progressRatio < 1) {
-        requestAnimationFrame(animate)
-      } else {
-        // Once at 100%, stay there (no pulsing)
-        setProgress(100)
+    const pollStatus = async () => {
+      try {
+        const response = await fetch(`/api/insights/issues/${issueSlug}/sections/supplements`)
+        if (!response.ok) return
+        
+        const data = await response.json()
+        const meta = data._meta || {}
+        const currentStatus = meta.status || 'missing'
+        
+        // Calculate progress based on elapsed time
+        const elapsed = Date.now() - startTime
+        const elapsedSeconds = elapsed / 1000
+        
+        // Realistic estimate: 60-120 seconds for full generation
+        // Progress calculation:
+        // - 0-10s: 0-20% (initialization)
+        // - 10-60s: 20-85% (main generation phase)
+        // - 60-120s: 85-95% (finalization)
+        // - Only reach 100% when status is 'fresh'
+        
+        let timeBasedProgress = 0
+        if (elapsedSeconds < 10) {
+          timeBasedProgress = (elapsedSeconds / 10) * 20 // 0-20%
+        } else if (elapsedSeconds < 60) {
+          timeBasedProgress = 20 + ((elapsedSeconds - 10) / 50) * 65 // 20-85%
+        } else if (elapsedSeconds < 120) {
+          timeBasedProgress = 85 + ((elapsedSeconds - 60) / 60) * 10 // 85-95%
+        } else {
+          timeBasedProgress = 95 // Cap at 95% until actually complete
+        }
+        
+        // Update status
+        if (currentStatus === 'fresh' || currentStatus === 'complete') {
+          setStatus('complete')
+          setProgress(100)
+          isComplete = true
+          if (pollInterval) clearInterval(pollInterval)
+          if (timeoutId) clearTimeout(timeoutId)
+          // Wait a moment for UI to show 100%, then call onComplete
+          setTimeout(() => {
+            onComplete()
+          }, 500)
+          return
+        } else if (currentStatus === 'generating' || currentStatus === 'stale') {
+          setStatus('generating')
+          setProgress(Math.min(timeBasedProgress, 95)) // Cap at 95% until complete
+        } else {
+          setStatus('generating')
+          setProgress(Math.min(timeBasedProgress, 95))
+        }
+      } catch (error) {
+        console.error('Error polling status:', error)
+        // Continue polling even on error
       }
     }
     
-    requestAnimationFrame(animate)
-  }, [])
+    // Start polling immediately, then every 2 seconds
+    pollStatus()
+    pollInterval = setInterval(pollStatus, 2000)
+    
+    // Safety timeout: if still not complete after 3 minutes, assume complete
+    timeoutId = setTimeout(() => {
+      if (!isComplete) {
+        console.warn('Regeneration timeout - assuming complete')
+        setStatus('complete')
+        setProgress(100)
+        if (pollInterval) clearInterval(pollInterval)
+        setTimeout(() => {
+          onComplete()
+        }, 500)
+      }
+    }, 180000) // 3 minutes max
+    
+    return () => {
+      if (pollInterval) clearInterval(pollInterval)
+      if (timeoutId) clearTimeout(timeoutId)
+    }
+  }, [issueSlug, startTime, onComplete])
   
   return (
-    <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-      <div 
-        className="bg-helfi-green h-2 rounded-full transition-all duration-300 ease-out"
-        style={{ width: `${Math.min(progress, 100)}%` }}
-      ></div>
+    <div className="w-full">
+      <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden mb-2">
+        <div 
+          className="bg-helfi-green h-2 rounded-full transition-all duration-500 ease-out"
+          style={{ width: `${Math.min(progress, 100)}%` }}
+        ></div>
+      </div>
+      <p className="text-xs text-gray-600">
+        {status === 'complete' 
+          ? '✓ Regeneration complete!' 
+          : `Regenerating insights... This may take 1-2 minutes.`}
+      </p>
     </div>
   )
 }
@@ -90,6 +154,7 @@ export default function SupplementsShell({ children, initialResult, issueSlug }:
   const [result, setResult] = useState<IssueSectionResult | null>(initialResult)
   const [loading, setLoading] = useState(!initialResult)
   const [error, setError] = useState<string | null>(null)
+  const [isRegenerating, setIsRegenerating] = useState(false)
   const segments = useSelectedLayoutSegments()
   const activeTab = (segments?.[0] as TabKey | undefined) ?? 'working'
 
@@ -163,8 +228,10 @@ export default function SupplementsShell({ children, initialResult, issueSlug }:
 
   async function handleGenerate(mode: 'daily' | 'weekly' | 'custom', range?: { from?: string; to?: string }) {
     try {
-      setLoading(true)
+      setIsRegenerating(true)
       setError(null)
+      
+      // Start regeneration (non-blocking - returns immediately)
       const response = await fetch(`/api/insights/issues/${issueSlug}/sections/supplements`, {
         method: 'POST',
         headers: {
@@ -172,16 +239,33 @@ export default function SupplementsShell({ children, initialResult, issueSlug }:
         },
         body: JSON.stringify({ mode, range, force: true }),
       })
-      if (response.status === 200) {
-        const data = await response.json()
-        setResult(data?.result ?? data)
-      } else {
-        throw new Error('Unable to regenerate report right now.')
+      
+      if (!response.ok) {
+        throw new Error('Unable to start regeneration right now.')
       }
+      
+      // Note: We don't wait for completion here - the progress bar will poll for status
+      // and call handleRegenerationComplete when done
     } catch (err) {
       setError((err as Error).message)
+      setIsRegenerating(false)
+    }
+  }
+  
+  async function handleRegenerationComplete() {
+    try {
+      // Fetch the updated result
+      const response = await fetch(`/api/insights/issues/${issueSlug}/sections/supplements`, {
+        cache: 'no-cache',
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setResult(data)
+      }
+    } catch (err) {
+      console.error('Error fetching regenerated result:', err)
     } finally {
-      setLoading(false)
+      setIsRegenerating(false)
     }
   }
 
@@ -318,13 +402,19 @@ export default function SupplementsShell({ children, initialResult, issueSlug }:
               </p>
             </div>
             <div className="flex-shrink-0">
-              <button
-                onClick={() => handleGenerate('daily')}
-                disabled={loading}
-                className="px-4 py-2 bg-helfi-green hover:bg-helfi-green/90 disabled:bg-gray-300 text-white rounded-lg text-sm font-medium transition-colors"
-              >
-                {loading ? 'Regenerating...' : '🔄 Regenerate'}
-              </button>
+              {isRegenerating ? (
+                <div className="w-full max-w-md">
+                  <RegenerationProgressBar issueSlug={issueSlug} onComplete={handleRegenerationComplete} />
+                </div>
+              ) : (
+                <button
+                  onClick={() => handleGenerate('daily')}
+                  disabled={loading}
+                  className="px-4 py-2 bg-helfi-green hover:bg-helfi-green/90 disabled:bg-gray-300 text-white rounded-lg text-sm font-medium transition-colors"
+                >
+                  {loading ? 'Loading...' : '🔄 Regenerate'}
+                </button>
+              )}
             </div>
           </div>
         </section>
