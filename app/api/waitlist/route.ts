@@ -286,19 +286,32 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Delete the waitlist entry
-    await prisma.waitlist.delete({
+    // Use deleteMany to be more resilient to schema changes
+    const result = await prisma.waitlist.deleteMany({
       where: { id }
     })
+
+    if (result.count === 0) {
+      return NextResponse.json(
+        { error: 'Waitlist entry not found' },
+        { status: 404 }
+      )
+    }
 
     return NextResponse.json({ 
       success: true,
       message: 'Waitlist entry deleted successfully'
     })
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error deleting waitlist entry:', error)
+    console.error('Error details:', {
+      message: error?.message,
+      code: error?.code,
+      meta: error?.meta
+    })
     return NextResponse.json(
-      { error: 'Failed to delete waitlist entry' },
+      { error: 'Failed to delete waitlist entry: ' + (error?.message || 'Unknown error') },
       { status: 500 }
     )
   }
