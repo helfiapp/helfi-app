@@ -60,7 +60,8 @@ export default function HeroCarousel() {
 
   return (
     <div 
-      className="relative w-full overflow-visible py-16"
+      className="relative w-full overflow-visible"
+      style={{ paddingTop: '5rem', paddingBottom: '5rem' }}
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
     >

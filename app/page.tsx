@@ -135,7 +135,7 @@ export default function SplashPage() {
       </div>
 
       {/* Navigation */}
-      <nav className="relative z-10 px-6 py-6">
+      <nav className="relative z-10 px-6 py-2">
         <div className="max-w-6xl mx-auto flex justify-between items-center">
           <div className="flex items-center">
             <button 
@@ -200,7 +200,7 @@ export default function SplashPage() {
       </nav>
 
       {/* Hero Section */}
-      <section className="relative w-full min-h-screen flex flex-col overflow-visible bg-gray-900">
+      <section className="relative w-full min-h-screen flex flex-col overflow-visible bg-gray-900" style={{ overflow: 'visible' }}>
         {/* Full-Width Background Video */}
         <div className="absolute inset-0 z-0">
           <video
@@ -261,7 +261,7 @@ export default function SplashPage() {
         </div>
 
         {/* Full-Screen Horizontal Scrolling Carousel */}
-        <div className="relative z-10 w-full flex-1 flex items-center overflow-visible">
+        <div className="relative z-10 w-full overflow-visible" style={{ paddingTop: '4rem', paddingBottom: '4rem' }}>
           <HeroCarousel />
         </div>
       </section>
