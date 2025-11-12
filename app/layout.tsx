@@ -7,6 +7,7 @@ import type { Metadata } from 'next'
 
 const inter = Inter({ 
   subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
   variable: '--font-inter',
 })
 
@@ -62,7 +63,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className={inter.className}>
+      <body className={`${inter.variable} ${inter.className}`}>
         <AuthProvider>
           <UserDataProvider>
             <LayoutWrapper>
