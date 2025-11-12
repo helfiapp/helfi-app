@@ -247,16 +247,34 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const waitlistEntries = await prisma.waitlist.findMany({
-      orderBy: { createdAt: 'desc' }
-    })
+    // Use raw query to be resilient to schema changes during migration
+    // This ensures we can still fetch data even if new columns don't exist yet
+    try {
+      const waitlistEntries = await prisma.waitlist.findMany({
+        orderBy: { createdAt: 'desc' }
+      })
+      return NextResponse.json({ waitlist: waitlistEntries })
+    } catch (schemaError: any) {
+      // If schema error (missing columns), try raw query as fallback
+      console.warn('Schema error, trying raw query fallback:', schemaError?.message)
+      const rawEntries = await prisma.$queryRawUnsafe(`
+        SELECT id, email, name, "createdAt" 
+        FROM "Waitlist" 
+        ORDER BY "createdAt" DESC
+      `) as Array<{ id: string; email: string; name: string; createdAt: Date }>
+      
+      return NextResponse.json({ waitlist: rawEntries })
+    }
 
-    return NextResponse.json({ waitlist: waitlistEntries })
-
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching waitlist:', error)
+    console.error('Error details:', {
+      message: error?.message,
+      code: error?.code,
+      meta: error?.meta
+    })
     return NextResponse.json(
-      { error: 'Failed to fetch waitlist' },
+      { error: 'Failed to fetch waitlist: ' + (error?.message || 'Unknown error') },
       { status: 500 }
     )
   }
