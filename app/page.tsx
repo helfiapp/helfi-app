@@ -252,7 +252,7 @@ export default function SplashPage() {
         </div>
 
         {/* Full-Screen Horizontal Scrolling Carousel */}
-        <div className="relative z-10 w-full flex-1 flex items-center">
+        <div className="relative z-10 w-full flex-1 flex items-center pb-24 md:pb-32">
           <HeroCarousel />
         </div>
       </section>

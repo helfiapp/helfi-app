@@ -64,7 +64,7 @@ export default function HeroCarousel() {
         {[...screenshots, ...screenshots].map((screenshot, index) => (
           <div
             key={`${screenshot}-${index}`}
-            className="flex-shrink-0 w-[300px] md:w-[400px] h-auto"
+            className="flex-shrink-0 w-[180px] md:w-[220px] lg:w-[250px] h-auto"
           >
             <div className="relative aspect-[9/16] rounded-2xl overflow-hidden shadow-xl">
               <Image
@@ -74,7 +74,7 @@ export default function HeroCarousel() {
                 className="object-contain"
                 priority={index < 2} // Prioritize first two images
                 loading={index < 3 ? 'eager' : 'lazy'}
-                sizes="(max-width: 768px) 300px, 400px"
+                sizes="(max-width: 768px) 180px, (max-width: 1024px) 220px, 250px"
               />
             </div>
           </div>
