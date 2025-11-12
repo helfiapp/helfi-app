@@ -84,8 +84,15 @@ export async function GET(request: NextRequest) {
     // Map to quick lookup by date+type
     const byKey = new Map<string, any>()
     data.forEach((row) => {
-      const key = `${formatYmd(row.date)}|${row.dataType}`
-      byKey.set(key, row.value)
+      try {
+        // Ensure row.date is a Date object
+        const dateObj = row.date instanceof Date ? row.date : new Date(row.date)
+        const key = `${formatYmd(dateObj)}|${row.dataType}`
+        byKey.set(key, row.value)
+      } catch (dateError) {
+        console.error('❌ Error processing row date:', dateError, 'Row:', row)
+        // Skip malformed rows
+      }
     })
 
     // Walk the range and extract values per day
@@ -157,9 +164,24 @@ export async function GET(request: NextRequest) {
       range: { start: formatYmd(start), end: formatYmd(end) },
       series,
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Fitbit data range error:', error)
-    return NextResponse.json({ error: 'Failed to load Fitbit data' }, { status: 500 })
+    console.error('Error message:', error?.message)
+    console.error('Error stack:', error?.stack)
+    console.error('Error code:', error?.code)
+    
+    const errorMessage = error?.message || 'Unknown error'
+    const errorDetails = process.env.NODE_ENV === 'development' 
+      ? `${errorMessage} (${error?.code || 'no code'})`
+      : 'Failed to load Fitbit data'
+    
+    return NextResponse.json(
+      { 
+        error: 'Failed to load Fitbit data',
+        details: errorDetails
+      }, 
+      { status: 500 }
+    )
   }
 }
 
