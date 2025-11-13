@@ -129,8 +129,17 @@ export async function POST(req: NextRequest) {
          frequency=EXCLUDED.frequency`,
       user.id, time1, time2, time3, timezone, frequency
     )
-    // Schedule next occurrences for all active reminders (best-effort, non-blocking)
-    scheduleAllActiveReminders(user.id, { time1, time2, time3, timezone, frequency }).catch(() => {})
+    // Schedule next occurrences for all active reminders and capture outcomes
+    const scheduleResults =
+      await scheduleAllActiveReminders(user.id, { time1, time2, time3, timezone, frequency }).catch((error) => {
+        console.error('[CHECKINS] Failed to schedule reminders via QStash', error)
+        return []
+      })
+
+    const failedSchedules = scheduleResults.filter((result) => !result.scheduled)
+    if (failedSchedules.length > 0) {
+      console.error('[CHECKINS] QStash scheduling failures detected', { failedSchedules })
+    }
 
     // If user saved shortly after a reminder time, send one immediately to avoid waiting until tomorrow.
     try {
@@ -171,7 +180,7 @@ export async function POST(req: NextRequest) {
       }
     } catch {}
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true, scheduleResults })
   } catch (e) {
     console.error('checkins settings save error', e)
     const message = e instanceof Error ? e.message : 'Unknown error'

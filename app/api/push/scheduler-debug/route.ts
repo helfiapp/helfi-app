@@ -91,6 +91,34 @@ export async function GET(req: NextRequest) {
       console.error('Failed to fetch scheduler logs:', e)
     }
 
+    // Get recent QStash schedule attempts
+    let qstashScheduleLogs: any[] = []
+    try {
+      await prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS QstashScheduleLog (
+          id TEXT PRIMARY KEY,
+          createdAt TIMESTAMP NOT NULL DEFAULT NOW(),
+          userId TEXT,
+          reminderTime TEXT,
+          timezone TEXT,
+          deltaMinutes INTEGER,
+          notBeforeEpochSeconds BIGINT,
+          scheduled BOOLEAN NOT NULL,
+          httpStatus INTEGER,
+          reason TEXT,
+          responseSnippet TEXT
+        )
+      `)
+      qstashScheduleLogs = await prisma.$queryRawUnsafe(`
+        SELECT createdAt, userId, reminderTime, timezone, deltaMinutes, notBeforeEpochSeconds, scheduled, httpStatus, reason, responseSnippet
+        FROM QstashScheduleLog
+        ORDER BY createdAt DESC
+        LIMIT 20
+      `)
+    } catch (e) {
+      console.error('Failed to fetch QStash schedule logs:', e)
+    }
+
     return NextResponse.json({
       userId: user.id,
       hasSubscription: subRows.length > 0,
@@ -111,7 +139,8 @@ export async function GET(req: NextRequest) {
       nextCronRuns: [
         'Every 5 minutes at :00, :05, :10, :15, :20, :25, :30, :35, :40, :45, :50, :55'
       ],
-      recentSchedulerLogs: schedulerLogs
+      recentSchedulerLogs: schedulerLogs,
+      recentQstashScheduleLogs: qstashScheduleLogs
     })
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || String(e) }, { status: 500 })

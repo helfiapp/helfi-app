@@ -100,7 +100,18 @@ export async function POST(req: NextRequest) {
     }
 
     // Schedule the next occurrence for this same reminder
-    await scheduleReminderWithQStash(userId, reminderTime, timezone).catch(() => {})
+    const nextSchedule = await scheduleReminderWithQStash(userId, reminderTime, timezone).catch((error) => {
+      console.error('[DISPATCH] Failed to schedule next reminder via QStash', error)
+      return { scheduled: false, reason: 'exception' }
+    })
+    if (!nextSchedule?.scheduled) {
+      console.error('[DISPATCH] QStash scheduling returned failure', {
+        userId,
+        reminderTime,
+        timezone,
+        reason: nextSchedule?.reason,
+      })
+    }
 
     return NextResponse.json({ ok: true })
   } catch (e: any) {
