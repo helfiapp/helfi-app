@@ -9,10 +9,26 @@ import crypto from 'crypto'
 export async function POST(req: NextRequest) {
   const authHeader = req.headers.get('authorization') || ''
   const expected = process.env.SCHEDULER_SECRET || ''
-  const isVercelCron = (req.headers.get('x-vercel-cron') || '').toString() === '1'
+  
+  // Check for Vercel cron header (can be '1', 'true', or truthy)
+  const vercelCronHeader = req.headers.get('x-vercel-cron')
+  const isVercelCron = vercelCronHeader === '1' || vercelCronHeader === 'true' || !!vercelCronHeader
+  
+  // Log authentication attempt for debugging
+  console.log('[SCHEDULER] Auth check:', {
+    hasVercelCronHeader: !!vercelCronHeader,
+    vercelCronValue: vercelCronHeader,
+    isVercelCron,
+    hasAuthHeader: !!authHeader,
+    hasExpectedSecret: !!expected
+  })
+  
   if (!(isVercelCron || (expected && authHeader === `Bearer ${expected}`))) {
+    console.error('[SCHEDULER] ❌ Unauthorized - missing x-vercel-cron header or valid Bearer token')
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+  
+  console.log('[SCHEDULER] ✅ Authorized - proceeding with notification check')
 
   const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || ''
   const privateKey = process.env.VAPID_PRIVATE_KEY || ''
