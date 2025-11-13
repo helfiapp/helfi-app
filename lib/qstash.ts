@@ -165,7 +165,7 @@ export async function scheduleReminderWithQStash(
   }
 
   const callbackUrl = `${base}/api/push/dispatch`
-  const url = `https://qstash.upstash.io/v2/publish/${encodeURIComponent(callbackUrl)}`
+  const url = `https://qstash.upstash.io/v2/publish/${callbackUrl}`
 
   const body = JSON.stringify({ userId, reminderTime: timeHHMM, timezone: timeZone })
   let responseBody = ''
