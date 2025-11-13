@@ -219,7 +219,7 @@ export async function POST(req: NextRequest) {
       }
 
       const alreadySent: Array<{ exists: number }> = await prisma.$queryRawUnsafe(
-        `SELECT 1 as exists FROM ReminderDeliveryLog WHERE userId = $1 AND reminderTime = $2 AND sentDate = $3 LIMIT 1`,
+        `SELECT 1 as exists FROM ReminderDeliveryLog WHERE userId = $1 AND reminderTime = $2 AND sentDate = $3::date LIMIT 1`,
         r.userId,
         matchedReminder,
         localDate
@@ -241,7 +241,7 @@ export async function POST(req: NextRequest) {
       sentTo.push(r.userId ?? 'unknown')
       await prisma.$executeRawUnsafe(
         `INSERT INTO ReminderDeliveryLog (userId, reminderTime, sentDate, sentAt)
-         VALUES ($1, $2, $3, NOW())
+         VALUES ($1, $2, $3::date, NOW())
          ON CONFLICT (userId, reminderTime, sentDate) DO UPDATE SET sentAt = NOW()`,
         r.userId,
         matchedReminder,
