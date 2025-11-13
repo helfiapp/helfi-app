@@ -1474,10 +1474,10 @@ Please add nutritional information manually if needed.`);
                         </div>
                       </div>
                     )}
-                  </div>
+                </div>
                   
-                  {/* Action Buttons */}
-                  <div className="space-y-3">
+                {/* Action Buttons */}
+                <div className="space-y-3">
                     <button
                       onClick={() => editingEntry 
                         ? updateFoodEntry(
@@ -1537,7 +1537,6 @@ Please add nutritional information manually if needed.`);
                       </svg>
                       Delete Photo
                     </button>
-                  </div>
                 </div>
               </div>
             )}
