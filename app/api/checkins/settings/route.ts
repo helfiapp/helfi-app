@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { scheduleAllActiveReminders } from '@/lib/qstash'
 
 export async function GET() {
   const session = await getServerSession(authOptions)
@@ -128,6 +129,8 @@ export async function POST(req: NextRequest) {
          frequency=EXCLUDED.frequency`,
       user.id, time1, time2, time3, timezone, frequency
     )
+    // Schedule next occurrences for all active reminders (best-effort, non-blocking)
+    scheduleAllActiveReminders(user.id, { time1, time2, time3, timezone, frequency }).catch(() => {})
     return NextResponse.json({ success: true })
   } catch (e) {
     console.error('checkins settings save error', e)
