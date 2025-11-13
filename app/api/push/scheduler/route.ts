@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
 
   // Load all users with subscriptions and their reminder settings
   const rows: Array<{
-    userId: string
+    userId: string | null
     time1: string
     time2: string
     time3: string
@@ -88,15 +88,15 @@ export async function POST(req: NextRequest) {
     subscription: any
   }> = await prisma.$queryRawUnsafe(`
     SELECT DISTINCT 
-      p.userId as userId, 
-      COALESCE(s.time1, '12:30') as time1,
-      COALESCE(s.time2, '18:30') as time2,
-      COALESCE(s.time3, '21:30') as time3,
-      COALESCE(s.timezone, 'Australia/Melbourne') as timezone,
-      COALESCE(s.frequency, 3) as frequency,
+      p."userId" AS "userId", 
+      COALESCE(s.time1, '12:30') AS time1,
+      COALESCE(s.time2, '18:30') AS time2,
+      COALESCE(s.time3, '21:30') AS time3,
+      COALESCE(s.timezone, 'Australia/Melbourne') AS timezone,
+      COALESCE(s.frequency, 3) AS frequency,
       p.subscription
     FROM PushSubscriptions p
-    LEFT JOIN CheckinSettings s ON s.userId = p.userId
+    LEFT JOIN CheckinSettings s ON s.userId = p."userId"
   `)
 
   // Determine current HH:MM in each user's timezone and match against their reminder times
