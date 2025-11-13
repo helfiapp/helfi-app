@@ -176,10 +176,11 @@ export async function POST(req: NextRequest) {
       if (r.frequency >= 2) reminderTimes.push(r.time2 || '18:30')
       if (r.frequency >= 3) reminderTimes.push(r.time3 || '21:30')
 
-      // Matching: Exact match, up to 3 minutes after (catch late cron), or 1 minute early
+      // Matching: Exact match, up to N minutes after (catch late cron), or 1 minute early
       let shouldSend = false
       let matchReason = ''
       let matchedReminder = ''
+      const backfillWindow = Math.max(1, Math.min(60, parseInt(process.env.REMINDER_LAG_MINUTES || '10', 10)))
       
       for (const reminderTime of reminderTimes) {
         const [rh, rm] = reminderTime.split(':').map(Number)
@@ -193,16 +194,16 @@ export async function POST(req: NextRequest) {
           break
         }
         
-        // Within 3 minutes after: catch late cron (e.g., cron runs at 8:27 for 8:25 reminder)
+        // Within backfillWindow minutes after: catch late cron (e.g., cron runs late)
         const currentTotalMinutes = ch * 60 + cm
         const reminderTotalMinutes = rh * 60 + rm
         let minutesDiff = currentTotalMinutes - reminderTotalMinutes
         if (minutesDiff < 0) minutesDiff += 1440 // wrap-around safe
         
-        if (minutesDiff >= 1 && minutesDiff <= 3) {
+        if (minutesDiff >= 1 && minutesDiff <= backfillWindow) {
           shouldSend = true
           matchedReminder = reminderTime
-          matchReason = `LATE CRON CATCH: reminder ${reminderTime} was ${minutesDiff} minute(s) ago (current ${current}), sending now`
+          matchReason = `LATE CRON CATCH: reminder ${reminderTime} was ${minutesDiff} minute(s) ago (current ${current}), sending now (window ${backfillWindow}m)`
           break
         }
 
