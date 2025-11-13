@@ -177,7 +177,7 @@ export async function POST(req: NextRequest) {
       if (r.frequency >= 3) reminderTimes.push(r.time3 || '21:30')
 
       const currentMinutes = parseInt(hh, 10) * 60 + parseInt(mm, 10)
-      const allowedLagMinutes = 2 // tolerate slight cron delays
+      const allowedLagMinutes = 5 // tolerate up to 5 minutes of cron drift
 
       let shouldSend = false
       let matchReason = ''
