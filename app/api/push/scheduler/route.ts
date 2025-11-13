@@ -3,6 +3,9 @@ import { prisma } from '@/lib/prisma'
 import webpush from 'web-push'
 import crypto from 'crypto'
 
+// Force dynamic execution - prevent caching for cron jobs
+export const dynamic = 'force-dynamic'
+
 // This endpoint is intended to be triggered by a cron (e.g., Vercel Cron) every 5 minutes.
 // It finds users whose reminder time matches the current time in their timezone and sends a push.
 
