@@ -40,6 +40,7 @@ export default function Settings() {
   const [frequency, setFrequency] = useState(3)
   const [savingTimes, setSavingTimes] = useState(false)
   const [loadingSettings, setLoadingSettings] = useState(true)
+  const [showIOSInstructions, setShowIOSInstructions] = useState(false)
   // Curated timezone list (IANA names)
   const baseTimezones = [
     'UTC','Europe/London','Europe/Paris','Europe/Berlin','Europe/Madrid','Europe/Rome','Europe/Amsterdam','Europe/Zurich','Europe/Stockholm','Europe/Athens',
@@ -620,17 +621,92 @@ export default function Settings() {
                 </div>
               )}
               {pushNotifications && (
-                <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                  <p className="text-xs text-blue-800 dark:text-blue-200">
-                    <strong>Note:</strong> Notifications may not appear if your browser is in the foreground. Try minimizing the browser window or switching to another app. On macOS, check System Preferences → Notifications → [Your Browser].
-                  </p>
-                </div>
-              )}
-              {/* Removed Save/Reset subscription actions after successful wiring */}
-              {isIOS && !isInstalled && (
-                <div className="mt-2 text-xs text-gray-600 dark:text-gray-400">
-                  Tip: In Safari, tap the share icon → “Add to Home Screen”, then open the Helfi app icon and enable here.
-                </div>
+                <>
+                  {isIOS ? (
+                    <div className="mt-3 p-4 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/20 rounded-lg border-2 border-blue-300 dark:border-blue-700">
+                      <div className="flex items-center gap-2 mb-3">
+                        <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <p className="text-sm font-bold text-blue-900 dark:text-blue-100">
+                          Enable Notifications on iPhone
+                        </p>
+                      </div>
+                      
+                      {!isInstalled && (
+                        <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/30 rounded-lg border border-yellow-300 dark:border-yellow-700">
+                          <p className="text-xs font-semibold text-yellow-900 dark:text-yellow-100 mb-2">
+                            📱 Step 0: Add to Home Screen First
+                          </p>
+                          <p className="text-xs text-yellow-800 dark:text-yellow-200 leading-relaxed">
+                            In Safari, tap the <span className="font-bold">Share button</span> (square with arrow ↑) → Select <span className="font-bold">"Add to Home Screen"</span> → Tap <span className="font-bold">"Add"</span>. Then open the Helfi app from your home screen.
+                          </p>
+                        </div>
+                      )}
+
+                      <div className="space-y-3 text-sm">
+                        <div className="flex items-start gap-3 p-2 bg-white/60 dark:bg-gray-800/40 rounded">
+                          <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">1</span>
+                          <div className="flex-1">
+                            <p className="font-semibold text-blue-900 dark:text-blue-100">Open Settings</p>
+                            <p className="text-xs mt-0.5 text-blue-700 dark:text-blue-300">Tap the <span className="font-bold">Settings</span> app icon on your iPhone home screen</p>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-start gap-3 p-2 bg-white/60 dark:bg-gray-800/40 rounded">
+                          <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">2</span>
+                          <div className="flex-1">
+                            <p className="font-semibold text-blue-900 dark:text-blue-100">Go to Notifications</p>
+                            <p className="text-xs mt-0.5 text-blue-700 dark:text-blue-300">Scroll down and tap <span className="font-bold">"Notifications"</span></p>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-start gap-3 p-2 bg-white/60 dark:bg-gray-800/40 rounded">
+                          <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">3</span>
+                          <div className="flex-1">
+                            <p className="font-semibold text-blue-900 dark:text-blue-100">Find Helfi</p>
+                            <p className="text-xs mt-0.5 text-blue-700 dark:text-blue-300">
+                              {isInstalled 
+                                ? <>Look for <span className="font-bold">"Helfi"</span> in the alphabetical list and tap it</>
+                                : <>After adding to Home Screen, look for <span className="font-bold">"Helfi"</span> in the list and tap it</>}
+                            </p>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-start gap-3 p-2 bg-white/60 dark:bg-gray-800/40 rounded">
+                          <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">4</span>
+                          <div className="flex-1">
+                            <p className="font-semibold text-blue-900 dark:text-blue-100">Enable Notifications</p>
+                            <p className="text-xs mt-0.5 text-blue-700 dark:text-blue-300">Toggle <span className="font-bold">"Allow Notifications"</span> to ON (green)</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {isInstalled && (
+                        <button
+                          onClick={() => {
+                            // Show alert with instructions since we can't deep link from web
+                            alert('To enable notifications:\n\n1. Open the Settings app\n2. Tap "Notifications"\n3. Find "Helfi" and tap it\n4. Toggle "Allow Notifications" ON\n\nThen return here and toggle notifications on.')
+                            setShowIOSInstructions(true)
+                          }}
+                          className="w-full mt-4 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors flex items-center justify-center gap-2 shadow-md"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                          Open Settings App
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                      <p className="text-xs text-blue-800 dark:text-blue-200">
+                        <strong>Note:</strong> Notifications may not appear if your browser is in the foreground. Try minimizing the browser window or switching to another app.
+                      </p>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>
