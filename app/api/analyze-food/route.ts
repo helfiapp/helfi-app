@@ -127,8 +127,16 @@ Calories: 485, Protein: 45g, Carbs: 45g, Fat: 8g"
 
 Pay close attention to portion size words like small, medium, large, or specific measurements. For meals, sum all components. Calculate nutrition accordingly. End your response with the nutrition line exactly once as shown.
 ${wantStructured ? `
-After your explanation and the one-line totals above, also include a compact JSON block between <ITEMS_JSON> and </ITEMS_JSON> with this exact shape for any detected foods (use an empty array if only one item):
-<ITEMS_JSON>{"items":[{"name":"string","portion":"string","calories":0,"protein_g":0,"carbs_g":0,"fat_g":0}],"total":{"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0}}</ITEMS_JSON>
+After your explanation and the one-line totals above, also include a compact JSON block between <ITEMS_JSON> and </ITEMS_JSON> with this exact shape for any detected foods:
+<ITEMS_JSON>{"items":[{"name":"string","brand":"string or null","serving_size":"string (e.g., '1 slice', '40g', '1 cup')","servings":1,"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"sugar_g":0}],"total":{"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0}}</ITEMS_JSON>
+
+CRITICAL REQUIREMENTS:
+- For packaged foods: ALWAYS extract the brand name if visible (e.g., "Burgen", "Heinz", "Nestle"). Set to null if not visible or not applicable.
+- For packaged foods: ALWAYS extract the serving size from the label (e.g., "1 slice", "2 cookies", "100g", "1 cup"). This is the DEFAULT serving size per package.
+- Set "servings" to 1 as the default (user can adjust this in the UI).
+- For multi-item meals: Create separate items for each distinct food component.
+- Nutrition values should be PER SERVING (not total) for each item.
+- The "total" object should sum all items multiplied by their servings.
 ` : ''}`
         }
       ];
@@ -234,8 +242,16 @@ Calories: 520, Protein: 35g, Carbs: 18g, Fat: 32g"
 
 Estimate portion size carefully from the image and calculate nutrition accordingly. For meals, sum all components. End your response with the nutrition line exactly once as shown.
 ${wantStructured ? `
-After your explanation and the one-line totals above, also include a compact JSON block between <ITEMS_JSON> and </ITEMS_JSON> with this exact shape for any detected foods (use an empty array if only one item):
-<ITEMS_JSON>{"items":[{"name":"string","portion":"string","calories":0,"protein_g":0,"carbs_g":0,"fat_g":0}],"total":{"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0}}</ITEMS_JSON>
+After your explanation and the one-line totals above, also include a compact JSON block between <ITEMS_JSON> and </ITEMS_JSON> with this exact shape for any detected foods:
+<ITEMS_JSON>{"items":[{"name":"string","brand":"string or null","serving_size":"string (e.g., '1 slice', '40g', '1 cup')","servings":1,"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"sugar_g":0}],"total":{"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0}}</ITEMS_JSON>
+
+CRITICAL REQUIREMENTS:
+- For packaged foods: ALWAYS extract the brand name if visible (e.g., "Burgen", "Heinz", "Nestle"). Set to null if not visible or not applicable.
+- For packaged foods: ALWAYS extract the serving size from the label (e.g., "1 slice", "2 cookies", "100g", "1 cup"). This is the DEFAULT serving size per package.
+- Set "servings" to 1 as the default (user can adjust this in the UI).
+- For multi-item meals: Create separate items for each distinct food component.
+- Nutrition values should be PER SERVING (not total) for each item.
+- The "total" object should sum all items multiplied by their servings.
 ` : ''}`
             },
             {
