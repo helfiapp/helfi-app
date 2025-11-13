@@ -1,11 +1,10 @@
 import { NextResponse } from 'next/server'
-
-// Safe to expose: VAPID public key (no secret)
-const FALLBACK_PUBLIC_KEY = 'BNEzs3dtRnQc555-9RGcLDt9XbH8PL6lgCFzeU4AReZMBF7zbiNCyWkr3ouz777DIjiJbXapj3s4_5xywJzjm1M'
-
+ 
+// Return only the configured VAPID public key.
+// If it's missing, return an empty key so the client can surface a clear error.
 export async function GET() {
-  const pub = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || FALLBACK_PUBLIC_KEY
+  const pub = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || ''
   return NextResponse.json({ publicKey: pub })
 }
-
-
+ 
+ 
