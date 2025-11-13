@@ -176,7 +176,7 @@ export async function POST(req: NextRequest) {
       if (r.frequency >= 2) reminderTimes.push(r.time2 || '18:30')
       if (r.frequency >= 3) reminderTimes.push(r.time3 || '21:30')
 
-      // SIMPLIFIED MATCHING: Exact match OR within 1 minute after (to catch late cron)
+      // Matching: Exact match, up to 3 minutes after (catch late cron), or 1 minute early
       let shouldSend = false
       let matchReason = ''
       let matchedReminder = ''
@@ -193,16 +193,26 @@ export async function POST(req: NextRequest) {
           break
         }
         
-        // Within 1 minute after: catch late cron (e.g., cron runs at 8:09 for 8:08 reminder)
+        // Within 3 minutes after: catch late cron (e.g., cron runs at 8:27 for 8:25 reminder)
         const currentTotalMinutes = ch * 60 + cm
         const reminderTotalMinutes = rh * 60 + rm
-        const minutesDiff = currentTotalMinutes - reminderTotalMinutes
+        let minutesDiff = currentTotalMinutes - reminderTotalMinutes
+        if (minutesDiff < 0) minutesDiff += 1440 // wrap-around safe
         
-        // If we're 1 minute after the reminder time, still send (cron was late)
-        if (minutesDiff === 1 || (minutesDiff === -1439)) { // -1439 handles wrap-around at midnight
+        if (minutesDiff >= 1 && minutesDiff <= 3) {
           shouldSend = true
           matchedReminder = reminderTime
-          matchReason = `LATE CRON CATCH: reminder ${reminderTime} was 1 minute ago (current ${current}), sending now`
+          matchReason = `LATE CRON CATCH: reminder ${reminderTime} was ${minutesDiff} minute(s) ago (current ${current}), sending now`
+          break
+        }
+
+        // One minute early: send proactively
+        let minutesAhead = reminderTotalMinutes - currentTotalMinutes
+        if (minutesAhead < 0) minutesAhead += 1440
+        if (minutesAhead === 1) {
+          shouldSend = true
+          matchedReminder = reminderTime
+          matchReason = `EARLY SEND: reminder ${reminderTime} is in 1 minute (current ${current}), sending now`
           break
         }
       }
