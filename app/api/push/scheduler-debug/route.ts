@@ -88,6 +88,53 @@ export async function GET(req: NextRequest) {
         'Every 5 minutes at :00, :05, :10, :15, :20, :25, :30, :35, :40, :45, :50, :55'
       ]
     })
+
+    // Get recent scheduler logs
+    let schedulerLogs: any[] = []
+    try {
+      await prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS SchedulerLogs (
+          id TEXT PRIMARY KEY,
+          timestamp TIMESTAMP NOT NULL DEFAULT NOW(),
+          utcTime TEXT NOT NULL,
+          usersProcessed INTEGER NOT NULL,
+          notificationsSent INTEGER NOT NULL,
+          errors INTEGER NOT NULL,
+          debugInfo JSONB
+        )
+      `)
+      schedulerLogs = await prisma.$queryRawUnsafe(`
+        SELECT timestamp, utcTime, usersProcessed, notificationsSent, errors, debugInfo
+        FROM SchedulerLogs
+        ORDER BY timestamp DESC
+        LIMIT 20
+      `)
+    } catch (e) {
+      console.error('Failed to fetch scheduler logs:', e)
+    }
+
+    return NextResponse.json({
+      userId: user.id,
+      hasSubscription: subRows.length > 0,
+      settings: {
+        time1: settings.time1,
+        time2: settings.time2,
+        time3: settings.time3,
+        timezone: settings.timezone,
+        frequency: settings.frequency
+      },
+      currentTime: {
+        utc: nowUtc.toISOString(),
+        local: current,
+        timezone: tz
+      },
+      reminderTimes,
+      matches,
+      nextCronRuns: [
+        'Every 5 minutes at :00, :05, :10, :15, :20, :25, :30, :35, :40, :45, :50, :55'
+      ],
+      recentSchedulerLogs: schedulerLogs
+    })
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || String(e) }, { status: 500 })
   }

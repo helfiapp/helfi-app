@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import webpush from 'web-push'
+import crypto from 'crypto'
 
 // This endpoint is intended to be triggered by a cron (e.g., Vercel Cron) every 5 minutes.
 // It finds users whose reminder time matches the current time in their timezone and sends a push.
@@ -73,6 +74,35 @@ export async function POST(req: NextRequest) {
 
   console.log(`[SCHEDULER] Cron triggered at UTC: ${nowUtc.toISOString()}, Processing ${rows.length} users`)
 
+  // Log scheduler execution to database for tracking
+  try {
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS SchedulerLogs (
+        id TEXT PRIMARY KEY,
+        timestamp TIMESTAMP NOT NULL DEFAULT NOW(),
+        utcTime TEXT NOT NULL,
+        usersProcessed INTEGER NOT NULL,
+        notificationsSent INTEGER NOT NULL,
+        errors INTEGER NOT NULL,
+        debugInfo JSONB
+      )
+    `)
+    const logId = crypto.randomUUID()
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO SchedulerLogs (id, timestamp, utcTime, usersProcessed, notificationsSent, errors, debugInfo)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      logId,
+      nowUtc,
+      nowUtc.toISOString(),
+      rows.length,
+      0, // Will update after processing
+      0, // Will update after processing
+      JSON.stringify({ cronTriggered: true })
+    )
+  } catch (e) {
+    console.error('[SCHEDULER] Failed to log execution:', e)
+  }
+
   for (const r of rows) {
     try {
       const tz = r.timezone || 'UTC'
@@ -144,6 +174,19 @@ export async function POST(req: NextRequest) {
   }
 
   console.log(`[SCHEDULER] Complete: sent=${sentTo.length}, errors=${errors.length}`)
+
+  // Update log with final counts
+  try {
+    await prisma.$executeRawUnsafe(`
+      UPDATE SchedulerLogs 
+      SET notificationsSent = $1, errors = $2, debugInfo = $3
+      WHERE timestamp >= NOW() - INTERVAL '1 minute'
+      ORDER BY timestamp DESC
+      LIMIT 1
+    `, sentTo.length, errors.length, JSON.stringify({ debug: debugLog, sentTo, errors }))
+  } catch (e) {
+    console.error('[SCHEDULER] Failed to update log:', e)
+  }
 
   return NextResponse.json({ 
     success: true, 
