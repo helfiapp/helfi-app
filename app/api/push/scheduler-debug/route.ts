@@ -120,7 +120,8 @@ export async function GET(req: NextRequest) {
           scheduled,
           httpStatus,
           reason,
-          responseSnippet
+          responseSnippet,
+          callbackUrl
         FROM QstashScheduleLog
         ORDER BY createdAt DESC
         LIMIT 20

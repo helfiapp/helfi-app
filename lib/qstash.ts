@@ -41,6 +41,7 @@ type ScheduleLogRecord = {
   httpStatus?: number | null
   reason?: string
   responseSnippet?: string | null
+  callbackUrl?: string | null
 }
 
 async function logScheduleAttempt(entry: ScheduleLogRecord) {
@@ -57,7 +58,8 @@ async function logScheduleAttempt(entry: ScheduleLogRecord) {
         scheduled BOOLEAN NOT NULL,
         httpStatus INTEGER,
         reason TEXT,
-        responseSnippet TEXT
+        responseSnippet TEXT,
+        callbackUrl TEXT
       )
     `)
 
@@ -73,8 +75,9 @@ async function logScheduleAttempt(entry: ScheduleLogRecord) {
         scheduled,
         httpStatus,
         reason,
-        responseSnippet
-      ) VALUES ($1, NOW(), $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+        responseSnippet,
+        callbackUrl
+      ) VALUES ($1, NOW(), $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
       randomUUID(),
       entry.userId,
       entry.reminderTime,
@@ -84,7 +87,8 @@ async function logScheduleAttempt(entry: ScheduleLogRecord) {
       entry.scheduled,
       entry.httpStatus ?? null,
       entry.reason ?? null,
-      entry.responseSnippet ?? null
+      entry.responseSnippet ?? null,
+      entry.callbackUrl ?? null
     )
   } catch (error) {
     console.error('[QSTASH_LOG] failed to persist schedule attempt', error)
@@ -109,6 +113,7 @@ export async function scheduleReminderWithQStash(
       notBeforeEpochSeconds: null,
       scheduled: false,
       reason: 'missing_qstash_token',
+      callbackUrl: null,
     })
     return { scheduled: false, reason: 'missing_qstash_token' }
   }
@@ -133,6 +138,7 @@ export async function scheduleReminderWithQStash(
       notBeforeEpochSeconds: null,
       scheduled: false,
       reason: 'missing_base_url',
+      callbackUrl: null,
     })
     return { scheduled: false, reason: 'missing_base_url' }
   }
@@ -170,6 +176,7 @@ export async function scheduleReminderWithQStash(
         httpStatus: res.status,
         reason,
         responseSnippet: responseBody.slice(0, 500),
+        callbackUrl,
       })
       return { scheduled: false, reason, status: res.status, responseBody }
     }
@@ -183,6 +190,7 @@ export async function scheduleReminderWithQStash(
       scheduled: true,
       httpStatus: res.status,
       responseSnippet: responseBody.slice(0, 500),
+      callbackUrl,
     })
     return { scheduled: true, status: res.status, responseBody }
   } catch (error: any) {
@@ -195,6 +203,7 @@ export async function scheduleReminderWithQStash(
       notBeforeEpochSeconds,
       scheduled: false,
       reason,
+      callbackUrl,
       responseSnippet: (error?.stack || String(error)).slice(0, 500),
     })
     return { scheduled: false, reason, status, responseBody }
