@@ -110,7 +110,17 @@ export async function GET(req: NextRequest) {
         )
       `)
       qstashScheduleLogs = await prisma.$queryRawUnsafe(`
-        SELECT createdAt, userId, reminderTime, timezone, deltaMinutes, notBeforeEpochSeconds, scheduled, httpStatus, reason, responseSnippet
+        SELECT 
+          createdAt,
+          userId,
+          reminderTime,
+          timezone,
+          deltaMinutes,
+          notBeforeEpochSeconds::text AS "notBeforeEpochSeconds",
+          scheduled,
+          httpStatus,
+          reason,
+          responseSnippet
         FROM QstashScheduleLog
         ORDER BY createdAt DESC
         LIMIT 20
