@@ -187,13 +187,22 @@ export async function POST(req: NextRequest) {
         const [rh, rm] = reminderTime.split(':').map(Number)
         const [ch, cm] = [parseInt(hh, 10), parseInt(mm, 10)]
         const reminderMinutes = rh * 60 + rm
-        let diff = ( (ch * 60 + cm) - reminderMinutes + 1440 ) % 1440
-        if (diff === 0 || (diff > 0 && diff <= allowedLagMinutes)) {
+        const diff = ((ch * 60 + cm) - reminderMinutes + 1440) % 1440
+        const diffForward = (reminderMinutes - (ch * 60 + cm) + 1440) % 1440
+        if (
+          diff === 0 ||
+          (diff > 0 && diff <= allowedLagMinutes) ||
+          diffForward === 1 // send one minute early in case a later run lags
+        ) {
           shouldSend = true
           matchedReminder = reminderTime
-          matchReason = diff === 0
-            ? `Matched reminder ${reminderTime} exactly at current time ${current}`
-            : `Matched reminder ${reminderTime} within ${diff} minute(s) lag (current ${current})`
+          if (diff === 0) {
+            matchReason = `Matched reminder ${reminderTime} exactly at current time ${current}`
+          } else if (diff > 0 && diff <= allowedLagMinutes) {
+            matchReason = `Matched reminder ${reminderTime} within ${diff} minute(s) lag (current ${current})`
+          } else {
+            matchReason = `Sending reminder ${reminderTime} one minute early at ${current} to guarantee on-time delivery`
+          }
           break
         }
       }
