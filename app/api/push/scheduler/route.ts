@@ -5,11 +5,14 @@ import crypto from 'crypto'
 
 // Force dynamic execution - prevent caching for cron jobs
 export const dynamic = 'force-dynamic'
+// Ensure Node.js runtime (web-push requires Node, not Edge)
+export const runtime = 'nodejs'
 
 // This endpoint is intended to be triggered by a cron (e.g., Vercel Cron) every 5 minutes.
 // It finds users whose reminder time matches the current time in their timezone and sends a push.
 
 export async function POST(req: NextRequest) {
+  try {
   const authHeader = req.headers.get('authorization') || ''
   const expected = process.env.SCHEDULER_SECRET || ''
   
@@ -232,6 +235,10 @@ export async function POST(req: NextRequest) {
     debug: debugLog,
     timestamp: nowUtc.toISOString()
   })
+  } catch (e: any) {
+    console.error('[SCHEDULER] Top-level error:', e?.stack || e)
+    return NextResponse.json({ error: 'scheduler_crash', message: e?.message || String(e) }, { status: 500 })
+  }
 }
 
 // Allow Vercel Cron (GET) to trigger the same logic safely
