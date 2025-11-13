@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 
 // Optimal order for maximum impact - tells a story from onboarding to advanced features
@@ -25,10 +25,20 @@ export default function HeroCarousel() {
   const scrollPositionRef = useRef(0)
   const [isMobile, setIsMobile] = useState(false)
   const [hasMounted, setHasMounted] = useState(false)
+  const mobileSlideIndexRef = useRef(0)
+  const autoScrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const resumeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const scrollAnimationFrameRef = useRef<number | null>(null)
+  const isAutoScrollingRef = useRef(false)
+  const isPausedRef = useRef(isPaused)
 
   useEffect(() => {
     setHasMounted(true)
   }, [])
+
+  useEffect(() => {
+    isPausedRef.current = isPaused
+  }, [isPaused])
 
   // Detect mobile on mount and resize
   useEffect(() => {
@@ -40,7 +50,7 @@ export default function HeroCarousel() {
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
-  const getScrollAmount = () => {
+  const getScrollAmount = useCallback(() => {
     const container = scrollContainerRef.current
     if (!container || typeof window === 'undefined') return 0
 
@@ -52,7 +62,7 @@ export default function HeroCarousel() {
       parseFloat(computedStyles.columnGap || computedStyles.gap || '0') || 0
 
     return firstSlide.offsetWidth + gapValue
-  }
+  }, [])
 
   const slidesToRender = useMemo(() => {
     if (!hasMounted) {
@@ -96,20 +106,182 @@ export default function HeroCarousel() {
     setTimeout(() => setIsPaused(false), 3000)
   }
 
-  // Mobile: manual swipe experience with snap points
+  // Mobile: auto-play carousel with smooth transitions
   useEffect(() => {
-    if (!isMobile) return
+    if (!isMobile || !hasMounted) {
+      if (autoScrollTimeoutRef.current) {
+        clearTimeout(autoScrollTimeoutRef.current)
+        autoScrollTimeoutRef.current = null
+      }
+      if (resumeTimeoutRef.current) {
+        clearTimeout(resumeTimeoutRef.current)
+        resumeTimeoutRef.current = null
+      }
+      if (scrollAnimationFrameRef.current) {
+        cancelAnimationFrame(scrollAnimationFrameRef.current)
+        scrollAnimationFrameRef.current = null
+      }
+      isAutoScrollingRef.current = false
+      mobileSlideIndexRef.current = 0
+      scrollPositionRef.current = 0
+      return
+    }
 
     const container = scrollContainerRef.current
     if (!container) return
 
-    container.scrollLeft = 0
-    scrollPositionRef.current = 0
+    let isUserInteracting = false
+    const totalSlides = screenshots.length
+    const fallbackSlideWidth = 336
+
+    const getSlideWidth = () => {
+      const width = getScrollAmount()
+      return width > 0 ? width : fallbackSlideWidth
+    }
+
+    const cancelAnimation = () => {
+      if (scrollAnimationFrameRef.current) {
+        cancelAnimationFrame(scrollAnimationFrameRef.current)
+        scrollAnimationFrameRef.current = null
+      }
+      isAutoScrollingRef.current = false
+    }
+
+    const scheduleAdvance = (delay = 5000) => {
+      if (autoScrollTimeoutRef.current) {
+        clearTimeout(autoScrollTimeoutRef.current)
+      }
+      autoScrollTimeoutRef.current = setTimeout(() => {
+        advanceSlide()
+      }, delay)
+    }
+
+    const advanceSlide = () => {
+      if (isUserInteracting || isPausedRef.current) {
+        scheduleAdvance(500)
+        return
+      }
+
+      const slideWidth = getSlideWidth()
+      const nextIndex = (mobileSlideIndexRef.current + 1) % totalSlides
+      const targetPosition = nextIndex * slideWidth
+      const startPosition = container.scrollLeft
+      const distance = targetPosition - startPosition
+
+      if (Math.abs(distance) < 1) {
+        container.scrollLeft = targetPosition
+        mobileSlideIndexRef.current = nextIndex
+        scheduleAdvance(5000)
+        return
+      }
+
+      const duration = 1400
+      let animationStart: number | null = null
+      isAutoScrollingRef.current = true
+
+      const animate = (timestamp: number) => {
+        if (animationStart === null) animationStart = timestamp
+        const elapsed = timestamp - animationStart
+        const progress = Math.min(elapsed / duration, 1)
+        const eased = 1 - Math.pow(1 - progress, 3)
+        container.scrollLeft = startPosition + distance * eased
+
+        if (progress < 1) {
+          scrollAnimationFrameRef.current = requestAnimationFrame(animate)
+        } else {
+          container.scrollLeft = targetPosition
+          mobileSlideIndexRef.current = nextIndex
+          cancelAnimation()
+          scheduleAdvance(5000)
+        }
+      }
+
+      scrollAnimationFrameRef.current = requestAnimationFrame(animate)
+    }
+
+    const restartResumeTimer = () => {
+      if (resumeTimeoutRef.current) {
+        clearTimeout(resumeTimeoutRef.current)
+      }
+      resumeTimeoutRef.current = setTimeout(() => {
+        const width = getSlideWidth()
+        const approxIndex = Math.round(container.scrollLeft / width)
+        mobileSlideIndexRef.current = Math.max(0, Math.min(approxIndex, totalSlides - 1))
+        isUserInteracting = false
+        scheduleAdvance(5000)
+      }, 1500)
+    }
+
+    const handleInteractionStart = () => {
+      isUserInteracting = true
+      if (autoScrollTimeoutRef.current) {
+        clearTimeout(autoScrollTimeoutRef.current)
+        autoScrollTimeoutRef.current = null
+      }
+      cancelAnimation()
+    }
+
+    const handleInteractionEnd = () => {
+      restartResumeTimer()
+    }
+
+    const handleScroll = () => {
+      if (isAutoScrollingRef.current) return
+      const width = getSlideWidth()
+      if (width <= 0) return
+      const approxIndex = Math.round(container.scrollLeft / width)
+      mobileSlideIndexRef.current = Math.max(0, Math.min(approxIndex, totalSlides - 1))
+      if (isUserInteracting) {
+        restartResumeTimer()
+      }
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        handleInteractionStart()
+      } else {
+        restartResumeTimer()
+      }
+    }
+
+    container.addEventListener('touchstart', handleInteractionStart, { passive: true })
+    container.addEventListener('touchmove', handleInteractionStart, { passive: true })
+    container.addEventListener('touchend', handleInteractionEnd, { passive: true })
+    container.addEventListener('touchcancel', handleInteractionEnd, { passive: true })
+    container.addEventListener('pointerdown', handleInteractionStart)
+    container.addEventListener('pointerup', handleInteractionEnd)
+    container.addEventListener('pointercancel', handleInteractionEnd)
+    container.addEventListener('wheel', handleInteractionStart, { passive: true })
+    container.addEventListener('scroll', handleScroll, { passive: true })
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    const initialWidth = getSlideWidth()
+    container.scrollLeft = mobileSlideIndexRef.current * initialWidth
+
+    scheduleAdvance(5000)
 
     return () => {
-      scrollPositionRef.current = 0
+      if (autoScrollTimeoutRef.current) {
+        clearTimeout(autoScrollTimeoutRef.current)
+        autoScrollTimeoutRef.current = null
+      }
+      if (resumeTimeoutRef.current) {
+        clearTimeout(resumeTimeoutRef.current)
+        resumeTimeoutRef.current = null
+      }
+      cancelAnimation()
+      container.removeEventListener('touchstart', handleInteractionStart)
+      container.removeEventListener('touchmove', handleInteractionStart)
+      container.removeEventListener('touchend', handleInteractionEnd)
+      container.removeEventListener('touchcancel', handleInteractionEnd)
+      container.removeEventListener('pointerdown', handleInteractionStart)
+      container.removeEventListener('pointerup', handleInteractionEnd)
+      container.removeEventListener('pointercancel', handleInteractionEnd)
+      container.removeEventListener('wheel', handleInteractionStart)
+      container.removeEventListener('scroll', handleScroll)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
-  }, [isMobile])
+  }, [isMobile, hasMounted, getScrollAmount])
 
   // Desktop: Continuous smooth scroll
   useEffect(() => {
