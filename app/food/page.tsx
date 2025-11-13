@@ -19,6 +19,17 @@ import UsageMeter from '@/components/UsageMeter'
 import FeatureUsageDisplay from '@/components/FeatureUsageDisplay'
 import CreditPurchaseModal from '@/components/CreditPurchaseModal'
 
+const NUTRIENT_DISPLAY_ORDER: Array<'calories' | 'protein' | 'carbs' | 'fat' | 'fiber' | 'sugar'> = ['calories', 'protein', 'carbs', 'fat', 'fiber', 'sugar']
+
+const NUTRIENT_CARD_META: Record<typeof NUTRIENT_DISPLAY_ORDER[number], { label: string; unit?: string; gradient: string; accent: string }> = {
+  calories: { label: 'Calories', unit: '', gradient: 'from-orange-50 to-orange-100', accent: 'text-orange-500' },
+  protein: { label: 'Protein', unit: 'g', gradient: 'from-blue-50 to-blue-100', accent: 'text-blue-500' },
+  carbs: { label: 'Carbs', unit: 'g', gradient: 'from-green-50 to-green-100', accent: 'text-green-500' },
+  fat: { label: 'Fat', unit: 'g', gradient: 'from-purple-50 to-purple-100', accent: 'text-purple-500' },
+  fiber: { label: 'Fiber', unit: 'g', gradient: 'from-amber-50 to-amber-100', accent: 'text-amber-500' },
+  sugar: { label: 'Sugar', unit: 'g', gradient: 'from-pink-50 to-pink-100', accent: 'text-pink-500' },
+}
+
 export default function FoodDiary() {
   const { data: session } = useSession()
   const pathname = usePathname()
@@ -322,56 +333,77 @@ export default function FoodDiary() {
     });
   };
 
-  // Extract nutrition data from AI response
   const extractNutritionData = (description: string) => {
-    // Try to parse common nutrition patterns from AI response
-    const caloriesMatch = description.match(/calories?[:\s]*(\d+)/i);
-    const proteinMatch = description.match(/protein[:\s]*(\d+(?:\.\d+)?)\s*g/i);
-    const carbsMatch = description.match(/carb(?:ohydrate)?s?[:\s]*(\d+(?:\.\d+)?)\s*g/i);
-    const fatMatch = description.match(/fat[:\s]*(\d+(?:\.\d+)?)\s*g/i);
-    const fiberMatch = description.match(/fiber[:\s]*(\d+(?:\.\d+)?)\s*g/i);
-    const sugarMatch = description.match(/sugar[:\s]*(\d+(?:\.\d+)?)\s*g/i);
+    const caloriesMatch = description.match(/calories?[:\s]*(\d+(?:\.\d+)?)/i)
+    const proteinMatch = description.match(/protein[:\s]*(\d+(?:\.\d+)?)\s*g/i)
+    const carbsMatch = description.match(/carb(?:ohydrate)?s?[:\s]*(\d+(?:\.\d+)?)\s*g/i)
+    const fatMatch = description.match(/fat[:\s]*(\d+(?:\.\d+)?)\s*g/i)
+    const fiberMatch = description.match(/fiber[:\s]*(\d+(?:\.\d+)?)\s*g/i)
+    const sugarMatch = description.match(/sugar[:\s]*(\d+(?:\.\d+)?)\s*g/i)
+
+    const toNumber = (match: RegExpMatchArray | null, fallback: number | null = null) => {
+      if (!match) return fallback
+      const value = parseFloat(match[1])
+      return Number.isFinite(value) ? value : fallback
+    }
 
     return {
-      calories: caloriesMatch ? parseInt(caloriesMatch[1]) : null,
-      protein: proteinMatch ? parseFloat(proteinMatch[1]) : null,
-      carbs: carbsMatch ? parseFloat(carbsMatch[1]) : null,
-      fat: fatMatch ? parseFloat(fatMatch[1]) : null,
-      fiber: fiberMatch ? parseFloat(fiberMatch[1]) : null,
-      sugar: sugarMatch ? parseFloat(sugarMatch[1]) : null,
-    };
-  };
+      calories: toNumber(caloriesMatch),
+      protein: toNumber(proteinMatch),
+      carbs: toNumber(carbsMatch),
+      fat: toNumber(fatMatch),
+      fiber: toNumber(fiberMatch),
+      sugar: toNumber(sugarMatch),
+    }
+  }
 
   // Recalculate nutrition totals from items array (multiplying by servings)
   const recalculateNutritionFromItems = (items: any[]) => {
-    if (!items || items.length === 0) return null;
-    
-    let totalCalories = 0;
-    let totalProtein = 0;
-    let totalCarbs = 0;
-    let totalFat = 0;
-    let totalFiber = 0;
-    let totalSugar = 0;
-    
+    if (!items || items.length === 0) return null
+
+    const totals = {
+      calories: 0,
+      protein: 0,
+      carbs: 0,
+      fat: 0,
+      fiber: 0,
+      sugar: 0,
+    }
+
     items.forEach((item: any) => {
-      const servings = item.servings || 1;
-      totalCalories += (item.calories || 0) * servings;
-      totalProtein += (item.protein_g || 0) * servings;
-      totalCarbs += (item.carbs_g || 0) * servings;
-      totalFat += (item.fat_g || 0) * servings;
-      totalFiber += (item.fiber_g || 0) * servings;
-      totalSugar += (item.sugar_g || 0) * servings;
-    });
-    
+      const servings = item?.servings && Number.isFinite(item.servings) ? item.servings : 1
+      totals.calories += (item.calories || 0) * servings
+      totals.protein += (item.protein_g || 0) * servings
+      totals.carbs += (item.carbs_g || 0) * servings
+      totals.fat += (item.fat_g || 0) * servings
+      totals.fiber += (item.fiber_g || 0) * servings
+      totals.sugar += (item.sugar_g || 0) * servings
+    })
+
+    const round = (value: number, decimals = 1) => {
+      const factor = Math.pow(10, decimals)
+      return Math.round(value * factor) / factor
+    }
+
     return {
-      calories: Math.round(totalCalories),
-      protein: Math.round(totalProtein * 10) / 10,
-      carbs: Math.round(totalCarbs * 10) / 10,
-      fat: Math.round(totalFat * 10) / 10,
-      fiber: totalFiber > 0 ? Math.round(totalFiber * 10) / 10 : null,
-      sugar: totalSugar > 0 ? Math.round(totalSugar * 10) / 10 : null,
-    };
-  };
+      calories: Math.round(totals.calories),
+      protein: round(totals.protein),
+      carbs: round(totals.carbs),
+      fat: round(totals.fat),
+      fiber: totals.fiber > 0 ? round(totals.fiber) : null,
+      sugar: totals.sugar > 0 ? round(totals.sugar) : null,
+    }
+  }
+
+  const formatNutrientValue = (key: typeof NUTRIENT_DISPLAY_ORDER[number], value: number) => {
+    if (!Number.isFinite(value)) return ''
+    if (key === 'calories') {
+      return `${Math.round(value)}`
+    }
+    const rounded = Math.round(value * 10) / 10
+    const unit = NUTRIENT_CARD_META[key]?.unit || ''
+    return `${rounded}${unit}`
+  }
 
   const analyzePhoto = async () => {
     if (!photoFile) return;
@@ -1242,50 +1274,33 @@ Please add nutritional information manually if needed.`);
                     <h3 className="text-xl font-semibold text-gray-900 mb-2">Food Analysis</h3>
                   </div>
 
-                  {/* Nutrition Cards - Cronometer Style */}
-                  {analyzedNutrition && (analyzedNutrition.calories !== null || analyzedNutrition.protein !== null || analyzedNutrition.carbs !== null || analyzedNutrition.fat !== null) && (
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6">
-                      {/* Calories */}
-                      {analyzedNutrition.calories !== null && analyzedNutrition.calories !== undefined && (
-                        <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-3 sm:p-4 border border-orange-200">
-                          <div className="text-center">
-                            <div className="text-xl sm:text-2xl font-bold text-orange-600">{analyzedNutrition.calories}</div>
-                            <div className="text-xs font-medium text-orange-500 uppercase tracking-wide">Calories</div>
-                          </div>
-                        </div>
-                      )}
-                      
-                      {/* Protein */}
-                      {analyzedNutrition.protein !== null && analyzedNutrition.protein !== undefined && (
-                        <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-3 sm:p-4 border border-blue-200">
-                          <div className="text-center">
-                            <div className="text-xl sm:text-2xl font-bold text-blue-600">{analyzedNutrition.protein}g</div>
-                            <div className="text-xs font-medium text-blue-500 uppercase tracking-wide">Protein</div>
-                          </div>
-                        </div>
-                      )}
-                      
-                      {/* Carbs */}
-                      {analyzedNutrition.carbs !== null && analyzedNutrition.carbs !== undefined && (
-                        <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-3 sm:p-4 border border-green-200">
-                          <div className="text-center">
-                            <div className="text-xl sm:text-2xl font-bold text-green-600">{analyzedNutrition.carbs}g</div>
-                            <div className="text-xs font-medium text-green-500 uppercase tracking-wide">Carbs</div>
-                          </div>
-                        </div>
-                      )}
-                      
-                      {/* Fat */}
-                      {analyzedNutrition.fat !== null && analyzedNutrition.fat !== undefined && (
-                        <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-3 sm:p-4 border border-purple-200">
-                          <div className="text-center">
-                            <div className="text-xl sm:text-2xl font-bold text-purple-600">{analyzedNutrition.fat}g</div>
-                            <div className="text-xs font-medium text-purple-500 uppercase tracking-wide">Fat</div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  {/* Nutrition Cards - Consistent Layout */}
+                  {analyzedNutrition && (() => {
+                    const cards = NUTRIENT_DISPLAY_ORDER.filter((key) => {
+                      const value = (analyzedNutrition as any)?.[key]
+                      if (value === null || value === undefined) return false
+                      if (key === 'calories') return Number(value) > 0
+                      return Number(value) > 0.009
+                    })
+
+                    if (cards.length === 0) return null
+
+                    return (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 mb-6">
+                        {cards.map((key) => {
+                          const meta = NUTRIENT_CARD_META[key]
+                          const rawValue = (analyzedNutrition as any)[key]
+                          const displayValue = formatNutrientValue(key, Number(rawValue))
+                          return (
+                            <div key={key} className={`bg-gradient-to-br ${meta.gradient} border border-white/60 rounded-xl p-3 sm:p-4 text-center shadow-sm`}>
+                              <div className={`text-xs font-medium uppercase tracking-wide ${meta.accent} mb-1`}>{meta.label}</div>
+                              <div className="text-xl sm:text-2xl font-bold text-gray-900">{displayValue}</div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )
+                  })()}
 
                   {/* Additional Nutrition Info */}
                   {analyzedNutrition && (analyzedNutrition.fiber !== null || analyzedNutrition.sugar !== null) && (
@@ -1319,6 +1334,8 @@ Please add nutritional information manually if needed.`);
                         const totalProtein = Math.round(((item.protein_g || 0) * servingsCount) * 10) / 10;
                         const totalCarbs = Math.round(((item.carbs_g || 0) * servingsCount) * 10) / 10;
                         const totalFat = Math.round(((item.fat_g || 0) * servingsCount) * 10) / 10;
+                        const totalFiber = Math.round(((item.fiber_g || 0) * servingsCount) * 10) / 10;
+                        const totalSugar = Math.round(((item.sugar_g || 0) * servingsCount) * 10) / 10;
                         const formattedServings = (() => {
                           if (!servingsCount) return '0 servings';
                           const rounded = Math.round(servingsCount * 100) / 100;
@@ -1418,6 +1435,8 @@ Please add nutritional information manually if needed.`);
                                 <span>{totalProtein}g protein</span>
                                 <span>{totalCarbs}g carbs</span>
                                 <span>{totalFat}g fat</span>
+                                {totalFiber > 0 && <span>{totalFiber}g fiber</span>}
+                                {totalSugar > 0 && <span>{totalSugar}g sugar</span>}
                               </div>
                             </div>
                           </div>
@@ -2187,37 +2206,46 @@ Please add nutritional information manually if needed.`);
             <div className="mb-4">
               {(() => {
                 const source = isViewingToday ? todaysFoods : (historyFoods || [])
-                const totals = source.reduce((acc: any, item: any) => {
-                  const n = item?.nutrition || {};
-                  acc.calories += Number.isFinite(n.calories) ? n.calories : 0;
-                  acc.protein += Number.isFinite(n.protein) ? n.protein : 0;
-                  acc.carbs += Number.isFinite(n.carbs) ? n.carbs : 0;
-                  acc.fat += Number.isFinite(n.fat) ? n.fat : 0;
-                  return acc;
-                }, { calories: 0, protein: 0, carbs: 0, fat: 0 });
+                const totals = source.reduce((acc: Record<typeof NUTRIENT_DISPLAY_ORDER[number], number>, item: any) => {
+                  const n = item?.nutrition || {}
+                  const safeNumber = (value: any) => {
+                    const num = Number(value)
+                    return Number.isFinite(num) ? num : 0
+                  }
+
+                  acc.calories += safeNumber(n.calories ?? n.kcal)
+                  acc.protein += safeNumber(n.protein ?? n.protein_g)
+                  acc.carbs += safeNumber(n.carbs ?? n.carbohydrates ?? n.carbs_g ?? n.carbohydrates_g)
+                  acc.fat += safeNumber(n.fat ?? n.total_fat ?? n.fat_g)
+                  acc.fiber += safeNumber(n.fiber ?? n.fiber_g ?? n.dietary_fiber_g)
+                  acc.sugar += safeNumber(n.sugar ?? n.sugar_g ?? n.sugars_g)
+                  return acc
+                }, { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0 })
+
+                const visibleCards = NUTRIENT_DISPLAY_ORDER.filter((key) => {
+                  if (key === 'calories') return totals[key] > 0
+                  return totals[key] > 0.009
+                })
+
+                if (visibleCards.length === 0) return null
+
                 return (
                   <div>
                     <div className="text-lg font-semibold text-gray-800 mb-2">{isViewingToday ? "Today's Totals" : 'Totals'}</div>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                      <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
-                        <div className="text-xs text-orange-500 mb-1">Calories</div>
-                        <div className="text-lg font-semibold text-orange-600">{totals.calories}</div>
-                      </div>
-                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                        <div className="text-xs text-blue-500 mb-1">Protein</div>
-                        <div className="text-lg font-semibold text-blue-600">{totals.protein}g</div>
-                      </div>
-                      <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                        <div className="text-xs text-green-500 mb-1">Carbs</div>
-                        <div className="text-lg font-semibold text-green-600">{totals.carbs}g</div>
-                      </div>
-                      <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
-                        <div className="text-xs text-purple-500 mb-1">Fat</div>
-                        <div className="text-lg font-semibold text-purple-600">{totals.fat}g</div>
-                      </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+                      {visibleCards.map((key) => {
+                        const meta = NUTRIENT_CARD_META[key]
+                        const displayValue = formatNutrientValue(key, totals[key])
+                        return (
+                          <div key={key} className={`bg-gradient-to-br ${meta.gradient} border border-white/60 rounded-lg p-3 shadow-sm`}>
+                            <div className={`text-xs ${meta.accent} mb-1 font-medium uppercase tracking-wide`}>{meta.label}</div>
+                            <div className="text-lg font-semibold text-gray-900">{displayValue}</div>
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
-                );
+                )
               })()}
             </div>
           )}
