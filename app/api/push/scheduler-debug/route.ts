@@ -67,28 +67,6 @@ export async function GET(req: NextRequest) {
       }
     })
 
-    return NextResponse.json({
-      userId: user.id,
-      hasSubscription: subRows.length > 0,
-      settings: {
-        time1: settings.time1,
-        time2: settings.time2,
-        time3: settings.time3,
-        timezone: settings.timezone,
-        frequency: settings.frequency
-      },
-      currentTime: {
-        utc: nowUtc.toISOString(),
-        local: current,
-        timezone: tz
-      },
-      reminderTimes,
-      matches,
-      nextCronRuns: [
-        'Every 5 minutes at :00, :05, :10, :15, :20, :25, :30, :35, :40, :45, :50, :55'
-      ]
-    })
-
     // Get recent scheduler logs
     let schedulerLogs: any[] = []
     try {
