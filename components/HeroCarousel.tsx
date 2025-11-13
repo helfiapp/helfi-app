@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 
 // Optimal order for maximum impact - tells a story from onboarding to advanced features
@@ -23,8 +23,12 @@ export default function HeroCarousel() {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const [isPaused, setIsPaused] = useState(false)
   const scrollPositionRef = useRef(0)
-  const [currentIndex, setCurrentIndex] = useState(0)
   const [isMobile, setIsMobile] = useState(false)
+  const [hasMounted, setHasMounted] = useState(false)
+
+  useEffect(() => {
+    setHasMounted(true)
+  }, [])
 
   // Detect mobile on mount and resize
   useEffect(() => {
@@ -36,12 +40,34 @@ export default function HeroCarousel() {
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
+  const getScrollAmount = () => {
+    const container = scrollContainerRef.current
+    if (!container || typeof window === 'undefined') return 0
+
+    const firstSlide = container.querySelector<HTMLElement>('[data-carousel-slide]')
+    if (!firstSlide) return 0
+
+    const computedStyles = window.getComputedStyle(container)
+    const gapValue =
+      parseFloat(computedStyles.columnGap || computedStyles.gap || '0') || 0
+
+    return firstSlide.offsetWidth + gapValue
+  }
+
+  const slidesToRender = useMemo(() => {
+    if (!hasMounted) {
+      return screenshots
+    }
+    return isMobile ? screenshots : [...screenshots, ...screenshots]
+  }, [isMobile, hasMounted])
+
   const scrollLeft = () => {
     const container = scrollContainerRef.current
     if (!container) return
     
     // Calculate scroll amount - scroll by 1 image width
-    const imageWidth = isMobile ? 320 + 24 : 250 + 24 // width + gap
+    const fallbackWidth = isMobile ? 336 : 276
+    const imageWidth = getScrollAmount() || fallbackWidth
     const newScrollLeft = Math.max(0, container.scrollLeft - imageWidth)
     
     container.scrollTo({ left: newScrollLeft, behavior: 'smooth' })
@@ -57,7 +83,8 @@ export default function HeroCarousel() {
     if (!container) return
     
     // Calculate scroll amount - scroll by 1 image width
-    const imageWidth = isMobile ? 320 + 24 : 250 + 24 // width + gap
+    const fallbackWidth = isMobile ? 336 : 276
+    const imageWidth = getScrollAmount() || fallbackWidth
     const maxScroll = container.scrollWidth - container.clientWidth
     const newScrollLeft = Math.min(maxScroll, container.scrollLeft + imageWidth)
     
@@ -69,157 +96,20 @@ export default function HeroCarousel() {
     setTimeout(() => setIsPaused(false), 3000)
   }
 
-  // Mobile: Smooth scroll animation - hold for 5 seconds, then quickly flash to next
+  // Mobile: manual swipe experience with snap points
   useEffect(() => {
     if (!isMobile) return
 
     const container = scrollContainerRef.current
     if (!container) return
 
-    let advanceTimeoutId: NodeJS.Timeout
-    let resumeTimeoutId: NodeJS.Timeout
-    let currentSlideIndex = 0
-    let isUserScrolling = false
-    let isAutoScrolling = false // Track when we're auto-scrolling
-    let scrollAnimationFrameId: number
-    const imageWidth = 320 + 24 // width + gap for mobile
-    const totalSlides = screenshots.length // Total unique slides to show
-
-    const advanceSlide = () => {
-      // Check if paused or user is scrolling
-      if (isPaused || isUserScrolling) {
-        advanceTimeoutId = setTimeout(advanceSlide, 100) // Check again in 100ms
-        return
-      }
-
-      // Move to next slide - only loop back after showing all unique images
-      currentSlideIndex = currentSlideIndex + 1
-      
-      // If we've shown all unique images, loop back to start
-      if (currentSlideIndex >= totalSlides) {
-        currentSlideIndex = 0
-        // Reset scroll position to start for seamless loop
-        container.scrollLeft = 0
-        scrollPositionRef.current = 0
-        setCurrentIndex(0)
-        // Hold for 5 seconds before next transition
-        advanceTimeoutId = setTimeout(advanceSlide, 5000)
-        return
-      }
-      
-      // Mark that we're auto-scrolling
-      isAutoScrolling = true
-      
-      // Calculate target scroll position
-      const targetScrollPosition = currentSlideIndex * imageWidth
-      const startScrollPosition = container.scrollLeft
-      const distance = targetScrollPosition - startScrollPosition
-      const scrollDuration = 1500 // Slower scroll: 1.5 seconds
-      let animationStartTime: number | null = null
-      
-      setCurrentIndex(currentSlideIndex)
-      
-      // Custom slow smooth scroll animation
-      const animateScroll = (currentTime: number) => {
-        if (!isAutoScrolling) return // Stop if user interrupted
-        
-        // Initialize start time on first frame
-        if (animationStartTime === null) {
-          animationStartTime = currentTime
-        }
-        
-        const elapsed = currentTime - animationStartTime
-        const progress = Math.min(elapsed / scrollDuration, 1)
-        
-        // Easing function for smooth deceleration
-        const easeOutCubic = 1 - Math.pow(1 - progress, 3)
-        
-        const currentScrollPosition = startScrollPosition + (distance * easeOutCubic)
-        container.scrollLeft = currentScrollPosition
-        scrollPositionRef.current = currentScrollPosition
-        
-        if (progress < 1) {
-          scrollAnimationFrameId = requestAnimationFrame(animateScroll)
-        } else {
-          // Ensure final position is exact
-          container.scrollLeft = targetScrollPosition
-          scrollPositionRef.current = targetScrollPosition
-          // Scroll complete
-          isAutoScrolling = false
-          animationStartTime = null
-          // Hold for 5 seconds before next transition
-          advanceTimeoutId = setTimeout(advanceSlide, 5000)
-        }
-      }
-      
-      // Start the scroll animation immediately
-      scrollAnimationFrameId = requestAnimationFrame(animateScroll)
-    }
-
-    // Pause auto-advance when user manually scrolls
-    const handleScroll = () => {
-      // Ignore scrolls during our auto-scroll animation
-      if (isAutoScrolling) {
-        return
-      }
-
-      // This is a user-initiated scroll
-      isUserScrolling = true
-      setIsPaused(true)
-      
-      // Clear any pending advance
-      if (advanceTimeoutId) {
-        clearTimeout(advanceTimeoutId)
-      }
-      
-      // Cancel any ongoing scroll animation
-      if (scrollAnimationFrameId) {
-        cancelAnimationFrame(scrollAnimationFrameId)
-        isAutoScrolling = false
-      }
-      
-      // Clear any existing resume timeout
-      if (resumeTimeoutId) {
-        clearTimeout(resumeTimeoutId)
-      }
-      
-      // Resume auto-advance after user stops scrolling for 5 seconds
-      resumeTimeoutId = setTimeout(() => {
-        isUserScrolling = false
-        setIsPaused(false)
-        // Sync currentSlideIndex with actual scroll position
-        const scrollPos = container.scrollLeft
-        // Calculate which slide we're on, but don't use modulo - allow going through all slides
-        const calculatedIndex = Math.round(scrollPos / imageWidth)
-        // Clamp to valid range (0 to totalSlides-1)
-        currentSlideIndex = Math.max(0, Math.min(calculatedIndex, totalSlides - 1))
-        advanceTimeoutId = setTimeout(advanceSlide, 5000)
-      }, 5000)
-    }
-
-    // Initialize to first slide
     container.scrollLeft = 0
     scrollPositionRef.current = 0
-    
-    // Add scroll listener
-    container.addEventListener('scroll', handleScroll, { passive: true })
-    
-    // Start the cycle after 5 seconds (hold first slide for 5 seconds)
-    advanceTimeoutId = setTimeout(advanceSlide, 5000)
 
     return () => {
-      container.removeEventListener('scroll', handleScroll)
-      if (advanceTimeoutId) {
-        clearTimeout(advanceTimeoutId)
-      }
-      if (resumeTimeoutId) {
-        clearTimeout(resumeTimeoutId)
-      }
-      if (scrollAnimationFrameId) {
-        cancelAnimationFrame(scrollAnimationFrameId)
-      }
+      scrollPositionRef.current = 0
     }
-  }, [isMobile, isPaused])
+  }, [isMobile])
 
   // Desktop: Continuous smooth scroll
   useEffect(() => {
@@ -256,7 +146,7 @@ export default function HeroCarousel() {
 
   return (
     <div 
-      className="relative w-full px-2 md:px-12 lg:px-14"
+      className="relative w-full px-2 sm:px-4 lg:px-8"
       style={{ paddingTop: '2rem', paddingBottom: '2rem' }}
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
@@ -298,20 +188,25 @@ export default function HeroCarousel() {
       {/* Horizontal Scrolling Container */}
       <div
         ref={scrollContainerRef}
-        className="flex gap-6 overflow-x-auto items-center mx-auto scrollbar-hide"
+        className="flex gap-4 overflow-x-auto items-center scrollbar-hide"
         style={{ 
           scrollBehavior: 'auto',
-          width: isMobile ? '100%' : 'calc(5 * (250px + 24px))', // Mobile: full width, Desktop: exactly 5 images
+          width: '100%',
           maxWidth: '100%',
-          scrollSnapType: 'none',
+          paddingLeft: isMobile ? '2.75rem' : '5.5rem',
+          paddingRight: isMobile ? '2.75rem' : '5.5rem',
+          scrollSnapType: isMobile ? 'x mandatory' : 'none',
         }}
       >
-        {/* Duplicate images for seamless loop */}
-        {[...screenshots, ...screenshots].map((screenshot, index) => (
+        {/* Render slides (desktop duplicates for seamless loop) */}
+        {slidesToRender.map((screenshot, index) => (
           <div
             key={`${screenshot}-${index}`}
-            className={`flex-shrink-0 relative ${isMobile ? 'w-[320px]' : 'w-[250px]'} h-auto`}
-            style={{}}
+            data-carousel-slide
+            className={`flex-shrink-0 relative ${isMobile ? 'w-[320px]' : 'w-[260px]'} h-auto`}
+            style={{
+              scrollSnapAlign: isMobile ? 'center' : 'none'
+            }}
           >
             <div className="relative aspect-[9/16] rounded-2xl overflow-hidden shadow-xl">
               <Image
@@ -321,7 +216,7 @@ export default function HeroCarousel() {
                 className="object-contain"
                 priority={index < 2}
                 loading={index < 3 ? 'eager' : 'lazy'}
-                sizes={isMobile ? "320px" : "250px"}
+                sizes={isMobile ? '320px' : '260px'}
               />
             </div>
           </div>
