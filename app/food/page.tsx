@@ -8,7 +8,7 @@ import { Cog6ToothIcon } from '@heroicons/react/24/outline'
  * If you change regexes or presentation, TEST that all four values still render.
  */
 
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -51,6 +51,8 @@ export default function FoodDiary() {
   const [showIngredientOptions, setShowIngredientOptions] = useState<string | null>(null)
   const [editingEntry, setEditingEntry] = useState<any>(null)
   const [hasReAnalyzed, setHasReAnalyzed] = useState<boolean>(false)
+
+  const descriptionTextareaRef = useRef<HTMLTextAreaElement | null>(null)
 
   const [foodImagesLoading, setFoodImagesLoading] = useState<{[key: string]: boolean}>({})
   const [expandedEntries, setExpandedEntries] = useState<{[key: string]: boolean}>({})
@@ -893,7 +895,7 @@ Please add nutritional information manually if needed.`);
   };
 
   // Debug logging to track state changes
-  React.useEffect(() => {
+  useEffect(() => {
     console.log('🔍 State Debug:', {
       showAddFood,
       showAiResult,
@@ -902,6 +904,15 @@ Please add nutritional information manually if needed.`);
       todaysFoodsCount: todaysFoods.length
     });
   }, [showAddFood, showAiResult, isEditingDescription, editingEntry, todaysFoods.length]);
+
+  useEffect(() => {
+    if (!isEditingDescription) return;
+    const textarea = descriptionTextareaRef.current;
+    if (textarea) {
+      textarea.style.height = 'auto';
+      textarea.style.height = `${textarea.scrollHeight}px`;
+    }
+  }, [isEditingDescription, editedDescription]);
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-gray-50">
@@ -1303,10 +1314,17 @@ Please add nutritional information manually if needed.`);
                     <div className="mb-6 space-y-3">
                       <div className="text-sm font-medium text-gray-600 mb-2">Detected Foods:</div>
                       {analyzedItems.map((item: any, index: number) => {
-                        const totalCalories = Math.round((item.calories || 0) * (item.servings || 1));
-                        const totalProtein = Math.round(((item.protein_g || 0) * (item.servings || 1)) * 10) / 10;
-                        const totalCarbs = Math.round(((item.carbs_g || 0) * (item.servings || 1)) * 10) / 10;
-                        const totalFat = Math.round(((item.fat_g || 0) * (item.servings || 1)) * 10) / 10;
+                        const servingsCount = item?.servings && item.servings > 0 ? item.servings : 1;
+                        const totalCalories = Math.round((item.calories || 0) * servingsCount);
+                        const totalProtein = Math.round(((item.protein_g || 0) * servingsCount) * 10) / 10;
+                        const totalCarbs = Math.round(((item.carbs_g || 0) * servingsCount) * 10) / 10;
+                        const totalFat = Math.round(((item.fat_g || 0) * servingsCount) * 10) / 10;
+                        const formattedServings = (() => {
+                          if (!servingsCount) return '0 servings';
+                          const rounded = Math.round(servingsCount * 100) / 100;
+                          const display = Number.isInteger(rounded) ? rounded.toString() : rounded.toFixed(2).replace(/\.0+$/, '').replace(/(\.[1-9])0$/, '$1');
+                          return `${display} serving${rounded === 1 ? '' : 's'}`;
+                        })();
                         
                         return (
                           <div key={index} className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
@@ -1352,7 +1370,7 @@ Please add nutritional information manually if needed.`);
                                   }}
                                   className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-medium transition-colors"
                                 >
-                                  −
+                                  -
                                 </button>
                                 <span className="text-base font-semibold text-gray-900 w-12 text-center">
                                   {item.servings || 1}
@@ -1370,12 +1388,10 @@ Please add nutritional information manually if needed.`);
                                   +
                                 </button>
                               </div>
-                              <span className="text-xs text-gray-500 ml-auto">
-                                ({totalCalories} cal, {totalProtein}g protein, {totalCarbs}g carbs, {totalFat}g fat)
-                              </span>
                             </div>
                             
                             {/* Per-serving nutrition */}
+                            <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Per serving</div>
                             <div className="grid grid-cols-4 gap-2 text-xs">
                               <div className="text-center">
                                 <div className="font-semibold text-orange-600">{item.calories || 0}</div>
@@ -1394,6 +1410,16 @@ Please add nutritional information manually if needed.`);
                                 <div className="text-gray-500">Fat</div>
                               </div>
                             </div>
+
+                            <div className="mt-3 bg-gray-50 border border-gray-100 rounded-lg px-3 py-2 text-xs text-gray-600">
+                              <div className="font-medium text-gray-700">Totals for {formattedServings}</div>
+                              <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                                <span>{totalCalories} cal</span>
+                                <span>{totalProtein}g protein</span>
+                                <span>{totalCarbs}g carbs</span>
+                                <span>{totalFat}g fat</span>
+                              </div>
+                            </div>
                           </div>
                         );
                       })}
@@ -1402,29 +1428,32 @@ Please add nutritional information manually if needed.`);
                     <div className="mb-6">
                       <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
                         <div className="text-sm font-medium text-gray-600 mb-2">Detected Foods:</div>
-                        <div className="text-gray-900 text-sm leading-relaxed">
+                        <div className="text-gray-900 text-sm leading-relaxed whitespace-pre-wrap break-words">
                           {(() => {
-                            const cleanDescription = aiDescription.split('\n').filter(line => 
-                              !line.toLowerCase().includes('calorie') && 
-                              !line.toLowerCase().includes('protein') && 
-                              !line.toLowerCase().includes('carb') && 
-                              !line.toLowerCase().includes('fat') && 
-                              !line.toLowerCase().includes('fiber') && 
-                              !line.toLowerCase().includes('sugar') &&
-                              !line.toLowerCase().includes('nutritional') &&
-                              !line.toLowerCase().includes('nutrition') &&
-                              !line.toLowerCase().includes('unable to see') &&
-                              !line.toLowerCase().includes('cannot provide') &&
-                              !line.toLowerCase().includes('general estimate') &&
-                              !line.toLowerCase().includes('approximate') &&
-                              !line.toLowerCase().includes('typical serving') &&
-                              line.trim().length > 0
-                            ).join(' ').replace(/^(This image shows|I can see|The food appears to be|This appears to be|I'm unable to see|Based on the image)/i, '').trim() || 
-                            aiDescription.split('.')[0].replace(/^(I'm unable to see.*?but I can provide a general estimate for|Based on.*?,)/i, '').trim() || 
-                            aiDescription.split(',')[0] || aiDescription;
-                            
-                            // Capitalize first letter
-                            return cleanDescription.replace(/^./, (match: string) => match.toUpperCase());
+                            const filteredLines = aiDescription
+                              .split('\n')
+                              .map((line) => line.trim())
+                              .filter(line =>
+                                line.length > 0 &&
+                                !/^calories?\b/i.test(line) &&
+                                !/^protein\b/i.test(line) &&
+                                !/^carb(?:ohydrate)?s?\b/i.test(line) &&
+                                !/^fat\b/i.test(line) &&
+                                !/^fiber\b/i.test(line) &&
+                                !/^sugar\b/i.test(line) &&
+                                !/insufficient credits/i.test(line) &&
+                                !/trial limit/i.test(line) &&
+                                !/^i'?m unable to see/i.test(line) &&
+                                !/^unable to see/i.test(line)
+                              );
+
+                            const cleaned = filteredLines.join('\n\n').trim();
+                            const fallback = aiDescription.replace(/calories\s*:[^\n]+/gi, '').trim();
+                            const merged = (cleaned || fallback || aiDescription || '').trim();
+                            const normalized = merged.replace(/^(This image shows|I can see|The food appears to be|This appears to be|I'm unable to see|Based on the image)/i, '').trim();
+                            const finalText = normalized || 'Description not available yet.';
+
+                            return finalText.replace(/^./, (match: string) => match.toUpperCase());
                           })()}
                         </div>
                       </div>
@@ -1701,9 +1730,19 @@ Please add nutritional information manually if needed.`);
                       Food Description
                     </label>
                     <textarea
+                      ref={descriptionTextareaRef}
                       value={editedDescription}
-                      onChange={(e) => setEditedDescription(e.target.value)}
-                      className="w-full h-32 px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 text-base resize-none bg-white shadow-sm font-normal leading-relaxed"
+                      onChange={(e) => {
+                        setEditedDescription(e.target.value);
+                        e.target.style.height = 'auto';
+                        e.target.style.height = `${e.target.scrollHeight}px`;
+                      }}
+                      onFocus={(e) => {
+                        e.target.style.height = 'auto';
+                        e.target.style.height = `${e.target.scrollHeight}px`;
+                      }}
+                      className="w-full min-h-[8rem] px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 text-base resize-none bg-white shadow-sm font-normal leading-relaxed whitespace-pre-wrap"
+                      style={{ overflow: 'hidden' }}
                       placeholder="Enter a detailed description of the food item..."
                     />
                     <p className="text-sm text-gray-600 font-normal">
@@ -1891,17 +1930,28 @@ Please add nutritional information manually if needed.`);
                     {/* Done Button - Full Width */}
                     <button
                       onClick={() => {
-                        // Done - Close editing mode and reset state
+                        const entry = editingEntry;
+                        // Close editing view but keep current analysis visible
                         setIsEditingDescription(false);
                         setEditedDescription('');
-                        setEditingEntry(null);
                         setHasReAnalyzed(false); // Reset button state
-                        setPhotoFile(null);
-                        setPhotoPreview(null);
-                        setAiDescription('');
-                        setShowAiResult(false);
-                        setShowAddFood(false);
-                        setAnalyzedNutrition(null);
+
+                        if (entry) {
+                          setAiDescription(entry.description || aiDescription);
+                          if (entry.nutrition) {
+                            setAnalyzedNutrition(entry.nutrition);
+                          }
+                          if (entry.photo) {
+                            setPhotoPreview(entry.photo);
+                          }
+                          setEditingEntry(null);
+                        } else {
+                          // For newly analyzed items, keep current data visible
+                          setAiDescription((current) => current || aiDescription);
+                        }
+
+                        setShowAiResult(true);
+                        setShowAddFood(true);
                         setShowPhotoOptions(false);
                       }}
                       className="w-full py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-all duration-300 flex items-center justify-center"
