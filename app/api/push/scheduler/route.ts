@@ -10,22 +10,33 @@ export async function POST(req: NextRequest) {
   const authHeader = req.headers.get('authorization') || ''
   const expected = process.env.SCHEDULER_SECRET || ''
   
-  // Check for Vercel cron header (can be '1', 'true', or truthy)
+  // Check for Vercel cron header
+  // Vercel sends x-vercel-cron header when triggering cron jobs
   const vercelCronHeader = req.headers.get('x-vercel-cron')
-  const isVercelCron = vercelCronHeader === '1' || vercelCronHeader === 'true' || !!vercelCronHeader
+  const isVercelCron = vercelCronHeader !== null // Header exists (even if empty, Vercel sets it)
+  
+  // Also check all headers for debugging
+  const allHeaders: Record<string, string> = {}
+  req.headers.forEach((value, key) => {
+    allHeaders[key] = value
+  })
   
   // Log authentication attempt for debugging
   console.log('[SCHEDULER] Auth check:', {
-    hasVercelCronHeader: !!vercelCronHeader,
+    hasVercelCronHeader: vercelCronHeader !== null,
     vercelCronValue: vercelCronHeader,
     isVercelCron,
     hasAuthHeader: !!authHeader,
-    hasExpectedSecret: !!expected
+    hasExpectedSecret: !!expected,
+    method: req.method,
+    url: req.url,
+    allHeaders: Object.keys(allHeaders)
   })
   
   if (!(isVercelCron || (expected && authHeader === `Bearer ${expected}`))) {
     console.error('[SCHEDULER] ❌ Unauthorized - missing x-vercel-cron header or valid Bearer token')
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    console.error('[SCHEDULER] Received headers:', JSON.stringify(allHeaders, null, 2))
+    return NextResponse.json({ error: 'Unauthorized', debug: { hasVercelCronHeader: vercelCronHeader !== null, headers: Object.keys(allHeaders) } }, { status: 401 })
   }
   
   console.log('[SCHEDULER] ✅ Authorized - proceeding with notification check')
