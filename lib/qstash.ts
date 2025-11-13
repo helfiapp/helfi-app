@@ -113,9 +113,17 @@ export async function scheduleReminderWithQStash(
     return { scheduled: false, reason: 'missing_qstash_token' }
   }
 
-  const base =
+  let base =
     process.env.PUBLIC_BASE_URL ||
     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '')
+  if (base) {
+    base = base.trim()
+    if (base && !/^https?:\/\//i.test(base)) {
+      base = `https://${base}`
+    }
+    // Remove any trailing slash to avoid double slashes in callback
+    base = base.replace(/\/+$/, '')
+  }
   if (!base) {
     await logScheduleAttempt({
       userId,
