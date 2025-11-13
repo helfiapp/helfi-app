@@ -20,12 +20,15 @@ export async function POST(req: NextRequest) {
   }
   webpush.setVapidDetails('mailto:support@helfi.ai', publicKey, privateKey)
 
-  // Ensure required tables exist (simplified schema - only time1 needed)
+  // Ensure required tables exist with full schema
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS CheckinSettings (
       userId TEXT PRIMARY KEY,
       time1 TEXT NOT NULL,
-      timezone TEXT NOT NULL
+      time2 TEXT NOT NULL,
+      time3 TEXT NOT NULL,
+      timezone TEXT NOT NULL,
+      frequency INTEGER NOT NULL DEFAULT 3
     )
   `)
   await prisma.$executeRawUnsafe(`
@@ -34,19 +37,35 @@ export async function POST(req: NextRequest) {
       subscription JSONB NOT NULL
     )
   `)
+  
+  // Migrate old schema if needed
+  await prisma.$executeRawUnsafe(`ALTER TABLE CheckinSettings ADD COLUMN IF NOT EXISTS time2 TEXT NOT NULL DEFAULT '18:00'`).catch(() => {})
+  await prisma.$executeRawUnsafe(`ALTER TABLE CheckinSettings ADD COLUMN IF NOT EXISTS time3 TEXT NOT NULL DEFAULT '21:00'`).catch(() => {})
+  await prisma.$executeRawUnsafe(`ALTER TABLE CheckinSettings ADD COLUMN IF NOT EXISTS frequency INTEGER NOT NULL DEFAULT 3`).catch(() => {})
 
-  // Load all users with subscriptions (use default 9pm for everyone)
+  // Load all users with subscriptions and their reminder settings
   const rows: Array<{
-    userid: string
+    userId: string
+    time1: string
+    time2: string
+    time3: string
     timezone: string
+    frequency: number
     subscription: any
   }> = await prisma.$queryRawUnsafe(`
-    SELECT DISTINCT p.userId as userId, COALESCE(s.timezone, 'Australia/Melbourne') as timezone, p.subscription
+    SELECT DISTINCT 
+      p.userId as userId, 
+      COALESCE(s.time1, '12:30') as time1,
+      COALESCE(s.time2, '18:30') as time2,
+      COALESCE(s.time3, '21:30') as time3,
+      COALESCE(s.timezone, 'Australia/Melbourne') as timezone,
+      COALESCE(s.frequency, 3) as frequency,
+      p.subscription
     FROM PushSubscriptions p
     LEFT JOIN CheckinSettings s ON s.userId = p.userId
   `)
 
-  // Determine current HH:MM in each user's timezone and match one of their times
+  // Determine current HH:MM in each user's timezone and match against their reminder times
   const nowUtc = new Date()
   const sentTo: string[] = []
   const errors: Array<{ userId: string, error: string }> = []
@@ -65,9 +84,25 @@ export async function POST(req: NextRequest) {
       const mm = parts.find(p => p.type === 'minute')?.value || '00'
       const current = `${hh}:${mm}`
 
-      // Always use default 9pm (21:00) for all users
-      const reminderTime = '21:00'
-      const shouldSend = current === reminderTime
+      // Build array of reminder times based on frequency
+      const reminderTimes: string[] = []
+      if (r.frequency >= 1) reminderTimes.push(r.time1 || '12:30')
+      if (r.frequency >= 2) reminderTimes.push(r.time2 || '18:30')
+      if (r.frequency >= 3) reminderTimes.push(r.time3 || '21:30')
+
+      // Check if current time matches any reminder time (within 5-minute window)
+      // Since cron runs every 5 minutes, we check if reminder time is within the current 5-minute bucket
+      const shouldSend = reminderTimes.some(reminderTime => {
+        const [rh, rm] = reminderTime.split(':').map(Number)
+        const [ch, cm] = [parseInt(hh, 10), parseInt(mm, 10)]
+        
+        // Round current time down to nearest 5-minute mark (e.g., 12:33 -> 12:30)
+        const currentRoundedMinutes = Math.floor(cm / 5) * 5
+        
+        // Check if reminder time matches the rounded current time
+        return rh === ch && rm === currentRoundedMinutes
+      })
+
       if (!shouldSend) continue
 
       const payload = JSON.stringify({
@@ -76,9 +111,9 @@ export async function POST(req: NextRequest) {
         url: '/check-in'
       })
       await webpush.sendNotification(r.subscription, payload)
-      sentTo.push(r.userid)
+      sentTo.push(r.userId)
     } catch (e: any) {
-      errors.push({ userId: (r as any).userid || (r as any).userId, error: e?.body || e?.message || String(e) })
+      errors.push({ userId: r.userId, error: e?.body || e?.message || String(e) })
     }
   }
 

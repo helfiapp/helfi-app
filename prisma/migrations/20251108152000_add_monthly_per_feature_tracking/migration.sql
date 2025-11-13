@@ -4,3 +4,4 @@ ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "monthlyFoodAnalysisUsed" INTEGER NO
 ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "monthlyMedicalImageAnalysisUsed" INTEGER NOT NULL DEFAULT 0;
 
 
+

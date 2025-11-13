@@ -23,34 +23,35 @@ export async function GET() {
     `)
     await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS CheckinRatings (
+        id TEXT PRIMARY KEY,
         userId TEXT NOT NULL,
         issueId TEXT NOT NULL,
         date TEXT NOT NULL,
+        timestamp TIMESTAMP NOT NULL DEFAULT NOW(),
         value INTEGER,
         note TEXT,
-        isNa BOOLEAN DEFAULT false,
-        PRIMARY KEY (userId, issueId, date)
+        isNa BOOLEAN DEFAULT false
       )
     `)
+    // Migrate old schema: add timestamp and id columns if they don't exist
+    await prisma.$executeRawUnsafe(`ALTER TABLE CheckinRatings ADD COLUMN IF NOT EXISTS id TEXT`).catch(() => {})
+    await prisma.$executeRawUnsafe(`ALTER TABLE CheckinRatings ADD COLUMN IF NOT EXISTS timestamp TIMESTAMP NOT NULL DEFAULT NOW()`).catch(() => {})
     // Ensure columns exist for older tables
+    await prisma.$executeRawUnsafe(`ALTER TABLE CheckinRatings ALTER COLUMN value DROP NOT NULL`).catch(()=>{})
+    await prisma.$executeRawUnsafe(`ALTER TABLE CheckinRatings ADD COLUMN IF NOT EXISTS note TEXT`).catch(()=>{})
+    await prisma.$executeRawUnsafe(`ALTER TABLE CheckinRatings ADD COLUMN IF NOT EXISTS isNa BOOLEAN DEFAULT false`).catch(()=>{})
+    
+    // Migrate existing records: generate IDs and timestamps for records without them
     await prisma.$executeRawUnsafe(`
-      ALTER TABLE CheckinRatings ALTER COLUMN value DROP NOT NULL;
-    `).catch(()=>{})
-    await prisma.$executeRawUnsafe(`
-      ALTER TABLE CheckinRatings ADD COLUMN IF NOT EXISTS note TEXT;
-    `).catch(()=>{})
-    await prisma.$executeRawUnsafe(`
-      ALTER TABLE CheckinRatings ADD COLUMN IF NOT EXISTS isNa BOOLEAN DEFAULT false;
-    `).catch(()=>{})
-    // Migrate earlier schema variants to current shape
-    // 1) Ensure note column exists
-    await prisma.$executeRawUnsafe(`ALTER TABLE CheckinRatings ADD COLUMN IF NOT EXISTS note TEXT`)
-    // 2) Ensure isNa column exists
-    await prisma.$executeRawUnsafe(`ALTER TABLE CheckinRatings ADD COLUMN IF NOT EXISTS isNa BOOLEAN DEFAULT false`)
-    // 3) Ensure value column is nullable (some earlier tables had NOT NULL)
-    try {
-      await prisma.$executeRawUnsafe(`ALTER TABLE CheckinRatings ALTER COLUMN value DROP NOT NULL`)
-    } catch { /* ignore if already nullable */ }
+      UPDATE CheckinRatings 
+      SET id = COALESCE(id, gen_random_uuid()::text),
+          timestamp = COALESCE(timestamp, NOW())
+      WHERE id IS NULL OR timestamp IS NULL
+    `).catch(() => {})
+    
+    // Create indexes for better query performance
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS idx_checkinratings_user_date ON CheckinRatings(userId, date)`).catch(() => {})
+    await prisma.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS idx_checkinratings_timestamp ON CheckinRatings(timestamp DESC)`).catch(() => {})
   } catch {}
 
   let issues: any[] = await prisma.$queryRawUnsafe(`SELECT id, name, polarity FROM CheckinIssues WHERE userId = $1`, user.id)
@@ -118,7 +119,22 @@ export async function GET() {
     }
   }
   
-  const ratings: any[] = await prisma.$queryRawUnsafe(`SELECT issueId, value FROM CheckinRatings WHERE userId = $1 AND date = $2`, user.id, today)
+  // Get the most recent check-in for today (show latest entry per issue)
+  const allRatings: any[] = await prisma.$queryRawUnsafe(`
+    SELECT issueId, value, note, isNa, timestamp
+    FROM CheckinRatings 
+    WHERE userId = $1 AND date = $2 
+    ORDER BY timestamp DESC
+  `, user.id, today)
+  
+  // Group by issueId and take the most recent one
+  const ratingsMap = new Map<string, any>()
+  for (const rating of allRatings) {
+    if (!ratingsMap.has(rating.issueId)) {
+      ratingsMap.set(rating.issueId, rating)
+    }
+  }
+  const ratings = Array.from(ratingsMap.values())
 
   return NextResponse.json({ issues, ratings })
 }
@@ -131,29 +147,37 @@ export async function POST(req: NextRequest) {
 
   const { ratings } = await req.json()
   const today = new Date().toISOString().slice(0,10)
+  const now = new Date().toISOString()
 
   try {
     await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS CheckinRatings (
+        id TEXT PRIMARY KEY,
         userId TEXT NOT NULL,
         issueId TEXT NOT NULL,
         date TEXT NOT NULL,
+        timestamp TIMESTAMP NOT NULL DEFAULT NOW(),
         value INTEGER,
         note TEXT,
-        isNa BOOLEAN DEFAULT false,
-        PRIMARY KEY (userId, issueId, date)
+        isNa BOOLEAN DEFAULT false
       )
     `)
+    // Migrate old schema: add timestamp and id columns if they don't exist
+    await prisma.$executeRawUnsafe(`ALTER TABLE CheckinRatings ADD COLUMN IF NOT EXISTS id TEXT`).catch(() => {})
+    await prisma.$executeRawUnsafe(`ALTER TABLE CheckinRatings ADD COLUMN IF NOT EXISTS timestamp TIMESTAMP NOT NULL DEFAULT NOW()`).catch(() => {})
     // Ensure columns/nullability exist for older tables
     try { await prisma.$executeRawUnsafe(`ALTER TABLE CheckinRatings ADD COLUMN IF NOT EXISTS note TEXT`) } catch(_) {}
     try { await prisma.$executeRawUnsafe(`ALTER TABLE CheckinRatings ADD COLUMN IF NOT EXISTS isNa BOOLEAN DEFAULT false`) } catch(_) {}
     try { await prisma.$executeRawUnsafe(`ALTER TABLE CheckinRatings ALTER COLUMN value DROP NOT NULL`) } catch(_) {}
+    
+    // Create a new check-in entry (allowing multiple per day)
     for (const r of ratings as Array<{ issueId: string, value?: number | null, note?: string, isNa?: boolean }>) {
       const clamped = (r.value === null || r.value === undefined) ? null : Math.max(0, Math.min(6, Number(r.value)))
+      const id = crypto.randomUUID()
       await prisma.$executeRawUnsafe(
-        `INSERT INTO CheckinRatings (userId, issueId, date, value, note, isNa) VALUES ($1,$2,$3,$4,$5,$6)
-         ON CONFLICT (userId, issueId, date) DO UPDATE SET value=EXCLUDED.value, note=EXCLUDED.note, isNa=EXCLUDED.isNa`,
-        user.id, r.issueId, today, clamped, String(r.note || ''), !!r.isNa
+        `INSERT INTO CheckinRatings (id, userId, issueId, date, timestamp, value, note, isNa) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        id, user.id, r.issueId, today, now, clamped, String(r.note || ''), !!r.isNa
       )
     }
     return NextResponse.json({ success: true })

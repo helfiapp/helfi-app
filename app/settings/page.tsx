@@ -32,10 +32,14 @@ export default function Settings() {
   const [showPdf, setShowPdf] = useState(false)
   const [pdfUrl, setPdfUrl] = useState<string>('')
   const [exporting, setExporting] = useState(false)
-  // Reminder settings (simplified to single daily reminder)
-  const [time1, setTime1] = useState('21:00')
+  // Reminder settings (multiple reminders per day)
+  const [time1, setTime1] = useState('12:30')
+  const [time2, setTime2] = useState('18:30')
+  const [time3, setTime3] = useState('21:30')
   const [tz, setTz] = useState('Australia/Melbourne')
+  const [frequency, setFrequency] = useState(3)
   const [savingTimes, setSavingTimes] = useState(false)
+  const [loadingSettings, setLoadingSettings] = useState(true)
   // Curated timezone list (IANA names)
   const baseTimezones = [
     'UTC','Europe/London','Europe/Paris','Europe/Berlin','Europe/Madrid','Europe/Rome','Europe/Amsterdam','Europe/Zurich','Europe/Stockholm','Europe/Athens',
@@ -158,11 +162,28 @@ export default function Settings() {
     })()
   }, [])
 
-  // Load reminder settings (always use defaults - no custom times allowed)
+  // Load reminder settings from API
   useEffect(() => {
-    setTime1('21:00')
-    setTz('Australia/Melbourne')
+    (async () => {
+      try {
+        const res = await fetch('/api/checkins/settings', { cache: 'no-store' as any })
+        if (res.ok) {
+          const data = await res.json()
+          if (data.time1) setTime1(data.time1)
+          if (data.time2) setTime2(data.time2)
+          if (data.time3) setTime3(data.time3)
+          if (data.timezone) setTz(data.timezone)
+          if (data.frequency !== undefined) setFrequency(data.frequency)
+        }
+      } catch (e) {
+        console.error('Failed to load reminder settings', e)
+      } finally {
+        setLoadingSettings(false)
+      }
+    })()
   }, [])
+
+  // Detect existing subscription on load
   useEffect(() => {
     (async () => {
       try {
@@ -177,12 +198,6 @@ export default function Settings() {
         }
       } catch {}
     })()
-  }, [])
-
-  // Load reminder settings (always use defaults - no custom times allowed)
-  useEffect(() => {
-    setTime1('21:00')
-    setTz('Australia/Melbourne')
   }, [])
 
   // Auto-save profile visibility
@@ -743,30 +758,119 @@ export default function Settings() {
             </Link>
           </div>
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-            Daily reminders are sent via push notifications once per day at the default time.
+            Set up to 3 daily reminders. You can check in multiple times per day to track your health throughout the day.
           </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Reminder Time</label>
-              <div 
-                onClick={() => alert('Currently 9 PM is the default time for all reminders.')}
-                className="w-full border rounded px-3 py-2 dark:bg-gray-700 dark:text-white bg-gray-50 dark:bg-gray-700 cursor-not-allowed opacity-60 flex items-center justify-between"
+          
+          {loadingSettings ? (
+            <div className="flex items-center justify-center py-4">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-helfi-green"></div>
+            </div>
+          ) : (
+            <>
+              <div className="space-y-4 mb-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Number of reminders per day
+                  </label>
+                  <select
+                    value={frequency}
+                    onChange={(e) => setFrequency(parseInt(e.target.value, 10))}
+                    className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  >
+                    <option value={1}>1 reminder</option>
+                    <option value={2}>2 reminders</option>
+                    <option value={3}>3 reminders</option>
+                  </select>
+                </div>
+
+                {frequency >= 1 && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Reminder 1
+                    </label>
+                    <input
+                      type="time"
+                      value={time1}
+                      onChange={(e) => setTime1(e.target.value)}
+                      className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    />
+                  </div>
+                )}
+
+                {frequency >= 2 && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Reminder 2
+                    </label>
+                    <input
+                      type="time"
+                      value={time2}
+                      onChange={(e) => setTime2(e.target.value)}
+                      className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    />
+                  </div>
+                )}
+
+                {frequency >= 3 && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Reminder 3
+                    </label>
+                    <input
+                      type="time"
+                      value={time3}
+                      onChange={(e) => setTime3(e.target.value)}
+                      className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Timezone
+                  </label>
+                  <select
+                    value={tz}
+                    onChange={(e) => setTz(e.target.value)}
+                    className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  >
+                    {baseTimezones.map((tzOption) => (
+                      <option key={tzOption} value={tzOption}>
+                        {tzOption}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <button
+                onClick={async () => {
+                  setSavingTimes(true)
+                  try {
+                    const res = await fetch('/api/checkins/settings', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ time1, time2, time3, timezone: tz, frequency })
+                    })
+                    if (res.ok) {
+                      alert('Reminder times saved successfully!')
+                    } else {
+                      const data = await res.json().catch(() => ({}))
+                      alert(`Failed to save: ${data.error || 'Unknown error'}`)
+                    }
+                  } catch (e) {
+                    alert('Failed to save reminder times. Please try again.')
+                  } finally {
+                    setSavingTimes(false)
+                  }
+                }}
+                disabled={savingTimes}
+                className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 disabled:opacity-60 disabled:cursor-not-allowed font-medium"
               >
-                <span>9:00 PM</span>
-                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Default time for all users</p>
-            </div>
-            <div>
-              <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Timezone</label>
-              <div className="w-full border rounded px-3 py-2 dark:bg-gray-700 dark:text-white bg-gray-50 dark:bg-gray-700 cursor-not-allowed opacity-60">
-                Australia/Melbourne
-              </div>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Default timezone</p>
-            </div>
-          </div>
+                {savingTimes ? 'Saving...' : 'Save Reminder Times'}
+              </button>
+            </>
+          )}
         </div>
       </div>
 
