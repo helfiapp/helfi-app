@@ -71,6 +71,15 @@ export async function POST(req: NextRequest) {
       subscription JSONB NOT NULL
     )
   `)
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS ReminderDeliveryLog (
+      userId TEXT NOT NULL,
+      reminderTime TEXT NOT NULL,
+      sentDate DATE NOT NULL,
+      sentAt TIMESTAMP NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (userId, reminderTime, sentDate)
+    )
+  `)
   
   // Migrate old schema if needed
   await prisma.$executeRawUnsafe(`ALTER TABLE CheckinSettings ADD COLUMN IF NOT EXISTS time2 TEXT NOT NULL DEFAULT '18:00'`).catch(() => {})
@@ -150,27 +159,41 @@ export async function POST(req: NextRequest) {
       const mm = parts.find(p => p.type === 'minute')?.value || '00'
       const current = `${hh}:${mm}`
 
+      const dateParts = new Intl.DateTimeFormat('en-GB', {
+        timeZone: tz,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      }).formatToParts(nowUtc)
+      const year = dateParts.find(p => p.type === 'year')?.value || '1970'
+      const month = dateParts.find(p => p.type === 'month')?.value || '01'
+      const day = dateParts.find(p => p.type === 'day')?.value || '01'
+      const localDate = `${year}-${month}-${day}`
+
       // Build array of reminder times based on frequency
       const reminderTimes: string[] = []
       if (r.frequency >= 1) reminderTimes.push(r.time1 || '12:30')
       if (r.frequency >= 2) reminderTimes.push(r.time2 || '18:30')
       if (r.frequency >= 3) reminderTimes.push(r.time3 || '21:30')
 
-      // Check if current time matches any reminder time
-      // Cron runs every 5 minutes at :00, :05, :10, :15, :20, :25, :30, :35, :40, :45, :50, :55
-      // We need to match exactly at those times
+      const currentMinutes = parseInt(hh, 10) * 60 + parseInt(mm, 10)
+      const allowedLagMinutes = 2 // tolerate slight cron delays
+
       let shouldSend = false
       let matchReason = ''
+      let matchedReminder = ''
       
       for (const reminderTime of reminderTimes) {
         const [rh, rm] = reminderTime.split(':').map(Number)
         const [ch, cm] = [parseInt(hh, 10), parseInt(mm, 10)]
-        
-        // Check if reminder time exactly matches current time (within the 5-minute cron window)
-        // Since cron runs at :00, :05, :10, etc., we check if current minute matches reminder minute exactly
-        if (rh === ch && rm === cm) {
+        const reminderMinutes = rh * 60 + rm
+        let diff = ( (ch * 60 + cm) - reminderMinutes + 1440 ) % 1440
+        if (diff === 0 || (diff > 0 && diff <= allowedLagMinutes)) {
           shouldSend = true
-          matchReason = `Matched reminder ${reminderTime} at current time ${current}`
+          matchedReminder = reminderTime
+          matchReason = diff === 0
+            ? `Matched reminder ${reminderTime} exactly at current time ${current}`
+            : `Matched reminder ${reminderTime} within ${diff} minute(s) lag (current ${current})`
           break
         }
       }
@@ -190,6 +213,23 @@ export async function POST(req: NextRequest) {
         continue
       }
 
+      if (!r.userId) {
+        console.warn('[SCHEDULER] Skipping send because userId is null')
+        continue
+      }
+
+      const alreadySent: Array<{ exists: number }> = await prisma.$queryRawUnsafe(
+        `SELECT 1 as exists FROM ReminderDeliveryLog WHERE userId = $1 AND reminderTime = $2 AND sentDate = $3 LIMIT 1`,
+        r.userId,
+        matchedReminder,
+        localDate
+      )
+
+      if (alreadySent.length > 0) {
+        console.log(`[SCHEDULER] User ${shortId}... (${tz}): Reminder ${matchedReminder} already sent today (${localDate}), skipping duplicate.`)
+        continue
+      }
+
       console.log(`[SCHEDULER] User ${shortId}... (${tz}): Sending notification - matched ${matchReason}`)
 
       const payload = JSON.stringify({
@@ -199,6 +239,14 @@ export async function POST(req: NextRequest) {
       })
       await webpush.sendNotification(r.subscription, payload)
       sentTo.push(r.userId ?? 'unknown')
+      await prisma.$executeRawUnsafe(
+        `INSERT INTO ReminderDeliveryLog (userId, reminderTime, sentDate, sentAt)
+         VALUES ($1, $2, $3, NOW())
+         ON CONFLICT (userId, reminderTime, sentDate) DO UPDATE SET sentAt = NOW()`,
+        r.userId,
+        matchedReminder,
+        localDate
+      )
       console.log(`[SCHEDULER] ✅ Notification sent to user ${shortId}...`)
     } catch (e: any) {
       const errorMsg = e?.body || e?.message || String(e)
