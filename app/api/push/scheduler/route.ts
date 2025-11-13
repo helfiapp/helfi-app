@@ -69,6 +69,9 @@ export async function POST(req: NextRequest) {
   const nowUtc = new Date()
   const sentTo: string[] = []
   const errors: Array<{ userId: string, error: string }> = []
+  const debugLog: Array<{ userId: string, timezone: string, currentTime: string, reminderTimes: string[], matched: boolean, reason?: string }> = []
+
+  console.log(`[SCHEDULER] Cron triggered at UTC: ${nowUtc.toISOString()}, Processing ${rows.length} users`)
 
   for (const r of rows) {
     try {
@@ -90,20 +93,40 @@ export async function POST(req: NextRequest) {
       if (r.frequency >= 2) reminderTimes.push(r.time2 || '18:30')
       if (r.frequency >= 3) reminderTimes.push(r.time3 || '21:30')
 
-      // Check if current time matches any reminder time (within 5-minute window)
-      // Since cron runs every 5 minutes, we check if reminder time is within the current 5-minute bucket
-      const shouldSend = reminderTimes.some(reminderTime => {
+      // Check if current time matches any reminder time
+      // Cron runs every 5 minutes at :00, :05, :10, :15, :20, :25, :30, :35, :40, :45, :50, :55
+      // We need to match exactly at those times
+      let shouldSend = false
+      let matchReason = ''
+      
+      for (const reminderTime of reminderTimes) {
         const [rh, rm] = reminderTime.split(':').map(Number)
         const [ch, cm] = [parseInt(hh, 10), parseInt(mm, 10)]
         
-        // Round current time down to nearest 5-minute mark (e.g., 12:33 -> 12:30)
-        const currentRoundedMinutes = Math.floor(cm / 5) * 5
-        
-        // Check if reminder time matches the rounded current time
-        return rh === ch && rm === currentRoundedMinutes
+        // Check if reminder time exactly matches current time (within the 5-minute cron window)
+        // Since cron runs at :00, :05, :10, etc., we check if current minute matches reminder minute exactly
+        if (rh === ch && rm === cm) {
+          shouldSend = true
+          matchReason = `Matched reminder ${reminderTime} at current time ${current}`
+          break
+        }
+      }
+
+      debugLog.push({
+        userId: r.userId,
+        timezone: tz,
+        currentTime: current,
+        reminderTimes,
+        matched: shouldSend,
+        reason: shouldSend ? matchReason : `No match: current=${current}, reminders=${reminderTimes.join(', ')}`
       })
 
-      if (!shouldSend) continue
+      if (!shouldSend) {
+        console.log(`[SCHEDULER] User ${r.userId.substring(0, 8)}... (${tz}): No match - current=${current}, reminders=${reminderTimes.join(', ')}`)
+        continue
+      }
+
+      console.log(`[SCHEDULER] User ${r.userId.substring(0, 8)}... (${tz}): Sending notification - matched ${matchReason}`)
 
       const payload = JSON.stringify({
         title: 'Time for your Helfi check‑in',
@@ -112,12 +135,23 @@ export async function POST(req: NextRequest) {
       })
       await webpush.sendNotification(r.subscription, payload)
       sentTo.push(r.userId)
+      console.log(`[SCHEDULER] ✅ Notification sent to user ${r.userId.substring(0, 8)}...`)
     } catch (e: any) {
-      errors.push({ userId: r.userId, error: e?.body || e?.message || String(e) })
+      const errorMsg = e?.body || e?.message || String(e)
+      console.error(`[SCHEDULER] ❌ Error for user ${r.userId.substring(0, 8)}...:`, errorMsg)
+      errors.push({ userId: r.userId, error: errorMsg })
     }
   }
 
-  return NextResponse.json({ success: true, sent: sentTo.length, errors })
+  console.log(`[SCHEDULER] Complete: sent=${sentTo.length}, errors=${errors.length}`)
+
+  return NextResponse.json({ 
+    success: true, 
+    sent: sentTo.length, 
+    errors,
+    debug: debugLog,
+    timestamp: nowUtc.toISOString()
+  })
 }
 
 // Allow Vercel Cron (GET) to trigger the same logic safely
