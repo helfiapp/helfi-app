@@ -62,6 +62,27 @@ async function logScheduleAttempt(entry: ScheduleLogRecord) {
         callbackUrl TEXT
       )
     `)
+    await prisma.$executeRawUnsafe(`ALTER TABLE QstashScheduleLog ADD COLUMN IF NOT EXISTS callbackUrl TEXT`).catch(
+      () => {}
+    )
+    await prisma.$executeRawUnsafe(
+      `ALTER TABLE QstashScheduleLog ADD COLUMN IF NOT EXISTS responseSnippet TEXT`
+    ).catch(() => {})
+    await prisma.$executeRawUnsafe(`ALTER TABLE QstashScheduleLog ADD COLUMN IF NOT EXISTS reason TEXT`).catch(
+      () => {}
+    )
+    await prisma.$executeRawUnsafe(`ALTER TABLE QstashScheduleLog ADD COLUMN IF NOT EXISTS httpStatus INTEGER`).catch(
+      () => {}
+    )
+    await prisma.$executeRawUnsafe(
+      `ALTER TABLE QstashScheduleLog ADD COLUMN IF NOT EXISTS notBeforeEpochSeconds BIGINT`
+    ).catch(() => {})
+    await prisma.$executeRawUnsafe(`ALTER TABLE QstashScheduleLog ADD COLUMN IF NOT EXISTS deltaMinutes INTEGER`).catch(
+      () => {}
+    )
+    await prisma.$executeRawUnsafe(`ALTER TABLE QstashScheduleLog ADD COLUMN IF NOT EXISTS scheduled BOOLEAN`).catch(
+      () => {}
+    )
 
     await prisma.$executeRawUnsafe(
       `INSERT INTO QstashScheduleLog (
