@@ -7,77 +7,8 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id                     String    @id @default(cuid())
-  email                  String    @unique
-  emailVerified          DateTime?
-  name                   String?
-  image                  String?
-  gender                 Gender?
-  weight                 Float?
-  height                 Float?
-  bodyType               BodyType?
-  exerciseFrequency      String?
-  exerciseTypes          String[]
-  termsAccepted          Boolean   @default(false)
-  // Credit system fields
-  dailyAnalysisCredits   Int       @default(3) // Free: 3, Premium: 30
-  additionalCredits      Int       @default(0) // Purchased credits that don't expire
-  lastAnalysisResetDate  DateTime? // Track daily reset
-  lastMonthlyResetDate   DateTime? // Track monthly reset for monthly quotas
-  totalAnalysisCount     Int       @default(0) // Lifetime usage counter
-  dailyAnalysisUsed      Int       @default(0) // Used today
-  // Wallet-based metering (Cursor-style)
-  walletMonthlyUsedCents Int       @default(0) // Amount used this month in cents
-  walletMonthlyResetAt   DateTime? // Last time monthly wallet was reset
-
-  // Feature-specific credit tracking
-  dailyFoodAnalysisUsed          Int @default(0) // Food analysis credits used today
-  dailyFoodReanalysisUsed        Int @default(0) // Food re-analysis used today
-  dailyMedicalAnalysisUsed       Int @default(0) // Medical image analyses used today
-  dailyInteractionAnalysisUsed   Int @default(0) // Interaction analysis credits used today
-  totalFoodAnalysisCount         Int @default(0) // Lifetime food analysis count
-  totalInteractionAnalysisCount  Int @default(0) // Lifetime interaction analysis count
-  monthlyInteractionAnalysisUsed Int @default(0) // Monthly interactions used (premium)
-
-  // Monthly per-feature usage tracking (resets monthly)
-  monthlySymptomAnalysisUsed      Int @default(0) // Symptom analyses used this month
-  monthlyFoodAnalysisUsed         Int @default(0) // Food analyses used this month
-  monthlyMedicalImageAnalysisUsed Int @default(0) // Medical image analyses used this month
-  monthlyInsightsGenerationUsed   Int @default(0) // Insights generations used this month
-
-  // One-time free use tracking (one free use per AI feature)
-  hasUsedFreeFoodAnalysis        Boolean @default(false) // Has used free food analysis
-  hasUsedFreeInteractionAnalysis Boolean @default(false) // Has used free interaction analysis
-  hasUsedFreeMedicalAnalysis     Boolean @default(false) // Has used free medical image analysis
-
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime              @updatedAt
-  accounts            Account[]
-  sessions            Session[]
-  healthGoals         HealthGoal[]
-  supplements         Supplement[]
-  medications         Medication[]
-  healthLogs          HealthLog[]
-  foodLogs            FoodLog[]
-  exerciseLogs        ExerciseLog[]
-  subscription        Subscription?
-  supportTickets      SupportTicket[]
-  interactionAnalyses InteractionAnalysis[]
-  creditTopUps        CreditTopUp[]
-  fitbitData          FitbitData[]
-
-  // File relationships (PHASE 2 addition)
-  uploadedFiles File[] @relation("UploadedFiles")
-  profileImages File[] @relation("ProfileImages")
-
-  // Lab report relationships
-  reports        Report[]
-  consentRecords ConsentRecord[]
-}
-
 model Account {
-  id                String  @id @default(cuid())
+  id                String  @id
   userId            String
   type              String
   provider          String
@@ -89,17 +20,436 @@ model Account {
   scope             String?
   id_token          String?
   session_state     String?
-  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  User              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
 }
 
+model AdminUser {
+  id             String           @id
+  email          String           @unique
+  password       String
+  name           String
+  isActive       Boolean          @default(true)
+  lastLogin      DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime
+  createdBy      String?
+  role           AdminRole        @default(ADMIN)
+  SupportTicket  SupportTicket[]
+  TicketResponse TicketResponse[]
+}
+
+model AuditEvent {
+  id               String         @id
+  reportId         String?
+  userId           String
+  eventType        AuditEventType
+  eventDescription String
+  metadata         Json?
+  ipAddress        String?
+  userAgent        String?
+  createdAt        DateTime       @default(now())
+  Report           Report?        @relation(fields: [reportId], references: [id])
+
+  @@index([eventType, createdAt])
+  @@index([reportId])
+  @@index([userId, createdAt])
+}
+
+model ConsentRecord {
+  id                String      @id
+  userId            String
+  consentType       ConsentType @default(PDF_DECRYPTION)
+  consentText       String
+  decryptionConsent Boolean
+  passwordConsent   Boolean
+  retentionConsent  Boolean     @default(false)
+  ipAddress         String?
+  userAgent         String?
+  consentedAt       DateTime    @default(now())
+  User              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  Report            Report[]
+
+  @@index([userId, consentedAt])
+}
+
+model CreditTopUp {
+  id          String   @id
+  userId      String
+  amountCents Int
+  usedCents   Int      @default(0)
+  purchasedAt DateTime @default(now())
+  expiresAt   DateTime
+  source      String?
+  User        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+}
+
+model EmailTemplate {
+  id        String        @id
+  name      String
+  category  EmailCategory @default(MARKETING)
+  subject   String
+  content   String
+  isActive  Boolean       @default(true)
+  isBuiltIn Boolean       @default(false)
+  createdBy String?
+  createdAt DateTime      @default(now())
+  updatedAt DateTime
+}
+
+model ExerciseLog {
+  id        String   @id
+  userId    String
+  type      String
+  duration  Int
+  intensity String?
+  notes     String?
+  createdAt DateTime @default(now())
+  User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model File {
+  id                           String       @id
+  originalName                 String
+  fileName                     String
+  fileSize                     Int
+  mimeType                     String
+  cloudinaryId                 String
+  cloudinaryUrl                String
+  secureUrl                    String
+  uploadedById                 String
+  fileType                     FileType     @default(IMAGE)
+  usage                        FileUsage    @default(OTHER)
+  metadata                     Json?
+  isPublic                     Boolean      @default(false)
+  createdAt                    DateTime     @default(now())
+  updatedAt                    DateTime
+  User_File_uploadedByIdToUser User         @relation("File_uploadedByIdToUser", fields: [uploadedById], references: [id], onDelete: Cascade)
+  FoodLog                      FoodLog[]    @relation("FoodLogImages")
+  Medication                   Medication[] @relation("MedicationImages")
+  User_ProfileImages           User[]       @relation("ProfileImages")
+  Supplement                   Supplement[] @relation("SupplementImages")
+}
+
+model FitbitData {
+  id        String   @id
+  userId    String
+  date      DateTime @db.Date
+  dataType  String
+  value     Json
+  syncedAt  DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+  User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date, dataType])
+  @@index([userId, dataType])
+  @@index([userId, date])
+}
+
+model FoodLog {
+  id          String   @id
+  userId      String
+  name        String
+  imageUrl    String?
+  description String?
+  nutrients   Json?
+  createdAt   DateTime @default(now())
+  User        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  File        File[]   @relation("FoodLogImages")
+}
+
+model HealthGoal {
+  id            String      @id
+  userId        String
+  name          String
+  category      String
+  currentRating Int
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime
+  User          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  HealthLog     HealthLog[]
+}
+
+model HealthLog {
+  id         String     @id
+  userId     String
+  goalId     String
+  rating     Int
+  notes      String?
+  createdAt  DateTime   @default(now())
+  HealthGoal HealthGoal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  User       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model InsightsChatMessage {
+  id                 String             @id
+  threadId           String
+  role               String
+  content            String
+  tokenCount         Int?
+  createdAt          DateTime           @default(now()) @db.Timestamptz(6)
+  InsightsChatThread InsightsChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([threadId, createdAt])
+}
+
+model InsightsChatThread {
+  id                  String                @id
+  userId              String
+  slug                String
+  section             String
+  createdAt           DateTime              @default(now()) @db.Timestamptz(6)
+  updatedAt           DateTime              @default(now()) @db.Timestamptz(6)
+  title               String?
+  InsightsChatMessage InsightsChatMessage[]
+
+  @@index([userId, slug, section], map: "InsightsChatThread_user_slug_section_idx")
+}
+
+model InsightsMetadata {
+  userId          String
+  issueSlug       String
+  section         String
+  lastGeneratedAt DateTime @default(now()) @db.Timestamptz(6)
+  dataFingerprint String
+  status          String   @default("fresh")
+  updatedAt       DateTime @default(now()) @db.Timestamptz(6)
+
+  @@id([userId, issueSlug, section])
+}
+
+model InsightsSectionCache {
+  userId    String
+  slug      String
+  section   String
+  mode      String
+  rangeKey  String
+  result    Json
+  updatedAt DateTime @default(now()) @db.Timestamptz(6)
+
+  @@id([userId, slug, section, mode, rangeKey])
+}
+
+model InteractionAnalysis {
+  id                  String   @id
+  userId              String
+  analysisName        String
+  overallRisk         String
+  supplementCount     Int      @default(0)
+  medicationCount     Int      @default(0)
+  analysisData        Json
+  supplementsAnalyzed Json
+  medicationsAnalyzed Json
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime
+  User                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model LabResult {
+  id                       String   @id
+  reportId                 String
+  analyteNameEncrypted     String
+  valueEncrypted           String
+  unitEncrypted            String?
+  referenceRangeEncrypted  String?
+  collectionDateEncrypted  String?
+  accessionNumberEncrypted String?
+  laboratoryNameEncrypted  String?
+  dataKeyEncrypted         String
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime
+  Report                   Report   @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId])
+}
+
+model Medication {
+  id        String   @id
+  userId    String
+  name      String
+  dosage    String
+  timing    String[]
+  imageUrl  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+  User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  File      File[]   @relation("MedicationImages")
+}
+
+model Report {
+  id                    String        @id
+  userId                String
+  originalFileName      String
+  s3Key                 String
+  fileSize              Int
+  mimeType              String        @default("application/pdf")
+  status                ReportStatus  @default(PENDING)
+  isPasswordProtected   Boolean       @default(false)
+  passwordHash          String?
+  retainOriginal        Boolean       @default(false)
+  originalDeletedAt     DateTime?
+  processingStartedAt   DateTime?
+  processingCompletedAt DateTime?
+  processingError       String?
+  consentRecordId       String
+  metadata              Json?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime
+  AuditEvent            AuditEvent[]
+  LabResult             LabResult[]
+  ConsentRecord         ConsentRecord @relation(fields: [consentRecordId], references: [id], onDelete: Cascade)
+  User                  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([consentRecordId])
+  @@index([status])
+  @@index([userId, createdAt])
+}
+
 model Session {
-  id           String   @id @default(cuid())
+  id           String   @id
   sessionToken String   @unique
   userId       String
   expires      DateTime
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  User         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Subscription {
+  id                String    @id
+  userId            String    @unique
+  plan              Plan      @default(PREMIUM)
+  startDate         DateTime  @default(now())
+  endDate           DateTime?
+  monthlyPriceCents Int?
+  User              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Supplement {
+  id        String   @id
+  userId    String
+  name      String
+  dosage    String
+  timing    String[]
+  imageUrl  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+  User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  File      File[]   @relation("SupplementImages")
+}
+
+model SupportTicket {
+  id                String           @id
+  subject           String
+  message           String
+  userEmail         String
+  userName          String?
+  userId            String?
+  status            TicketStatus     @default(OPEN)
+  priority          TicketPriority   @default(MEDIUM)
+  category          TicketCategory   @default(GENERAL)
+  externalMessageId String?
+  assignedAdminId   String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime
+  AdminUser         AdminUser?       @relation(fields: [assignedAdminId], references: [id])
+  User              User?            @relation(fields: [userId], references: [id])
+  TicketResponse    TicketResponse[]
+}
+
+model TalkToAIChatMessage {
+  id                 String             @id
+  threadId           String
+  role               String
+  content            String
+  tokenCount         Int?
+  createdAt          DateTime           @default(now()) @db.Timestamptz(6)
+  TalkToAIChatThread TalkToAIChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([threadId, createdAt])
+}
+
+model TalkToAIChatThread {
+  id                  String                @id
+  userId              String
+  title               String?
+  createdAt           DateTime              @default(now()) @db.Timestamptz(6)
+  updatedAt           DateTime              @default(now()) @db.Timestamptz(6)
+  TalkToAIChatMessage TalkToAIChatMessage[]
+
+  @@index([userId])
+}
+
+model TicketResponse {
+  id              String        @id
+  ticketId        String
+  message         String
+  isAdminResponse Boolean       @default(false)
+  adminId         String?
+  userEmail       String?
+  createdAt       DateTime      @default(now())
+  AdminUser       AdminUser?    @relation(fields: [adminId], references: [id])
+  SupportTicket   SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id                              String                @id
+  email                           String                @unique
+  name                            String?
+  image                           String?
+  gender                          Gender?
+  weight                          Float?
+  height                          Float?
+  bodyType                        BodyType?
+  createdAt                       DateTime              @default(now())
+  updatedAt                       DateTime
+  emailVerified                   DateTime?
+  exerciseFrequency               String?
+  exerciseTypes                   String[]
+  additionalCredits               Int                   @default(0)
+  dailyAnalysisCredits            Int                   @default(3)
+  dailyAnalysisUsed               Int                   @default(0)
+  lastAnalysisResetDate           DateTime?
+  totalAnalysisCount              Int                   @default(0)
+  dailyFoodAnalysisUsed           Int                   @default(0)
+  dailyInteractionAnalysisUsed    Int                   @default(0)
+  totalFoodAnalysisCount          Int                   @default(0)
+  totalInteractionAnalysisCount   Int                   @default(0)
+  dailyMedicalAnalysisUsed        Int                   @default(0)
+  monthlyInteractionAnalysisUsed  Int                   @default(0)
+  lastMonthlyResetDate            DateTime?
+  dailyFoodReanalysisUsed         Int                   @default(0)
+  termsAccepted                   Boolean               @default(false)
+  walletMonthlyUsedCents          Int                   @default(0)
+  walletMonthlyResetAt            DateTime?
+  hasUsedFreeFoodAnalysis         Boolean               @default(false)
+  hasUsedFreeInteractionAnalysis  Boolean               @default(false)
+  hasUsedFreeMedicalAnalysis      Boolean               @default(false)
+  monthlySymptomAnalysisUsed      Int                   @default(0)
+  monthlyFoodAnalysisUsed         Int                   @default(0)
+  monthlyMedicalImageAnalysisUsed Int                   @default(0)
+  monthlyInsightsGenerationUsed   Int                   @default(0)
+  Account                         Account[]
+  ConsentRecord                   ConsentRecord[]
+  CreditTopUp                     CreditTopUp[]
+  ExerciseLog                     ExerciseLog[]
+  File_File_uploadedByIdToUser    File[]                @relation("File_uploadedByIdToUser")
+  FitbitData                      FitbitData[]
+  FoodLog                         FoodLog[]
+  HealthGoal                      HealthGoal[]
+  HealthLog                       HealthLog[]
+  InteractionAnalysis             InteractionAnalysis[]
+  Medication                      Medication[]
+  Report                          Report[]
+  Session                         Session[]
+  Subscription                    Subscription?
+  Supplement                      Supplement[]
+  SupportTicket                   SupportTicket[]
+  File_ProfileImages              File[]                @relation("ProfileImages")
 }
 
 model VerificationToken {
@@ -110,164 +460,37 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
-model HealthGoal {
-  id            String      @id @default(cuid())
-  userId        String
-  name          String
-  category      String
-  currentRating Int
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  healthLogs    HealthLog[]
-}
-
-model Supplement {
-  id        String   @id @default(cuid())
-  userId    String
-  name      String
-  dosage    String
-  timing    String[]
-  imageUrl  String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  // File relationships (PHASE 2 addition)
-  images File[] @relation("SupplementImages")
-}
-
-model Medication {
-  id        String   @id @default(cuid())
-  userId    String
-  name      String
-  dosage    String
-  timing    String[]
-  imageUrl  String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  // File relationships (PHASE 2 addition)
-  images File[] @relation("MedicationImages")
-}
-
-model HealthLog {
-  id        String     @id @default(cuid())
-  userId    String
-  goalId    String
-  rating    Int
-  notes     String?
-  createdAt DateTime   @default(now())
-  goal      HealthGoal @relation(fields: [goalId], references: [id], onDelete: Cascade)
-  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model FoodLog {
-  id          String   @id @default(cuid())
-  userId      String
-  name        String
-  imageUrl    String?
-  description String?
-  nutrients   Json?
-  createdAt   DateTime @default(now())
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  // File relationships (PHASE 2 addition)
-  images File[] @relation("FoodLogImages")
-}
-
-model ExerciseLog {
-  id        String   @id @default(cuid())
-  userId    String
-  type      String
-  duration  Int
-  intensity String?
-  notes     String?
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-// Fitbit Data Sync - stores synced data from Fitbit API
-model FitbitData {
-  id        String   @id @default(cuid())
-  userId    String
-  date      DateTime @db.Date // Date of the data (YYYY-MM-DD)
-  dataType  String // 'steps', 'heartrate', 'sleep', 'weight', 'activity'
-  value     Json // Flexible JSON storage for different data types
-  syncedAt  DateTime @default(now())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, date, dataType])
-  @@index([userId, date])
-  @@index([userId, dataType])
-}
-
-model Subscription {
-  id                String    @id @default(cuid())
-  userId            String    @unique
-  plan              Plan      @default(PREMIUM)
-  monthlyPriceCents Int? // Track subscription tier: 2000 ($20), 3000 ($30), 5000 ($50)
-  startDate         DateTime  @default(now())
-  endDate           DateTime?
-  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-// Monetary credit top-ups valid for up to 12 months, consumed FIFO
-model CreditTopUp {
-  id          String   @id @default(cuid())
-  userId      String
-  amountCents Int
-  usedCents   Int      @default(0)
-  purchasedAt DateTime @default(now())
-  expiresAt   DateTime
-  source      String? // e.g., Stripe session id or admin note
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, expiresAt])
-}
-
-enum Gender {
-  MALE
-  FEMALE
-}
-
-enum BodyType {
-  ECTOMORPH
-  MESOMORPH
-  ENDOMORPH
-}
-
-enum Plan {
-  PREMIUM
-}
-
 model Waitlist {
-  id           String   @id @default(cuid())
+  id           String   @id
   email        String   @unique
   name         String
-  unsubscribed Boolean  @default(false)
   createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  unsubscribed Boolean  @default(false)
 }
 
-model AdminUser {
-  id        String    @id @default(cuid())
-  email     String    @unique
-  password  String // Hashed password
-  name      String
-  role      AdminRole @default(ADMIN)
-  isActive  Boolean   @default(true)
-  lastLogin DateTime?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  createdBy String? // ID of admin who created this user
+model checkinissues {
+  id       String @id
+  userid   String
+  name     String
+  polarity String
 
-  // Support ticket relations
-  assignedTickets SupportTicket[]  @relation("AssignedTickets")
-  ticketResponses TicketResponse[] @relation("TicketResponses")
+  @@unique([userid, name], map: "checkinissues_user_name_idx")
+}
+
+model checkinratings {
+  userid  String
+  issueid String
+  date    String
+  value   Int?
+  note    String?
+  isna    Boolean? @default(false)
+
+  @@id([userid, issueid, date])
+}
+
+model pushsubscriptions {
+  userid       String @id
+  subscription Json
 }
 
 enum AdminRole {
@@ -276,17 +499,31 @@ enum AdminRole {
   MODERATOR
 }
 
-model EmailTemplate {
-  id        String        @id @default(cuid())
-  name      String // Display name (e.g., "Welcome New Users")
-  category  EmailCategory @default(MARKETING)
-  subject   String // Email subject line
-  content   String // Email body content
-  isActive  Boolean       @default(true)
-  isBuiltIn Boolean       @default(false) // True for system templates, false for custom
-  createdBy String? // Admin user ID who created it
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+enum AuditEventType {
+  CONSENT_GRANTED
+  CONSENT_WITHDRAWN
+  PDF_UPLOADED
+  PDF_PROCESSING_STARTED
+  PDF_PROCESSING_COMPLETED
+  PDF_PROCESSING_FAILED
+  PDF_DECRYPTED
+  LAB_DATA_EXTRACTED
+  LAB_DATA_ENCRYPTED
+  ORIGINAL_DELETED
+  DATA_ACCESSED
+  DATA_DELETED
+}
+
+enum BodyType {
+  ECTOMORPH
+  MESOMORPH
+  ENDOMORPH
+}
+
+enum ConsentType {
+  PDF_DECRYPTION
+  DATA_PROCESSING
+  DATA_RETENTION
 }
 
 enum EmailCategory {
@@ -296,95 +533,6 @@ enum EmailCategory {
   ANNOUNCEMENTS
   RETENTION
   CUSTOM
-}
-
-model SupportTicket {
-  id                String         @id @default(cuid())
-  subject           String
-  message           String
-  userEmail         String
-  userName          String?
-  userId            String? // Optional link to registered user
-  status            TicketStatus   @default(OPEN)
-  priority          TicketPriority @default(MEDIUM)
-  category          TicketCategory @default(GENERAL)
-  externalMessageId String? // For email threading
-  assignedAdminId   String?
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
-
-  // Relations
-  user          User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
-  assignedAdmin AdminUser?       @relation("AssignedTickets", fields: [assignedAdminId], references: [id], onDelete: SetNull)
-  responses     TicketResponse[]
-}
-
-model TicketResponse {
-  id              String   @id @default(cuid())
-  ticketId        String
-  message         String
-  isAdminResponse Boolean  @default(false)
-  adminId         String? // If admin response
-  userEmail       String? // If user response (for non-registered users)
-  createdAt       DateTime @default(now())
-
-  // Relations
-  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  admin  AdminUser?    @relation("TicketResponses", fields: [adminId], references: [id], onDelete: SetNull)
-}
-
-enum TicketStatus {
-  OPEN
-  IN_PROGRESS
-  AWAITING_RESPONSE
-  RESPONDED
-  RESOLVED
-  CLOSED
-}
-
-enum TicketPriority {
-  LOW
-  MEDIUM
-  HIGH
-  URGENT
-}
-
-enum TicketCategory {
-  GENERAL
-  TECHNICAL
-  BILLING
-  ACCOUNT
-  FEATURE_REQUEST
-  BUG_REPORT
-  EMAIL
-}
-
-// File Management System - PHASE 2 ADDITION
-model File {
-  id            String    @id @default(cuid())
-  originalName  String // Original filename from user
-  fileName      String // Processed filename
-  fileSize      Int // File size in bytes
-  mimeType      String // File MIME type (image/jpeg, etc.)
-  cloudinaryId  String // Cloudinary public_id
-  cloudinaryUrl String // Full Cloudinary URL
-  secureUrl     String // Secure HTTPS Cloudinary URL
-  uploadedById  String // User who uploaded it
-  fileType      FileType  @default(IMAGE)
-  usage         FileUsage @default(OTHER)
-  metadata      Json? // Additional file metadata
-  isPublic      Boolean   @default(false)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-
-  // Relations
-  uploadedBy User @relation("UploadedFiles", fields: [uploadedById], references: [id], onDelete: Cascade)
-
-  // Optional relationships to existing models (for future use)
-  profileUsers    User[]       @relation("ProfileImages")
-  supplementFiles Supplement[] @relation("SupplementImages")
-  medicationFiles Medication[] @relation("MedicationImages")
-  foodLogFiles    FoodLog[]    @relation("FoodLogImages")
 }
 
 enum FileType {
@@ -404,141 +552,45 @@ enum FileUsage {
   OTHER
 }
 
-model InteractionAnalysis {
-  id                  String   @id @default(cuid())
-  userId              String
-  analysisName        String // User-friendly name for the analysis
-  overallRisk         String // low, medium, high
-  supplementCount     Int      @default(0)
-  medicationCount     Int      @default(0)
-  analysisData        Json // Full analysis results (interactions, recommendations, etc.)
-  supplementsAnalyzed Json // Array of supplements that were analyzed
-  medicationsAnalyzed Json // Array of medications that were analyzed
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-
-  // Relations
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, createdAt])
+enum Gender {
+  MALE
+  FEMALE
 }
 
-// PDF Lab Report Intake & Encryption System
-model Report {
-  id                    String       @id @default(cuid())
-  userId                String
-  originalFileName      String // Original filename from user
-  s3Key                 String // Blob pathname (stored in s3Key field for compatibility)
-  fileSize              Int // File size in bytes
-  mimeType              String       @default("application/pdf")
-  status                ReportStatus @default(PENDING)
-  isPasswordProtected   Boolean      @default(false)
-  passwordHash          String? // Ephemeral hash (not the actual password) - only for verification attempts
-  retainOriginal        Boolean      @default(false) // User consent to retain original PDF
-  originalDeletedAt     DateTime? // When original was deleted
-  processingStartedAt   DateTime?
-  processingCompletedAt DateTime?
-  processingError       String? // Error message if processing failed
-  consentRecordId       String // Link to consent record
-  metadata              Json? // Store blob URL and other metadata
-  createdAt             DateTime     @default(now())
-  updatedAt             DateTime     @updatedAt
-
-  // Relations
-  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  consentRecord ConsentRecord @relation(fields: [consentRecordId], references: [id], onDelete: Cascade)
-  labResults    LabResult[]
-  auditEvents   AuditEvent[]
-
-  @@index([userId, createdAt])
-  @@index([status])
-  @@index([consentRecordId])
-}
-
-model LabResult {
-  id                       String   @id @default(cuid())
-  reportId                 String
-  // All sensitive fields are encrypted with AES-256-GCM
-  analyteNameEncrypted     String // AES-256-GCM encrypted analyte name (e.g., "Glucose", "Cholesterol")
-  valueEncrypted           String // AES-256-GCM encrypted test value
-  unitEncrypted            String? // AES-256-GCM encrypted unit of measurement
-  referenceRangeEncrypted  String? // AES-256-GCM encrypted normal range
-  collectionDateEncrypted  String? // AES-256-GCM encrypted date (ISO string)
-  accessionNumberEncrypted String? // AES-256-GCM encrypted lab accession number
-  laboratoryNameEncrypted  String? // AES-256-GCM encrypted lab name
-  dataKeyEncrypted         String // KMS-wrapped data encryption key (envelope encryption)
-  createdAt                DateTime @default(now())
-  updatedAt                DateTime @updatedAt
-
-  // Relations
-  report Report @relation(fields: [reportId], references: [id], onDelete: Cascade)
-
-  @@index([reportId])
-}
-
-model ConsentRecord {
-  id                String      @id @default(cuid())
-  userId            String
-  consentType       ConsentType @default(PDF_DECRYPTION)
-  consentText       String // Full text of consent shown to user
-  decryptionConsent Boolean // Required: User authorized PDF decryption
-  passwordConsent   Boolean // Required: User authorized password use (ephemeral)
-  retentionConsent  Boolean     @default(false) // Optional: User chose to retain original PDF
-  ipAddress         String? // User's IP at time of consent
-  userAgent         String? // User's browser/device info
-  consentedAt       DateTime    @default(now())
-
-  // Relations
-  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  reports Report[]
-
-  @@index([userId, consentedAt])
-}
-
-enum ConsentType {
-  PDF_DECRYPTION
-  DATA_PROCESSING
-  DATA_RETENTION
-}
-
-model AuditEvent {
-  id               String         @id @default(cuid())
-  reportId         String?
-  userId           String
-  eventType        AuditEventType
-  eventDescription String // Human-readable description
-  metadata         Json? // Additional event data (redacted of sensitive info)
-  ipAddress        String?
-  userAgent        String?
-  createdAt        DateTime       @default(now())
-
-  // Relations
-  report Report? @relation(fields: [reportId], references: [id], onDelete: SetNull)
-
-  @@index([userId, createdAt])
-  @@index([reportId])
-  @@index([eventType, createdAt])
-}
-
-enum AuditEventType {
-  CONSENT_GRANTED
-  CONSENT_WITHDRAWN
-  PDF_UPLOADED
-  PDF_PROCESSING_STARTED
-  PDF_PROCESSING_COMPLETED
-  PDF_PROCESSING_FAILED
-  PDF_DECRYPTED
-  LAB_DATA_EXTRACTED
-  LAB_DATA_ENCRYPTED
-  ORIGINAL_DELETED
-  DATA_ACCESSED
-  DATA_DELETED
+enum Plan {
+  PREMIUM
 }
 
 enum ReportStatus {
-  PENDING // Uploaded, awaiting processing
-  PROCESSING // Currently being processed
-  COMPLETED // Successfully processed
-  FAILED // Processing failed
-  DECRYPTION_FAILED // Password incorrect or PDF corrupted
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  DECRYPTION_FAILED
+}
+
+enum TicketCategory {
+  GENERAL
+  TECHNICAL
+  BILLING
+  ACCOUNT
+  FEATURE_REQUEST
+  BUG_REPORT
+  EMAIL
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  AWAITING_RESPONSE
+  RESPONDED
+  RESOLVED
+  CLOSED
 }
