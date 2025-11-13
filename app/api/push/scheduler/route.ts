@@ -176,9 +176,7 @@ export async function POST(req: NextRequest) {
       if (r.frequency >= 2) reminderTimes.push(r.time2 || '18:30')
       if (r.frequency >= 3) reminderTimes.push(r.time3 || '21:30')
 
-      const currentMinutes = parseInt(hh, 10) * 60 + parseInt(mm, 10)
-      const allowedLagMinutes = 5 // tolerate up to 5 minutes of cron drift
-
+      // SIMPLIFIED MATCHING: Exact match OR within 1 minute after (to catch late cron)
       let shouldSend = false
       let matchReason = ''
       let matchedReminder = ''
@@ -186,23 +184,25 @@ export async function POST(req: NextRequest) {
       for (const reminderTime of reminderTimes) {
         const [rh, rm] = reminderTime.split(':').map(Number)
         const [ch, cm] = [parseInt(hh, 10), parseInt(mm, 10)]
-        const reminderMinutes = rh * 60 + rm
-        const diff = ((ch * 60 + cm) - reminderMinutes + 1440) % 1440
-        const diffForward = (reminderMinutes - (ch * 60 + cm) + 1440) % 1440
-        if (
-          diff === 0 ||
-          (diff > 0 && diff <= allowedLagMinutes) ||
-          diffForward === 1 // send one minute early in case a later run lags
-        ) {
+        
+        // Exact match: current time equals reminder time
+        if (rh === ch && rm === cm) {
           shouldSend = true
           matchedReminder = reminderTime
-          if (diff === 0) {
-            matchReason = `Matched reminder ${reminderTime} exactly at current time ${current}`
-          } else if (diff > 0 && diff <= allowedLagMinutes) {
-            matchReason = `Matched reminder ${reminderTime} within ${diff} minute(s) lag (current ${current})`
-          } else {
-            matchReason = `Sending reminder ${reminderTime} one minute early at ${current} to guarantee on-time delivery`
-          }
+          matchReason = `EXACT MATCH: reminder ${reminderTime} at current time ${current}`
+          break
+        }
+        
+        // Within 1 minute after: catch late cron (e.g., cron runs at 8:09 for 8:08 reminder)
+        const currentTotalMinutes = ch * 60 + cm
+        const reminderTotalMinutes = rh * 60 + rm
+        const minutesDiff = currentTotalMinutes - reminderTotalMinutes
+        
+        // If we're 1 minute after the reminder time, still send (cron was late)
+        if (minutesDiff === 1 || (minutesDiff === -1439)) { // -1439 handles wrap-around at midnight
+          shouldSend = true
+          matchedReminder = reminderTime
+          matchReason = `LATE CRON CATCH: reminder ${reminderTime} was 1 minute ago (current ${current}), sending now`
           break
         }
       }
