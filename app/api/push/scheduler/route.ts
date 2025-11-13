@@ -185,11 +185,13 @@ export async function POST(req: NextRequest) {
       })
 
       if (!shouldSend) {
-        console.log(`[SCHEDULER] User ${r.userId.substring(0, 8)}... (${tz}): No match - current=${current}, reminders=${reminderTimes.join(', ')}`)
+        const shortId = (r.userId ?? 'unknown').toString().slice(0, 8)
+        console.log(`[SCHEDULER] User ${shortId}... (${tz}): No match - current=${current}, reminders=${reminderTimes.join(', ')}`)
         continue
       }
 
-      console.log(`[SCHEDULER] User ${r.userId.substring(0, 8)}... (${tz}): Sending notification - matched ${matchReason}`)
+      const shortId = (r.userId ?? 'unknown').toString().slice(0, 8)
+      console.log(`[SCHEDULER] User ${shortId}... (${tz}): Sending notification - matched ${matchReason}`)
 
       const payload = JSON.stringify({
         title: 'Time for your Helfi check‑in',
@@ -198,10 +200,11 @@ export async function POST(req: NextRequest) {
       })
       await webpush.sendNotification(r.subscription, payload)
       sentTo.push(r.userId)
-      console.log(`[SCHEDULER] ✅ Notification sent to user ${r.userId.substring(0, 8)}...`)
+      console.log(`[SCHEDULER] ✅ Notification sent to user ${shortId}...`)
     } catch (e: any) {
       const errorMsg = e?.body || e?.message || String(e)
-      console.error(`[SCHEDULER] ❌ Error for user ${r.userId.substring(0, 8)}...:`, errorMsg)
+      const shortId = (r.userId ?? 'unknown').toString().slice(0, 8)
+      console.error(`[SCHEDULER] ❌ Error for user ${shortId}...:`, errorMsg)
       errors.push({ userId: r.userId, error: errorMsg })
     }
   }
