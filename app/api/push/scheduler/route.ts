@@ -175,8 +175,9 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      const shortId = (r.userId ?? 'unknown').toString().slice(0, 8)
       debugLog.push({
-        userId: r.userId,
+        userId: r.userId ?? 'unknown',
         timezone: tz,
         currentTime: current,
         reminderTimes,
@@ -185,12 +186,10 @@ export async function POST(req: NextRequest) {
       })
 
       if (!shouldSend) {
-        const shortId = (r.userId ?? 'unknown').toString().slice(0, 8)
         console.log(`[SCHEDULER] User ${shortId}... (${tz}): No match - current=${current}, reminders=${reminderTimes.join(', ')}`)
         continue
       }
 
-      const shortId = (r.userId ?? 'unknown').toString().slice(0, 8)
       console.log(`[SCHEDULER] User ${shortId}... (${tz}): Sending notification - matched ${matchReason}`)
 
       const payload = JSON.stringify({
@@ -199,13 +198,13 @@ export async function POST(req: NextRequest) {
         url: '/check-in'
       })
       await webpush.sendNotification(r.subscription, payload)
-      sentTo.push(r.userId)
+      sentTo.push(r.userId ?? 'unknown')
       console.log(`[SCHEDULER] ✅ Notification sent to user ${shortId}...`)
     } catch (e: any) {
       const errorMsg = e?.body || e?.message || String(e)
       const shortId = (r.userId ?? 'unknown').toString().slice(0, 8)
       console.error(`[SCHEDULER] ❌ Error for user ${shortId}...:`, errorMsg)
-      errors.push({ userId: r.userId, error: errorMsg })
+      errors.push({ userId: r.userId ?? 'unknown', error: errorMsg })
     }
   }
 
