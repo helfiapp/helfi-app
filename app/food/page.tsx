@@ -893,7 +893,7 @@ Please add nutritional information manually if needed.`);
   };
 
   // Debug logging to track state changes
-  useEffect(() => {
+  React.useEffect(() => {
     console.log('🔍 State Debug:', {
       showAddFood,
       showAiResult,
@@ -1352,7 +1352,7 @@ Please add nutritional information manually if needed.`);
                                   }}
                                   className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-medium transition-colors"
                                 >
-                                  -
+                                  −
                                 </button>
                                 <span className="text-base font-semibold text-gray-900 w-12 text-center">
                                   {item.servings || 1}
@@ -1543,7 +1543,7 @@ Please add nutritional information manually if needed.`);
             )}
 
             {/* Item Edit Modal */}
-            {showItemEditModal && editingItemIndex !== null && analyzedItems.length > 0 && analyzedItems[editingItemIndex] && (
+            {showItemEditModal && editingItemIndex !== null && analyzedItems[editingItemIndex] && (
               <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                 <div className="bg-white rounded-2xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
                   <div className="p-6">
