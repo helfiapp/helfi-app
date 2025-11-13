@@ -177,13 +177,20 @@ export async function POST(req: NextRequest) {
 
   // Update log with final counts
   try {
-    await prisma.$executeRawUnsafe(`
-      UPDATE SchedulerLogs 
-      SET notificationsSent = $1, errors = $2, debugInfo = $3
+    // Find the most recent log entry and update it
+    const recentLogs: any[] = await prisma.$queryRawUnsafe(`
+      SELECT id FROM SchedulerLogs 
       WHERE timestamp >= NOW() - INTERVAL '1 minute'
       ORDER BY timestamp DESC
       LIMIT 1
-    `, sentTo.length, errors.length, JSON.stringify({ debug: debugLog, sentTo, errors }))
+    `)
+    if (recentLogs.length > 0) {
+      await prisma.$executeRawUnsafe(`
+        UPDATE SchedulerLogs 
+        SET notificationsSent = $1, errors = $2, debugInfo = $3::jsonb
+        WHERE id = $4
+      `, sentTo.length, errors.length, JSON.stringify({ debug: debugLog, sentTo, errors }), recentLogs[0].id)
+    }
   } catch (e) {
     console.error('[SCHEDULER] Failed to update log:', e)
   }
