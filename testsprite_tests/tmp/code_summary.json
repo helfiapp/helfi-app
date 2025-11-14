@@ -1,0 +1,290 @@
+{
+  "tech_stack": [
+    "TypeScript",
+    "Next.js 14",
+    "React",
+    "Tailwind CSS",
+    "PostgreSQL",
+    "Prisma",
+    "NextAuth.js",
+    "OpenAI",
+    "Stripe",
+    "Cloudinary",
+    "Chart.js",
+    "Fitbit API",
+    "Vercel"
+  ],
+  "features": [
+    {
+      "name": "Authentication",
+      "description": "User authentication with Google OAuth and Magic Link email verification",
+      "files": [
+        "app/auth/signin/page.tsx",
+        "app/auth/verify/page.tsx",
+        "app/auth/check-email/page.tsx",
+        "app/api/auth/[...nextauth]/route.ts",
+        "app/api/auth/signup/route.ts",
+        "app/api/auth/verify/route.ts",
+        "lib/auth.ts",
+        "lib/session.ts"
+      ]
+    },
+    {
+      "name": "Dashboard",
+      "description": "Main user dashboard displaying health overview and quick actions",
+      "files": [
+        "app/dashboard/page.tsx",
+        "app/page.tsx"
+      ]
+    },
+    {
+      "name": "Health Tracking",
+      "description": "Track health metrics including weight, sleep, mood, energy levels, and custom metrics",
+      "files": [
+        "app/health-tracking/page.tsx",
+        "app/api/checkins/today/route.ts",
+        "app/api/checkins/history/route.ts",
+        "app/api/checkins/ratings/route.ts",
+        "app/api/checkins/settings/route.ts"
+      ]
+    },
+    {
+      "name": "Food Analysis",
+      "description": "AI-powered food photo analysis with ingredient recognition and nutritional breakdown",
+      "files": [
+        "app/food/page.tsx",
+        "app/api/analyze-food/route.ts",
+        "app/api/food-log/route.ts",
+        "app/api/analyze-packaged/route.ts"
+      ]
+    },
+    {
+      "name": "Insights",
+      "description": "AI-powered health insights and personalized recommendations based on user data",
+      "files": [
+        "app/insights/page.tsx",
+        "app/insights/[id]/page.tsx",
+        "app/insights/issues/[issueSlug]/page.tsx",
+        "app/insights/nutrition/page.tsx",
+        "app/insights/sleep/page.tsx",
+        "app/insights/supplements/page.tsx",
+        "app/insights/safety/page.tsx",
+        "app/insights/goals/page.tsx",
+        "app/api/insights/generate/route.ts",
+        "app/api/insights/list/route.ts",
+        "app/api/insights/detail/route.ts",
+        "app/api/insights/regenerate/route.ts",
+        "app/api/insights/ask/route.ts",
+        "lib/insights/insights-generator.ts"
+      ]
+    },
+    {
+      "name": "Supplements Management",
+      "description": "Track supplements with photo recognition, timing, dosages, and interaction checking",
+      "files": [
+        "app/insights/supplements/page.tsx",
+        "app/insights/supplements/[name]/page.tsx",
+        "app/api/analyze-supplement-image/route.ts",
+        "app/api/analyze-interactions/route.ts"
+      ]
+    },
+    {
+      "name": "Medications Management",
+      "description": "Track medications with safety checks and interaction warnings",
+      "files": [
+        "app/onboarding/Medications.tsx",
+        "app/api/analyze-interactions/route.ts"
+      ]
+    },
+    {
+      "name": "Lab Reports",
+      "description": "Upload and analyze PDF lab reports with AI extraction of biomarkers",
+      "files": [
+        "app/lab-reports/page.tsx",
+        "app/api/reports/upload/route.ts",
+        "app/api/reports/process/route.ts",
+        "app/api/reports/presign/route.ts",
+        "lib/pdf-processor.ts",
+        "lib/encryption.ts"
+      ]
+    },
+    {
+      "name": "Medical Images",
+      "description": "Upload and analyze medical images with AI",
+      "files": [
+        "app/medical-images/page.tsx"
+      ]
+    },
+    {
+      "name": "Symptoms Tracking",
+      "description": "Log symptoms with photos and descriptions, AI pattern analysis",
+      "files": [
+        "app/symptoms/page.tsx",
+        "app/symptoms/SymptomChat.tsx",
+        "app/api/analyze-symptoms/route.ts",
+        "app/api/analyze-symptoms/chat/route.ts"
+      ]
+    },
+    {
+      "name": "Chat and Voice AI",
+      "description": "Conversational AI assistant with voice support for health queries",
+      "files": [
+        "app/chat/page.tsx",
+        "app/api/chat/threads/route.ts",
+        "app/api/chat/voice/route.ts",
+        "components/VoiceChat.tsx",
+        "lib/talk-to-ai-chat-store.ts"
+      ]
+    },
+    {
+      "name": "Billing and Subscriptions",
+      "description": "Stripe integration for subscription management and credit purchases",
+      "files": [
+        "app/billing/page.tsx",
+        "app/api/billing/create-checkout-session/route.ts",
+        "app/api/billing/webhook/route.ts",
+        "app/api/billing/confirm/route.ts",
+        "components/CreditPurchaseModal.tsx"
+      ]
+    },
+    {
+      "name": "Credit System",
+      "description": "Usage-based credit system for AI features with daily and monthly limits",
+      "files": [
+        "app/api/credit/status/route.ts",
+        "app/api/credit/feature-usage/route.ts",
+        "app/api/credit/usage-breakdown/route.ts",
+        "lib/credit-system.ts",
+        "lib/cost-meter.ts",
+        "components/FeatureUsageDisplay.tsx",
+        "components/UsageMeter.tsx"
+      ]
+    },
+    {
+      "name": "Onboarding",
+      "description": "Multi-step onboarding flow for new users",
+      "files": [
+        "app/onboarding/page.tsx",
+        "app/onboarding/SignUp.tsx",
+        "app/onboarding/PhysicalMetrics.tsx",
+        "app/onboarding/HealthGoals.tsx",
+        "app/onboarding/Medications.tsx",
+        "app/onboarding/Supplements.tsx",
+        "app/onboarding/Review.tsx",
+        "components/onboarding/OnboardingProgress.tsx"
+      ]
+    },
+    {
+      "name": "Admin Panel",
+      "description": "Administrative interface for user management and system administration",
+      "files": [
+        "app/admin-panel/page.tsx",
+        "app/admin-panel/tickets/[id]/page.tsx",
+        "app/api/admin/users/route.ts",
+        "app/api/admin/user-management/route.ts",
+        "app/api/admin/tickets/route.ts",
+        "lib/admin-auth.ts"
+      ]
+    },
+    {
+      "name": "Check-ins",
+      "description": "Daily check-in system for tracking health status and issues",
+      "files": [
+        "app/check-in/page.tsx",
+        "app/check-in/history/page.tsx",
+        "app/api/checkins/today/route.ts",
+        "app/api/checkins/history/route.ts",
+        "app/api/checkins/issues/route.ts"
+      ]
+    },
+    {
+      "name": "Reports",
+      "description": "Generate and view health reports",
+      "files": [
+        "app/reports/page.tsx",
+        "app/api/reports/weekly/list/route.ts",
+        "app/api/export/pdf/route.ts",
+        "components/reports/ReportViewer.tsx"
+      ]
+    },
+    {
+      "name": "Devices Integration",
+      "description": "Integration with health devices like Fitbit for automatic data sync",
+      "files": [
+        "app/devices/page.tsx",
+        "app/api/auth/fitbit/authorize/route.ts",
+        "app/api/auth/fitbit/callback/route.ts",
+        "app/api/fitbit/data/route.ts",
+        "app/api/fitbit/sync/route.ts",
+        "app/api/fitbit/status/route.ts",
+        "lib/fitbit-api.ts",
+        "lib/fitbit-db.ts",
+        "components/devices/FitbitConnect.tsx"
+      ]
+    },
+    {
+      "name": "Profile Management",
+      "description": "User profile management with image upload",
+      "files": [
+        "app/profile/page.tsx",
+        "app/profile/image/page.tsx",
+        "app/api/upload-profile-image/route.ts",
+        "app/account/page.tsx"
+      ]
+    },
+    {
+      "name": "Notifications",
+      "description": "Push notifications and reminder system",
+      "files": [
+        "app/notifications/page.tsx",
+        "app/api/push/subscribe/route.ts",
+        "app/api/push/unsubscribe/route.ts",
+        "app/api/push/scheduler/route.ts",
+        "app/api/push/dispatch/route.ts"
+      ]
+    },
+    {
+      "name": "Settings",
+      "description": "User settings and preferences",
+      "files": [
+        "app/settings/page.tsx"
+      ]
+    },
+    {
+      "name": "Support",
+      "description": "Support ticket system and help pages",
+      "files": [
+        "app/support/page.tsx",
+        "app/help/page.tsx",
+        "app/faq/page.tsx",
+        "app/api/tickets/webhook/route.ts"
+      ]
+    },
+    {
+      "name": "Waitlist",
+      "description": "Waitlist signup for early access",
+      "files": [
+        "app/api/waitlist/route.ts"
+      ]
+    },
+    {
+      "name": "Layout and Navigation",
+      "description": "Main layout wrapper and navigation components",
+      "files": [
+        "app/layout.tsx",
+        "components/LayoutWrapper.tsx",
+        "components/PageHeader.tsx",
+        "components/MobileMoreMenu.tsx",
+        "app/insights/InsightsTopNav.tsx",
+        "app/insights/InsightsBottomNav.tsx"
+      ]
+    },
+    {
+      "name": "Analytics",
+      "description": "Analytics tracking for user behavior",
+      "files": [
+        "app/api/analytics/route.ts"
+      ]
+    }
+  ]
+}

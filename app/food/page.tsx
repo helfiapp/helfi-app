@@ -119,6 +119,7 @@ export default function FoodDiary() {
   const [showEntryOptions, setShowEntryOptions] = useState<string | null>(null)
   const [showIngredientOptions, setShowIngredientOptions] = useState<string | null>(null)
   const [editingEntry, setEditingEntry] = useState<any>(null)
+  const [originalEditingEntry, setOriginalEditingEntry] = useState<any>(null)
 
   const descriptionTextareaRef = useRef<HTMLTextAreaElement | null>(null)
 
@@ -152,6 +153,65 @@ export default function FoodDiary() {
     const recalculated = recalculateNutritionFromItems(items)
     setAnalyzedNutrition(recalculated)
     setAnalyzedTotal(convertTotalsForStorage(recalculated))
+  }
+
+  const clampNumber = (value: any, min: number, max: number) => {
+    const num = Number(value)
+    if (!Number.isFinite(num)) return min
+    if (num < min) return min
+    if (num > max) return max
+    return num
+  }
+
+  const updateItemField = (index: number, field: 'name' | 'brand' | 'serving_size' | 'servings' | 'calories' | 'protein_g' | 'carbs_g' | 'fat_g' | 'fiber_g' | 'sugar_g', value: any) => {
+    const itemsCopy = [...analyzedItems]
+    if (!itemsCopy[index]) return
+
+    // Normalize and clamp values by field
+    if (field === 'name') {
+      itemsCopy[index].name = String(value || '').trim()
+    } else if (field === 'brand') {
+      const v = String(value || '').trim()
+      itemsCopy[index].brand = v.length > 0 ? v : null
+    } else if (field === 'serving_size') {
+      itemsCopy[index].serving_size = String(value || '').trim()
+    } else if (field === 'servings') {
+      // Minimum quarter serving, reasonable upper bound
+      const clamped = clampNumber(value, 0.25, 20)
+      // Round to nearest quarter
+      const rounded = Math.round(clamped * 4) / 4
+      itemsCopy[index].servings = rounded
+    } else if (field === 'calories') {
+      // Calories as integer, reasonable upper bound per serving
+      const clamped = clampNumber(value, 0, 3000)
+      itemsCopy[index].calories = Math.round(clamped)
+    } else {
+      // Macros in grams with 1 decimal place, reasonable upper bound per serving
+      const clamped = clampNumber(value, 0, 500)
+      const rounded = Math.round(clamped * 10) / 10
+      itemsCopy[index][field] = rounded
+    }
+
+    setAnalyzedItems(itemsCopy)
+    applyRecalculatedNutrition(itemsCopy)
+
+    // Live-update Today's Totals while editing an existing entry (no persistence)
+    if (editingEntry) {
+      try {
+        const updatedNutrition = recalculateNutritionFromItems(itemsCopy)
+        const updatedEntry = {
+          ...editingEntry,
+          items: itemsCopy,
+          nutrition: updatedNutrition,
+          total: convertTotalsForStorage(updatedNutrition),
+        }
+        setTodaysFoods(prev =>
+          prev.map(food => (food.id === editingEntry.id ? updatedEntry : food))
+        )
+      } catch {
+        // no-op: do not block UI on totals calc errors
+      }
+    }
   }
 
   // Profile data - using consistent green avatar
@@ -914,8 +974,35 @@ Please add nutritional information manually if needed.`);
     setEditingEntry(null);
   };
 
+  const revertEditingChanges = () => {
+    if (!editingEntry || !originalEditingEntry) return
+    // Restore analysis view state from the original persisted entry
+    setAiDescription(originalEditingEntry.description || '')
+    setPhotoPreview(originalEditingEntry.photo || null)
+    const originalItems = Array.isArray(originalEditingEntry.items) ? originalEditingEntry.items : []
+    setAnalyzedItems(originalItems)
+    if (originalItems.length > 0) {
+      applyRecalculatedNutrition(originalItems)
+    } else {
+      setAnalyzedNutrition(originalEditingEntry.nutrition || null)
+      setAnalyzedTotal(originalEditingEntry.total || null)
+    }
+    setHasReAnalyzed(false)
+
+    // Revert Today's Meals entry (no persistence)
+    setTodaysFoods(prev =>
+      prev.map(food => (food.id === editingEntry.id ? originalEditingEntry : food))
+    )
+  }
+
   const editFood = (food: any) => {
     setEditingEntry(food);
+    try {
+      // Keep an immutable copy to enable "Cancel changes"
+      setOriginalEditingEntry(JSON.parse(JSON.stringify(food)))
+    } catch {
+      setOriginalEditingEntry(food)
+    }
     setHasReAnalyzed(false); // Reset button state for new editing session
     // Populate the form with existing data and go directly to editing
     if (food.method === 'photo') {
@@ -1435,12 +1522,9 @@ Please add nutritional information manually if needed.`);
                               <div className="flex items-center gap-2">
                                 <button
                                   onClick={() => {
-                                    const updatedItems = [...analyzedItems];
-                                    if (updatedItems[index].servings > 0.25) {
-                                      updatedItems[index].servings = Math.max(0.25, (updatedItems[index].servings || 1) - 0.25);
-                                      setAnalyzedItems(updatedItems);
-                                      applyRecalculatedNutrition(updatedItems);
-                                    }
+                                    const current = analyzedItems[index]?.servings || 1
+                                    const next = Math.max(0.25, current - 0.25)
+                                    updateItemField(index, 'servings', next)
                                   }}
                                   className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-medium transition-colors"
                                 >
@@ -1451,10 +1535,9 @@ Please add nutritional information manually if needed.`);
                                 </span>
                                 <button
                                   onClick={() => {
-                                    const updatedItems = [...analyzedItems];
-                                    updatedItems[index].servings = ((updatedItems[index].servings || 1) + 0.25);
-                                    setAnalyzedItems(updatedItems);
-                                    applyRecalculatedNutrition(updatedItems);
+                                    const current = analyzedItems[index]?.servings || 1
+                                    const next = current + 0.25
+                                    updateItemField(index, 'servings', next)
                                   }}
                                   className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-medium transition-colors"
                                 >
@@ -1683,11 +1766,7 @@ Please add nutritional information manually if needed.`);
                         <input
                           type="text"
                           value={analyzedItems[editingItemIndex]?.name || ''}
-                          onChange={(e) => {
-                            const updatedItems = [...analyzedItems];
-                            updatedItems[editingItemIndex].name = e.target.value;
-                            setAnalyzedItems(updatedItems);
-                          }}
+                          onChange={(e) => updateItemField(editingItemIndex, 'name', e.target.value)}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                           placeholder="e.g., Bread, Sausage, etc."
                         />
@@ -1700,11 +1779,7 @@ Please add nutritional information manually if needed.`);
                         <input
                           type="text"
                           value={analyzedItems[editingItemIndex]?.brand || ''}
-                          onChange={(e) => {
-                            const updatedItems = [...analyzedItems];
-                            updatedItems[editingItemIndex].brand = e.target.value || null;
-                            setAnalyzedItems(updatedItems);
-                          }}
+                          onChange={(e) => updateItemField(editingItemIndex, 'brand', e.target.value)}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                           placeholder="e.g., Burgen, Heinz, etc."
                         />
@@ -1717,17 +1792,111 @@ Please add nutritional information manually if needed.`);
                         <input
                           type="text"
                           value={analyzedItems[editingItemIndex]?.serving_size || ''}
-                          onChange={(e) => {
-                            const updatedItems = [...analyzedItems];
-                            updatedItems[editingItemIndex].serving_size = e.target.value;
-                            setAnalyzedItems(updatedItems);
-                          }}
+                          onChange={(e) => updateItemField(editingItemIndex, 'serving_size', e.target.value)}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                           placeholder="e.g., 1 slice, 40g, 1 cup"
                         />
                         <p className="text-xs text-gray-500 mt-1">
                           This is the serving size shown on the package or your estimate
                         </p>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Servings
+                        </label>
+                        <input
+                          type="number"
+                          min={0.25}
+                          step={0.25}
+                          value={analyzedItems[editingItemIndex]?.servings ?? 1}
+                          onChange={(e) => updateItemField(editingItemIndex, 'servings', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                          placeholder="e.g., 1"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Adjust servings to multiply nutrients accordingly
+                        </p>
+                      </div>
+
+                      <div>
+                        <div className="block text-sm font-medium text-gray-700 mb-2">
+                          Macros per serving
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs text-gray-600 mb-1">Calories</label>
+                            <input
+                              type="number"
+                              min={0}
+                              step={1}
+                              value={analyzedItems[editingItemIndex]?.calories ?? ''}
+                              onChange={(e) => updateItemField(editingItemIndex, 'calories', e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                              placeholder="kcal"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-600 mb-1">Protein (g)</label>
+                            <input
+                              type="number"
+                              min={0}
+                              step={0.1}
+                              value={analyzedItems[editingItemIndex]?.protein_g ?? ''}
+                              onChange={(e) => updateItemField(editingItemIndex, 'protein_g', e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                              placeholder="g"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-600 mb-1">Carbs (g)</label>
+                            <input
+                              type="number"
+                              min={0}
+                              step={0.1}
+                              value={analyzedItems[editingItemIndex]?.carbs_g ?? ''}
+                              onChange={(e) => updateItemField(editingItemIndex, 'carbs_g', e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                              placeholder="g"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-600 mb-1">Fat (g)</label>
+                            <input
+                              type="number"
+                              min={0}
+                              step={0.1}
+                              value={analyzedItems[editingItemIndex]?.fat_g ?? ''}
+                              onChange={(e) => updateItemField(editingItemIndex, 'fat_g', e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                              placeholder="g"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-600 mb-1">Fiber (g)</label>
+                            <input
+                              type="number"
+                              min={0}
+                              step={0.1}
+                              value={analyzedItems[editingItemIndex]?.fiber_g ?? ''}
+                              onChange={(e) => updateItemField(editingItemIndex, 'fiber_g', e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                              placeholder="g"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-600 mb-1">Sugar (g)</label>
+                            <input
+                              type="number"
+                              min={0}
+                              step={0.1}
+                              value={analyzedItems[editingItemIndex]?.sugar_g ?? ''}
+                              onChange={(e) => updateItemField(editingItemIndex, 'sugar_g', e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                              placeholder="g"
+                            />
+                          </div>
+                        </div>
                       </div>
                       
                       <div className="pt-4 border-t border-gray-200">
@@ -1929,6 +2098,17 @@ Please add nutritional information manually if needed.`);
                       Analyze Again
                     </button>
                     )}
+
+                    {/* Cancel changes: revert to persisted entry without saving */}
+                    <button
+                      onClick={revertEditingChanges}
+                      className="w-full py-3 px-4 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium rounded-xl transition-all duration-300 flex items-center justify-center"
+                    >
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                      Cancel changes
+                    </button>
 
                     {/* Done Button - Full Width */}
                     <button
