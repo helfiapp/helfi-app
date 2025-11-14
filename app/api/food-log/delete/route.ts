@@ -16,8 +16,8 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json().catch(() => ({} as any))
-    const id = Number((body as any)?.id)
-    if (!Number.isFinite(id)) {
+    const id = String((body as any)?.id || '').trim()
+    if (!id) {
       return NextResponse.json({ error: 'Missing id' }, { status: 400 })
     }
 
