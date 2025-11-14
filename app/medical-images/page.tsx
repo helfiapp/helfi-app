@@ -210,6 +210,9 @@ export default function MedicalImagesPage() {
             </div>
             <div className="mt-2">
               <p className="text-xs text-gray-500 mb-2">Typical cost: 2 credits</p>
+              <div className="text-[11px] text-blue-800 bg-blue-50 border border-blue-200 rounded px-2 py-1 mb-2">
+                Free accounts can try this AI feature once. After your free analysis, upgrade or buy credits to continue.
+              </div>
               <UsageMeter inline={true} refreshTrigger={usageMeterRefresh} />
               <FeatureUsageDisplay featureName="medicalImageAnalysis" featureLabel="Medical Image Analysis" refreshTrigger={usageMeterRefresh} />
             </div>

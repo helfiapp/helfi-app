@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
+import { getToken } from 'next-auth/jwt'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { CreditManager, CREDIT_COSTS } from '@/lib/credit-system'
@@ -15,9 +16,23 @@ const getOpenAIClient = () => {
 
 export async function POST(req: NextRequest) {
   try {
-    // Auth check
+    // Auth check (with JWT fallback to avoid sporadic session resolution issues)
     const session = await getServerSession(authOptions)
-    if (!session?.user?.email) {
+    let userEmail: string | null = session?.user?.email ?? null
+    if (!userEmail) {
+      try {
+        const token = await getToken({
+          req,
+          secret: process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET || 'helfi-secret-key-production-2024',
+        })
+        if (token?.email) {
+          userEmail = token.email as string
+        }
+      } catch {
+        // ignore – will fall through to 401 below if still missing
+      }
+    }
+    if (!userEmail) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -44,7 +59,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Fetch user
-    const user = await prisma.user.findUnique({ where: { email: session.user.email }, include: { subscription: true, creditTopUps: true } })
+    const user = await prisma.user.findUnique({ where: { email: userEmail }, include: { subscription: true, creditTopUps: true } })
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
@@ -58,14 +73,17 @@ export async function POST(req: NextRequest) {
       (topUp: any) => topUp.expiresAt > now && (topUp.amountCents - topUp.usedCents) > 0
     )
     
-    // Note: Symptom analysis doesn't have free use (it's not an AI image analysis feature)
-    // Users need subscription or credits for symptom analysis
-    
-    if (!isPremium && !hasPurchasedCredits) {
+    // One‑time free use for symptom analysis (match other AI features)
+    const hasUsedFreeSymptom = (user as any).hasUsedFreeSymptomAnalysis || false
+    let allowViaFreeUse = false
+    if (!isPremium && !hasPurchasedCredits && !hasUsedFreeSymptom) {
+      allowViaFreeUse = true
+    } else if (!isPremium && !hasPurchasedCredits) {
+      // No subscription, no credits, and already used free - require payment
       return NextResponse.json(
         { 
           error: 'Payment required',
-          message: 'Symptom analysis requires a subscription or credits. Subscribe to a monthly plan or purchase credits to continue.',
+          message: 'You\'ve used your free symptom analysis. Subscribe to a monthly plan or purchase credits to continue.',
           requiresPayment: true
         },
         { status: 402 }
@@ -117,11 +135,11 @@ Return two parts:
       }
     ]
 
-    // Wallet pre-check (all non-trial users)
+    // Wallet pre-check (skip when allowed via one-time free use)
     const model = 'gpt-4o'
     const promptText = messages.map((m) => (typeof (m as any).content === 'string' ? (m as any).content : '')).join('\n')
     const estimateCents = costCentsEstimateFromText(model, promptText, 1200 * 4)
-    {
+    if (!allowViaFreeUse) {
       const cm = new CreditManager(refreshedUser.id)
       const wallet = await cm.getWalletStatus()
       if (wallet.totalAvailableCents < estimateCents) {
@@ -153,8 +171,8 @@ Return two parts:
       // ignore parsing error, we'll still return analysisText
     }
 
-    // Charge wallet and update counters
-    {
+    // Charge wallet and update counters (skip charge if allowed via free use)
+    if (!allowViaFreeUse) {
       const cm = new CreditManager(refreshedUser.id)
       const ok = await cm.chargeCents(wrapped.costCents)
       if (!ok) {
@@ -170,6 +188,22 @@ Return two parts:
         monthlySymptomAnalysisUsed: { increment: 1 },
       } as any,
     })
+    
+    // Mark free use as used (safe if column doesn't exist yet)
+    if (allowViaFreeUse) {
+      try {
+        await prisma.user.update({
+          where: { id: refreshedUser.id },
+          data: {
+            hasUsedFreeSymptomAnalysis: true,
+          } as any
+        })
+      } catch (e: any) {
+        if (!e?.message?.includes('does not exist')) {
+          console.warn('Failed to update hasUsedFreeSymptomAnalysis:', e)
+        }
+      }
+    }
 
     // Build response
     const resp: any = {

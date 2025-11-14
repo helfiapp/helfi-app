@@ -52,6 +52,17 @@ const CreditPurchaseModal: React.FC<CreditPurchaseModalProps> = ({
         </div>
 
         <div className="mb-6">
+          {/* Free account notice */}
+          {creditInfo.plan !== 'PREMIUM' && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+              <p className="text-sm text-blue-800">
+                With a free account, you can try each AI feature once. If you've already
+                used the free analysis for this feature, please upgrade to Premium or buy
+                credits to continue.
+              </p>
+            </div>
+          )}
+
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
             <div className="flex items-center">
               <div className="flex-shrink-0">

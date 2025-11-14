@@ -1399,6 +1399,9 @@ Please add nutritional information manually if needed.`);
                   </button>
                   <div className="mt-2">
                     <p className="text-xs text-gray-500 text-center mb-2">Typical cost: 1–2 credits</p>
+                    <div className="text-[11px] text-blue-800 bg-blue-50 border border-blue-200 rounded px-2 py-1 mb-2 text-center">
+                      Free accounts can try this AI feature once. After your free analysis, upgrade or buy credits to continue.
+                    </div>
                     <UsageMeter inline={true} refreshTrigger={usageMeterRefresh} />
                     <FeatureUsageDisplay featureName="foodAnalysis" featureLabel="Food Analysis" refreshTrigger={usageMeterRefresh} />
                   </div>
