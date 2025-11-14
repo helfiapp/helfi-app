@@ -1118,7 +1118,10 @@ Please add nutritional information manually if needed.`);
   }
 
   const handleDoneEditing = () => {
-    exitEditingSession()
+    // Exit description edit mode but keep analysis panel visible
+    setIsEditingDescription(false)
+    setShowAiResult(true)
+    setShowAddFood(true)
   }
 
   const handleEditDescriptionClick = () => {
@@ -2056,8 +2059,11 @@ Please add nutritional information manually if needed.`);
                         </label>
                         <input
                           type="number"
-                          min={0.25}
-                          step={0.25}
+                          min={0}
+                          step={(() => {
+                            const meta = parseServingUnitMetadata(analyzedItems[editingItemIndex]?.serving_size || '')
+                            return meta && isDiscreteUnitLabel(meta.unitLabel) ? (1 / meta.quantity) : 0.25
+                          })()}
                           value={analyzedItems[editingItemIndex]?.servings ?? 1}
                           onChange={(e) => updateItemField(editingItemIndex, 'servings', e.target.value)}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
@@ -2182,8 +2188,8 @@ Please add nutritional information manually if needed.`);
                   </div>
 
                   {/* Nutrition Cards - Match Main Page Style */}
-                  {analyzedNutrition && (analyzedNutrition.calories !== null || analyzedNutrition.protein !== null || analyzedNutrition.carbs !== null || analyzedNutrition.fat !== null) && (
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+                  {analyzedNutrition && (
+                    <div className="grid grid-cols-2 sm:grid-cols-6 gap-3 sm:gap-4">
                       {/* Calories */}
                       {analyzedNutrition.calories !== null && analyzedNutrition.calories !== undefined && (
                         <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-3 sm:p-4 border border-orange-200">
@@ -2220,6 +2226,26 @@ Please add nutritional information manually if needed.`);
                           <div className="text-center">
                             <div className="text-xl sm:text-2xl font-bold text-purple-600">{analyzedNutrition.fat}g</div>
                             <div className="text-xs font-medium text-purple-500 uppercase tracking-wide">Fat</div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Fiber */}
+                      {(analyzedNutrition as any)?.fiber !== null && (analyzedNutrition as any)?.fiber !== undefined && (
+                        <div className="bg-gradient-to-br from-amber-50 to-amber-100 rounded-xl p-3 sm:p-4 border border-amber-200">
+                          <div className="text-center">
+                            <div className="text-xl sm:text-2xl font-bold text-amber-600">{(analyzedNutrition as any).fiber}g</div>
+                            <div className="text-xs font-medium text-amber-500 uppercase tracking-wide">Fiber</div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Sugar */}
+                      {(analyzedNutrition as any)?.sugar !== null && (analyzedNutrition as any)?.sugar !== undefined && (
+                        <div className="bg-gradient-to-br from-pink-50 to-pink-100 rounded-xl p-3 sm:p-4 border border-pink-200">
+                          <div className="text-center">
+                            <div className="text-xl sm:text-2xl font-bold text-pink-600">{(analyzedNutrition as any).sugar}g</div>
+                            <div className="text-xs font-medium text-pink-500 uppercase tracking-wide">Sugar</div>
                           </div>
                         </div>
                       )}

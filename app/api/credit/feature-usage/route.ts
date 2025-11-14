@@ -120,28 +120,11 @@ export async function GET(_req: NextRequest) {
       }
     }
 
-    // Query actual food analysis usage from FoodLog since monthlyStartDate
-    let actualFoodUsage = 0
-    let foodLabel: 'monthly' | 'total' = 'total'
-    
-    if (monthlyStartDate) {
-      // Count FoodLog entries created since the start of current subscription month
-      const foodLogCount = await prisma.foodLog.count({
-        where: {
-          userId: user.id,
-          createdAt: {
-            gte: monthlyStartDate,
-          },
-        },
-      })
-      actualFoodUsage = foodLogCount
-      foodLabel = 'monthly'
-    } else {
-      // Fallback: use monthly counter or total count
-      const foodMonthly = user.monthlyFoodAnalysisUsed || 0
-      actualFoodUsage = Math.max(foodMonthly, (user.totalFoodAnalysisCount || 0))
-      foodLabel = foodMonthly >= (user.totalFoodAnalysisCount || 0) && foodMonthly > 0 ? 'monthly' : 'total'
-    }
+    // Use live monthly counter that updates immediately after analysis completes
+    // Fallback to lifetime total if monthly is unavailable
+    const foodMonthly = (user as any).monthlyFoodAnalysisUsed || 0
+    const actualFoodUsage = Math.max(foodMonthly, (user.totalFoodAnalysisCount || 0))
+    const foodLabel: 'monthly' | 'total' = foodMonthly > 0 ? 'monthly' : 'total'
 
     // Calculate symptom analysis count
     // If user has subscription, only show monthly count (not lifetime)
