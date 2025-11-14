@@ -267,12 +267,37 @@ const removeItemsByIndex = (
   setItems(nextItems)
   applyRecalc(nextItems)
   if (editingEntry) {
-    const updatedNutrition = recalculateNutritionFromItems(nextItems)
+    // Lightweight inline totals calculator (avoid referencing later-scoped functions)
+    const totals = { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0 }
+    nextItems.forEach((it: any) => {
+      const servings = it?.servings && Number.isFinite(it.servings) ? Number(it.servings) : 1
+      totals.calories += (Number(it?.calories) || 0) * servings
+      totals.protein += (Number(it?.protein_g) || 0) * servings
+      totals.carbs += (Number(it?.carbs_g) || 0) * servings
+      totals.fat += (Number(it?.fat_g) || 0) * servings
+      totals.fiber += (Number(it?.fiber_g) || 0) * servings
+      totals.sugar += (Number(it?.sugar_g) || 0) * servings
+    })
+    const updatedNutrition = {
+      calories: Math.round(totals.calories),
+      protein: Math.round(totals.protein * 10) / 10,
+      carbs: Math.round(totals.carbs * 10) / 10,
+      fat: Math.round(totals.fat * 10) / 10,
+      fiber: Math.round(totals.fiber * 10) / 10,
+      sugar: Math.round(totals.sugar * 10) / 10,
+    }
     const updatedEntry = {
       ...editingEntry,
       items: nextItems,
       nutrition: updatedNutrition,
-      total: convertTotalsForStorage(updatedNutrition),
+      total: {
+        calories: updatedNutrition.calories ?? null,
+        protein_g: updatedNutrition.protein ?? null,
+        carbs_g: updatedNutrition.carbs ?? null,
+        fat_g: updatedNutrition.fat ?? null,
+        fiber_g: updatedNutrition.fiber ?? null,
+        sugar_g: updatedNutrition.sugar ?? null,
+      },
     }
     setEditingEntry(updatedEntry)
     setTodaysFoods((prev: any[]) => prev.map((f: any) => (f.id === editingEntry.id ? updatedEntry : f)))
