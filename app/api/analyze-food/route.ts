@@ -58,11 +58,37 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const normalizedEmail = userEmail.trim().toLowerCase();
+
+    const findOrCreateUser = async (includeRelations: any = { subscription: true }) => {
+      try {
+        const existing = await prisma.user.findUnique({
+          where: { email: normalizedEmail },
+          include: includeRelations,
+        });
+        if (existing) return existing;
+
+        console.warn('⚠️ Food analyzer could not find user record. Auto-creating placeholder record for', normalizedEmail);
+        await prisma.user.create({
+          data: {
+            email: normalizedEmail,
+            name: session?.user?.name || normalizedEmail.split('@')[0],
+            emailVerified: new Date(),
+          },
+        });
+
+        return await prisma.user.findUnique({
+          where: { email: normalizedEmail },
+          include: includeRelations,
+        });
+      } catch (creationError) {
+        console.error('❌ Failed to find or create user for food analyzer:', creationError);
+        return null;
+      }
+    };
+
     // Find user
-    const user = await prisma.user.findUnique({
-      where: { email: userEmail },
-      include: { subscription: true }
-    });
+    const user = await findOrCreateUser({ subscription: true });
 
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -290,10 +316,7 @@ CRITICAL REQUIREMENTS:
     }
 
     // PREMIUM/CREDITS/FREE USE GATING
-    const currentUser = await prisma.user.findUnique({
-      where: { email: userEmail },
-      include: { subscription: true, creditTopUps: true }
-    });
+    const currentUser = await findOrCreateUser({ subscription: true, creditTopUps: true });
     if (!currentUser) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
