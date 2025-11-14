@@ -1645,35 +1645,59 @@ Please add nutritional information manually if needed.`);
                                 </button>
                               </div>
                               </div>
-                              {quickAddDelta && (
-                                <div className="flex flex-wrap gap-2 text-xs">
-                                  <span className="text-gray-500">Quick add:</span>
-                                  <button
-                                    onClick={() => {
-                                      const current = analyzedItems[index]?.servings || 1
-                                      updateItemField(index, 'servings', current + quickAddDelta)
-                                    }}
-                                    className="px-3 py-1 rounded-full border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors"
-                                  >
-                                    +1 {servingUnitMeta?.unitLabelSingular}{' '}
-                                    <span className="text-gray-500">
-                                      (+{formatServingsDisplay(quickAddDelta)} serving{quickAddDelta !== 1 ? 's' : ''})
-                                    </span>
-                                  </button>
-                                  {quickAddHalfDelta && quickAddHalfDelta >= 0.1 && (
-                                    <button
-                                      onClick={() => {
-                                        const current = analyzedItems[index]?.servings || 1
-                                        updateItemField(index, 'servings', current + quickAddHalfDelta)
-                                      }}
-                                      className="px-3 py-1 rounded-full border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors"
-                                    >
-                                      +1/2 {servingUnitMeta?.unitLabelSingular}{' '}
-                                      <span className="text-gray-500">
-                                        (+{formatServingsDisplay(quickAddHalfDelta)} serving{quickAddHalfDelta !== 1 ? 's' : ''})
-                                      </span>
-                                    </button>
+                              {servingUnitMeta && (
+                                <div className="flex flex-col gap-1">
+                                  {quickAddDelta && (
+                                    <div className="flex flex-wrap gap-2 text-xs">
+                                      <span className="text-gray-500">Quick add:</span>
+                                      <button
+                                        onClick={() => {
+                                          const current = analyzedItems[index]?.servings || 1
+                                          updateItemField(index, 'servings', current + quickAddDelta)
+                                        }}
+                                        className="px-3 py-1 rounded-full border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors"
+                                      >
+                                        +1 {servingUnitMeta.unitLabelSingular}{' '}
+                                        <span className="text-gray-500">
+                                          (+{formatServingsDisplay(quickAddDelta)} serving{quickAddDelta !== 1 ? 's' : ''})
+                                        </span>
+                                      </button>
+                                      {quickAddHalfDelta && quickAddHalfDelta >= 0.1 && (
+                                        <button
+                                          onClick={() => {
+                                            const current = analyzedItems[index]?.servings || 1
+                                            updateItemField(index, 'servings', current + quickAddHalfDelta)
+                                          }}
+                                          className="px-3 py-1 rounded-full border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors"
+                                        >
+                                          +1/2 {servingUnitMeta.unitLabelSingular}{' '}
+                                          <span className="text-gray-500">
+                                            (+{formatServingsDisplay(quickAddHalfDelta)} serving{quickAddHalfDelta !== 1 ? 's' : ''})
+                                          </span>
+                                        </button>
+                                      )}
+                                    </div>
                                   )}
+                                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                                    <span>Units:</span>
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      step={0.1}
+                                      value={formatNumberInputValue(((item.servings ?? 1) * servingUnitMeta.quantity))}
+                                      onChange={(e) => {
+                                        const units = Number(e.target.value)
+                                        if (Number.isFinite(units) && units >= 0) {
+                                          const servingsFromUnits = units / servingUnitMeta.quantity
+                                          updateItemField(index, 'servings', servingsFromUnits)
+                                        }
+                                      }}
+                                      className="w-24 px-2 py-1 border border-gray-300 rounded-lg text-base font-semibold text-gray-900 text-center focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                    />
+                                    <span className="text-xs text-gray-500 flex-1">
+                                      1 serving = {item.serving_size || 'N/A'}
+                                    </span>
+                                  </div>
                                 </div>
                               )}
                             </div>
