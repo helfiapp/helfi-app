@@ -24,14 +24,32 @@ async function resolveAdminInfo(authHeader: string | null) {
 
   const fallbackEmail = getFallbackAdminEmail(authHeader)
   if (!fallbackEmail) {
+    console.log('[QR-GEN] No fallback email found for auth header:', authHeader?.substring(0, 20))
     return null
   }
 
-  const adminUser = await prisma.adminUser.findFirst({
+  console.log('[QR-GEN] Looking up admin user with email:', fallbackEmail)
+  
+  // Try to find admin user
+  let adminUser = await prisma.adminUser.findFirst({
     where: { email: fallbackEmail }
   })
 
+  // If no admin user exists, try to find or create a regular User account
   if (!adminUser) {
+    console.log('[QR-GEN] No AdminUser found, checking User table')
+    const regularUser = await prisma.user.findUnique({
+      where: { email: fallbackEmail },
+      select: { id: true, email: true }
+    })
+    
+    if (regularUser) {
+      // Use the user's ID as adminId for QR token storage
+      // This allows QR login to work even without AdminUser record
+      return { adminId: regularUser.id, email: regularUser.email.toLowerCase() }
+    }
+    
+    console.log('[QR-GEN] No user found with email:', fallbackEmail)
     return null
   }
 
@@ -54,11 +72,18 @@ export async function GET(request: NextRequest) {
   try {
     // Verify admin is authenticated (support legacy desktop token)
     const authHeader = request.headers.get('authorization')
+    console.log('[QR-GEN] Received request with auth header:', authHeader ? 'Bearer ***' : 'none')
+    
     const adminInfo = await resolveAdminInfo(authHeader)
     
     if (!adminInfo) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      console.error('[QR-GEN] Failed to resolve admin info')
+      return NextResponse.json({ 
+        error: 'Unauthorized - Could not identify admin user. Make sure OWNER_EMAIL is set correctly.' 
+      }, { status: 401 })
     }
+    
+    console.log('[QR-GEN] Resolved admin info:', { adminId: adminInfo.adminId, email: adminInfo.email })
 
     // Generate a unique QR token (valid for 5 minutes)
     const qrToken = crypto.randomBytes(32).toString('hex')
@@ -85,9 +110,11 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({ success: true, qrData })
-  } catch (error) {
-    console.error('Error generating QR code:', error)
-    return NextResponse.json({ error: 'Failed to generate QR code' }, { status: 500 })
+  } catch (error: any) {
+    console.error('[QR-GEN] Error generating QR code:', error)
+    return NextResponse.json({ 
+      error: `Failed to generate QR code: ${error?.message || 'Unknown error'}` 
+    }, { status: 500 })
   }
 }
 
@@ -111,8 +138,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Token expired' }, { status: 401 })
     }
 
-    // Get admin user details
-    const adminUser = await prisma.adminUser.findUnique({
+    // Get admin user details - try AdminUser first, then fall back to User
+    let adminUser = await prisma.adminUser.findUnique({
       where: { id: qrData.adminId },
       select: {
         id: true,
@@ -123,7 +150,30 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    if (!adminUser || !adminUser.isActive) {
+    // If not found in AdminUser, check User table (for legacy login)
+    if (!adminUser) {
+      const regularUser = await prisma.user.findUnique({
+        where: { id: qrData.adminId },
+        select: {
+          id: true,
+          email: true,
+          name: true
+        }
+      })
+      
+      if (regularUser) {
+        // Create a mock admin user object for QR login
+        adminUser = {
+          id: regularUser.id,
+          email: regularUser.email,
+          name: regularUser.name || 'Admin',
+          role: 'ADMIN' as any,
+          isActive: true
+        }
+      }
+    }
+
+    if (!adminUser || (adminUser as any).isActive === false) {
       return NextResponse.json({ error: 'Admin user not found or inactive' }, { status: 404 })
     }
 

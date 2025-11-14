@@ -1262,11 +1262,13 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
         })
         setQrCodeData(qrImageData)
       } else {
-        alert('Failed to generate QR code')
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        console.error('QR generation failed:', errorData)
+        alert(`Failed to generate QR code: ${errorData.error || 'Unknown error'}`)
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error generating QR code:', error)
-      alert('Failed to generate QR code')
+      alert(`Failed to generate QR code: ${error?.message || 'Network error'}`)
     }
     setIsGeneratingQR(false)
   }
