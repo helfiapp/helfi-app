@@ -1809,7 +1809,7 @@ Please add nutritional information manually if needed.`);
 
             {/* AI Analysis Result - Premium Cronometer-style UI */}
             {showAiResult && (
-              <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+              <div className="bg-white rounded-2xl shadow-lg border border-gray-100">
                 {/* Photo Section */}
                 {photoPreview && (
                   <div className="p-4 border-b border-gray-100 flex justify-center">
