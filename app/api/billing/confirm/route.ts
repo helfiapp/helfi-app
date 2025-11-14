@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import Stripe from 'stripe'
+import { notifyOwner } from '@/lib/owner-notifications'
 
 // Force dynamic so this route isn't considered for static optimization at build time
 export const dynamic = 'force-dynamic'
@@ -65,6 +66,25 @@ export async function GET(request: NextRequest) {
         expiresAt,
         source: `stripe:${checkout.id}`,
       },
+    })
+
+    // Calculate credit amount based on purchase amount
+    // Common packages: $5 = 500 credits, $10 = 1000 credits, etc.
+    let creditAmount = 0
+    if (amountCents >= 1000) creditAmount = 1000
+    else if (amountCents >= 500) creditAmount = 500
+    else if (amountCents >= 250) creditAmount = 250
+
+    // Notify owner of credit purchase (don't await to avoid blocking response)
+    notifyOwner({
+      event: 'credit_purchase',
+      userEmail: user.email,
+      userName: user.name || undefined,
+      amount: amountCents,
+      currency: (checkout.currency || 'usd').toUpperCase(),
+      creditAmount: creditAmount || undefined,
+    }).catch(error => {
+      console.error('❌ Owner notification failed (non-blocking):', error)
     })
 
     return NextResponse.json({ ok: true })

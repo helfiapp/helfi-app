@@ -4,6 +4,7 @@ import GoogleProvider from 'next-auth/providers/google'
 import { prisma } from '@/lib/prisma'
 import { Resend } from 'resend'
 import { getEmailFooter } from '@/lib/email-footer'
+import { notifyOwner } from '@/lib/owner-notifications'
 
 // Initialize Resend for welcome emails
 function getResend() {
@@ -321,6 +322,15 @@ export const authOptions: NextAuthOptions = {
             console.log('📧 Sending welcome email to new Google user:', userName)
             sendWelcomeEmail(dbUser.email, userName).catch(error => {
               console.error('❌ Google welcome email failed (non-blocking):', error)
+            })
+
+            // Notify owner of new Google signup (don't await to avoid blocking auth)
+            notifyOwner({
+              event: 'signup',
+              userEmail: dbUser.email,
+              userName: dbUser.name || undefined,
+            }).catch(error => {
+              console.error('❌ Owner notification failed (non-blocking):', error)
             })
           }
           

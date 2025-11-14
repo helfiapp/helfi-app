@@ -89,6 +89,12 @@ export default function AdminPanel() {
   const [adminList, setAdminList] = useState<any[]>([])
   const [isLoadingAdmins, setIsLoadingAdmins] = useState(false)
 
+  // QR Code and Push Notification states
+  const [qrCodeData, setQrCodeData] = useState<string | null>(null)
+  const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null)
+  const [isGeneratingQR, setIsGeneratingQR] = useState(false)
+  const [pushNotificationStatus, setPushNotificationStatus] = useState<{subscribed: boolean, loading: boolean}>({subscribed: false, loading: false})
+
   // Check for URL hash to set active tab and load data
   useEffect(() => {
     const token = sessionStorage.getItem('adminToken')
@@ -1234,6 +1240,130 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
     }
   }
 
+  // QR Code Functions
+  const generateQRCode = async () => {
+    setIsGeneratingQR(true)
+    try {
+      const response = await fetch('/api/admin/qr-generate', {
+        headers: {
+          'Authorization': `Bearer ${adminToken}`
+        }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setQrCodeUrl(data.qrData.url)
+        
+        // Generate QR code image using qrcode library
+        const QRCode = (await import('qrcode')).default
+        const qrImageData = await QRCode.toDataURL(data.qrData.url, {
+          width: 300,
+          margin: 2
+        })
+        setQrCodeData(qrImageData)
+      } else {
+        alert('Failed to generate QR code')
+      }
+    } catch (error) {
+      console.error('Error generating QR code:', error)
+      alert('Failed to generate QR code')
+    }
+    setIsGeneratingQR(false)
+  }
+
+  // Push Notification Functions
+  const checkPushNotificationStatus = async () => {
+    if (!adminUser?.email || !adminToken) return
+    
+    setPushNotificationStatus({ subscribed: false, loading: true })
+    try {
+      // Check if admin user has push subscription
+      const response = await fetch('/api/admin/push-subscribe', {
+        headers: {
+          'Authorization': `Bearer ${adminToken}`
+        }
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setPushNotificationStatus({ subscribed: data.hasSubscription || false, loading: false })
+      } else {
+        setPushNotificationStatus({ subscribed: false, loading: false })
+      }
+    } catch (error) {
+      console.error('Error checking push status:', error)
+      setPushNotificationStatus({ subscribed: false, loading: false })
+    }
+  }
+
+  const enablePushNotifications = async () => {
+    if (!('Notification' in window)) {
+      alert('Push notifications are not supported in this browser')
+      return
+    }
+
+    if (Notification.permission === 'denied') {
+      alert('Push notifications were denied. Please enable them in your browser settings.')
+      return
+    }
+
+    setPushNotificationStatus({ subscribed: false, loading: true })
+
+    try {
+      const permission = await Notification.requestPermission()
+      if (permission !== 'granted') {
+        alert('Push notifications were denied')
+        setPushNotificationStatus({ subscribed: false, loading: false })
+        return
+      }
+
+      // Register service worker
+      const registration = await navigator.serviceWorker.register('/sw.js')
+      await navigator.serviceWorker.ready
+
+      // Subscribe to push notifications
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+          ? urlBase64ToUint8Array(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY)
+          : undefined
+      })
+
+      // Send subscription to server (using admin API endpoint)
+      const response = await fetch('/api/admin/push-subscribe', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${adminToken}`
+        },
+        body: JSON.stringify({ subscription })
+      })
+
+      if (response.ok) {
+        setPushNotificationStatus({ subscribed: true, loading: false })
+        alert('✅ Push notifications enabled! You will now receive notifications for signups, subscriptions, and credit purchases.')
+      } else {
+        throw new Error('Failed to save subscription')
+      }
+    } catch (error: any) {
+      console.error('Error enabling push notifications:', error)
+      alert(`Failed to enable push notifications: ${error.message}`)
+      setPushNotificationStatus({ subscribed: false, loading: false })
+    }
+  }
+
+  const urlBase64ToUint8Array = (base64String: string) => {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4)
+    const base64 = (base64String + padding)
+      .replace(/\-/g, '+')
+      .replace(/_/g, '/')
+    const rawData = window.atob(base64)
+    const outputArray = new Uint8Array(rawData.length)
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i)
+    }
+    return outputArray
+  }
+
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -1354,7 +1484,8 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
               { id: 'users', label: '👥 Users', desc: 'User stats' },
               { id: 'management', label: '🛠️ User Management', desc: 'Manage users' },
               { id: 'templates', label: '📝 Templates', desc: 'Email templates' },
-              { id: 'tickets', label: '🎫 Support', desc: 'Customer support' }
+              { id: 'tickets', label: '🎫 Support', desc: 'Customer support' },
+              { id: 'settings', label: '⚙️ Settings', desc: 'QR Login & Notifications' }
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -1372,6 +1503,9 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                   }
                   if (tab.id === 'tickets') {
                     loadSupportTickets()
+                  }
+                  if (tab.id === 'settings') {
+                    checkPushNotificationStatus()
                   }
                 }}
                 className={`py-4 px-1 border-b-2 font-medium text-sm ${
@@ -3470,6 +3604,88 @@ The Helfi Team`,
                     </button>
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'settings' && (
+          <div className="space-y-6">
+            {/* QR Code Login Section */}
+            <div className="bg-white rounded-lg shadow p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">📱 QR Code Login</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Generate a QR code to log into the admin panel on your phone. Scan the QR code with your phone's camera to instantly log in.
+              </p>
+              
+              {qrCodeData ? (
+                <div className="flex flex-col items-center space-y-4">
+                  <img src={qrCodeData} alt="QR Code" className="border-2 border-gray-200 rounded-lg" />
+                  <p className="text-sm text-gray-600 text-center">
+                    Scan this QR code with your phone to log into the admin panel
+                  </p>
+                  <p className="text-xs text-gray-500 text-center">
+                    Or visit: <a href={qrCodeUrl || '#'} className="text-blue-600 underline" target="_blank" rel="noopener noreferrer">{qrCodeUrl}</a>
+                  </p>
+                  <button
+                    onClick={generateQRCode}
+                    className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors"
+                  >
+                    🔄 Generate New QR Code
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={generateQRCode}
+                  disabled={isGeneratingQR}
+                  className="bg-emerald-500 text-white px-6 py-3 rounded-lg hover:bg-emerald-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isGeneratingQR ? 'Generating...' : '📱 Generate QR Code'}
+                </button>
+              )}
+            </div>
+
+            {/* Push Notifications Section */}
+            <div className="bg-white rounded-lg shadow p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">🔔 Push Notifications</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Enable push notifications to receive instant alerts on your phone when:
+              </p>
+              <ul className="list-disc list-inside text-sm text-gray-600 mb-4 space-y-1">
+                <li>Someone signs up on your website</li>
+                <li>Someone purchases a paid subscription</li>
+                <li>Someone buys credits</li>
+              </ul>
+
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                <div>
+                  <p className="font-medium text-gray-900">Push Notifications</p>
+                  <p className="text-sm text-gray-600">
+                    {pushNotificationStatus.loading 
+                      ? 'Checking status...' 
+                      : pushNotificationStatus.subscribed 
+                        ? '✅ Enabled - You will receive notifications' 
+                        : '❌ Not enabled - Click below to enable'}
+                  </p>
+                </div>
+                <button
+                  onClick={enablePushNotifications}
+                  disabled={pushNotificationStatus.loading || pushNotificationStatus.subscribed}
+                  className="bg-emerald-500 text-white px-6 py-2 rounded-lg hover:bg-emerald-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {pushNotificationStatus.loading 
+                    ? 'Loading...' 
+                    : pushNotificationStatus.subscribed 
+                      ? '✅ Enabled' 
+                      : 'Enable Notifications'}
+                </button>
+              </div>
+
+              <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-800">
+                  <strong>Note:</strong> Make sure you've enabled push notifications in your browser settings. 
+                  On mobile, you may need to add the site to your home screen for best results.
+                </p>
               </div>
             </div>
           </div>

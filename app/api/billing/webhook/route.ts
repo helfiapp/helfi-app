@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { prisma } from '@/lib/prisma'
 import { Resend } from 'resend'
+import { notifyOwner } from '@/lib/owner-notifications'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', { apiVersion: '2024-06-20' })
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
@@ -39,15 +40,33 @@ export async function POST(request: NextRequest) {
         if (!email) break
 
         // Set plan to PREMIUM (no trial periods)
-        await prisma.user.update({
+        const user = await prisma.user.update({
           where: { email: email.toLowerCase() },
           data: {
             subscription: { upsert: {
               create: { plan: 'PREMIUM' },
               update: { plan: 'PREMIUM' }
             }},
-          }
+          },
+          include: { subscription: true }
         })
+
+        // Notify owner of subscription purchase (don't await to avoid blocking webhook)
+        const amountCents = sub.items.data[0]?.price?.unit_amount || 0
+        const currency = sub.currency?.toUpperCase() || 'USD'
+        const planName = `Premium (${currency === 'USD' ? '$' : ''}${(amountCents / 100).toFixed(0)}/month)`
+        
+        notifyOwner({
+          event: 'subscription',
+          userEmail: email,
+          userName: user.name || undefined,
+          amount: amountCents,
+          currency: currency,
+          planName: planName,
+        }).catch(error => {
+          console.error('❌ Owner notification failed (non-blocking):', error)
+        })
+
         break
       }
       case 'customer.subscription.trial_will_end': {
@@ -84,6 +103,47 @@ export async function POST(request: NextRequest) {
         }
         break
       }
+      case 'checkout.session.completed': {
+        const session = event.data.object as Stripe.Checkout.Session
+        
+        // Only handle credit purchases (one-time payments), not subscriptions
+        if (session.mode === 'payment' && session.payment_status === 'paid') {
+          const customerEmail = session.customer_details?.email || session.customer_email
+          if (!customerEmail) break
+
+          const user = await prisma.user.findUnique({
+            where: { email: customerEmail.toLowerCase() },
+            select: { id: true, email: true, name: true }
+          })
+
+          if (user) {
+            // Get amount and credit details from line items
+            const amountCents = session.amount_total || 0
+            const currency = (session.currency || 'usd').toUpperCase()
+            
+            // Determine credit amount based on price (common credit packages)
+            // This is approximate - actual credits are handled in /api/billing/confirm
+            let creditAmount = 0
+            if (amountCents >= 1000) creditAmount = 1000 // $10 = 1000 credits
+            else if (amountCents >= 500) creditAmount = 500 // $5 = 500 credits
+            else if (amountCents >= 250) creditAmount = 250 // $2.50 = 250 credits
+
+            // Notify owner of credit purchase (don't await to avoid blocking webhook)
+            notifyOwner({
+              event: 'credit_purchase',
+              userEmail: user.email,
+              userName: user.name || undefined,
+              amount: amountCents,
+              currency: currency,
+              creditAmount: creditAmount || undefined,
+            }).catch(error => {
+              console.error('❌ Owner notification failed (non-blocking):', error)
+            })
+          }
+        }
+        break
+      }
+
       default:
         break
     }

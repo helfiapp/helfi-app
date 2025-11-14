@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getEmailFooter } from '@/lib/email-footer'
+import { notifyOwner } from '@/lib/owner-notifications'
 
 // This API route uses dynamic data and should not be statically generated
 export const runtime = 'nodejs'
@@ -130,6 +131,15 @@ export async function POST(request: NextRequest) {
     console.log('📧 Sending verification email to new user')
     sendVerificationEmail(user.email, verificationToken).catch(error => {
       console.error('❌ Verification email failed (non-blocking):', error)
+    })
+
+    // Notify owner of new signup (don't await to avoid blocking)
+    notifyOwner({
+      event: 'signup',
+      userEmail: user.email,
+      userName: user.name || undefined,
+    }).catch(error => {
+      console.error('❌ Owner notification failed (non-blocking):', error)
     })
 
     console.log('✅ Direct signup successful:', { id: user.id, email: user.email })
