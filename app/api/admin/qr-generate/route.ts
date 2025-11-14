@@ -6,9 +6,6 @@ import crypto from 'crypto'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'helfi-admin-secret-2024'
 
-// Store active QR tokens (in production, use Redis or database)
-const activeQRTokens = new Map<string, { adminId: string; email: string; expiresAt: number }>()
-
 function getFallbackAdminEmail(authHeader: string | null) {
   if (authHeader && authHeader.includes('temp-admin-token')) {
     return (process.env.OWNER_EMAIL || 'admin@helfi.ai').toLowerCase()
@@ -56,17 +53,27 @@ async function resolveAdminInfo(authHeader: string | null) {
   return { adminId: adminUser.id, email: adminUser.email.toLowerCase() }
 }
 
-// Clean up expired tokens every 5 minutes
-setInterval(() => {
+// Ensure QR tokens table exists
+async function ensureQRTokensTable() {
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS QRTokens (
+      token TEXT PRIMARY KEY,
+      adminId TEXT NOT NULL,
+      email TEXT NOT NULL,
+      expiresAt BIGINT NOT NULL,
+      createdAt TIMESTAMP DEFAULT NOW()
+    )
+  `)
+}
+
+// Clean up expired tokens (run on each request to avoid stale data)
+async function cleanupExpiredTokens() {
   const now = Date.now()
-  const tokensToDelete: string[] = []
-  activeQRTokens.forEach((data, token) => {
-    if (data.expiresAt < now) {
-      tokensToDelete.push(token)
-    }
-  })
-  tokensToDelete.forEach(token => activeQRTokens.delete(token))
-}, 5 * 60 * 1000)
+  await prisma.$executeRawUnsafe(
+    `DELETE FROM QRTokens WHERE expiresAt < $1`,
+    now
+  )
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -85,16 +92,22 @@ export async function GET(request: NextRequest) {
     
     console.log('[QR-GEN] Resolved admin info:', { adminId: adminInfo.adminId, email: adminInfo.email })
 
+    // Ensure table exists and clean up expired tokens
+    await ensureQRTokensTable()
+    await cleanupExpiredTokens()
+
     // Generate a unique QR token (valid for 5 minutes)
     const qrToken = crypto.randomBytes(32).toString('hex')
     const expiresAt = Date.now() + 5 * 60 * 1000 // 5 minutes
 
-    // Store token with admin info
-    activeQRTokens.set(qrToken, {
-      adminId: adminInfo.adminId,
-      email: adminInfo.email,
+    // Store token in database
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO QRTokens (token, adminId, email, expiresAt) VALUES ($1, $2, $3, $4)`,
+      qrToken,
+      adminInfo.adminId,
+      adminInfo.email,
       expiresAt
-    })
+    )
 
     // Get app URL from request or environment
     const origin = request.headers.get('origin') || request.headers.get('host')
@@ -127,14 +140,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Token required' }, { status: 400 })
     }
 
-    const qrData = activeQRTokens.get(token)
-    
-    if (!qrData) {
+    // Ensure table exists and clean up expired tokens
+    await ensureQRTokensTable()
+    await cleanupExpiredTokens()
+
+    // Look up token in database
+    const rows: Array<{ adminId: string; email: string; expiresAt: number }> = await prisma.$queryRawUnsafe(
+      `SELECT adminId, email, expiresAt FROM QRTokens WHERE token = $1`,
+      token
+    )
+
+    if (!rows.length) {
+      console.log('[QR-VERIFY] Token not found:', token.substring(0, 10))
       return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 })
     }
 
+    const qrData = rows[0]
+
     if (qrData.expiresAt < Date.now()) {
-      activeQRTokens.delete(token)
+      // Delete expired token
+      await prisma.$executeRawUnsafe(`DELETE FROM QRTokens WHERE token = $1`, token)
       return NextResponse.json({ error: 'Token expired' }, { status: 401 })
     }
 
@@ -189,13 +214,18 @@ export async function POST(request: NextRequest) {
     )
 
     // Remove QR token (one-time use)
-    activeQRTokens.delete(token)
+    await prisma.$executeRawUnsafe(`DELETE FROM QRTokens WHERE token = $1`, token)
 
-    // Update last login
-    await prisma.adminUser.update({
-      where: { id: adminUser.id },
-      data: { lastLogin: new Date() }
-    })
+    // Update last login (only if AdminUser exists, not for regular User accounts)
+    try {
+      await prisma.adminUser.update({
+        where: { id: adminUser.id },
+        data: { lastLogin: new Date() }
+      })
+    } catch (e) {
+      // Ignore if AdminUser doesn't exist (using regular User account)
+      console.log('[QR-VERIFY] Skipping lastLogin update for regular User account')
+    }
 
     return NextResponse.json({
       success: true,

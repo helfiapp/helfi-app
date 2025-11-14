@@ -103,13 +103,28 @@ function QRLoginContent() {
   const handleQRCodeScanned = (qrData: string) => {
     stopScanner()
     
+    console.log('[QR-SCAN] Scanned QR data:', qrData.substring(0, 100))
+    
     // Extract token from URL if it's a full URL
     let token = qrData
     if (qrData.includes('token=')) {
-      const match = qrData.match(/token=([^&]+)/)
-      token = match ? match[1] : qrData
+      const match = qrData.match(/token=([^&?#]+)/)
+      if (match && match[1]) {
+        token = match[1]
+        console.log('[QR-SCAN] Extracted token:', token.substring(0, 20) + '...')
+      } else {
+        console.error('[QR-SCAN] Failed to extract token from URL')
+      }
+    } else if (qrData.includes('/admin-panel/qr-login')) {
+      // Try to extract from path
+      const urlMatch = qrData.match(/qr-login[?&]token=([^&?#]+)/)
+      if (urlMatch && urlMatch[1]) {
+        token = urlMatch[1]
+        console.log('[QR-SCAN] Extracted token from path:', token.substring(0, 20) + '...')
+      }
     }
 
+    console.log('[QR-SCAN] Final token to verify:', token.substring(0, 20) + '...')
     handleTokenVerification(token)
   }
 
@@ -117,6 +132,8 @@ function QRLoginContent() {
     setLoading(true)
     setStatus('idle')
     setError('')
+
+    console.log('[QR-VERIFY] Verifying token:', token.substring(0, 20) + '...')
 
     try {
       const response = await fetch('/api/admin/qr-generate', {
@@ -128,6 +145,7 @@ function QRLoginContent() {
       })
 
       const data = await response.json()
+      console.log('[QR-VERIFY] Response status:', response.status, 'Data:', data)
 
       if (!response.ok) {
         throw new Error(data.error || 'Failed to verify QR code')
