@@ -99,7 +99,8 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Delete a specific food log (by id) for the authenticated user
+// Legacy DELETE handler kept for compatibility with older clients
+// Newer clients can use POST /api/food-log/delete, but both share the same logic.
 export async function DELETE(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -112,8 +113,8 @@ export async function DELETE(request: NextRequest) {
     }
 
     const body = await request.json().catch(() => ({} as any))
-    const id = Number((body as any)?.id)
-    if (!Number.isFinite(id)) {
+    const id = String((body as any)?.id || '').trim()
+    if (!id) {
       return NextResponse.json({ error: 'Missing id' }, { status: 400 })
     }
 
@@ -130,5 +131,4 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to delete log' }, { status: 500 })
   }
 }
-
 
