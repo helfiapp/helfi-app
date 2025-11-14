@@ -167,7 +167,6 @@ export default function FoodDiary() {
   const [hasReAnalyzed, setHasReAnalyzed] = useState<boolean>(false)
 
   const descriptionTextareaRef = useRef<HTMLTextAreaElement | null>(null)
-const editEntryInitRef = useRef<string | null>(null)
 
   const [foodImagesLoading, setFoodImagesLoading] = useState<{[key: string]: boolean}>({})
   const [expandedEntries, setExpandedEntries] = useState<{[key: string]: boolean}>({})
@@ -1270,41 +1269,6 @@ Please add nutritional information manually if needed.`);
     }
   }, [isEditingDescription, editedDescription]);
 
-useEffect(() => {
-  if (!isEditingDescription || !editingEntry) return
-
-  const entryKey = String(editingEntry.id ?? 'unknown')
-  if (editEntryInitRef.current === entryKey) return
-  editEntryInitRef.current = entryKey
-
-  if (Array.isArray(editingEntry.items) && editingEntry.items.length > 0) {
-    const sanitized = sanitizeItemsForStorage(editingEntry.items)
-    setAnalyzedItems(sanitized)
-    const recalculated = recalculateNutritionFromItems(sanitized)
-    if (recalculated) {
-      setAnalyzedNutrition(recalculated)
-      setAnalyzedTotal(buildTotalFromTotals(recalculated))
-    } else if (editingEntry.nutrition) {
-      setAnalyzedNutrition(editingEntry.nutrition)
-      setAnalyzedTotal(buildTotalFromTotals(editingEntry.total || null))
-    }
-  } else {
-    setAnalyzedItems([])
-    if (editingEntry.nutrition) {
-      setAnalyzedNutrition(editingEntry.nutrition)
-      setAnalyzedTotal(buildTotalFromTotals(editingEntry.total || null))
-    }
-  }
-
-  setEditedDescription(editingEntry.description || '')
-}, [isEditingDescription, editingEntry])
-
-useEffect(() => {
-  if (!isEditingDescription) {
-    editEntryInitRef.current = null
-  }
-}, [isEditingDescription])
-
   const cleanedAiDescription = useMemo(() => stripItemsJsonBlock(aiDescription), [aiDescription])
   const mealSummary = useMemo(() => buildMealSummaryFromItems(analyzedItems), [analyzedItems])
   const displayDescription = mealSummary || cleanedAiDescription
@@ -1985,6 +1949,7 @@ useEffect(() => {
                         const entry = editingEntry;
                         // Close editing view but keep current analysis visible
                         setIsEditingDescription(false);
+                        setEditedDescription('');
                         setHasReAnalyzed(false); // Reset button state
 
                         if (entry) {
@@ -2388,6 +2353,7 @@ useEffect(() => {
                         const entry = editingEntry;
                         // Close editing view but keep current analysis visible
                         setIsEditingDescription(false);
+                        setEditedDescription('');
                         setHasReAnalyzed(false); // Reset button state
 
                         if (entry) {
