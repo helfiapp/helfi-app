@@ -163,9 +163,9 @@ export async function POST(request: NextRequest) {
     const allTokens: Array<{ token: string }> = await prisma.$queryRawUnsafe(`SELECT token FROM QRTokens`)
     console.log('[QR-VERIFY] Total tokens in database:', allTokens.length)
 
-    // Look up token in database
-    const rows: Array<{ adminId: string; email: string; expiresAt: number }> = await prisma.$queryRawUnsafe(
-      `SELECT adminId, email, expiresAt FROM QRTokens WHERE token = $1`,
+    // Look up token in database with explicit aliases to preserve casing of keys
+    const rows: Array<{ adminId: string; email: string; expiresAt: any }> = await prisma.$queryRawUnsafe(
+      `SELECT adminId AS "adminId", email AS "email", expiresAt AS "expiresAt" FROM QRTokens WHERE token = $1`,
       token
     )
 
