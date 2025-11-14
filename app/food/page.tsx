@@ -152,6 +152,24 @@ const parseServingUnitMetadata = (servingSize: string | number | null | undefine
   }
 }
 
+const extractStructuredItemsFromAnalysis = (analysis: string | null | undefined) => {
+  if (!analysis) return null
+  const match = analysis.match(/<ITEMS_JSON>([\s\S]+?)<\/ITEMS_JSON>/)
+  if (!match) return null
+  try {
+    const payload = JSON.parse(match[1].trim())
+    if (payload && Array.isArray(payload.items)) {
+      return {
+        items: payload.items,
+        total: payload.total || null,
+      }
+    }
+  } catch (error) {
+    console.warn('Failed to parse structured items from analysis', error)
+  }
+  return null
+}
+
 export default function FoodDiary() {
   const { data: session } = useSession()
   const pathname = usePathname()
@@ -211,11 +229,31 @@ export default function FoodDiary() {
     featureUsageToday: { foodAnalysis: 0, interactionAnalysis: 0 }
   })
   const [usageMeterRefresh, setUsageMeterRefresh] = useState<number>(0) // Trigger for UsageMeter refresh
+  const [hasPaidAccess, setHasPaidAccess] = useState<boolean>(false)
 
   const applyRecalculatedNutrition = (items: any[]) => {
     const recalculated = recalculateNutritionFromItems(items)
     setAnalyzedNutrition(recalculated)
     setAnalyzedTotal(convertTotalsForStorage(recalculated))
+  }
+
+  const applyStructuredItems = (itemsFromApi: any[] | null | undefined, totalFromApi: any, analysisText: string | null | undefined) => {
+    let finalItems = Array.isArray(itemsFromApi) ? itemsFromApi : []
+    let finalTotal = totalFromApi || null
+    if (!finalItems.length) {
+      const fallback = extractStructuredItemsFromAnalysis(analysisText)
+      if (fallback?.items?.length) {
+        finalItems = fallback.items
+        finalTotal = fallback.total || finalTotal
+      }
+    }
+    if (finalItems.length > 0) {
+      setAnalyzedItems(finalItems)
+      applyRecalculatedNutrition(finalItems)
+    } else {
+      setAnalyzedItems([])
+      setAnalyzedTotal(finalTotal)
+    }
   }
 
   const clampNumber = (value: any, min: number, max: number) => {
@@ -695,18 +733,7 @@ const convertTotalsForStorage = (totals: ReturnType<typeof recalculateNutritionF
         console.log('🎉 SUCCESS: Real AI analysis received!');
         setAiDescription(result.analysis);
         setAnalyzedNutrition(extractNutritionData(result.analysis));
-        // Store structured items and total if available
-        if (result.items && Array.isArray(result.items)) {
-          setAnalyzedItems(result.items);
-          if (result.items.length > 0) {
-            applyRecalculatedNutrition(result.items);
-          } else {
-            setAnalyzedTotal(result.total || null);
-          }
-        } else {
-          setAnalyzedItems([]);
-          setAnalyzedTotal(null);
-        }
+        applyStructuredItems(result.items, result.total, result.analysis);
         // Set health warning and alternatives if present
         setHealthWarning(result.healthWarning || null);
         setHealthAlternatives(result.alternatives || null);
@@ -801,18 +828,7 @@ Meanwhile, you can describe your food manually:
       if (result.analysis) {
         setAiDescription(result.analysis);
         setAnalyzedNutrition(extractNutritionData(result.analysis));
-        // Store structured items and total if available
-        if (result.items && Array.isArray(result.items)) {
-          setAnalyzedItems(result.items);
-          if (result.items.length > 0) {
-            applyRecalculatedNutrition(result.items);
-          } else {
-            setAnalyzedTotal(result.total || null);
-          }
-        } else {
-          setAnalyzedItems([]);
-          setAnalyzedTotal(null);
-        }
+        applyStructuredItems(result.items, result.total, result.analysis);
         // Set health warning and alternatives if present
         setHealthWarning(result.healthWarning || null);
         setHealthAlternatives(result.alternatives || null);
@@ -997,17 +1013,7 @@ Please add nutritional information manually if needed.`);
         if (result.success && result.analysis) {
           setAiDescription(result.analysis);
           setAnalyzedNutrition(extractNutritionData(result.analysis));
-          if (result.items && Array.isArray(result.items)) {
-            setAnalyzedItems(result.items);
-            if (result.items.length > 0) {
-              applyRecalculatedNutrition(result.items);
-            } else {
-              setAnalyzedTotal(result.total || null);
-            }
-          } else {
-            setAnalyzedItems([]);
-            setAnalyzedTotal(null);
-          }
+          applyStructuredItems(result.items, result.total, result.analysis);
           setHealthWarning(result.healthWarning || null);
           setHealthAlternatives(result.alternatives || null);
           setUsageMeterRefresh(prev => prev + 1);
@@ -1457,9 +1463,11 @@ Please add nutritional information manually if needed.`);
                   </button>
                   <div className="mt-2">
                     <p className="text-xs text-gray-500 text-center mb-2">Typical cost: 1–2 credits</p>
-                    <div className="text-[11px] text-blue-800 bg-blue-50 border border-blue-200 rounded px-2 py-1 mb-2 text-center">
-                      Free accounts can try this AI feature once. After your free analysis, upgrade or buy credits to continue.
-                    </div>
+                    {!hasPaidAccess && (
+                      <div className="text-[11px] text-blue-800 bg-blue-50 border border-blue-200 rounded px-2 py-1 mb-2 text-center">
+                        Free accounts can try this AI feature once. After your free analysis, upgrade or buy credits to continue.
+                      </div>
+                    )}
                     <UsageMeter inline={true} refreshTrigger={usageMeterRefresh} />
                     <FeatureUsageDisplay featureName="foodAnalysis" featureLabel="Food Analysis" refreshTrigger={usageMeterRefresh} />
                   </div>
@@ -2734,3 +2742,17 @@ Please add nutritional information manually if needed.`);
     </div>
   )
 } 
+  useEffect(() => {
+    const fetchCreditStatus = async () => {
+      try {
+        const res = await fetch(`/api/credit/status?t=${Date.now()}`, { cache: 'no-store' })
+        if (res.ok) {
+          const data = await res.json()
+          setHasPaidAccess(Boolean(data?.hasAccess))
+        }
+      } catch {
+        // ignore failures
+      }
+    }
+    fetchCreditStatus()
+  }, [usageMeterRefresh])
