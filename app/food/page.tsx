@@ -1119,10 +1119,9 @@ Please add nutritional information manually if needed.`);
   }
 
   const handleDoneEditing = () => {
-    // Exit description edit mode but keep analysis panel visible
-    setIsEditingDescription(false)
-    setShowAiResult(true)
-    setShowAddFood(true)
+    // For existing saved entries, Done should exit the edit session
+    // (serving changes are already reflected in today's totals)
+    exitEditingSession()
   }
 
   const handleEditDescriptionClick = () => {
@@ -2353,7 +2352,13 @@ Please add nutritional information manually if needed.`);
                         Cancel
                       </button>
                       <button
-                        onClick={exitEditingSession}
+                        onClick={() => {
+                          // For new (unsaved) analyses, Done should simply close
+                          // the description editor and return to the analysis view
+                          setIsEditingDescription(false)
+                          setShowAiResult(true)
+                          setShowAddFood(true)
+                        }}
                         className="w-full py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-all duration-300 flex items-center justify-center"
                       >
                         <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
