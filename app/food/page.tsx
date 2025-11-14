@@ -1187,7 +1187,7 @@ Please add nutritional information manually if needed.`);
     setShowEntryOptions(null);
   };
 
-  const deleteHistoryFood = async (dbId: number) => {
+  const deleteHistoryFood = async (dbId: string) => {
     try {
       // Optimistic UI update
       setHistoryFoods((prev) => (prev || []).filter((f: any) => f.dbId !== dbId));

@@ -113,19 +113,18 @@ export async function DELETE(request: NextRequest) {
     }
 
     const body = await request.json().catch(() => ({} as any))
-    const idRaw = (body as any)?.id
-    const id = Number(idRaw)
-    if (!Number.isFinite(id)) {
+    const id = String((body as any)?.id || '').trim()
+    if (!id) {
       return NextResponse.json({ error: 'Missing id' }, { status: 400 })
     }
 
     // Ensure the log belongs to the user
-    const existing = await prisma.foodLog.findUnique({ where: { id } })
+    const existing = await prisma.foodLog.findUnique({ where: { id: id as any } })
     if (!existing || existing.userId !== user.id) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 })
     }
 
-    await prisma.foodLog.delete({ where: { id } })
+    await prisma.foodLog.delete({ where: { id: id as any } })
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('DELETE /api/food-log error', error)
