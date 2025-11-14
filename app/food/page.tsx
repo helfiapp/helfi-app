@@ -169,23 +169,21 @@ const isDiscreteUnitLabel = (label: string) => {
 
 const extractStructuredItemsFromAnalysis = (analysis: string | null | undefined) => {
   if (!analysis) return null
-  const match = analysis.match(/<ITEMS_JSON>([\s\S]+?)<\/ITEMS_JSON>/)
-  if (!match) return null
-  try {
-    const raw = match[1].trim()
-    // Try strict JSON first
+  // Strategy:
+  // 1) Try tagged block <ITEMS_JSON>...</ITEMS_JSON>
+  // 2) If not found, try to locate a JSON object containing "items":[...]
+  // 3) Use relaxed parsing where necessary
+  const tryParse = (raw: string) => {
     let payload: any = null
     try {
       payload = JSON.parse(raw)
     } catch {
-      // Relaxed parsing: quote keys, convert single quotes, remove trailing commas
       try {
         const keysQuoted = raw.replace(/([{,]\s*)([A-Za-z0-9_]+)\s*:/g, '$1"$2":')
         const doubleQuoted = keysQuoted.replace(/'/g, '"')
         const noTrailingCommas = doubleQuoted.replace(/,\s*([}\]])/g, '$1')
         payload = JSON.parse(noTrailingCommas)
-      } catch (err) {
-        console.warn('Failed relaxed parse for ITEMS_JSON payload', err)
+      } catch {
         payload = null
       }
     }
@@ -195,8 +193,19 @@ const extractStructuredItemsFromAnalysis = (analysis: string | null | undefined)
         total: payload.total || null,
       }
     }
-  } catch (error) {
-    console.warn('Failed to parse structured items from analysis', error)
+    return null
+  }
+  // 1) Tagged block
+  const tagged = analysis.match(/<ITEMS_JSON>([\s\S]+?)<\/ITEMS_JSON>/i)
+  if (tagged && tagged[1]) {
+    const res = tryParse(tagged[1].trim())
+    if (res) return res
+  }
+  // 2) Untagged JSON containing "items":[...]
+  const jsonBlock = analysis.match(/\{[\s\S]*?"items"\s*:\s*\[[\s\S]*?\][\s\S]*?\}/)
+  if (jsonBlock && jsonBlock[0]) {
+    const res = tryParse(jsonBlock[0].trim())
+    if (res) return res
   }
   return null
 }
@@ -1861,8 +1870,11 @@ Please add nutritional information manually if needed.`);
                         <div className="text-gray-900 text-sm leading-relaxed whitespace-pre-wrap break-words">
 
                   {(() => {
-                            // Hide any embedded ITEMS_JSON blocks if present to avoid dumping raw JSON
-                            const cleanedText = aiDescription.replace(/<ITEMS_JSON>[\s\S]*?<\/ITEMS_JSON>/g, '').trim()
+                            // Hide any embedded ITEMS_JSON blocks and any untagged JSON that looks like items[]
+                            const cleanedText = aiDescription
+                              .replace(/<ITEMS_JSON>[\s\S]*?<\/ITEMS_JSON>/gi, '')
+                              .replace(/\{[\s\S]*?"items"\s*:\s*\[[\s\S]*?\][\s\S]*?\}/g, '')
+                              .trim()
                             const filteredLines = cleanedText
                               .split('\n')
                               .map((line) => line.trim())
