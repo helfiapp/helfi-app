@@ -29,6 +29,33 @@ export default function BillingPage() {
   const userImage = profileImage || session?.user?.image || defaultAvatar;
   const userName = session?.user?.name || 'User';
 
+  // Stripe checkout
+  const [isCreatingCheckout, setIsCreatingCheckout] = useState<string | null>(null)
+  const startCheckout = async (plan: string, quantity: number = 1) => {
+    try {
+      setIsCreatingCheckout(plan)
+      const res = await fetch('/api/billing/create-checkout-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan, quantity }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data?.error || 'Checkout error')
+      }
+      const { url } = await res.json()
+      if (url) {
+        window.location.href = url
+      } else {
+        throw new Error('No checkout URL returned')
+      }
+    } catch (e: any) {
+      alert(e?.message || 'Failed to start checkout')
+    } finally {
+      setIsCreatingCheckout(null)
+    }
+  }
+
   // Close dropdown on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -98,6 +125,10 @@ export default function BillingPage() {
 
       {/* Main Content */}
               <div className="max-w-6xl mx-auto px-6 py-8 pb-24 md:pb-8">
+        {/* Test mode note */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 text-sm text-blue-900">
+          Stripe Sandbox is enabled for testing. Use test card 4242 4242 4242 4242, any future expiry, any CVC and ZIP.
+        </div>
         {/* Available Plans */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
           <div className="flex items-center justify-between mb-6">
@@ -116,13 +147,11 @@ export default function BillingPage() {
                 <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Top‑ups valid 12 months</li>
               </ul>
               <button
-                onClick={() => {
-                  alert('We are currently in the process of building this amazing application. If you would like to be notified the moment we go live, please sign up below on the homepage.')
-                  window.location.href = '/#waitlist-signup'
-                }}
-                className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors"
+                onClick={() => startCheckout('plan_20_monthly')}
+                disabled={isCreatingCheckout === 'plan_20_monthly'}
+                className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors disabled:opacity-60"
               >
-                Choose $20 Plan
+                {isCreatingCheckout === 'plan_20_monthly' ? 'Redirecting…' : 'Choose $20 Plan'}
               </button>
             </div>
 
@@ -140,13 +169,11 @@ export default function BillingPage() {
                 <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Top‑ups valid 12 months</li>
               </ul>
               <button
-                onClick={() => {
-                  alert('We are currently in the process of building this amazing application. If you would like to be notified the moment we go live, please sign up below on the homepage.')
-                  window.location.href = '/#waitlist-signup'
-                }}
-                className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors"
+                onClick={() => startCheckout('plan_30_monthly')}
+                disabled={isCreatingCheckout === 'plan_30_monthly'}
+                className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors disabled:opacity-60"
               >
-                Choose $30 Plan
+                {isCreatingCheckout === 'plan_30_monthly' ? 'Redirecting…' : 'Choose $30 Plan'}
               </button>
             </div>
 
@@ -161,13 +188,11 @@ export default function BillingPage() {
                 <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Top‑ups valid 12 months</li>
               </ul>
               <button
-                onClick={() => {
-                  alert('We are currently in the process of building this amazing application. If you would like to be notified the moment we go live, please sign up below on the homepage.')
-                  window.location.href = '/#waitlist-signup'
-                }}
-                className="w-full bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors"
+                onClick={() => startCheckout('plan_50_monthly')}
+                disabled={isCreatingCheckout === 'plan_50_monthly'}
+                className="w-full bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-60"
               >
-                Choose $50 Plan
+                {isCreatingCheckout === 'plan_50_monthly' ? 'Redirecting…' : 'Choose $50 Plan'}
               </button>
             </div>
           </div>
@@ -181,39 +206,33 @@ export default function BillingPage() {
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Try with $5 (250 credits)</h3>
               <p className="text-sm text-gray-600 mb-6">One‑time top‑up. Credits valid for 12 months.</p>
               <button
-                onClick={() => {
-                  alert('We are currently in the process of building this amazing application. If you would like to be notified the moment we go live, please sign up below on the homepage.')
-                  window.location.href = '/#waitlist-signup'
-                }}
-                className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors"
+                onClick={() => startCheckout('credits_250')}
+                disabled={isCreatingCheckout === 'credits_250'}
+                className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors disabled:opacity-60"
               >
-                Buy $5 Credits
+                {isCreatingCheckout === 'credits_250' ? 'Redirecting…' : 'Buy $5 Credits'}
               </button>
             </div>
             <div className="border border-gray-200 rounded-lg p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-2">$10 (500 credits)</h3>
               <p className="text-sm text-gray-600 mb-6">One‑time top‑up. Credits valid for 12 months.</p>
               <button
-                onClick={() => {
-                  alert('We are currently in the process of building this amazing application. If you would like to be notified the moment we go live, please sign up below on the homepage.')
-                  window.location.href = '/#waitlist-signup'
-                }}
-                className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors"
+                onClick={() => startCheckout('credits_500')}
+                disabled={isCreatingCheckout === 'credits_500'}
+                className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors disabled:opacity-60"
               >
-                Buy $10 Credits
+                {isCreatingCheckout === 'credits_500' ? 'Redirecting…' : 'Buy $10 Credits'}
               </button>
             </div>
             <div className="border border-gray-200 rounded-lg p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-2">$20 (1,000 credits)</h3>
               <p className="text-sm text-gray-600 mb-6">One‑time top‑up. Credits valid for 12 months.</p>
               <button
-                onClick={() => {
-                  alert('We are currently in the process of building this amazing application. If you would like to be notified the moment we go live, please sign up below on the homepage.')
-                  window.location.href = '/#waitlist-signup'
-                }}
-                className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors"
+                onClick={() => startCheckout('credits_1000')}
+                disabled={isCreatingCheckout === 'credits_1000'}
+                className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors disabled:opacity-60"
               >
-                Buy $20 Credits
+                {isCreatingCheckout === 'credits_1000' ? 'Redirecting…' : 'Buy $20 Credits'}
               </button>
             </div>
           </div>

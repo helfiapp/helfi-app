@@ -95,6 +95,61 @@ const extractBaseMealDescription = (value: string | null | undefined) => {
   return firstLine || value.trim()
 }
 
+const parseServingQuantity = (input: string) => {
+  if (!input) return null
+  const mixedMatch = input.match(/(\d+)\s+(\d+)\/(\d+)/)
+  if (mixedMatch) {
+    const whole = Number(mixedMatch[1])
+    const numerator = Number(mixedMatch[2])
+    const denominator = Number(mixedMatch[3])
+    if (Number.isFinite(whole) && Number.isFinite(numerator) && Number.isFinite(denominator) && denominator !== 0) {
+      return whole + numerator / denominator
+    }
+  }
+  const fractionMatch = input.match(/(\d+)\/(\d+)/)
+  if (fractionMatch) {
+    const numerator = Number(fractionMatch[1])
+    const denominator = Number(fractionMatch[2])
+    if (Number.isFinite(numerator) && Number.isFinite(denominator) && denominator !== 0) {
+      return numerator / denominator
+    }
+  }
+  const decimalMatch = input.match(/(\d+(?:\.\d+)?)/)
+  if (decimalMatch) {
+    const value = Number(decimalMatch[1])
+    return Number.isFinite(value) ? value : null
+  }
+  return null
+}
+
+const singularizeUnitLabel = (label: string) => {
+  const trimmed = label.trim()
+  if (!trimmed) return 'unit'
+  if (trimmed.toLowerCase().endsWith('ies')) {
+    return trimmed.slice(0, -3) + 'y'
+  }
+  if (trimmed.length > 3 && trimmed.toLowerCase().endsWith('es')) {
+    return trimmed.slice(0, -2)
+  }
+  if (trimmed.length > 3 && trimmed.toLowerCase().endsWith('s')) {
+    return trimmed.slice(0, -1)
+  }
+  return trimmed
+}
+
+const parseServingUnitMetadata = (servingSize: string | null | undefined) => {
+  if (!servingSize) return null
+  const quantity = parseServingQuantity(servingSize)
+  if (!quantity || quantity <= 0) return null
+  const numberToken = servingSize.match(/(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?)/)
+  const unitLabel = numberToken ? servingSize.replace(numberToken[0], '').trim().replace(/^of\s+/i, '').trim() : servingSize.trim()
+  return {
+    quantity,
+    unitLabel: unitLabel || 'unit',
+    unitLabelSingular: singularizeUnitLabel(unitLabel || 'unit'),
+  }
+}
+
 export default function FoodDiary() {
   const { data: session } = useSession()
   const pathname = usePathname()
@@ -1522,6 +1577,9 @@ Please add nutritional information manually if needed.`);
                           fiber_g: totalFiber,
                           sugar_g: totalSugar,
                         };
+                        const servingUnitMeta = parseServingUnitMetadata(item.serving_size || '')
+                        const quickAddDelta = servingUnitMeta && servingUnitMeta.quantity >= 1.1 ? 1 / servingUnitMeta.quantity : null
+                        const quickAddHalfDelta = quickAddDelta ? quickAddDelta / 2 : null
                         
                         return (
                           <div key={index} className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
@@ -1552,7 +1610,8 @@ Please add nutritional information manually if needed.`);
                             </div>
                             
                             {/* Serving Controls */}
-                            <div className="flex items-center gap-3 mb-3 pb-3 border-b border-gray-100">
+                            <div className="flex flex-col gap-3 mb-3 pb-3 border-b border-gray-100">
+                              <div className="flex items-center gap-3">
                               <span className="text-sm text-gray-600">Servings:</span>
                               <div className="flex items-center gap-2">
                                 <button
@@ -1565,9 +1624,14 @@ Please add nutritional information manually if needed.`);
                                 >
                                   -
                                 </button>
-                                <span className="text-base font-semibold text-gray-900 w-12 text-center">
-                                  {item.servings || 1}
-                                </span>
+                                <input
+                                  type="number"
+                                  min={0.1}
+                                  step={0.01}
+                                  value={formatNumberInputValue(item.servings ?? 1)}
+                                  onChange={(e) => updateItemField(index, 'servings', e.target.value)}
+                                  className="w-20 px-2 py-1 border border-gray-300 rounded-lg text-base font-semibold text-gray-900 text-center focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                />
                                 <button
                                   onClick={() => {
                                     const current = analyzedItems[index]?.servings || 1
@@ -1579,6 +1643,38 @@ Please add nutritional information manually if needed.`);
                                   +
                                 </button>
                               </div>
+                              </div>
+                              {quickAddDelta && (
+                                <div className="flex flex-wrap gap-2 text-xs">
+                                  <span className="text-gray-500">Quick add:</span>
+                                  <button
+                                    onClick={() => {
+                                      const current = analyzedItems[index]?.servings || 1
+                                      updateItemField(index, 'servings', current + quickAddDelta)
+                                    }}
+                                    className="px-3 py-1 rounded-full border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors"
+                                  >
+                                    +1 {servingUnitMeta?.unitLabelSingular}{' '}
+                                    <span className="text-gray-500">
+                                      (+{formatServingsDisplay(quickAddDelta)} serving{quickAddDelta !== 1 ? 's' : ''})
+                                    </span>
+                                  </button>
+                                  {quickAddHalfDelta && quickAddHalfDelta >= 0.1 && (
+                                    <button
+                                      onClick={() => {
+                                        const current = analyzedItems[index]?.servings || 1
+                                        updateItemField(index, 'servings', current + quickAddHalfDelta)
+                                      }}
+                                      className="px-3 py-1 rounded-full border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors"
+                                    >
+                                      +½ {servingUnitMeta?.unitLabelSingular}{' '}
+                                      <span className="text-gray-500">
+                                        (+{formatServingsDisplay(quickAddHalfDelta)} serving{quickAddHalfDelta !== 1 ? 's' : ''})
+                                      </span>
+                                    </button>
+                                  )}
+                                </div>
+                              )}
                             </div>
                             
                             {/* Per-serving nutrition */}
