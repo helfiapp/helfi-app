@@ -1192,10 +1192,14 @@ Please add nutritional information manually if needed.`);
       // Optimistic UI update
       setHistoryFoods((prev) => (prev || []).filter((f: any) => f.dbId !== dbId));
       // Call API to delete from DB
-      await fetch('/api/food-log', {
-        method: 'DELETE',
+      await fetch('/api/food-log/delete', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: dbId }),
+      }).then(async (r) => {
+        if (!r.ok) {
+          throw new Error('delete_failed')
+        }
       });
     } catch {
       // On error, reload history for the selected date
