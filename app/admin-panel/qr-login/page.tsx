@@ -222,6 +222,17 @@ function QRLoginContent() {
             <div className="text-red-500 text-5xl mb-4">✗</div>
             <p className="text-lg font-semibold text-gray-800">Login Failed</p>
             <p className="text-sm text-gray-600 mt-2">{error}</p>
+            <button
+              onClick={() => {
+                setError('')
+                setStatus('idle')
+                verifyingRef.current = false
+                startScanner()
+              }}
+              className="w-full bg-gray-900 text-white py-2 px-4 rounded-lg hover:bg-gray-800 transition-colors mt-4"
+            >
+              Try Again
+            </button>
           </div>
         )}
 
@@ -255,20 +266,6 @@ function QRLoginContent() {
                   <strong>Alternative:</strong> You can also manually visit the URL shown below the QR code on your desktop.
                 </p>
               </div>
-            )}
-
-            {status === 'error' && (
-              <button
-                onClick={() => {
-                  setError('')
-                  setStatus('idle')
-                  verifyingRef.current = false
-                  startScanner()
-                }}
-                className="w-full bg-gray-900 text-white py-2 px-4 rounded-lg hover:bg-gray-800 transition-colors mb-2"
-              >
-                Try Again
-              </button>
             )}
 
             <button
