@@ -1201,6 +1201,21 @@ Please add nutritional information manually if needed.`);
   }, [showAddFood, showAiResult, isEditingDescription, editingEntry, todaysFoods.length]);
 
   useEffect(() => {
+    const fetchCreditStatus = async () => {
+      try {
+        const res = await fetch(`/api/credit/status?t=${Date.now()}`, { cache: 'no-store' })
+        if (res.ok) {
+          const data = await res.json()
+          setHasPaidAccess(Boolean(data?.hasAccess))
+        }
+      } catch {
+        // ignore failures
+      }
+    }
+    fetchCreditStatus()
+  }, [usageMeterRefresh])
+
+  useEffect(() => {
     if (!isEditingDescription) return;
     const textarea = descriptionTextareaRef.current;
     if (textarea) {
@@ -2742,17 +2757,3 @@ Please add nutritional information manually if needed.`);
     </div>
   )
 } 
-  useEffect(() => {
-    const fetchCreditStatus = async () => {
-      try {
-        const res = await fetch(`/api/credit/status?t=${Date.now()}`, { cache: 'no-store' })
-        if (res.ok) {
-          const data = await res.json()
-          setHasPaidAccess(Boolean(data?.hasAccess))
-        }
-      } catch {
-        // ignore failures
-      }
-    }
-    fetchCreditStatus()
-  }, [usageMeterRefresh])
