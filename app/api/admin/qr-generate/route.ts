@@ -9,6 +9,35 @@ const JWT_SECRET = process.env.JWT_SECRET || 'helfi-admin-secret-2024'
 // Store active QR tokens (in production, use Redis or database)
 const activeQRTokens = new Map<string, { adminId: string; email: string; expiresAt: number }>()
 
+function getFallbackAdminEmail(authHeader: string | null) {
+  if (authHeader && authHeader.includes('temp-admin-token')) {
+    return (process.env.OWNER_EMAIL || 'admin@helfi.ai').toLowerCase()
+  }
+  return null
+}
+
+async function resolveAdminInfo(authHeader: string | null) {
+  const admin = extractAdminFromHeaders(authHeader)
+  if (admin) {
+    return { adminId: admin.adminId, email: admin.email.toLowerCase() }
+  }
+
+  const fallbackEmail = getFallbackAdminEmail(authHeader)
+  if (!fallbackEmail) {
+    return null
+  }
+
+  const adminUser = await prisma.adminUser.findFirst({
+    where: { email: fallbackEmail }
+  })
+
+  if (!adminUser) {
+    return null
+  }
+
+  return { adminId: adminUser.id, email: adminUser.email.toLowerCase() }
+}
+
 // Clean up expired tokens every 5 minutes
 setInterval(() => {
   const now = Date.now()
@@ -23,11 +52,11 @@ setInterval(() => {
 
 export async function GET(request: NextRequest) {
   try {
-    // Verify admin is authenticated
+    // Verify admin is authenticated (support legacy desktop token)
     const authHeader = request.headers.get('authorization')
-    const admin = extractAdminFromHeaders(authHeader)
+    const adminInfo = await resolveAdminInfo(authHeader)
     
-    if (!admin) {
+    if (!adminInfo) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -37,8 +66,8 @@ export async function GET(request: NextRequest) {
 
     // Store token with admin info
     activeQRTokens.set(qrToken, {
-      adminId: admin.adminId,
-      email: admin.email,
+      adminId: adminInfo.adminId,
+      email: adminInfo.email,
       expiresAt
     })
 
