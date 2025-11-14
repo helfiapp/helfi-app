@@ -407,6 +407,23 @@ CRITICAL REQUIREMENTS:
       }
     }
 
+    // Pre-charge a minimal credit immediately upon analysis start (skip for free trial)
+    let prechargedCents = 0;
+    if (!allowViaFreeUse) {
+      try {
+        const cm = new CreditManager(currentUser.id);
+        const immediate = CREDIT_COSTS.FOOD_ANALYSIS; // 1 credit upfront
+        const okPre = await cm.chargeCents(immediate);
+        if (!okPre) {
+          return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
+        }
+        prechargedCents = immediate;
+      } catch (e) {
+        console.warn('Immediate pre-charge failed:', e);
+        return NextResponse.json({ error: 'Billing error' }, { status: 402 });
+      }
+    }
+
     console.log('🤖 Calling OpenAI API with:', {
       model,
       messageCount: messages.length,
@@ -719,7 +736,9 @@ Your recommendations:`;
     if (!allowViaFreeUse) {
       try {
         const cm = new CreditManager(currentUser.id);
-        const ok = await cm.chargeCents(totalCostCents);
+        // Charge the remainder after the upfront 1-credit pre-charge
+        const remainder = Math.max(0, totalCostCents - prechargedCents);
+        const ok = await cm.chargeCents(remainder);
         if (!ok) {
           return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
         }
