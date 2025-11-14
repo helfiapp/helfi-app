@@ -30,6 +30,41 @@ const NUTRIENT_CARD_META: Record<typeof NUTRIENT_DISPLAY_ORDER[number], { label:
   sugar: { label: 'Sugar', unit: 'g', gradient: 'from-pink-50 to-pink-100', accent: 'text-pink-500' },
 }
 
+const stripItemsJsonBlock = (text: string | null | undefined) => {
+  if (!text) return ''
+  return text.replace(/<ITEMS_JSON>[\s\S]*?<\/ITEMS_JSON>/gi, '').trim()
+}
+
+const formatServingsDisplay = (value: number | null | undefined) => {
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric) || numeric <= 0) return '1'
+  const rounded = Math.round(numeric * 100) / 100
+  if (Number.isInteger(rounded)) return String(rounded)
+  return rounded.toFixed(2).replace(/\.0+$/, '').replace(/(\.[1-9])0$/, '$1')
+}
+
+const buildMealSummaryFromItems = (items: any[] | null | undefined) => {
+  if (!Array.isArray(items) || items.length === 0) return ''
+
+  const summaryParts = items.map((item) => {
+    const pieces: string[] = []
+    const servings = Number(item?.servings)
+    if (Number.isFinite(servings) && Math.abs(servings - 1) > 0.001) {
+      pieces.push(`${formatServingsDisplay(servings)}×`)
+    }
+    if (item?.brand) {
+      pieces.push(String(item.brand))
+    }
+    pieces.push(item?.name ? String(item.name) : 'Food item')
+    if (item?.serving_size) {
+      pieces.push(`(${item.serving_size})`)
+    }
+    return pieces.join(' ').replace(/\s+/g, ' ').trim()
+  })
+
+  return summaryParts.join(', ')
+}
+
 export default function FoodDiary() {
   const { data: session } = useSession()
   const pathname = usePathname()
@@ -405,6 +440,33 @@ export default function FoodDiary() {
     return `${rounded}${unit}`
   }
 
+  const updateItemServings = (index: number, nextServings: number) => {
+    setAnalyzedItems((prevItems) => {
+      if (!Array.isArray(prevItems) || index < 0 || index >= prevItems.length) {
+        return prevItems
+      }
+
+      const clamped = Math.max(0.25, Math.round(nextServings * 100) / 100)
+      const updated = prevItems.map((item, idx) =>
+        idx === index ? { ...item, servings: clamped } : item
+      )
+
+      const recalculated = recalculateNutritionFromItems(updated)
+      setAnalyzedNutrition(recalculated)
+      if (recalculated) {
+        setAnalyzedTotal({
+          calories: recalculated.calories,
+          protein_g: recalculated.protein,
+          carbs_g: recalculated.carbs,
+          fat_g: recalculated.fat,
+          fiber_g: recalculated.fiber,
+          sugar_g: recalculated.sugar,
+        })
+      }
+      return updated
+    })
+  }
+
   const analyzePhoto = async () => {
     if (!photoFile) return;
     
@@ -493,7 +555,8 @@ export default function FoodDiary() {
       
       if (result.success && result.analysis) {
         console.log('🎉 SUCCESS: Real AI analysis received!');
-        setAiDescription(result.analysis);
+        const cleanedAnalysis = stripItemsJsonBlock(result.analysis);
+        setAiDescription(cleanedAnalysis);
         setAnalyzedNutrition(extractNutritionData(result.analysis));
         // Store structured items and total if available
         if (result.items && Array.isArray(result.items)) {
@@ -600,7 +663,8 @@ Meanwhile, you can describe your food manually:
       const result = await response.json();
       
       if (result.analysis) {
-        setAiDescription(result.analysis);
+        const cleanedAnalysis = stripItemsJsonBlock(result.analysis);
+        setAiDescription(cleanedAnalysis);
         setAnalyzedNutrition(extractNutritionData(result.analysis));
         // Store structured items and total if available
         if (result.items && Array.isArray(result.items)) {
@@ -761,11 +825,12 @@ Please add nutritional information manually if needed.`);
         console.log('API Response:', result); // Debug log
         if (result.success && result.analysis) {
           updatedNutrition = extractNutritionData(result.analysis);
-          fullAnalysis = result.analysis;
+          const cleanedAnalysis = stripItemsJsonBlock(result.analysis);
+          fullAnalysis = cleanedAnalysis;
           console.log('Extracted Nutrition:', updatedNutrition); // Debug log
           
           // Update the UI states with new nutrition but keep clean description
-          setAiDescription(result.analysis); // Full AI response for processing
+          setAiDescription(cleanedAnalysis); // Cleaned AI response for processing
           setAnalyzedNutrition(updatedNutrition);
           // Store structured items and total if available
           if (result.items && Array.isArray(result.items)) {
@@ -794,17 +859,10 @@ Please add nutritional information manually if needed.`);
     }
 
     // Build description from items if available, otherwise use provided description
-    let finalDescription = fullAnalysis || description;
-    if (analyzedItems && analyzedItems.length > 0) {
-      // Create a clean description from items
-      const itemDescriptions = analyzedItems.map((item: any) => {
-        const servings = item.servings || 1;
-        const servingText = servings !== 1 ? `${servings}x ` : '';
-        const brandText = item.brand ? `${item.brand} ` : '';
-        const servingSizeText = item.serving_size ? `(${item.serving_size})` : '';
-        return `${servingText}${brandText}${item.name}${servingSizeText ? ' ' + servingSizeText : ''}`;
-      });
-      finalDescription = itemDescriptions.join(', ');
+    let finalDescription = stripItemsJsonBlock(fullAnalysis || description);
+    const summarizedDescription = buildMealSummaryFromItems(analyzedItems);
+    if (summarizedDescription) {
+      finalDescription = summarizedDescription;
     }
     
     // Update the existing entry with AI analysis for nutrition display
@@ -864,9 +922,7 @@ Please add nutritional information manually if needed.`);
       setShowAddFood(true);
       // Go directly to editing mode and extract clean food name only
       setIsEditingDescription(true);
-      // Extract just the food name from the description (remove nutrition info)
-      const cleanDescription = food.description.split('\n')[0].split('Calories:')[0].trim();
-      setEditedDescription(cleanDescription);
+      setEditedDescription(food.description || '');
     } else {
       // For manual entries, populate the manual form
       setManualFoodName(food.description);
@@ -945,6 +1001,10 @@ Please add nutritional information manually if needed.`);
       textarea.style.height = `${textarea.scrollHeight}px`;
     }
   }, [isEditingDescription, editedDescription]);
+
+  const cleanedAiDescription = useMemo(() => stripItemsJsonBlock(aiDescription), [aiDescription])
+  const mealSummary = useMemo(() => buildMealSummaryFromItems(analyzedItems), [analyzedItems])
+  const displayDescription = mealSummary || cleanedAiDescription
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-gray-50">
@@ -1326,159 +1386,146 @@ Please add nutritional information manually if needed.`);
 
                   {/* Detected Items with Brand, Serving Size, and Edit Controls */}
                   {analyzedItems && analyzedItems.length > 0 ? (
-                    <div className="mb-6 space-y-3">
-                      <div className="text-sm font-medium text-gray-600 mb-2">Detected Foods:</div>
-                      {analyzedItems.map((item: any, index: number) => {
-                        const servingsCount = item?.servings && item.servings > 0 ? item.servings : 1;
-                        const totalCalories = Math.round((item.calories || 0) * servingsCount);
-                        const totalProtein = Math.round(((item.protein_g || 0) * servingsCount) * 10) / 10;
-                        const totalCarbs = Math.round(((item.carbs_g || 0) * servingsCount) * 10) / 10;
-                        const totalFat = Math.round(((item.fat_g || 0) * servingsCount) * 10) / 10;
-                        const totalFiber = Math.round(((item.fiber_g || 0) * servingsCount) * 10) / 10;
-                        const totalSugar = Math.round(((item.sugar_g || 0) * servingsCount) * 10) / 10;
-                        const formattedServings = (() => {
-                          if (!servingsCount) return '0 servings';
-                          const rounded = Math.round(servingsCount * 100) / 100;
-                          const display = Number.isInteger(rounded) ? rounded.toString() : rounded.toFixed(2).replace(/\.0+$/, '').replace(/(\.[1-9])0$/, '$1');
-                          return `${display} serving${rounded === 1 ? '' : 's'}`;
-                        })();
-                        
-                        return (
-                          <div key={index} className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
-                            <div className="flex items-start justify-between mb-3">
-                              <div className="flex-1">
-                                <div className="font-semibold text-gray-900 text-base">
-                                  {item.name || 'Unknown Food'}
-                                </div>
-                                {item.brand && (
-                                  <div className="text-sm text-gray-600 mt-0.5">Brand: {item.brand}</div>
-                                )}
-                                <div className="text-sm text-gray-500 mt-1">
-                                  Serving size: {item.serving_size || 'Not specified'}
-                                </div>
-                              </div>
-                              <button
-                                onClick={() => {
-                                  setEditingItemIndex(index);
-                                  setShowItemEditModal(true);
-                                }}
-                                className="ml-3 p-2 text-gray-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                                title="Adjust details"
-                              >
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                </svg>
-                              </button>
-                            </div>
-                            
-                            {/* Serving Controls */}
-                            <div className="flex items-center gap-3 mb-3 pb-3 border-b border-gray-100">
-                              <span className="text-sm text-gray-600">Servings:</span>
-                              <div className="flex items-center gap-2">
-                                <button
-                                  onClick={() => {
-                                    const updatedItems = [...analyzedItems];
-                                    if (updatedItems[index].servings > 0.25) {
-                                      updatedItems[index].servings = Math.max(0.25, (updatedItems[index].servings || 1) - 0.25);
-                                      setAnalyzedItems(updatedItems);
-                                      const recalculated = recalculateNutritionFromItems(updatedItems);
-                                      setAnalyzedNutrition(recalculated);
-                                    }
-                                  }}
-                                  className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-medium transition-colors"
-                                >
-                                  -
-                                </button>
-                                <span className="text-base font-semibold text-gray-900 w-12 text-center">
-                                  {item.servings || 1}
-                                </span>
-                                <button
-                                  onClick={() => {
-                                    const updatedItems = [...analyzedItems];
-                                    updatedItems[index].servings = ((updatedItems[index].servings || 1) + 0.25);
-                                    setAnalyzedItems(updatedItems);
-                                    const recalculated = recalculateNutritionFromItems(updatedItems);
-                                    setAnalyzedNutrition(recalculated);
-                                  }}
-                                  className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-medium transition-colors"
-                                >
-                                  +
-                                </button>
-                              </div>
-                            </div>
-                            
-                            {/* Per-serving nutrition */}
-                            <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Per serving</div>
-                            <div className="grid grid-cols-4 gap-2 text-xs">
-                              <div className="text-center">
-                                <div className="font-semibold text-orange-600">{item.calories || 0}</div>
-                                <div className="text-gray-500">Cal</div>
-                              </div>
-                              <div className="text-center">
-                                <div className="font-semibold text-blue-600">{item.protein_g || 0}g</div>
-                                <div className="text-gray-500">Protein</div>
-                              </div>
-                              <div className="text-center">
-                                <div className="font-semibold text-green-600">{item.carbs_g || 0}g</div>
-                                <div className="text-gray-500">Carbs</div>
-                              </div>
-                              <div className="text-center">
-                                <div className="font-semibold text-purple-600">{item.fat_g || 0}g</div>
-                                <div className="text-gray-500">Fat</div>
-                              </div>
-                            </div>
-
-                            <div className="mt-3 bg-gray-50 border border-gray-100 rounded-lg px-3 py-2 text-xs text-gray-600">
-                              <div className="font-medium text-gray-700">Totals for {formattedServings}</div>
-                              <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
-                                <span>{totalCalories} cal</span>
-                                <span>{totalProtein}g protein</span>
-                                <span>{totalCarbs}g carbs</span>
-                                <span>{totalFat}g fat</span>
-                                {totalFiber > 0 && <span>{totalFiber}g fiber</span>}
-                                {totalSugar > 0 && <span>{totalSugar}g sugar</span>}
-                              </div>
+                    <div className="mb-6">
+                      <div className="bg-white border border-gray-200 rounded-xl shadow-sm">
+                        <div className="px-4 py-4 sm:px-5 sm:py-5">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+                            <div>
+                              <div className="text-sm font-semibold text-gray-800">Detected Foods</div>
+                              <div className="text-xs text-gray-500">Adjust servings to match what you ate</div>
                             </div>
                           </div>
-                        );
-                      })}
+                          <div className="space-y-3">
+                            {analyzedItems.map((item: any, index: number) => {
+                              const rawServings = Number(item?.servings)
+                              const servingsCount = Number.isFinite(rawServings) && rawServings > 0 ? rawServings : 1
+                              const servingsLabel = `${formatServingsDisplay(servingsCount)} serving${Math.abs(servingsCount - 1) < 0.001 ? '' : 's'}`
+
+                              const perCalories = Number(item?.calories) || 0
+                              const perProtein = Number(item?.protein_g) || 0
+                              const perCarbs = Number(item?.carbs_g) || 0
+                              const perFat = Number(item?.fat_g) || 0
+                              const perFiber = Number(item?.fiber_g) || 0
+                              const perSugar = Number(item?.sugar_g) || 0
+
+                              const totalCalories = Math.round(perCalories * servingsCount)
+                              const totalProtein = Math.round(perProtein * servingsCount * 10) / 10
+                              const totalCarbs = Math.round(perCarbs * servingsCount * 10) / 10
+                              const totalFat = Math.round(perFat * servingsCount * 10) / 10
+                              const totalFiber = Math.round(perFiber * servingsCount * 10) / 10
+                              const totalSugar = Math.round(perSugar * servingsCount * 10) / 10
+
+                              const perServingDetails = [
+                                perCalories > 0 ? `${Math.round(perCalories)} cal` : null,
+                                perProtein > 0 ? `${Math.round(perProtein * 10) / 10}g protein` : null,
+                                perCarbs > 0 ? `${Math.round(perCarbs * 10) / 10}g carbs` : null,
+                                perFat > 0 ? `${Math.round(perFat * 10) / 10}g fat` : null,
+                                perFiber > 0 ? `${Math.round(perFiber * 10) / 10}g fiber` : null,
+                                perSugar > 0 ? `${Math.round(perSugar * 10) / 10}g sugar` : null,
+                              ].filter(Boolean)
+
+                              const totalDetails = [
+                                `${totalCalories} cal`,
+                                totalProtein > 0 ? `${totalProtein}g protein` : null,
+                                totalCarbs > 0 ? `${totalCarbs}g carbs` : null,
+                                totalFat > 0 ? `${totalFat}g fat` : null,
+                                totalFiber > 0 ? `${totalFiber}g fiber` : null,
+                                totalSugar > 0 ? `${totalSugar}g sugar` : null,
+                              ].filter(Boolean)
+
+                              const currentServings = servingsCount
+                              const minServings = 0.25
+                              const canDecrement = currentServings - minServings > 0.001
+
+                              return (
+                                <div key={`${item?.name || 'item'}-${index}`} className="rounded-xl border border-gray-100 bg-gray-50/80 p-3 sm:p-4">
+                                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                          <div className="font-semibold text-gray-900 truncate">{item?.name || 'Food item'}</div>
+                                          {item?.brand && (
+                                            <div className="text-xs text-gray-500 mt-0.5 truncate">{item.brand}</div>
+                                          )}
+                                          <div className="text-xs text-gray-500 mt-1">
+                                            {item?.serving_size ? `Serving size: ${item.serving_size}` : 'Serving size not provided'}
+                                          </div>
+                                        </div>
+                                        <button
+                                          onClick={() => {
+                                            setEditingItemIndex(index)
+                                            setShowItemEditModal(true)
+                                          }}
+                                          className="flex-shrink-0 p-2 text-gray-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                                          title="Adjust details"
+                                        >
+                                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                          </svg>
+                                        </button>
+                                      </div>
+                                      {perServingDetails.length > 0 && (
+                                        <div className="mt-2 text-xs text-gray-600">
+                                          <span className="font-medium text-gray-700">Per serving:</span>{' '}
+                                          {perServingDetails.join(' • ')}
+                                        </div>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Servings</span>
+                                      <div className="flex items-center gap-2">
+                                        <button
+                                          onClick={() => {
+                                            if (canDecrement) {
+                                              updateItemServings(index, currentServings - 0.25)
+                                            }
+                                          }}
+                                          disabled={!canDecrement}
+                                          className={`w-8 h-8 flex items-center justify-center rounded-lg text-gray-700 font-semibold transition-colors ${
+                                            canDecrement ? 'bg-white border border-gray-200 hover:bg-gray-100' : 'bg-gray-100 text-gray-300 cursor-not-allowed'
+                                          }`}
+                                        >
+                                          -
+                                        </button>
+                                        <span className="text-sm font-semibold text-gray-900 w-14 text-center">
+                                          {formatServingsDisplay(currentServings)}
+                                        </span>
+                                        <button
+                                          onClick={() => updateItemServings(index, currentServings + 0.25)}
+                                          className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-700 font-semibold transition-colors bg-white border border-gray-200 hover:bg-gray-100"
+                                        >
+                                          +
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  {totalDetails.length > 0 && (
+                                    <div className="mt-3 pt-3 border-t border-white/80 text-xs text-gray-600 flex flex-wrap gap-x-3 gap-y-1">
+                                      <span className="font-medium text-gray-700">Totals for {servingsLabel}:</span>
+                                      {totalDetails.map((detail, detailIdx) => (
+                                        <span key={detailIdx}>{detail}</span>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   ) : (
                     <div className="mb-6">
                       <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
                         <div className="text-sm font-medium text-gray-600 mb-2">Detected Foods:</div>
                         <div className="text-gray-900 text-sm leading-relaxed whitespace-pre-wrap break-words">
-                          {(() => {
-                            const filteredLines = aiDescription
-                              .split('\n')
-                              .map((line) => line.trim())
-                              .filter(line =>
-                                line.length > 0 &&
-                                !/^calories?\b/i.test(line) &&
-                                !/^protein\b/i.test(line) &&
-                                !/^carb(?:ohydrate)?s?\b/i.test(line) &&
-                                !/^fat\b/i.test(line) &&
-                                !/^fiber\b/i.test(line) &&
-                                !/^sugar\b/i.test(line) &&
-                                !/insufficient credits/i.test(line) &&
-                                !/trial limit/i.test(line) &&
-                                !/^i'?m unable to see/i.test(line) &&
-                                !/^unable to see/i.test(line)
-                              );
-
-                            const cleaned = filteredLines.join('\n\n').trim();
-                            const fallback = aiDescription.replace(/calories\s*:[^\n]+/gi, '').trim();
-                            const merged = (cleaned || fallback || aiDescription || '').trim();
-                            const normalized = merged.replace(/^(This image shows|I can see|The food appears to be|This appears to be|I'm unable to see|Based on the image)/i, '').trim();
-                            const finalText = normalized || 'Description not available yet.';
-
-                            return finalText.replace(/^./, (match: string) => match.toUpperCase());
-                          })()}
+                          {(displayDescription && displayDescription.replace(/^./, (match: string) => match.toUpperCase())) || 'Description not available yet.'}
                         </div>
                       </div>
                     </div>
                   )}
-                    {aiDescription && /(Insufficient credits|trial limit)/i.test(aiDescription) && (
+
+                    {cleanedAiDescription && /(Insufficient credits|trial limit)/i.test(cleanedAiDescription) && (
                       <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
                         <div className="flex flex-col gap-3">
                           <div>
@@ -1489,7 +1536,7 @@ Please add nutritional information manually if needed.`);
                         </div>
                       </div>
                     )}
-                    {aiDescription && /(Failed to analyze|describe your food manually)/i.test(aiDescription) && (
+                    {cleanedAiDescription && /(Failed to analyze|describe your food manually)/i.test(cleanedAiDescription) && (
                       <div className="mt-2 text-xs text-gray-600">Calorie modals are not available when you manually input the information.</div>
                     )}
                     
@@ -1529,10 +1576,10 @@ Please add nutritional information manually if needed.`);
                     <button
                       onClick={() => editingEntry 
                         ? updateFoodEntry(
-                            (isEditingDescription && editedDescription.trim() ? editedDescription.trim() : aiDescription),
+                            (isEditingDescription && editedDescription.trim() ? editedDescription.trim() : cleanedAiDescription),
                             (editingEntry?.method === 'photo' ? 'photo' : 'text')
                           )
-                        : addFoodEntry(aiDescription, 'photo')}
+                        : addFoodEntry(cleanedAiDescription, 'photo')}
                       disabled={isAnalyzing}
                       className="w-full py-3 px-4 bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-300 text-white font-medium rounded-xl transition-colors duration-200 flex items-center justify-center shadow-lg"
                     >
@@ -1556,7 +1603,7 @@ Please add nutritional information manually if needed.`);
                     <button
                       onClick={() => {
                         setIsEditingDescription(true);
-                        setEditedDescription(aiDescription);
+                        setEditedDescription(cleanedAiDescription);
                       }}
                       className="w-full py-3 px-4 bg-amber-500 hover:bg-amber-600 text-white font-medium rounded-xl transition-colors duration-200 flex items-center justify-center"
                     >
@@ -1798,7 +1845,8 @@ Please add nutritional information manually if needed.`);
                               if (result.success && result.analysis) {
                                 updatedNutrition = extractNutritionData(result.analysis);
                                 setAnalyzedNutrition(updatedNutrition);
-                                setAiDescription(result.analysis);
+                                const cleanedAnalysis = stripItemsJsonBlock(result.analysis);
+                                setAiDescription(cleanedAnalysis);
                                 // Store structured items and total if available
                                 if (result.items && Array.isArray(result.items)) {
                                   setAnalyzedItems(result.items);
@@ -1912,7 +1960,8 @@ Please add nutritional information manually if needed.`);
                             if (result.success && result.analysis) {
                               updatedNutrition = extractNutritionData(result.analysis);
                               setAnalyzedNutrition(updatedNutrition);
-                              setAiDescription(result.analysis);
+                              const cleanedAnalysis = stripItemsJsonBlock(result.analysis);
+                              setAiDescription(cleanedAnalysis);
                               // Store structured items and total if available
                               if (result.items && Array.isArray(result.items)) {
                                 setAnalyzedItems(result.items);
@@ -1956,7 +2005,7 @@ Please add nutritional information manually if needed.`);
                         setHasReAnalyzed(false); // Reset button state
 
                         if (entry) {
-                          setAiDescription(entry.description || aiDescription);
+                          setAiDescription(entry.description || cleanedAiDescription);
                           if (entry.nutrition) {
                             setAnalyzedNutrition(entry.nutrition);
                           }
@@ -1966,7 +2015,7 @@ Please add nutritional information manually if needed.`);
                           setEditingEntry(null);
                         } else {
                           // For newly analyzed items, keep current data visible
-                          setAiDescription((current) => current || aiDescription);
+                          setAiDescription((current) => current || cleanedAiDescription);
                         }
 
                         setShowAiResult(true);
