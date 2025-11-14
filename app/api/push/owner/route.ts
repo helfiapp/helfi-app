@@ -12,6 +12,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'invalid_payload' }, { status: 400 })
     }
 
+    // Log receipt
+    try {
+      await prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS OwnerPushLog (
+          createdAt TIMESTAMP NOT NULL DEFAULT NOW(),
+          event TEXT,
+          userEmail TEXT,
+          status TEXT,
+          info TEXT
+        )
+      `)
+      await prisma.$executeRawUnsafe(
+        `INSERT INTO OwnerPushLog (event, userEmail, status, info) VALUES ($1, $2, $3, $4)`,
+        event,
+        userEmail,
+        'received_qstash',
+        null
+      )
+    } catch {}
+
     // Direct delivery using same underlying mechanism as reminders
     const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || ''
     const privateKey = process.env.VAPID_PRIVATE_KEY || ''
@@ -68,6 +88,15 @@ export async function POST(req: NextRequest) {
     })
 
     await webpush.sendNotification(subRows[0].subscription, payload)
+    try {
+      await prisma.$executeRawUnsafe(
+        `INSERT INTO OwnerPushLog (event, userEmail, status, info) VALUES ($1, $2, $3, $4)`,
+        event,
+        userEmail,
+        'sent_qstash',
+        null
+      )
+    } catch {}
 
     return NextResponse.json({ ok: true })
   } catch (e: any) {

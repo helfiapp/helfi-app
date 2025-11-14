@@ -121,3 +121,21 @@ This document captures the exact work required to finish the latest round of Foo
 
 Feel free to iterate on the visual polish, but do **not** deviate from the flow described above without explicit user approval. The priority is restoring the original user experience (Save/Edit/Cancel) while adding the ability to correct structured items without spending extra credits.***
 
+---
+
+## Notes from latest agent (did not resolve issues)
+
+- Added helper utilities in `app/food/page.tsx` (`parseServingUnitMetadata`, `extractStructuredItemsFromAnalysis`, `applyStructuredItems`) to support the new quick‑add serving controls and to try to rebuild the ingredient list from the `<ITEMS_JSON>` block the API is supposed to include. The idea was to keep the quarter‑serving buttons but also allow users to tap “+1 egg / +½ egg” when the model detects a specific serving size.  
+  - **Result:** The quick‑add chips work when the AI response includes a recognizable `serving_size`, but there is still no ingredient list when OpenAI omits `items` *and* the `<ITEMS_JSON>` snippet. Many current photo analyses return only prose (see user screenshot), so we continue to fall back to the long text block.
+  - **Follow‑up needed:** Either ensure the backend always sends `items`/`total` or adjust the client to gracefully handle prose‑only responses (e.g., hide the empty “Detected Foods” shell and avoid duplicating the text block).
+
+- Added a `hasPaidAccess` flag that checks `/api/credit/status` so the “Free accounts can try this AI feature once…” warning only shows for free users. This part works, but it didn’t address the missing cards/text layout problem.
+
+- Introduced `applyStructuredItems` usage in **all** analysis paths (photo, manual text, re‑analyze) so whenever `result.items` exists, the UI immediately populates `analyzedItems`. Unfortunately this still depends on the API returning structured data.
+
+### Outstanding issues observed after these changes
+1. **Ingredient list still AWOL:** When GPT doesn’t include `<ITEMS_JSON>`, `analyzedItems` remains empty and the UI prints the raw description. Need a server‑side guarantee or a robust client fallback that converts the prose into structured entries.
+2. **Fiber/Sugar parity in Today’s Meals:** The “Today’s Meals” section now shows all six macros unconditionally, but the modal cards inside each entry still only show the four legacy macros. Verify how the totals should look when `food.nutrition` is missing fiber/sugar keys.
+3. **Credit warning logic:** Although `hasPaidAccess` hides the banner for paid accounts, `UsageMeter` still assumes the user has plan/credits, so double‑check the API response fields before relying on it for gating.
+
+Please pick up from here so we don’t duplicate the same attempts. If you change the backend contract (e.g., guarantee `items` is present), remember to update the parsing helper accordingly.

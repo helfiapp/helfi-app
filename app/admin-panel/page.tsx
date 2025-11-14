@@ -94,6 +94,7 @@ export default function AdminPanel() {
   const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null)
   const [isGeneratingQR, setIsGeneratingQR] = useState(false)
   const [pushNotificationStatus, setPushNotificationStatus] = useState<{subscribed: boolean, loading: boolean}>({subscribed: false, loading: false})
+  const [pushLogs, setPushLogs] = useState<Array<{createdAt: string; event: string; userEmail: string; status: string; info?: string}>>([])
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   // Check for URL hash to set active tab and load data
@@ -1351,6 +1352,61 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
       console.error('Error enabling push notifications:', error)
       alert(`Failed to enable push notifications: ${error.message}`)
       setPushNotificationStatus({ subscribed: false, loading: false })
+    }
+  }
+
+  const disablePushNotifications = async () => {
+    setPushNotificationStatus((s) => ({ ...s, loading: true }))
+    try {
+      const response = await fetch('/api/admin/push-subscribe', {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${adminToken}` }
+      })
+      if (response.ok) {
+        setPushNotificationStatus({ subscribed: false, loading: false })
+        alert('🔕 Push notifications disabled.')
+      } else {
+        throw new Error('Failed to unsubscribe')
+      }
+    } catch (e: any) {
+      console.error('Disable push error', e)
+      alert(`Failed to disable push notifications: ${e?.message || e}`)
+      setPushNotificationStatus((s) => ({ ...s, loading: false }))
+    }
+  }
+
+  const sendTestOwnerPush = async () => {
+    try {
+      const res = await fetch('/api/admin/push-test', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${adminToken}` }
+      })
+      if (!res.ok) throw new Error('Failed to send test push')
+      alert('✅ Test notification enqueued (via Upstash).')
+    } catch (e: any) {
+      alert(`Test notification failed: ${e?.message || e}`)
+    }
+  }
+
+  const loadPushLogs = async () => {
+    try {
+      const res = await fetch('/api/admin/push-logs', {
+        headers: { 'Authorization': `Bearer ${adminToken}` }
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setPushLogs(
+          (data.logs || []).map((r: any) => ({
+            createdAt: r.createdAt,
+            event: r.event,
+            userEmail: r.userEmail,
+            status: r.status,
+            info: r.info || ''
+          }))
+        )
+      }
+    } catch (e) {
+      console.error('loadPushLogs error', e)
     }
   }
 
@@ -3710,23 +3766,72 @@ The Helfi Team`,
                         : '❌ Not enabled - Click below to enable'}
                   </p>
                 </div>
+                {pushNotificationStatus.subscribed ? (
+                  <button
+                    onClick={disablePushNotifications}
+                    disabled={pushNotificationStatus.loading}
+                    className="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {pushNotificationStatus.loading ? '...' : 'Disable'}
+                  </button>
+                ) : (
+                  <button
+                    onClick={enablePushNotifications}
+                    disabled={pushNotificationStatus.loading}
+                    className="bg-emerald-500 text-white px-6 py-2 rounded-lg hover:bg-emerald-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {pushNotificationStatus.loading ? 'Loading...' : 'Enable'}
+                  </button>
+                )}
+              </div>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 <button
-                  onClick={enablePushNotifications}
-                  disabled={pushNotificationStatus.loading || pushNotificationStatus.subscribed}
-                  className="bg-emerald-500 text-white px-6 py-2 rounded-lg hover:bg-emerald-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={sendTestOwnerPush}
+                  className="w-full bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 px-4 py-2 rounded-lg"
                 >
-                  {pushNotificationStatus.loading 
-                    ? 'Loading...' 
-                    : pushNotificationStatus.subscribed 
-                      ? '✅ Enabled' 
-                      : 'Enable Notifications'}
+                  Send Test Notification
+                </button>
+                <button
+                  onClick={loadPushLogs}
+                  className="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-4 py-2 rounded-lg"
+                >
+                  Refresh Logs
                 </button>
               </div>
 
+              {pushLogs.length > 0 && (
+                <div className="mt-4">
+                  <h4 className="text-sm font-medium text-gray-900 mb-2">Recent Notification Logs</h4>
+                  <div className="max-h-56 overflow-auto border rounded-lg">
+                    <table className="min-w-full text-xs">
+                      <thead className="bg-gray-50 text-gray-500">
+                        <tr>
+                          <th className="text-left px-3 py-2">Time</th>
+                          <th className="text-left px-3 py-2">Event</th>
+                          <th className="text-left px-3 py-2">Status</th>
+                          <th className="text-left px-3 py-2">Info</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pushLogs.map((l, i) => (
+                          <tr key={i} className="border-t">
+                            <td className="px-3 py-2 text-gray-600">{new Date(l.createdAt).toLocaleString()}</td>
+                            <td className="px-3 py-2">{l.event}</td>
+                            <td className="px-3 py-2">{l.status}</td>
+                            <td className="px-3 py-2 text-gray-500 truncate max-w-[200px]">{l.info}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
               <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="text-sm text-blue-800">
-                  <strong>Note:</strong> Make sure you've enabled push notifications in your browser settings. 
-                  On mobile, you may need to add the site to your home screen for best results.
+                  <strong>Note:</strong> On iPhone, web push only works when opened from the Home Screen app icon (PWA).
+                  Add to Home Screen and then enable notifications here.
                 </p>
               </div>
             </div>

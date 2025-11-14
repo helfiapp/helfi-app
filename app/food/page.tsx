@@ -1604,7 +1604,7 @@ Please add nutritional information manually if needed.`);
                           sugar_g: totalSugar,
                         };
                         const servingUnitMeta = parseServingUnitMetadata(item.serving_size || '')
-                        const quickAddDelta = servingUnitMeta && servingUnitMeta.quantity >= 1.1 ? 1 / servingUnitMeta.quantity : null
+                        const quickAddDelta = servingUnitMeta ? 1 / servingUnitMeta.quantity : null
                         const quickAddHalfDelta = quickAddDelta ? quickAddDelta / 2 : null
                         
                         return (
@@ -1678,6 +1678,19 @@ Please add nutritional information manually if needed.`);
                                       <button
                                         onClick={() => {
                                           const current = analyzedItems[index]?.servings || 1
+                                          const next = Math.max(0.25, current - quickAddDelta)
+                                          updateItemField(index, 'servings', next)
+                                        }}
+                                        className="px-3 py-1 rounded-full border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors"
+                                      >
+                                        -1 {servingUnitMeta.unitLabelSingular}{' '}
+                                        <span className="text-gray-500">
+                                          (-{formatServingsDisplay(quickAddDelta)} serving{quickAddDelta !== 1 ? 's' : ''})
+                                        </span>
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          const current = analyzedItems[index]?.servings || 1
                                           updateItemField(index, 'servings', current + quickAddDelta)
                                         }}
                                         className="px-3 py-1 rounded-full border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors"
@@ -1688,6 +1701,20 @@ Please add nutritional information manually if needed.`);
                                         </span>
                                       </button>
                                       {quickAddHalfDelta && quickAddHalfDelta >= 0.1 && (
+                                        <>
+                                          <button
+                                            onClick={() => {
+                                              const current = analyzedItems[index]?.servings || 1
+                                              const next = Math.max(0.25, current - quickAddHalfDelta)
+                                              updateItemField(index, 'servings', next)
+                                            }}
+                                            className="px-3 py-1 rounded-full border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors"
+                                          >
+                                            -1/2 {servingUnitMeta.unitLabelSingular}{' '}
+                                            <span className="text-gray-500">
+                                              (-{formatServingsDisplay(quickAddHalfDelta)} serving{quickAddHalfDelta !== 1 ? 's' : ''})
+                                            </span>
+                                          </button>
                                         <button
                                           onClick={() => {
                                             const current = analyzedItems[index]?.servings || 1
@@ -1700,11 +1727,24 @@ Please add nutritional information manually if needed.`);
                                             (+{formatServingsDisplay(quickAddHalfDelta)} serving{quickAddHalfDelta !== 1 ? 's' : ''})
                                           </span>
                                         </button>
+                                        </>
                                       )}
                                     </div>
                                   )}
                                   <div className="flex items-center gap-2 text-sm text-gray-600">
-                                    <span>Units:</span>
+                                    <span>Units{servingUnitMeta.unitLabelSingular ? ` (${servingUnitMeta.unitLabelSingular})` : ''}:</span>
+                                    <div className="flex items-center gap-2">
+                                      <button
+                                        onClick={() => {
+                                          const currentUnits = ((item.servings ?? 1) * servingUnitMeta.quantity)
+                                          const nextUnits = Math.max(0, (currentUnits - 1))
+                                          const servingsFromUnits = nextUnits / servingUnitMeta.quantity
+                                          updateItemField(index, 'servings', Math.max(0.25, servingsFromUnits))
+                                        }}
+                                        className="w-7 h-7 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-md text-gray-700"
+                                      >
+                                        -
+                                      </button>
                                     <input
                                       type="number"
                                       min={0}
@@ -1719,6 +1759,18 @@ Please add nutritional information manually if needed.`);
                                       }}
                                       className="w-24 px-2 py-1 border border-gray-300 rounded-lg text-base font-semibold text-gray-900 text-center focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                                     />
+                                      <button
+                                        onClick={() => {
+                                          const currentUnits = ((item.servings ?? 1) * servingUnitMeta.quantity)
+                                          const nextUnits = currentUnits + 1
+                                          const servingsFromUnits = nextUnits / servingUnitMeta.quantity
+                                          updateItemField(index, 'servings', servingsFromUnits)
+                                        }}
+                                        className="w-7 h-7 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-md text-gray-700"
+                                      >
+                                        +
+                                      </button>
+                                    </div>
                                     <span className="text-xs text-gray-500 flex-1">
                                       1 serving = {item.serving_size || 'N/A'}
                                     </span>
@@ -1728,11 +1780,13 @@ Please add nutritional information manually if needed.`);
                             </div>
                             
                             {/* Per-serving nutrition */}
-                            <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Per serving</div>
+                            <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
+                              {item.serving_size ? `Per 1 serving (= ${item.serving_size})` : 'Per serving'}
+                            </div>
                             <div className="flex flex-wrap gap-2">
                               {ITEM_NUTRIENT_META.map((meta) => {
                                 const rawValue = item?.[meta.field as keyof typeof item]
-                                const displayUnit = meta.key === 'calories' ? ' cal' : 'g'
+                                const displayUnit = meta.key === 'calories' ? ' kcal' : 'g'
                                 const displayValue = formatMacroValue(
                                   typeof rawValue === 'number' ? rawValue : Number(rawValue),
                                   displayUnit

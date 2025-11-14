@@ -180,6 +180,25 @@ export async function notifyOwner(options: NotificationOptions): Promise<void> {
         })
         // If QStash accepted the message, we can return early and let it handle retries/delivery
         if (res.ok) {
+          // Log enqueue
+          try {
+            await prisma.$executeRawUnsafe(`
+              CREATE TABLE IF NOT EXISTS OwnerPushLog (
+                createdAt TIMESTAMP NOT NULL DEFAULT NOW(),
+                event TEXT,
+                userEmail TEXT,
+                status TEXT,
+                info TEXT
+              )
+            `)
+            await prisma.$executeRawUnsafe(
+              `INSERT INTO OwnerPushLog (event, userEmail, status, info) VALUES ($1, $2, $3, $4)`,
+              options.event,
+              options.userEmail,
+              'enqueued_qstash',
+              null
+            )
+          } catch {}
           console.log(`📢 [OWNER NOTIFICATION] Enqueued via QStash: ${options.event}`)
           return
         } else {
@@ -212,8 +231,36 @@ export async function notifyOwner(options: NotificationOptions): Promise<void> {
     const payloadJson = JSON.stringify(payload)
 
     // Send notification (don't await to avoid blocking)
-    webpush.sendNotification(subscription, payloadJson).catch((error: any) => {
+    webpush.sendNotification(subscription, payloadJson).then(async () => {
+      try {
+        await prisma.$executeRawUnsafe(`
+          CREATE TABLE IF NOT EXISTS OwnerPushLog (
+            createdAt TIMESTAMP NOT NULL DEFAULT NOW(),
+            event TEXT,
+            userEmail TEXT,
+            status TEXT,
+            info TEXT
+          )
+        `)
+        await prisma.$executeRawUnsafe(
+          `INSERT INTO OwnerPushLog (event, userEmail, status, info) VALUES ($1, $2, $3, $4)`,
+          options.event,
+          options.userEmail,
+          'sent_direct',
+          null
+        )
+      } catch {}
+    }).catch((error: any) => {
       console.error('❌ [OWNER PUSH] Failed to send:', error?.body || error?.message || error)
+      try {
+        prisma.$executeRawUnsafe(
+          `INSERT INTO OwnerPushLog (event, userEmail, status, info) VALUES ($1, $2, $3, $4)`,
+          options.event,
+          options.userEmail,
+          'error_direct',
+          String(error?.body || error?.message || error).slice(0, 500)
+        ).catch(() => {})
+      } catch {}
       // If subscription is invalid, we could optionally remove it here
       // But for now, just log the error
     })

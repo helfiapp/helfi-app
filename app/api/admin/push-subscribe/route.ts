@@ -107,3 +107,44 @@ export async function GET(req: NextRequest) {
   }
 }
 
+export async function DELETE(req: NextRequest) {
+  try {
+    // Verify admin authentication
+    const authHeader = req.headers.get('authorization')
+    const admin = extractAdminFromHeaders(authHeader)
+    const fallbackEmail = getFallbackAdminEmail(authHeader)
+    
+    if (!admin && !fallbackEmail) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const adminEmail = (admin?.email || fallbackEmail!).toLowerCase()
+
+    // Find User account for admin
+    const user = await prisma.user.findUnique({
+      where: { email: adminEmail },
+      select: { id: true }
+    })
+    if (!user) {
+      return NextResponse.json({ success: true }) // nothing to delete
+    }
+
+    // Ensure table and delete subscription
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS PushSubscriptions (
+        userId TEXT PRIMARY KEY,
+        subscription JSONB NOT NULL
+      )
+    `)
+    await prisma.$executeRawUnsafe(
+      `DELETE FROM PushSubscriptions WHERE userId = $1`,
+      user.id
+    )
+
+    return NextResponse.json({ success: true })
+  } catch (e) {
+    console.error('admin push unsubscribe error', e)
+    return NextResponse.json({ error: 'Failed to unsubscribe' }, { status: 500 })
+  }
+}
+
