@@ -65,6 +65,74 @@ const buildMealSummaryFromItems = (items: any[] | null | undefined) => {
   return summaryParts.join(', ')
 }
 
+const toNumberOrNull = (value: any) => {
+  const num = Number(value)
+  return Number.isFinite(num) ? num : null
+}
+
+const sanitizeItemsForStorage = (items: any[] | null | undefined) => {
+  if (!Array.isArray(items) || items.length === 0) return []
+
+  return items.map((item) => {
+    const servingsValue = Number(item?.servings)
+    const normalizedServings = Number.isFinite(servingsValue) && servingsValue > 0
+      ? Math.round(servingsValue * 100) / 100
+      : 1
+
+    const sanitized: Record<string, any> = {
+      ...item,
+      name: typeof item?.name === 'string' ? item.name.trim() : (item?.name ? String(item.name) : ''),
+      brand: item?.brand ? String(item.brand).trim() : null,
+      serving_size: item?.serving_size ? String(item.serving_size).trim() : '',
+      servings: normalizedServings,
+    }
+
+    sanitized.calories = toNumberOrNull(item?.calories)
+    sanitized.protein_g = toNumberOrNull(item?.protein_g)
+    sanitized.carbs_g = toNumberOrNull(item?.carbs_g)
+    sanitized.fat_g = toNumberOrNull(item?.fat_g)
+    sanitized.fiber_g = toNumberOrNull(item?.fiber_g)
+    sanitized.sugar_g = toNumberOrNull(item?.sugar_g)
+
+    return sanitized
+  })
+}
+
+const buildNutritionFromTotals = (totals: any, fallback?: any) => {
+  if (!totals) {
+    return fallback || {
+      calories: null,
+      protein: null,
+      carbs: null,
+      fat: null,
+      fiber: null,
+      sugar: null,
+    }
+  }
+
+  return {
+    calories: toNumberOrNull(totals.calories),
+    protein: toNumberOrNull(totals.protein),
+    carbs: toNumberOrNull(totals.carbs),
+    fat: toNumberOrNull(totals.fat),
+    fiber: totals.fiber !== null && totals.fiber !== undefined ? toNumberOrNull(totals.fiber) : null,
+    sugar: totals.sugar !== null && totals.sugar !== undefined ? toNumberOrNull(totals.sugar) : null,
+  }
+}
+
+const buildTotalFromTotals = (totals: any) => {
+  if (!totals) return null
+
+  return {
+    calories: toNumberOrNull(totals.calories),
+    protein_g: toNumberOrNull(totals.protein),
+    carbs_g: toNumberOrNull(totals.carbs),
+    fat_g: toNumberOrNull(totals.fat),
+    fiber_g: totals.fiber !== null && totals.fiber !== undefined ? toNumberOrNull(totals.fiber) : null,
+    sugar_g: totals.sugar !== null && totals.sugar !== undefined ? toNumberOrNull(totals.sugar) : null,
+  }
+}
+
 export default function FoodDiary() {
   const { data: session } = useSession()
   const pathname = usePathname()
@@ -453,16 +521,7 @@ export default function FoodDiary() {
 
       const recalculated = recalculateNutritionFromItems(updated)
       setAnalyzedNutrition(recalculated)
-      if (recalculated) {
-        setAnalyzedTotal({
-          calories: recalculated.calories,
-          protein_g: recalculated.protein,
-          carbs_g: recalculated.carbs,
-          fat_g: recalculated.fat,
-          fiber_g: recalculated.fiber,
-          sugar_g: recalculated.sugar,
-        })
-      }
+      setAnalyzedTotal(buildTotalFromTotals(recalculated))
       return updated
     })
   }
@@ -708,12 +767,15 @@ export default function FoodDiary() {
         setAnalyzedNutrition(extractNutritionData(result.analysis));
         // Store structured items and total if available
         if (result.items && Array.isArray(result.items)) {
-          setAnalyzedItems(result.items);
-          setAnalyzedTotal(result.total || null);
-          // If we have items, recalculate nutrition from items with servings
-          if (result.items.length > 0) {
-            const recalculated = recalculateNutritionFromItems(result.items);
+          const sanitizedItems = sanitizeItemsForStorage(result.items);
+          if (sanitizedItems.length > 0) {
+            setAnalyzedItems(sanitizedItems);
+            const recalculated = recalculateNutritionFromItems(sanitizedItems);
             setAnalyzedNutrition(recalculated);
+            setAnalyzedTotal(buildTotalFromTotals(recalculated));
+          } else {
+            setAnalyzedItems([]);
+            setAnalyzedTotal(buildTotalFromTotals(result.total || null));
           }
         } else {
           setAnalyzedItems([]);
@@ -816,12 +878,15 @@ Meanwhile, you can describe your food manually:
         setAnalyzedNutrition(extractNutritionData(result.analysis));
         // Store structured items and total if available
         if (result.items && Array.isArray(result.items)) {
-          setAnalyzedItems(result.items);
-          setAnalyzedTotal(result.total || null);
-          // If we have items, recalculate nutrition from items with servings
-          if (result.items.length > 0) {
-            const recalculated = recalculateNutritionFromItems(result.items);
+          const sanitizedItems = sanitizeItemsForStorage(result.items);
+          if (sanitizedItems.length > 0) {
+            setAnalyzedItems(sanitizedItems);
+            const recalculated = recalculateNutritionFromItems(sanitizedItems);
             setAnalyzedNutrition(recalculated);
+            setAnalyzedTotal(buildTotalFromTotals(recalculated));
+          } else {
+            setAnalyzedItems([]);
+            setAnalyzedTotal(buildTotalFromTotals(result.total || null));
           }
         } else {
           setAnalyzedItems([]);
@@ -874,19 +939,36 @@ Please add nutritional information manually if needed.`);
       return;
     }
 
-    // Build description from items if available, otherwise use provided description
-    let finalDescription = description;
-    if (analyzedItems && analyzedItems.length > 0) {
-      // Create a clean description from items
-      const itemDescriptions = analyzedItems.map((item: any) => {
-        const servings = item.servings || 1;
-        const servingText = servings !== 1 ? `${servings}x ` : '';
-        const brandText = item.brand ? `${item.brand} ` : '';
-        const servingSizeText = item.serving_size ? `(${item.serving_size})` : '';
-        return `${servingText}${brandText}${item.name}${servingSizeText ? ' ' + servingSizeText : ''}`;
-      });
-      finalDescription = itemDescriptions.join(', ');
-    }
+    const sanitizedItems = sanitizeItemsForStorage(analyzedItems);
+    const itemsToStore = sanitizedItems.length > 0 ? sanitizedItems : null;
+    const recalculatedTotals = sanitizedItems.length > 0 ? recalculateNutritionFromItems(sanitizedItems) : null;
+    const fallbackNutrition = nutrition || analyzedNutrition || null;
+    const nutritionForEntryRaw = recalculatedTotals
+      ? buildNutritionFromTotals(recalculatedTotals, fallbackNutrition)
+      : (fallbackNutrition || {
+          calories: null,
+          protein: null,
+          carbs: null,
+          fat: null,
+          fiber: null,
+          sugar: null,
+        });
+
+    const safeNutrition = {
+      calories: toNumberOrNull(nutritionForEntryRaw?.calories),
+      protein: toNumberOrNull(nutritionForEntryRaw?.protein),
+      carbs: toNumberOrNull(nutritionForEntryRaw?.carbs),
+      fat: toNumberOrNull(nutritionForEntryRaw?.fat),
+      fiber: nutritionForEntryRaw?.fiber !== null && nutritionForEntryRaw?.fiber !== undefined ? toNumberOrNull(nutritionForEntryRaw?.fiber) : null,
+      sugar: nutritionForEntryRaw?.sugar !== null && nutritionForEntryRaw?.sugar !== undefined ? toNumberOrNull(nutritionForEntryRaw?.sugar) : null,
+    };
+
+    const totalForEntry = recalculatedTotals
+      ? buildTotalFromTotals(recalculatedTotals)
+      : (analyzedTotal ? buildTotalFromTotals(analyzedTotal) : null);
+
+    const summaryDescription = itemsToStore ? buildMealSummaryFromItems(itemsToStore) : '';
+    const finalDescription = summaryDescription || description;
     
     const newEntry = {
       id: Date.now(),
@@ -894,9 +976,9 @@ Please add nutritional information manually if needed.`);
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       method,
       photo: method === 'photo' ? photoPreview : null,
-      nutrition: nutrition || analyzedNutrition,
-      items: analyzedItems && analyzedItems.length > 0 ? analyzedItems : null, // Store structured items
-      total: analyzedTotal || null // Store total nutrition
+      nutrition: safeNutrition,
+      items: itemsToStore,
+      total: totalForEntry
     };
     
     const updatedFoods = [newEntry, ...todaysFoods];
@@ -982,13 +1064,16 @@ Please add nutritional information manually if needed.`);
           setAnalyzedNutrition(updatedNutrition);
           // Store structured items and total if available
           if (result.items && Array.isArray(result.items)) {
-            setAnalyzedItems(result.items);
-            setAnalyzedTotal(result.total || null);
-            // Recalculate nutrition from items with servings
-            if (result.items.length > 0) {
-              const recalculated = recalculateNutritionFromItems(result.items);
+            const sanitizedItems = sanitizeItemsForStorage(result.items);
+            if (sanitizedItems.length > 0) {
+              setAnalyzedItems(sanitizedItems);
+              const recalculated = recalculateNutritionFromItems(sanitizedItems);
               setAnalyzedNutrition(recalculated);
+              setAnalyzedTotal(buildTotalFromTotals(recalculated));
               updatedNutrition = recalculated;
+            } else {
+              setAnalyzedItems([]);
+              setAnalyzedTotal(buildTotalFromTotals(result.total || null));
             }
           } else {
             setAnalyzedItems([]);
@@ -1006,21 +1091,47 @@ Please add nutritional information manually if needed.`);
       setIsAnalyzing(false);
     }
 
+    const sanitizedAnalyzedItems = sanitizeItemsForStorage(analyzedItems);
+    const existingItems = Array.isArray(editingEntry.items) ? sanitizeItemsForStorage(editingEntry.items) : [];
+    const itemsToPersist = sanitizedAnalyzedItems.length > 0 ? sanitizedAnalyzedItems : (existingItems.length > 0 ? existingItems : null);
+    const recalculatedTotals = itemsToPersist ? recalculateNutritionFromItems(itemsToPersist) : null;
+    const nutritionSource = updatedNutrition || editingEntry.nutrition || null;
+    const nutritionForEntryRaw = recalculatedTotals ? buildNutritionFromTotals(recalculatedTotals, nutritionSource) : (nutritionSource || {
+      calories: null,
+      protein: null,
+      carbs: null,
+      fat: null,
+      fiber: null,
+      sugar: null,
+    });
+
+    const safeUpdatedNutrition = {
+      calories: toNumberOrNull(nutritionForEntryRaw?.calories),
+      protein: toNumberOrNull(nutritionForEntryRaw?.protein),
+      carbs: toNumberOrNull(nutritionForEntryRaw?.carbs),
+      fat: toNumberOrNull(nutritionForEntryRaw?.fat),
+      fiber: nutritionForEntryRaw?.fiber !== null && nutritionForEntryRaw?.fiber !== undefined ? toNumberOrNull(nutritionForEntryRaw?.fiber) : null,
+      sugar: nutritionForEntryRaw?.sugar !== null && nutritionForEntryRaw?.sugar !== undefined ? toNumberOrNull(nutritionForEntryRaw?.sugar) : null,
+    };
+
+    const totalForEntry = recalculatedTotals
+      ? buildTotalFromTotals(recalculatedTotals)
+      : (analyzedTotal
+        ? buildTotalFromTotals(analyzedTotal)
+        : (editingEntry.total ? buildTotalFromTotals(editingEntry.total) : null));
+
     // Build description from items if available, otherwise use provided description
-    let finalDescription = stripItemsJsonBlock(fullAnalysis || description);
-    const summarizedDescription = buildMealSummaryFromItems(analyzedItems);
-    if (summarizedDescription) {
-      finalDescription = summarizedDescription;
-    }
+    const summarizedDescription = itemsToPersist ? buildMealSummaryFromItems(itemsToPersist) : '';
+    const finalDescription = summarizedDescription || stripItemsJsonBlock(fullAnalysis || description);
     
     // Update the existing entry with AI analysis for nutrition display
     const updatedEntry = {
       ...editingEntry,
       description: finalDescription,
       photo: method === 'photo' ? photoPreview : editingEntry.photo,
-      nutrition: updatedNutrition || editingEntry.nutrition,
-      items: analyzedItems && analyzedItems.length > 0 ? analyzedItems : (editingEntry.items || null),
-      total: analyzedTotal || (editingEntry.total || null)
+      nutrition: safeUpdatedNutrition,
+      items: itemsToPersist,
+      total: totalForEntry
     };
 
     const updatedFoods = todaysFoods.map(food => 
@@ -1060,8 +1171,16 @@ Please add nutritional information manually if needed.`);
       setAnalyzedNutrition(food.nutrition);
       // Restore items if available
       if (food.items && Array.isArray(food.items)) {
-        setAnalyzedItems(food.items);
-        setAnalyzedTotal(food.total || null);
+        const sanitizedItems = sanitizeItemsForStorage(food.items);
+        if (sanitizedItems.length > 0) {
+          setAnalyzedItems(sanitizedItems);
+          const recalculated = recalculateNutritionFromItems(sanitizedItems);
+          setAnalyzedNutrition(recalculated);
+          setAnalyzedTotal(buildTotalFromTotals(recalculated));
+        } else {
+          setAnalyzedItems([]);
+          setAnalyzedTotal(buildTotalFromTotals(food.total || null));
+        }
       } else {
         setAnalyzedItems([]);
         setAnalyzedTotal(null);
@@ -1153,6 +1272,90 @@ Please add nutritional information manually if needed.`);
   const cleanedAiDescription = useMemo(() => stripItemsJsonBlock(aiDescription), [aiDescription])
   const mealSummary = useMemo(() => buildMealSummaryFromItems(analyzedItems), [analyzedItems])
   const displayDescription = mealSummary || cleanedAiDescription
+
+  const handleEntryItemServingsChange = (foodId: number, itemIndex: number, nextServings: number) => {
+    if (!isViewingToday) return
+
+    const normalizedServings = Math.max(0.25, Math.round(nextServings * 100) / 100)
+    let updatedAnalyzedItemsForEditing: any[] | null = null
+    let updatedRecalculatedForEditing: any | null = null
+    let updatedDescriptionForEditing: string | null = null
+
+    const updatedFoods = todaysFoods.map((food) => {
+      if (food.id !== foodId || !Array.isArray(food.items) || food.items.length === 0) {
+        return food
+      }
+
+      const sanitizedExistingItems = sanitizeItemsForStorage(food.items)
+      if (itemIndex < 0 || itemIndex >= sanitizedExistingItems.length) {
+        return food
+      }
+
+      const updatedItems = sanitizedExistingItems.map((item, idx) =>
+        idx === itemIndex ? { ...item, servings: normalizedServings } : item
+      )
+
+      const recalculated = recalculateNutritionFromItems(updatedItems)
+      const nutritionRaw = buildNutritionFromTotals(recalculated, food.nutrition)
+      const safeNutrition = {
+        calories: toNumberOrNull(nutritionRaw?.calories),
+        protein: toNumberOrNull(nutritionRaw?.protein),
+        carbs: toNumberOrNull(nutritionRaw?.carbs),
+        fat: toNumberOrNull(nutritionRaw?.fat),
+        fiber: nutritionRaw?.fiber !== null && nutritionRaw?.fiber !== undefined ? toNumberOrNull(nutritionRaw?.fiber) : null,
+        sugar: nutritionRaw?.sugar !== null && nutritionRaw?.sugar !== undefined ? toNumberOrNull(nutritionRaw?.sugar) : null,
+      }
+
+      const updatedDescription = buildMealSummaryFromItems(updatedItems) || food.description
+      const updatedTotal = buildTotalFromTotals(recalculated)
+
+      if (editingEntry && editingEntry.id === foodId) {
+        updatedAnalyzedItemsForEditing = updatedItems
+        updatedRecalculatedForEditing = recalculated
+        updatedDescriptionForEditing = updatedDescription
+      }
+
+      return {
+        ...food,
+        items: updatedItems,
+        description: updatedDescription,
+        nutrition: safeNutrition,
+        total: updatedTotal,
+      }
+    })
+
+    setTodaysFoods(updatedFoods)
+    if (updatedAnalyzedItemsForEditing) {
+      setAnalyzedItems(updatedAnalyzedItemsForEditing)
+      if (updatedRecalculatedForEditing) {
+        setAnalyzedNutrition(updatedRecalculatedForEditing)
+        setAnalyzedTotal(buildTotalFromTotals(updatedRecalculatedForEditing))
+      }
+      if (editingEntry) {
+        setEditingEntry({
+          ...editingEntry,
+          items: updatedAnalyzedItemsForEditing,
+          nutrition: updatedRecalculatedForEditing
+            ? {
+                calories: toNumberOrNull(updatedRecalculatedForEditing.calories),
+                protein: toNumberOrNull(updatedRecalculatedForEditing.protein),
+                carbs: toNumberOrNull(updatedRecalculatedForEditing.carbs),
+                fat: toNumberOrNull(updatedRecalculatedForEditing.fat),
+                fiber: updatedRecalculatedForEditing.fiber !== null && updatedRecalculatedForEditing.fiber !== undefined
+                  ? toNumberOrNull(updatedRecalculatedForEditing.fiber)
+                  : null,
+                sugar: updatedRecalculatedForEditing.sugar !== null && updatedRecalculatedForEditing.sugar !== undefined
+                  ? toNumberOrNull(updatedRecalculatedForEditing.sugar)
+                  : null,
+              }
+            : editingEntry.nutrition,
+          description: updatedDescriptionForEditing || editingEntry.description,
+        })
+      }
+    }
+
+    void saveFoodEntries(updatedFoods, { appendHistory: false })
+  }
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-gray-50">
@@ -1588,12 +1791,15 @@ Please add nutritional information manually if needed.`);
                                 setAiDescription(cleanedAnalysis);
                                 // Store structured items and total if available
                                 if (result.items && Array.isArray(result.items)) {
-                                  setAnalyzedItems(result.items);
-                                  setAnalyzedTotal(result.total || null);
-                                  // Recalculate nutrition from items with servings
-                                  if (result.items.length > 0) {
-                                    const recalculated = recalculateNutritionFromItems(result.items);
+                                  const sanitizedItems = sanitizeItemsForStorage(result.items);
+                                  if (sanitizedItems.length > 0) {
+                                    setAnalyzedItems(sanitizedItems);
+                                    const recalculated = recalculateNutritionFromItems(sanitizedItems);
                                     setAnalyzedNutrition(recalculated);
+                                    setAnalyzedTotal(buildTotalFromTotals(recalculated));
+                                  } else {
+                                    setAnalyzedItems([]);
+                                    setAnalyzedTotal(buildTotalFromTotals(result.total || null));
                                   }
                                 } else {
                                   setAnalyzedItems([]);
@@ -1703,12 +1909,15 @@ Please add nutritional information manually if needed.`);
                               setAiDescription(cleanedAnalysis);
                               // Store structured items and total if available
                               if (result.items && Array.isArray(result.items)) {
-                                setAnalyzedItems(result.items);
-                                setAnalyzedTotal(result.total || null);
-                                // Recalculate nutrition from items with servings
-                                if (result.items.length > 0) {
-                                  const recalculated = recalculateNutritionFromItems(result.items);
+                                const sanitizedItems = sanitizeItemsForStorage(result.items);
+                                if (sanitizedItems.length > 0) {
+                                  setAnalyzedItems(sanitizedItems);
+                                  const recalculated = recalculateNutritionFromItems(sanitizedItems);
                                   setAnalyzedNutrition(recalculated);
+                                  setAnalyzedTotal(buildTotalFromTotals(recalculated));
+                                } else {
+                                  setAnalyzedItems([]);
+                                  setAnalyzedTotal(buildTotalFromTotals(result.total || null));
                                 }
                               } else {
                                 setAnalyzedItems([]);
@@ -1986,12 +2195,15 @@ Please add nutritional information manually if needed.`);
                                 setAiDescription(cleanedAnalysis);
                                 // Store structured items and total if available
                                 if (result.items && Array.isArray(result.items)) {
-                                  setAnalyzedItems(result.items);
-                                  setAnalyzedTotal(result.total || null);
-                                  // Recalculate nutrition from items with servings
-                                  if (result.items.length > 0) {
-                                    const recalculated = recalculateNutritionFromItems(result.items);
+                                  const sanitizedItems = sanitizeItemsForStorage(result.items);
+                                  if (sanitizedItems.length > 0) {
+                                    setAnalyzedItems(sanitizedItems);
+                                    const recalculated = recalculateNutritionFromItems(sanitizedItems);
                                     setAnalyzedNutrition(recalculated);
+                                    setAnalyzedTotal(buildTotalFromTotals(recalculated));
+                                  } else {
+                                    setAnalyzedItems([]);
+                                    setAnalyzedTotal(buildTotalFromTotals(result.total || null));
                                   }
                                 } else {
                                   setAnalyzedItems([]);
@@ -2101,12 +2313,15 @@ Please add nutritional information manually if needed.`);
                               setAiDescription(cleanedAnalysis);
                               // Store structured items and total if available
                               if (result.items && Array.isArray(result.items)) {
-                                setAnalyzedItems(result.items);
-                                setAnalyzedTotal(result.total || null);
-                                // Recalculate nutrition from items with servings
-                                if (result.items.length > 0) {
-                                  const recalculated = recalculateNutritionFromItems(result.items);
+                                const sanitizedItems = sanitizeItemsForStorage(result.items);
+                                if (sanitizedItems.length > 0) {
+                                  setAnalyzedItems(sanitizedItems);
+                                  const recalculated = recalculateNutritionFromItems(sanitizedItems);
                                   setAnalyzedNutrition(recalculated);
+                                  setAnalyzedTotal(buildTotalFromTotals(recalculated));
+                                } else {
+                                  setAnalyzedItems([]);
+                                  setAnalyzedTotal(buildTotalFromTotals(result.total || null));
                                 }
                               } else {
                                 setAnalyzedItems([]);
@@ -2639,6 +2854,129 @@ Please add nutritional information manually if needed.`);
                           )}
                         </div>
                       </div>
+
+                      {food.description && (
+                        <div className="mt-4 text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+                          {food.description}
+                        </div>
+                      )}
+
+                      {Array.isArray(food.items) && food.items.length > 0 && (
+                        <div className="mt-4">
+                          <div className="text-sm font-semibold text-gray-700 mb-2">Serving Details</div>
+                          <div className="space-y-3">
+                            {food.items.map((item: any, itemIndex: number) => {
+                              const rawServings = Number(item?.servings)
+                              const servingsCount = Number.isFinite(rawServings) && rawServings > 0 ? rawServings : 1
+                              const servingsLabel = `${formatServingsDisplay(servingsCount)} serving${Math.abs(servingsCount - 1) < 0.001 ? '' : 's'}`
+
+                              const perCalories = Number(item?.calories) || 0
+                              const perProtein = Number(item?.protein_g) || 0
+                              const perCarbs = Number(item?.carbs_g) || 0
+                              const perFat = Number(item?.fat_g) || 0
+                              const perFiber = Number(item?.fiber_g) || 0
+                              const perSugar = Number(item?.sugar_g) || 0
+
+                              const totalCalories = Math.round(perCalories * servingsCount)
+                              const totalProtein = Math.round(perProtein * servingsCount * 10) / 10
+                              const totalCarbs = Math.round(perCarbs * servingsCount * 10) / 10
+                              const totalFat = Math.round(perFat * servingsCount * 10) / 10
+                              const totalFiber = Math.round(perFiber * servingsCount * 10) / 10
+                              const totalSugar = Math.round(perSugar * servingsCount * 10) / 10
+
+                              const perServingDetails = [
+                                perCalories > 0 ? `${Math.round(perCalories)} cal` : null,
+                                perProtein > 0 ? `${Math.round(perProtein * 10) / 10}g protein` : null,
+                                perCarbs > 0 ? `${Math.round(perCarbs * 10) / 10}g carbs` : null,
+                                perFat > 0 ? `${Math.round(perFat * 10) / 10}g fat` : null,
+                                perFiber > 0 ? `${Math.round(perFiber * 10) / 10}g fiber` : null,
+                                perSugar > 0 ? `${Math.round(perSugar * 10) / 10}g sugar` : null,
+                              ].filter(Boolean)
+
+                              const totalDetails = [
+                                `${totalCalories} cal`,
+                                totalProtein > 0 ? `${totalProtein}g protein` : null,
+                                totalCarbs > 0 ? `${totalCarbs}g carbs` : null,
+                                totalFat > 0 ? `${totalFat}g fat` : null,
+                                totalFiber > 0 ? `${totalFiber}g fiber` : null,
+                                totalSugar > 0 ? `${totalSugar}g sugar` : null,
+                              ].filter(Boolean)
+
+                              const entryIdRaw = typeof food.id === 'number' ? food.id : Number(food.id)
+                              const numericEntryId = Number.isFinite(entryIdRaw) ? entryIdRaw : null
+                              const canAdjustServings = isViewingToday && numericEntryId !== null
+                              const canDecrement = servingsCount - 0.25 >= 0.25
+
+                              return (
+                                <div key={`${food.id}-item-${itemIndex}`} className="rounded-xl border border-gray-100 bg-white p-3 sm:p-4 shadow-sm">
+                                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                    <div className="flex-1 min-w-0">
+                                      <div className="font-semibold text-gray-900 truncate">
+                                        {item?.name || 'Food item'}
+                                        {item?.brand && <span className="text-gray-500 text-xs ml-1">({item.brand})</span>}
+                                      </div>
+                                      <div className="text-xs text-gray-500 mt-1">
+                                        {item?.serving_size ? `Serving size: ${item.serving_size}` : 'Serving size not provided'}
+                                      </div>
+                                      {perServingDetails.length > 0 && (
+                                        <div className="mt-2 text-xs text-gray-600">
+                                          <span className="font-medium text-gray-700">Per serving:</span>{' '}
+                                          {perServingDetails.join(' • ')}
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Servings</span>
+                                      {canAdjustServings ? (
+                                        <div className="flex items-center gap-2">
+                                          <button
+                                            onClick={() => {
+                                              if (canDecrement && numericEntryId !== null) {
+                                                handleEntryItemServingsChange(numericEntryId, itemIndex, servingsCount - 0.25)
+                                              }
+                                            }}
+                                            disabled={!canDecrement}
+                                            className={`w-8 h-8 flex items-center justify-center rounded-lg text-gray-700 font-semibold transition-colors ${
+                                              canDecrement ? 'bg-white border border-gray-200 hover:bg-gray-100' : 'bg-gray-100 text-gray-300 cursor-not-allowed'
+                                            }`}
+                                          >
+                                            -
+                                          </button>
+                                          <span className="text-sm font-semibold text-gray-900 w-14 text-center">
+                                            {formatServingsDisplay(servingsCount)}
+                                          </span>
+                                          <button
+                                            onClick={() => {
+                                              if (numericEntryId !== null) {
+                                                handleEntryItemServingsChange(numericEntryId, itemIndex, servingsCount + 0.25)
+                                              }
+                                            }}
+                                            className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-700 font-semibold transition-colors bg-white border border-gray-200 hover:bg-gray-100"
+                                          >
+                                            +
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        <span className="text-sm font-semibold text-gray-900">{formatServingsDisplay(servingsCount)}</span>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {totalDetails.length > 0 && (
+                                    <div className="mt-3 pt-3 border-t border-gray-100 text-xs text-gray-600 flex flex-wrap gap-x-3 gap-y-1">
+                                      <span className="font-medium text-gray-700">Totals for {servingsLabel}:</span>
+                                      {totalDetails.map((detail, detailIdx) => (
+                                        <span key={detailIdx}>{detail}</span>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
