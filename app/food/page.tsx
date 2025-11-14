@@ -137,12 +137,14 @@ const singularizeUnitLabel = (label: string) => {
   return trimmed
 }
 
-const parseServingUnitMetadata = (servingSize: string | null | undefined) => {
-  if (!servingSize) return null
-  const quantity = parseServingQuantity(servingSize)
+const parseServingUnitMetadata = (servingSize: string | number | null | undefined) => {
+  if (servingSize === null || servingSize === undefined) return null
+  const normalized = typeof servingSize === 'string' ? servingSize : String(servingSize)
+  if (!normalized.trim()) return null
+  const quantity = parseServingQuantity(normalized)
   if (!quantity || quantity <= 0) return null
-  const numberToken = servingSize.match(/(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?)/)
-  const unitLabel = numberToken ? servingSize.replace(numberToken[0], '').trim().replace(/^of\s+/i, '').trim() : servingSize.trim()
+  const numberToken = normalized.match(/(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?)/)
+  const unitLabel = numberToken ? normalized.replace(numberToken[0], '').trim().replace(/^of\s+/i, '').trim() : normalized.trim()
   return {
     quantity,
     unitLabel: unitLabel || 'unit',
