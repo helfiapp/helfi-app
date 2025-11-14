@@ -2687,7 +2687,14 @@ Please add nutritional information manually if needed.`);
                                 </div>
                               </button>
                               <button
-                                onClick={() => deleteFood(food.id)}
+                                onClick={() => {
+                                  if (isViewingToday) {
+                                    deleteFood(food.id)
+                                  } else {
+                                    // For history view, use the database id
+                                    deleteHistoryFood((food as any).dbId)
+                                  }
+                                }}
                                 className="w-full px-4 py-3 text-left text-sm text-red-600 hover:bg-red-50 flex items-center border-t border-gray-100 transition-colors"
                               >
                                 <svg className="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
