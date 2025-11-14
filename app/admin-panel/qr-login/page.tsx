@@ -141,6 +141,9 @@ function QRLoginContent() {
       }
     }
 
+    // Normalize token
+    token = (token || '').trim()
+
     if (!token || token.length < 10) {
       console.error('[QR-SCAN] Invalid token extracted:', token)
       setError('Invalid QR code format. Please scan a fresh QR code from your desktop.')
@@ -165,6 +168,8 @@ function QRLoginContent() {
     setStatus('idle')
     setError('')
 
+    // Normalize token
+    token = (token || '').trim()
     console.log('[QR-VERIFY] Verifying token:', token.substring(0, 20) + '...')
 
     try {

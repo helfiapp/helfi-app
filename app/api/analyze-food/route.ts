@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
  * A server-side fallback below appends this line when missing.
  */
 import { getServerSession } from 'next-auth';
+import { getToken } from 'next-auth/jwt';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { CreditManager, CREDIT_COSTS } from '@/lib/credit-system';
@@ -31,15 +32,35 @@ export async function POST(req: NextRequest) {
     
     // Check authentication - pass request headers for proper session resolution
     const session = await getServerSession(authOptions);
-    console.log('Session check:', { hasSession: !!session, hasEmail: !!session?.user?.email });
-    if (!session?.user?.email) {
+    let userEmail: string | null = session?.user?.email ?? null;
+    let usedTokenFallback = false;
+
+    // Some recent route-handler changes made getServerSession unreliable for this endpoint.
+    // Safeguard the analyzer by grabbing the JWT directly if the normal session lookup fails.
+    if (!userEmail) {
+      try {
+        const token = await getToken({
+          req,
+          secret: process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET || 'helfi-secret-key-production-2024',
+        });
+        if (token?.email) {
+          userEmail = token.email as string;
+          usedTokenFallback = true;
+        }
+      } catch (tokenError) {
+        console.error('Failed to read JWT token for food analyzer auth:', tokenError);
+      }
+    }
+
+    console.log('Session check:', { hasSession: !!session, hasEmail: !!userEmail, usedTokenFallback });
+    if (!userEmail) {
       console.error('❌ Authentication failed - no valid session');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // Find user
     const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
+      where: { email: userEmail },
       include: { subscription: true }
     });
 
@@ -270,7 +291,7 @@ CRITICAL REQUIREMENTS:
 
     // PREMIUM/CREDITS/FREE USE GATING
     const currentUser = await prisma.user.findUnique({
-      where: { email: session.user.email },
+      where: { email: userEmail },
       include: { subscription: true, creditTopUps: true }
     });
     if (!currentUser) {

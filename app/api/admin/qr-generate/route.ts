@@ -109,6 +109,17 @@ export async function GET(request: NextRequest) {
       expiresAt
     )
 
+    // Verify insert (debug)
+    try {
+      const verifyRows: Array<{ token: string }> = await prisma.$queryRawUnsafe(
+        `SELECT token FROM QRTokens WHERE token = $1`,
+        qrToken
+      )
+      console.log('[QR-GEN] Insert verify for token prefix:', qrToken.substring(0, 20), 'found:', verifyRows.length)
+    } catch (e) {
+      console.log('[QR-GEN] Insert verification query failed')
+    }
+
     // Get app URL from request or environment
     const origin = request.headers.get('origin') || request.headers.get('host')
     const protocol = request.headers.get('x-forwarded-proto') || 'https'
@@ -134,7 +145,8 @@ export async function GET(request: NextRequest) {
 // Endpoint to verify QR token and get admin info
 export async function POST(request: NextRequest) {
   try {
-    const { token } = await request.json()
+    const body = await request.json()
+    const token = typeof body?.token === 'string' ? body.token.trim() : ''
 
     console.log('[QR-VERIFY] Received token:', token ? `${token.substring(0, 20)}... (length: ${token.length})` : 'null')
 
