@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
 
     const normalizedEmail = userEmail.trim().toLowerCase();
 
-    const findOrCreateUser = async (includeRelations: any = { subscription: true }) => {
+    const findOrCreateUser = async (includeRelations: any = { subscription: true }): Promise<any> => {
       try {
         const existing = await prisma.user.findUnique({
           where: { email: normalizedEmail },
