@@ -86,6 +86,7 @@ export default function MedicalImagesPage() {
         setAnalysis(result.analysis)
         // Trigger usage meter refresh after successful analysis
         setUsageMeterRefresh(prev => prev + 1)
+        try { window.dispatchEvent(new Event('credits:refresh')); } catch {}
       } else {
         throw new Error('Invalid response from server')
       }

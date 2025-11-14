@@ -166,6 +166,22 @@ Be thorough but not alarmist. Provide actionable recommendations.`;
       }
     }
 
+    // Immediate pre-charge (interaction analysis typical cost = CREDIT_COSTS.INTERACTION_ANALYSIS)
+    let prechargedCents = 0;
+    if (!allowViaFreeUse) {
+      try {
+        const cm = new CreditManager(user.id);
+        const immediate = CREDIT_COSTS.INTERACTION_ANALYSIS;
+        const okPre = await cm.chargeCents(immediate);
+        if (!okPre) {
+          return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
+        }
+        prechargedCents = immediate;
+      } catch {
+        return NextResponse.json({ error: 'Billing error' }, { status: 402 });
+      }
+    }
+
     const wrapped = await chatCompletionWithCost(openai, {
       model,
       messages: [
@@ -256,7 +272,8 @@ Be thorough but not alarmist. Provide actionable recommendations.`;
     // Charge wallet and update counters (skip if allowed via free use)
     if (!allowViaFreeUse) {
       const cm = new CreditManager(user.id);
-      const ok = await cm.chargeCents(wrapped.costCents);
+      const remainder = Math.max(0, wrapped.costCents - prechargedCents);
+      const ok = await cm.chargeCents(remainder);
       if (!ok) {
         return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
       }

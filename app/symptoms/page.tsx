@@ -128,6 +128,7 @@ export default function SymptomAnalysisPage() {
       setResult(data)
       // Trigger usage meter refresh after successful analysis
       setUsageMeterRefresh(prev => prev + 1)
+      try { window.dispatchEvent(new Event('credits:refresh')); } catch {}
     } catch (e: any) {
       setError(e?.message || 'Something went wrong')
     } finally {

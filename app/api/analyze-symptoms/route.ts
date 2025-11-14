@@ -147,6 +147,22 @@ Return two parts:
       }
     }
 
+    // Immediate pre-charge (1 credit) before calling the model (skip for free trial)
+    let prechargedCents = 0
+    if (!allowViaFreeUse) {
+      try {
+        const cm = new CreditManager(refreshedUser.id)
+        const immediate = CREDIT_COSTS.SYMPTOM_ANALYSIS
+        const okPre = await cm.chargeCents(immediate)
+        if (!okPre) {
+          return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 })
+        }
+        prechargedCents = immediate
+      } catch {
+        return NextResponse.json({ error: 'Billing error' }, { status: 402 })
+      }
+    }
+
     // Progress is handled on UI; this call may take longer for deeper reasoning
     const wrapped = await chatCompletionWithCost(openai, {
       model,
@@ -174,7 +190,8 @@ Return two parts:
     // Charge wallet and update counters (skip charge if allowed via free use)
     if (!allowViaFreeUse) {
       const cm = new CreditManager(refreshedUser.id)
-      const ok = await cm.chargeCents(wrapped.costCents)
+      const remainder = Math.max(0, wrapped.costCents - prechargedCents)
+      const ok = await cm.chargeCents(remainder)
       if (!ok) {
         return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 })
       }

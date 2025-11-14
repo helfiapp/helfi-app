@@ -308,11 +308,14 @@ export default function FoodDiary() {
     } else if (field === 'serving_size') {
       itemsCopy[index].serving_size = String(value || '').trim()
     } else if (field === 'servings') {
-      // Minimum quarter serving, reasonable upper bound
-      const clamped = clampNumber(value, 0.25, 20)
-      // Round to nearest quarter
-      const rounded = Math.round(clamped * 4) / 4
-      itemsCopy[index].servings = rounded
+      // Snap servings to appropriate step:
+      // - Discrete units (eggs/slices) => step = 1 / quantity-per-serving
+      // - Otherwise => 0.25
+      const meta = parseServingUnitMetadata(itemsCopy[index].serving_size || '')
+      const step = meta && isDiscreteUnitLabel(meta.unitLabel) ? (1 / meta.quantity) : 0.25
+      const clamped = clampNumber(value, 0, 20)
+      const snapped = step > 0 ? Math.round(clamped / step) * step : clamped
+      itemsCopy[index].servings = snapped
     } else if (field === 'calories') {
       // Calories as integer, reasonable upper bound per serving
       const clamped = clampNumber(value, 0, 3000)
@@ -771,6 +774,7 @@ const convertTotalsForStorage = (totals: ReturnType<typeof recalculateNutritionF
         setShowAiResult(true);
         // Trigger usage meter refresh after successful analysis
         setUsageMeterRefresh(prev => prev + 1);
+        try { window.dispatchEvent(new Event('credits:refresh')); } catch {}
       } else {
         console.error('❌ Invalid API response format:', result);
         throw new Error('Invalid response format from AI service');
@@ -869,6 +873,7 @@ Meanwhile, you can describe your food manually:
         setManualFoodName('');
         setManualIngredients([{ name: '', weight: '', unit: 'g' }]);
         setManualFoodType('single');
+        try { window.dispatchEvent(new Event('credits:refresh')); } catch {}
       } else {
         throw new Error('Invalid response from AI service');
       }
@@ -1048,6 +1053,7 @@ Please add nutritional information manually if needed.`);
           setHealthWarning(result.healthWarning || null);
           setHealthAlternatives(result.alternatives || null);
           setUsageMeterRefresh(prev => prev + 1);
+          try { window.dispatchEvent(new Event('credits:refresh')); } catch {}
         } else {
           console.error('Re-analysis failed:', result.error || 'Unknown error');
         }
@@ -1674,7 +1680,10 @@ Please add nutritional information manually if needed.`);
                                 <button
                                   onClick={() => {
                                     const current = analyzedItems[index]?.servings || 1
-                                    const next = Math.max(0.25, current - 0.25)
+                                    const step = (servingUnitMeta && isDiscreteUnitLabel(servingUnitMeta.unitLabel)) 
+                                      ? (1 / servingUnitMeta.quantity) 
+                                      : 0.25
+                                    const next = Math.max(0, current - step)
                                     updateItemField(index, 'servings', next)
                                   }}
                                   className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-medium transition-colors"
@@ -1683,8 +1692,8 @@ Please add nutritional information manually if needed.`);
                                 </button>
                                 <input
                                   type="number"
-                                  min={0.1}
-                                  step={0.01}
+                                  min={0}
+                                  step={(servingUnitMeta && isDiscreteUnitLabel(servingUnitMeta.unitLabel)) ? (1 / servingUnitMeta.quantity) : 0.25}
                                   value={formatNumberInputValue(item.servings ?? 1)}
                                   onChange={(e) => updateItemField(index, 'servings', e.target.value)}
                                   className="w-20 px-2 py-1 border border-gray-300 rounded-lg text-base font-semibold text-gray-900 text-center focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
@@ -1692,7 +1701,10 @@ Please add nutritional information manually if needed.`);
                                 <button
                                   onClick={() => {
                                     const current = analyzedItems[index]?.servings || 1
-                                    const next = current + 0.25
+                                    const step = (servingUnitMeta && isDiscreteUnitLabel(servingUnitMeta.unitLabel)) 
+                                      ? (1 / servingUnitMeta.quantity) 
+                                      : 0.25
+                                    const next = current + step
                                     updateItemField(index, 'servings', next)
                                   }}
                                   className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-medium transition-colors"
@@ -1703,86 +1715,16 @@ Please add nutritional information manually if needed.`);
                               </div>
                               {servingUnitMeta && (
                                 <div className="flex flex-col gap-1">
-                                  {quickAddDelta && (
-                                    <div className="flex flex-wrap gap-2 text-xs">
-                                      <span className="text-gray-500">Quick add:</span>
-                                      <button
-                                        onClick={() => {
-                                          const current = analyzedItems[index]?.servings || 1
-                                          const next = Math.max(0.25, current - quickAddDelta)
-                                          updateItemField(index, 'servings', next)
-                                        }}
-                                        className="px-3 py-1 rounded-full border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors"
-                                      >
-                                        -1 {servingUnitMeta.unitLabelSingular}{' '}
-                                        <span className="text-gray-500">
-                                          (-{formatServingsDisplay(quickAddDelta)} serving{quickAddDelta !== 1 ? 's' : ''})
-                                        </span>
-                                      </button>
-                                      <button
-                                        onClick={() => {
-                                          const current = analyzedItems[index]?.servings || 1
-                                          updateItemField(index, 'servings', current + quickAddDelta)
-                                        }}
-                                        className="px-3 py-1 rounded-full border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors"
-                                      >
-                                        +1 {servingUnitMeta.unitLabelSingular}{' '}
-                                        <span className="text-gray-500">
-                                          (+{formatServingsDisplay(quickAddDelta)} serving{quickAddDelta !== 1 ? 's' : ''})
-                                        </span>
-                                      </button>
-                                      {quickAddHalfDelta && quickAddHalfDelta >= 0.1 && (
-                                        <>
-                                          <button
-                                            onClick={() => {
-                                              const current = analyzedItems[index]?.servings || 1
-                                              const next = Math.max(0.25, current - quickAddHalfDelta)
-                                              updateItemField(index, 'servings', next)
-                                            }}
-                                            className="px-3 py-1 rounded-full border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors"
-                                          >
-                                            -1/2 {servingUnitMeta.unitLabelSingular}{' '}
-                                            <span className="text-gray-500">
-                                              (-{formatServingsDisplay(quickAddHalfDelta)} serving{quickAddHalfDelta !== 1 ? 's' : ''})
-                                            </span>
-                                          </button>
-                                        <button
-                                          onClick={() => {
-                                            const current = analyzedItems[index]?.servings || 1
-                                            updateItemField(index, 'servings', current + quickAddHalfDelta)
-                                          }}
-                                          className="px-3 py-1 rounded-full border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors"
-                                        >
-                                          +1/2 {servingUnitMeta.unitLabelSingular}{' '}
-                                          <span className="text-gray-500">
-                                            (+{formatServingsDisplay(quickAddHalfDelta)} serving{quickAddHalfDelta !== 1 ? 's' : ''})
-                                          </span>
-                                        </button>
-                                        </>
-                                      )}
-                                    </div>
-                                  )}
                                   <div className="flex items-center gap-2 text-sm text-gray-600">
                                     <span>Units{servingUnitMeta.unitLabelSingular ? ` (${servingUnitMeta.unitLabelSingular})` : ''}:</span>
                                     <div className="flex items-center gap-2">
-                                      {isDiscreteUnitLabel(servingUnitMeta.unitLabel) && (
-                                        <button
-                                          onClick={() => {
-                                            const currentUnits = ((item.servings ?? 1) * servingUnitMeta.quantity)
-                                            const nextUnits = Math.max(0, (currentUnits - 1))
-                                            const servingsFromUnits = nextUnits / servingUnitMeta.quantity
-                                            updateItemField(index, 'servings', Math.max(0.25, servingsFromUnits))
-                                          }}
-                                          className="hidden" // keep previous -1 button below; we will show dedicated half-step buttons instead
-                                        />
-                                      )}
                                       <button
                                         onClick={() => {
                                           const currentUnits = ((item.servings ?? 1) * servingUnitMeta.quantity)
                                           const step = isDiscreteUnitLabel(servingUnitMeta.unitLabel) ? 1 : 1
                                           const nextUnits = Math.max(0, (currentUnits - step))
                                           const servingsFromUnits = nextUnits / servingUnitMeta.quantity
-                                          updateItemField(index, 'servings', Math.max(0.25, servingsFromUnits))
+                                          updateItemField(index, 'servings', Math.max(0, servingsFromUnits))
                                         }}
                                         className="w-7 h-7 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-md text-gray-700"
                                       >
@@ -1791,29 +1733,19 @@ Please add nutritional information manually if needed.`);
                                     <input
                                       type="number"
                                       min={0}
-                                      step={isDiscreteUnitLabel(servingUnitMeta.unitLabel) ? 0.5 : 0.1}
+                                      step={isDiscreteUnitLabel(servingUnitMeta.unitLabel) ? 1 : 0.1}
                                       value={formatNumberInputValue(((item.servings ?? 1) * servingUnitMeta.quantity))}
                                       onChange={(e) => {
                                         const units = Number(e.target.value)
                                         if (Number.isFinite(units) && units >= 0) {
-                                          const servingsFromUnits = units / servingUnitMeta.quantity
-                                          updateItemField(index, 'servings', servingsFromUnits)
+                                          const rawServings = units / servingUnitMeta.quantity
+                                          const step = isDiscreteUnitLabel(servingUnitMeta.unitLabel) ? (1 / servingUnitMeta.quantity) : 0.25
+                                          const snapped = Math.round(rawServings / step) * step
+                                          updateItemField(index, 'servings', Math.max(0, snapped))
                                         }
                                       }}
                                       className="w-24 px-2 py-1 border border-gray-300 rounded-lg text-base font-semibold text-gray-900 text-center focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                                     />
-                                      {isDiscreteUnitLabel(servingUnitMeta.unitLabel) && (
-                                        <button
-                                          onClick={() => {
-                                            const currentUnits = ((item.servings ?? 1) * servingUnitMeta.quantity)
-                                            const step = 1
-                                            const nextUnits = currentUnits + step
-                                            const servingsFromUnits = nextUnits / servingUnitMeta.quantity
-                                            updateItemField(index, 'servings', servingsFromUnits)
-                                          }}
-                                          className="hidden"
-                                        />
-                                      )}
                                       <button
                                         onClick={() => {
                                           const currentUnits = ((item.servings ?? 1) * servingUnitMeta.quantity)
@@ -1831,55 +1763,6 @@ Please add nutritional information manually if needed.`);
                                       1 serving = {item.serving_size || 'N/A'}
                                     </span>
                                   </div>
-                                  {isDiscreteUnitLabel(servingUnitMeta.unitLabel) && (
-                                    <div className="flex flex-wrap gap-2 text-xs mt-1">
-                                      <span className="text-gray-500">Units quick add:</span>
-                                      <button
-                                        onClick={() => {
-                                          const current = ((item.servings ?? 1) * servingUnitMeta.quantity)
-                                          const nextUnits = Math.max(0, current - 0.5)
-                                          const servingsFromUnits = nextUnits / servingUnitMeta.quantity
-                                          updateItemField(index, 'servings', Math.max(0.25, servingsFromUnits))
-                                        }}
-                                        className="px-3 py-1 rounded-full border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors"
-                                      >
-                                        -0.5 {servingUnitMeta.unitLabelSingular}
-                                      </button>
-                                      <button
-                                        onClick={() => {
-                                          const current = ((item.servings ?? 1) * servingUnitMeta.quantity)
-                                          const nextUnits = current + 0.5
-                                          const servingsFromUnits = nextUnits / servingUnitMeta.quantity
-                                          updateItemField(index, 'servings', servingsFromUnits)
-                                        }}
-                                        className="px-3 py-1 rounded-full border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors"
-                                      >
-                                        +0.5 {servingUnitMeta.unitLabelSingular}
-                                      </button>
-                                      <button
-                                        onClick={() => {
-                                          const current = ((item.servings ?? 1) * servingUnitMeta.quantity)
-                                          const nextUnits = Math.max(0, current - 1)
-                                          const servingsFromUnits = nextUnits / servingUnitMeta.quantity
-                                          updateItemField(index, 'servings', Math.max(0.25, servingsFromUnits))
-                                        }}
-                                        className="px-3 py-1 rounded-full border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors"
-                                      >
-                                        -1 {servingUnitMeta.unitLabelSingular}
-                                      </button>
-                                      <button
-                                        onClick={() => {
-                                          const current = ((item.servings ?? 1) * servingUnitMeta.quantity)
-                                          const nextUnits = current + 1
-                                          const servingsFromUnits = nextUnits / servingUnitMeta.quantity
-                                          updateItemField(index, 'servings', servingsFromUnits)
-                                        }}
-                                        className="px-3 py-1 rounded-full border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors"
-                                      >
-                                        +1 {servingUnitMeta.unitLabelSingular}
-                                      </button>
-                                    </div>
-                                  )}
                                 </div>
                               )}
                             </div>

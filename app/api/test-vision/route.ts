@@ -77,6 +77,23 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 });
     }
     
+    // Immediate pre-charge (2 credits) before calling the model (skip for free trial)
+    const allowViaFreeUse = !isPremium && !hasPurchasedCredits && !hasUsedFreeMedical;
+    let prechargedCents = 0;
+    if (!allowViaFreeUse) {
+      try {
+        const cm = new CreditManager(user.id);
+        const immediate = 2; // medical image analysis typical cost (credits)
+        const okPre = await cm.chargeCents(immediate);
+        if (!okPre) {
+          return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
+        }
+        prechargedCents = immediate;
+      } catch {
+        return NextResponse.json({ error: 'Billing error' }, { status: 402 });
+      }
+    }
+
     const wrapped = await chatCompletionWithCost(openai, {
       model: "gpt-4o",
       messages: [
@@ -103,11 +120,11 @@ export async function POST(req: NextRequest) {
 
     const analysis = wrapped.completion.choices[0]?.message?.content;
     
-    // Charge wallet (skip if allowed via free use)
-    const allowViaFreeUse = !isPremium && !hasPurchasedCredits && !hasUsedFreeMedical;
+    // Charge wallet remainder (skip if allowed via free use)
     if (!allowViaFreeUse) {
       const cm = new CreditManager(user.id);
-      const ok = await cm.chargeCents(wrapped.costCents);
+      const remainder = Math.max(0, wrapped.costCents - prechargedCents);
+      const ok = await cm.chargeCents(remainder);
       if (!ok) {
         return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
       }

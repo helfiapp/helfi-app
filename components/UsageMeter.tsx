@@ -24,6 +24,18 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
   const [creditsTotal, setCreditsTotal] = useState<number | null>(null)
   const [creditsDailyRemaining, setCreditsDailyRemaining] = useState<number | null>(null)
   const [creditsAdditionalRemaining, setCreditsAdditionalRemaining] = useState<number | null>(null)
+  // Listen for global refresh events so sidebar meter updates immediately after charges
+  const [eventTick, setEventTick] = useState(0)
+  useEffect(() => {
+    const handler = () => setEventTick((v) => v + 1)
+    try {
+      window.addEventListener('credits:refresh', handler)
+      return () => window.removeEventListener('credits:refresh', handler)
+    } catch {
+      // SSR/no-window safe
+      return () => {}
+    }
+  }, [])
 
   useEffect(() => {
     const loadStatus = async () => {
@@ -82,7 +94,7 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
     // Refresh every 30 seconds to keep usage meter updated
     const interval = setInterval(loadStatus, 30000)
     return () => clearInterval(interval)
-  }, [session, refreshTrigger]) // Added refreshTrigger to dependencies
+  }, [session, refreshTrigger, eventTick]) // include eventTick for global refresh
 
   // Don't render if not authenticated, still loading, or no access
   if (!session || loading || !hasAccess) {
