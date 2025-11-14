@@ -20,14 +20,14 @@ function QRLoginContent() {
   const tokenFromUrl = searchParams.get('token')
 
   useEffect(() => {
-    // If token is in URL, verify it directly
+    // If token is in URL, verify it directly (no camera needed)
     if (tokenFromUrl) {
       handleTokenVerification(tokenFromUrl)
       return
     }
 
-    // Otherwise, start QR scanner
-    startScanner()
+    // Don't auto-start scanner - let user click button to start
+    // This prevents permission issues on mobile
     
     return () => {
       stopScanner()
@@ -40,6 +40,21 @@ function QRLoginContent() {
       setScanning(true)
       setStatus('scanning')
       setError('')
+
+      // Request camera permissions first (especially important on mobile)
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { facingMode: 'environment' } 
+        })
+        // Stop the stream immediately - html5-qrcode will start its own
+        stream.getTracks().forEach(track => track.stop())
+      } catch (permError: any) {
+        console.error('Camera permission error:', permError)
+        setError('Camera permission denied. Please allow camera access in your browser settings and try again.')
+        setStatus('error')
+        setScanning(false)
+        return
+      }
 
       const html5QrCode = new Html5Qrcode(qrCodeRegionId)
       scannerRef.current = html5QrCode
@@ -60,7 +75,15 @@ function QRLoginContent() {
       )
     } catch (err: any) {
       console.error('Scanner error:', err)
-      setError('Failed to start camera. Please check permissions.')
+      let errorMsg = 'Failed to start camera. '
+      if (err?.message?.includes('permission')) {
+        errorMsg += 'Please allow camera access in your browser settings.'
+      } else if (err?.message?.includes('not found') || err?.message?.includes('not available')) {
+        errorMsg += 'Camera not found. Make sure your device has a camera.'
+      } else {
+        errorMsg += 'Please check permissions and try again.'
+      }
+      setError(errorMsg)
       setStatus('error')
       setScanning(false)
     }
@@ -160,7 +183,15 @@ function QRLoginContent() {
               Scan the QR code from your desktop admin panel
             </p>
             
-            <div id={qrCodeRegionId} className="w-full mb-4" style={{ minHeight: '300px' }}></div>
+            {!scanning && !error && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                <p className="text-sm text-blue-800 text-center">
+                  <strong>Tip:</strong> When you click "Start Scanner", your browser will ask for camera permission. Please allow it to scan the QR code.
+                </p>
+              </div>
+            )}
+            
+            <div id={qrCodeRegionId} className="w-full mb-4" style={{ minHeight: scanning ? '300px' : '0px' }}></div>
             
             {loading && (
               <div className="text-center">
@@ -171,7 +202,10 @@ function QRLoginContent() {
 
             {error && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
-                <p className="text-sm text-red-800">{error}</p>
+                <p className="text-sm text-red-800 mb-2">{error}</p>
+                <p className="text-xs text-red-600 mt-2">
+                  <strong>Alternative:</strong> You can also manually visit the URL shown below the QR code on your desktop.
+                </p>
               </div>
             )}
 
