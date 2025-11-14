@@ -152,12 +152,43 @@ const parseServingUnitMetadata = (servingSize: string | number | null | undefine
   }
 }
 
+// Heuristics: treat eggs, slices, cookies, pieces, patties, wings, nuggets, meatballs, sticks, bars as discrete items
+// and DO NOT treat weight/volume units as discrete
+const isDiscreteUnitLabel = (label: string) => {
+  const l = (label || '').toLowerCase().trim()
+  const nonDiscreteUnits = [
+    'g','gram','grams','kg','kilogram','ml','milliliter','millilitre','l','liter','litre',
+    'cup','cups','tbsp','tablespoon','tsp','teaspoon','oz','ounce','lb','pound'
+  ]
+  if (nonDiscreteUnits.some(u => l === u || l.endsWith(' ' + u))) return false
+  const discreteKeywords = [
+    'egg','slice','cookie','piece','patty','wing','nugget','meatball','stick','bar','biscuit','pancake','scoop'
+  ]
+  return discreteKeywords.some(k => l.includes(k))
+}
+
 const extractStructuredItemsFromAnalysis = (analysis: string | null | undefined) => {
   if (!analysis) return null
   const match = analysis.match(/<ITEMS_JSON>([\s\S]+?)<\/ITEMS_JSON>/)
   if (!match) return null
   try {
-    const payload = JSON.parse(match[1].trim())
+    const raw = match[1].trim()
+    // Try strict JSON first
+    let payload: any = null
+    try {
+      payload = JSON.parse(raw)
+    } catch {
+      // Relaxed parsing: quote keys, convert single quotes, remove trailing commas
+      try {
+        const keysQuoted = raw.replace(/([{,]\s*)([A-Za-z0-9_]+)\s*:/g, '$1"$2":')
+        const doubleQuoted = keysQuoted.replace(/'/g, '"')
+        const noTrailingCommas = doubleQuoted.replace(/,\s*([}\]])/g, '$1')
+        payload = JSON.parse(noTrailingCommas)
+      } catch (err) {
+        console.warn('Failed relaxed parse for ITEMS_JSON payload', err)
+        payload = null
+      }
+    }
     if (payload && Array.isArray(payload.items)) {
       return {
         items: payload.items,
@@ -1734,10 +1765,22 @@ Please add nutritional information manually if needed.`);
                                   <div className="flex items-center gap-2 text-sm text-gray-600">
                                     <span>Units{servingUnitMeta.unitLabelSingular ? ` (${servingUnitMeta.unitLabelSingular})` : ''}:</span>
                                     <div className="flex items-center gap-2">
+                                      {isDiscreteUnitLabel(servingUnitMeta.unitLabel) && (
+                                        <button
+                                          onClick={() => {
+                                            const currentUnits = ((item.servings ?? 1) * servingUnitMeta.quantity)
+                                            const nextUnits = Math.max(0, (currentUnits - 1))
+                                            const servingsFromUnits = nextUnits / servingUnitMeta.quantity
+                                            updateItemField(index, 'servings', Math.max(0.25, servingsFromUnits))
+                                          }}
+                                          className="hidden" // keep previous -1 button below; we will show dedicated half-step buttons instead
+                                        />
+                                      )}
                                       <button
                                         onClick={() => {
                                           const currentUnits = ((item.servings ?? 1) * servingUnitMeta.quantity)
-                                          const nextUnits = Math.max(0, (currentUnits - 1))
+                                          const step = isDiscreteUnitLabel(servingUnitMeta.unitLabel) ? 1 : 1
+                                          const nextUnits = Math.max(0, (currentUnits - step))
                                           const servingsFromUnits = nextUnits / servingUnitMeta.quantity
                                           updateItemField(index, 'servings', Math.max(0.25, servingsFromUnits))
                                         }}
@@ -1748,7 +1791,7 @@ Please add nutritional information manually if needed.`);
                                     <input
                                       type="number"
                                       min={0}
-                                      step={0.1}
+                                      step={isDiscreteUnitLabel(servingUnitMeta.unitLabel) ? 0.5 : 0.1}
                                       value={formatNumberInputValue(((item.servings ?? 1) * servingUnitMeta.quantity))}
                                       onChange={(e) => {
                                         const units = Number(e.target.value)
@@ -1759,10 +1802,23 @@ Please add nutritional information manually if needed.`);
                                       }}
                                       className="w-24 px-2 py-1 border border-gray-300 rounded-lg text-base font-semibold text-gray-900 text-center focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                                     />
+                                      {isDiscreteUnitLabel(servingUnitMeta.unitLabel) && (
+                                        <button
+                                          onClick={() => {
+                                            const currentUnits = ((item.servings ?? 1) * servingUnitMeta.quantity)
+                                            const step = 1
+                                            const nextUnits = currentUnits + step
+                                            const servingsFromUnits = nextUnits / servingUnitMeta.quantity
+                                            updateItemField(index, 'servings', servingsFromUnits)
+                                          }}
+                                          className="hidden"
+                                        />
+                                      )}
                                       <button
                                         onClick={() => {
                                           const currentUnits = ((item.servings ?? 1) * servingUnitMeta.quantity)
-                                          const nextUnits = currentUnits + 1
+                                          const step = isDiscreteUnitLabel(servingUnitMeta.unitLabel) ? 1 : 1
+                                          const nextUnits = currentUnits + step
                                           const servingsFromUnits = nextUnits / servingUnitMeta.quantity
                                           updateItemField(index, 'servings', servingsFromUnits)
                                         }}
@@ -1775,6 +1831,55 @@ Please add nutritional information manually if needed.`);
                                       1 serving = {item.serving_size || 'N/A'}
                                     </span>
                                   </div>
+                                  {isDiscreteUnitLabel(servingUnitMeta.unitLabel) && (
+                                    <div className="flex flex-wrap gap-2 text-xs mt-1">
+                                      <span className="text-gray-500">Units quick add:</span>
+                                      <button
+                                        onClick={() => {
+                                          const current = ((item.servings ?? 1) * servingUnitMeta.quantity)
+                                          const nextUnits = Math.max(0, current - 0.5)
+                                          const servingsFromUnits = nextUnits / servingUnitMeta.quantity
+                                          updateItemField(index, 'servings', Math.max(0.25, servingsFromUnits))
+                                        }}
+                                        className="px-3 py-1 rounded-full border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors"
+                                      >
+                                        -0.5 {servingUnitMeta.unitLabelSingular}
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          const current = ((item.servings ?? 1) * servingUnitMeta.quantity)
+                                          const nextUnits = current + 0.5
+                                          const servingsFromUnits = nextUnits / servingUnitMeta.quantity
+                                          updateItemField(index, 'servings', servingsFromUnits)
+                                        }}
+                                        className="px-3 py-1 rounded-full border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors"
+                                      >
+                                        +0.5 {servingUnitMeta.unitLabelSingular}
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          const current = ((item.servings ?? 1) * servingUnitMeta.quantity)
+                                          const nextUnits = Math.max(0, current - 1)
+                                          const servingsFromUnits = nextUnits / servingUnitMeta.quantity
+                                          updateItemField(index, 'servings', Math.max(0.25, servingsFromUnits))
+                                        }}
+                                        className="px-3 py-1 rounded-full border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors"
+                                      >
+                                        -1 {servingUnitMeta.unitLabelSingular}
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          const current = ((item.servings ?? 1) * servingUnitMeta.quantity)
+                                          const nextUnits = current + 1
+                                          const servingsFromUnits = nextUnits / servingUnitMeta.quantity
+                                          updateItemField(index, 'servings', servingsFromUnits)
+                                        }}
+                                        className="px-3 py-1 rounded-full border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors"
+                                      >
+                                        +1 {servingUnitMeta.unitLabelSingular}
+                                      </button>
+                                    </div>
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -1831,7 +1936,9 @@ Please add nutritional information manually if needed.`);
                         <div className="text-gray-900 text-sm leading-relaxed whitespace-pre-wrap break-words">
 
                   {(() => {
-                            const filteredLines = aiDescription
+                            // Hide any embedded ITEMS_JSON blocks if present to avoid dumping raw JSON
+                            const cleanedText = aiDescription.replace(/<ITEMS_JSON>[\s\S]*?<\/ITEMS_JSON>/g, '').trim()
+                            const filteredLines = cleanedText
                               .split('\n')
                               .map((line) => line.trim())
                               .filter(line =>
