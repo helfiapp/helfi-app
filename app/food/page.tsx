@@ -1362,27 +1362,31 @@ Please add nutritional information manually if needed.`);
                     )
                   })()}
 
-                  {/* Additional Nutrition Info */}
-                  {analyzedNutrition && (analyzedNutrition.fiber !== null || analyzedNutrition.sugar !== null) && (
-                    <div className="flex gap-4 mb-6">
-                      {analyzedNutrition.fiber !== null && analyzedNutrition.fiber !== undefined && (
-                        <div className="flex-1 bg-amber-50 rounded-lg p-3 border border-amber-200">
-                          <div className="text-center">
-                            <div className="text-lg font-semibold text-amber-600">{analyzedNutrition.fiber}g</div>
-                            <div className="text-xs text-amber-500 uppercase">Fiber</div>
-                          </div>
-                        </div>
-                      )}
-                      {analyzedNutrition.sugar !== null && analyzedNutrition.sugar !== undefined && (
-                        <div className="flex-1 bg-pink-50 rounded-lg p-3 border border-pink-200">
-                          <div className="text-center">
-                            <div className="text-lg font-semibold text-pink-600">{analyzedNutrition.sugar}g</div>
-                            <div className="text-xs text-pink-500 uppercase">Sugar</div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  {/* Supplemental Nutrition Cards */}
+                  {analyzedNutrition && (analyzedNutrition.fiber !== null || analyzedNutrition.sugar !== null) && (() => {
+                    const supplementalKeys = (['fiber', 'sugar'] as const).filter((key) => {
+                      const value = (analyzedNutrition as any)?.[key]
+                      return value !== null && value !== undefined && Number(value) > 0.009
+                    })
+
+                    if (supplementalKeys.length === 0) return null
+
+                    return (
+                      <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-6">
+                        {supplementalKeys.map((key) => {
+                          const meta = NUTRIENT_CARD_META[key]
+                          const rawValue = (analyzedNutrition as any)[key]
+                          const displayValue = formatNutrientValue(key, Number(rawValue))
+                          return (
+                            <div key={key} className={`bg-gradient-to-br ${meta.gradient} border border-white/60 rounded-xl p-3 sm:p-4 text-center shadow-sm`}>
+                              <div className={`text-xs font-medium uppercase tracking-wide ${meta.accent} mb-1`}>{meta.label}</div>
+                              <div className="text-xl sm:text-2xl font-bold text-gray-900">{displayValue}</div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )
+                  })()}
 
                   {/* Detected Items with Brand, Serving Size, and Edit Controls */}
                   {analyzedItems && analyzedItems.length > 0 ? (
