@@ -1,10 +1,12 @@
 'use client'
 
-import React, { useEffect, useState, useRef } from 'react'
+import React, { useEffect, useState, useRef, Suspense } from 'react'
 import { Html5Qrcode } from 'html5-qrcode'
 import { useRouter, useSearchParams } from 'next/navigation'
 
-export default function QRLoginPage() {
+export const dynamic = 'force-dynamic'
+
+function QRLoginContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [scanning, setScanning] = useState(false)
@@ -189,6 +191,21 @@ export default function QRLoginPage() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function QRLoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+          <p className="mt-2 text-sm text-gray-600">Loading...</p>
+        </div>
+      </div>
+    }>
+      <QRLoginContent />
+    </Suspense>
   )
 }
 

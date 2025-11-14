@@ -30,6 +30,64 @@ const NUTRIENT_CARD_META: Record<typeof NUTRIENT_DISPLAY_ORDER[number], { label:
   sugar: { label: 'Sugar', unit: 'g', gradient: 'from-pink-50 to-pink-100', accent: 'text-pink-500' },
 }
 
+const ITEM_NUTRIENT_META = [
+  { key: 'calories', field: 'calories', label: 'Cal', unit: '', accent: 'text-orange-600' },
+  { key: 'protein', field: 'protein_g', label: 'Protein', unit: 'g', accent: 'text-blue-600' },
+  { key: 'carbs', field: 'carbs_g', label: 'Carbs', unit: 'g', accent: 'text-green-600' },
+  { key: 'fat', field: 'fat_g', label: 'Fat', unit: 'g', accent: 'text-purple-600' },
+  { key: 'fiber', field: 'fiber_g', label: 'Fiber', unit: 'g', accent: 'text-amber-600' },
+  { key: 'sugar', field: 'sugar_g', label: 'Sugar', unit: 'g', accent: 'text-pink-600' },
+] as const
+
+const formatServingsDisplay = (value: number | null | undefined) => {
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric) || numeric <= 0) return '1'
+  const rounded = Math.round(numeric * 100) / 100
+  if (Number.isInteger(rounded)) return String(rounded)
+  return rounded.toFixed(2).replace(/\.0+$/, '').replace(/(\.[1-9])0$/, '$1')
+}
+
+const buildMealSummaryFromItems = (items: any[] | null | undefined) => {
+  if (!Array.isArray(items) || items.length === 0) return ''
+
+  const summaryParts = items.map((item) => {
+    const pieces: string[] = []
+    const servings = Number(item?.servings)
+    if (Number.isFinite(servings) && Math.abs(servings - 1) > 0.001) {
+      pieces.push(`${formatServingsDisplay(servings)}×`)
+    }
+    if (item?.brand) {
+      pieces.push(String(item.brand))
+    }
+    pieces.push(item?.name ? String(item.name) : 'Food item')
+    if (item?.serving_size) {
+      pieces.push(`(${item.serving_size})`)
+    }
+    return pieces.join(' ').replace(/\s+/g, ' ').trim()
+  })
+
+  return summaryParts.join(', ')
+}
+
+const formatMacroValue = (value: number | null | undefined, unit: string) => {
+  if (value === null || value === undefined) {
+    return unit ? `0${unit}` : '0'
+  }
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric)) {
+    return unit ? `0${unit}` : '0'
+  }
+  if (unit) {
+    return `${Math.round(numeric * 10) / 10}${unit}`
+  }
+  return `${Math.round(numeric)}`
+}
+
+const formatNumberInputValue = (value: any) => {
+  if (value === null || value === undefined || Number.isNaN(value)) return ''
+  return value
+}
+
 export default function FoodDiary() {
   const { data: session } = useSession()
   const pathname = usePathname()
@@ -61,7 +119,6 @@ export default function FoodDiary() {
   const [showEntryOptions, setShowEntryOptions] = useState<string | null>(null)
   const [showIngredientOptions, setShowIngredientOptions] = useState<string | null>(null)
   const [editingEntry, setEditingEntry] = useState<any>(null)
-  const [hasReAnalyzed, setHasReAnalyzed] = useState<boolean>(false)
 
   const descriptionTextareaRef = useRef<HTMLTextAreaElement | null>(null)
 
@@ -89,6 +146,13 @@ export default function FoodDiary() {
     featureUsageToday: { foodAnalysis: 0, interactionAnalysis: 0 }
   })
   const [usageMeterRefresh, setUsageMeterRefresh] = useState<number>(0) // Trigger for UsageMeter refresh
+  const [hasReAnalyzed, setHasReAnalyzed] = useState<boolean>(false) // Track if food has been re-analyzed
+
+  const applyRecalculatedNutrition = (items: any[]) => {
+    const recalculated = recalculateNutritionFromItems(items)
+    setAnalyzedNutrition(recalculated)
+    setAnalyzedTotal(convertTotalsForStorage(recalculated))
+  }
 
   // Profile data - using consistent green avatar
   const defaultAvatar = 'data:image/svg+xml;base64,' + btoa(`
@@ -395,6 +459,18 @@ export default function FoodDiary() {
     }
   }
 
+const convertTotalsForStorage = (totals: ReturnType<typeof recalculateNutritionFromItems>) => {
+  if (!totals) return null
+  return {
+    calories: totals.calories ?? null,
+    protein_g: totals.protein ?? null,
+    carbs_g: totals.carbs ?? null,
+    fat_g: totals.fat ?? null,
+    fiber_g: totals.fiber ?? null,
+    sugar_g: totals.sugar ?? null,
+  }
+}
+
   const formatNutrientValue = (key: typeof NUTRIENT_DISPLAY_ORDER[number], value: number) => {
     if (!Number.isFinite(value)) return ''
     if (key === 'calories') {
@@ -498,11 +574,10 @@ export default function FoodDiary() {
         // Store structured items and total if available
         if (result.items && Array.isArray(result.items)) {
           setAnalyzedItems(result.items);
-          setAnalyzedTotal(result.total || null);
-          // If we have items, recalculate nutrition from items with servings
           if (result.items.length > 0) {
-            const recalculated = recalculateNutritionFromItems(result.items);
-            setAnalyzedNutrition(recalculated);
+            applyRecalculatedNutrition(result.items);
+          } else {
+            setAnalyzedTotal(result.total || null);
           }
         } else {
           setAnalyzedItems([]);
@@ -605,11 +680,10 @@ Meanwhile, you can describe your food manually:
         // Store structured items and total if available
         if (result.items && Array.isArray(result.items)) {
           setAnalyzedItems(result.items);
-          setAnalyzedTotal(result.total || null);
-          // If we have items, recalculate nutrition from items with servings
           if (result.items.length > 0) {
-            const recalculated = recalculateNutritionFromItems(result.items);
-            setAnalyzedNutrition(recalculated);
+            applyRecalculatedNutrition(result.items);
+          } else {
+            setAnalyzedTotal(result.total || null);
           }
         } else {
           setAnalyzedItems([]);
@@ -733,86 +807,18 @@ Please add nutritional information manually if needed.`);
   };
 
   // New function to update existing entries with AI re-analysis
-  const updateFoodEntry = async (description: string, method: 'text' | 'photo') => {
+  const updateFoodEntry = async () => {
     if (!editingEntry) return;
 
-    // Re-analyze with AI for updated nutrition info
-    setIsAnalyzing(true);
-    let updatedNutrition = null;
-    let fullAnalysis = null;
+    const generatedSummary = buildMealSummaryFromItems(analyzedItems);
+    const fallbackDescription = (editedDescription?.trim?.() || aiDescription || editingEntry.description || '').trim();
+    const finalDescription = generatedSummary || fallbackDescription;
 
-    try {
-      const response = await fetch('/api/analyze-food', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          textDescription: description,
-          foodType: 'meal',
-          isReanalysis: true,
-          multi: true,
-          returnItems: true
-        }),
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        console.log('API Response:', result); // Debug log
-        if (result.success && result.analysis) {
-          updatedNutrition = extractNutritionData(result.analysis);
-          fullAnalysis = result.analysis;
-          console.log('Extracted Nutrition:', updatedNutrition); // Debug log
-          
-          // Update the UI states with new nutrition but keep clean description
-          setAiDescription(result.analysis); // Full AI response for processing
-          setAnalyzedNutrition(updatedNutrition);
-          // Store structured items and total if available
-          if (result.items && Array.isArray(result.items)) {
-            setAnalyzedItems(result.items);
-            setAnalyzedTotal(result.total || null);
-            // Recalculate nutrition from items with servings
-            if (result.items.length > 0) {
-              const recalculated = recalculateNutritionFromItems(result.items);
-              setAnalyzedNutrition(recalculated);
-              updatedNutrition = recalculated;
-            }
-          } else {
-            setAnalyzedItems([]);
-            setAnalyzedTotal(null);
-          }
-        }
-      } else {
-        console.error('API Error:', response.status, response.statusText);
-      }
-    } catch (error) {
-      console.error('Error re-analyzing food:', error);
-      // Keep original nutrition if re-analysis fails
-      updatedNutrition = editingEntry.nutrition;
-    } finally {
-      setIsAnalyzing(false);
-    }
-
-    // Build description from items if available, otherwise use provided description
-    let finalDescription = fullAnalysis || description;
-    if (analyzedItems && analyzedItems.length > 0) {
-      // Create a clean description from items
-      const itemDescriptions = analyzedItems.map((item: any) => {
-        const servings = item.servings || 1;
-        const servingText = servings !== 1 ? `${servings}x ` : '';
-        const brandText = item.brand ? `${item.brand} ` : '';
-        const servingSizeText = item.serving_size ? `(${item.serving_size})` : '';
-        return `${servingText}${brandText}${item.name}${servingSizeText ? ' ' + servingSizeText : ''}`;
-      });
-      finalDescription = itemDescriptions.join(', ');
-    }
-    
-    // Update the existing entry with AI analysis for nutrition display
     const updatedEntry = {
       ...editingEntry,
       description: finalDescription,
-      photo: method === 'photo' ? photoPreview : editingEntry.photo,
-      nutrition: updatedNutrition || editingEntry.nutrition,
+      photo: photoPreview || editingEntry.photo,
+      nutrition: analyzedNutrition || editingEntry.nutrition,
       items: analyzedItems && analyzedItems.length > 0 ? analyzedItems : (editingEntry.items || null),
       total: analyzedTotal || (editingEntry.total || null)
     };
@@ -822,9 +828,7 @@ Please add nutritional information manually if needed.`);
     );
     
     setTodaysFoods(updatedFoods);
-    
-    // Save to database
-    await saveFoodEntries(updatedFoods);
+    await saveFoodEntries(updatedFoods, { appendHistory: false });
     
     // Reset all form states
     setNewFoodText('');
@@ -844,6 +848,72 @@ Please add nutritional information manually if needed.`);
     setEditingEntry(null);
   };
 
+  const reanalyzeCurrentEntry = async () => {
+    const descriptionToAnalyze = (editedDescription?.trim?.() || aiDescription || editingEntry?.description || '').trim();
+    if (!descriptionToAnalyze) return;
+
+    setIsAnalyzing(true);
+    try {
+      const response = await fetch('/api/analyze-food', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          textDescription: descriptionToAnalyze,
+          foodType: 'meal',
+          isReanalysis: true,
+          multi: true,
+          returnItems: true
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success && result.analysis) {
+          setAiDescription(result.analysis);
+          setAnalyzedNutrition(extractNutritionData(result.analysis));
+          if (result.items && Array.isArray(result.items)) {
+            setAnalyzedItems(result.items);
+            if (result.items.length > 0) {
+              applyRecalculatedNutrition(result.items);
+            } else {
+              setAnalyzedTotal(result.total || null);
+            }
+          } else {
+            setAnalyzedItems([]);
+            setAnalyzedTotal(null);
+          }
+          setHealthWarning(result.healthWarning || null);
+          setHealthAlternatives(result.alternatives || null);
+        } else {
+          console.error('Re-analysis failed:', result.error || 'Unknown error');
+        }
+      } else {
+        console.error('API Error:', response.status, response.statusText);
+      }
+    } catch (error) {
+      console.error('Error re-analyzing food:', error);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const cancelEditingSession = () => {
+    setIsEditingDescription(false);
+    setEditedDescription('');
+    setShowAiResult(false);
+    setShowAddFood(false);
+    setPhotoPreview(null);
+    setPhotoFile(null);
+    setAnalyzedItems([]);
+    setAnalyzedNutrition(null);
+    setAnalyzedTotal(null);
+    setHealthWarning(null);
+    setHealthAlternatives(null);
+    setEditingEntry(null);
+  };
+
   const editFood = (food: any) => {
     setEditingEntry(food);
     setHasReAnalyzed(false); // Reset button state for new editing session
@@ -855,7 +925,11 @@ Please add nutritional information manually if needed.`);
       // Restore items if available
       if (food.items && Array.isArray(food.items)) {
         setAnalyzedItems(food.items);
-        setAnalyzedTotal(food.total || null);
+        if (food.items.length > 0) {
+          applyRecalculatedNutrition(food.items);
+        } else {
+          setAnalyzedTotal(food.total || null);
+        }
       } else {
         setAnalyzedItems([]);
         setAnalyzedTotal(null);
@@ -925,6 +999,8 @@ Please add nutritional information manually if needed.`);
     const ampm = hour24 >= 12 ? 'PM' : 'AM';
     return `${hour12}:${minutes} ${ampm}`;
   };
+
+  const mealSummary = useMemo(() => buildMealSummaryFromItems(analyzedItems), [analyzedItems])
 
   // Debug logging to track state changes
   useEffect(() => {
@@ -1302,28 +1378,6 @@ Please add nutritional information manually if needed.`);
                     )
                   })()}
 
-                  {/* Additional Nutrition Info */}
-                  {analyzedNutrition && (analyzedNutrition.fiber !== null || analyzedNutrition.sugar !== null) && (
-                    <div className="flex gap-4 mb-6">
-                      {analyzedNutrition.fiber !== null && analyzedNutrition.fiber !== undefined && (
-                        <div className="flex-1 bg-amber-50 rounded-lg p-3 border border-amber-200">
-                          <div className="text-center">
-                            <div className="text-lg font-semibold text-amber-600">{analyzedNutrition.fiber}g</div>
-                            <div className="text-xs text-amber-500 uppercase">Fiber</div>
-                          </div>
-                        </div>
-                      )}
-                      {analyzedNutrition.sugar !== null && analyzedNutrition.sugar !== undefined && (
-                        <div className="flex-1 bg-pink-50 rounded-lg p-3 border border-pink-200">
-                          <div className="text-center">
-                            <div className="text-lg font-semibold text-pink-600">{analyzedNutrition.sugar}g</div>
-                            <div className="text-xs text-pink-500 uppercase">Sugar</div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
                   {/* Detected Items with Brand, Serving Size, and Edit Controls */}
                   {analyzedItems && analyzedItems.length > 0 ? (
                     <div className="mb-6 space-y-3">
@@ -1334,14 +1388,18 @@ Please add nutritional information manually if needed.`);
                         const totalProtein = Math.round(((item.protein_g || 0) * servingsCount) * 10) / 10;
                         const totalCarbs = Math.round(((item.carbs_g || 0) * servingsCount) * 10) / 10;
                         const totalFat = Math.round(((item.fat_g || 0) * servingsCount) * 10) / 10;
-                        const totalFiber = Math.round(((item.fiber_g || 0) * servingsCount) * 10) / 10;
-                        const totalSugar = Math.round(((item.sugar_g || 0) * servingsCount) * 10) / 10;
-                        const formattedServings = (() => {
-                          if (!servingsCount) return '0 servings';
-                          const rounded = Math.round(servingsCount * 100) / 100;
-                          const display = Number.isInteger(rounded) ? rounded.toString() : rounded.toFixed(2).replace(/\.0+$/, '').replace(/(\.[1-9])0$/, '$1');
-                          return `${display} serving${rounded === 1 ? '' : 's'}`;
-                        })();
+                        const totalFiber = Math.round(((item.fiber_g ?? 0) * servingsCount) * 10) / 10;
+                        const totalSugar = Math.round(((item.sugar_g ?? 0) * servingsCount) * 10) / 10;
+                        const formattedServings = `${formatServingsDisplay(servingsCount)} serving${Math.abs(servingsCount - 1) < 0.001 ? '' : 's'}`;
+
+                        const totalsByField: Record<string, number | null> = {
+                          calories: totalCalories,
+                          protein_g: totalProtein,
+                          carbs_g: totalCarbs,
+                          fat_g: totalFat,
+                          fiber_g: totalFiber,
+                          sugar_g: totalSugar,
+                        };
                         
                         return (
                           <div key={index} className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
@@ -1381,8 +1439,7 @@ Please add nutritional information manually if needed.`);
                                     if (updatedItems[index].servings > 0.25) {
                                       updatedItems[index].servings = Math.max(0.25, (updatedItems[index].servings || 1) - 0.25);
                                       setAnalyzedItems(updatedItems);
-                                      const recalculated = recalculateNutritionFromItems(updatedItems);
-                                      setAnalyzedNutrition(recalculated);
+                                      applyRecalculatedNutrition(updatedItems);
                                     }
                                   }}
                                   className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-medium transition-colors"
@@ -1397,8 +1454,7 @@ Please add nutritional information manually if needed.`);
                                     const updatedItems = [...analyzedItems];
                                     updatedItems[index].servings = ((updatedItems[index].servings || 1) + 0.25);
                                     setAnalyzedItems(updatedItems);
-                                    const recalculated = recalculateNutritionFromItems(updatedItems);
-                                    setAnalyzedNutrition(recalculated);
+                                    applyRecalculatedNutrition(updatedItems);
                                   }}
                                   className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-medium transition-colors"
                                 >
@@ -1409,34 +1465,41 @@ Please add nutritional information manually if needed.`);
                             
                             {/* Per-serving nutrition */}
                             <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Per serving</div>
-                            <div className="grid grid-cols-4 gap-2 text-xs">
-                              <div className="text-center">
-                                <div className="font-semibold text-orange-600">{item.calories || 0}</div>
-                                <div className="text-gray-500">Cal</div>
-                              </div>
-                              <div className="text-center">
-                                <div className="font-semibold text-blue-600">{item.protein_g || 0}g</div>
-                                <div className="text-gray-500">Protein</div>
-                              </div>
-                              <div className="text-center">
-                                <div className="font-semibold text-green-600">{item.carbs_g || 0}g</div>
-                                <div className="text-gray-500">Carbs</div>
-                              </div>
-                              <div className="text-center">
-                                <div className="font-semibold text-purple-600">{item.fat_g || 0}g</div>
-                                <div className="text-gray-500">Fat</div>
-                              </div>
+                            <div className="flex flex-wrap gap-2">
+                              {ITEM_NUTRIENT_META.map((meta) => {
+                                const rawValue = item?.[meta.field as keyof typeof item]
+                                const displayUnit = meta.key === 'calories' ? ' cal' : 'g'
+                                const displayValue = formatMacroValue(
+                                  typeof rawValue === 'number' ? rawValue : Number(rawValue),
+                                  displayUnit
+                                )
+                                return (
+                                  <div
+                                    key={`${meta.field}-${index}`}
+                                    className="px-3 py-1 rounded-full bg-gray-100 border border-gray-200 text-[11px] font-medium text-gray-700 flex items-center gap-1"
+                                  >
+                                    <span className={`font-semibold ${meta.accent}`}>{displayValue}</span>
+                                    <span className="uppercase text-gray-500">{meta.label}</span>
+                                  </div>
+                                )
+                              })}
                             </div>
 
                             <div className="mt-3 bg-gray-50 border border-gray-100 rounded-lg px-3 py-2 text-xs text-gray-600">
                               <div className="font-medium text-gray-700">Totals for {formattedServings}</div>
                               <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
-                                <span>{totalCalories} cal</span>
-                                <span>{totalProtein}g protein</span>
-                                <span>{totalCarbs}g carbs</span>
-                                <span>{totalFat}g fat</span>
-                                {totalFiber > 0 && <span>{totalFiber}g fiber</span>}
-                                {totalSugar > 0 && <span>{totalSugar}g sugar</span>}
+                                {ITEM_NUTRIENT_META.map((meta) => {
+                                  const displayUnit = meta.key === 'calories' ? ' cal' : 'g'
+                                  return (
+                                    <span key={`${meta.field}-total-${index}`} className="text-gray-700">
+                                      {formatMacroValue(
+                                        totalsByField[meta.field as keyof typeof totalsByField],
+                                        displayUnit
+                                      )}{' '}
+                                      {meta.label.toLowerCase()}
+                                    </span>
+                                  )
+                                })}
                               </div>
                             </div>
                           </div>
@@ -1448,7 +1511,13 @@ Please add nutritional information manually if needed.`);
                       <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
                         <div className="text-sm font-medium text-gray-600 mb-2">Detected Foods:</div>
                         <div className="text-gray-900 text-sm leading-relaxed whitespace-pre-wrap break-words">
-                          {(() => {
+                  {mealSummary && (
+                    <div className="mb-4 px-4 py-3 bg-emerald-50 border border-emerald-100 rounded-xl text-sm sm:text-base text-emerald-900 leading-relaxed">
+                      {mealSummary}
+                    </div>
+                  )}
+
+                  {(() => {
                             const filteredLines = aiDescription
                               .split('\n')
                               .map((line) => line.trim())
@@ -1528,10 +1597,7 @@ Please add nutritional information manually if needed.`);
                 <div className="space-y-3">
                     <button
                       onClick={() => editingEntry 
-                        ? updateFoodEntry(
-                            (isEditingDescription && editedDescription.trim() ? editedDescription.trim() : aiDescription),
-                            (editingEntry?.method === 'photo' ? 'photo' : 'text')
-                          )
+                        ? updateFoodEntry()
                         : addFoodEntry(aiDescription, 'photo')}
                       disabled={isAnalyzing}
                       className="w-full py-3 px-4 bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-300 text-white font-medium rounded-xl transition-colors duration-200 flex items-center justify-center shadow-lg"
@@ -1668,8 +1734,7 @@ Please add nutritional information manually if needed.`);
                         <button
                           onClick={() => {
                             // Recalculate nutrition after edits
-                            const recalculated = recalculateNutritionFromItems(analyzedItems);
-                            setAnalyzedNutrition(recalculated);
+                            applyRecalculatedNutrition(analyzedItems);
                             setShowItemEditModal(false);
                             setEditingItemIndex(null);
                           }}
@@ -1772,67 +1837,16 @@ Please add nutritional information manually if needed.`);
                   {/* Full-Width Action Buttons */}
                   <div className="space-y-3">
                     {/* Initial State: Re-Analyze Button */}
-                    {!hasReAnalyzed && (
-                      <button
-                        onClick={async () => {
-                          // Re-analyze with AI for updated nutrition info
-                          setIsAnalyzing(true);
-                          let updatedNutrition = null;
-
-                          try {
-                            const response = await fetch('/api/analyze-food', {
-                              method: 'POST',
-                              headers: {
-                                'Content-Type': 'application/json',
-                              },
-                              body: JSON.stringify({
-                                textDescription: editedDescription,
-                                foodType: 'meal',
-                                multi: true,
-                                returnItems: true
-                              }),
-                            });
-
-                            if (response.ok) {
-                              const result = await response.json();
-                              if (result.success && result.analysis) {
-                                updatedNutrition = extractNutritionData(result.analysis);
-                                setAnalyzedNutrition(updatedNutrition);
-                                setAiDescription(result.analysis);
-                                // Store structured items and total if available
-                                if (result.items && Array.isArray(result.items)) {
-                                  setAnalyzedItems(result.items);
-                                  setAnalyzedTotal(result.total || null);
-                                  // Recalculate nutrition from items with servings
-                                  if (result.items.length > 0) {
-                                    const recalculated = recalculateNutritionFromItems(result.items);
-                                    setAnalyzedNutrition(recalculated);
-                                  }
-                                } else {
-                                  setAnalyzedItems([]);
-                                  setAnalyzedTotal(null);
-                                }
-                              }
-                            } else {
-                              console.error('API Error:', response.status, response.statusText);
-                            }
-                          } catch (error) {
-                            console.error('Error re-analyzing food:', error);
-                          } finally {
-                            setIsAnalyzing(false);
-                          }
-
-                          // Set state to show Update Entry button
-                          setHasReAnalyzed(true);
-                        }}
-                      disabled={!editedDescription.trim() || isAnalyzing}
+                    <button
+                      onClick={reanalyzeCurrentEntry}
+                      disabled={isAnalyzing}
                       className="w-full py-4 px-6 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-all duration-300 flex items-center justify-center shadow-sm hover:shadow-md disabled:shadow-none"
                     >
                       {isAnalyzing ? (
                         <>
                           <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                           </svg>
                           <span className="font-normal">Re-Analyzing...</span>
                         </>
@@ -1841,50 +1855,21 @@ Please add nutritional information manually if needed.`);
                           <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                           </svg>
-                          <span className="font-normal">Re-Analyze</span>
+                          <span className="font-normal">Re-Analyze with AI (uses 1 credit)</span>
                         </>
                       )}
                     </button>
-                    )}
 
                     {/* After Re-Analyze: Update Entry Button */}
-                    {hasReAnalyzed && (
-                      <button
-                        onClick={async () => {
-                          if (editingEntry) {
-                            // Update the existing entry
-                            const updatedEntry = {
-                              ...editingEntry,
-                              description: editedDescription,
-                              photo: photoPreview || editingEntry.photo,
-                              nutrition: analyzedNutrition || editingEntry.nutrition
-                            };
-
-                            const updatedFoods = todaysFoods.map(food => 
-                              food.id === editingEntry.id ? updatedEntry : food
-                            );
-                            
-                            setTodaysFoods(updatedFoods);
-                            await saveFoodEntries(updatedFoods, { appendHistory: false });
-                            // Subtle insights notification
-                            setInsightsNotification({ show: true, message: 'Updating insights...', type: 'updating' });
-                            setTimeout(() => {
-                              setInsightsNotification({ show: true, message: 'Insights updated', type: 'updated' });
-                              setTimeout(() => setInsightsNotification(null), 3000);
-                            }, 2000);
-                          } else {
-                            addFoodEntry(editedDescription, 'photo');
-                            setIsEditingDescription(false);
-                          }
-                        }}
-                        className="w-full py-4 px-6 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-xl transition-all duration-300 flex items-center justify-center shadow-sm hover:shadow-md"
-                      >
-                        <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        <span className="font-normal">Update Entry</span>
-                      </button>
-                    )}
+                    <button
+                      onClick={updateFoodEntry}
+                      className="w-full py-4 px-6 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition-all duration-300 flex items-center justify-center shadow-sm hover:shadow-md"
+                    >
+                      <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      <span className="font-normal">Update Entry</span>
+                    </button>
 
                     {/* After Re-Analyze: Analyze Again Button */}
                     {hasReAnalyzed && (
@@ -1916,11 +1901,10 @@ Please add nutritional information manually if needed.`);
                               // Store structured items and total if available
                               if (result.items && Array.isArray(result.items)) {
                                 setAnalyzedItems(result.items);
-                                setAnalyzedTotal(result.total || null);
-                                // Recalculate nutrition from items with servings
                                 if (result.items.length > 0) {
-                                  const recalculated = recalculateNutritionFromItems(result.items);
-                                  setAnalyzedNutrition(recalculated);
+                                  applyRecalculatedNutrition(result.items);
+                                } else {
+                                  setAnalyzedTotal(result.total || null);
                                 }
                               } else {
                                 setAnalyzedItems([]);
@@ -2430,27 +2414,6 @@ Please add nutritional information manually if needed.`);
                             </div>
                           )}
 
-                          {/* Additional Nutrition Cards (Fiber/Sugar) */}
-                          {food.nutrition && (food.nutrition.fiber !== null || food.nutrition.sugar !== null) && (
-                            <div className="grid grid-cols-2 gap-2 mt-2">
-                              {food.nutrition.fiber !== null && food.nutrition.fiber !== undefined && (
-                                <div className="bg-gradient-to-br from-amber-50 to-amber-100 rounded-lg p-2 border border-amber-200">
-                                  <div className="text-center">
-                                    <div className="text-sm font-bold text-amber-600">{food.nutrition.fiber}g</div>
-                                    <div className="text-xs font-medium text-amber-500 uppercase tracking-wide">Fiber</div>
-                                  </div>
-                                </div>
-                              )}
-                              {food.nutrition.sugar !== null && food.nutrition.sugar !== undefined && (
-                                <div className="bg-gradient-to-br from-pink-50 to-pink-100 rounded-lg p-2 border border-pink-200">
-                                  <div className="text-center">
-                                    <div className="text-sm font-bold text-pink-600">{food.nutrition.sugar}g</div>
-                                    <div className="text-xs font-medium text-pink-500 uppercase tracking-wide">Sugar</div>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          )}
                         </div>
                       </div>
                     </div>
