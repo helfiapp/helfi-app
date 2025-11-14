@@ -152,6 +152,46 @@ function generateNotificationPayload(options: NotificationOptions): { title: str
  */
 export async function notifyOwner(options: NotificationOptions): Promise<void> {
   try {
+    // 1) Attempt to deliver via Upstash QStash (same infra used for reminders)
+    //    This gives us retries and decouples from the request that triggered the event.
+    const qstashToken = process.env.QSTASH_TOKEN || ''
+    let base =
+      process.env.PUBLIC_BASE_URL ||
+      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '') ||
+      process.env.NEXT_PUBLIC_APP_URL ||
+      ''
+    if (base) {
+      base = base.trim()
+      if (base && !/^https?:\/\//i.test(base)) {
+        base = `https://${base}`
+      }
+      base = base.replace(/\/+$/, '')
+    }
+    if (qstashToken && base) {
+      try {
+        const callbackUrl = `${base}/api/push/owner`
+        const res = await fetch(`https://qstash.upstash.io/v2/publish/${callbackUrl}`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${qstashToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(options),
+        })
+        // If QStash accepted the message, we can return early and let it handle retries/delivery
+        if (res.ok) {
+          console.log(`📢 [OWNER NOTIFICATION] Enqueued via QStash: ${options.event}`)
+          return
+        } else {
+          const text = await res.text().catch(() => '')
+          console.warn('[OWNER NOTIFICATION] QStash publish failed, falling back to direct push:', res.status, text.slice(0, 200))
+        }
+      } catch (e) {
+        console.warn('[OWNER NOTIFICATION] QStash publish error, falling back to direct push')
+      }
+    }
+
+    // 2) Fallback: direct web-push delivery (same as reminders use under the hood)
     const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || ''
     const privateKey = process.env.VAPID_PRIVATE_KEY || ''
     

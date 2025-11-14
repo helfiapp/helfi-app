@@ -94,6 +94,7 @@ export default function AdminPanel() {
   const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null)
   const [isGeneratingQR, setIsGeneratingQR] = useState(false)
   const [pushNotificationStatus, setPushNotificationStatus] = useState<{subscribed: boolean, loading: boolean}>({subscribed: false, loading: false})
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   // Check for URL hash to set active tab and load data
   useEffect(() => {
@@ -1458,6 +1459,14 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
             </div>
           </div>
           <div className="flex items-center gap-2 sm:gap-4">
+            {/* Mobile menu toggle */}
+            <button
+              onClick={() => setMobileMenuOpen(v => !v)}
+              className="sm:hidden mr-1 inline-flex items-center justify-center rounded-lg border border-gray-200 px-3 py-2 text-xs"
+              aria-label="Open menu"
+            >
+              ☰
+            </button>
             <button
               onClick={refreshData}
               className="shrink-0 bg-emerald-500 text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-emerald-600 transition-colors text-xs sm:text-sm"
@@ -1475,8 +1484,38 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
         </div>
       </div>
 
+      {/* Mobile Menu (only essential sections) */}
+      {mobileMenuOpen && (
+        <div className="sm:hidden bg-white border-b border-gray-200 px-4 py-2 z-30">
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { id: 'overview', label: 'Overview' },
+              { id: 'waitlist', label: 'Waitlist' },
+              { id: 'users', label: 'Users' },
+              { id: 'settings', label: 'Settings' },
+            ].map((item) => (
+              <button
+                key={item.id}
+                onClick={() => {
+                  setActiveTab(item.id)
+                  setMobileMenuOpen(false)
+                  if (item.id === 'settings') {
+                    checkPushNotificationStatus()
+                  }
+                }}
+                className={`w-full py-2 rounded-lg border text-sm ${
+                  activeTab === item.id ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-white border-gray-200 text-gray-700'
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Navigation Tabs */}
-      <div className="bg-white border-b border-gray-200">
+      <div className="hidden md:block bg-white border-b border-gray-200">
         <div className="px-4 sm:px-6">
           <nav className="flex space-x-4 md:space-x-8 overflow-x-auto whitespace-nowrap no-scrollbar -mx-4 px-4">
             {[

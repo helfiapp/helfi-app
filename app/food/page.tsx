@@ -88,6 +88,13 @@ const formatNumberInputValue = (value: any) => {
   return value
 }
 
+const extractBaseMealDescription = (value: string | null | undefined) => {
+  if (!value) return ''
+  const withoutNutrition = value.replace(/Calories:[\s\S]*/i, '').trim()
+  const firstLine = withoutNutrition.split('\n').map((line) => line.trim()).find(Boolean)
+  return firstLine || value.trim()
+}
+
 export default function FoodDiary() {
   const { data: session } = useSession()
   const pathname = usePathname()
@@ -147,7 +154,6 @@ export default function FoodDiary() {
     featureUsageToday: { foodAnalysis: 0, interactionAnalysis: 0 }
   })
   const [usageMeterRefresh, setUsageMeterRefresh] = useState<number>(0) // Trigger for UsageMeter refresh
-  const [hasReAnalyzed, setHasReAnalyzed] = useState<boolean>(false) // Track if food has been re-analyzed
 
   const applyRecalculatedNutrition = (items: any[]) => {
     const recalculated = recalculateNutritionFromItems(items)
@@ -205,6 +211,7 @@ export default function FoodDiary() {
           nutrition: updatedNutrition,
           total: convertTotalsForStorage(updatedNutrition),
         }
+        setEditingEntry(updatedEntry)
         setTodaysFoods(prev =>
           prev.map(food => (food.id === editingEntry.id ? updatedEntry : food))
         )
@@ -959,40 +966,71 @@ Please add nutritional information manually if needed.`);
     }
   };
 
-  const cancelEditingSession = () => {
-    setIsEditingDescription(false);
-    setEditedDescription('');
-    setShowAiResult(false);
-    setShowAddFood(false);
-    setPhotoPreview(null);
-    setPhotoFile(null);
-    setAnalyzedItems([]);
-    setAnalyzedNutrition(null);
-    setAnalyzedTotal(null);
-    setHealthWarning(null);
-    setHealthAlternatives(null);
-    setEditingEntry(null);
-  };
+  const resetAnalyzerPanel = () => {
+    setIsEditingDescription(false)
+    setEditedDescription('')
+    setPhotoFile(null)
+    setPhotoPreview(null)
+    setAiDescription('')
+    setAnalyzedItems([])
+    setAnalyzedNutrition(null)
+    setAnalyzedTotal(null)
+    setHealthWarning(null)
+    setHealthAlternatives(null)
+    setShowAiResult(false)
+    setShowAddFood(false)
+    setShowPhotoOptions(false)
+    setHasReAnalyzed(false)
+  }
+
+  const exitEditingSession = () => {
+    resetAnalyzerPanel()
+    setEditingEntry(null)
+    setOriginalEditingEntry(null)
+  }
 
   const revertEditingChanges = () => {
-    if (!editingEntry || !originalEditingEntry) return
-    // Restore analysis view state from the original persisted entry
-    setAiDescription(originalEditingEntry.description || '')
-    setPhotoPreview(originalEditingEntry.photo || null)
-    const originalItems = Array.isArray(originalEditingEntry.items) ? originalEditingEntry.items : []
+    if (!editingEntry || !originalEditingEntry) return null
+    const restoredEntry = JSON.parse(JSON.stringify(originalEditingEntry))
+    setAiDescription(restoredEntry.description || '')
+    setPhotoPreview(restoredEntry.photo || null)
+    const originalItems = Array.isArray(restoredEntry.items) ? restoredEntry.items : []
     setAnalyzedItems(originalItems)
     if (originalItems.length > 0) {
       applyRecalculatedNutrition(originalItems)
     } else {
-      setAnalyzedNutrition(originalEditingEntry.nutrition || null)
-      setAnalyzedTotal(originalEditingEntry.total || null)
+      setAnalyzedNutrition(restoredEntry.nutrition || null)
+      setAnalyzedTotal(restoredEntry.total || null)
     }
     setHasReAnalyzed(false)
-
-    // Revert Today's Meals entry (no persistence)
+    setEditedDescription(extractBaseMealDescription(restoredEntry.description || ''))
+    setEditingEntry(restoredEntry)
     setTodaysFoods(prev =>
-      prev.map(food => (food.id === editingEntry.id ? originalEditingEntry : food))
+      prev.map(food => (food.id === restoredEntry.id ? restoredEntry : food))
     )
+    return restoredEntry
+  }
+
+  const handleCancelEditing = () => {
+    const restored = revertEditingChanges()
+    if (restored) {
+      exitEditingSession()
+    }
+  }
+
+  const handleDoneEditing = () => {
+    exitEditingSession()
+  }
+
+  const handleEditDescriptionClick = () => {
+    if (!isEditingDescription) {
+      if (editingEntry) {
+        setEditedDescription((current) => current || extractBaseMealDescription(editingEntry.description || ''))
+      } else {
+        setEditedDescription(aiDescription || '')
+      }
+    }
+    setIsEditingDescription(true)
   }
 
   const editFood = (food: any) => {
@@ -1023,10 +1061,9 @@ Please add nutritional information manually if needed.`);
       }
       setShowAiResult(true);
       setShowAddFood(true);
-      // Go directly to editing mode and extract clean food name only
-      setIsEditingDescription(true);
-      // Extract just the food name from the description (remove nutrition info)
-      const cleanDescription = food.description.split('\n')[0].split('Calories:')[0].trim();
+      setIsEditingDescription(false);
+      // Prefill description editor with a clean summary
+      const cleanDescription = extractBaseMealDescription(food.description);
       setEditedDescription(cleanDescription);
     } else {
       // For manual entries, populate the manual form
@@ -1402,7 +1439,7 @@ Please add nutritional information manually if needed.`);
             )}
 
             {/* AI Analysis Result - Premium Cronometer-style UI */}
-            {showAiResult && !isEditingDescription && (
+            {showAiResult && (
               <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
                 {/* Photo Section */}
                 {photoPreview && (
@@ -1680,62 +1717,91 @@ Please add nutritional information manually if needed.`);
                   
                 {/* Action Buttons */}
                 <div className="space-y-3">
-                    <button
-                      onClick={() => editingEntry 
-                        ? updateFoodEntry()
-                        : addFoodEntry(aiDescription, 'photo')}
-                      disabled={isAnalyzing}
-                      className="w-full py-3 px-4 bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-300 text-white font-medium rounded-xl transition-colors duration-200 flex items-center justify-center shadow-lg"
-                    >
-                      {isAnalyzing ? (
-                        <>
-                          <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
-                          Re-analyzing...
-                        </>
-                      ) : (
-                        <>
-                          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                          {editingEntry ? 'Update & Save' : 'Save to Food Diary'}
-                        </>
-                      )}
-                    </button>
-                    <button
-                      onClick={() => {
-                        setIsEditingDescription(true);
-                        setEditedDescription(aiDescription);
-                      }}
-                      className="w-full py-3 px-4 bg-amber-500 hover:bg-amber-600 text-white font-medium rounded-xl transition-colors duration-200 flex items-center justify-center"
-                    >
-                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                      </svg>
-                      Edit Description
-                    </button>
-                    <button
-                      onClick={() => {
-                        setPhotoFile(null);
-                        setPhotoPreview(null);
-                        setAiDescription('');
-                        setShowAiResult(false);
-                        setIsEditingDescription(false);
-                        setEditedDescription('');
-                        setAnalyzedItems([]);
-                        setAnalyzedTotal(null);
-                        setHealthWarning(null);
-                        setHealthAlternatives(null);
-                      }}
-                      className="w-full py-3 px-4 bg-gray-500 hover:bg-gray-600 text-white font-medium rounded-xl transition-colors duration-200 flex items-center justify-center"
-                    >
-                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                      Delete Photo
-                    </button>
+                  <button
+                    onClick={() =>
+                      editingEntry ? updateFoodEntry() : addFoodEntry(aiDescription, 'photo')
+                    }
+                    disabled={isAnalyzing}
+                    className="w-full py-3 px-4 bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-300 text-white font-medium rounded-xl transition-colors duration-200 flex items-center justify-center shadow-lg"
+                  >
+                    {isAnalyzing ? (
+                      <>
+                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Re-analyzing...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        {editingEntry ? 'Update Entry' : 'Save to Food Diary'}
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={handleEditDescriptionClick}
+                    className="w-full py-3 px-4 bg-amber-500 hover:bg-amber-600 text-white font-medium rounded-xl transition-colors duration-200 flex items-center justify-center"
+                  >
+                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                    Edit Description
+                  </button>
+                  <button
+                    onClick={() => {
+                      setPhotoFile(null)
+                      setPhotoPreview(null)
+                      setAiDescription('')
+                      setShowAiResult(false)
+                      setIsEditingDescription(false)
+                      setEditedDescription('')
+                      setAnalyzedItems([])
+                      setAnalyzedTotal(null)
+                      setHealthWarning(null)
+                      setHealthAlternatives(null)
+                    }}
+                    className="w-full py-3 px-4 bg-gray-500 hover:bg-gray-600 text-white font-medium rounded-xl transition-colors duration-200 flex items-center justify-center"
+                  >
+                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    Delete Photo
+                  </button>
+                  {editingEntry && (
+                    <>
+                      <button
+                        onClick={reanalyzeCurrentEntry}
+                        disabled={isAnalyzing}
+                        className="w-full py-3 px-4 bg-blue-100 hover:bg-blue-200 text-blue-800 font-medium rounded-xl transition-colors duration-200 flex items-center justify-center border border-blue-200 disabled:opacity-60"
+                      >
+                        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        Re-Analyze
+                      </button>
+                      <button
+                        onClick={handleDoneEditing}
+                        className="w-full py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-colors duration-200 flex items-center justify-center"
+                      >
+                        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Done
+                      </button>
+                      <button
+                        onClick={handleCancelEditing}
+                        className="w-full py-3 px-4 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium rounded-xl transition-colors duration-200 flex items-center justify-center"
+                      >
+                        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                        Cancel changes
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             )}
@@ -2005,148 +2071,51 @@ Please add nutritional information manually if needed.`);
                     </p>
                   </div>
                   
-                  {/* Full-Width Action Buttons */}
-                  <div className="space-y-3">
-                    {/* Initial State: Re-Analyze Button */}
-                    <button
-                      onClick={reanalyzeCurrentEntry}
-                      disabled={isAnalyzing}
-                      className="w-full py-4 px-6 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-all duration-300 flex items-center justify-center shadow-sm hover:shadow-md disabled:shadow-none"
-                    >
-                      {isAnalyzing ? (
-                        <>
-                          <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
-                          <span className="font-normal">Re-Analyzing...</span>
-                        </>
-                      ) : (
-                        <>
-                          <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                          <span className="font-normal">Re-Analyze with AI (uses 1 credit)</span>
-                        </>
-                      )}
-                    </button>
-
-                    {/* After Re-Analyze: Update Entry Button */}
-                    <button
-                      onClick={updateFoodEntry}
-                      className="w-full py-4 px-6 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-xl transition-all duration-300 flex items-center justify-center shadow-sm hover:shadow-md"
-                    >
-                      <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      <span className="font-normal">Update Entry</span>
-                    </button>
-
-                    {/* After Re-Analyze: Analyze Again Button */}
-                    {hasReAnalyzed && (
+                  {/* Full-Width Action Buttons (new entries) */}
+                  {!editingEntry && (
+                    <div className="space-y-3">
                       <button
-                      onClick={async () => {
-                        // Analyze Again - Re-run analysis with current description
-                        setIsAnalyzing(true);
-                        let updatedNutrition = null;
-
-                        try {
-                          const response = await fetch('/api/analyze-food', {
-                            method: 'POST',
-                            headers: {
-                              'Content-Type': 'application/json',
-                            },
-                            body: JSON.stringify({
-                              textDescription: editedDescription,
-                              foodType: 'single',
-                              isReanalysis: true
-                            }),
-                          });
-
-                          if (response.ok) {
-                            const result = await response.json();
-                            if (result.success && result.analysis) {
-                              updatedNutrition = extractNutritionData(result.analysis);
-                              setAnalyzedNutrition(updatedNutrition);
-                              setAiDescription(result.analysis);
-                              // Store structured items and total if available
-                              if (result.items && Array.isArray(result.items)) {
-                                setAnalyzedItems(result.items);
-                                if (result.items.length > 0) {
-                                  applyRecalculatedNutrition(result.items);
-                                } else {
-                                  setAnalyzedTotal(result.total || null);
-                                }
-                              } else {
-                                setAnalyzedItems([]);
-                                setAnalyzedTotal(null);
-                              }
-                            }
-                          } else {
-                            console.error('API Error:', response.status, response.statusText);
-                          }
-                        } catch (error) {
-                          console.error('Error re-analyzing food:', error);
-                        } finally {
-                          setIsAnalyzing(false);
-                        }
-                      }}
-                      disabled={!editedDescription.trim() || isAnalyzing}
-                      className="w-full py-3 px-4 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-all duration-300 flex items-center justify-center"
-                    >
-                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                      </svg>
-                      Analyze Again
-                    </button>
-                    )}
-
-                    {/* Cancel changes: revert to persisted entry without saving */}
-                    <button
-                      onClick={revertEditingChanges}
-                      className="w-full py-3 px-4 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium rounded-xl transition-all duration-300 flex items-center justify-center"
-                    >
-                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                      Cancel changes
-                    </button>
-
-                    {/* Done Button - Full Width */}
-                    <button
-                      onClick={() => {
-                        const entry = editingEntry;
-                        // Close editing view but keep current analysis visible
-                        setIsEditingDescription(false);
-                        setEditedDescription('');
-                        setHasReAnalyzed(false); // Reset button state
-
-                        if (entry) {
-                          setAiDescription(entry.description || aiDescription);
-                          if (entry.nutrition) {
-                            setAnalyzedNutrition(entry.nutrition);
-                          }
-                          if (entry.photo) {
-                            setPhotoPreview(entry.photo);
-                          }
-                          setEditingEntry(null);
-                        } else {
-                          // For newly analyzed items, keep current data visible
-                          setAiDescription((current) => current || aiDescription);
-                        }
-
-                        setShowAiResult(true);
-                        setShowAddFood(true);
-                        setShowPhotoOptions(false);
-                      }}
-                      className="w-full py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-all duration-300 flex items-center justify-center"
-                    >
-                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      Done
-                    </button>
-                  </div>
+                        onClick={reanalyzeCurrentEntry}
+                        disabled={isAnalyzing}
+                        className="w-full py-4 px-6 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-all duration-300 flex items-center justify-center shadow-sm hover:shadow-md disabled:shadow-none"
+                      >
+                        {isAnalyzing ? (
+                          <>
+                            <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <span className="font-normal">Re-Analyzing...</span>
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            <span className="font-normal">Re-Analyze with AI (uses 1 credit)</span>
+                          </>
+                        )}
+                      </button>
+                      <button
+                        onClick={resetAnalyzerPanel}
+                        className="w-full py-3 px-4 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium rounded-xl transition-all duration-300 flex items-center justify-center"
+                      >
+                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                        Cancel
+                      </button>
+                      <button
+                        onClick={exitEditingSession}
+                        className="w-full py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-all duration-300 flex items-center justify-center"
+                      >
+                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Done
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
