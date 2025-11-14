@@ -113,8 +113,9 @@ export async function DELETE(request: NextRequest) {
     }
 
     const body = await request.json().catch(() => ({} as any))
-    const id = String((body as any)?.id || '').trim()
-    if (!id) {
+    const idRaw = (body as any)?.id
+    const id = Number(idRaw)
+    if (!Number.isFinite(id)) {
       return NextResponse.json({ error: 'Missing id' }, { status: 400 })
     }
 
