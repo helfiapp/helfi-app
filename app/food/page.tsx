@@ -1780,26 +1780,8 @@ Please add nutritional information manually if needed.`);
                     </div>
                   )}
 
-                  {/* Nutrition Cards - Single row, all six macros, no duplicates */}
                   {analyzedNutrition && (
-                    <div className="sticky top-2 z-10 bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60 rounded-lg border border-gray-200 p-2 mb-3">
-                      <div className="flex flex-wrap gap-2 items-center">
-                        {NUTRIENT_DISPLAY_ORDER.map((key) => {
-                          const meta = NUTRIENT_CARD_META[key]
-                          const rawValue = (analyzedNutrition as any)?.[key] ?? 0
-                          const displayValue = formatNutrientValue(key, Number(rawValue))
-                          return (
-                            <div key={key} className="px-2 py-1 text-xs rounded-md bg-white border border-white shadow-sm">
-                              <span className={`mr-1 font-medium ${meta.accent}`}>{meta.label}:</span>
-                              <span className="font-semibold text-gray-900">{displayValue}</span>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  )}
-                  {analyzedNutrition && (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 mb-6 mt-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 mb-6 mt-3 sticky top-2 z-10 bg-white/90 supports-[backdrop-filter]:bg-white/60 backdrop-blur rounded-lg p-2">
                       {NUTRIENT_DISPLAY_ORDER.map((key) => {
                         const meta = NUTRIENT_CARD_META[key]
                         const rawValue = (analyzedNutrition as any)?.[key] ?? 0
