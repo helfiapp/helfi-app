@@ -539,11 +539,11 @@ const convertTotalsForStorage = (totals: ReturnType<typeof recalculateNutritionF
 }
 
   const formatNutrientValue = (key: typeof NUTRIENT_DISPLAY_ORDER[number], value: number) => {
-    if (!Number.isFinite(value)) return ''
+    const safeValue = Number.isFinite(value) ? value : 0
     if (key === 'calories') {
-      return `${Math.round(value)}`
+      return `${Math.round(safeValue)}`
     }
-    const rounded = Math.round(value * 10) / 10
+    const rounded = Math.round(safeValue * 10) / 10
     const unit = NUTRIENT_CARD_META[key]?.unit || ''
     return `${rounded}${unit}`
   }
@@ -980,7 +980,6 @@ Please add nutritional information manually if needed.`);
     setShowAiResult(false)
     setShowAddFood(false)
     setShowPhotoOptions(false)
-    setHasReAnalyzed(false)
   }
 
   const exitEditingSession = () => {
@@ -1002,7 +1001,6 @@ Please add nutritional information manually if needed.`);
       setAnalyzedNutrition(restoredEntry.nutrition || null)
       setAnalyzedTotal(restoredEntry.total || null)
     }
-    setHasReAnalyzed(false)
     setEditedDescription(extractBaseMealDescription(restoredEntry.description || ''))
     setEditingEntry(restoredEntry)
     setTodaysFoods(prev =>
@@ -1041,7 +1039,6 @@ Please add nutritional information manually if needed.`);
     } catch {
       setOriginalEditingEntry(food)
     }
-    setHasReAnalyzed(false); // Reset button state for new editing session
     // Populate the form with existing data and go directly to editing
     if (food.method === 'photo') {
       setPhotoPreview(food.photo);
@@ -1482,32 +1479,21 @@ Please add nutritional information manually if needed.`);
                   )}
 
                   {/* Nutrition Cards - Single row, all six macros, no duplicates */}
-                  {analyzedNutrition && (() => {
-                    const cards = NUTRIENT_DISPLAY_ORDER.filter((key) => {
-                      const value = (analyzedNutrition as any)?.[key]
-                      if (value === null || value === undefined) return false
-                      if (key === 'calories') return Number(value) > 0
-                      return Number(value) > 0.009
-                    })
-
-                    if (cards.length === 0) return null
-
-                    return (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 mb-6">
-                        {cards.map((key) => {
-                          const meta = NUTRIENT_CARD_META[key]
-                          const rawValue = (analyzedNutrition as any)[key]
-                          const displayValue = formatNutrientValue(key, Number(rawValue))
-                          return (
-                            <div key={key} className={`bg-gradient-to-br ${meta.gradient} border border-white/60 rounded-xl p-3 sm:p-4 text-center shadow-sm`}>
-                              <div className={`text-xs font-medium uppercase tracking-wide ${meta.accent} mb-1`}>{meta.label}</div>
-                              <div className="text-xl sm:text-2xl font-bold text-gray-900">{displayValue}</div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    )
-                  })()}
+                  {analyzedNutrition && (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 mb-6">
+                      {NUTRIENT_DISPLAY_ORDER.map((key) => {
+                        const meta = NUTRIENT_CARD_META[key]
+                        const rawValue = (analyzedNutrition as any)?.[key] ?? 0
+                        const displayValue = formatNutrientValue(key, Number(rawValue))
+                        return (
+                          <div key={key} className={`bg-gradient-to-br ${meta.gradient} border border-white/60 rounded-xl p-3 sm:p-4 text-center shadow-sm`}>
+                            <div className={`text-xs font-medium uppercase tracking-wide ${meta.accent} mb-1`}>{meta.label}</div>
+                            <div className="text-xl sm:text-2xl font-bold text-gray-900">{displayValue}</div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
 
                   {/* Detected Items with Brand, Serving Size, and Edit Controls */}
                   {analyzedItems && analyzedItems.length > 0 ? (
