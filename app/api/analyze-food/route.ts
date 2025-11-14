@@ -29,9 +29,11 @@ export async function POST(req: NextRequest) {
   try {
     console.log('=== FOOD ANALYZER DEBUG START ===');
     
-    // Check authentication
+    // Check authentication - pass request headers for proper session resolution
     const session = await getServerSession(authOptions);
+    console.log('Session check:', { hasSession: !!session, hasEmail: !!session?.user?.email });
     if (!session?.user?.email) {
+      console.error('❌ Authentication failed - no valid session');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

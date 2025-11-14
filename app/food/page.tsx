@@ -1437,7 +1437,14 @@ Please add nutritional information manually if needed.`);
                     <h3 className="text-xl font-semibold text-gray-900 mb-2">Food Analysis</h3>
                   </div>
 
-                  {/* Nutrition Cards - Consistent Layout */}
+                  {/* Meal Summary - Single sentence at top */}
+                  {mealSummary && (
+                    <div className="mb-4 px-4 py-3 bg-emerald-50 border border-emerald-100 rounded-xl text-sm sm:text-base text-emerald-900 leading-relaxed">
+                      {mealSummary}
+                    </div>
+                  )}
+
+                  {/* Nutrition Cards - Single row, all six macros, no duplicates */}
                   {analyzedNutrition && (() => {
                     const cards = NUTRIENT_DISPLAY_ORDER.filter((key) => {
                       const value = (analyzedNutrition as any)?.[key]
@@ -1594,11 +1601,6 @@ Please add nutritional information manually if needed.`);
                       <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
                         <div className="text-sm font-medium text-gray-600 mb-2">Detected Foods:</div>
                         <div className="text-gray-900 text-sm leading-relaxed whitespace-pre-wrap break-words">
-                  {mealSummary && (
-                    <div className="mb-4 px-4 py-3 bg-emerald-50 border border-emerald-100 rounded-xl text-sm sm:text-base text-emerald-900 leading-relaxed">
-                      {mealSummary}
-                    </div>
-                  )}
 
                   {(() => {
                             const filteredLines = aiDescription
