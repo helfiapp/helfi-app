@@ -12,11 +12,13 @@ const activeQRTokens = new Map<string, { adminId: string; email: string; expires
 // Clean up expired tokens every 5 minutes
 setInterval(() => {
   const now = Date.now()
-  for (const [token, data] of activeQRTokens.entries()) {
+  const tokensToDelete: string[] = []
+  activeQRTokens.forEach((data, token) => {
     if (data.expiresAt < now) {
-      activeQRTokens.delete(token)
+      tokensToDelete.push(token)
     }
-  }
+  })
+  tokensToDelete.forEach(token => activeQRTokens.delete(token))
 }, 5 * 60 * 1000)
 
 export async function GET(request: NextRequest) {
