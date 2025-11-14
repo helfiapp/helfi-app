@@ -161,7 +161,10 @@ export default function AdminPanel() {
     setError('')
 
     // Password-only authentication for admin panel
-    if (password === 'gX8#bQ3!Vr9zM2@kLf1T') {
+    const entered = password.trim()
+    const expected = (process.env.NEXT_PUBLIC_ADMIN_PANEL_PASSWORD || 'gX8#bQ3!Vr9zM2@kLf1T').trim()
+
+    if (entered === expected) {
       const mockAdmin = {
         id: 'temp-admin-id',
         email: 'admin@helfi.ai',

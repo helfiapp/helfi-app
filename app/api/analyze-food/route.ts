@@ -15,6 +15,23 @@ import OpenAI from 'openai';
 import { chatCompletionWithCost } from '@/lib/metered-openai';
 import { costCentsEstimateFromText } from '@/lib/cost-meter';
 
+// Best-effort relaxed JSON parsing to handle minor LLM formatting issues
+function parseItemsJsonRelaxed(raw: string): any | null {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    try {
+      // 1) Quote unquoted keys after { or ,  2) convert single quotes to double  3) remove trailing commas
+      const keysQuoted = raw.replace(/([{,]\s*)([A-Za-z0-9_]+)\s*:/g, '$1"$2":');
+      const doubleQuoted = keysQuoted.replace(/'/g, '"');
+      const noTrailingCommas = doubleQuoted.replace(/,\s*([}\]])/g, '$1');
+      return JSON.parse(noTrailingCommas);
+    } catch {
+      return null;
+    }
+  }
+}
+
 // Initialize OpenAI client only when API key is available
 // Updated: 2025-06-26 - Ensure environment variable is properly loaded
 const getOpenAIClient = () => {
@@ -537,16 +554,16 @@ CRITICAL REQUIREMENTS:
       try {
         const m = analysis.match(/<ITEMS_JSON>([\s\S]*?)<\/ITEMS_JSON>/i);
         if (m && m[1]) {
-          const parsed = JSON.parse(m[1]);
+          const parsed = parseItemsJsonRelaxed(m[1].trim());
           if (parsed && typeof parsed === 'object') {
             resp.items = Array.isArray(parsed.items) ? parsed.items : [];
             resp.total = parsed.total || null;
           }
-          // Strip the ITEMS_JSON block from analysis text to avoid UI artifacts
+          // Always strip the ITEMS_JSON block to avoid UI artifacts, even if parsing failed
           resp.analysis = resp.analysis.replace(m[0], '').trim();
         }
       } catch (e) {
-        console.warn('ITEMS_JSON parse failed');
+        console.warn('ITEMS_JSON handling failed (non-fatal):', e);
       }
     }
 
