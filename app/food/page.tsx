@@ -1021,12 +1021,14 @@ Please add nutritional information manually if needed.`);
   }
 
   const handleEditDescriptionClick = () => {
-    if (!isEditingDescription) {
-      if (editingEntry) {
-        setEditedDescription((current) => current || extractBaseMealDescription(editingEntry.description || ''))
-      } else {
-        setEditedDescription(aiDescription || '')
-      }
+    if (isEditingDescription) {
+      setIsEditingDescription(false)
+      return
+    }
+    if (editingEntry) {
+      setEditedDescription((current) => current || extractBaseMealDescription(editingEntry.description || ''))
+    } else {
+      setEditedDescription(aiDescription || '')
     }
     setIsEditingDescription(true)
   }
