@@ -1442,8 +1442,8 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex justify-between items-center">
+      <div className="sticky top-0 z-40 bg-white border-b border-gray-200 px-4 sm:px-6 py-3 sm:py-4">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center">
             <Image
               src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/HELFI_TRANSPARENT_rmssry.png"
@@ -1453,22 +1453,23 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
               className="mr-3"
             />
             <div>
-              <h1 className="text-xl font-bold text-gray-900">Helfi Analytics Dashboard</h1>
-              <p className="text-sm text-gray-600">Real-time user behavior insights</p>
+              <h1 className="text-lg sm:text-xl font-bold text-gray-900">Helfi Analytics Dashboard</h1>
+              <p className="text-xs sm:text-sm text-gray-600">Real-time user behavior insights</p>
             </div>
           </div>
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center gap-2 sm:gap-4">
             <button
               onClick={refreshData}
-              className="bg-emerald-500 text-white px-4 py-2 rounded-lg hover:bg-emerald-600 transition-colors text-sm"
+              className="shrink-0 bg-emerald-500 text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-emerald-600 transition-colors text-xs sm:text-sm"
             >
-              🔄 Refresh Data
+              🔄 <span className="hidden sm:inline">Refresh Data</span>
+              <span className="sm:hidden">Refresh</span>
             </button>
             <button
               onClick={handleLogout}
-              className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors text-sm"
+              className="shrink-0 bg-gray-500 text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors text-xs sm:text-sm"
             >
-              Logout
+              🚪 <span className="hidden sm:inline">Logout</span>
             </button>
           </div>
         </div>
@@ -1476,8 +1477,8 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
 
       {/* Navigation Tabs */}
       <div className="bg-white border-b border-gray-200">
-        <div className="px-6">
-          <nav className="flex space-x-8">
+        <div className="px-4 sm:px-6">
+          <nav className="flex space-x-4 md:space-x-8 overflow-x-auto whitespace-nowrap no-scrollbar -mx-4 px-4">
             {[
               { id: 'overview', label: '📊 Overview', desc: 'Key metrics' },
               { id: 'events', label: '📋 Events', desc: 'Raw data' },
@@ -1510,7 +1511,7 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                     checkPushNotificationStatus()
                   }
                 }}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                className={`py-3 md:py-4 px-2 md:px-1 border-b-2 font-medium text-xs sm:text-sm min-w-fit ${
                   activeTab === tab.id
                     ? 'border-emerald-500 text-emerald-600'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -1518,7 +1519,7 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
               >
                 <div className="flex flex-col items-center">
                   <span>{tab.label}</span>
-                  <span className="text-xs text-gray-400">{tab.desc}</span>
+                  <span className="text-[10px] sm:text-xs text-gray-400">{tab.desc}</span>
                 </div>
               </button>
             ))}
@@ -1527,11 +1528,11 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
       </div>
 
       {/* Content */}
-      <div className="px-6 py-6">
+      <div className="px-4 sm:px-6 py-4 sm:py-6">
         {activeTab === 'overview' && (
           <div className="space-y-6">
             {/* Quick Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
               <div className="bg-white rounded-lg shadow p-6">
                 <div className="text-2xl font-bold text-emerald-600">
                   {analyticsSummary?.totalEvents || 0}
