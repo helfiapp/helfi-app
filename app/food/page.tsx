@@ -1008,6 +1008,7 @@ Please add nutritional information manually if needed.`);
           }
           setHealthWarning(result.healthWarning || null);
           setHealthAlternatives(result.alternatives || null);
+          setUsageMeterRefresh(prev => prev + 1);
         } else {
           console.error('Re-analysis failed:', result.error || 'Unknown error');
         }
@@ -1667,7 +1668,7 @@ Please add nutritional information manually if needed.`);
                                       }}
                                       className="px-3 py-1 rounded-full border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors"
                                     >
-                                      +½ {servingUnitMeta?.unitLabelSingular}{' '}
+                                      +1/2 {servingUnitMeta?.unitLabelSingular}{' '}
                                       <span className="text-gray-500">
                                         (+{formatServingsDisplay(quickAddHalfDelta)} serving{quickAddHalfDelta !== 1 ? 's' : ''})
                                       </span>
@@ -2444,18 +2445,11 @@ Please add nutritional information manually if needed.`);
                   return acc
                 }, { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0 })
 
-                const visibleCards = NUTRIENT_DISPLAY_ORDER.filter((key) => {
-                  if (key === 'calories') return totals[key] > 0
-                  return totals[key] > 0.009
-                })
-
-                if (visibleCards.length === 0) return null
-
                 return (
                   <div>
                     <div className="text-lg font-semibold text-gray-800 mb-2">{isViewingToday ? "Today's Totals" : 'Totals'}</div>
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-                      {visibleCards.map((key) => {
+                      {NUTRIENT_DISPLAY_ORDER.map((key) => {
                         const meta = NUTRIENT_CARD_META[key]
                         const displayValue = formatNutrientValue(key, totals[key])
                         return (
@@ -2608,50 +2602,22 @@ Please add nutritional information manually if needed.`);
 
                         {/* Nutrition Cards - Adjusted Width for Perfect Height Match */}
                         <div className="flex-1 sm:max-w-xs">
-                          {food.nutrition && (food.nutrition.calories !== null || food.nutrition.protein !== null || food.nutrition.carbs !== null || food.nutrition.fat !== null) && (
-                            <div className="grid grid-cols-2 gap-2 h-32">
-                              {/* Calories */}
-                              {food.nutrition.calories !== null && food.nutrition.calories !== undefined && (
-                                <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg p-2 border border-orange-200 flex items-center justify-center">
-                                  <div className="text-center">
-                                    <div className="text-lg font-bold text-orange-600">{food.nutrition.calories}</div>
-                                    <div className="text-xs font-medium text-orange-500 uppercase tracking-wide">Calories</div>
+                          {food.nutrition && (
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                              {NUTRIENT_DISPLAY_ORDER.map((key) => {
+                                const meta = NUTRIENT_CARD_META[key]
+                                const rawValue = (food.nutrition as any)?.[key] ?? 0
+                                return (
+                                  <div key={`${food.id}-${key}`} className={`bg-gradient-to-br ${meta.gradient} rounded-lg p-2 border border-white/60 flex items-center justify-center`}>
+                                    <div className="text-center">
+                                      <div className={`text-lg font-bold ${meta.accent}`}>{formatNutrientValue(key, Number(rawValue))}</div>
+                                      <div className={`text-xs font-medium ${meta.accent} uppercase tracking-wide`}>{meta.label}</div>
+                                    </div>
                                   </div>
-                                </div>
-                              )}
-                              
-                              {/* Protein */}
-                              {food.nutrition.protein !== null && food.nutrition.protein !== undefined && (
-                                <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-2 border border-blue-200 flex items-center justify-center">
-                                  <div className="text-center">
-                                    <div className="text-lg font-bold text-blue-600">{food.nutrition.protein}g</div>
-                                    <div className="text-xs font-medium text-blue-500 uppercase tracking-wide">Protein</div>
-                                  </div>
-                                </div>
-                              )}
-                              
-                              {/* Carbs */}
-                              {food.nutrition.carbs !== null && food.nutrition.carbs !== undefined && (
-                                <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-2 border border-green-200 flex items-center justify-center">
-                                  <div className="text-center">
-                                    <div className="text-lg font-bold text-green-600">{food.nutrition.carbs}g</div>
-                                    <div className="text-xs font-medium text-green-500 uppercase tracking-wide">Carbs</div>
-                                  </div>
-                                </div>
-                              )}
-                              
-                              {/* Fat */}
-                              {food.nutrition.fat !== null && food.nutrition.fat !== undefined && (
-                                <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-2 border border-purple-200 flex items-center justify-center">
-                                  <div className="text-center">
-                                    <div className="text-lg font-bold text-purple-600">{food.nutrition.fat}g</div>
-                                    <div className="text-xs font-medium text-purple-500 uppercase tracking-wide">Fat</div>
-                                  </div>
-                                </div>
-                              )}
+                                )
+                              })}
                             </div>
                           )}
-
                         </div>
                       </div>
                     </div>
