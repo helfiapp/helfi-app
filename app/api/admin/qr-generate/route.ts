@@ -181,8 +181,18 @@ export async function POST(request: NextRequest) {
     }
 
     const qrData = rows[0]
+    // Normalize BIGINT from Postgres to Number before comparing
+    const expiresAtMs =
+      typeof (qrData as any).expiresAt === 'bigint'
+        ? Number((qrData as any).expiresAt)
+        : Number((qrData as any).expiresAt)
 
-    if (qrData.expiresAt < Date.now()) {
+    if (Number.isNaN(expiresAtMs)) {
+      console.error('[QR-VERIFY] Invalid expiresAt value for token prefix:', token.substring(0, 20))
+      return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 })
+    }
+
+    if (expiresAtMs < Date.now()) {
       // Delete expired token
       await prisma.$executeRawUnsafe(`DELETE FROM QRTokens WHERE token = $1`, token)
       return NextResponse.json({ error: 'Token expired' }, { status: 401 })
