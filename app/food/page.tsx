@@ -467,6 +467,154 @@ export default function FoodDiary() {
     })
   }
 
+  const renderDetectedFoods = (options?: { containerClassName?: string }) => {
+    const containerClassName = options?.containerClassName ?? 'mb-6'
+
+    if (analyzedItems && analyzedItems.length > 0) {
+      return (
+        <div className={containerClassName}>
+          <div className="bg-white border border-gray-200 rounded-xl shadow-sm">
+            <div className="px-4 py-4 sm:px-5 sm:py-5">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+                <div>
+                  <div className="text-sm font-semibold text-gray-800">Detected Foods</div>
+                  <div className="text-xs text-gray-500">Adjust servings to match what you ate</div>
+                </div>
+              </div>
+              <div className="space-y-3">
+                {analyzedItems.map((item: any, index: number) => {
+                  const rawServings = Number(item?.servings)
+                  const servingsCount = Number.isFinite(rawServings) && rawServings > 0 ? rawServings : 1
+                  const servingsLabel = `${formatServingsDisplay(servingsCount)} serving${Math.abs(servingsCount - 1) < 0.001 ? '' : 's'}`
+
+                  const perCalories = Number(item?.calories) || 0
+                  const perProtein = Number(item?.protein_g) || 0
+                  const perCarbs = Number(item?.carbs_g) || 0
+                  const perFat = Number(item?.fat_g) || 0
+                  const perFiber = Number(item?.fiber_g) || 0
+                  const perSugar = Number(item?.sugar_g) || 0
+
+                  const totalCalories = Math.round(perCalories * servingsCount)
+                  const totalProtein = Math.round(perProtein * servingsCount * 10) / 10
+                  const totalCarbs = Math.round(perCarbs * servingsCount * 10) / 10
+                  const totalFat = Math.round(perFat * servingsCount * 10) / 10
+                  const totalFiber = Math.round(perFiber * servingsCount * 10) / 10
+                  const totalSugar = Math.round(perSugar * servingsCount * 10) / 10
+
+                  const perServingDetails = [
+                    perCalories > 0 ? `${Math.round(perCalories)} cal` : null,
+                    perProtein > 0 ? `${Math.round(perProtein * 10) / 10}g protein` : null,
+                    perCarbs > 0 ? `${Math.round(perCarbs * 10) / 10}g carbs` : null,
+                    perFat > 0 ? `${Math.round(perFat * 10) / 10}g fat` : null,
+                    perFiber > 0 ? `${Math.round(perFiber * 10) / 10}g fiber` : null,
+                    perSugar > 0 ? `${Math.round(perSugar * 10) / 10}g sugar` : null,
+                  ].filter(Boolean)
+
+                  const totalDetails = [
+                    `${totalCalories} cal`,
+                    totalProtein > 0 ? `${totalProtein}g protein` : null,
+                    totalCarbs > 0 ? `${totalCarbs}g carbs` : null,
+                    totalFat > 0 ? `${totalFat}g fat` : null,
+                    totalFiber > 0 ? `${totalFiber}g fiber` : null,
+                    totalSugar > 0 ? `${totalSugar}g sugar` : null,
+                  ].filter(Boolean)
+
+                  const currentServings = servingsCount
+                  const minServings = 0.25
+                  const canDecrement = currentServings - minServings > 0.001
+
+                  return (
+                    <div key={`${item?.name || 'item'}-${index}`} className="rounded-xl border border-gray-100 bg-gray-50/80 p-3 sm:p-4">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="font-semibold text-gray-900 truncate">{item?.name || 'Food item'}</div>
+                              {item?.brand && (
+                                <div className="text-xs text-gray-500 mt-0.5 truncate">{item.brand}</div>
+                              )}
+                              <div className="text-xs text-gray-500 mt-1">
+                                {item?.serving_size ? `Serving size: ${item.serving_size}` : 'Serving size not provided'}
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => {
+                                setEditingItemIndex(index)
+                                setShowItemEditModal(true)
+                              }}
+                              className="flex-shrink-0 p-2 text-gray-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                              title="Adjust details"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                            </button>
+                          </div>
+                          {perServingDetails.length > 0 && (
+                            <div className="mt-2 text-xs text-gray-600">
+                              <span className="font-medium text-gray-700">Per serving:</span>{' '}
+                              {perServingDetails.join(' • ')}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Servings</span>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => {
+                                if (canDecrement) {
+                                  updateItemServings(index, currentServings - 0.25)
+                                }
+                              }}
+                              disabled={!canDecrement}
+                              className={`w-8 h-8 flex items-center justify-center rounded-lg text-gray-700 font-semibold transition-colors ${
+                                canDecrement ? 'bg-white border border-gray-200 hover:bg-gray-100' : 'bg-gray-100 text-gray-300 cursor-not-allowed'
+                              }`}
+                            >
+                              -
+                            </button>
+                            <span className="text-sm font-semibold text-gray-900 w-14 text-center">
+                              {formatServingsDisplay(currentServings)}
+                            </span>
+                            <button
+                              onClick={() => updateItemServings(index, currentServings + 0.25)}
+                              className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-700 font-semibold transition-colors bg-white border border-gray-200 hover:bg-gray-100"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                      {totalDetails.length > 0 && (
+                        <div className="mt-3 pt-3 border-t border-white/80 text-xs text-gray-600 flex flex-wrap gap-x-3 gap-y-1">
+                          <span className="font-medium text-gray-700">Totals for {servingsLabel}:</span>
+                          {totalDetails.map((detail, detailIdx) => (
+                            <span key={detailIdx}>{detail}</span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )
+    }
+
+    return (
+      <div className={containerClassName}>
+        <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+          <div className="text-sm font-medium text-gray-600 mb-2">Detected Foods:</div>
+          <div className="text-gray-900 text-sm leading-relaxed whitespace-pre-wrap break-words">
+            {(displayDescription && displayDescription.replace(/^./, (match: string) => match.toUpperCase())) || 'Description not available yet.'}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   const analyzePhoto = async () => {
     if (!photoFile) return;
     
@@ -1334,308 +1482,293 @@ Please add nutritional information manually if needed.`);
                     <h3 className="text-xl font-semibold text-gray-900 mb-2">Food Analysis</h3>
                   </div>
 
-                  {/* Nutrition Cards - Consistent Layout */}
-                  {analyzedNutrition && (() => {
-                    const cards = NUTRIENT_DISPLAY_ORDER.filter((key) => {
-                      const value = (analyzedNutrition as any)?.[key]
-                      if (value === null || value === undefined) return false
-                      if (key === 'calories') return Number(value) > 0
-                      return Number(value) > 0.009
-                    })
-
-                    if (cards.length === 0) return null
-
-                    return (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 mb-6">
-                        {cards.map((key) => {
-                          const meta = NUTRIENT_CARD_META[key]
-                          const rawValue = (analyzedNutrition as any)[key]
-                          const displayValue = formatNutrientValue(key, Number(rawValue))
-                          return (
-                            <div key={key} className={`bg-gradient-to-br ${meta.gradient} border border-white/60 rounded-xl p-3 sm:p-4 text-center shadow-sm`}>
-                              <div className={`text-xs font-medium uppercase tracking-wide ${meta.accent} mb-1`}>{meta.label}</div>
-                              <div className="text-xl sm:text-2xl font-bold text-gray-900">{displayValue}</div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    )
-                  })()}
-
-                  {/* Supplemental Nutrition Cards */}
-                  {analyzedNutrition && (analyzedNutrition.fiber !== null || analyzedNutrition.sugar !== null) && (() => {
-                    const supplementalKeys = (['fiber', 'sugar'] as const).filter((key) => {
-                      const value = (analyzedNutrition as any)?.[key]
-                      return value !== null && value !== undefined && Number(value) > 0.009
-                    })
-
-                    if (supplementalKeys.length === 0) return null
-
-                    return (
-                      <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-6">
-                        {supplementalKeys.map((key) => {
-                          const meta = NUTRIENT_CARD_META[key]
-                          const rawValue = (analyzedNutrition as any)[key]
-                          const displayValue = formatNutrientValue(key, Number(rawValue))
-                          return (
-                            <div key={key} className={`bg-gradient-to-br ${meta.gradient} border border-white/60 rounded-xl p-3 sm:p-4 text-center shadow-sm`}>
-                              <div className={`text-xs font-medium uppercase tracking-wide ${meta.accent} mb-1`}>{meta.label}</div>
-                              <div className="text-xl sm:text-2xl font-bold text-gray-900">{displayValue}</div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    )
-                  })()}
-
-                  {/* Detected Items with Brand, Serving Size, and Edit Controls */}
-                  {analyzedItems && analyzedItems.length > 0 ? (
-                    <div className="mb-6">
-                      <div className="bg-white border border-gray-200 rounded-xl shadow-sm">
-                        <div className="px-4 py-4 sm:px-5 sm:py-5">
-                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
-                            <div>
-                              <div className="text-sm font-semibold text-gray-800">Detected Foods</div>
-                              <div className="text-xs text-gray-500">Adjust servings to match what you ate</div>
-                            </div>
-                          </div>
-                          <div className="space-y-3">
-                            {analyzedItems.map((item: any, index: number) => {
-                              const rawServings = Number(item?.servings)
-                              const servingsCount = Number.isFinite(rawServings) && rawServings > 0 ? rawServings : 1
-                              const servingsLabel = `${formatServingsDisplay(servingsCount)} serving${Math.abs(servingsCount - 1) < 0.001 ? '' : 's'}`
-
-                              const perCalories = Number(item?.calories) || 0
-                              const perProtein = Number(item?.protein_g) || 0
-                              const perCarbs = Number(item?.carbs_g) || 0
-                              const perFat = Number(item?.fat_g) || 0
-                              const perFiber = Number(item?.fiber_g) || 0
-                              const perSugar = Number(item?.sugar_g) || 0
-
-                              const totalCalories = Math.round(perCalories * servingsCount)
-                              const totalProtein = Math.round(perProtein * servingsCount * 10) / 10
-                              const totalCarbs = Math.round(perCarbs * servingsCount * 10) / 10
-                              const totalFat = Math.round(perFat * servingsCount * 10) / 10
-                              const totalFiber = Math.round(perFiber * servingsCount * 10) / 10
-                              const totalSugar = Math.round(perSugar * servingsCount * 10) / 10
-
-                              const perServingDetails = [
-                                perCalories > 0 ? `${Math.round(perCalories)} cal` : null,
-                                perProtein > 0 ? `${Math.round(perProtein * 10) / 10}g protein` : null,
-                                perCarbs > 0 ? `${Math.round(perCarbs * 10) / 10}g carbs` : null,
-                                perFat > 0 ? `${Math.round(perFat * 10) / 10}g fat` : null,
-                                perFiber > 0 ? `${Math.round(perFiber * 10) / 10}g fiber` : null,
-                                perSugar > 0 ? `${Math.round(perSugar * 10) / 10}g sugar` : null,
-                              ].filter(Boolean)
-
-                              const totalDetails = [
-                                `${totalCalories} cal`,
-                                totalProtein > 0 ? `${totalProtein}g protein` : null,
-                                totalCarbs > 0 ? `${totalCarbs}g carbs` : null,
-                                totalFat > 0 ? `${totalFat}g fat` : null,
-                                totalFiber > 0 ? `${totalFiber}g fiber` : null,
-                                totalSugar > 0 ? `${totalSugar}g sugar` : null,
-                              ].filter(Boolean)
-
-                              const currentServings = servingsCount
-                              const minServings = 0.25
-                              const canDecrement = currentServings - minServings > 0.001
-
-                              return (
-                                <div key={`${item?.name || 'item'}-${index}`} className="rounded-xl border border-gray-100 bg-gray-50/80 p-3 sm:p-4">
-                                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                                    <div className="flex-1 min-w-0">
-                                      <div className="flex items-start justify-between gap-3">
-                                        <div className="min-w-0">
-                                          <div className="font-semibold text-gray-900 truncate">{item?.name || 'Food item'}</div>
-                                          {item?.brand && (
-                                            <div className="text-xs text-gray-500 mt-0.5 truncate">{item.brand}</div>
-                                          )}
-                                          <div className="text-xs text-gray-500 mt-1">
-                                            {item?.serving_size ? `Serving size: ${item.serving_size}` : 'Serving size not provided'}
-                                          </div>
-                                        </div>
-                                        <button
-                                          onClick={() => {
-                                            setEditingItemIndex(index)
-                                            setShowItemEditModal(true)
-                                          }}
-                                          className="flex-shrink-0 p-2 text-gray-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                                          title="Adjust details"
-                                        >
-                                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                          </svg>
-                                        </button>
-                                      </div>
-                                      {perServingDetails.length > 0 && (
-                                        <div className="mt-2 text-xs text-gray-600">
-                                          <span className="font-medium text-gray-700">Per serving:</span>{' '}
-                                          {perServingDetails.join(' • ')}
-                                        </div>
-                                      )}
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Servings</span>
-                                      <div className="flex items-center gap-2">
-                                        <button
-                                          onClick={() => {
-                                            if (canDecrement) {
-                                              updateItemServings(index, currentServings - 0.25)
-                                            }
-                                          }}
-                                          disabled={!canDecrement}
-                                          className={`w-8 h-8 flex items-center justify-center rounded-lg text-gray-700 font-semibold transition-colors ${
-                                            canDecrement ? 'bg-white border border-gray-200 hover:bg-gray-100' : 'bg-gray-100 text-gray-300 cursor-not-allowed'
-                                          }`}
-                                        >
-                                          -
-                                        </button>
-                                        <span className="text-sm font-semibold text-gray-900 w-14 text-center">
-                                          {formatServingsDisplay(currentServings)}
-                                        </span>
-                                        <button
-                                          onClick={() => updateItemServings(index, currentServings + 0.25)}
-                                          className="w-8 h-8 flex items-center justify-center rounded-lg text-gray-700 font-semibold transition-colors bg-white border border-gray-200 hover:bg-gray-100"
-                                        >
-                                          +
-                                        </button>
-                                      </div>
-                                    </div>
-                                  </div>
-                                  {totalDetails.length > 0 && (
-                                    <div className="mt-3 pt-3 border-t border-white/80 text-xs text-gray-600 flex flex-wrap gap-x-3 gap-y-1">
-                                      <span className="font-medium text-gray-700">Totals for {servingsLabel}:</span>
-                                      {totalDetails.map((detail, detailIdx) => (
-                                        <span key={detailIdx}>{detail}</span>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-                              )
-                            })}
+                  {/* Nutrition Cards - Match Main Page Style */}
+                  {analyzedNutrition && (analyzedNutrition.calories !== null || analyzedNutrition.protein !== null || analyzedNutrition.carbs !== null || analyzedNutrition.fat !== null) && (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+                      {/* Calories */}
+                      {analyzedNutrition.calories !== null && analyzedNutrition.calories !== undefined && (
+                        <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-3 sm:p-4 border border-orange-200">
+                          <div className="text-center">
+                            <div className="text-xl sm:text-2xl font-bold text-orange-600">{analyzedNutrition.calories}</div>
+                            <div className="text-xs font-medium text-orange-500 uppercase tracking-wide">Calories</div>
                           </div>
                         </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="mb-6">
-                      <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-                        <div className="text-sm font-medium text-gray-600 mb-2">Detected Foods:</div>
-                        <div className="text-gray-900 text-sm leading-relaxed whitespace-pre-wrap break-words">
-                          {(displayDescription && displayDescription.replace(/^./, (match: string) => match.toUpperCase())) || 'Description not available yet.'}
+                      )}
+                      
+                      {/* Protein */}
+                      {analyzedNutrition.protein !== null && analyzedNutrition.protein !== undefined && (
+                        <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-3 sm:p-4 border border-blue-200">
+                          <div className="text-center">
+                            <div className="text-xl sm:text-2xl font-bold text-blue-600">{analyzedNutrition.protein}g</div>
+                            <div className="text-xs font-medium text-blue-500 uppercase tracking-wide">Protein</div>
+                          </div>
                         </div>
-                      </div>
+                      )}
+                      
+                      {/* Carbs */}
+                      {analyzedNutrition.carbs !== null && analyzedNutrition.carbs !== undefined && (
+                        <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-3 sm:p-4 border border-green-200">
+                          <div className="text-center">
+                            <div className="text-xl sm:text-2xl font-bold text-green-600">{analyzedNutrition.carbs}g</div>
+                            <div className="text-xs font-medium text-green-500 uppercase tracking-wide">Carbs</div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Fat */}
+                      {analyzedNutrition.fat !== null && analyzedNutrition.fat !== undefined && (
+                        <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-3 sm:p-4 border border-purple-200">
+                          <div className="text-center">
+                            <div className="text-xl sm:text-2xl font-bold text-purple-600">{analyzedNutrition.fat}g</div>
+                            <div className="text-xs font-medium text-purple-500 uppercase tracking-wide">Fat</div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 
-                    {cleanedAiDescription && /(Insufficient credits|trial limit)/i.test(cleanedAiDescription) && (
-                      <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-                        <div className="flex flex-col gap-3">
-                          <div>
-                            <div className="font-semibold text-amber-800">Payment required</div>
-                            <div className="text-sm text-amber-700">Subscribe to Premium or purchase credits to unlock AI food analysis, medical image analysis, and interaction checks.</div>
-                          </div>
-                          <Link href="/billing" className="inline-flex items-center justify-center px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium w-full sm:w-auto">Upgrade to Premium</Link>
-                        </div>
-                      </div>
-                    )}
-                    {cleanedAiDescription && /(Failed to analyze|describe your food manually)/i.test(cleanedAiDescription) && (
-                      <div className="mt-2 text-xs text-gray-600">Calorie modals are not available when you manually input the information.</div>
-                    )}
-                    
-                    {/* Health Warning */}
-                    {healthWarning && (
-                      <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-                        <div className="flex items-start">
-                          <svg className="w-5 h-5 text-red-600 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                          </svg>
-                          <div className="flex-1">
-                            <div className="font-semibold text-red-800 mb-1">Health Warning</div>
-                            <div className="text-sm text-red-700 whitespace-pre-line">{healthWarning.replace('⚠️ HEALTH WARNING:', '').trim()}</div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* Health Alternatives */}
-                    {healthAlternatives && (
-                      <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                        <div className="flex items-start">
-                          <svg className="w-5 h-5 text-blue-600 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                          </svg>
-                          <div className="flex-1">
-                            <div className="font-semibold text-blue-800 mb-2">Would you like me to recommend something more suitable?</div>
-                            <div className="text-sm text-blue-700 whitespace-pre-line">{healthAlternatives}</div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                </div>
+                  {renderDetectedFoods({ containerClassName: 'mt-4 mb-6' })}
+
+                  {/* Enhanced Description Section */}
+                  <div className="space-y-4">
+                    <label className="block text-lg font-medium text-gray-900">
+                      Food Description
+                    </label>
+                    <textarea
+                      ref={descriptionTextareaRef}
+                      value={editedDescription}
+                      onChange={(e) => {
+                        setEditedDescription(e.target.value);
+                        e.target.style.height = 'auto';
+                        e.target.style.height = `${e.target.scrollHeight}px`;
+                      }}
+                      onFocus={(e) => {
+                        e.target.style.height = 'auto';
+                        e.target.style.height = `${e.target.scrollHeight}px`;
+                      }}
+                      className="w-full min-h-[8rem] px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 text-base resize-none bg-white shadow-sm font-normal leading-relaxed whitespace-pre-wrap"
+                      style={{ overflow: 'hidden' }}
+                      placeholder="Enter a detailed description of the food item..."
+                    />
+                    <p className="text-sm text-gray-600 font-normal">
+                      Change the food description and click on the 'Re-Analyze' button.
+                    </p>
+                  </div>
                   
-                {/* Action Buttons */}
-                <div className="space-y-3">
-                    <button
-                      onClick={() => editingEntry 
-                        ? updateFoodEntry(
-                            (isEditingDescription && editedDescription.trim() ? editedDescription.trim() : cleanedAiDescription),
-                            (editingEntry?.method === 'photo' ? 'photo' : 'text')
-                          )
-                        : addFoodEntry(cleanedAiDescription, 'photo')}
-                      disabled={isAnalyzing}
-                      className="w-full py-3 px-4 bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-300 text-white font-medium rounded-xl transition-colors duration-200 flex items-center justify-center shadow-lg"
+                  {/* Full-Width Action Buttons */}
+                  <div className="space-y-3">
+                    {/* Initial State: Re-Analyze Button */}
+                    {!hasReAnalyzed && (
+                      <button
+                        onClick={async () => {
+                          // Re-analyze with AI for updated nutrition info
+                          setIsAnalyzing(true);
+                          let updatedNutrition = null;
+
+                          try {
+                            const response = await fetch('/api/analyze-food', {
+                              method: 'POST',
+                              headers: {
+                                'Content-Type': 'application/json',
+                              },
+                              body: JSON.stringify({
+                                textDescription: editedDescription,
+                                foodType: 'meal',
+                                multi: true,
+                                returnItems: true
+                              }),
+                            });
+
+                            if (response.ok) {
+                              const result = await response.json();
+                              if (result.success && result.analysis) {
+                                updatedNutrition = extractNutritionData(result.analysis);
+                                setAnalyzedNutrition(updatedNutrition);
+                                const cleanedAnalysis = stripItemsJsonBlock(result.analysis);
+                                setAiDescription(cleanedAnalysis);
+                                // Store structured items and total if available
+                                if (result.items && Array.isArray(result.items)) {
+                                  setAnalyzedItems(result.items);
+                                  setAnalyzedTotal(result.total || null);
+                                  // Recalculate nutrition from items with servings
+                                  if (result.items.length > 0) {
+                                    const recalculated = recalculateNutritionFromItems(result.items);
+                                    setAnalyzedNutrition(recalculated);
+                                  }
+                                } else {
+                                  setAnalyzedItems([]);
+                                  setAnalyzedTotal(null);
+                                }
+                              }
+                            } else {
+                              console.error('API Error:', response.status, response.statusText);
+                            }
+                          } catch (error) {
+                            console.error('Error re-analyzing food:', error);
+                          } finally {
+                            setIsAnalyzing(false);
+                          }
+
+                          // Set state to show Update Entry button
+                          setHasReAnalyzed(true);
+                        }}
+                      disabled={!editedDescription.trim() || isAnalyzing}
+                      className="w-full py-4 px-6 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-all duration-300 flex items-center justify-center shadow-sm hover:shadow-md disabled:shadow-none"
                     >
                       {isAnalyzing ? (
                         <>
                           <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                           </svg>
-                          Re-analyzing...
+                          <span className="font-normal">Re-Analyzing...</span>
                         </>
                       ) : (
                         <>
-                          <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                           </svg>
-                          {editingEntry ? 'Update & Save' : 'Save to Food Diary'}
+                          <span className="font-normal">Re-Analyze</span>
                         </>
                       )}
                     </button>
-                    <button
-                      onClick={() => {
-                        setIsEditingDescription(true);
-                        setEditedDescription(cleanedAiDescription);
+                    )}
+
+                    {/* After Re-Analyze: Update Entry Button */}
+                    {hasReAnalyzed && (
+                      <button
+                        onClick={async () => {
+                          if (editingEntry) {
+                            // Update the existing entry
+                            const updatedEntry = {
+                              ...editingEntry,
+                              description: editedDescription,
+                              photo: photoPreview || editingEntry.photo,
+                              nutrition: analyzedNutrition || editingEntry.nutrition
+                            };
+
+                            const updatedFoods = todaysFoods.map(food => 
+                              food.id === editingEntry.id ? updatedEntry : food
+                            );
+                            
+                            setTodaysFoods(updatedFoods);
+                            await saveFoodEntries(updatedFoods, { appendHistory: false });
+                            // Subtle insights notification
+                            setInsightsNotification({ show: true, message: 'Updating insights...', type: 'updating' });
+                            setTimeout(() => {
+                              setInsightsNotification({ show: true, message: 'Insights updated', type: 'updated' });
+                              setTimeout(() => setInsightsNotification(null), 3000);
+                            }, 2000);
+                          } else {
+                            addFoodEntry(editedDescription, 'photo');
+                            setIsEditingDescription(false);
+                          }
+                        }}
+                        className="w-full py-4 px-6 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-xl transition-all duration-300 flex items-center justify-center shadow-sm hover:shadow-md"
+                      >
+                        <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        <span className="font-normal">Update Entry</span>
+                      </button>
+                    )}
+
+                    {/* After Re-Analyze: Analyze Again Button */}
+                    {hasReAnalyzed && (
+                      <button
+                      onClick={async () => {
+                        // Analyze Again - Re-run analysis with current description
+                        setIsAnalyzing(true);
+                        let updatedNutrition = null;
+
+                        try {
+                          const response = await fetch('/api/analyze-food', {
+                            method: 'POST',
+                            headers: {
+                              'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                              textDescription: editedDescription,
+                              foodType: 'single',
+                              isReanalysis: true
+                            }),
+                          });
+
+                          if (response.ok) {
+                            const result = await response.json();
+                            if (result.success && result.analysis) {
+                              updatedNutrition = extractNutritionData(result.analysis);
+                              setAnalyzedNutrition(updatedNutrition);
+                              const cleanedAnalysis = stripItemsJsonBlock(result.analysis);
+                              setAiDescription(cleanedAnalysis);
+                              // Store structured items and total if available
+                              if (result.items && Array.isArray(result.items)) {
+                                setAnalyzedItems(result.items);
+                                setAnalyzedTotal(result.total || null);
+                                // Recalculate nutrition from items with servings
+                                if (result.items.length > 0) {
+                                  const recalculated = recalculateNutritionFromItems(result.items);
+                                  setAnalyzedNutrition(recalculated);
+                                }
+                              } else {
+                                setAnalyzedItems([]);
+                                setAnalyzedTotal(null);
+                              }
+                            }
+                          } else {
+                            console.error('API Error:', response.status, response.statusText);
+                          }
+                        } catch (error) {
+                          console.error('Error re-analyzing food:', error);
+                        } finally {
+                          setIsAnalyzing(false);
+                        }
                       }}
-                      className="w-full py-3 px-4 bg-amber-500 hover:bg-amber-600 text-white font-medium rounded-xl transition-colors duration-200 flex items-center justify-center"
+                      disabled={!editedDescription.trim() || isAnalyzing}
+                      className="w-full py-3 px-4 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-all duration-300 flex items-center justify-center"
                     >
-                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                       </svg>
-                      Edit Description
+                      Analyze Again
                     </button>
+                    )}
+
+                    {/* Done Button - Full Width */}
                     <button
                       onClick={() => {
-                        setPhotoFile(null);
-                        setPhotoPreview(null);
-                        setAiDescription('');
-                        setShowAiResult(false);
+                        const entry = editingEntry;
+                        // Close editing view but keep current analysis visible
                         setIsEditingDescription(false);
                         setEditedDescription('');
-                        setAnalyzedItems([]);
-                        setAnalyzedTotal(null);
-                        setHealthWarning(null);
-                        setHealthAlternatives(null);
+                        setHasReAnalyzed(false); // Reset button state
+
+                        if (entry) {
+                          setAiDescription(entry.description || cleanedAiDescription);
+                          if (entry.nutrition) {
+                            setAnalyzedNutrition(entry.nutrition);
+                          }
+                          if (entry.photo) {
+                            setPhotoPreview(entry.photo);
+                          }
+                          setEditingEntry(null);
+                        } else {
+                          // For newly analyzed items, keep current data visible
+                          setAiDescription((current) => current || cleanedAiDescription);
+                        }
+
+                        setShowAiResult(true);
+                        setShowAddFood(true);
+                        setShowPhotoOptions(false);
                       }}
-                      className="w-full py-3 px-4 bg-gray-500 hover:bg-gray-600 text-white font-medium rounded-xl transition-colors duration-200 flex items-center justify-center"
+                      className="w-full py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-all duration-300 flex items-center justify-center"
                     >
-                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
-                      Delete Photo
+                      Done
                     </button>
+                  </div>
                 </div>
               </div>
             )}
