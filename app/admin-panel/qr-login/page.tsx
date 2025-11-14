@@ -14,6 +14,7 @@ function QRLoginContent() {
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState<'idle' | 'scanning' | 'success' | 'error'>('idle')
   const scannerRef = useRef<Html5Qrcode | null>(null)
+  const verifyingRef = useRef<boolean>(false) // Prevent multiple simultaneous verifications
   const qrCodeRegionId = 'qr-reader'
 
   // Check if token is in URL (direct link from QR code)
@@ -21,7 +22,7 @@ function QRLoginContent() {
 
   useEffect(() => {
     // If token is in URL, verify it directly (no camera needed)
-    if (tokenFromUrl) {
+    if (tokenFromUrl && !verifyingRef.current) {
       handleTokenVerification(tokenFromUrl)
       return
     }
@@ -101,6 +102,12 @@ function QRLoginContent() {
   }
 
   const handleQRCodeScanned = (qrData: string) => {
+    // Prevent multiple scans from triggering multiple verifications
+    if (verifyingRef.current) {
+      console.log('[QR-SCAN] Already verifying, ignoring duplicate scan')
+      return
+    }
+
     stopScanner()
     
     console.log('[QR-SCAN] Scanned QR data:', qrData.substring(0, 100))
@@ -114,6 +121,10 @@ function QRLoginContent() {
         console.log('[QR-SCAN] Extracted token:', token.substring(0, 20) + '...')
       } else {
         console.error('[QR-SCAN] Failed to extract token from URL')
+        setError('Failed to extract token from QR code. Please try scanning again.')
+        setStatus('error')
+        setScanning(false)
+        return
       }
     } else if (qrData.includes('/admin-panel/qr-login')) {
       // Try to extract from path
@@ -121,7 +132,21 @@ function QRLoginContent() {
       if (urlMatch && urlMatch[1]) {
         token = urlMatch[1]
         console.log('[QR-SCAN] Extracted token from path:', token.substring(0, 20) + '...')
+      } else {
+        console.error('[QR-SCAN] Failed to extract token from path')
+        setError('Failed to extract token from QR code. Please try scanning again.')
+        setStatus('error')
+        setScanning(false)
+        return
       }
+    }
+
+    if (!token || token.length < 10) {
+      console.error('[QR-SCAN] Invalid token extracted:', token)
+      setError('Invalid QR code format. Please scan a fresh QR code from your desktop.')
+      setStatus('error')
+      setScanning(false)
+      return
     }
 
     console.log('[QR-SCAN] Final token to verify:', token.substring(0, 20) + '...')
@@ -129,6 +154,13 @@ function QRLoginContent() {
   }
 
   const handleTokenVerification = async (token: string) => {
+    // Prevent multiple simultaneous verification attempts
+    if (verifyingRef.current) {
+      console.log('[QR-VERIFY] Already verifying, ignoring duplicate request')
+      return
+    }
+
+    verifyingRef.current = true
     setLoading(true)
     setStatus('idle')
     setError('')
@@ -156,21 +188,19 @@ function QRLoginContent() {
       sessionStorage.setItem('adminUser', JSON.stringify(data.admin))
 
       setStatus('success')
+      setLoading(false)
       
       // Redirect to admin panel after short delay
       setTimeout(() => {
         router.push('/admin-panel')
       }, 1500)
     } catch (err: any) {
-      console.error('Verification error:', err)
-      setError(err.message || 'Failed to verify QR code. Please try again.')
+      console.error('[QR-VERIFY] Verification error:', err)
+      setError(err.message || 'Failed to verify QR code. Please try scanning a fresh QR code.')
       setStatus('error')
       setLoading(false)
-      
-      // Restart scanner after error
-      setTimeout(() => {
-        startScanner()
-      }, 2000)
+      verifyingRef.current = false
+      // DO NOT auto-restart scanner - let user manually retry
     }
   }
 
@@ -227,15 +257,33 @@ function QRLoginContent() {
               </div>
             )}
 
+            {status === 'error' && (
+              <button
+                onClick={() => {
+                  setError('')
+                  setStatus('idle')
+                  verifyingRef.current = false
+                  startScanner()
+                }}
+                className="w-full bg-gray-900 text-white py-2 px-4 rounded-lg hover:bg-gray-800 transition-colors mb-2"
+              >
+                Try Again
+              </button>
+            )}
+
             <button
               onClick={() => {
                 if (scanning) {
                   stopScanner()
                 } else {
+                  setError('')
+                  setStatus('idle')
+                  verifyingRef.current = false
                   startScanner()
                 }
               }}
               className="w-full bg-gray-900 text-white py-2 px-4 rounded-lg hover:bg-gray-800 transition-colors"
+              disabled={loading || status === 'success'}
             >
               {scanning ? 'Stop Scanner' : 'Start Scanner'}
             </button>

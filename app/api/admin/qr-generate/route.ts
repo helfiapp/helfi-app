@@ -136,7 +136,10 @@ export async function POST(request: NextRequest) {
   try {
     const { token } = await request.json()
 
+    console.log('[QR-VERIFY] Received token:', token ? `${token.substring(0, 20)}... (length: ${token.length})` : 'null')
+
     if (!token) {
+      console.error('[QR-VERIFY] No token provided')
       return NextResponse.json({ error: 'Token required' }, { status: 400 })
     }
 
@@ -144,14 +147,24 @@ export async function POST(request: NextRequest) {
     await ensureQRTokensTable()
     await cleanupExpiredTokens()
 
+    // Check how many tokens exist in database (for debugging)
+    const allTokens: Array<{ token: string }> = await prisma.$queryRawUnsafe(`SELECT token FROM QRTokens`)
+    console.log('[QR-VERIFY] Total tokens in database:', allTokens.length)
+
     // Look up token in database
     const rows: Array<{ adminId: string; email: string; expiresAt: number }> = await prisma.$queryRawUnsafe(
       `SELECT adminId, email, expiresAt FROM QRTokens WHERE token = $1`,
       token
     )
 
+    console.log('[QR-VERIFY] Token lookup result:', rows.length > 0 ? 'Found' : 'Not found')
+
     if (!rows.length) {
-      console.log('[QR-VERIFY] Token not found:', token.substring(0, 10))
+      console.log('[QR-VERIFY] Token not found in database:', token.substring(0, 20))
+      // Log first few tokens in DB for comparison
+      if (allTokens.length > 0) {
+        console.log('[QR-VERIFY] Sample tokens in DB:', allTokens.slice(0, 3).map(t => t.token.substring(0, 20)))
+      }
       return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 })
     }
 
