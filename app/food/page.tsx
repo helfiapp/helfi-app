@@ -210,6 +210,75 @@ const extractStructuredItemsFromAnalysis = (analysis: string | null | undefined)
   return null
 }
 
+// Simple description-to-items synchronizer
+// Detect items that are no longer mentioned in the edited description and offer to remove them.
+const normalizeForMatch = (s: string) =>
+  String(s || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+const isItemMentionedInText = (item: any, textNorm: string) => {
+  const candidates: string[] = []
+  if (item?.name) candidates.push(String(item.name))
+  if (item?.brand) candidates.push(String(item.brand))
+  // Serving size sometimes contains the noun (e.g., "1 slice"), include as weak signal
+  if (item?.serving_size) candidates.push(String(item.serving_size))
+
+  // Build a few normalized tokens and check that at least the name tokens all appear
+  const nameTokens = normalizeForMatch(item?.name || '').split(' ').filter(Boolean)
+  if (nameTokens.length > 0) {
+    const allTokensPresent = nameTokens.every((t) => textNorm.includes(t))
+    if (allTokensPresent) return true
+  }
+  // Fallback: direct includes for common strings (brand or serving label)
+  for (const c of candidates) {
+    const cNorm = normalizeForMatch(c)
+    if (cNorm && textNorm.includes(cNorm)) return true
+  }
+  return false
+}
+
+const computeItemsToRemoveFromDescription = (items: any[], description: string) => {
+  const textNorm = normalizeForMatch(description || '')
+  const toRemove: number[] = []
+  items.forEach((it, idx) => {
+    if (!isItemMentionedInText(it, textNorm)) {
+      toRemove.push(idx)
+    }
+  })
+  return toRemove
+}
+
+// Hook to remove items and recalc, optionally updating editingEntry
+const removeItemsByIndex = (
+  items: any[],
+  indexes: number[],
+  applyRecalc: (next: any[]) => void,
+  setItems: (next: any[]) => void,
+  editingEntry: any | null,
+  setEditingEntry: (next: any | null) => void,
+  setTodaysFoods: (updater: any) => void,
+) => {
+  if (!Array.isArray(items) || items.length === 0 || indexes.length === 0) return
+  const setToRemove = new Set(indexes)
+  const nextItems = items.filter((_, i) => !setToRemove.has(i))
+  setItems(nextItems)
+  applyRecalc(nextItems)
+  if (editingEntry) {
+    const updatedNutrition = recalculateNutritionFromItems(nextItems)
+    const updatedEntry = {
+      ...editingEntry,
+      items: nextItems,
+      nutrition: updatedNutrition,
+      total: convertTotalsForStorage(updatedNutrition),
+    }
+    setEditingEntry(updatedEntry)
+    setTodaysFoods((prev: any[]) => prev.map((f: any) => (f.id === editingEntry.id ? updatedEntry : f)))
+  }
+}
+
 export default function FoodDiary() {
   const { data: session } = useSession()
   const pathname = usePathname()
@@ -1128,9 +1197,43 @@ Please add nutritional information manually if needed.`);
   }
 
   const handleDoneEditing = () => {
-    // For existing saved entries, Done should exit the edit session
-    // (serving changes are already reflected in today's totals)
-    exitEditingSession()
+    try {
+      // Try description-to-items sync before exiting edit mode
+      if ((editedDescription || '').trim() && analyzedItems && analyzedItems.length > 0) {
+        const indexes = computeItemsToRemoveFromDescription(analyzedItems, editedDescription)
+        // Only prompt if we are clearly removing at least one full item
+        if (indexes.length > 0) {
+          const names = indexes
+            .map((i) => analyzedItems[i]?.name)
+            .filter(Boolean)
+            .join(', ')
+          const ok = typeof window !== 'undefined'
+            ? window.confirm(`Remove ${indexes.length} item(s) that are no longer mentioned in the description?\n${names}`)
+            : true
+          if (ok) {
+            removeItemsByIndex(
+              analyzedItems,
+              indexes,
+              applyRecalculatedNutrition,
+              setAnalyzedItems,
+              editingEntry,
+              setEditingEntry,
+              setTodaysFoods,
+            )
+          }
+        }
+      }
+    } catch {
+      // non-blocking
+    }
+    // Exit edit session for existing entries; for new analyses, just return to analysis panel
+    if (editingEntry) {
+      exitEditingSession()
+    } else {
+      setIsEditingDescription(false)
+      setShowAiResult(true)
+      setShowAddFood(true)
+    }
   }
 
   const handleEditDescriptionClick = () => {
@@ -1654,7 +1757,24 @@ Please add nutritional information manually if needed.`);
 
                   {/* Nutrition Cards - Single row, all six macros, no duplicates */}
                   {analyzedNutrition && (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 mb-6">
+                    <div className="sticky top-2 z-10 bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60 rounded-lg border border-gray-200 p-2 mb-3">
+                      <div className="flex flex-wrap gap-2 items-center">
+                        {NUTRIENT_DISPLAY_ORDER.map((key) => {
+                          const meta = NUTRIENT_CARD_META[key]
+                          const rawValue = (analyzedNutrition as any)?.[key] ?? 0
+                          const displayValue = formatNutrientValue(key, Number(rawValue))
+                          return (
+                            <div key={key} className="px-2 py-1 text-xs rounded-md bg-white border border-white shadow-sm">
+                              <span className={`mr-1 font-medium ${meta.accent}`}>{meta.label}:</span>
+                              <span className="font-semibold text-gray-900">{displayValue}</span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  {analyzedNutrition && (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 mb-6 mt-3">
                       {NUTRIENT_DISPLAY_ORDER.map((key) => {
                         const meta = NUTRIENT_CARD_META[key]
                         const rawValue = (analyzedNutrition as any)?.[key] ?? 0
