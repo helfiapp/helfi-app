@@ -18,6 +18,7 @@ import MobileMoreMenu from '@/components/MobileMoreMenu'
 import UsageMeter from '@/components/UsageMeter'
 import FeatureUsageDisplay from '@/components/FeatureUsageDisplay'
 import CreditPurchaseModal from '@/components/CreditPurchaseModal'
+import { STARTER_FOODS, StarterFood } from '@/data/foods-starter'
 
 const NUTRIENT_DISPLAY_ORDER: Array<'calories' | 'protein' | 'carbs' | 'fat' | 'fiber' | 'sugar'> = ['calories', 'protein', 'carbs', 'fat', 'fiber', 'sugar']
 
@@ -327,6 +328,8 @@ export default function FoodDiary() {
   const [showItemEditModal, setShowItemEditModal] = useState<boolean>(false) // Show edit modal for item
   const [healthWarning, setHealthWarning] = useState<string | null>(null)
   const [healthAlternatives, setHealthAlternatives] = useState<string | null>(null)
+  const [showAddIngredientModal, setShowAddIngredientModal] = useState<boolean>(false)
+  const [ingredientSearchQuery, setIngredientSearchQuery] = useState<string>('') 
   
   // Manual food entry states
   const [manualFoodName, setManualFoodName] = useState('')
@@ -369,6 +372,73 @@ export default function FoodDiary() {
     const recalculated = recalculateNutritionFromItems(items)
     setAnalyzedNutrition(recalculated)
     setAnalyzedTotal(convertTotalsForStorage(recalculated))
+  }
+
+  const filteredStarterFoods = useMemo(() => {
+    const q = ingredientSearchQuery.trim().toLowerCase()
+    if (!q) return STARTER_FOODS
+    return STARTER_FOODS.filter(f =>
+      f.name.toLowerCase().includes(q) ||
+      (f.brand || '').toLowerCase().includes(q)
+    )
+  }, [ingredientSearchQuery])
+
+  const handleDeleteItem = (index: number) => {
+    const item = analyzedItems[index]
+    const name = item?.name || 'this ingredient'
+    if (typeof window !== 'undefined') {
+      const ok = window.confirm(`Remove "${name}" from this meal?`)
+      if (!ok) return
+    }
+    const next = analyzedItems.filter((_, i) => i !== index)
+    setAnalyzedItems(next)
+    applyRecalculatedNutrition(next)
+    if (editingEntry) {
+      try {
+        const updatedNutrition = recalculateNutritionFromItems(next)
+        const updatedEntry = {
+          ...editingEntry,
+          items: next,
+          nutrition: updatedNutrition,
+          total: convertTotalsForStorage(updatedNutrition),
+        }
+        setEditingEntry(updatedEntry)
+        setTodaysFoods(prev => prev.map(food => (food.id === editingEntry.id ? updatedEntry : food)))
+      } catch {}
+    }
+  }
+
+  const addIngredientFromStarter = (food: StarterFood) => {
+    const newItem = {
+      name: food.name,
+      brand: food.brand ?? null,
+      serving_size: food.serving_size,
+      servings: 1,
+      calories: food.calories,
+      protein_g: food.protein_g,
+      carbs_g: food.carbs_g,
+      fat_g: food.fat_g,
+      fiber_g: food.fiber_g ?? 0,
+      sugar_g: food.sugar_g ?? 0,
+    }
+    const next = [...analyzedItems, newItem]
+    setAnalyzedItems(next)
+    applyRecalculatedNutrition(next)
+    if (editingEntry) {
+      try {
+        const updatedNutrition = recalculateNutritionFromItems(next)
+        const updatedEntry = {
+          ...editingEntry,
+          items: next,
+          nutrition: updatedNutrition,
+          total: convertTotalsForStorage(updatedNutrition),
+        }
+        setEditingEntry(updatedEntry)
+        setTodaysFoods(prev => prev.map(food => (food.id === editingEntry.id ? updatedEntry : food)))
+      } catch {}
+    }
+    setShowAddIngredientModal(false)
+    setIngredientSearchQuery('')
   }
 
   const applyStructuredItems = (itemsFromApi: any[] | null | undefined, totalFromApi: any, analysisText: string | null | undefined) => {
@@ -1781,13 +1851,13 @@ Please add nutritional information manually if needed.`);
                   )}
 
                   {analyzedNutrition && (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 mb-6 mt-3 sticky top-2 z-10 bg-white/90 supports-[backdrop-filter]:bg-white/60 backdrop-blur rounded-lg p-2">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-4 mb-6 mt-3 sticky top-0 sm:top-2 z-20 bg-white/90 supports-[backdrop-filter]:bg-white/60 backdrop-blur rounded-lg p-1 sm:p-2">
                       {NUTRIENT_DISPLAY_ORDER.map((key) => {
                         const meta = NUTRIENT_CARD_META[key]
                         const rawValue = (analyzedNutrition as any)?.[key] ?? 0
                         const displayValue = formatNutrientValue(key, Number(rawValue))
                         return (
-                          <div key={key} className={`bg-gradient-to-br ${meta.gradient} border border-white/60 rounded-xl p-3 sm:p-4 text-center shadow-sm`}>
+                          <div key={key} className={`bg-gradient-to-br ${meta.gradient} border border-white/60 rounded-xl p-2 sm:p-4 text-center shadow-sm`}>
                             <div className={`text-xs font-medium uppercase tracking-wide ${meta.accent} mb-1`}>{meta.label}</div>
                             <div className="text-xl sm:text-2xl font-bold text-gray-900">{displayValue}</div>
                           </div>
@@ -1799,7 +1869,16 @@ Please add nutritional information manually if needed.`);
                   {/* Detected Items with Brand, Serving Size, and Edit Controls */}
                   {analyzedItems && analyzedItems.length > 0 ? (
                     <div className="mb-6 space-y-3">
-                      <div className="text-sm font-medium text-gray-600 mb-2">Detected Foods:</div>
+                      <div className="mb-2 flex items-center justify-between">
+                        <div className="text-sm font-medium text-gray-600">Detected Foods:</div>
+                        <button
+                          onClick={() => setShowAddIngredientModal(true)}
+                          className="text-sm px-3 py-1.5 rounded-md bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
+                          title="Add a missing ingredient"
+                        >
+                          + Add ingredient
+                        </button>
+                      </div>
                       {analyzedItems.map((item: any, index: number) => {
                         const servingsCount = item?.servings && item.servings > 0 ? item.servings : 1;
                         const totalCalories = Math.round((item.calories || 0) * servingsCount);
@@ -1836,18 +1915,29 @@ Please add nutritional information manually if needed.`);
                                   Serving size: {item.serving_size || 'Not specified'}
                                 </div>
                               </div>
-                              <button
-                                onClick={() => {
-                                  setEditingItemIndex(index);
-                                  setShowItemEditModal(true);
-                                }}
-                                className="ml-3 p-2 text-gray-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                                title="Adjust details"
-                              >
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                </svg>
-                              </button>
+                              <div className="ml-3 flex items-center gap-1">
+                                <button
+                                  onClick={() => {
+                                    setEditingItemIndex(index);
+                                    setShowItemEditModal(true);
+                                  }}
+                                  className="p-2 text-gray-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                                  title="Adjust details"
+                                >
+                                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                  </svg>
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteItem(index)}
+                                  className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                  title="Delete ingredient"
+                                >
+                                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 7h12M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2m-7 0l1 12a2 2 0 002 2h2a2 2 0 002-2l1-12" />
+                                  </svg>
+                                </button>
+                              </div>
                             </div>
                             
                             {/* Serving Controls */}
@@ -1893,7 +1983,7 @@ Please add nutritional information manually if needed.`);
                               </div>
                               {servingUnitMeta && (
                                 <div className="flex flex-col gap-1">
-                                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                                  <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
                                     <span>Units{servingUnitMeta.unitLabelSingular ? ` (${servingUnitMeta.unitLabelSingular})` : ''}:</span>
                                     <div className="flex items-center gap-2">
                                       <button
@@ -1937,7 +2027,7 @@ Please add nutritional information manually if needed.`);
                                         +
                                       </button>
                                     </div>
-                                    <span className="text-xs text-gray-500 flex-1">
+                                    <span className="text-xs text-gray-500 w-full sm:w-auto">
                                       1 serving = {item.serving_size || 'N/A'}
                                     </span>
                                   </div>
@@ -2077,6 +2167,54 @@ Please add nutritional information manually if needed.`);
                     )}
                 </div>
                   
+                {/* Add Ingredient Modal */}
+                {showAddIngredientModal && (
+                  <div className="fixed inset-0 z-50">
+                    <div className="absolute inset-0 bg-black/30" onClick={() => setShowAddIngredientModal(false)}></div>
+                    <div className="absolute inset-0 flex items-start sm:items-center justify-center mt-10 sm:mt-0">
+                      <div className="w-[92%] max-w-lg bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+                        <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+                          <div className="font-semibold text-gray-900">Add ingredient</div>
+                          <button onClick={() => setShowAddIngredientModal(false)} className="p-2 rounded-md hover:bg-gray-100">
+                            <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        </div>
+                        <div className="p-4">
+                          <input
+                            type="text"
+                            value={ingredientSearchQuery}
+                            onChange={(e) => setIngredientSearchQuery(e.target.value)}
+                            placeholder="Search starter foods (e.g., egg, bacon, rice)"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                          />
+                          <div className="mt-3 max-h-80 overflow-y-auto divide-y divide-gray-100">
+                            {filteredStarterFoods.map((f, i) => (
+                              <div key={`${f.name}-${i}`} className="py-3 flex items-center justify-between">
+                                <div className="min-w-0">
+                                  <div className="font-medium text-gray-900 truncate">{f.name}{f.brand ? ` – ${f.brand}` : ''}</div>
+                                  <div className="text-xs text-gray-600 mt-0.5">
+                                    {f.serving_size} • {Math.round(f.calories)} cal, {f.protein_g}g protein, {f.carbs_g}g carbs, {f.fat_g}g fat
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={() => addIngredientFromStarter(f)}
+                                  className="ml-3 whitespace-nowrap px-3 py-1.5 rounded-md bg-emerald-600 text-white text-sm hover:bg-emerald-700"
+                                >
+                                  Add
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="mt-3 text-xs text-gray-500">
+                            This is a starter list. We can connect USDA FoodData Central next.
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 {/* Action Buttons */}
                 <div className="space-y-3">
                   <button
