@@ -3184,11 +3184,15 @@ Please add nutritional information manually if needed.`);
                   return Number.isFinite(num) ? num : 0
                 }
 
+                // ⚠️ GUARD RAIL: Today’s Totals must always be rebuilt from ingredient cards.
+                // DO NOT revert this to older nutrition objects. Fiber/sugar accuracy depends on this.
                 const deriveItemsForEntry = (entry: any) => {
                   if (entry?.items && Array.isArray(entry.items) && entry.items.length > 0) {
                     return entry.items
                   }
                   if (entry?.description) {
+                    // Rebuild ingredient cards from stored analysis text when needed.
+                    // This mirrors the Edit Entry view so users always see consistent numbers.
                     const structured = extractStructuredItemsFromAnalysis(entry.description)
                     if (structured?.items?.length) {
                       return enrichItemsFromStarter(structured.items)
@@ -3202,6 +3206,7 @@ Please add nutritional information manually if needed.`);
                 }
 
                 const convertStoredTotals = (input: any) => {
+                  // Fallback only. If you touch this, confirm Today’s Totals still matches the Edit modal exactly.
                   if (!input) return null
                   return {
                     calories: safeNumber(input.calories ?? input.calories_g ?? input.kcal),
