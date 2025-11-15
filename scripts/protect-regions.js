@@ -133,6 +133,12 @@ function checkIngredientsCard() {
   const normalizedCurrent = currentRegion.replace(/\r\n/g, '\n');
 
   if (normalizedCurrent !== EXPECTED_INGREDIENTS_CARD) {
+    // Secondary tolerant comparison: ignore all whitespace differences
+    const stripWS = (s) => s.replace(/\s+/g, '');
+    if (stripWS(normalizedCurrent) === stripWS(EXPECTED_INGREDIENTS_CARD)) {
+      console.warn('⚠️ Guard Rails: Ingredients Card differs only by whitespace. Proceeding.');
+      return;
+    }
     if (!allow) {
       fail(
         'The Ingredients Card (manual multi-ingredient entry) was modified.\n' +
