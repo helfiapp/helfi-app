@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import webpush from 'web-push'
-import { scheduleReminderWithQStash } from '@/lib/qstash'
+import { scheduleAllActiveReminders, scheduleReminderWithQStash } from '@/lib/qstash'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -47,6 +47,58 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'no_subscription' }, { status: 400 })
     }
 
+    // Load the latest reminder settings for this user to validate stale schedules
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS CheckinSettings (
+        userId TEXT PRIMARY KEY,
+        time1 TEXT NOT NULL,
+        time2 TEXT NOT NULL,
+        time3 TEXT NOT NULL,
+        timezone TEXT NOT NULL,
+        frequency INTEGER NOT NULL DEFAULT 3
+      )
+    `)
+    const settingsRows: Array<{ time1: string; time2: string; time3: string; timezone: string; frequency: number | null }> =
+      await prisma.$queryRawUnsafe(
+        `SELECT time1, time2, time3, timezone, frequency FROM CheckinSettings WHERE userId = $1`,
+        userId
+      )
+    const settings = settingsRows[0]
+    const resolvedFrequency = Math.max(1, Math.min(3, settings?.frequency ?? 3))
+    const activeTimes: string[] = []
+    if (resolvedFrequency >= 1 && settings?.time1) activeTimes.push(settings.time1)
+    if (resolvedFrequency >= 2 && settings?.time2) activeTimes.push(settings.time2)
+    if (resolvedFrequency >= 3 && settings?.time3) activeTimes.push(settings.time3)
+    const timezoneToUse = settings?.timezone || timezone
+
+    const reminderStillActive = settings ? activeTimes.includes(reminderTime) : true
+    const timezoneStillMatches = settings ? settings.timezone === timezone : true
+
+    if (!reminderStillActive || !timezoneStillMatches) {
+      console.log('[DISPATCH] Skipping stale reminder job', {
+        userId,
+        reminderTime,
+        incomingTimezone: timezone,
+        latestTimezone: settings?.timezone,
+        activeTimes,
+        reason: reminderStillActive ? 'timezone_changed' : 'time_removed',
+      })
+      if (settings) {
+        try {
+          await scheduleAllActiveReminders(userId, {
+            time1: settings.time1,
+            time2: settings.time2,
+            time3: settings.time3,
+            timezone: settings.timezone,
+            frequency: resolvedFrequency,
+          })
+        } catch (err) {
+          console.error('[DISPATCH] Failed to reschedule active reminders after stale job', err)
+        }
+      }
+      return NextResponse.json({ skipped: 'stale_schedule' })
+    }
+
     const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || ''
     const privateKey = process.env.VAPID_PRIVATE_KEY || ''
     if (!publicKey || !privateKey) {
@@ -67,8 +119,9 @@ export async function POST(req: NextRequest) {
 
     // Compute local date for de-dup (based on the user's tz)
     const now = new Date()
+    const effectiveTimezone = timezoneToUse || 'UTC'
     const dateParts = new Intl.DateTimeFormat('en-GB', {
-      timeZone: timezone,
+      timeZone: effectiveTimezone,
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
@@ -100,7 +153,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Schedule the next occurrence for this same reminder
-    const nextSchedule = await scheduleReminderWithQStash(userId, reminderTime, timezone).catch((error) => {
+    const nextSchedule = await scheduleReminderWithQStash(userId, reminderTime, effectiveTimezone).catch((error) => {
       console.error('[DISPATCH] Failed to schedule next reminder via QStash', error)
       return { scheduled: false, reason: 'exception' }
     })
