@@ -3181,12 +3181,14 @@ Please add nutritional information manually if needed.`);
                   // This ensures Today's Totals matches what's shown when editing the entry
                   if (item?.items && Array.isArray(item.items) && item.items.length > 0) {
                     const recalculated = recalculateNutritionFromItems(item.items)
-                    acc.calories += recalculated.calories || 0
-                    acc.protein += recalculated.protein || 0
-                    acc.carbs += recalculated.carbs || 0
-                    acc.fat += recalculated.fat || 0
-                    acc.fiber += recalculated.fiber || 0
-                    acc.sugar += recalculated.sugar || 0
+                    if (recalculated) {
+                      acc.calories += recalculated.calories || 0
+                      acc.protein += recalculated.protein || 0
+                      acc.carbs += recalculated.carbs || 0
+                      acc.fat += recalculated.fat || 0
+                      acc.fiber += recalculated.fiber || 0
+                      acc.sugar += recalculated.sugar || 0
+                    }
                   } else {
                     // Fallback to saved nutrition object if items don't exist
                     const n = item?.nutrition || {}
