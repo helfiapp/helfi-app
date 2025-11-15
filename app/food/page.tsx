@@ -70,6 +70,43 @@ const buildMealSummaryFromItems = (items: any[] | null | undefined) => {
   return summaryParts.join(', ')
 }
 
+const normalizeFoodName = (name: string | null | undefined) =>
+  String(name || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+
+// Enrich items with starter DB values when fiber/sugar (or other macros) are missing or implausibly zero.
+const enrichItemsFromStarter = (items: any[]) => {
+  try {
+    const map = new Map<string, any>()
+    STARTER_FOODS.forEach((f) => map.set(normalizeFoodName(f.name), f))
+    return items.map((it) => {
+      const key = normalizeFoodName(it?.name)
+      const db = map.get(key)
+      if (!db) return it
+      const next = { ...it }
+      // If serving size is empty, adopt starter serving_size
+      if (!next.serving_size || String(next.serving_size).trim().length === 0) {
+        next.serving_size = db.serving_size
+      } else {
+        // Add common ounce equivalent for orange juice when missing
+        if (/^1\s*cup\b/i.test(String(next.serving_size)) && /orange\s*juice/i.test(key) && !/\(8\s*oz\)/i.test(String(next.serving_size))) {
+          next.serving_size = `${next.serving_size} (8 oz)`
+        }
+      }
+      const maybeUse = (v: any, dbv: any) =>
+        (v === null || v === undefined || (Number(v) === 0 && Number(dbv) > 0)) ? dbv : v
+      next.calories = maybeUse(next.calories, db.calories)
+      next.protein_g = maybeUse(next.protein_g, db.protein_g)
+      next.carbs_g = maybeUse(next.carbs_g, db.carbs_g)
+      next.fat_g = maybeUse(next.fat_g, db.fat_g)
+      next.fiber_g = maybeUse(next.fiber_g, db.fiber_g ?? 0)
+      next.sugar_g = maybeUse(next.sugar_g, db.sugar_g ?? 0)
+      return next
+    })
+  } catch {
+    return items
+  }
+}
+
 const formatMacroValue = (value: number | null | undefined, unit: string) => {
   if (value === null || value === undefined) {
     return '—'
@@ -570,8 +607,9 @@ export default function FoodDiary() {
       }
     }
     if (finalItems.length > 0) {
-      setAnalyzedItems(finalItems)
-      applyRecalculatedNutrition(finalItems)
+      const enriched = enrichItemsFromStarter(finalItems)
+      setAnalyzedItems(enriched)
+      applyRecalculatedNutrition(enriched)
     } else {
       setAnalyzedItems([])
       setAnalyzedTotal(finalTotal)
@@ -735,11 +773,14 @@ export default function FoodDiary() {
   useEffect(() => {
     try {
       if (!analyzedItems || analyzedItems.length === 0) {
-        if (aiDescription && (/<ITEMS_JSON>/i.test(aiDescription) || /&lt;ITEMS_JSON&gt;/i.test(aiDescription) || /"items"\s*:\s*\[/.test(aiDescription))) {
+        const hasItemsJson = aiDescription && (/<ITEMS_JSON>/i.test(aiDescription) || /&lt;ITEMS_JSON&gt;/i.test(aiDescription) || /"items"\s*:\s*\[/.test(aiDescription))
+        const hasNutritionEstimates = aiDescription && /\*\*\s*Nutrition Estimates\s*\*\*/i.test(aiDescription)
+        if (aiDescription && (hasItemsJson || hasNutritionEstimates)) {
           const extracted = extractStructuredItemsFromAnalysis(aiDescription)
           if (extracted && Array.isArray(extracted.items) && extracted.items.length > 0) {
-            setAnalyzedItems(extracted.items)
-            applyRecalculatedNutrition(extracted.items)
+            const enriched = enrichItemsFromStarter(extracted.items)
+            setAnalyzedItems(enriched)
+            applyRecalculatedNutrition(enriched)
           }
         }
       }
@@ -1500,14 +1541,16 @@ Please add nutritional information manually if needed.`);
       setAnalyzedNutrition(food.nutrition);
       // Restore items if available; otherwise attempt to extract from saved description text
       if (food.items && Array.isArray(food.items) && food.items.length > 0) {
-        setAnalyzedItems(food.items);
-        applyRecalculatedNutrition(food.items);
+        const enriched = enrichItemsFromStarter(food.items)
+        setAnalyzedItems(enriched);
+        applyRecalculatedNutrition(enriched);
       } else {
         // Try to rebuild items from any embedded <ITEMS_JSON> in the saved description
         const extracted = extractStructuredItemsFromAnalysis(food.description || '');
         if (extracted && Array.isArray(extracted.items) && extracted.items.length > 0) {
-          setAnalyzedItems(extracted.items);
-          applyRecalculatedNutrition(extracted.items);
+          const enriched = enrichItemsFromStarter(extracted.items)
+          setAnalyzedItems(enriched);
+          applyRecalculatedNutrition(enriched);
         } else {
           setAnalyzedItems([]);
           setAnalyzedTotal(food.total || null);
