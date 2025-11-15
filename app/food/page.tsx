@@ -752,6 +752,10 @@ export default function FoodDiary() {
       // Filter to only entries created on the selected (today) date using the entry timestamp id
       const onlySelectedDate = userData.todaysFoods.filter((item: any) => {
         try {
+          // Prefer explicit localDate stamp if present
+          if (typeof item.localDate === 'string' && item.localDate.length >= 8) {
+            return item.localDate === selectedDate;
+          }
           const d = new Date(typeof item.id === 'number' ? item.id : Number(item.id));
           const y = d.getFullYear();
           const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -1284,6 +1288,7 @@ Please add nutritional information manually if needed.`);
     
     const newEntry = {
       id: Date.now(),
+      localDate: selectedDate, // pin to the date the user is viewing when saving
       description: finalDescription,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       method,
@@ -1348,6 +1353,7 @@ Please add nutritional information manually if needed.`);
 
     const updatedEntry = {
       ...editingEntry,
+      localDate: editingEntry.localDate || selectedDate,
       description: finalDescription,
       photo: photoPreview || editingEntry.photo,
       nutrition: analyzedNutrition || editingEntry.nutrition,
