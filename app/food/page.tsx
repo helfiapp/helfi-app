@@ -1511,7 +1511,7 @@ Please add nutritional information manually if needed.`);
   }, [isEditingDescription, editedDescription]);
 
   return (
-    <div className="flex-1 flex flex-col bg-gray-50">
+    <div className="flex-1 flex flex-col overflow-hidden bg-gray-50">
       {/* Saved Toast (brief confirmation) */}
       {showSavedToast && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[10000]">
@@ -1646,7 +1646,7 @@ Please add nutritional information manually if needed.`);
 
       {/* Main Content */}
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-4xl mx-auto px-2 sm:px-6 py-6 sm:py-8 pb-24 md:pb-8">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8 pb-24 md:pb-8">
         
         {/* Instruction Text - Hidden during edit mode */}
         {!isEditingDescription && (
