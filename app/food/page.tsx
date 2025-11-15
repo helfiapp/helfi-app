@@ -173,7 +173,15 @@ const extractStructuredItemsFromAnalysis = (analysis: string | null | undefined)
   // Strategy:
   // 1) Try tagged block <ITEMS_JSON>...</ITEMS_JSON>
   // 2) If not found, try to locate a JSON object containing "items":[...]
+  // 2b) Handle OPEN TAG ONLY (model forgot </ITEMS_JSON>) by extracting the first balanced { ... } after the tag
+  // 3) Last resort: scan for the nearest balanced JSON object that contains "items"
   // 3) Use relaxed parsing where necessary
+  //    Handle HTML-encoded brackets (&lt; &gt;) and code fences
+  const source = analysis
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/```json/gi, '```')
+    .replace(/```/g, '')
   const tryParse = (raw: string) => {
     let payload: any = null
     try {
@@ -196,17 +204,57 @@ const extractStructuredItemsFromAnalysis = (analysis: string | null | undefined)
     }
     return null
   }
+  const findBalancedJsonFrom = (text: string, startIdx: number) => {
+    const n = text.length
+    let i = text.indexOf('{', startIdx)
+    if (i < 0) return null
+    let depth = 0
+    for (; i < n; i++) {
+      const ch = text[i]
+      if (ch === '{') depth++
+      if (ch === '}') {
+        depth--
+        if (depth === 0) {
+          const jsonStr = text.slice(startIdx, i + 1)
+          return jsonStr
+        }
+      }
+    }
+    return null
+  }
   // 1) Tagged block
-  const tagged = analysis.match(/<ITEMS_JSON>([\s\S]+?)<\/ITEMS_JSON>/i)
+  const tagged = source.match(/<ITEMS_JSON>([\s\S]+?)<\/ITEMS_JSON>/i)
   if (tagged && tagged[1]) {
     const res = tryParse(tagged[1].trim())
     if (res) return res
   }
+  // 1b) Open tag without close — extract the first balanced JSON object after the tag
+  const openTagIdx = source.indexOf('<ITEMS_JSON>')
+  if (openTagIdx >= 0) {
+    const after = openTagIdx + '<ITEMS_JSON>'.length
+    const balanced = findBalancedJsonFrom(source, after)
+    if (balanced) {
+      const res = tryParse(balanced.trim())
+      if (res) return res
+    }
+  }
   // 2) Untagged JSON containing "items":[...]
-  const jsonBlock = analysis.match(/\{[\s\S]*?"items"\s*:\s*\[[\s\S]*?\][\s\S]*?\}/)
+  const jsonBlock = source.match(/\{[\s\S]*?"items"\s*:\s*\[[\s\S]*?\][\s\S]*?\}/)
   if (jsonBlock && jsonBlock[0]) {
     const res = tryParse(jsonBlock[0].trim())
     if (res) return res
+  }
+  // 3) Last resort: locate "items" then walk backward to a '{' and forward to matching '}'
+  const itemsIdx = source.toLowerCase().indexOf('"items"')
+  if (itemsIdx >= 0) {
+    let openIdx = source.lastIndexOf('{', itemsIdx)
+    if (openIdx >= 0) {
+      const balanced = findBalancedJsonFrom(source, openIdx)
+      if (balanced) {
+        const res = tryParse(balanced.trim())
+        if (res) return res
+      }
+    }
   }
   return null
 }
@@ -617,7 +665,7 @@ export default function FoodDiary() {
   useEffect(() => {
     try {
       if (!analyzedItems || analyzedItems.length === 0) {
-        if (aiDescription && /<ITEMS_JSON>[\s\S]*?<\/ITEMS_JSON>/i.test(aiDescription)) {
+        if (aiDescription && (/<ITEMS_JSON>/i.test(aiDescription) || /&lt;ITEMS_JSON&gt;/i.test(aiDescription) || /"items"\s*:\s*\[/.test(aiDescription))) {
           const extracted = extractStructuredItemsFromAnalysis(aiDescription)
           if (extracted && Array.isArray(extracted.items) && extracted.items.length > 0) {
             setAnalyzedItems(extracted.items)
@@ -2112,7 +2160,10 @@ Please add nutritional information manually if needed.`);
                   {(() => {
                             // Hide any embedded ITEMS_JSON blocks and any untagged JSON that looks like items[]
                             const cleanedText = aiDescription
-                              .replace(/<ITEMS_JSON>[\s\S]*?<\/ITEMS_JSON>/gi, '')
+                              // Remove tagged block (with or without closing tag) - literal and HTML-encoded
+                              .replace(/<ITEMS_JSON>[\s\S]*?(<\/ITEMS_JSON>|$)/gi, '')
+                              .replace(/&lt;ITEMS_JSON&gt;[\s\S]*?(&lt;\/ITEMS_JSON&gt;|$)/gi, '')
+                              // Remove any untagged inline JSON that looks like items[]
                               .replace(/\{[\s\S]*?"items"\s*:\s*\[[\s\S]*?\][\s\S]*?\}/g, '')
                               .trim()
                             const filteredLines = cleanedText
