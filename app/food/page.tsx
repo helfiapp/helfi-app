@@ -849,34 +849,31 @@ export default function FoodDiary() {
     if (analyzedItems && analyzedItems.length > 0) return
     
     try {
-      const hasItemsJson = /<ITEMS_JSON>/i.test(aiDescription) || /&lt;ITEMS_JSON&gt;/i.test(aiDescription) || /"items"\s*:\s*\[/.test(aiDescription)
-      const hasNutritionEstimates = /\*\*\s*Nutrition Estimates\s*\*\*/i.test(aiDescription) || /Nutrition Estimates/i.test(aiDescription)
-      if (hasItemsJson || hasNutritionEstimates) {
-        const extracted = extractStructuredItemsFromAnalysis(aiDescription)
-        if (extracted && Array.isArray(extracted.items) && extracted.items.length > 0) {
-          const enriched = enrichItemsFromStarter(extracted.items)
-          setAnalyzedItems(enriched)
-          applyRecalculatedNutrition(enriched)
-        } else {
-          // Try prose extraction as fallback
-          const proseExtracted = extractItemsFromTextEstimates(aiDescription)
-          if (proseExtracted && Array.isArray(proseExtracted.items) && proseExtracted.items.length > 0) {
-            const enriched = enrichItemsFromStarter(proseExtracted.items)
-            setAnalyzedItems(enriched)
-            applyRecalculatedNutrition(enriched)
-          }
-        }
-      } else {
-        // Even without explicit markers, try prose extraction
-        const proseExtracted = extractItemsFromTextEstimates(aiDescription)
-        if (proseExtracted && Array.isArray(proseExtracted.items) && proseExtracted.items.length > 0) {
-          const enriched = enrichItemsFromStarter(proseExtracted.items)
-          setAnalyzedItems(enriched)
-          applyRecalculatedNutrition(enriched)
-        }
+      // Always try structured JSON extraction first (handles <ITEMS_JSON>, HTML-encoded tags, and untagged JSON)
+      const extracted = extractStructuredItemsFromAnalysis(aiDescription)
+      if (extracted && Array.isArray(extracted.items) && extracted.items.length > 0) {
+        const enriched = enrichItemsFromStarter(extracted.items)
+        setAnalyzedItems(enriched)
+        applyRecalculatedNutrition(enriched)
+        return // Success, exit early
+      }
+      
+      // If structured extraction failed, try prose extraction as fallback
+      // This handles "Nutrition Estimates" sections and other prose formats
+      const proseExtracted = extractItemsFromTextEstimates(aiDescription)
+      if (proseExtracted && Array.isArray(proseExtracted.items) && proseExtracted.items.length > 0) {
+        const enriched = enrichItemsFromStarter(proseExtracted.items)
+        setAnalyzedItems(enriched)
+        applyRecalculatedNutrition(enriched)
+        return // Success, exit early
+      }
+      
+      // If both methods failed, log for debugging (but don't spam console)
+      if (aiDescription.length > 100) { // Only log if description is substantial
+        console.log('Could not extract items from description:', aiDescription.substring(0, 200))
       }
     } catch (e) {
-      console.error('Failed to rebuild cards from prose:', e)
+      console.error('Failed to rebuild cards from description:', e)
     }
   }, [aiDescription, analyzedItems]) 
 
@@ -1629,36 +1626,52 @@ Please add nutritional information manually if needed.`);
     }
     // Populate the form with existing data and go directly to editing
     if (food.method === 'photo') {
-      // Clear items first so useEffect can rebuild from description if needed
+      // Clear all state first to ensure clean rebuild
       setAnalyzedItems([]);
+      setAnalyzedNutrition(null);
+      setAnalyzedTotal(null);
       setPhotoPreview(food.photo);
-      setAiDescription(food.description);
+      // Set aiDescription AFTER clearing items so useEffect can rebuild
+      setAiDescription(food.description || '');
       setAnalyzedNutrition(food.nutrition);
-      // Restore items if available; otherwise attempt to extract from saved description text
+      
+      // Try to restore items immediately (synchronous extraction)
+      let itemsRestored = false;
+      
+      // First priority: use saved items if they exist and are valid
       if (food.items && Array.isArray(food.items) && food.items.length > 0) {
         const enriched = enrichItemsFromStarter(food.items)
         setAnalyzedItems(enriched);
         applyRecalculatedNutrition(enriched);
-      } else {
-        // Try to rebuild items from any embedded <ITEMS_JSON> in the saved description
-        const extracted = extractStructuredItemsFromAnalysis(food.description || '');
+        itemsRestored = true;
+      }
+      
+      // Second priority: extract from description text (try both JSON and prose)
+      if (!itemsRestored && food.description) {
+        // Try structured JSON extraction first
+        const extracted = extractStructuredItemsFromAnalysis(food.description);
         if (extracted && Array.isArray(extracted.items) && extracted.items.length > 0) {
           const enriched = enrichItemsFromStarter(extracted.items)
           setAnalyzedItems(enriched);
           applyRecalculatedNutrition(enriched);
+          itemsRestored = true;
         } else {
-          // Try prose extraction as fallback - useEffect will also attempt this
-          const proseExtracted = extractItemsFromTextEstimates(food.description || '');
+          // Try prose extraction as fallback
+          const proseExtracted = extractItemsFromTextEstimates(food.description);
           if (proseExtracted && Array.isArray(proseExtracted.items) && proseExtracted.items.length > 0) {
             const enriched = enrichItemsFromStarter(proseExtracted.items);
             setAnalyzedItems(enriched);
             applyRecalculatedNutrition(enriched);
-          } else {
-            // Leave empty - useEffect will attempt to rebuild from prose when aiDescription is set
-            setAnalyzedTotal(food.total || null);
+            itemsRestored = true;
           }
         }
       }
+      
+      // If nothing worked, set total nutrition at least
+      if (!itemsRestored) {
+        setAnalyzedTotal(food.total || null);
+      }
+      
       setShowAiResult(true);
       setShowAddFood(true);
       setIsEditingDescription(false);
@@ -3449,3 +3462,4 @@ Please add nutritional information manually if needed.`);
     </div>
   )
 } 
+
