@@ -40,6 +40,15 @@ const ITEM_NUTRIENT_META = [
   { key: 'sugar', field: 'sugar_g', label: 'Sugar', unit: 'g', accent: 'text-pink-600' },
 ] as const
 
+type NutritionTotals = {
+  calories: number | null
+  protein: number | null
+  carbs: number | null
+  fat: number | null
+  fiber: number | null
+  sugar: number | null
+}
+
 const formatServingsDisplay = (value: number | null | undefined) => {
   const numeric = Number(value)
   if (!Number.isFinite(numeric) || numeric <= 0) return '1'
@@ -1118,7 +1127,7 @@ const applyStructuredItems = (
     });
   };
 
-  const extractNutritionData = (description: string) => {
+  const extractNutritionData = (description: string): NutritionTotals => {
     const caloriesMatch = description.match(/calories?[:\s]*(\d+(?:\.\d+)?)/i)
     const proteinMatch = description.match(/protein[:\s]*(\d+(?:\.\d+)?)\s*g/i)
     const carbsMatch = description.match(/carb(?:ohydrate)?s?[:\s]*(\d+(?:\.\d+)?)\s*g/i)
@@ -1143,7 +1152,7 @@ const applyStructuredItems = (
   }
 
   // Recalculate nutrition totals from items array (multiplying by servings)
-  const recalculateNutritionFromItems = (items: any[]) => {
+  const recalculateNutritionFromItems = (items: any[]): NutritionTotals | null => {
     if (!items || items.length === 0) return null
 
     const totals = {
@@ -1180,7 +1189,7 @@ const applyStructuredItems = (
     }
   }
 
-const convertTotalsForStorage = (totals: ReturnType<typeof recalculateNutritionFromItems>) => {
+const convertTotalsForStorage = (totals: NutritionTotals | null | undefined) => {
   if (!totals) return null
   return {
     calories: totals.calories ?? null,
@@ -1192,7 +1201,7 @@ const convertTotalsForStorage = (totals: ReturnType<typeof recalculateNutritionF
   }
 }
 
-function sanitizeNutritionTotals(raw: any) {
+function sanitizeNutritionTotals(raw: any): NutritionTotals | null {
   if (!raw || typeof raw !== 'object') return null
   const toNumber = (value: any) => {
     if (value === null || value === undefined) return null
@@ -1213,7 +1222,7 @@ function sanitizeNutritionTotals(raw: any) {
   const fiber = toNumber(raw.fiber ?? raw.fiber_g)
   const sugar = toNumber(raw.sugar ?? raw.sugar_g)
 
-  const normalized = {
+  const normalized: NutritionTotals = {
     calories: calories === null ? null : Math.round(calories),
     protein: round(protein, 1),
     carbs: round(carbs, 1),
@@ -3745,5 +3754,4 @@ Please add nutritional information manually if needed.`);
       </div>
     </div>
   )
-} 
-
+}
