@@ -624,26 +624,36 @@ export default function FoodDiary() {
     setIngredientSearchQuery('')
   }
 
-  const applyStructuredItems = (itemsFromApi: any[] | null | undefined, totalFromApi: any, analysisText: string | null | undefined) => {
-    let finalItems = Array.isArray(itemsFromApi) ? itemsFromApi : []
-    let finalTotal = totalFromApi || null
-    if (!finalItems.length && analysisText) {
-      const fallback = extractStructuredItemsFromAnalysis(analysisText)
-      if (fallback?.items?.length) {
-        finalItems = fallback.items
-        finalTotal = fallback.total || finalTotal
+const applyStructuredItems = (itemsFromApi: any[] | null | undefined, totalFromApi: any, analysisText: string | null | undefined) => {
+  let finalItems = Array.isArray(itemsFromApi) ? itemsFromApi : []
+  let finalTotal = totalFromApi || null
+
+  if (!finalItems.length && analysisText) {
+    // 1) Try structured JSON / ITEMS_JSON block first
+    const fallback = extractStructuredItemsFromAnalysis(analysisText)
+    if (fallback?.items?.length) {
+      finalItems = fallback.items
+      finalTotal = fallback.total || finalTotal
+    } else {
+      // 2) If there is no JSON, fall back to parsing the prose \"Detected foods\" bullets
+      const prose = extractItemsFromTextEstimates(analysisText)
+      if (prose?.items?.length) {
+        finalItems = prose.items
+        finalTotal = prose.total || finalTotal
       }
     }
-    if (finalItems.length > 0) {
-      const enriched = enrichItemsFromStarter(finalItems)
-      setAnalyzedItems(enriched)
-      applyRecalculatedNutrition(enriched)
-    } else {
-      // If still no items, set empty but don't clear aiDescription - let useEffect try prose parser
-      setAnalyzedItems([])
-      setAnalyzedTotal(finalTotal)
-    }
   }
+
+  if (finalItems.length > 0) {
+    const enriched = enrichItemsFromStarter(finalItems)
+    setAnalyzedItems(enriched)
+    applyRecalculatedNutrition(enriched)
+  } else {
+    // If still no items, set empty but don't clear aiDescription - let useEffect try prose parser
+    setAnalyzedItems([])
+    setAnalyzedTotal(finalTotal)
+  }
+}
 
   const clampNumber = (value: any, min: number, max: number) => {
     const num = Number(value)
