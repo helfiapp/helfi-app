@@ -9,6 +9,19 @@ function getFallbackAdminEmail(authHeader: string | null) {
   return null
 }
 
+async function ensurePushSubscriptionsTable() {
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS PushSubscriptions (
+      userId TEXT PRIMARY KEY,
+      subscription JSONB NOT NULL,
+      updatedAt TIMESTAMP NOT NULL DEFAULT NOW()
+    )
+  `)
+  await prisma.$executeRawUnsafe(
+    `ALTER TABLE PushSubscriptions ADD COLUMN IF NOT EXISTS updatedAt TIMESTAMP NOT NULL DEFAULT NOW()`
+  ).catch(() => {})
+}
+
 export async function POST(req: NextRequest) {
   try {
     // Verify admin authentication
@@ -44,17 +57,12 @@ export async function POST(req: NextRequest) {
     }
 
     // Save push subscription
-    await prisma.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS PushSubscriptions (
-        userId TEXT PRIMARY KEY,
-        subscription JSONB NOT NULL
-      )
-    `)
-    
+    await ensurePushSubscriptionsTable()
     await prisma.$executeRawUnsafe(
-      `INSERT INTO PushSubscriptions (userId, subscription) VALUES ($1, $2::jsonb)
-       ON CONFLICT (userId) DO UPDATE SET subscription=EXCLUDED.subscription`,
-      user.id, JSON.stringify(subscription)
+      `INSERT INTO PushSubscriptions (userId, subscription, updatedAt) VALUES ($1, $2::jsonb, NOW())
+       ON CONFLICT (userId) DO UPDATE SET subscription=EXCLUDED.subscription, updatedAt=NOW()`,
+      user.id,
+      JSON.stringify(subscription)
     )
 
     return NextResponse.json({ success: true })
@@ -88,19 +96,17 @@ export async function GET(req: NextRequest) {
     }
 
     // Check for push subscription
-    await prisma.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS PushSubscriptions (
-        userId TEXT PRIMARY KEY,
-        subscription JSONB NOT NULL
-      )
-    `)
+    await ensurePushSubscriptionsTable()
     
-    const rows: Array<{ subscription: any }> = await prisma.$queryRawUnsafe(
-      `SELECT subscription FROM PushSubscriptions WHERE userId = $1`,
+    const rows: Array<{ subscription: any; updatedAt: Date | null }> = await prisma.$queryRawUnsafe(
+      `SELECT subscription, updatedAt FROM PushSubscriptions WHERE userId = $1`,
       user.id
     )
 
-    return NextResponse.json({ hasSubscription: rows.length > 0 })
+    return NextResponse.json({
+      hasSubscription: rows.length > 0,
+      lastUpdated: rows[0]?.updatedAt ?? null
+    })
   } catch (e) {
     console.error('admin push status error', e)
     return NextResponse.json({ error: 'Failed to check status' }, { status: 500 })
@@ -130,12 +136,7 @@ export async function DELETE(req: NextRequest) {
     }
 
     // Ensure table and delete subscription
-    await prisma.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS PushSubscriptions (
-        userId TEXT PRIMARY KEY,
-        subscription JSONB NOT NULL
-      )
-    `)
+    await ensurePushSubscriptionsTable()
     await prisma.$executeRawUnsafe(
       `DELETE FROM PushSubscriptions WHERE userId = $1`,
       user.id

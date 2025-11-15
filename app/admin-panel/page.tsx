@@ -93,7 +93,12 @@ export default function AdminPanel() {
   const [qrCodeData, setQrCodeData] = useState<string | null>(null)
   const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null)
   const [isGeneratingQR, setIsGeneratingQR] = useState(false)
-  const [pushNotificationStatus, setPushNotificationStatus] = useState<{subscribed: boolean, loading: boolean}>({subscribed: false, loading: false})
+  type PushNotificationState = { subscribed: boolean; loading: boolean; lastUpdated: string | null }
+  const [pushNotificationStatus, setPushNotificationStatus] = useState<PushNotificationState>({
+    subscribed: false,
+    loading: false,
+    lastUpdated: null
+  })
   const [pushLogs, setPushLogs] = useState<Array<{createdAt: string; event: string; userEmail: string; status: string; info?: string}>>([])
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
@@ -1282,7 +1287,7 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
   const checkPushNotificationStatus = async () => {
     if (!adminUser?.email || !adminToken) return
     
-    setPushNotificationStatus({ subscribed: false, loading: true })
+    setPushNotificationStatus((prev) => ({ ...prev, loading: true }))
     try {
       // Check if admin user has push subscription
       const response = await fetch('/api/admin/push-subscribe', {
@@ -1292,13 +1297,17 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
       })
       if (response.ok) {
         const data = await response.json()
-        setPushNotificationStatus({ subscribed: data.hasSubscription || false, loading: false })
+        setPushNotificationStatus({
+          subscribed: data.hasSubscription || false,
+          loading: false,
+          lastUpdated: data.lastUpdated || null
+        })
       } else {
-        setPushNotificationStatus({ subscribed: false, loading: false })
+        setPushNotificationStatus({ subscribed: false, loading: false, lastUpdated: null })
       }
     } catch (error) {
       console.error('Error checking push status:', error)
-      setPushNotificationStatus({ subscribed: false, loading: false })
+      setPushNotificationStatus({ subscribed: false, loading: false, lastUpdated: null })
     }
   }
 
@@ -1313,13 +1322,13 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
       return
     }
 
-    setPushNotificationStatus({ subscribed: false, loading: true })
+    setPushNotificationStatus((prev) => ({ ...prev, loading: true }))
 
     try {
       const permission = await Notification.requestPermission()
       if (permission !== 'granted') {
         alert('Push notifications were denied')
-        setPushNotificationStatus({ subscribed: false, loading: false })
+        setPushNotificationStatus({ subscribed: false, loading: false, lastUpdated: null })
         return
       }
 
@@ -1346,7 +1355,11 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
       })
 
       if (response.ok) {
-        setPushNotificationStatus({ subscribed: true, loading: false })
+        setPushNotificationStatus({
+          subscribed: true,
+          loading: false,
+          lastUpdated: new Date().toISOString()
+        })
         alert('✅ Push notifications enabled! You will now receive notifications for signups, subscriptions, and credit purchases.')
       } else {
         throw new Error('Failed to save subscription')
@@ -1354,7 +1367,7 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
     } catch (error: any) {
       console.error('Error enabling push notifications:', error)
       alert(`Failed to enable push notifications: ${error.message}`)
-      setPushNotificationStatus({ subscribed: false, loading: false })
+      setPushNotificationStatus({ subscribed: false, loading: false, lastUpdated: null })
     }
   }
 
@@ -1366,7 +1379,7 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
         headers: { 'Authorization': `Bearer ${adminToken}` }
       })
       if (response.ok) {
-        setPushNotificationStatus({ subscribed: false, loading: false })
+        setPushNotificationStatus({ subscribed: false, loading: false, lastUpdated: null })
         alert('🔕 Push notifications disabled.')
       } else {
         throw new Error('Failed to unsubscribe')
@@ -1400,7 +1413,7 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
       if (res.ok) {
         setPushLogs(
           (data.logs || []).map((r: any) => ({
-            createdAt: r.createdAt,
+            createdAt: r.createdAt || r.createdat,
             event: r.event,
             userEmail: r.userEmail,
             status: r.status,
@@ -3768,6 +3781,16 @@ The Helfi Team`,
                         ? '✅ Enabled - You will receive notifications' 
                         : '❌ Not enabled - Click below to enable'}
                   </p>
+                  {pushNotificationStatus.subscribed && pushNotificationStatus.lastUpdated && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Last enabled on {new Date(pushNotificationStatus.lastUpdated).toLocaleString()}. Enabling on a new device will move alerts to that device.
+                    </p>
+                  )}
+                  {!pushNotificationStatus.subscribed && !pushNotificationStatus.loading && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Push subscriptions are saved per device. Tap Enable on this phone (PWA) to get notifications here.
+                    </p>
+                  )}
                 </div>
                 {pushNotificationStatus.subscribed ? (
                   <button

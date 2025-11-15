@@ -6,6 +6,10 @@ import Image from 'next/image'
 import Link from 'next/link'
 
 const ADMIN_GATE_COOKIE_MAX_AGE = 30 * 24 * 60 * 60 // 30 days
+const DEFAULT_GATE_PASSWORD = 'HealthBeta2024!'
+const DEFAULT_ADMIN_PASSWORD = 'gX8#bQ3!Vr9zM2@kLf1T'
+const GATE_PASSWORD = (process.env.NEXT_PUBLIC_ADMIN_GATE_PASSWORD || DEFAULT_GATE_PASSWORD).trim()
+const ADMIN_PANEL_PASSWORD = (process.env.NEXT_PUBLIC_ADMIN_PANEL_PASSWORD || DEFAULT_ADMIN_PASSWORD).trim()
 
 export default function HealthApp() {
   const [password, setPassword] = useState('')
@@ -43,7 +47,10 @@ export default function HealthApp() {
     setLoading(true)
     setError('')
 
-    if (password === 'HealthBeta2024!') {
+    const entered = password.trim()
+    const allowedPasswords = [GATE_PASSWORD, ADMIN_PANEL_PASSWORD].filter(Boolean)
+
+    if (allowedPasswords.includes(entered)) {
       const secureFlag = window.location.protocol === 'https:' ? '; Secure' : ''
       document.cookie = `passed_admin_gate=1; path=/; max-age=${ADMIN_GATE_COOKIE_MAX_AGE}; SameSite=Lax${secureFlag}`
       try {
@@ -120,6 +127,9 @@ export default function HealthApp() {
                   )}
                 </button>
               </div>
+              <p className="mt-2 text-xs text-gray-500">
+                Use either the Health app gate password or the same admin panel password you enter on desktop.
+              </p>
             </div>
 
             {error && (
