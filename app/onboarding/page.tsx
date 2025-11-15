@@ -5204,6 +5204,7 @@ export default function Onboarding() {
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
+              <span className="ml-2 hidden md:inline font-medium">Go To Dashboard</span>
             </a>
             
             <h1 className="text-lg font-semibold text-gray-900">
