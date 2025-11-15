@@ -163,7 +163,8 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   const publicPages = ['/', '/healthapp', '/auth/signin', '/auth/verify', '/auth/check-email', '/onboarding', '/privacy', '/terms', '/help', '/faq']
   
   // Admin panel paths should never show user sidebar
-  const isAdminPanelPath = pathname.startsWith('/admin-panel')
+  const isAdminPanelPath =
+    pathname.startsWith('/admin-panel') || pathname.startsWith('/main-admin')
   
   // Don't show sidebar while session is loading to prevent flickering
   if (status === 'loading') {
