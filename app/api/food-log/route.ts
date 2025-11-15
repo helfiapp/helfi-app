@@ -28,10 +28,8 @@ export async function GET(request: NextRequest) {
     // If tz is supplied (minutes difference between UTC and local), shift window by -tz
     const [y, m, d] = dateStr.split('-').map((v) => parseInt(v, 10))
     const tzMin = Number.isFinite(parseInt(tzOffsetMinRaw || '')) ? parseInt(tzOffsetMinRaw || '0', 10) : 0
-    // Convert local-day window to UTC by ADDING the timezone offset in minutes.
-    // Example: Sydney (UTC+10) => tzMin = -600, adding -600 shifts start to previous day 14:00Z.
-    const startUtcMs = Date.UTC(y, (m || 1) - 1, d || 1, 0, 0, 0, 0) + tzMin * 60 * 1000
-    const endUtcMs = Date.UTC(y, (m || 1) - 1, d || 1, 23, 59, 59, 999) + tzMin * 60 * 1000
+    const startUtcMs = Date.UTC(y, (m || 1) - 1, d || 1, 0, 0, 0, 0) - tzMin * 60 * 1000
+    const endUtcMs = Date.UTC(y, (m || 1) - 1, d || 1, 23, 59, 59, 999) - tzMin * 60 * 1000
     const start = new Date(startUtcMs)
     const end = new Date(endUtcMs)
 

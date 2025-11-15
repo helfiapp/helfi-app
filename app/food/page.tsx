@@ -1645,7 +1645,7 @@ Please add nutritional information manually if needed.`);
       </div>
 
       {/* Main Content */}
-      <div className="flex-1">
+      <div className="flex-1 overflow-y-auto">
         <div className="max-w-4xl mx-auto px-2 sm:px-6 py-6 sm:py-8 pb-24 md:pb-8">
         
         {/* Instruction Text - Hidden during edit mode */}
@@ -1812,7 +1812,7 @@ Please add nutritional information manually if needed.`);
               <div className="bg-white rounded-2xl shadow-lg border border-gray-100">
                 {/* Photo Section */}
                 {photoPreview && (
-                  <div className="p-2 sm:p-4 border-b border-gray-100 flex justify-center">
+                  <div className="p-4 border-b border-gray-100 flex justify-center">
                     <div className="relative w-full">
                       {foodImagesLoading[photoPreview] && (
                         <div className="absolute inset-0 bg-gray-100 rounded-xl flex items-center justify-center">
