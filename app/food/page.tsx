@@ -766,9 +766,33 @@ export default function FoodDiary() {
           return false;
         }
       });
-      // Important: don't wipe current list if provider hasn't populated yet
       if (Array.isArray(onlySelectedDate) && onlySelectedDate.length > 0) {
         setTodaysFoods(onlySelectedDate);
+      } else {
+        // Fallback: if provider cache is empty, load from food-log API for the selected date
+        (async () => {
+          try {
+            const tz = new Date().getTimezoneOffset();
+            const res = await fetch(`/api/food-log?date=${selectedDate}&tz=${tz}`);
+            if (res.ok) {
+              const json = await res.json();
+              const logs = Array.isArray(json.logs) ? json.logs : [];
+              const mapped = logs.map((l: any) => ({
+                id: new Date(l.createdAt).getTime(),
+                dbId: l.id,
+                description: l.description || l.name,
+                time: new Date(l.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                method: l.imageUrl ? 'photo' : 'text',
+                photo: l.imageUrl || null,
+                nutrition: l.nutrients || null,
+                localDate: selectedDate,
+              }));
+              setTodaysFoods(mapped);
+            }
+          } catch {
+            // ignore
+          }
+        })();
       }
     }
   }, [userData, isViewingToday, selectedDate]);
