@@ -3178,34 +3178,69 @@ Please add nutritional information manually if needed.`);
             <div className="mb-4">
               {(() => {
                 const source = isViewingToday ? todaysFoods : (historyFoods || [])
-                const totals = source.reduce((acc: Record<typeof NUTRIENT_DISPLAY_ORDER[number], number>, item: any) => {
-                  // Prioritize recalculating from items array (ingredient cards) for accuracy
-                  // This ensures Today's Totals matches what's shown when editing the entry
-                  if (item?.items && Array.isArray(item.items) && item.items.length > 0) {
-                    const recalculated = recalculateNutritionFromItems(item.items)
-                    if (recalculated) {
-                      acc.calories += recalculated.calories || 0
-                      acc.protein += recalculated.protein || 0
-                      acc.carbs += recalculated.carbs || 0
-                      acc.fat += recalculated.fat || 0
-                      acc.fiber += recalculated.fiber || 0
-                      acc.sugar += recalculated.sugar || 0
-                    }
-                  } else {
-                    // Fallback to saved nutrition object if items don't exist
-                    const n = item?.nutrition || {}
-                    const safeNumber = (value: any) => {
-                      const num = Number(value)
-                      return Number.isFinite(num) ? num : 0
-                    }
 
-                    acc.calories += safeNumber(n.calories ?? n.kcal)
-                    acc.protein += safeNumber(n.protein ?? n.protein_g)
-                    acc.carbs += safeNumber(n.carbs ?? n.carbohydrates ?? n.carbs_g ?? n.carbohydrates_g)
-                    acc.fat += safeNumber(n.fat ?? n.total_fat ?? n.fat_g)
-                    acc.fiber += safeNumber(n.fiber ?? n.fiber_g ?? n.dietary_fiber_g)
-                    acc.sugar += safeNumber(n.sugar ?? n.sugar_g ?? n.sugars_g)
+                const safeNumber = (value: any) => {
+                  const num = Number(value)
+                  return Number.isFinite(num) ? num : 0
+                }
+
+                const deriveItemsForEntry = (entry: any) => {
+                  if (entry?.items && Array.isArray(entry.items) && entry.items.length > 0) {
+                    return entry.items
                   }
+                  if (entry?.description) {
+                    const structured = extractStructuredItemsFromAnalysis(entry.description)
+                    if (structured?.items?.length) {
+                      return enrichItemsFromStarter(structured.items)
+                    }
+                    const prose = extractItemsFromTextEstimates(entry.description)
+                    if (prose?.items?.length) {
+                      return enrichItemsFromStarter(prose.items)
+                    }
+                  }
+                  return null
+                }
+
+                const convertStoredTotals = (input: any) => {
+                  if (!input) return null
+                  return {
+                    calories: safeNumber(input.calories ?? input.calories_g ?? input.kcal),
+                    protein: safeNumber(input.protein ?? input.protein_g),
+                    carbs: safeNumber(input.carbs ?? input.carbs_g ?? input.carbohydrates),
+                    fat: safeNumber(input.fat ?? input.fat_g ?? input.total_fat),
+                    fiber: safeNumber(input.fiber ?? input.fiber_g ?? input.dietary_fiber_g),
+                    sugar: safeNumber(input.sugar ?? input.sugar_g ?? input.sugars_g),
+                  }
+                }
+
+                const totals = source.reduce((acc: Record<typeof NUTRIENT_DISPLAY_ORDER[number], number>, item: any) => {
+                  const derivedItems = deriveItemsForEntry(item)
+                  const recalculated = derivedItems ? recalculateNutritionFromItems(derivedItems) : null
+                  if (recalculated) {
+                    acc.calories += recalculated.calories || 0
+                    acc.protein += recalculated.protein || 0
+                    acc.carbs += recalculated.carbs || 0
+                    acc.fat += recalculated.fat || 0
+                    acc.fiber += recalculated.fiber || 0
+                    acc.sugar += recalculated.sugar || 0
+                    return acc
+                  }
+
+                  const storedTotals = convertStoredTotals(item?.total) || convertStoredTotals(item?.nutrition) || {
+                    calories: 0,
+                    protein: 0,
+                    carbs: 0,
+                    fat: 0,
+                    fiber: 0,
+                    sugar: 0,
+                  }
+
+                  acc.calories += storedTotals.calories
+                  acc.protein += storedTotals.protein
+                  acc.carbs += storedTotals.carbs
+                  acc.fat += storedTotals.fat
+                  acc.fiber += storedTotals.fiber
+                  acc.sugar += storedTotals.sugar
                   return acc
                 }, { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0 })
 
