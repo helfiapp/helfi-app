@@ -606,7 +606,10 @@ export default function FoodDiary() {
           return false;
         }
       });
-      setTodaysFoods(onlySelectedDate);
+      // Important: don't wipe current list if provider hasn't populated yet
+      if (Array.isArray(onlySelectedDate) && onlySelectedDate.length > 0) {
+        setTodaysFoods(onlySelectedDate);
+      }
     }
   }, [userData, isViewingToday, selectedDate]);
 
