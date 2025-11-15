@@ -72,11 +72,11 @@ const buildMealSummaryFromItems = (items: any[] | null | undefined) => {
 
 const formatMacroValue = (value: number | null | undefined, unit: string) => {
   if (value === null || value === undefined) {
-    return unit ? `0${unit}` : '0'
+    return '—'
   }
   const numeric = Number(value)
   if (!Number.isFinite(numeric)) {
-    return unit ? `0${unit}` : '0'
+    return '—'
   }
   if (unit) {
     return `${Math.round(numeric * 10) / 10}${unit}`
@@ -313,8 +313,21 @@ const extractItemsFromTextEstimates = (analysis: string) => {
     .split('\n')
     .map((l) => l.trim())
     .filter(Boolean)
+  // Build a map of name -> serving_size from the enumerated detected foods before "Nutrition Estimates"
+  const servingMap: Record<string, string> = {}
+  for (const l of lines) {
+    if (/^\*\*nutrition estimates/i.test(l) || /^\*\*nutrition/i.test(l)) break
+    const m = l.match(/^\d+\.\s*\**([A-Za-z0-9 ,()\/\-]+?)\**\s*:\s*(.+)$/i)
+    if (m) {
+      const name = m[1].replace(/\*+/g, '').trim()
+      const desc = m[2].replace(/\*+/g, '').trim().replace(/\.$/, '')
+      if (name && desc) {
+        servingMap[name.toLowerCase()] = desc
+      }
+    }
+  }
   const items: any[] = []
-  const macroRegex = /(?:^|[*\-\u2022]\s*)\**([A-Za-z0-9 ,()\/\-]+?)\**\s*:\s*Calories:\s*([\d\.]+)[^,\n]*,\s*Protein:\s*([\d\.]+)\s*g[^,\n]*,\s*Carbs:\s*([\d\.]+)\s*g[^,\n]*,\s*Fat:\s*([\d\.]+)\s*g/i
+  const macroRegex = /(?:^|[*\-\u2022]\s*)\**([A-Za-z0-9 ,()\/\-]+?)\**\s*:\s*Calories:\s*([\d\.]+)[^,\n]*,\s*Protein:\s*([\d\.]+)\s*g[^,\n]*,\s*Carbs:\s*([\d\.]+)\s*g[^,\n]*,\s*Fat:\s*([\d\.]+)\s*g(?:[^,\n]*,\s*Fiber:\s*([\d\.]+)\s*g)?(?:[^,\n]*,\s*Sugar:\s*([\d\.]+)\s*g)?/i
   for (const l of lines) {
     const m = l.match(macroRegex)
     if (m) {
@@ -323,18 +336,20 @@ const extractItemsFromTextEstimates = (analysis: string) => {
       const protein_g = Number(m[3])
       const carbs_g = Number(m[4])
       const fat_g = Number(m[5])
+      const fiber_g = m[6] !== undefined ? Number(m[6]) : null
+      const sugar_g = m[7] !== undefined ? Number(m[7]) : null
       if (name && [calories, protein_g, carbs_g, fat_g].every((n) => Number.isFinite(n))) {
         items.push({
           name,
           brand: null,
-          serving_size: '', // unknown in this prose format
+          serving_size: servingMap[name.toLowerCase()] || '',
           servings: 1,
           calories,
           protein_g,
           carbs_g,
           fat_g,
-          fiber_g: 0,
-          sugar_g: 0,
+          fiber_g: Number.isFinite(fiber_g as any) ? (fiber_g as number) : null,
+          sugar_g: Number.isFinite(sugar_g as any) ? (sugar_g as number) : null,
         })
       }
     }
@@ -346,8 +361,8 @@ const extractItemsFromTextEstimates = (analysis: string) => {
       acc.protein_g += it.protein_g
       acc.carbs_g += it.carbs_g
       acc.fat_g += it.fat_g
-      acc.fiber_g += it.fiber_g || 0
-      acc.sugar_g += it.sugar_g || 0
+      acc.fiber_g += Number.isFinite(it.fiber_g) ? it.fiber_g : 0
+      acc.sugar_g += Number.isFinite(it.sugar_g) ? it.sugar_g : 0
       return acc
     },
     { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fiber_g: 0, sugar_g: 0 }
