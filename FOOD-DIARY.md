@@ -1,5 +1,47 @@
 # Food Diary – Pending Improvements
 
+## ⚠️ CRITICAL HANDOVER FOR NEXT AGENT - READ THIS FIRST ⚠️
+
+**Date:** November 15, 2025  
+**Status:** URGENT FIX NEEDED
+
+### The Problem
+
+**Today's Totals section is showing incorrect nutrition numbers that don't match the actual food entry.**
+
+**What's happening:**
+- There is ONE food entry saved for today (November 15, 2025)
+- When you click "Edit Entry" on that entry, the nutrition numbers shown are CORRECT (750 calories, 41g protein, 75.1g carbs, 31.5g fat, 2.5g fiber, 28g sugar)
+- But the "Today's Totals" section at the top of the page shows DIFFERENT numbers (750 calories, 41g protein, 75g carbs, 31g fat, 0g fiber, 0g sugar)
+- Since there's only ONE entry, "Today's Totals" should match that entry EXACTLY
+
+**What needs to be fixed:**
+- "Today's Totals" must recalculate from the ingredient cards data (the `items` array) instead of using the old saved `nutrition` object
+- The totals should match what's shown when editing the entry
+- This ensures accuracy, especially for fiber and sugar which are showing as 0g when they should be 2.5g and 28g respectively
+
+**What NOT to touch:**
+- ⚠️ **DO NOT MODIFY ANY CODE RELATED TO INGREDIENT CARDS** ⚠️
+- The ingredient cards functionality has been worked on for many hours and is currently working correctly
+- Do not change:
+  - How ingredient cards are displayed
+  - How ingredient cards are extracted from AI responses
+  - How ingredient cards are saved/loaded
+  - Any code in the ingredient card rendering section
+- Only modify the "Today's Totals" calculation logic
+
+**Where to look:**
+- The "Today's Totals" calculation is in `app/food/page.tsx` around line 3179
+- It currently tries to recalculate from `item.items` but may not be working correctly
+- The function `recalculateNutritionFromItems` exists and should be used to calculate totals from the ingredient cards
+
+**Testing:**
+- After fixing, verify that "Today's Totals" matches the nutrition numbers shown when editing the entry
+- Refresh the page and confirm the totals are still correct
+- Test with multiple entries to ensure it sums correctly
+
+---
+
 This document captures the exact work required to finish the latest round of Food Analyzer updates. Please follow these instructions step‑by‑step so we can ship the changes safely and avoid burning extra AI credits for users.
 
 ---
