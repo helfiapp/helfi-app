@@ -857,6 +857,22 @@ export default function FoodDiary() {
           const enriched = enrichItemsFromStarter(extracted.items)
           setAnalyzedItems(enriched)
           applyRecalculatedNutrition(enriched)
+        } else {
+          // Try prose extraction as fallback
+          const proseExtracted = extractItemsFromTextEstimates(aiDescription)
+          if (proseExtracted && Array.isArray(proseExtracted.items) && proseExtracted.items.length > 0) {
+            const enriched = enrichItemsFromStarter(proseExtracted.items)
+            setAnalyzedItems(enriched)
+            applyRecalculatedNutrition(enriched)
+          }
+        }
+      } else {
+        // Even without explicit markers, try prose extraction
+        const proseExtracted = extractItemsFromTextEstimates(aiDescription)
+        if (proseExtracted && Array.isArray(proseExtracted.items) && proseExtracted.items.length > 0) {
+          const enriched = enrichItemsFromStarter(proseExtracted.items)
+          setAnalyzedItems(enriched)
+          applyRecalculatedNutrition(enriched)
         }
       }
     } catch (e) {
