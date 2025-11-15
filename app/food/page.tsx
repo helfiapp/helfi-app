@@ -364,9 +364,13 @@ const extractItemsFromTextEstimates = (analysis: string) => {
     }
   }
   const items: any[] = []
-  const macroRegex = /(?:^|[*\-\u2022]\s*)\**([A-Za-z0-9 ,()\/\-]+?)\**\s*:\s*Calories:\s*([\d\.]+)[^,\n]*,\s*Protein:\s*([\d\.]+)\s*g[^,\n]*,\s*Carbs:\s*([\d\.]+)\s*g[^,\n]*,\s*Fat:\s*([\d\.]+)\s*g(?:[^,\n]*,\s*Fiber:\s*([\d\.]+)\s*g)?(?:[^,\n]*,\s*Sugar:\s*([\d\.]+)\s*g)?/i
+  // Match formats like: "- **Scrambled Eggs**: 210 calories, 18g protein, 1g carbs, 15g fat, 0g fiber, 1g sugar."
+  // Also handles: "**Scrambled Eggs**: Calories: 210, Protein: 18g, ..."
+  const macroRegex1 = /(?:^|[*\-\u2022]\s*)\**([A-Za-z0-9 ,()\/\-]+?)\**\s*:\s*Calories:\s*([\d\.]+)[^,\n]*,\s*Protein:\s*([\d\.]+)\s*g[^,\n]*,\s*Carbs:\s*([\d\.]+)\s*g[^,\n]*,\s*Fat:\s*([\d\.]+)\s*g(?:[^,\n]*,\s*Fiber:\s*([\d\.]+)\s*g)?(?:[^,\n]*,\s*Sugar:\s*([\d\.]+)\s*g)?/i
+  const macroRegex2 = /(?:^|[*\-\u2022]\s*)\**([A-Za-z0-9 ,()\/\-]+?)\**\s*:\s*([\d\.]+)\s*calories[^,\n]*,\s*([\d\.]+)g\s+protein[^,\n]*,\s*([\d\.]+)g\s+carbs[^,\n]*,\s*([\d\.]+)g\s+fat(?:[^,\n]*,\s*([\d\.]+)g\s+fiber)?(?:[^,\n]*,\s*([\d\.]+)g\s+sugar)?/i
   for (const l of lines) {
-    const m = l.match(macroRegex)
+    let m = l.match(macroRegex1)
+    if (!m) m = l.match(macroRegex2)
     if (m) {
       const name = m[1].replace(/\*+/g, '').trim()
       const calories = Number(m[2])
@@ -599,7 +603,7 @@ export default function FoodDiary() {
   const applyStructuredItems = (itemsFromApi: any[] | null | undefined, totalFromApi: any, analysisText: string | null | undefined) => {
     let finalItems = Array.isArray(itemsFromApi) ? itemsFromApi : []
     let finalTotal = totalFromApi || null
-    if (!finalItems.length) {
+    if (!finalItems.length && analysisText) {
       const fallback = extractStructuredItemsFromAnalysis(analysisText)
       if (fallback?.items?.length) {
         finalItems = fallback.items
@@ -611,6 +615,7 @@ export default function FoodDiary() {
       setAnalyzedItems(enriched)
       applyRecalculatedNutrition(enriched)
     } else {
+      // If still no items, set empty but don't clear aiDescription - let useEffect try prose parser
       setAnalyzedItems([])
       setAnalyzedTotal(finalTotal)
     }
@@ -836,23 +841,25 @@ export default function FoodDiary() {
     }
   }, [userData, isViewingToday, selectedDate]);
 
-  // Auto-rebuild ingredient cards from <ITEMS_JSON> if analysis text contains it
+  // Auto-rebuild ingredient cards from <ITEMS_JSON> or Nutrition Estimates prose when aiDescription changes
   useEffect(() => {
+    if (!aiDescription) return
+    // Only rebuild if we currently have no items
+    if (analyzedItems && analyzedItems.length > 0) return
+    
     try {
-      if (!analyzedItems || analyzedItems.length === 0) {
-        const hasItemsJson = aiDescription && (/<ITEMS_JSON>/i.test(aiDescription) || /&lt;ITEMS_JSON&gt;/i.test(aiDescription) || /"items"\s*:\s*\[/.test(aiDescription))
-        const hasNutritionEstimates = aiDescription && /\*\*\s*Nutrition Estimates\s*\*\*/i.test(aiDescription)
-        if (aiDescription && (hasItemsJson || hasNutritionEstimates)) {
-          const extracted = extractStructuredItemsFromAnalysis(aiDescription)
-          if (extracted && Array.isArray(extracted.items) && extracted.items.length > 0) {
-            const enriched = enrichItemsFromStarter(extracted.items)
-            setAnalyzedItems(enriched)
-            applyRecalculatedNutrition(enriched)
-          }
+      const hasItemsJson = /<ITEMS_JSON>/i.test(aiDescription) || /&lt;ITEMS_JSON&gt;/i.test(aiDescription) || /"items"\s*:\s*\[/.test(aiDescription)
+      const hasNutritionEstimates = /\*\*\s*Nutrition Estimates\s*\*\*/i.test(aiDescription) || /Nutrition Estimates/i.test(aiDescription)
+      if (hasItemsJson || hasNutritionEstimates) {
+        const extracted = extractStructuredItemsFromAnalysis(aiDescription)
+        if (extracted && Array.isArray(extracted.items) && extracted.items.length > 0) {
+          const enriched = enrichItemsFromStarter(extracted.items)
+          setAnalyzedItems(enriched)
+          applyRecalculatedNutrition(enriched)
         }
       }
-    } catch {
-      // non-blocking
+    } catch (e) {
+      console.error('Failed to rebuild cards from prose:', e)
     }
   }, [aiDescription]) 
 
