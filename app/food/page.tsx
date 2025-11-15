@@ -789,6 +789,14 @@ export default function FoodDiary() {
               }));
               if (mapped.length > 0) {
                 setTodaysFoods(mapped);
+                // Persist localDate back to user data for stability
+                try {
+                  fetch('/api/user-data', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ todaysFoods: mapped })
+                  }).catch(() => {})
+                } catch {}
               } else {
                 // Secondary fallback: load from /api/user-data directly and pull todaysFoods
                 try {
@@ -806,7 +814,17 @@ export default function FoodDiary() {
                       return false
                     }
                   })
-                  if (byDate.length > 0) setTodaysFoods(byDate)
+                  if (byDate.length > 0) {
+                    setTodaysFoods(byDate)
+                    // Persist localDate back to user data so future loads are stable
+                    try {
+                      fetch('/api/user-data', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ todaysFoods: byDate })
+                      }).catch(() => {})
+                    } catch {}
+                  }
                 } catch {}
               }
             }
