@@ -610,6 +610,23 @@ export default function FoodDiary() {
     }
   }, [userData, isViewingToday, selectedDate]);
 
+  // Auto-rebuild ingredient cards from <ITEMS_JSON> if analysis text contains it
+  useEffect(() => {
+    try {
+      if (!analyzedItems || analyzedItems.length === 0) {
+        if (aiDescription && /<ITEMS_JSON>[\s\S]*?<\/ITEMS_JSON>/i.test(aiDescription)) {
+          const extracted = extractStructuredItemsFromAnalysis(aiDescription)
+          if (extracted && Array.isArray(extracted.items) && extracted.items.length > 0) {
+            setAnalyzedItems(extracted.items)
+            applyRecalculatedNutrition(extracted.items)
+          }
+        }
+      }
+    } catch {
+      // non-blocking
+    }
+  }, [aiDescription]) 
+
   // Load history for non-today dates
   useEffect(() => {
     const loadHistory = async () => {
