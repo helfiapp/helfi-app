@@ -25,11 +25,14 @@ export async function GET(request: NextRequest) {
     }
 
     // Build a UTC window that corresponds to the user's local day
-    // If tz is supplied (minutes difference between UTC and local), shift window by -tz
+    // tz is minutes difference between local time and UTC (Date.getTimezoneOffset()).
+    // To get the correct UTC window for the local date, we ADD the offset.
     const [y, m, d] = dateStr.split('-').map((v) => parseInt(v, 10))
-    const tzMin = Number.isFinite(parseInt(tzOffsetMinRaw || '')) ? parseInt(tzOffsetMinRaw || '0', 10) : 0
-    const startUtcMs = Date.UTC(y, (m || 1) - 1, d || 1, 0, 0, 0, 0) - tzMin * 60 * 1000
-    const endUtcMs = Date.UTC(y, (m || 1) - 1, d || 1, 23, 59, 59, 999) - tzMin * 60 * 1000
+    const tzMin = Number.isFinite(parseInt(tzOffsetMinRaw || ''))
+      ? parseInt(tzOffsetMinRaw || '0', 10)
+      : 0
+    const startUtcMs = Date.UTC(y, (m || 1) - 1, d || 1, 0, 0, 0, 0) + tzMin * 60 * 1000
+    const endUtcMs = Date.UTC(y, (m || 1) - 1, d || 1, 23, 59, 59, 999) + tzMin * 60 * 1000
     const start = new Date(startUtcMs)
     const end = new Date(endUtcMs)
 
@@ -61,7 +64,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { description, nutrition, imageUrl } = body || {}
+    const { description, nutrition, imageUrl, items } = body || {}
     const name = (description || '')
       .toString()
       .split('\n')[0]
@@ -77,6 +80,7 @@ export async function POST(request: NextRequest) {
         description: description || null,
         imageUrl: imageUrl || null,
         nutrients: nutrition || null,
+        items: items || null,
       },
     })
 

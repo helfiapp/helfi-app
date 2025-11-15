@@ -1,183 +1,358 @@
-# Food Diary – Pending Improvements
+## Food Diary – Handover and Fix Plan
 
-## ⚠️ CRITICAL HANDOVER FOR NEXT AGENT - READ THIS FIRST ⚠️
+**Last updated:** November 16, 2025  
+**Baseline code version:** commit `557b732` (current live baseline after rollback)
 
-**Date:** November 15, 2025  
-**Status:** URGENT FIX NEEDED
-
-### The Problem
-
-**Today's Totals section is showing incorrect nutrition numbers that don't match the actual food entry.**
-
-**What's happening:**
-- There is ONE food entry saved for today (November 15, 2025)
-- When you click "Edit Entry" on that entry, the nutrition numbers shown are CORRECT (750 calories, 41g protein, 75.1g carbs, 31.5g fat, 2.5g fiber, 28g sugar)
-- But the "Today's Totals" section at the top of the page shows DIFFERENT numbers (750 calories, 41g protein, 75g carbs, 31g fat, 0g fiber, 0g sugar)
-- Since there's only ONE entry, "Today's Totals" should match that entry EXACTLY
-
-**What needs to be fixed:**
-- "Today's Totals" must recalculate from the ingredient cards data (the `items` array) instead of using the old saved `nutrition` object
-- The totals should match what's shown when editing the entry
-- This ensures accuracy, especially for fiber and sugar which are showing as 0g when they should be 2.5g and 28g respectively
-
-**What NOT to touch:**
-- ⚠️ **DO NOT MODIFY ANY CODE RELATED TO INGREDIENT CARDS** ⚠️
-- The ingredient cards functionality has been worked on for many hours and is currently working correctly
-- Do not change:
-  - How ingredient cards are displayed
-  - How ingredient cards are extracted from AI responses
-  - How ingredient cards are saved/loaded
-  - Any code in the ingredient card rendering section
-- Only modify the "Today's Totals" calculation logic
-
-**Where to look:**
-- The "Today's Totals" calculation is in `app/food/page.tsx` around line 3179
-- It currently tries to recalculate from `item.items` but may not be working correctly
-- The function `recalculateNutritionFromItems` exists and should be used to calculate totals from the ingredient cards
-
-**Testing:**
-- After fixing, verify that "Today's Totals" matches the nutrition numbers shown when editing the entry
-- Refresh the page and confirm the totals are still correct
-- Test with multiple entries to ensure it sums correctly
+This document is the **single source of truth** for the Food Diary / Food Analyzer area.  
+Every future agent must read this fully before changing anything under `/app/food` or the related APIs.
 
 ---
 
-This document captures the exact work required to finish the latest round of Food Analyzer updates. Please follow these instructions step‑by‑step so we can ship the changes safely and avoid burning extra AI credits for users.
+## 1. What the user originally asked for (this round)
+
+1. Add reliable **Units** controls on ingredient cards:
+   - Whole eggs / crackers / pieces.
+   - 1 oz increments for liquids (e.g. orange juice), no strange fractions.
+2. Keep `servings` fractional under the hood for precision, but hide that complexity in normal use.
+3. Add safe toggles:
+   - **Energy**: calories ↔ kilojoules.
+   - **Volume**: ounces ↔ milliliters (for drinks and other volume-based items).
+4. Absolutely **do not break** the existing ingredient card UI/UX, which has taken many hours of work.
+
+During implementation we discovered deeper issues that must be fixed **before** units/toggles are added.
 
 ---
 
-## 1. Goals
+## 2. What went wrong & why we rolled back
 
-1. **Single compact meal card**
-   - Top of the analysis view must show one sentence summary of the meal (e.g. “Scrambled eggs…, bacon…, orange juice…”).
-   - The coloured nutrient tiles must appear **once** and list **all six macros** (calories, protein, carbs, fat, fiber, sugar). Remove the duplicate strip underneath.
+1. An agent implemented early versions of:
+   - New Units behaviour.
+   - kcal ↔ kJ and oz ↔ ml toggles.
+2. A function-order bug briefly broke the Food page; this was fixed but exposed more serious issues:
+   - **Date bug** in `/api/food-log`:
+     - Meals created on the **15th (Melbourne time)** appeared when viewing **14/11/2025**.
+   - **Ingredient cards disappearing**:
+     - Recent entries like **crackers** and **San Remo** had full cards at creation and in Edit mode.
+     - Later, after date navigation, those entries lost their cards, while an older **scrambled eggs** entry still showed cards.
+3. Because this area is extremely sensitive and has a long history of regressions, the user requested a **hard rollback** to commit `557b732`.  
+   That commit is now the working baseline.
 
-2. **Ingredient list parity**
-   - Every detected ingredient row must show the same macros as the tiles (include fiber + sugar).
-   - Keep serving +/- controls but tighten vertical spacing so the list is compact on mobile.
-
-3. **Editable structured items without re‑analyzing**
-   - Users must be able to fix AI mistakes (name, brand, serving size, macros, servings) directly.
-   - Editing an ingredient must immediately update totals, nutrient tiles, and Today’s Totals **without calling `/api/analyze-food` again** or charging a credit.
-   - Store the edited values with the entry so reopening it shows the corrected data.
-
-4. **Edit mode UX**
-   - When you tap **Edit Entry** on a saved meal, the screen must look exactly like the initial analysis (photo, nutrient tiles, ingredient list, description).
-   - Buttons required while editing:
-     - `Save to Food Diary` / `Update Entry`
-     - `Edit Description`
-     - `Delete Photo` (or `Cancel Photo`)
-     - `Re-Analyze` (optional use, still available if user wants fresh AI output)
-     - `Done`
-     - `Cancel changes`
-
-5. **Credits policy**
-   - Only re-analysis should consume credits. Adjusting structured items manually must **not** trigger another API call or credit deduction.
+Your job as the next agent:
+- Start from **exactly** this baseline.
+- Fix the underlying **date** and **card persistence** issues.
+- Only then reintroduce units/toggles using the plan in section 5.
 
 ---
 
-## 2. Implementation Checklist
+## 3. Current behaviour & confirmed bugs
 
-1. **Refactor state shape**
-   - Keep `analyzedItems` as the single source of truth for the ingredient list.
-   - Each item should store: `name`, `brand`, `serving_size`, `servings`, `calories`, `protein_g`, `carbs_g`, `fat_g`, `fiber_g`, `sugar_g`.
-   - Add helper `updateItemField(index, field, value)` that:
-     - clones `analyzedItems`
-     - updates the field and clamps numbers where appropriate
-     - calls `recalculateNutritionFromItems` and updates `analyzedNutrition`, `analyzedTotal`, and `todaysFoods` (when editing an existing entry)
+### 3.1 Date bug – entries show up on the wrong day
 
-2. **Ingredient editor**
-   - Replace the current modal with inline editing controls or enhance the modal to include inputs for all macros + serving size + name + brand.
-   - No network call when saving edits; rely on the helper above.
+**Relevant files**
+- `app/api/food-log/route.ts`
+- `app/food/page.tsx`
 
-3. **Remove duplicate nutrient tiles**
-   - Delete the secondary fiber/sugar row.
-   - Ensure `NUTRIENT_DISPLAY_ORDER` drives the single tile grid.
+**How it works now**
 
-4. **Compact layout**
-   - Add meal summary block at the very top (above tiles).
-   - Reduce padding/margins within each ingredient card (smaller font sizes, tighten gaps).
-   - Test on an iPhone viewport to confirm scrolling is minimal.
+- The client (Food Diary page) calls history like:
 
-5. **Edit mode parity**
-   - When `editingEntry` is set, prefill:
-     - `photoPreview`
-     - `analyzedItems` (from stored `items`)
-     - `analyzedNutrition` + `analyzedTotal`
-     - `aiDescription` (use saved description)
-     - `editedDescription`
-   - Show the same buttons arranged exactly as the screenshot:
-     1. `Save to Food Diary` / `Update Entry`
-     2. `Edit Description`
-     3. `Delete Photo`
-     4. `Re-Analyze`
-     5. `Done`
-     6. `Cancel changes`
-   - `Cancel changes` should revert the state to the persisted entry without touching credits.
+```ts
+const tz = new Date().getTimezoneOffset()
+fetch(`/api/food-log?date=${selectedDate}&tz=${tz}`)
+```
 
-6. **Persistence**
-   - When saving or updating an entry, persist the fully edited `items` array and `total` so they load intact next time.
+- On the server (`GET /api/food-log`):
 
-7. **Credits safeguard**
-   - Double-check that the only code calling `/api/analyze-food` is: initial analysis, re-analyze buttons, manual entry analysis.
-   - All other mutations must remain client-side.
+```ts
+const dateStr = searchParams.get('date')            // YYYY-MM-DD
+const tzOffsetMinRaw = searchParams.get('tz')       // from getTimezoneOffset()
+
+const [y, m, d] = dateStr.split('-').map((v) => parseInt(v, 10))
+const tzMin = Number.isFinite(parseInt(tzOffsetMinRaw || ''))
+  ? parseInt(tzOffsetMinRaw || '0', 10)
+  : 0
+
+// CURRENT (BUGGY) LOGIC
+const startUtcMs = Date.UTC(y, m - 1, d,   0, 0, 0, 0) - tzMin * 60 * 1000
+const endUtcMs   = Date.UTC(y, m - 1, d,  23,59,59,999) - tzMin * 60 * 1000
+```
+
+- `getTimezoneOffset()` returns the **difference between local time and UTC in minutes**.  
+  - For Melbourne (UTC+10/11), this value is **negative** (e.g. `-600`, `-660`).
+- Subtracting `tzMin` therefore **shifts the window in the wrong direction** for negative offsets.
+
+**Practical effect**
+
+- The server’s “day window” does not match the local date the user selected.
+- Result: entries created on the **15th (local)** appear when the app asks for logs for the **14th**, which is exactly what the user is seeing.
+- Today’s view (which uses `todaysFoods` from `/api/user-data`) can still appear correct, but history view based on `/api/food-log` is wrong.
+
+### 3.2 Ingredient cards disappearing
+
+**Relevant files**
+- `app/food/page.tsx`
+- `app/api/user-data/route.ts`
+- `app/api/food-log/route.ts`
+- `prisma/schema.prisma` (`model FoodLog`)
+
+**How cards are supposed to work**
+
+1. Each analyzed meal builds a structured `analyzedItems` array with:
+   - `name`, `brand`, `serving_size`, `servings`,
+   - `calories`, `protein_g`, `carbs_g`, `fat_g`, `fiber_g`, `sugar_g`.
+2. When saving via `addFoodEntry`:
+
+```ts
+const newEntry = {
+  id: Date.now(),
+  localDate: selectedDate,
+  description: finalDescription,
+  time: new Date().toLocaleTimeString(...),
+  method,
+  photo: method === 'photo' ? photoPreview : null,
+  nutrition: nutrition || analyzedNutrition,
+  items: analyzedItems && analyzedItems.length > 0 ? analyzedItems : null,
+  total: analyzedTotal || null,
+}
+```
+
+3. This entry is persisted in two places:
+   - In the user’s `todaysFoods` (via `/api/user-data` and the hidden `__TODAYS_FOODS_DATA__` health goal).
+   - In a separate `FoodLog` row via `/api/food-log`:
+     - Currently stores `description`, `imageUrl`, `nutrients`, `createdAt` – **no `items` field**.
+
+**How Edit mode restores cards**
+
+- Function `editFood(food)` in `app/food/page.tsx` does:
+
+```ts
+if (food.items && Array.isArray(food.items) && food.items.length > 0) {
+  // Use saved items directly (ideal)
+} else if (food.description) {
+  // Try to rebuild items from description text:
+  // 1) extractStructuredItemsFromAnalysis(food.description)
+  // 2) extractItemsFromTextEstimates(food.description)
+}
+```
+
+**What the user has observed**
+
+- The **scrambled eggs** entry (created earlier) still shows cards fine.
+- Very recent entries like **crackers** and **San Remo**:
+  - Showed full cards at creation and in early edits (so they originally had valid `items`).  
+  - Later, after being shifted to the previous date by the date bug and/or edited in history mode, some of those entries **lost their cards**.
+
+**Likely root cause**
+
+- History view uses `/api/food-log` where `FoodLog` does **not** store the `items` array.
+- When editing from history, `editFood(food)` often has only the description and totals:
+  - Text parsers sometimes recreate reasonable `items` (scrambled eggs).  
+  - For certain descriptions (crackers/San Remo), parsers fail → `analyzedItems` empty.
+- If an entry is ever saved while `analyzedItems` is empty, `updateFoodEntry` can persist `items: []`, permanently losing card data for that entry.
+- The date bug exposes this more often by pushing entries into the history path earlier than expected.
 
 ---
 
-## 3. Testing Plan
+## 4. Phase 1 – Fix date logic (must be done first)
 
-1. **Fresh analysis**
-   - Upload a multi-item meal photo.
-   - Confirm: summary sentence, one set of nutrient tiles, ingredient list with fiber/sugar, Save/Edit/Cancel buttons.
+### 4.1 Correct `/api/food-log` time-zone math
 
-2. **Manual corrections**
-   - Change “beef sausage” to “pork sausage” via the structured editor.
-   - Adjust macros manually; totals and tiles must update instantly without hitting the API.
+In `app/api/food-log/route.ts`, change the UTC window to **add** the offset, not subtract it:
 
-3. **Edit existing entry**
-   - Save the meal, go back to Today’s Meals, tap Edit.
-   - The full analysis view should reappear with all buttons.
-   - Modify servings, use Cancel changes to verify rollback, then Update Entry and ensure Today’s Totals refresh.
+```ts
+const [y, m, d] = dateStr.split('-').map((v) => parseInt(v, 10))
+const tzMin = Number.isFinite(parseInt(tzOffsetMinRaw || ''))
+  ? parseInt(tzOffsetMinRaw || '0', 10)
+  : 0
 
-4. **Credit verification**
-   - Monitor network tab / log statements to confirm no `/api/analyze-food` call fires when editing structured items.
+// FIXED WINDOW
+const startUtcMs = Date.UTC(y, (m || 1) - 1, d || 1, 0, 0, 0, 0) + tzMin * 60 * 1000
+const endUtcMs   = Date.UTC(y, (m || 1) - 1, d || 1, 23, 59, 59, 999) + tzMin * 60 * 1000
+```
 
-5. **Mobile layout**
-   - Use responsive dev tools (iPhone 13 width) and ensure the ingredient list fits without excessive scrolling.
+### 4.2 Manual verification (especially in Melbourne time)
 
-6. **Regression sweep**
-   - Run `npm run build`.
-   - Smoke-test manual food entry to ensure the refactor didn’t break the form or saved history.
+On production, with the user’s account:
 
----
+1. Pick a date (e.g. 15th of a month) and add a new test meal.
+2. Confirm it appears:
+   - In Today’s view (using `todaysFoods`), and  
+   - When viewing that exact date via the date selector in history mode.
+3. Use **Previous/Next**:
+   - Confirm the test entry **does not** appear on the previous or next day.
+4. Try again near midnight or at edge cases if possible (optional but recommended).
 
-## 4. Deployment
+### 4.3 Historical repair (planning only)
 
-1. `npm run build`
-2. Commit changes with a descriptive message.
-3. `git push origin master`
-4. Run `./scripts/check-deployment-status.sh` and wait for **READY**.
-5. Only then notify the user that production is updated.
-
----
-
-Feel free to iterate on the visual polish, but do **not** deviate from the flow described above without explicit user approval. The priority is restoring the original user experience (Save/Edit/Cancel) while adding the ability to correct structured items without spending extra credits.***
+- Some `FoodLog` rows may have “incorrect” apparent dates because of the old window.  
+- Document a one-off script or SQL plan to repair them if the user ever wants it, but **do not run it** without explicit permission.
 
 ---
 
-## Notes from latest agent (did not resolve issues)
+## 5. Phase 2 – Make ingredient cards robust
 
-- Added helper utilities in `app/food/page.tsx` (`parseServingUnitMetadata`, `extractStructuredItemsFromAnalysis`, `applyStructuredItems`) to support the new quick‑add serving controls and to try to rebuild the ingredient list from the `<ITEMS_JSON>` block the API is supposed to include. The idea was to keep the quarter‑serving buttons but also allow users to tap “+1 egg / +½ egg” when the model detects a specific serving size.  
-  - **Result:** The quick‑add chips work when the AI response includes a recognizable `serving_size`, but there is still no ingredient list when OpenAI omits `items` *and* the `<ITEMS_JSON>` snippet. Many current photo analyses return only prose (see user screenshot), so we continue to fall back to the long text block.
-  - **Follow‑up needed:** Either ensure the backend always sends `items`/`total` or adjust the client to gracefully handle prose‑only responses (e.g., hide the empty “Detected Foods” shell and avoid duplicating the text block).
+### 5.1 Persist `items` into history logs going forward
 
-- Added a `hasPaidAccess` flag that checks `/api/credit/status` so the “Free accounts can try this AI feature once…” warning only shows for free users. This part works, but it didn’t address the missing cards/text layout problem.
+1. **Schema:** update `prisma/schema.prisma` `model FoodLog` to also store `items`:
 
-- Introduced `applyStructuredItems` usage in **all** analysis paths (photo, manual text, re‑analyze) so whenever `result.items` exists, the UI immediately populates `analyzedItems`. Unfortunately this still depends on the API returning structured data.
+```prisma
+model FoodLog {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  imageUrl    String?
+  description String?
+  nutrients   Json?
+  items       Json?      // NEW: structured ingredient list
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  images      File[]   @relation("FoodLogImages")
+}
+```
 
-### Outstanding issues observed after these changes
-1. **Ingredient list still AWOL:** When GPT doesn’t include `<ITEMS_JSON>`, `analyzedItems` remains empty and the UI prints the raw description. Need a server‑side guarantee or a robust client fallback that converts the prose into structured entries.
-2. **Fiber/Sugar parity in Today’s Meals:** The “Today’s Meals” section now shows all six macros unconditionally, but the modal cards inside each entry still only show the four legacy macros. Verify how the totals should look when `food.nutrition` is missing fiber/sugar keys.
-3. **Credit warning logic:** Although `hasPaidAccess` hides the banner for paid accounts, `UsageMeter` still assumes the user has plan/credits, so double‑check the API response fields before relying on it for gating.
+2. **Saving:** in `saveFoodEntries` (`app/food/page.tsx`), when calling `/api/food-log`, include `items`:
 
-Please pick up from here so we don’t duplicate the same attempts. If you change the backend contract (e.g., guarantee `items` is present), remember to update the parsing helper accordingly.
+```ts
+const last = updatedFoods[0]
+if (last) {
+  fetch('/api/food-log', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      description: last.description,
+      nutrition: last.nutrition,
+      imageUrl: last.photo || null,
+      items: last.items || null,
+    }),
+  }).catch(() => {})
+}
+```
+
+3. **Loading:** in `GET /api/food-log`, include `items` when building `historyFoods`:
+
+```ts
+const mapped = logs.map((l: any) => ({
+  id: new Date(l.createdAt).getTime(),
+  dbId: l.id,
+  description: l.description || l.name,
+  time: new Date(l.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+  method: l.imageUrl ? 'photo' : 'text',
+  photo: l.imageUrl || null,
+  nutrition: l.nutrients || null,
+  items: (l as any).items || (l.nutrients as any)?.items || null,
+  localDate: dateStr,
+}))
+```
+
+### 5.2 Prefer stored items in `editFood`
+
+In `editFood(food)` (`app/food/page.tsx`):
+
+1. If `food.items` exists and is non‑empty:
+   - Use `enrichItemsFromStarter(food.items)` and **do not** attempt to parse description text.
+2. Only when `food.items` is missing or empty:
+   - Try `extractStructuredItemsFromAnalysis(food.description)`.  
+   - If that fails, try `extractItemsFromTextEstimates(food.description)`.
+
+This ensures that once an entry has cards, Edit mode does not depend on brittle text parsing.
+
+### 5.3 Guard against wiping cards on save
+
+In `updateFoodEntry`:
+
+```ts
+const updatedEntry = {
+  ...editingEntry,
+  localDate: editingEntry.localDate || selectedDate,
+  description: finalDescription,
+  photo: photoPreview || editingEntry.photo,
+  nutrition: analyzedNutrition || editingEntry.nutrition,
+  items:
+    analyzedItems && analyzedItems.length > 0
+      ? analyzedItems
+      : (editingEntry.items || null),
+  total: analyzedTotal || (editingEntry.total || null),
+}
+```
+
+This prevents a temporary failure to build `analyzedItems` from permanently erasing cards.
+
+### 5.4 Backfill critical recent entries (optional but recommended)
+
+Once Phase 1 and 2 changes are stable on production:
+
+1. Work with the user to identify high‑value entries (e.g. crackers and San Remo meals).
+2. Re‑analyze those photos with the fixed code to ensure:
+   - `items` are stored in both `todaysFoods` and `FoodLog`.  
+   - Edit mode reliably shows ingredient cards even after date navigation and refreshes.
+
+---
+
+## 6. Phase 3 – Reintroduce units and toggles (from `fix.plan.md`)
+
+The original unit/toggle plan is still desired; it should be implemented **after** Phases 1–2.  
+This section is lifted directly (with minor wording tweaks) from `fix.plan.md`.
+
+### 6.1 Goals
+
+- Make `Units` behave predictably: whole eggs/crackers, 1 oz steps for liquids, no weird fractions.  
+- Keep fractional `servings` internally but hide the complexity for normal use.  
+- Add safe toggles for calories ↔ kilojoules and ounces ↔ milliliters without altering the existing card layout.
+
+### 6.2 Step 1: Stabilize serving/unit calculations
+
+1. In `app/food/page.tsx`, fully trace how `servingUnitMeta` is built from `serving_size` (using `parseServingQuantity`) and how `servings` and `Units` are derived and updated.
+2. Replace the current mixed stepping logic for `Units` so that:
+   - `Units` always changes in whole-number steps (no 0.3, 0.5, etc), but the underlying `servings` can still be fractional.
+   - For any item, `servings = units / servingUnitMeta.quantity` and we round `units` to an integer before storing.
+3. Keep the `Servings` control flexible (can stay fractional) but ensure its +/- buttons and direct input changes always recalculate `Units` consistently with the same formula.
+4. Add a small helper to clamp and round unit and serving values to avoid float noise (e.g., `Math.round(value * 1000) / 1000`) before display.
+
+### 6.3 Step 2: Handle discrete vs volume/weight foods correctly
+
+1. Refine `isDiscreteUnitLabel` in `app/food/page.tsx`:
+   - Extend the discrete list to include terms like `cracker`, `crackers`, `chip`, `chips`, and any other obvious piece-based snack words.
+   - Keep weight/volume words (g, kg, ml, l, oz, lb, cup, tbsp, tsp, etc.) strictly treated as non-discrete.
+2. Introduce a small helper like `getUnitStep(servingUnitMeta, mode)` that returns:
+   - `1` unit for discrete items (eggs, slices, crackers, etc.).
+   - `1` unit for liquids measured in ounces (so an 8 oz glass can move 7, 8, 9, 10 oz, etc.).
+   - `1` unit for grams/milliliters internally (even if we later show them grouped visually).
+3. Wire this helper into the +/- buttons and `Units` input so both desktop and mobile behaviors are consistent.
+
+### 6.4 Step 3: Energy unit toggle (calories ↔ kilojoules)
+
+1. Add a simple state on the food page (e.g., `energyUnit` = `'kcal' | 'kJ'`) with default `'kcal'`.
+2. Add a tiny, inline toggle control near the existing per-serving and totals energy labels (reusing current typography and spacing so the card layout doesn’t change, just the label text).
+3. Update `formatMacroValue` or a new `formatEnergyValue` helper in `app/food/page.tsx` so that:
+   - Under the hood, values stay stored in calories.
+   - When `energyUnit === 'kJ'`, values are converted using a fixed factor (e.g., `kJ = kcal * 4.184`, rounded to a sensible whole or one decimal place).
+4. Ensure nutrient chips and totals sections both respect the selected energy unit while keeping fonts, colors, and chip layout identical.
+
+### 6.5 Step 4: Volume unit toggle (ounces ↔ milliliters)
+
+1. Add a `volumeUnit` state (e.g. `'oz' | 'ml'`) on the food page, defaulting to `'oz'` so existing behavior is untouched for current users.
+2. Detect serving sizes that are volume-based (contain `oz`, `ml`, `cup`, etc.) using the existing parsing logic.
+3. For items with ounces:
+   - When `volumeUnit === 'oz'`, continue to show ounces and use 1 oz steps for `Units`.
+   - When `volumeUnit === 'ml'`, convert the base quantity using a standard factor (e.g., `1 oz ≈ 29.57 ml`), update the unit label to `ml`, and use a whole-number ml step (e.g., 10 ml) for `Units`.
+   - Keep `servings = units_in_current_unit / base_quantity_in_current_unit` so totals remain correct regardless of display mode.
+4. Place the ounces↔ml toggle as a small pill-style control in the same area as the energy toggle or near the units label, matching existing styles so the card layout does not shift.
+
+### 6.6 Step 5: Testing and verification
+
+1. Manually test on desktop and iPhone for:
+   - Eggs (per-piece discrete), crackers (newly discrete), and a glass of orange juice (8 oz) to verify clean 1-unit or 1-oz steps only.
+   - Switching between calories and kilojoules and confirming that per-serving and total energy values update consistently without layout changes.
+   - Switching between oz and ml for a liquid item and checking that increments, totals, and labels all stay correct.
+2. Spot-check a few other starter foods from `data/foods-starter.ts` to confirm no regressions in unit behavior.
+3. Once everything passes, summarize the behavioural changes for the user and wait for explicit approval before any deployment.
+
+---
+
+## 7. To-do checklist (for the next agent)
+
+- [ ] Phase 1: Fix `/api/food-log` date window and verify behaviour in Melbourne and at least one other timezone.  
+- [ ] Phase 2: Persist `items` to `FoodLog`, prefer stored items in `editFood`, and guard against wiping cards; backfill key recent entries (crackers/San Remo) once stable.  
+- [ ] Phase 3: Implement units and toggles exactly as in section 6 and complete a full regression sweep on desktop + iPhone.
+
+

@@ -121,6 +121,19 @@ const formatMacroValue = (value: number | null | undefined, unit: string) => {
   return `${Math.round(numeric)}`
 }
 
+const KCAL_TO_KJ = 4.184
+const OZ_TO_ML = 29.57
+
+const formatEnergyValue = (value: number | null | undefined, unit: 'kcal' | 'kJ') => {
+  if (value === null || value === undefined) return '—'
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric)) return '—'
+  const baseKcal = numeric
+  const display = unit === 'kJ' ? baseKcal * KCAL_TO_KJ : baseKcal
+  const rounded = unit === 'kJ' ? Math.round(display) : Math.round(display)
+  return `${rounded} ${unit}`
+}
+
 const formatNumberInputValue = (value: any) => {
   if (value === null || value === undefined || Number.isNaN(value)) return ''
   return value
@@ -200,9 +213,17 @@ const isDiscreteUnitLabel = (label: string) => {
   ]
   if (nonDiscreteUnits.some(u => l === u || l.endsWith(' ' + u))) return false
   const discreteKeywords = [
-    'egg','slice','cookie','piece','patty','wing','nugget','meatball','stick','bar','biscuit','pancake','scoop'
+    'egg','slice','cookie','piece','patty','wing','nugget','meatball','stick','bar','biscuit','pancake','scoop',
+    'cracker','crackers','chip','chips'
   ]
   return discreteKeywords.some(k => l.includes(k))
+}
+
+const isVolumeBasedUnitLabel = (label: string) => {
+  const l = (label || '').toLowerCase().trim()
+  if (!l) return false
+  const volumeKeywords = ['oz', 'ounce', 'ounces', 'ml', 'milliliter', 'millilitre', 'cup', 'cups']
+  return volumeKeywords.some((u) => l.includes(u))
 }
 
 const extractStructuredItemsFromAnalysis = (analysis: string | null | undefined) => {
@@ -527,6 +548,8 @@ export default function FoodDiary() {
   })
   const [usageMeterRefresh, setUsageMeterRefresh] = useState<number>(0) // Trigger for UsageMeter refresh
   const [hasPaidAccess, setHasPaidAccess] = useState<boolean>(false)
+  const [energyUnit, setEnergyUnit] = useState<'kcal' | 'kJ'>('kcal')
+  const [volumeUnit, setVolumeUnit] = useState<'oz' | 'ml'>('oz')
 
   const applyRecalculatedNutrition = (items: any[]) => {
     const recalculated = recalculateNutritionFromItems(items)
@@ -791,6 +814,7 @@ export default function FoodDiary() {
                 method: l.imageUrl ? 'photo' : 'text',
                 photo: l.imageUrl || null,
                 nutrition: l.nutrients || null,
+                items: (l as any).items || (l.nutrients as any)?.items || null,
                 localDate: selectedDate,
               }));
               if (mapped.length > 0) {
@@ -899,6 +923,7 @@ export default function FoodDiary() {
             method: l.imageUrl ? 'photo' : 'text',
             photo: l.imageUrl || null,
             nutrition: l.nutrients || null,
+            items: (l as any).items || (l.nutrients as any)?.items || null,
           }));
           setHistoryFoods(mapped);
         } else {
@@ -951,7 +976,12 @@ export default function FoodDiary() {
             fetch('/api/food-log', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ description: last.description, nutrition: last.nutrition, imageUrl: last.photo || null })
+              body: JSON.stringify({
+                description: last.description,
+                nutrition: last.nutrition,
+                imageUrl: last.photo || null,
+                items: last.items || null,
+              }),
             }).catch(() => {});
           }
         } catch {}
@@ -1111,7 +1141,9 @@ const convertTotalsForStorage = (totals: ReturnType<typeof recalculateNutritionF
   const formatNutrientValue = (key: typeof NUTRIENT_DISPLAY_ORDER[number], value: number) => {
     const safeValue = Number.isFinite(value) ? value : 0
     if (key === 'calories') {
-      return `${Math.round(safeValue)}`
+      return energyUnit === 'kJ'
+        ? `${Math.round(safeValue * KCAL_TO_KJ)} kJ`
+        : `${Math.round(safeValue)}`
     }
     const rounded = Math.round(safeValue * 10) / 10
     const unit = NUTRIENT_CARD_META[key]?.unit || ''
@@ -1726,6 +1758,7 @@ Please add nutritional information manually if needed.`);
             method: l.imageUrl ? 'photo' : 'text',
             photo: l.imageUrl || null,
             nutrition: l.nutrients || null,
+            items: (l as any).items || (l.nutrients as any)?.items || null,
           }));
           setHistoryFoods(mapped);
         }
@@ -2154,18 +2187,46 @@ Please add nutritional information manually if needed.`);
                   )}
 
                   {analyzedNutrition && (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-4 mb-6 mt-3 sticky top-0 sm:top-2 z-20 bg-white/90 supports-[backdrop-filter]:bg-white/60 backdrop-blur rounded-lg p-1 sm:p-2">
-                      {NUTRIENT_DISPLAY_ORDER.map((key) => {
-                        const meta = NUTRIENT_CARD_META[key]
-                        const rawValue = (analyzedNutrition as any)?.[key] ?? 0
-                        const displayValue = formatNutrientValue(key, Number(rawValue))
-                        return (
-                          <div key={key} className={`bg-gradient-to-br ${meta.gradient} border border-white/60 rounded-xl p-2 sm:p-4 text-center shadow-sm`}>
-                            <div className={`text-xs font-medium uppercase tracking-wide ${meta.accent} mb-1`}>{meta.label}</div>
-                            <div className="text-xl sm:text-2xl font-bold text-gray-900">{displayValue}</div>
-                          </div>
-                        )
-                      })}
+                    <div className="mb-6 mt-3 sticky top-0 sm:top-2 z-20 bg-white/90 supports-[backdrop-filter]:bg-white/60 backdrop-blur rounded-lg p-1 sm:p-2">
+                      <div className="flex justify-end mb-1 pr-1">
+                        <div className="inline-flex items-center text-[11px] sm:text-xs bg-gray-100 rounded-full p-0.5 border border-gray-200">
+                          <button
+                            type="button"
+                            onClick={() => setEnergyUnit('kcal')}
+                            className={`px-2 py-0.5 rounded-full ${
+                              energyUnit === 'kcal'
+                                ? 'bg-white text-gray-900 shadow-sm'
+                                : 'text-gray-500'
+                            }`}
+                          >
+                            kcal
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEnergyUnit('kJ')}
+                            className={`px-2 py-0.5 rounded-full ${
+                              energyUnit === 'kJ'
+                                ? 'bg-white text-gray-900 shadow-sm'
+                                : 'text-gray-500'
+                            }`}
+                          >
+                            kJ
+                          </button>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-4">
+                        {NUTRIENT_DISPLAY_ORDER.map((key) => {
+                          const meta = NUTRIENT_CARD_META[key]
+                          const rawValue = (analyzedNutrition as any)?.[key] ?? 0
+                          const displayValue = formatNutrientValue(key, Number(rawValue))
+                          return (
+                            <div key={key} className={`bg-gradient-to-br ${meta.gradient} border border-white/60 rounded-xl p-2 sm:p-4 text-center shadow-sm`}>
+                              <div className={`text-xs font-medium uppercase tracking-wide ${meta.accent} mb-1`}>{meta.label}</div>
+                              <div className="text-xl sm:text-2xl font-bold text-gray-900">{displayValue}</div>
+                            </div>
+                          )
+                        })}
+                      </div>
                     </div>
                   )}
 
@@ -2203,6 +2264,31 @@ Please add nutritional information manually if needed.`);
                         const servingUnitMeta = parseServingUnitMetadata(item.serving_size || '')
                         const quickAddDelta = servingUnitMeta ? 1 / servingUnitMeta.quantity : null
                         const quickAddHalfDelta = quickAddDelta ? quickAddDelta / 2 : null
+                        const hasOunces = servingUnitMeta
+                          ? /oz|ounce/.test((servingUnitMeta.unitLabel || '').toLowerCase())
+                          : false
+                        const isVolumeUnit = servingUnitMeta
+                          ? isVolumeBasedUnitLabel(servingUnitMeta.unitLabel)
+                          : false
+                        const unitsPerServing = servingUnitMeta
+                          ? hasOunces && volumeUnit === 'ml'
+                            ? servingUnitMeta.quantity * OZ_TO_ML
+                            : servingUnitMeta.quantity
+                          : 1
+                        const displayUnitLabel = servingUnitMeta
+                          ? hasOunces && isVolumeUnit
+                            ? (volumeUnit === 'ml' ? 'ml' : 'oz')
+                            : servingUnitMeta.unitLabelSingular
+                          : null
+                        const unitStep = (() => {
+                          if (!servingUnitMeta || !servingUnitMeta.quantity || servingUnitMeta.quantity <= 0) return 1
+                          if (isDiscreteUnitLabel(servingUnitMeta.unitLabel)) return 1
+                          if (hasOunces) {
+                            return volumeUnit === 'ml' ? 10 : 1
+                          }
+                          if (isVolumeUnit) return 10
+                          return 1
+                        })()
                         
                         return (
                           <div key={index} className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
@@ -2287,42 +2373,72 @@ Please add nutritional information manually if needed.`);
                               {servingUnitMeta && (
                                 <div className="flex flex-col gap-1">
                                   <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
-                                    <span>Units{servingUnitMeta.unitLabelSingular ? ` (${servingUnitMeta.unitLabelSingular})` : ''}:</span>
+                                    <span>
+                                      Units{displayUnitLabel ? ` (${displayUnitLabel})` : ''}:
+                                    </span>
+                                    {hasOunces && (
+                                      <div className="inline-flex items-center text-[11px] bg-gray-100 rounded-full px-1 py-0.5 border border-gray-200">
+                                        <button
+                                          type="button"
+                                          onClick={() => setVolumeUnit('oz')}
+                                          className={`px-2 py-0.5 rounded-full ${
+                                            volumeUnit === 'oz'
+                                              ? 'bg-white text-gray-900 shadow-sm'
+                                              : 'text-gray-500'
+                                          }`}
+                                        >
+                                          oz
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => setVolumeUnit('ml')}
+                                          className={`px-2 py-0.5 rounded-full ${
+                                            volumeUnit === 'ml'
+                                              ? 'bg-white text-gray-900 shadow-sm'
+                                              : 'text-gray-500'
+                                          }`}
+                                        >
+                                          ml
+                                        </button>
+                                      </div>
+                                    )}
                                     <div className="flex items-center gap-2">
                                       <button
                                         onClick={() => {
-                                          const currentUnits = ((item.servings ?? 1) * servingUnitMeta.quantity)
-                                          const step = isDiscreteUnitLabel(servingUnitMeta.unitLabel) ? 1 : 1
-                                          const nextUnits = Math.max(0, (currentUnits - step))
-                                          const servingsFromUnits = nextUnits / servingUnitMeta.quantity
+                                          const currentUnits = (item.servings ?? 1) * unitsPerServing
+                                          const nextUnits = Math.max(0, currentUnits - unitStep)
+                                          const servingsFromUnits = nextUnits / unitsPerServing
                                           updateItemField(index, 'servings', Math.max(0, servingsFromUnits))
                                         }}
                                         className="w-7 h-7 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-md text-gray-700"
                                       >
                                         -
                                       </button>
-                                    <input
-                                      type="number"
-                                      min={0}
-                                      step={isDiscreteUnitLabel(servingUnitMeta.unitLabel) ? 1 : 0.1}
-                                      value={formatNumberInputValue(((item.servings ?? 1) * servingUnitMeta.quantity))}
-                                      onChange={(e) => {
-                                        const units = Number(e.target.value)
-                                        if (Number.isFinite(units) && units >= 0) {
-                                          const rawServings = units / servingUnitMeta.quantity
-                                          const step = isDiscreteUnitLabel(servingUnitMeta.unitLabel) ? (1 / servingUnitMeta.quantity) : 0.25
-                                          const snapped = Math.round(rawServings / step) * step
-                                          updateItemField(index, 'servings', Math.max(0, snapped))
-                                        }
-                                      }}
-                                      className="w-24 px-2 py-1 border border-gray-300 rounded-lg text-base font-semibold text-gray-900 text-center focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                    />
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        step={unitStep}
+                                        value={formatNumberInputValue((item.servings ?? 1) * unitsPerServing)}
+                                        onChange={(e) => {
+                                          const units = Number(e.target.value)
+                                          if (Number.isFinite(units) && units >= 0) {
+                                            const rawServings = units / unitsPerServing
+                                            const servingStep = isDiscreteUnitLabel(servingUnitMeta.unitLabel)
+                                              ? (1 / servingUnitMeta.quantity)
+                                              : 0.25
+                                            const snapped = servingStep > 0
+                                              ? Math.round(rawServings / servingStep) * servingStep
+                                              : rawServings
+                                            updateItemField(index, 'servings', Math.max(0, snapped))
+                                          }
+                                        }}
+                                        className="w-24 px-2 py-1 border border-gray-300 rounded-lg text-base font-semibold text-gray-900 text-center focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                      />
                                       <button
                                         onClick={() => {
-                                          const currentUnits = ((item.servings ?? 1) * servingUnitMeta.quantity)
-                                          const step = isDiscreteUnitLabel(servingUnitMeta.unitLabel) ? 1 : 1
-                                          const nextUnits = currentUnits + step
-                                          const servingsFromUnits = nextUnits / servingUnitMeta.quantity
+                                          const currentUnits = (item.servings ?? 1) * unitsPerServing
+                                          const nextUnits = currentUnits + unitStep
+                                          const servingsFromUnits = nextUnits / unitsPerServing
                                           updateItemField(index, 'servings', servingsFromUnits)
                                         }}
                                         className="w-7 h-7 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-md text-gray-700"
@@ -2345,11 +2461,11 @@ Please add nutritional information manually if needed.`);
                             <div className="flex flex-wrap gap-2">
                               {ITEM_NUTRIENT_META.map((meta) => {
                                 const rawValue = item?.[meta.field as keyof typeof item]
-                                const displayUnit = meta.key === 'calories' ? ' kcal' : 'g'
-                                const displayValue = formatMacroValue(
-                                  typeof rawValue === 'number' ? rawValue : Number(rawValue),
-                                  displayUnit
-                                )
+                                const numeric = typeof rawValue === 'number' ? rawValue : Number(rawValue)
+                                const displayValue =
+                                  meta.key === 'calories'
+                                    ? formatEnergyValue(numeric, energyUnit)
+                                    : formatMacroValue(numeric, 'g')
                                 return (
                                   <div
                                     key={`${meta.field}-${index}`}
@@ -2366,14 +2482,14 @@ Please add nutritional information manually if needed.`);
                               <div className="font-medium text-gray-700">Totals for {formattedServings}</div>
                               <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
                                 {ITEM_NUTRIENT_META.map((meta) => {
-                                  const displayUnit = meta.key === 'calories' ? ' cal' : 'g'
+                                  const value = totalsByField[meta.field as keyof typeof totalsByField]
+                                  const display =
+                                    meta.key === 'calories'
+                                      ? formatEnergyValue(value, energyUnit)
+                                      : formatMacroValue(value, 'g')
                                   return (
                                     <span key={`${meta.field}-total-${index}`} className="text-gray-700">
-                                      {formatMacroValue(
-                                        totalsByField[meta.field as keyof typeof totalsByField],
-                                        displayUnit
-                                      )}{' '}
-                                      {meta.label.toLowerCase()}
+                                      {display} {meta.label.toLowerCase()}
                                     </span>
                                   )
                                 })}
@@ -3251,7 +3367,33 @@ Please add nutritional information manually if needed.`);
 
                 return (
                   <div>
-                    <div className="text-lg font-semibold text-gray-800 mb-2">{isViewingToday ? "Today's Totals" : 'Totals'}</div>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-lg font-semibold text-gray-800">{isViewingToday ? "Today's Totals" : 'Totals'}</div>
+                      <div className="inline-flex items-center text-[11px] sm:text-xs bg-gray-100 rounded-full p-0.5 border border-gray-200">
+                        <button
+                          type="button"
+                          onClick={() => setEnergyUnit('kcal')}
+                          className={`px-2 py-0.5 rounded-full ${
+                            energyUnit === 'kcal'
+                              ? 'bg-white text-gray-900 shadow-sm'
+                              : 'text-gray-500'
+                          }`}
+                        >
+                          kcal
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEnergyUnit('kJ')}
+                          className={`px-2 py-0.5 rounded-full ${
+                            energyUnit === 'kJ'
+                              ? 'bg-white text-gray-900 shadow-sm'
+                              : 'text-gray-500'
+                          }`}
+                        >
+                          kJ
+                        </button>
+                      </div>
+                    </div>
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
                       {NUTRIENT_DISPLAY_ORDER.map((key) => {
                         const meta = NUTRIENT_CARD_META[key]

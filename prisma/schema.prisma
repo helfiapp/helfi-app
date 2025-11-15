@@ -170,6 +170,7 @@ model FoodLog {
   imageUrl    String?
   description String?
   nutrients   Json?
+  items       Json?      // Structured ingredient list for robust card editing
   createdAt   DateTime @default(now())
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
