@@ -256,6 +256,9 @@ const extractStructuredItemsFromAnalysis = (analysis: string | null | undefined)
       }
     }
   }
+  // 4) Prose fallback parsing (Nutrition Estimates bullets)
+  const textParsed = extractItemsFromTextEstimates(source)
+  if (textParsed) return textParsed
   return null
 }
 
@@ -298,6 +301,58 @@ const computeItemsToRemoveFromDescription = (items: any[], description: string) 
     }
   })
   return toRemove
+}
+
+// Fallback parser for prose sections like:
+// "**Scrambled Eggs**: Calories: 210, Protein: 18g, Carbs: 2g, Fat: 15g"
+const extractItemsFromTextEstimates = (analysis: string) => {
+  if (!analysis) return null
+  const lines = analysis
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean)
+  const items: any[] = []
+  const macroRegex = /(?:^|[*\-\u2022]\s*)\**([A-Za-z0-9 ,()\/\-]+?)\**\s*:\s*Calories:\s*([\d\.]+)[^,\n]*,\s*Protein:\s*([\d\.]+)\s*g[^,\n]*,\s*Carbs:\s*([\d\.]+)\s*g[^,\n]*,\s*Fat:\s*([\d\.]+)\s*g/i
+  for (const l of lines) {
+    const m = l.match(macroRegex)
+    if (m) {
+      const name = m[1].replace(/\*+/g, '').trim()
+      const calories = Number(m[2])
+      const protein_g = Number(m[3])
+      const carbs_g = Number(m[4])
+      const fat_g = Number(m[5])
+      if (name && [calories, protein_g, carbs_g, fat_g].every((n) => Number.isFinite(n))) {
+        items.push({
+          name,
+          brand: null,
+          serving_size: '', // unknown in this prose format
+          servings: 1,
+          calories,
+          protein_g,
+          carbs_g,
+          fat_g,
+          fiber_g: 0,
+          sugar_g: 0,
+        })
+      }
+    }
+  }
+  if (!items.length) return null
+  const total = items.reduce(
+    (acc, it) => {
+      acc.calories += it.calories
+      acc.protein_g += it.protein_g
+      acc.carbs_g += it.carbs_g
+      acc.fat_g += it.fat_g
+      acc.fiber_g += it.fiber_g || 0
+      acc.sugar_g += it.sugar_g || 0
+      return acc
+    },
+    { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fiber_g: 0, sugar_g: 0 }
+  )
+  return { items, total }
 }
 
 // Hook to remove items and recalc, optionally updating editingEntry
