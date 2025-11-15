@@ -703,7 +703,10 @@ const applyStructuredItems = (itemsFromApi: any[] | null | undefined, totalFromA
   if (finalItems.length > 0) {
     const enriched = enrichItemsFromStarter(finalItems)
     setAnalyzedItems(enriched)
-    applyRecalculatedNutrition(enriched)
+    // Do NOT override the initial nutrition summary here.
+    // We first trust the AI's own total (extractNutritionData).
+    // When the user edits cards (change servings, units, etc.), updateItemField
+    // will call applyRecalculatedNutrition to keep everything in sync.
   } else {
     // If still no items, set empty but don't clear aiDescription - let useEffect try prose parser
     setAnalyzedItems([])
