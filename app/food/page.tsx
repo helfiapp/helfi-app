@@ -1161,7 +1161,10 @@ Meanwhile, you can describe your food manually:
         },
         body: JSON.stringify({
           textDescription: foodDescription,
-          foodType: manualFoodType
+          foodType: manualFoodType,
+          // Strongly request structured items and multi-detect for best accuracy
+          returnItems: true,
+          multi: true,
         }),
       });
 

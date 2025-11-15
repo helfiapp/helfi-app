@@ -129,7 +129,8 @@ export async function POST(req: NextRequest) {
     console.log('📝 Content-Type:', contentType);
     let messages: any[] = [];
     // Backward-compatible enhancement flags
-    let wantStructured = false; // when true, we also return items[] and totals
+    // Default ON for best accuracy
+    let wantStructured = true; // when true, we also return items[] and totals
     let preferMultiDetect = true; // default ON: detect multiple foods without changing output line
 
     let isReanalysis = false;
@@ -138,8 +139,9 @@ export async function POST(req: NextRequest) {
       const body = await req.json();
       const { textDescription, foodType, isReanalysis: reFlag, returnItems, multi } = body as any;
       isReanalysis = !!reFlag;
-      wantStructured = !!returnItems;
-      preferMultiDetect = !!multi;
+      // Default to true unless explicitly disabled
+      wantStructured = returnItems !== undefined ? !!returnItems : true;
+      preferMultiDetect = multi !== undefined ? !!multi : true;
       console.log('📝 Text analysis mode:', { textDescription, foodType });
 
       if (!textDescription) {
@@ -394,7 +396,8 @@ CRITICAL REQUIREMENTS:
       );
     }
 
-    const model = isReanalysis ? 'gpt-4o-mini' : 'gpt-4o';
+    // Use the higher-accuracy model for both first pass and re-analysis
+    const model = 'gpt-4o';
     const maxTokens = 600;
 
     // Wallet pre-check (skip if allowed via free use)
