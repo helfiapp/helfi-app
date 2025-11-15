@@ -4865,6 +4865,15 @@ export default function Onboarding() {
   const { data: session, status } = useSession();
   const { profileImage: providerProfileImage } = useUserData();
   
+  // ⚠️ HEALTH SETUP GUARD RAIL
+  // This onboarding component is part of a carefully tuned flow:
+  // - Onboarding is "complete" only when gender, weight, height, and at least one health goal exist.
+  // - The first-time modal MUST continue to appear on this page until setup is complete.
+  // - The "I'll do it later" button sets sessionStorage.onboardingDeferredThisSession = '1'
+  //   and allows the user to use the app for the rest of the browser session without
+  //   redirect loops from the dashboard.
+  // Do NOT change this behaviour without reading HEALTH_SETUP_PROTECTION.md and obtaining
+  // explicit approval from the user.
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<any>({});
   // Removed forced remount to avoid infinite loops

@@ -13,6 +13,12 @@ export default async function InsightsPage() {
 
   const payload = await getIssueLandingPayload(session.user.id)
 
+  // ⚠️ HEALTH SETUP GUARD RAIL
+  // If Health Setup is not complete, Insights MUST remain fully locked.
+  // This gate is the single source of truth for /insights access and must
+  // mirror the onboardingComplete definition in HEALTH_SETUP_PROTECTION.md.
+  // Do NOT bypass this check or show "fake" personalised insights to users
+  // with incomplete Health Setup.
   // If Health Setup is not complete, completely gate the Insights section and
   // guide the user back to onboarding instead of showing empty insights.
   if (!payload.onboardingComplete) {

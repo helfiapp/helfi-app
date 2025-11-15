@@ -16,7 +16,7 @@ Before pushing ANY code changes to GitHub, you MUST:
 
 3. ✅ **Test Your Changes**: Ensure code compiles and doesn't break existing functionality
 
-4. ✅ **Check Protected Code Areas**: Before modifying email functionality, read `WAITLIST_EMAIL_PROTECTION.md`
+4. ✅ **Check Protected Code Areas**: Before modifying email functionality, read `WAITLIST_EMAIL_PROTECTION.md`. Before modifying health setup, onboarding, dashboard redirects, or insights gating, read `HEALTH_SETUP_PROTECTION.md`.
 
 ## Why This Matters
 
@@ -28,7 +28,9 @@ Before pushing ANY code changes to GitHub, you MUST:
 
 - **Deployment Status Script**: `./scripts/check-deployment-status.sh`
 - **Deployment Protocol**: `DEPLOYMENT_PROTOCOL.md`
-- **Protected Code Areas**: `WAITLIST_EMAIL_PROTECTION.md` (⚠️ Read before modifying email code)
+- **Protected Code Areas**:
+  - `WAITLIST_EMAIL_PROTECTION.md` (⚠️ Read before modifying email code)
+  - `HEALTH_SETUP_PROTECTION.md` (⚠️ Read before modifying health setup / onboarding / insights code)
 - **Vercel Dashboard**: https://vercel.com/louie-veleskis-projects/helfi-app/deployments
 - **Project Name**: `helfi-app`
 - **Team ID**: `team_DLxtczVMOZUXhiInxhTSDrCs`

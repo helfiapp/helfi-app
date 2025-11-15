@@ -3,6 +3,16 @@ import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
+// ⚠️ HEALTH SETUP GUARD RAIL
+// This endpoint is the single source of truth for lightweight Health Setup
+// status checks (used by the 5-minute reminder). It MUST:
+// - Use the same "onboarding complete" definition as HEALTH_SETUP_PROTECTION.md.
+// - Respect the account-wide "__HEALTH_SETUP_REMINDER_DISABLED__" flag.
+// - Only control reminders, NOT actual access gates (Insights gating lives in
+//   lib/insights/issue-engine.ts and app/insights/page.tsx).
+// Do NOT repurpose this endpoint for other auth/redirect logic without
+// reading HEALTH_SETUP_PROTECTION.md and getting explicit user approval.
+
 // This endpoint provides a lightweight view of a user's health setup status
 // so that the UI can decide when to show reminders without loading the full
 // onboarding payload.

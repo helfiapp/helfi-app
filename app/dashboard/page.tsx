@@ -12,6 +12,14 @@ import UsageMeter from '@/components/UsageMeter'
 import FitbitSummary from '@/components/devices/FitbitSummary'
 
 export default function Dashboard() {
+  // ⚠️ HEALTH SETUP GUARD RAIL
+  // Dashboard onboarding logic is tightly coupled to HEALTH_SETUP_PROTECTION.md:
+  // - Onboarding is "complete" only when gender, weight, height, and at least one health goal exist.
+  // - Brand-new users may be redirected to /onboarding, but only if
+  //   sessionStorage.onboardingDeferredThisSession !== '1' (user has NOT chosen "I'll do it later").
+  // - The green "Onboarding Complete" card must only show when onboardingComplete === true.
+  // Do NOT loosen these checks or remove the deferral flag without reading
+  // HEALTH_SETUP_PROTECTION.md and getting explicit user approval.
   const { data: session } = useSession()
   const pathname = usePathname()
   const { profileImage: providerProfileImage } = useUserData()

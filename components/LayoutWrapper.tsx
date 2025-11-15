@@ -168,6 +168,14 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   const isAdminPanelPath =
     pathname.startsWith('/admin-panel') || pathname.startsWith('/main-admin')
 
+  // ⚠️ HEALTH SETUP GUARD RAIL
+  // The 5-minute global Health Setup reminder must:
+  // - Only appear for authenticated users on non-public, non-admin pages.
+  // - Use GET /api/health-setup-status to respect account-wide "Don't ask me again".
+  // - Show at most once per browser session via sessionStorage.helfiHealthSetupReminderShownThisSession.
+  // Do NOT convert this into a hard block or change the timing/behaviour without
+  // reading HEALTH_SETUP_PROTECTION.md and obtaining explicit user approval.
+
   // One-time per-session reminder: if a user has been using the app
   // for more than ~5 minutes without completing Health Setup, gently prompt
   // them to finish it. Users can permanently opt out of this reminder for
