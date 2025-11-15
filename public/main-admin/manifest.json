@@ -1,0 +1,22 @@
+{
+  "short_name": "Helfi Admin",
+  "name": "Helfi Admin Panel",
+  "icons": [
+    {
+      "src": "/icons/admin-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "/icons/admin-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "/main-admin",
+  "scope": "/main-admin/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff"
+}
+
