@@ -787,7 +787,28 @@ export default function FoodDiary() {
                 nutrition: l.nutrients || null,
                 localDate: selectedDate,
               }));
-              setTodaysFoods(mapped);
+              if (mapped.length > 0) {
+                setTodaysFoods(mapped);
+              } else {
+                // Secondary fallback: load from /api/user-data directly and pull todaysFoods
+                try {
+                  const ud = await fetch('/api/user-data', { cache: 'no-store' }).then(r => r.ok ? r.json() : null);
+                  const tf = Array.isArray(ud?.todaysFoods) ? ud.todaysFoods : [];
+                  const byDate = tf.filter((item: any) => {
+                    if (typeof item?.localDate === 'string') return item.localDate === selectedDate
+                    try {
+                      const d = new Date(typeof item.id === 'number' ? item.id : Number(item.id))
+                      const y = d.getFullYear()
+                      const m = String(d.getMonth() + 1).padStart(2, '0')
+                      const day = String(d.getDate()).padStart(2, '0')
+                      return `${y}-${m}-${day}` === selectedDate
+                    } catch {
+                      return false
+                    }
+                  })
+                  if (byDate.length > 0) setTodaysFoods(byDate)
+                } catch {}
+              }
             }
           } catch {
             // ignore
