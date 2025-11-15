@@ -88,22 +88,21 @@ export default function Dashboard() {
               dataSize: JSON.stringify(result.data).length + ' characters'
             });
             
-            // Check if user needs onboarding (only for truly new users)
-            const hasBasicProfile = result.data.gender && result.data.weight && result.data.height;
-            const hasHealthGoals = result.data.goals && result.data.goals.length > 0;
-            
-            if (!hasBasicProfile || !hasHealthGoals) {
-              const deferred = typeof window !== 'undefined' && sessionStorage.getItem('onboardingDeferredThisSession') === '1';
-              if (!deferred) {
-                console.log('🎯 New user detected - redirecting to onboarding');
-                window.location.href = '/onboarding';
-                return;
-              } else {
-                console.log('⏳ Onboarding deferred this session — staying on dashboard');
-              }
+            // Define onboarding completion using the same rule as Insights:
+            // 1) basic profile data present, and 2) at least one health goal selected.
+            const hasBasicProfile = !!(result.data.gender && result.data.weight && result.data.height)
+            const hasHealthGoals = !!(result.data.goals && result.data.goals.length > 0)
+            const onboardingComplete = hasBasicProfile && hasHealthGoals
+
+            // For truly brand-new users with no meaningful data at all, still
+            // redirect straight into onboarding on first visit.
+            if (!onboardingComplete && !hasBasicProfile && !hasHealthGoals && !result.data.supplements?.length && !result.data.medications?.length) {
+              console.log('🎯 Brand new user detected - redirecting to onboarding')
+              window.location.href = '/onboarding'
+              return
             }
-            
-            setOnboardingData(result.data);
+
+            setOnboardingData({ ...result.data, onboardingComplete });
             // Load device interest flags if present
             if (result.data.deviceInterest && typeof result.data.deviceInterest === 'object') {
               setDeviceInterest(result.data.deviceInterest)
@@ -122,14 +121,9 @@ export default function Dashboard() {
             }
           } else {
             // No data at all - definitely a new user
-            const deferred = typeof window !== 'undefined' && sessionStorage.getItem('onboardingDeferredThisSession') === '1';
-            if (!deferred) {
-              console.log('🎯 No user data found - redirecting new user to onboarding');
-              window.location.href = '/onboarding';
-              return;
-            } else {
-              console.log('⏳ Onboarding deferred with no data — staying on dashboard');
-            }
+            console.log('🎯 No user data found - redirecting new user to onboarding');
+            window.location.href = '/onboarding';
+            return;
           }
         } else if (response.status === 404) {
           console.log('ℹ️ No existing data found for user in database - redirecting to onboarding');
@@ -785,7 +779,7 @@ export default function Dashboard() {
 
             {/* Data Status Section */}
             <div className="mb-8">
-              {onboardingData ? (
+              {onboardingData?.onboardingComplete ? (
                 <div className="bg-green-50 border border-green-200 rounded-xl p-6">
                   <div className="flex items-center justify-between">
                     <div>
@@ -847,9 +841,9 @@ export default function Dashboard() {
                 <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="text-lg font-semibold text-blue-900 mb-2">🚀 Get Started</h3>
+                      <h3 className="text-lg font-semibold text-blue-900 mb-2">🚀 Complete your Health Setup</h3>
                       <p className="text-blue-700 mb-4">
-                        Complete your health profile to unlock personalized insights and tracking
+                        Finish your health profile to unlock personalized insights and tracking
                       </p>
                     </div>
                     <div className="text-blue-600">
@@ -863,7 +857,7 @@ export default function Dashboard() {
                     href="/onboarding"
                     className="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium"
                   >
-                    Start Health Profile Setup
+                    {onboardingData ? 'Continue Health Setup' : 'Start Health Profile Setup'}
                   </Link>
                 </div>
               )}
