@@ -32,6 +32,47 @@ function parseItemsJsonRelaxed(raw: string): any | null {
   }
 }
 
+const computeTotalsFromItems = (items: any[]): any | null => {
+  if (!Array.isArray(items) || items.length === 0) {
+    return null;
+  }
+
+  const totals = items.reduce(
+    (acc, item) => {
+      const servings = Number.isFinite(Number(item?.servings)) ? Number(item.servings) : 1;
+      acc.calories += Number(item?.calories || 0) * servings;
+      acc.protein_g += Number(item?.protein_g || 0) * servings;
+      acc.carbs_g += Number(item?.carbs_g || 0) * servings;
+      acc.fat_g += Number(item?.fat_g || 0) * servings;
+      acc.fiber_g += Number(item?.fiber_g || 0) * servings;
+      acc.sugar_g += Number(item?.sugar_g || 0) * servings;
+      return acc;
+    },
+    {
+      calories: 0,
+      protein_g: 0,
+      carbs_g: 0,
+      fat_g: 0,
+      fiber_g: 0,
+      sugar_g: 0,
+    },
+  );
+
+  const round = (value: number, decimals = 1) => {
+    const factor = Math.pow(10, decimals);
+    return Math.round(value * factor) / factor;
+  };
+
+  return {
+    calories: Math.round(totals.calories),
+    protein_g: round(totals.protein_g),
+    carbs_g: round(totals.carbs_g),
+    fat_g: round(totals.fat_g),
+    fiber_g: totals.fiber_g > 0 ? round(totals.fiber_g) : null,
+    sugar_g: totals.sugar_g > 0 ? round(totals.sugar_g) : null,
+  };
+};
+
 // Initialize OpenAI client only when API key is available
 // Updated: 2025-06-26 - Ensure environment variable is properly loaded
 const getOpenAIClient = () => {
@@ -570,7 +611,10 @@ CRITICAL REQUIREMENTS:
           const parsed = parseItemsJsonRelaxed(m[1].trim());
           if (parsed && typeof parsed === 'object') {
             resp.items = Array.isArray(parsed.items) ? parsed.items : [];
-            resp.total = parsed.total || null;
+            resp.total = typeof parsed.total === 'object' ? parsed.total : null;
+            if ((!resp.total || Object.keys(resp.total).length === 0) && resp.items.length > 0) {
+              resp.total = computeTotalsFromItems(resp.items);
+            }
           }
           // Always strip the ITEMS_JSON block to avoid UI artifacts, even if parsing failed
           resp.analysis = resp.analysis.replace(m[0], '').trim();
@@ -578,6 +622,10 @@ CRITICAL REQUIREMENTS:
       } catch (e) {
         console.warn('ITEMS_JSON handling failed (non-fatal):', e);
       }
+    }
+
+    if (resp.items && resp.items.length > 0 && !resp.total) {
+      resp.total = computeTotalsFromItems(resp.items);
     }
 
     // HEALTH COMPATIBILITY CHECK: Analyze food against user's health data

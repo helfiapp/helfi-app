@@ -680,38 +680,50 @@ export default function FoodDiary() {
     setIngredientSearchQuery('')
   }
 
-const applyStructuredItems = (itemsFromApi: any[] | null | undefined, totalFromApi: any, analysisText: string | null | undefined) => {
+const applyStructuredItems = (
+  itemsFromApi: any[] | null | undefined,
+  totalFromApi: any,
+  analysisText: string | null | undefined,
+  options?: { allowTextFallback?: boolean },
+) => {
   let finalItems = Array.isArray(itemsFromApi) ? itemsFromApi : []
-  let finalTotal = totalFromApi || null
+  let finalTotal = sanitizeNutritionTotals(totalFromApi)
+  const allowTextFallback = options?.allowTextFallback ?? true
 
   if (!finalItems.length && analysisText) {
-    // 1) Try structured JSON / ITEMS_JSON block first
     const fallback = extractStructuredItemsFromAnalysis(analysisText)
     if (fallback?.items?.length) {
       finalItems = fallback.items
-      finalTotal = fallback.total || finalTotal
+      finalTotal = sanitizeNutritionTotals(fallback.total) || finalTotal
     } else {
-      // 2) If there is no JSON, fall back to parsing the prose \"Detected foods\" bullets
       const prose = extractItemsFromTextEstimates(analysisText)
       if (prose?.items?.length) {
         finalItems = prose.items
-        finalTotal = prose.total || finalTotal
+        finalTotal = sanitizeNutritionTotals(prose.total) || finalTotal
       }
     }
   }
 
-  if (finalItems.length > 0) {
-    const enriched = enrichItemsFromStarter(finalItems)
-    setAnalyzedItems(enriched)
-    // Do NOT override the initial nutrition summary here.
-    // We first trust the AI's own total (extractNutritionData).
-    // When the user edits cards (change servings, units, etc.), updateItemField
-    // will call applyRecalculatedNutrition to keep everything in sync.
-  } else {
-    // If still no items, set empty but don't clear aiDescription - let useEffect try prose parser
-    setAnalyzedItems([])
-    setAnalyzedTotal(finalTotal)
+  const enrichedItems = finalItems.length > 0 ? enrichItemsFromStarter(finalItems) : []
+  setAnalyzedItems(enrichedItems)
+
+  let totalsToUse = finalTotal
+  if (!totalsToUse && enrichedItems.length > 0) {
+    totalsToUse = recalculateNutritionFromItems(enrichedItems)
   }
+  if (!totalsToUse && analysisText && allowTextFallback) {
+    totalsToUse = sanitizeNutritionTotals(extractNutritionData(analysisText))
+  }
+
+  if (totalsToUse) {
+    setAnalyzedNutrition(totalsToUse)
+    setAnalyzedTotal(convertTotalsForStorage(totalsToUse))
+  } else if (!analyzedNutrition) {
+    setAnalyzedNutrition(null)
+    setAnalyzedTotal(null)
+  }
+
+  return { items: enrichedItems, total: totalsToUse }
 }
 
   const clampNumber = (value: any, min: number, max: number) => {
@@ -935,40 +947,13 @@ const applyStructuredItems = (itemsFromApi: any[] | null | undefined, totalFromA
     }
   }, [userData, isViewingToday, selectedDate]);
 
-  // Auto-rebuild ingredient cards from <ITEMS_JSON> or Nutrition Estimates prose when aiDescription changes
+  // Auto-rebuild ingredient cards from aiDescription when needed
   useEffect(() => {
     if (!aiDescription) return
-    // Only rebuild if we currently have no items
     if (analyzedItems && analyzedItems.length > 0) return
-    
-    try {
-      // Always try structured JSON extraction first (handles <ITEMS_JSON>, HTML-encoded tags, and untagged JSON)
-      const extracted = extractStructuredItemsFromAnalysis(aiDescription)
-      if (extracted && Array.isArray(extracted.items) && extracted.items.length > 0) {
-        const enriched = enrichItemsFromStarter(extracted.items)
-        setAnalyzedItems(enriched)
-        applyRecalculatedNutrition(enriched)
-        return // Success, exit early
-      }
-      
-      // If structured extraction failed, try prose extraction as fallback
-      // This handles "Nutrition Estimates" sections and other prose formats
-      const proseExtracted = extractItemsFromTextEstimates(aiDescription)
-      if (proseExtracted && Array.isArray(proseExtracted.items) && proseExtracted.items.length > 0) {
-        const enriched = enrichItemsFromStarter(proseExtracted.items)
-        setAnalyzedItems(enriched)
-        applyRecalculatedNutrition(enriched)
-        return // Success, exit early
-      }
-      
-      // If both methods failed, log for debugging (but don't spam console)
-      if (aiDescription.length > 100) { // Only log if description is substantial
-        console.log('Could not extract items from description:', aiDescription.substring(0, 200))
-      }
-    } catch (e) {
-      console.error('Failed to rebuild cards from description:', e)
-    }
-  }, [aiDescription, analyzedItems]) 
+    const allowTextFallback = editingEntry ? !editingEntry?.nutrition : true
+    applyStructuredItems(null, null, aiDescription, { allowTextFallback })
+  }, [aiDescription, analyzedItems, editingEntry])
 
   // Load history for non-today dates
   useEffect(() => {
@@ -1207,6 +1192,40 @@ const convertTotalsForStorage = (totals: ReturnType<typeof recalculateNutritionF
   }
 }
 
+function sanitizeNutritionTotals(raw: any) {
+  if (!raw || typeof raw !== 'object') return null
+  const toNumber = (value: any) => {
+    if (value === null || value === undefined) return null
+    const parsed = typeof value === 'string' ? parseFloat(value) : Number(value)
+    return Number.isFinite(parsed) ? parsed : null
+  }
+  const round = (value: number | null, decimals = 1, zeroAsNull = false) => {
+    if (value === null) return null
+    if (zeroAsNull && value <= 0) return null
+    const factor = Math.pow(10, decimals)
+    return Math.round(value * factor) / factor
+  }
+
+  const calories = toNumber(raw.calories ?? raw.kcal ?? raw.energy ?? raw.cal)
+  const protein = toNumber(raw.protein ?? raw.protein_g)
+  const carbs = toNumber(raw.carbs ?? raw.carbs_g)
+  const fat = toNumber(raw.fat ?? raw.fat_g)
+  const fiber = toNumber(raw.fiber ?? raw.fiber_g)
+  const sugar = toNumber(raw.sugar ?? raw.sugar_g)
+
+  const normalized = {
+    calories: calories === null ? null : Math.round(calories),
+    protein: round(protein, 1),
+    carbs: round(carbs, 1),
+    fat: round(fat, 1),
+    fiber: round(fiber, 1, true),
+    sugar: round(sugar, 1, true),
+  }
+
+  const hasValues = Object.values(normalized).some((value) => value !== null)
+  return hasValues ? normalized : null
+}
+
   const formatNutrientValue = (key: typeof NUTRIENT_DISPLAY_ORDER[number], value: number) => {
     const safeValue = Number.isFinite(value) ? value : 0
     if (key === 'calories') {
@@ -1308,7 +1327,6 @@ const convertTotalsForStorage = (totals: ReturnType<typeof recalculateNutritionF
       if (result.success && result.analysis) {
         console.log('🎉 SUCCESS: Real AI analysis received!');
         setAiDescription(result.analysis);
-        setAnalyzedNutrition(extractNutritionData(result.analysis));
         applyStructuredItems(result.items, result.total, result.analysis);
         // Set health warning and alternatives if present
         setHealthWarning(result.healthWarning || null);
@@ -1407,7 +1425,6 @@ Meanwhile, you can describe your food manually:
       
       if (result.analysis) {
         setAiDescription(result.analysis);
-        setAnalyzedNutrition(extractNutritionData(result.analysis));
         applyStructuredItems(result.items, result.total, result.analysis);
         // Set health warning and alternatives if present
         setHealthWarning(result.healthWarning || null);
@@ -1595,7 +1612,6 @@ Please add nutritional information manually if needed.`);
         const result = await response.json();
         if (result.success && result.analysis) {
           setAiDescription(result.analysis);
-          setAnalyzedNutrition(extractNutritionData(result.analysis));
           applyStructuredItems(result.items, result.total, result.analysis);
           setHealthWarning(result.healthWarning || null);
           setHealthAlternatives(result.alternatives || null);
