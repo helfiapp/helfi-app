@@ -363,6 +363,9 @@ const computeItemsToRemoveFromDescription = (items: any[], description: string) 
 
 // Fallback parser for prose sections like:
 // "**Scrambled Eggs**: Calories: 210, Protein: 18g, Carbs: 2g, Fat: 15g"
+// and two-line formats like:
+// "1. **Bun**: 1 bun (3 oz)"
+// "- Calories: 150, Protein: 5g, Carbs: 28g, Fat: 3g"
 const extractItemsFromTextEstimates = (analysis: string) => {
   if (!analysis) return null
   const lines = analysis
@@ -385,14 +388,44 @@ const extractItemsFromTextEstimates = (analysis: string) => {
     }
   }
   const items: any[] = []
-  // Match formats like: "- **Scrambled Eggs**: 210 calories, 18g protein, 1g carbs, 15g fat, 0g fiber, 1g sugar."
-  // Also handles: "**Scrambled Eggs**: Calories: 210, Protein: 18g, ..."
-  const macroRegex1 = /(?:^|[*\-\u2022]\s*)\**([A-Za-z0-9 ,()\/\-]+?)\**\s*:\s*Calories:\s*([\d\.]+)[^,\n]*,\s*Protein:\s*([\d\.]+)\s*g[^,\n]*,\s*Carbs:\s*([\d\.]+)\s*g[^,\n]*,\s*Fat:\s*([\d\.]+)\s*g(?:[^,\n]*,\s*Fiber:\s*([\d\.]+)\s*g)?(?:[^,\n]*,\s*Sugar:\s*([\d\.]+)\s*g)?/i
-  // More flexible regex for "210 calories, 18g protein" format - handles variable spacing
-  const macroRegex2 = /(?:^|[*\-\u2022]\s*)\**([A-Za-z0-9 ,()\/\-]+?)\**\s*:\s*([\d\.]+)\s*calories?\s*,\s*([\d\.]+)\s*g\s*protein\s*,\s*([\d\.]+)\s*g\s*carbs?\s*,\s*([\d\.]+)\s*g\s*fat\s*(?:,\s*([\d\.]+)\s*g\s*fiber\s*)?(?:,\s*([\d\.]+)\s*g\s*sugar\s*)?/i
-  for (const l of lines) {
-    let m = l.match(macroRegex1)
-    if (!m) m = l.match(macroRegex2)
+
+  // Inline macro formats like:
+  // "- **Scrambled Eggs**: Calories: 210, Protein: 18g, Carbs: 2g, Fat: 15g, Fiber: 0g, Sugar: 1g"
+  // or "**Scrambled Eggs**: 210 calories, 18g protein, 2g carbs, 15g fat"
+  const inlineMacroRegex1 =
+    /(?:^|[*\-\u2022]\s*)\**([A-Za-z0-9 ,()\/\-]+?)\**\s*:\s*Calories:\s*([\d\.]+)[^,\n]*,\s*Protein:\s*([\d\.]+)\s*g[^,\n]*,\s*Carbs:\s*([\d\.]+)\s*g[^,\n]*,\s*Fat:\s*([\d\.]+)\s*g(?:[^,\n]*,\s*Fiber:\s*([\d\.]+)\s*g)?(?:[^,\n]*,\s*Sugar:\s*([\d\.]+)\s*g)?/i
+  const inlineMacroRegex2 =
+    /(?:^|[*\-\u2022]\s*)\**([A-Za-z0-9 ,()\/\-]+?)\**\s*:\s*([\d\.]+)\s*calories?\s*,\s*([\d\.]+)\s*g\s*protein\s*,\s*([\d\.]+)\s*g\s*carbs?\s*,\s*([\d\.]+)\s*g\s*fat\s*(?:,\s*([\d\.]+)\s*g\s*fiber\s*)?(?:,\s*([\d\.]+)\s*g\s*sugar\s*)?/i
+
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i]
+    let m = l.match(inlineMacroRegex1)
+    if (!m) m = l.match(inlineMacroRegex2)
+
+    // Two-line variant: numbered header, then "- Calories: ..." on next line
+    if (!m) {
+      const header = l.match(/^\d+\.\s*\**([A-Za-z0-9 ,()\/\-]+?)\**\s*:\s*(.+)$/i)
+      const next = lines[i + 1]
+      if (header && next && /^-\s*calories:/i.test(next)) {
+        const macroLineMatch =
+          next.match(
+            /^-\s*Calories:\s*([\d\.]+)[^,\n]*,\s*Protein:\s*([\d\.]+)\s*g[^,\n]*,\s*Carbs:\s*([\d\.]+)\s*g[^,\n]*,\s*Fat:\s*([\d\.]+)\s*g(?:[^,\n]*,\s*Fiber:\s*([\d\.]+)\s*g)?(?:[^,\n]*,\s*Sugar:\s*([\d\.]+)\s*g)?/i,
+          ) || null
+        if (macroLineMatch) {
+          m = [
+            header[0],
+            header[1],
+            macroLineMatch[1],
+            macroLineMatch[2],
+            macroLineMatch[3],
+            macroLineMatch[4],
+            macroLineMatch[5],
+            macroLineMatch[6],
+          ] as any
+        }
+      }
+    }
+
     if (m) {
       const name = m[1].replace(/\*+/g, '').trim()
       const calories = Number(m[2])
@@ -417,7 +450,30 @@ const extractItemsFromTextEstimates = (analysis: string) => {
       }
     }
   }
+
+  // If we still have no macros but we *do* have a serving map, at least
+  // build items with names + serving sizes so cards can render.
+  if (!items.length && Object.keys(servingMap).length > 0) {
+    for (const [nameKey, serving_size] of Object.entries(servingMap)) {
+      const displayName = nameKey.replace(/\b\w/g, (c) => c.toUpperCase())
+      items.push({
+        name: displayName,
+        brand: null,
+        serving_size,
+        servings: 1,
+        calories: null,
+        protein_g: null,
+        carbs_g: null,
+        fat_g: null,
+        fiber_g: null,
+        sugar_g: null,
+      })
+    }
+    return { items, total: null }
+  }
+
   if (!items.length) return null
+
   const total = items.reduce(
     (acc, it) => {
       acc.calories += it.calories
