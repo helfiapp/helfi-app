@@ -1357,17 +1357,20 @@ Please add nutritional information manually if needed.`);
       setPhotoPreview(food.photo);
       setAiDescription(food.description);
       setAnalyzedNutrition(food.nutrition);
-      // Restore items if available
-      if (food.items && Array.isArray(food.items)) {
+      // Restore items if available; otherwise attempt to extract from saved description text
+      if (food.items && Array.isArray(food.items) && food.items.length > 0) {
         setAnalyzedItems(food.items);
-        if (food.items.length > 0) {
-          applyRecalculatedNutrition(food.items);
+        applyRecalculatedNutrition(food.items);
+      } else {
+        // Try to rebuild items from any embedded <ITEMS_JSON> in the saved description
+        const extracted = extractStructuredItemsFromAnalysis(food.description || '');
+        if (extracted && Array.isArray(extracted.items) && extracted.items.length > 0) {
+          setAnalyzedItems(extracted.items);
+          applyRecalculatedNutrition(extracted.items);
         } else {
+          setAnalyzedItems([]);
           setAnalyzedTotal(food.total || null);
         }
-      } else {
-        setAnalyzedItems([]);
-        setAnalyzedTotal(null);
       }
       setShowAiResult(true);
       setShowAddFood(true);
