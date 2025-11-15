@@ -3034,6 +3034,7 @@ Please add nutritional information manually if needed.`);
                 )}
 
                 {/* Multiple Ingredients Entry */}
+                {/* PROTECTED: INGREDIENTS_CARD START */}
                 {manualFoodType === 'multiple' && (
                   <div className="mb-6">
                     <div className="space-y-4">
@@ -3123,6 +3124,7 @@ Please add nutritional information manually if needed.`);
                     </div>
                   </div>
                 )}
+                {/* PROTECTED: INGREDIENTS_CARD END */}
 
                 {/* Action Buttons */}
                 <div className="flex gap-3">
