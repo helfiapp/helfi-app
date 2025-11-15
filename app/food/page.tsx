@@ -367,7 +367,8 @@ const extractItemsFromTextEstimates = (analysis: string) => {
   // Match formats like: "- **Scrambled Eggs**: 210 calories, 18g protein, 1g carbs, 15g fat, 0g fiber, 1g sugar."
   // Also handles: "**Scrambled Eggs**: Calories: 210, Protein: 18g, ..."
   const macroRegex1 = /(?:^|[*\-\u2022]\s*)\**([A-Za-z0-9 ,()\/\-]+?)\**\s*:\s*Calories:\s*([\d\.]+)[^,\n]*,\s*Protein:\s*([\d\.]+)\s*g[^,\n]*,\s*Carbs:\s*([\d\.]+)\s*g[^,\n]*,\s*Fat:\s*([\d\.]+)\s*g(?:[^,\n]*,\s*Fiber:\s*([\d\.]+)\s*g)?(?:[^,\n]*,\s*Sugar:\s*([\d\.]+)\s*g)?/i
-  const macroRegex2 = /(?:^|[*\-\u2022]\s*)\**([A-Za-z0-9 ,()\/\-]+?)\**\s*:\s*([\d\.]+)\s*calories[^,\n]*,\s*([\d\.]+)g\s+protein[^,\n]*,\s*([\d\.]+)g\s+carbs[^,\n]*,\s*([\d\.]+)g\s+fat(?:[^,\n]*,\s*([\d\.]+)g\s+fiber)?(?:[^,\n]*,\s*([\d\.]+)g\s+sugar)?/i
+  // More flexible regex for "210 calories, 18g protein" format - handles variable spacing
+  const macroRegex2 = /(?:^|[*\-\u2022]\s*)\**([A-Za-z0-9 ,()\/\-]+?)\**\s*:\s*([\d\.]+)\s*calories?\s*,\s*([\d\.]+)\s*g\s*protein\s*,\s*([\d\.]+)\s*g\s*carbs?\s*,\s*([\d\.]+)\s*g\s*fat\s*(?:,\s*([\d\.]+)\s*g\s*fiber\s*)?(?:,\s*([\d\.]+)\s*g\s*sugar\s*)?/i
   for (const l of lines) {
     let m = l.match(macroRegex1)
     if (!m) m = l.match(macroRegex2)
@@ -861,7 +862,7 @@ export default function FoodDiary() {
     } catch (e) {
       console.error('Failed to rebuild cards from prose:', e)
     }
-  }, [aiDescription]) 
+  }, [aiDescription, analyzedItems]) 
 
   // Load history for non-today dates
   useEffect(() => {
@@ -1612,6 +1613,8 @@ Please add nutritional information manually if needed.`);
     }
     // Populate the form with existing data and go directly to editing
     if (food.method === 'photo') {
+      // Clear items first so useEffect can rebuild from description if needed
+      setAnalyzedItems([]);
       setPhotoPreview(food.photo);
       setAiDescription(food.description);
       setAnalyzedNutrition(food.nutrition);
@@ -1628,8 +1631,16 @@ Please add nutritional information manually if needed.`);
           setAnalyzedItems(enriched);
           applyRecalculatedNutrition(enriched);
         } else {
-          setAnalyzedItems([]);
-          setAnalyzedTotal(food.total || null);
+          // Try prose extraction as fallback - useEffect will also attempt this
+          const proseExtracted = extractItemsFromTextEstimates(food.description || '');
+          if (proseExtracted && Array.isArray(proseExtracted.items) && proseExtracted.items.length > 0) {
+            const enriched = enrichItemsFromStarter(proseExtracted.items);
+            setAnalyzedItems(enriched);
+            applyRecalculatedNutrition(enriched);
+          } else {
+            // Leave empty - useEffect will attempt to rebuild from prose when aiDescription is set
+            setAnalyzedTotal(food.total || null);
+          }
         }
       }
       setShowAiResult(true);
