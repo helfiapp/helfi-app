@@ -5157,8 +5157,14 @@ export default function Onboarding() {
   const mobileProgress = getMobileProgressWindow();
 
   const handleDeferFirstTime = () => {
-    // Allow user to leave onboarding for now, but continue to remind them
-    // on future visits until health setup is actually complete.
+    // Allow user to leave onboarding for this browser session without being
+    // forced back from the dashboard, but continue to remind them on future
+    // visits until health setup is actually complete.
+    try {
+      sessionStorage.setItem('onboardingDeferredThisSession', '1')
+    } catch {
+      // Ignore storage errors – deferral will just apply to this navigation
+    }
     window.location.replace('/dashboard?deferred=1');
   };
 

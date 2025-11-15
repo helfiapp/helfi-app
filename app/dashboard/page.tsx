@@ -94,12 +94,18 @@ export default function Dashboard() {
             const hasHealthGoals = !!(result.data.goals && result.data.goals.length > 0)
             const onboardingComplete = hasBasicProfile && hasHealthGoals
 
-            // For truly brand-new users with no meaningful data at all, still
-            // redirect straight into onboarding on first visit.
+            // For truly brand-new users with no meaningful data at all, redirect
+            // into onboarding on first visit, but respect "I'll do it later"
+            // for the current browser session.
             if (!onboardingComplete && !hasBasicProfile && !hasHealthGoals && !result.data.supplements?.length && !result.data.medications?.length) {
-              console.log('🎯 Brand new user detected - redirecting to onboarding')
-              window.location.href = '/onboarding'
-              return
+              const deferred = typeof window !== 'undefined' && sessionStorage.getItem('onboardingDeferredThisSession') === '1'
+              if (!deferred) {
+                console.log('🎯 Brand new user detected - redirecting to onboarding')
+                window.location.href = '/onboarding'
+                return
+              } else {
+                console.log('⏳ Onboarding deferred this session — staying on dashboard')
+              }
             }
 
             setOnboardingData({ ...result.data, onboardingComplete });
@@ -121,9 +127,14 @@ export default function Dashboard() {
             }
           } else {
             // No data at all - definitely a new user
-            console.log('🎯 No user data found - redirecting new user to onboarding');
-            window.location.href = '/onboarding';
-            return;
+            const deferred = typeof window !== 'undefined' && sessionStorage.getItem('onboardingDeferredThisSession') === '1';
+            if (!deferred) {
+              console.log('🎯 No user data found - redirecting new user to onboarding');
+              window.location.href = '/onboarding';
+              return;
+            } else {
+              console.log('⏳ Onboarding deferred with no data — staying on dashboard');
+            }
           }
         } else if (response.status === 404) {
           console.log('ℹ️ No existing data found for user in database - redirecting to onboarding');
