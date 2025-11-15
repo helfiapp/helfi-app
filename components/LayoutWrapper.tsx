@@ -1,9 +1,9 @@
 'use client'
 import { Cog6ToothIcon } from '@heroicons/react/24/outline'
 
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { ReactNode } from 'react'
+import { ReactNode, useEffect, useState } from 'react'
 import UsageMeter from '@/components/UsageMeter'
 
 // Desktop Sidebar Navigation Component  
@@ -157,7 +157,9 @@ interface LayoutWrapperProps {
 
 export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   const pathname = usePathname()
+  const router = useRouter()
   const { data: session, status } = useSession()
+  const [showHealthSetupReminder, setShowHealthSetupReminder] = useState(false)
   
   // Pages that should ALWAYS be public (no sidebar regardless of auth status)
   const publicPages = ['/', '/healthapp', '/auth/signin', '/auth/verify', '/auth/check-email', '/onboarding', '/privacy', '/terms', '/help', '/faq']
@@ -165,6 +167,48 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   // Admin panel paths should never show user sidebar
   const isAdminPanelPath =
     pathname.startsWith('/admin-panel') || pathname.startsWith('/main-admin')
+
+  // One-time per-session reminder: if a user has been using the app
+  // for more than ~5 minutes without completing Health Setup, gently prompt
+  // them to finish it. Users can permanently opt out of this reminder for
+  // their account by choosing "Don't ask me again".
+  useEffect(() => {
+    if (status !== 'authenticated') return
+    if (publicPages.includes(pathname) || isAdminPanelPath) return
+    if ((session as any)?.user?.needsVerification) return
+
+    try {
+      if (sessionStorage.getItem('helfiHealthSetupReminderShownThisSession') === '1') {
+        return
+      }
+    } catch {
+      // Ignore storage errors
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch('/api/health-setup-status', { method: 'GET' })
+        if (!res.ok) return
+        const data = await res.json()
+        const complete = !!data.complete
+        const reminderDisabled = !!data.reminderDisabled
+
+        if (!complete && !reminderDisabled) {
+          setShowHealthSetupReminder(true)
+          try {
+            sessionStorage.setItem('helfiHealthSetupReminderShownThisSession', '1')
+          } catch {
+            // Ignore
+          }
+        }
+      } catch {
+        // Non-blocking; ignore failures
+      }
+    }, 5 * 60 * 1000)
+
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, pathname, isAdminPanelPath, publicPages, session])
   
   // Don't show sidebar while session is loading to prevent flickering
   if (status === 'loading') {
@@ -258,7 +302,49 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
         <DesktopSidebar />
         
         {/* Main Content */}
-        <div className="md:pl-64 flex flex-col flex-1 overflow-y-auto">
+        <div className="md:pl-64 flex flex-col flex-1 overflow-y-auto relative">
+          {showHealthSetupReminder && (
+            <div className="fixed bottom-4 right-4 z-50 max-w-sm w-full mx-4 md:mx-0">
+              <div className="bg-white border border-helfi-green/30 shadow-xl rounded-lg p-4">
+                <h2 className="text-sm font-semibold text-helfi-black mb-1">
+                  Complete your Health Setup for accurate insights
+                </h2>
+                <p className="text-xs text-gray-600 mb-3">
+                  Helfi can only give you precise health guidance when your Health Setup is finished.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowHealthSetupReminder(false)
+                      router.push('/onboarding?step=1')
+                    }}
+                    className="flex-1 bg-helfi-green text-white text-sm px-3 py-2 rounded-md hover:bg-helfi-green-dark transition-colors"
+                  >
+                    Complete Health Setup
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setShowHealthSetupReminder(false)
+                      try {
+                        await fetch('/api/health-setup-status', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ disableReminder: true }),
+                        })
+                      } catch {
+                        // Non-blocking; if this fails we may remind again in a future session
+                      }
+                    }}
+                    className="flex-1 bg-gray-100 text-gray-700 text-sm px-3 py-2 rounded-md hover:bg-gray-200 transition-colors"
+                  >
+                    Don&apos;t ask me again
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
           {children}
         </div>
       </div>

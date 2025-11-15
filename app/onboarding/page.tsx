@@ -4930,14 +4930,6 @@ export default function Onboarding() {
     };
   }, [dropdownOpen]);
 
-  // Show first-time modal only when arriving with ?first=1
-  useEffect(() => {
-    try {
-      const isFirst = new URLSearchParams(window.location.search).get('first') === '1';
-      if (isFirst) setShowFirstTimeModal(true);
-    } catch {}
-  }, []);
-
   // Basic session validation without aggressive checks
   useEffect(() => {
     if (status === 'loading') return;
@@ -4979,17 +4971,18 @@ export default function Onboarding() {
     }
   };
 
-  // If arriving without ?first=1 but user is clearly new, show the modal (unless deferred this session)
+  // If user is clearly new or incomplete, show the health-setup modal every time
+  // they visit onboarding until the basic profile + goals are complete.
   useEffect(() => {
     if (status !== 'authenticated' || !dataLoaded) return;
     try {
       const hasBasic = form && form.gender && form.weight && form.height;
       const hasGoals = Array.isArray(form?.goals) && form.goals.length > 0;
-      const isFirstParam = new URLSearchParams(window.location.search).get('first') === '1';
-      const deferred = sessionStorage.getItem('onboardingDeferredThisSession') === '1';
-      if (!showFirstTimeModal && !isFirstParam && !deferred && (!hasBasic || !hasGoals)) {
+      const needsSetup = !(hasBasic && hasGoals);
+
+      if (needsSetup && !showFirstTimeModal) {
         setShowFirstTimeModal(true);
-      } else if (showFirstTimeModal && hasBasic && hasGoals) {
+      } else if (!needsSetup && showFirstTimeModal) {
         // Auto-hide if data arrived and user is complete
         setShowFirstTimeModal(false);
       }
@@ -5164,7 +5157,8 @@ export default function Onboarding() {
   const mobileProgress = getMobileProgressWindow();
 
   const handleDeferFirstTime = () => {
-    try { sessionStorage.setItem('onboardingDeferredThisSession', '1'); } catch {}
+    // Allow user to leave onboarding for now, but continue to remind them
+    // on future visits until health setup is actually complete.
     window.location.replace('/dashboard?deferred=1');
   };
 

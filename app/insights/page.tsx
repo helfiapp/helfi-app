@@ -1,4 +1,5 @@
 import { getServerSession } from 'next-auth'
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { authOptions } from '@/lib/auth'
 import { getIssueLandingPayload } from '@/lib/insights/issue-engine'
@@ -11,6 +12,41 @@ export default async function InsightsPage() {
   }
 
   const payload = await getIssueLandingPayload(session.user.id)
+
+  // If Health Setup is not complete, completely gate the Insights section and
+  // guide the user back to onboarding instead of showing empty insights.
+  if (!payload.onboardingComplete) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-white to-helfi-green-light/10 px-4">
+        <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-6 text-center">
+          <div className="mx-auto mb-4 w-14 h-14 rounded-full bg-amber-100 flex items-center justify-center">
+            <span className="text-2xl">📝</span>
+          </div>
+          <h1 className="text-xl font-semibold text-gray-900 mb-2">
+            Finish your Health Setup to unlock Insights
+          </h1>
+          <p className="text-sm text-gray-600 mb-5">
+            Helfi needs your core health information to generate accurate insights. Complete your
+            Health Setup and we&apos;ll unlock this section for you.
+          </p>
+          <div className="space-y-3">
+            <Link
+              href="/onboarding?step=1"
+              className="block w-full bg-helfi-green text-white text-sm font-medium py-2.5 rounded-lg hover:bg-helfi-green-dark transition-colors"
+            >
+              Complete Health Setup
+            </Link>
+            <Link
+              href="/dashboard"
+              className="block w-full bg-gray-100 text-gray-700 text-sm font-medium py-2.5 rounded-lg hover:bg-gray-200 transition-colors"
+            >
+              Back to Dashboard
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <InsightsLandingClient

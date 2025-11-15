@@ -1618,7 +1618,11 @@ const loadUserInsightContext = cache(async (userId: string): Promise<UserInsight
     }))
   }
 
-  const onboardingComplete = visibleGoals.length > 0
+  // Treat onboarding as "complete" only when the user has both:
+  // 1) basic profile data (gender, weight, height), and
+  // 2) at least one visible health goal.
+  const hasBasicProfile = !!(user.gender && user.weight && user.height)
+  const onboardingComplete = hasBasicProfile && visibleGoals.length > 0
 
   return {
     userId,
@@ -1805,7 +1809,9 @@ const loadUserLandingContext = cache(async (userId: string): Promise<UserInsight
     }))
   }
 
-  const onboardingComplete = visibleGoals.length > 0
+  // Same onboarding completion rule as the full context loader above.
+  const hasBasicProfileLanding = !!(user.gender && user.weight && user.height)
+  const onboardingComplete = hasBasicProfileLanding && visibleGoals.length > 0
 
   return {
     userId,
