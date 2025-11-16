@@ -744,9 +744,18 @@ export default function Dashboard() {
                         {fitbitConnected && <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>}
                       </div>
                       {fitbitConnected ? (
-                        <Link href="/devices" className="text-[12px] px-3.5 py-1.5 rounded-full bg-emerald-600 text-white block">Connected ✓</Link>
+                        <Link
+                          href="/devices"
+                          className="w-full inline-flex items-center justify-center text-[12px] px-3.5 py-1.5 rounded-full bg-emerald-600 text-white"
+                        >
+                          Connected ✓
+                        </Link>
                       ) : (
-                        <button onClick={handleConnectFitbit} className={`text-[12px] px-3.5 py-1.5 rounded-full bg-helfi-green text-white hover:bg-green-600 transition-colors`} disabled={fitbitLoading}>
+                        <button
+                          onClick={handleConnectFitbit}
+                          className="w-full inline-flex items-center justify-center text-[12px] px-3.5 py-1.5 rounded-full bg-helfi-green text-white hover:bg-green-600 transition-colors"
+                          disabled={fitbitLoading}
+                        >
                           {fitbitLoading ? 'Connecting...' : 'Connect Fitbit'}
                         </button>
                       )}
@@ -758,7 +767,15 @@ export default function Dashboard() {
                     <div className="text-center">
                       <div className="text-2xl mb-1">⌚</div>
                       <div className="text-xs font-medium text-gray-700 mb-2">Apple Watch</div>
-                      <button onClick={() => toggleInterest('appleWatch')} className={`text-[12px] px-3.5 py-1.5 rounded-full ${deviceInterest.appleWatch ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>{deviceInterest.appleWatch ? 'Interested ✓' : "I'm interested"}</button>
+                      <button
+                        onClick={() => toggleInterest('appleWatch')}
+                        className={`w-full inline-flex items-center justify-center text-[12px] px-3.5 py-1.5 rounded-full ${
+                          deviceInterest.appleWatch ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                        disabled={!!savingInterest}
+                      >
+                        {deviceInterest.appleWatch ? 'Interested ✓' : "I'm interested"}
+                      </button>
                     </div>
                   </div>
 
@@ -767,7 +784,15 @@ export default function Dashboard() {
                     <div className="text-center">
                       <div className="text-2xl mb-1">💪</div>
                       <div className="text-xs font-medium text-gray-700 mb-2">Garmin</div>
-                      <button onClick={() => toggleInterest('garmin')} className={`text-[12px] px-3.5 py-1.5 rounded-full ${deviceInterest.garmin ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>{deviceInterest.garmin ? 'Interested ✓' : "I'm interested"}</button>
+                      <button
+                        onClick={() => toggleInterest('garmin')}
+                        className={`w-full inline-flex items-center justify-center text-[12px] px-3.5 py-1.5 rounded-full ${
+                          deviceInterest.garmin ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                        disabled={!!savingInterest}
+                      >
+                        {deviceInterest.garmin ? 'Interested ✓' : "I'm interested"}
+                      </button>
                     </div>
                   </div>
 
@@ -776,7 +801,15 @@ export default function Dashboard() {
                     <div className="text-center">
                       <div className="text-2xl mb-1">📱</div>
                       <div className="text-xs font-medium text-gray-700 mb-2">Samsung Health</div>
-                      <button onClick={() => toggleInterest('samsung')} className={`text-[12px] px-3.5 py-1.5 rounded-full ${deviceInterest.samsung ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>{deviceInterest.samsung ? 'Interested ✓' : "I'm interested"}</button>
+                      <button
+                        onClick={() => toggleInterest('samsung')}
+                        className={`w-full inline-flex items-center justify-center text-[12px] px-3.5 py-1.5 rounded-full ${
+                          deviceInterest.samsung ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                        disabled={!!savingInterest}
+                      >
+                        {deviceInterest.samsung ? 'Interested ✓' : "I'm interested"}
+                      </button>
                     </div>
                   </div>
 
@@ -785,7 +818,15 @@ export default function Dashboard() {
                     <div className="text-center">
                       <div className="text-2xl mb-1">🤖</div>
                       <div className="text-xs font-medium text-gray-700 mb-2">Google Fit</div>
-                      <button onClick={() => toggleInterest('googleFit')} className={`text-[12px] px-3.5 py-1.5 rounded-full ${deviceInterest.googleFit ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>{deviceInterest.googleFit ? 'Interested ✓' : "I'm interested"}</button>
+                      <button
+                        onClick={() => toggleInterest('googleFit')}
+                        className={`w-full inline-flex items-center justify-center text-[12px] px-3.5 py-1.5 rounded-full ${
+                          deviceInterest.googleFit ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                        disabled={!!savingInterest}
+                      >
+                        {deviceInterest.googleFit ? 'Interested ✓' : "I'm interested"}
+                      </button>
                     </div>
                   </div>
 
@@ -794,7 +835,15 @@ export default function Dashboard() {
                     <div className="text-center">
                       <div className="text-2xl mb-1">💍</div>
                       <div className="text-xs font-medium text-gray-700 mb-2">Oura Ring</div>
-                      <button onClick={() => toggleInterest('oura')} className={`text-[12px] px-3.5 py-1.5 rounded-full ${deviceInterest.oura ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>{deviceInterest.oura ? 'Interested ✓' : "I'm interested"}</button>
+                      <button
+                        onClick={() => toggleInterest('oura')}
+                        className={`w-full inline-flex items-center justify-center text-[12px] px-3.5 py-1.5 rounded-full ${
+                          deviceInterest.oura ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                        disabled={!!savingInterest}
+                      >
+                        {deviceInterest.oura ? 'Interested ✓' : "I'm interested"}
+                      </button>
                     </div>
                   </div>
 
@@ -803,7 +852,15 @@ export default function Dashboard() {
                     <div className="text-center">
                       <div className="text-2xl mb-1">🧭</div>
                       <div className="text-xs font-medium text-gray-700 mb-2">Polar</div>
-                      <button onClick={() => toggleInterest('polar')} className={`text-[12px] px-3.5 py-1.5 rounded-full ${deviceInterest.polar ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>{deviceInterest.polar ? 'Interested ✓' : "I'm interested"}</button>
+                      <button
+                        onClick={() => toggleInterest('polar')}
+                        className={`w-full inline-flex items-center justify-center text-[12px] px-3.5 py-1.5 rounded-full ${
+                          deviceInterest.polar ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                        disabled={!!savingInterest}
+                      >
+                        {deviceInterest.polar ? 'Interested ✓' : "I'm interested"}
+                      </button>
                     </div>
                   </div>
                 </div>
