@@ -309,6 +309,8 @@ export default function HealthTipsPage() {
                         className="h-80"
                         context={{
                           healthTipSummary: `${tip.title}. ${tip.body}`,
+                          healthTipTitle: tip.title,
+                          healthTipCategory: tip.category,
                         }}
                       />
                     </div>

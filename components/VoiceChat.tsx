@@ -11,6 +11,8 @@ interface VoiceChatContext {
   section?: string
   // Optional: summary of a specific health tip to keep the AI focused on that advice
   healthTipSummary?: string
+  healthTipTitle?: string
+  healthTipCategory?: string
 }
 
 interface VoiceChatProps {
@@ -34,6 +36,26 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null)
   const [showThreadMenu, setShowThreadMenu] = useState(false)
   const storageKey = useMemo(() => 'helfi:chat:talk', [])
+  const hasHealthTipContext = !!context?.healthTipSummary
+  const healthTipTitle = context?.healthTipTitle
+  const healthTipCategory = context?.healthTipCategory
+
+  const healthTipSuggestionQuestions = useMemo(() => {
+    if (!hasHealthTipContext) return []
+    const titleSnippet = healthTipTitle || 'this tip'
+    const typeLabel =
+      healthTipCategory === 'supplement'
+        ? 'supplement tip'
+        : healthTipCategory === 'lifestyle'
+        ? 'lifestyle tip'
+        : 'food tip'
+    return [
+      `Can you explain how the "${titleSnippet}" ${typeLabel} fits with my current health issues?`,
+      `Are there any safety concerns, interactions, or situations where I should avoid following this "${titleSnippet}" tip?`,
+      `How could I adapt the "${titleSnippet}" tip to better fit my daily routine and preferences?`,
+      `Based on my overall health data, what should I pay most attention to when following this "${titleSnippet}" tip?`,
+    ]
+  }, [hasHealthTipContext, healthTipTitle, healthTipCategory])
   
   const endRef = useRef<HTMLDivElement | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -486,26 +508,57 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
       <div ref={containerRef} className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-6 space-y-6 min-w-0" aria-live="polite" style={{ maxWidth: '100%', wordWrap: 'break-word' }}>
         {messages.length === 0 && !loading && (
           <div className="max-w-3xl mx-auto">
-            <div className="text-center mb-8">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-2">How can I help you today?</h2>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {[
-                'What supplements should I take?',
-                'How are my medications interacting?',
-                'Why am I feeling tired?',
-                'What should I eat today?',
-              ].map((q) => (
-                <button
-                  key={q}
-                  onClick={() => setInput(q)}
-                  className="text-left px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded-xl text-sm text-gray-700 transition-colors"
-                  type="button"
-                >
-                  {q}
-                </button>
-              ))}
-            </div>
+            {hasHealthTipContext ? (
+              <>
+                <div className="text-center mb-6">
+                  <h2 className="text-lg font-semibold text-gray-900">
+                    Questions about this tip
+                  </h2>
+                  {healthTipTitle && (
+                    <p className="mt-1 text-sm text-gray-600 line-clamp-2">
+                      “{healthTipTitle}”
+                    </p>
+                  )}
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {healthTipSuggestionQuestions.map((q) => (
+                    <button
+                      key={q}
+                      onClick={() => setInput(q)}
+                      className="text-left px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded-xl text-sm text-gray-700 transition-colors"
+                      type="button"
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="text-center mb-8">
+                  <h2 className="text-2xl font-semibold text-gray-900 mb-2">
+                    How can I help you today?
+                  </h2>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {[
+                    'What supplements should I take?',
+                    'How are my medications interacting?',
+                    'Why am I feeling tired?',
+                    'What should I eat today?',
+                  ].map((q) => (
+                    <button
+                      key={q}
+                      onClick={() => setInput(q)}
+                      className="text-left px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded-xl text-sm text-gray-700 transition-colors"
+                      type="button"
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         )}
         {messages.map((m, idx) => (
