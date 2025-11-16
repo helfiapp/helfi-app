@@ -4,6 +4,8 @@ import React, { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import PageHeader from '@/components/PageHeader'
+import UsageMeter from '@/components/UsageMeter'
+import FeatureUsageDisplay from '@/components/FeatureUsageDisplay'
 
 type HealthTip = {
   id: string
@@ -293,6 +295,12 @@ export default function HealthTipsPage() {
             receive them. Each tip uses your Helfi credits (we always charge more credits than the
             raw AI cost so things stay in line with your subscription and top-ups).
           </p>
+
+          {/* Credits usage for Health Tips */}
+          <div className="mb-4">
+            <UsageMeter inline={true} />
+            <FeatureUsageDisplay featureName="healthTips" featureLabel="Health Tips" />
+          </div>
 
           {loadingSettings ? (
             <div className="flex items-center justify-center py-4">

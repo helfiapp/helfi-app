@@ -5,6 +5,8 @@ interface FeatureUsage {
   count: number
   costPerUse: number
   label?: 'monthly' | 'total'
+  // Optional explicit total credits used for this feature (for dynamic-cost features like Health Tips)
+  totalCredits?: number
 }
 
 interface FeatureUsageData {
@@ -14,13 +16,16 @@ interface FeatureUsageData {
     interactionAnalysis: FeatureUsage
     medicalImageAnalysis: FeatureUsage
     insightsGeneration: FeatureUsage
+    healthTips?: FeatureUsage
   }
   hasSubscription: boolean
   actualCreditsUsed: number
 }
 
+type FeatureKey = keyof FeatureUsageData['featureUsage']
+
 interface FeatureUsageDisplayProps {
-  featureName: 'symptomAnalysis' | 'foodAnalysis' | 'interactionAnalysis' | 'medicalImageAnalysis' | 'insightsGeneration'
+  featureName: FeatureKey
   featureLabel: string
   refreshTrigger?: number // Trigger refresh when this changes
 }
@@ -37,7 +42,8 @@ export default function FeatureUsageDisplay({ featureName, featureLabel, refresh
         const res = await fetch('/api/credit/feature-usage', { cache: 'no-store' })
         if (res.ok) {
           const data: FeatureUsageData = await res.json()
-          setUsage(data.featureUsage[featureName])
+          const value = data.featureUsage[featureName]
+          setUsage(value ?? null)
           setHasSubscription(data.hasSubscription)
         }
       } catch (err) {
@@ -58,7 +64,10 @@ export default function FeatureUsageDisplay({ featureName, featureLabel, refresh
   }
 
   // Calculate total credits used for this feature
-  const creditsUsed = usage.count * usage.costPerUse
+  const creditsUsed =
+    typeof usage.totalCredits === 'number'
+      ? usage.totalCredits
+      : usage.count * usage.costPerUse
   
   // Determine label and suffix based on API-provided label (monthly vs total)
   const isMonthly = usage.label === 'monthly'
