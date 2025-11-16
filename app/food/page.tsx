@@ -2369,21 +2369,29 @@ Please add nutritional information manually if needed.`);
                         const isVolumeUnit = servingUnitMeta
                           ? isVolumeBasedUnitLabel(servingUnitMeta.unitLabel)
                           : false
+                        const isLikelyLiquidName = (() => {
+                          const n = String(item.name || '').toLowerCase()
+                          return /juice|milk|water|coffee|tea|smoothie|shake|soda|soft drink|cola|coke|soup|broth|stock|sauce|dressing|oil|vinegar|wine|beer|drink|beverage/.test(
+                            n,
+                          )
+                        })()
+                        const showVolumeToggle = hasOunces && isVolumeUnit && isLikelyLiquidName
+                        const activeVolumeUnit = showVolumeToggle ? volumeUnit : 'oz'
                         const unitsPerServing = servingUnitMeta
-                          ? hasOunces && volumeUnit === 'ml'
+                          ? hasOunces && activeVolumeUnit === 'ml'
                             ? servingUnitMeta.quantity * OZ_TO_ML
                             : servingUnitMeta.quantity
                           : 1
                         const displayUnitLabel = servingUnitMeta
                           ? hasOunces && isVolumeUnit
-                            ? (volumeUnit === 'ml' ? 'ml' : 'oz')
+                            ? activeVolumeUnit
                             : servingUnitMeta.unitLabelSingular
                           : null
                         const unitStep = (() => {
                           if (!servingUnitMeta || !servingUnitMeta.quantity || servingUnitMeta.quantity <= 0) return 1
                           if (isDiscreteUnitLabel(servingUnitMeta.unitLabel)) return 1
                           if (hasOunces) {
-                            return volumeUnit === 'ml' ? 10 : 1
+                            return activeVolumeUnit === 'ml' ? 10 : 1
                           }
                           if (isVolumeUnit) return 10
                           return 1
@@ -2477,19 +2485,19 @@ Please add nutritional information manually if needed.`);
                               </div>
                               {servingUnitMeta && (
                                 <div className="flex flex-col gap-1">
-                                  <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
-                                    <span>
-                                      Units{displayUnitLabel ? ` (${displayUnitLabel})` : ''}:
-                                    </span>
-                                    {hasOunces && (
-                                      <div className="inline-flex items-center text-[11px] bg-gray-100 rounded-full px-1 py-0.5 border border-gray-200">
+                                <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
+                                  <span>
+                                    Units{displayUnitLabel ? ` (${displayUnitLabel})` : ''}:
+                                  </span>
+                                  {showVolumeToggle && (
+                                      <div className="inline-flex items-center text-[11px] sm:text-xs bg-gray-100 rounded-full px-1.5 py-0.5 border border-gray-200">
                                         <button
                                           type="button"
                                           onClick={() => setVolumeUnit('oz')}
                                           className={`px-2 py-0.5 rounded-full ${
-                                            volumeUnit === 'oz'
-                                              ? 'bg-white text-gray-900 shadow-sm'
-                                              : 'text-gray-500'
+                                            activeVolumeUnit === 'oz'
+                                              ? 'bg-emerald-500 text-white shadow-sm border border-emerald-500'
+                                              : 'bg-transparent text-gray-500'
                                           }`}
                                         >
                                           oz
@@ -2498,9 +2506,9 @@ Please add nutritional information manually if needed.`);
                                           type="button"
                                           onClick={() => setVolumeUnit('ml')}
                                           className={`px-2 py-0.5 rounded-full ${
-                                            volumeUnit === 'ml'
-                                              ? 'bg-white text-gray-900 shadow-sm'
-                                              : 'text-gray-500'
+                                            activeVolumeUnit === 'ml'
+                                              ? 'bg-emerald-500 text-white shadow-sm border border-emerald-500'
+                                              : 'bg-transparent text-gray-500'
                                           }`}
                                         >
                                           ml
