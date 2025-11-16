@@ -2380,6 +2380,14 @@ Please add nutritional information manually if needed.`);
                         const isVolumeUnit = servingUnitMeta
                           ? isVolumeBasedUnitLabel(servingUnitMeta.unitLabel)
                           : false
+                        const baseOunces = (() => {
+                          if (!hasOunces) return null
+                          const raw = String(item.serving_size || '')
+                          const m = raw.match(/(\d+(?:\.\d+)?)\s*oz/i)
+                          if (!m) return null
+                          const v = parseFloat(m[1])
+                          return Number.isFinite(v) && v > 0 ? v : null
+                        })()
                         const isLikelyLiquidName = (() => {
                           const n = String(item.name || '').toLowerCase()
                           return /juice|milk|water|coffee|tea|smoothie|shake|soda|soft drink|cola|coke|soup|broth|stock|sauce|dressing|oil|vinegar|wine|beer|drink|beverage/.test(
@@ -2389,8 +2397,10 @@ Please add nutritional information manually if needed.`);
                         const showVolumeToggle = hasOunces && isVolumeUnit && isLikelyLiquidName
                         const activeVolumeUnit = showVolumeToggle ? volumeUnit : 'oz'
                         const unitsPerServing = servingUnitMeta
-                          ? hasOunces && activeVolumeUnit === 'ml'
-                            ? servingUnitMeta.quantity * OZ_TO_ML
+                          ? hasOunces
+                            ? activeVolumeUnit === 'ml'
+                              ? (baseOunces ?? servingUnitMeta.quantity) * OZ_TO_ML
+                              : baseOunces ?? servingUnitMeta.quantity
                             : servingUnitMeta.quantity
                           : 1
                         const displayUnitLabel = servingUnitMeta
@@ -2410,8 +2420,23 @@ Please add nutritional information manually if needed.`);
                         const unitsDisplay = (() => {
                           const raw = (item.servings ?? 1) * unitsPerServing
                           if (!Number.isFinite(raw)) return 0
-                          // Show whole-number units to keep the control intuitive (7, 8, 9 oz, etc.)
+                          // For ml, show a rounded multiple of 10 (e.g. 240 ml instead of 236.56 ml)
+                          if (activeVolumeUnit === 'ml') {
+                            return Math.round(raw / 10) * 10
+                          }
+                          // For oz (and other units), whole-number units (7, 8, 9 oz, etc.)
                           return Math.round(raw)
+                        })()
+                        const servingSizeDisplay = (() => {
+                          if (!item.serving_size) return 'N/A'
+                          if (hasOunces && activeVolumeUnit === 'ml') {
+                            const oz = baseOunces ?? (servingUnitMeta?.quantity || 0)
+                            if (!oz || oz <= 0) return item.serving_size
+                            const ml = oz * OZ_TO_ML
+                            const roundedMl = Math.round(ml / 10) * 10
+                            return `≈ ${roundedMl} ml`
+                          }
+                          return item.serving_size
                         })()
                         
                         return (
@@ -2568,7 +2593,7 @@ Please add nutritional information manually if needed.`);
                                       </button>
                                     </div>
                                     <span className="text-xs text-gray-500 w-full sm:w-auto">
-                                      1 serving = {item.serving_size || 'N/A'}
+                                      1 serving = {servingSizeDisplay}
                                     </span>
                                   </div>
                                 </div>
@@ -3531,9 +3556,18 @@ Please add nutritional information manually if needed.`);
                       {NUTRIENT_DISPLAY_ORDER.map((key) => {
                         const meta = NUTRIENT_CARD_META[key]
                         const displayValue = formatNutrientValue(key, totals[key])
+                        const headerLabel =
+                          key === 'calories' && energyUnit === 'kJ' ? 'Kilojoules' : meta.label
                         return (
-                          <div key={key} className={`bg-gradient-to-br ${meta.gradient} border border-white/60 rounded-lg p-3 shadow-sm`}>
-                            <div className={`text-xs ${meta.accent} mb-1 font-medium uppercase tracking-wide`}>{meta.label}</div>
+                          <div
+                            key={key}
+                            className={`bg-gradient-to-br ${meta.gradient} border border-white/60 rounded-lg p-3 shadow-sm`}
+                          >
+                            <div
+                              className={`text-xs ${meta.accent} mb-1 font-medium uppercase tracking-wide`}
+                            >
+                              {headerLabel}
+                            </div>
                             <div className="text-lg font-semibold text-gray-900">{displayValue}</div>
                           </div>
                         )
