@@ -44,6 +44,7 @@ export default function HealthTipsPage() {
   const [focusFood, setFocusFood] = useState(true)
   const [focusSupplements, setFocusSupplements] = useState(true)
   const [focusLifestyle, setFocusLifestyle] = useState(true)
+  const [timezoneOptions, setTimezoneOptions] = useState<string[]>([])
 
   useEffect(() => {
     ;(async () => {
@@ -85,6 +86,71 @@ export default function HealthTipsPage() {
       }
     })()
   }, [])
+
+  // Populate timezone dropdown with all supported IANA timezones (with a safe fallback list)
+  useEffect(() => {
+    try {
+      const anyIntl = Intl as any
+      if (anyIntl && typeof anyIntl.supportedValuesOf === 'function') {
+        const supported = anyIntl.supportedValuesOf('timeZone') as string[]
+        if (Array.isArray(supported) && supported.length > 0) {
+          const sorted = [...supported].sort((a, b) => a.localeCompare(b))
+          setTimezoneOptions(sorted)
+          // If current timezone is not set, default to the environment's best guess
+          if (!timezone) {
+            const guessed =
+              Intl.DateTimeFormat().resolvedOptions().timeZone || sorted[0] || 'UTC'
+            setTimezone(guessed)
+          }
+          return
+        }
+      }
+    } catch {
+      // fall through to static fallback list
+    }
+
+    // Static curated fallback list (mirrors Settings page selection)
+    const fallback = [
+      'UTC',
+      'Europe/London',
+      'Europe/Paris',
+      'Europe/Berlin',
+      'Europe/Madrid',
+      'Europe/Rome',
+      'Europe/Amsterdam',
+      'Europe/Zurich',
+      'Europe/Stockholm',
+      'Europe/Athens',
+      'Africa/Johannesburg',
+      'Asia/Dubai',
+      'Asia/Kolkata',
+      'Asia/Bangkok',
+      'Asia/Singapore',
+      'Asia/Kuala_Lumpur',
+      'Asia/Hong_Kong',
+      'Asia/Tokyo',
+      'Asia/Seoul',
+      'Asia/Shanghai',
+      'Australia/Perth',
+      'Australia/Adelaide',
+      'Australia/Melbourne',
+      'Australia/Sydney',
+      'Pacific/Auckland',
+      'America/New_York',
+      'America/Chicago',
+      'America/Denver',
+      'America/Los_Angeles',
+      'America/Toronto',
+      'America/Vancouver',
+      'America/Mexico_City',
+      'America/Bogota',
+      'America/Sao_Paulo',
+    ]
+    setTimezoneOptions(fallback)
+    if (!timezone) {
+      setTimezone(fallback[0])
+    }
+  }, [timezone])
 
   const handleSaveSettings = async () => {
     setSaving(true)
@@ -303,16 +369,28 @@ export default function HealthTipsPage() {
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Timezone
                   </label>
-                  <input
-                    type="text"
+                  <select
                     value={timezone}
                     onChange={(e) => setTimezone(e.target.value)}
                     className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
                     disabled={!enabled}
-                  />
+                  >
+                    {timezoneOptions.length === 0 ? (
+                      <option value={timezone || 'UTC'}>
+                        {timezone || 'Detecting timezones…'}
+                      </option>
+                    ) : (
+                      timezoneOptions.map((tzValue) => (
+                        <option key={tzValue} value={tzValue}>
+                          {tzValue}
+                        </option>
+                      ))
+                    )}
+                  </select>
                   <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    Uses standard timezone names like <span className="font-mono">Australia/Melbourne</span>{' '}
-                    or <span className="font-mono">America/New_York</span>.
+                    Choose your local timezone so tips arrive at the right local time (for example:{' '}
+                    <span className="font-mono">Australia/Melbourne</span> or{' '}
+                    <span className="font-mono">America/New_York</span>).
                   </p>
                 </div>
               </div>

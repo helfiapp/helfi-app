@@ -198,8 +198,11 @@ async function buildUserHealthContext(userId: string) {
 function buildTipPrompt(args: {
   context: Awaited<ReturnType<typeof buildUserHealthContext>>
   localTimeDescription: string
+  focusFood: boolean
+  focusSupplements: boolean
+  focusLifestyle: boolean
 }) {
-  const { context, localTimeDescription } = args
+  const { context, localTimeDescription, focusFood, focusSupplements, focusLifestyle } = args
   const { healthData, selectedHealthGoals, supplements, medications, recentFoodLogs, recentCheckins } =
     context
 
@@ -277,6 +280,15 @@ function buildTipPrompt(args: {
       ? lines.join('\n')
       : 'No structured health data is available yet beyond basic account information.'
 
+  const preferredCategories: string[] = []
+  if (focusFood) preferredCategories.push('food')
+  if (focusSupplements) preferredCategories.push('supplement')
+  if (focusLifestyle) preferredCategories.push('lifestyle')
+  const preferredCategoriesText =
+    preferredCategories.length > 0
+      ? preferredCategories.join(', ')
+      : 'food, supplement, lifestyle'
+
   const prompt = `You are a careful, practical health coach creating ONE personalised micro health tip for a specific user.
 
 USER HEALTH SNAPSHOT (from Helfi app):
@@ -293,13 +305,16 @@ GOAL:
 CRITICAL RULES:
 1. Avoid generic advice that could apply to absolutely everyone (e.g. "drink more water", "sleep more", "eat healthier") unless you tie it tightly to a concrete pattern from their data and make it very specific.
 2. The tip must feel like it was written specifically for THIS person, based on the snapshot above.
-3. You may focus on ONE of these categories:
+3. The user has expressed a preference for these tip categories (in order of priority): ${preferredCategoriesText}.
+   - You MUST choose the JSON "category" from these options: "food", "supplement", or "lifestyle".
+   - Prefer a category that is in the preferred list above, but if the health snapshot clearly demands a different category, you may choose it and briefly explain why.
+4. You may focus on ONE of these categories:
    - food: a specific meal, snack, or ingredient pattern that fits their issues
    - supplement: a specific supplement idea, timing tweak, or reminder connected to their issues
    - lifestyle: a small behaviour or routine change (sleep, stress, movement, bathroom timing, etc.)
-4. Never diagnose or claim to cure anything. Use soft language like "may help", "you might consider", "many people with X find Y helpful".
-5. Include a brief safety note that reminds them to consider medications, allergies, and to talk with a clinician when appropriate—especially if you mention a supplement or strong change.
-6. Do NOT reveal your chain-of-thought. Only show the final recommendation and brief reasoning.
+5. Never diagnose or claim to cure anything. Use soft language like "may help", "you might consider", "many people with X find Y helpful".
+6. Include a brief safety note that reminds them to consider medications, allergies, and to talk with a clinician when appropriate—especially if you mention a supplement or strong change.
+7. Do NOT reveal your chain-of-thought. Only show the final recommendation and brief reasoning.
 
 RESPONSE FORMAT (JSON ONLY, no markdown, no extra text):
 {
@@ -486,7 +501,13 @@ export async function POST(req: NextRequest) {
     const localTimeDescription = `${reminderTime} in their local timezone (${approxSlot})`
 
     const model = 'gpt-4o'
-    const prompt = buildTipPrompt({ context, localTimeDescription })
+    const prompt = buildTipPrompt({
+      context,
+      localTimeDescription,
+      focusFood: settings.focusFood !== false,
+      focusSupplements: settings.focusSupplements !== false,
+      focusLifestyle: settings.focusLifestyle !== false,
+    })
     const messages = [
       {
         role: 'user' as const,
