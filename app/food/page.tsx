@@ -2318,10 +2318,21 @@ Please add nutritional information manually if needed.`);
                           const meta = NUTRIENT_CARD_META[key]
                           const rawValue = (analyzedNutrition as any)?.[key] ?? 0
                           const displayValue = formatNutrientValue(key, Number(rawValue))
+                          const headerLabel =
+                            key === 'calories' && energyUnit === 'kJ' ? 'Kilojoules' : meta.label
                           return (
-                            <div key={key} className={`bg-gradient-to-br ${meta.gradient} border border-white/60 rounded-xl p-2 sm:p-4 text-center shadow-sm`}>
-                              <div className={`text-xs font-medium uppercase tracking-wide ${meta.accent} mb-1`}>{meta.label}</div>
-                              <div className="text-xl sm:text-2xl font-bold text-gray-900">{displayValue}</div>
+                            <div
+                              key={key}
+                              className={`bg-gradient-to-br ${meta.gradient} border border-white/60 rounded-xl p-2 sm:p-4 text-center shadow-sm`}
+                            >
+                              <div
+                                className={`text-xs font-medium uppercase tracking-wide ${meta.accent} mb-1`}
+                              >
+                                {headerLabel}
+                              </div>
+                              <div className="text-xl sm:text-2xl font-bold text-gray-900">
+                                {displayValue}
+                              </div>
                             </div>
                           )
                         })}
@@ -2576,13 +2587,19 @@ Please add nutritional information manually if needed.`);
                                   meta.key === 'calories'
                                     ? formatEnergyValue(numeric, energyUnit)
                                     : formatMacroValue(numeric, 'g')
+                                const labelText =
+                                  meta.key === 'calories'
+                                    ? energyUnit === 'kJ'
+                                      ? 'Kilojoules'
+                                      : 'Calories'
+                                    : meta.label
                                 return (
                                   <div
                                     key={`${meta.field}-${index}`}
                                     className="px-3 py-1 rounded-full bg-gray-100 border border-gray-200 text-[11px] font-medium text-gray-700 flex items-center gap-1"
                                   >
                                     <span className={`font-semibold ${meta.accent}`}>{displayValue}</span>
-                                    <span className="uppercase text-gray-500">{meta.label}</span>
+                                    <span className="uppercase text-gray-500">{labelText}</span>
                                   </div>
                                 )
                               })}
@@ -2597,9 +2614,15 @@ Please add nutritional information manually if needed.`);
                                     meta.key === 'calories'
                                       ? formatEnergyValue(value, energyUnit)
                                       : formatMacroValue(value, 'g')
+                                  const labelText =
+                                    meta.key === 'calories'
+                                      ? energyUnit === 'kJ'
+                                        ? 'kilojoules'
+                                        : 'calories'
+                                      : meta.label.toLowerCase()
                                   return (
                                     <span key={`${meta.field}-total-${index}`} className="text-gray-700">
-                                      {display} {meta.label.toLowerCase()}
+                                      {display} {labelText}
                                     </span>
                                   )
                                 })}
