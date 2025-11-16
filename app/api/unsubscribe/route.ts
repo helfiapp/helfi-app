@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
-export const dynamic = 'force-dynamic'
-
 /**
  * Unsubscribe API endpoint
  * Handles email unsubscription requests for legal compliance (CAN-SPAM, GDPR, etc.)

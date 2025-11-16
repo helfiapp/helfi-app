@@ -4,8 +4,6 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { ensureFitbitDataSchema } from '@/lib/fitbit-db'
 
-export const dynamic = 'force-dynamic'
-
 type DataType = 'steps' | 'heartrate' | 'sleep' | 'weight'
 
 function parseDate(input: string | null): Date | null {

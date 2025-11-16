@@ -3,8 +3,6 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getIssueLandingPayload } from '@/lib/insights/issue-engine'
 
-export const dynamic = 'force-dynamic'
-
 export async function GET() {
   try {
     const session = await getServerSession(authOptions)
