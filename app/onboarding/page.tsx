@@ -11,6 +11,7 @@ import { useUserData } from '@/components/providers/UserDataProvider';
 import MobileMoreMenu from '@/components/MobileMoreMenu';
 import UsageMeter from '@/components/UsageMeter';
 import InsightsProgressBar from '@/components/InsightsProgressBar';
+import { UserCircleIcon } from '@heroicons/react/24/outline';
 
 // Auth-enabled onboarding flow
 
@@ -4904,15 +4905,9 @@ export default function Onboarding() {
 
   // Removed blocking render - users should always be able to access intake to edit information
 
-  // Profile data - using consistent green avatar
-  const defaultAvatar = 'data:image/svg+xml;base64,' + btoa(`
-    <svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="64" cy="64" r="64" fill="#10B981"/>
-      <circle cx="64" cy="48" r="20" fill="white"/>
-      <path d="M64 76c-13.33 0-24 5.34-24 12v16c0 8.84 7.16 16 16 16h16c8.84 0 16-7.16 16-16V88c0-6.66-10.67-12-24-12z" fill="white"/>
-    </svg>
-  `);
-  const userImage = providerProfileImage || profileImage || session?.user?.image || defaultAvatar;
+  // Profile data - prefer real photos; fall back to professional icon for nav
+  const hasProfileImage = !!(providerProfileImage || profileImage || session?.user?.image)
+  const userImage = (providerProfileImage || profileImage || session?.user?.image || '') as string
   const userName = session?.user?.name || 'User';
 
   useEffect(() => {
@@ -5240,24 +5235,36 @@ export default function Onboarding() {
                   className="focus:outline-none"
                   aria-label="Open profile menu"
                 >
-                  <Image
-                    src={userImage}
-                    alt="Profile"
-                    width={36}
-                    height={36}
-                    className="w-9 h-9 rounded-full border-2 border-helfi-green shadow-sm object-cover"
-                  />
+                  {hasProfileImage ? (
+                    <Image
+                      src={userImage}
+                      alt="Profile"
+                      width={36}
+                      height={36}
+                      className="w-9 h-9 rounded-full border-2 border-helfi-green shadow-sm object-cover"
+                    />
+                  ) : (
+                    <div className="w-9 h-9 rounded-full border-2 border-helfi-green bg-white shadow-sm flex items-center justify-center">
+                      <UserCircleIcon className="w-5 h-5 text-helfi-green" aria-hidden="true" />
+                    </div>
+                  )}
                 </button>
                 {dropdownOpen && (
                   <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-100 animate-fade-in">
                     <div className="flex items-center px-4 py-3 border-b border-gray-100">
-                      <Image
-                        src={userImage}
-                        alt="Profile"
-                        width={40}
-                        height={40}
-                        className="w-10 h-10 rounded-full object-cover mr-3"
-                      />
+                      {hasProfileImage ? (
+                        <Image
+                          src={userImage}
+                          alt="Profile"
+                          width={40}
+                          height={40}
+                          className="w-10 h-10 rounded-full object-cover mr-3"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center mr-3">
+                          <UserCircleIcon className="w-6 h-6 text-helfi-green" aria-hidden="true" />
+                        </div>
+                      )}
                       <div>
                         <div className="font-semibold text-gray-900">{userName}</div>
                         <div className="text-xs text-gray-500">{session?.user?.email || 'user@email.com'}</div>

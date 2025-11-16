@@ -5,8 +5,9 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { signOut } from 'next-auth/react'
 import { useUserData } from '@/components/providers/UserDataProvider'
+import { UserCircleIcon } from '@heroicons/react/24/outline'
 
-export const DEFAULT_INSIGHTS_AVATAR = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTI4IiBoZWlnaHQ9IjEyOCIgdmlld0JveD0iMCAwIDEyOCAxMjgiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iNjQiIGN5PSI2NCIgcj0iNjQiIGZpbGw9IiMxMEI5ODEiLz48Y2lyY2xlIGN4PSI2NCIgY3k9IjQ4IiByPSIyMCIgZmlsbD0id2hpdGUiLz48cGF0aCBkPSJNNjQgNzZjLTEzLjMzIDAtMjQgNS4zNC0yNCAxMnYxNmMwIDguODQgNy4xNiAxNiAxNiAxNmgxNmM4Ljg0IDAgMTYtNy4xNiAxNi0xNlY4OGMwLTYuNjYtMTAuNjctMTItMjQtMTJ6IiBmaWxsPSJ3aGl0ZSIvPjwvc3ZnPg=='
+export const DEFAULT_INSIGHTS_AVATAR = '' // no longer used; kept for backward compatibility
 
 interface InsightsTopNavProps {
   sessionUser: {
@@ -20,8 +21,12 @@ export default function InsightsTopNav({ sessionUser }: InsightsTopNavProps) {
   const { profileImage: providerProfileImage } = useUserData()
   const [dropdownOpen, setDropdownOpen] = useState(false)
 
+  const hasProfileImage = useMemo(
+    () => !!(providerProfileImage || sessionUser.image),
+    [providerProfileImage, sessionUser.image]
+  )
   const avatarSrc = useMemo(() => {
-    return providerProfileImage || sessionUser.image || DEFAULT_INSIGHTS_AVATAR
+    return (providerProfileImage || sessionUser.image || '') as string
   }, [providerProfileImage, sessionUser.image])
 
   useEffect(() => {
@@ -51,24 +56,36 @@ export default function InsightsTopNav({ sessionUser }: InsightsTopNavProps) {
             className="focus:outline-none"
             aria-label="Open profile menu"
           >
-            <Image
-              src={avatarSrc}
-              alt="Profile"
-              width={48}
-              height={48}
-              className="w-12 h-12 rounded-full border-2 border-helfi-green shadow-sm object-cover"
-            />
+            {hasProfileImage ? (
+              <Image
+                src={avatarSrc}
+                alt="Profile"
+                width={48}
+                height={48}
+                className="w-12 h-12 rounded-full border-2 border-helfi-green shadow-sm object-cover"
+              />
+            ) : (
+              <div className="w-12 h-12 rounded-full border-2 border-helfi-green bg-white shadow-sm flex items-center justify-center">
+                <UserCircleIcon className="w-7 h-7 text-helfi-green" aria-hidden="true" />
+              </div>
+            )}
           </button>
           {dropdownOpen && (
             <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-100">
               <div className="flex items-center px-4 py-3 border-b border-gray-100">
-                <Image
-                  src={avatarSrc}
-                  alt="Profile"
-                  width={40}
-                  height={40}
-                  className="w-10 h-10 rounded-full object-cover mr-3"
-                />
+                {hasProfileImage ? (
+                  <Image
+                    src={avatarSrc}
+                    alt="Profile"
+                    width={40}
+                    height={40}
+                    className="w-10 h-10 rounded-full object-cover mr-3"
+                  />
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center mr-3">
+                    <UserCircleIcon className="w-6 h-6 text-helfi-green" aria-hidden="true" />
+                  </div>
+                )}
                 <div>
                   <div className="font-semibold text-gray-900">{sessionUser.name || 'User'}</div>
                   <div className="text-xs text-gray-500">{sessionUser.email || 'user@email.com'}</div>

@@ -28,16 +28,10 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
   const [userData, setUserData] = useState<UserData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
-  // Default avatar
-  const defaultAvatar = 'data:image/svg+xml;base64,' + btoa(`
-    <svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="64" cy="64" r="64" fill="#10B981"/>
-      <circle cx="64" cy="48" r="20" fill="white"/>
-      <path d="M64 76c-13.33 0-24 5.34-24 12v16c0 8.84 7.16 16 16 16h16c8.84 0 16-7.16 16-16V88c0-6.66-10.67-12-24-12z" fill="white"/>
-    </svg>
-  `);
-
-  const profileImage = userData?.profileImage || session?.user?.image || defaultAvatar
+  // Profile image is either the saved Cloudinary image or the auth provider image.
+  // We intentionally do NOT provide a graphic default here so UI components can
+  // render a professional icon fallback when no real image exists.
+  const profileImage = userData?.profileImage || (session?.user?.image ?? '')
 
   // Load data once and cache it
   const loadData = async () => {

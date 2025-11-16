@@ -6,6 +6,7 @@ import Image from 'next/image'
 import { useState } from 'react'
 import Link from 'next/link'
 import { useUserData } from '@/components/providers/UserDataProvider'
+import { UserCircleIcon } from '@heroicons/react/24/outline'
 
 interface PageHeaderProps {
   title: string
@@ -18,7 +19,8 @@ export default function PageHeader({ title, backHref }: PageHeaderProps) {
   const { profileImage } = useUserData()
   const [dropdownOpen, setDropdownOpen] = useState(false)
 
-  const userImage = profileImage || '/default-avatar.png'
+  const hasProfileImage = !!(profileImage || session?.user?.image)
+  const userImage = (profileImage || session?.user?.image || '') as string
   const userName = session?.user?.name || 'User'
 
   const handleBack = () => {
@@ -74,24 +76,36 @@ export default function PageHeader({ title, backHref }: PageHeaderProps) {
             className="focus:outline-none"
             aria-label="Open profile menu"
           >
-            <Image
-              src={userImage}
-              alt="Profile"
-              width={40}
-              height={40}
-              className="w-10 h-10 rounded-full border-2 border-helfi-green shadow-sm object-cover"
-            />
+            {hasProfileImage ? (
+              <Image
+                src={userImage}
+                alt="Profile"
+                width={40}
+                height={40}
+                className="w-10 h-10 rounded-full border-2 border-helfi-green shadow-sm object-cover"
+              />
+            ) : (
+              <div className="w-10 h-10 rounded-full border-2 border-helfi-green bg-white shadow-sm flex items-center justify-center">
+                <UserCircleIcon className="w-6 h-6 text-helfi-green" aria-hidden="true" />
+              </div>
+            )}
           </button>
           {dropdownOpen && (
             <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-xl shadow-lg py-2 z-50 border border-gray-100 dark:border-gray-700 animate-fade-in">
               <div className="flex items-center px-4 py-3 border-b border-gray-100 dark:border-gray-700">
-                <Image
-                  src={userImage}
-                  alt="Profile"
-                  width={40}
-                  height={40}
-                  className="w-10 h-10 rounded-full object-cover mr-3"
-                />
+                {hasProfileImage ? (
+                  <Image
+                    src={userImage}
+                    alt="Profile"
+                    width={40}
+                    height={40}
+                    className="w-10 h-10 rounded-full object-cover mr-3"
+                  />
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center mr-3">
+                    <UserCircleIcon className="w-6 h-6 text-helfi-green" aria-hidden="true" />
+                  </div>
+                )}
                 <div>
                   <div className="font-semibold text-gray-900 dark:text-white">{userName}</div>
                   <div className="text-xs text-gray-500 dark:text-gray-400">

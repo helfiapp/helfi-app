@@ -1,5 +1,5 @@
 'use client'
-import { Cog6ToothIcon } from '@heroicons/react/24/outline'
+import { Cog6ToothIcon, UserCircleIcon } from '@heroicons/react/24/outline'
 
 import React, { useState, useEffect } from 'react'
 import { useSession, signOut } from 'next-auth/react'
@@ -23,15 +23,9 @@ export default function Profile() {
     gender: ''
   })
 
-  // Profile data - using consistent green avatar
-  const defaultAvatar = 'data:image/svg+xml;base64,' + btoa(`
-    <svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="64" cy="64" r="64" fill="#10B981"/>
-      <circle cx="64" cy="48" r="20" fill="white"/>
-      <path d="M64 76c-13.33 0-24 5.34-24 12v16c0 8.84 7.16 16 16 16h16c8.84 0 16-7.16 16-16V88c0-6.66-10.67-12-24-12z" fill="white"/>
-    </svg>
-  `);
-  const userImage = profileImage || session?.user?.image || defaultAvatar;
+  // Profile data - prefer real photos; fall back to professional icon
+  const hasProfileImage = !!(profileImage || session?.user?.image)
+  const userImage = (profileImage || session?.user?.image || '') as string
   const userName = session?.user?.name || 'User';
 
   // Close dropdown on outside click
@@ -173,14 +167,20 @@ export default function Profile() {
           
           {/* Profile Photo */}
           <div className="mb-8 text-center">
-            <Image
-              src={userImage}
-              alt={userName}
-              width={96}
-              height={96}
-              className="w-24 h-24 rounded-full object-cover mx-auto mb-4"
-              priority
-            />
+            {hasProfileImage ? (
+              <Image
+                src={userImage}
+                alt={userName}
+                width={96}
+                height={96}
+                className="w-24 h-24 rounded-full object-cover mx-auto mb-4"
+                priority
+              />
+            ) : (
+              <div className="w-24 h-24 rounded-full bg-emerald-50 flex items-center justify-center mx-auto mb-4">
+                <UserCircleIcon className="w-12 h-12 text-helfi-green" aria-hidden="true" />
+              </div>
+            )}
             <Link href="/profile/image" className="text-helfi-green hover:underline">
               Change Profile Photo
             </Link>
