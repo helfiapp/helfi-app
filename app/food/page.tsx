@@ -1483,19 +1483,12 @@ Please add nutritional information manually if needed.`);
       return;
     }
 
-    // Build description from items if available, otherwise use provided description
-    let finalDescription = description;
-    if (analyzedItems && analyzedItems.length > 0) {
-      // Create a clean description from items
-      const itemDescriptions = analyzedItems.map((item: any) => {
-        const servings = item.servings || 1;
-        const servingText = servings !== 1 ? `${servings}x ` : '';
-        const brandText = item.brand ? `${item.brand} ` : '';
-        const servingSizeText = item.serving_size ? `(${item.serving_size})` : '';
-        return `${servingText}${brandText}${item.name}${servingSizeText ? ' ' + servingSizeText : ''}`;
-      });
-      finalDescription = itemDescriptions.join(', ');
-    }
+    // Prefer a clean natural-language summary from the AI analysis, falling
+    // back to a structured summary from items only when needed.
+    const baseFromAi = extractBaseMealDescription(description);
+    const baseFromItems =
+      analyzedItems && analyzedItems.length > 0 ? buildMealSummaryFromItems(analyzedItems) : '';
+    const finalDescription = (baseFromAi || baseFromItems || description || '').trim();
     
     const newEntry = {
       id: Date.now(),

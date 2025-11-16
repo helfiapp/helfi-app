@@ -529,7 +529,8 @@ CRITICAL REQUIREMENTS:
       );
     }
 
-    console.log('✅ Analysis received:', analysis.substring(0, 100) + '...');
+    console.log('✅ Analysis received:', analysis.substring(0, 200) + '...');
+    console.log('✅ Analysis received:', analysis.substring(0, 200) + '...');
 
     // Server-side safeguard: ensure nutrition line is present so frontend cards render reliably
     const hasCalories = /calories\s*[:\-]?\s*\d+/i.test(analysis);
@@ -621,6 +622,51 @@ CRITICAL REQUIREMENTS:
         }
       } catch (e) {
         console.warn('ITEMS_JSON handling failed (non-fatal):', e);
+      }
+
+      // If the main analysis did not contain a usable ITEMS_JSON block, make a
+      // compact follow-up call whose ONLY job is to produce structured items.
+      if ((!resp.items || resp.items.length === 0) && analysis.length > 0) {
+        try {
+          console.log('ℹ️ No ITEMS_JSON found, running structured-items extractor');
+          const extractor = await chatCompletionWithCost(openai, {
+            model: 'gpt-4o-mini',
+            messages: [
+              {
+                role: 'user',
+                content:
+                  'From the following nutrition analysis text, extract a JSON object with this exact shape:\n\n' +
+                  '{"items":[{"name":"string","brand":null,"serving_size":"string","servings":1,"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"sugar_g":0}],' +
+                  '"total":{"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"sugar_g":0}}\n\n' +
+                  'Rules:\n' +
+                  '- Use PER-SERVING nutrition values for each item.\n' +
+                  '- The "total" object must be the sum of all items multiplied by their servings.\n' +
+                  '- If you are unsure about fiber or sugar, set them to 0.\n' +
+                  '- Respond with JSON ONLY, no backticks, no comments, no extra text.\n\n' +
+                  'Analysis text:\n' +
+                  analysis,
+              },
+            ],
+            max_tokens: 260,
+            temperature: 0,
+          } as any);
+          totalCostCents += extractor.costCents;
+          const text = extractor.completion.choices?.[0]?.message?.content?.trim() || '';
+          const parsed = text ? parseItemsJsonRelaxed(text) : null;
+          if (parsed && typeof parsed === 'object') {
+            const items = Array.isArray(parsed.items) ? parsed.items : [];
+            const total = typeof parsed.total === 'object' ? parsed.total : null;
+            if (items.length > 0) {
+              resp.items = items;
+              resp.total = total || computeTotalsFromItems(items) || resp.total || null;
+              console.log('✅ Structured items extracted via follow-up call:', {
+                itemCount: items.length,
+              });
+            }
+          }
+        } catch (e) {
+          console.warn('ITEMS_JSON extractor follow-up failed (non-fatal):', e);
+        }
       }
     }
 

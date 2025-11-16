@@ -8,6 +8,30 @@ Every future agent must read this fully before changing anything under `/app/foo
 
 ---
 
+## Latest handover – Agent GPT‑5.1 (read this first, then the rest of this file)
+
+Before touching any code, **read this section once**, then go back and read the entire `FOOD-DIARY.md` file from top to bottom.
+
+- I have **implemented**, on the live system:
+  - The corrected date‑window logic in `GET /api/food-log` (see section 4.1 for details).  
+  - A new `items` JSON column on `FoodLog` and wiring so **new** meals save their cards into history:
+    - `prisma/schema.prisma` `FoodLog.items Json?` + SQL migration `20251115120000_add_foodlog_items`.  
+    - `saveFoodEntries` now sends `items` when calling `/api/food-log`.  
+    - `GET /api/food-log` now maps `items: l.items || l.nutrients?.items || null`.  
+    - `editFood(food)` already prefers `food.items`, so new entries edited from history should keep their cards.
+- I have **started but not finished**:
+  - Burger‑style text → cards parsing (two‑line “1. **Bun** / - Calories: …” format).  
+  - Energy (`kcal ↔ kJ`) and volume (`oz ↔ ml`) toggles on the Food page.
+- I have **not fully solved**:
+  - Reliable calories/macros for the user’s burger image – cards now appear, but the numbers in both the header and the cards are still untrustworthy.  
+  - Missing history rows for 14–16 November 2025 – those meals were never written into `FoodLog`, so there is nothing in the DB to fix.
+
+For a full, detailed description of exactly what I changed, what is working, and what is still broken, see **section 8: “Session log – Agent GPT‑5.1”** near the end of this file.
+
+Please **do not undo** the `FoodLog.items` column or the new `/api/food-log` date window; build on top of them.
+
+---
+
 ## 1. What the user originally asked for (this round)
 
 1. Add reliable **Units** controls on ingredient cards:
@@ -354,5 +378,128 @@ This section is lifted directly (with minor wording tweaks) from `fix.plan.md`.
 - [ ] Phase 1: Fix `/api/food-log` date window and verify behaviour in Melbourne and at least one other timezone.  
 - [ ] Phase 2: Persist `items` to `FoodLog`, prefer stored items in `editFood`, and guard against wiping cards; backfill key recent entries (crackers/San Remo) once stable.  
 - [ ] Phase 3: Implement units and toggles exactly as in section 6 and complete a full regression sweep on desktop + iPhone.
+-
+---
 
+## 8. Session log – Agent GPT‑5.1 (this session, November 16, 2025)
 
+### 8.1 What I changed in the code
+
+**Back‑end / database**
+- **`app/api/food-log/route.ts`**  
+  - Updated the date window logic to **add** the timezone offset instead of subtracting it (as described in section 4.1), so that a given local day (e.g. 15/11 in Melbourne) maps to the correct UTC window.  
+  - Extended the `POST` handler to accept and store an `items` field (structured ingredient list) alongside `description`, `imageUrl`, and `nutrients`.
+- **`prisma/schema.prisma` + migration**  
+  - Added `items Json?` to `model FoodLog`.  
+  - Ran a small SQL migration (`prisma/migrations/20251115120000_add_foodlog_items/migration.sql`) directly against the live Postgres database to add the `items` column.  
+  - Verified via Prisma that existing rows are still present (`id`, `userId`, `name`, `createdAt`), but **none of the historical rows have `items` populated** (all `items = null`).
+
+**Front‑end – history / persistence**
+- **`app/food/page.tsx` – saving to history**
+  - In `saveFoodEntries`, when calling `/api/food-log`, I now send:
+    - `description`, `nutrition`, `imageUrl` **and** `items: last.items || null`.  
+  - This means **new** analyzed meals will have their ingredient cards saved into `FoodLog.items` as soon as they are created.
+- **`app/food/page.tsx` – loading history**
+  - When mapping responses from `GET /api/food-log` into `todaysFoods` / `historyFoods`, I now include:
+    - `items: (l as any).items || (l.nutrients as any)?.items || null`  
+  - So if the DB row has `items`, edit mode will use those; if not, it falls back to any `items` nested inside `nutrients`.
+- **`editFood(food)`** was already written to prefer `food.items` when present; I did not change that logic, but the new wiring above finally gives it real `items` data for new entries.
+
+**Front‑end – units, toggles and parsing**
+- **Units / toggles (Phase 3 work started but not fully validated)**  
+  - Added `energyUnit` (`'kcal' | 'kJ'`) and `volumeUnit` (`'oz' | 'ml'`) state to the Food page.  
+  - Inserted a **kcal ↔ kJ toggle** above the summary cards and wired it so that when `energyUnit === 'kJ'`, the summary and per‑ingredient displays use `kJ = kcal * 4.184`.  
+  - Added an **oz ↔ ml toggle** inside the ingredient “Units” controls for oz‑based foods (e.g. burger patties), using `1 oz ≈ 29.57 ml` and whole‑number steps (1 oz or 10 ml) while keeping `servings` tied back to the base quantity.  
+  - Extended `isDiscreteUnitLabel` to treat crackers/chips as discrete items so the **Units** control uses whole numbers for them.
+- **Text → card parsing (this is where things are still fragile)**  
+  - `extractStructuredItemsFromAnalysis(...)` was left as the primary JSON/`<ITEMS_JSON>` parser.  
+  - `extractItemsFromTextEstimates(...)` was expanded to handle the user’s burger format:
+    - Lines like `1. **Bun**: 1 bun (3 oz)` followed by  
+      `- Calories: 150, Protein: 5g, Carbs: 28g, Fat: 3g`  
+    - It builds a `servingMap` from the numbered lines and a set of macros from either inline or two‑line bullet formats.  
+    - If it finds macros, it creates items with `name`, `serving_size`, `calories`, `protein_g`, `carbs_g`, `fat_g`, `fiber_g`, `sugar_g`.  
+    - If it **only** finds serving descriptions (no macros), it still builds items with `serving_size` and `name` but leaves macros `null` so cards exist but numbers are blank rather than wrong.
+  - `applyStructuredItems(itemsFromApi, totalFromApi, analysisText)` now:
+    - Starts with `itemsFromApi` (what the API returns).  
+    - If empty, tries `extractStructuredItemsFromAnalysis(analysisText)`.  
+    - If still empty, tries `extractItemsFromTextEstimates(analysisText)` (the prose parser described above).  
+    - When it ends up with any items, it **builds cards** (`setAnalyzedItems(enriched)`), but as of my final change it **no longer forces a recalculated nutrition summary immediately**. The intention was:
+      - First trust the AI’s own total from `extractNutritionData(result.analysis)` for the header cards.  
+      - Only move to recalculated totals when the user edits the cards (via `updateItemField`, which still calls `applyRecalculatedNutrition`).
+
+### 8.2 What is currently working
+
+- **Date logic implementation (code‑side)**  
+  - `GET /api/food-log` now uses the corrected timezone math shown in section 4.1 (`+ tzMin * 60 * 1000`).  
+  - For new test entries created after this session (once `FoodLog` actually contains rows on that day), the API should return rows in the expected local‑day window.  
+  - I verified via SQL that the existing `FoodLog` rows around 12/11/2025 have sensible Melbourne local times; when you run the date‑window math by hand they land in the intended day.
+- **`FoodLog.items` column and wiring**  
+  - The `items` column exists on the live DB and Prisma can read/write it.  
+  - New saves from `saveFoodEntries` will record `items` into `FoodLog`.  
+  - History mapping and `editFood` will prefer these stored `items` going forward, which should prevent **new** card data from disappearing just because the description parser fails later.
+- **Burger entry now shows ingredient cards in Edit mode**  
+  - For the user’s burger photo, clicking **Edit** now shows:
+    - Cards for Bun, Patty, Cheese, Bacon, Lettuce, Tomato, Sauce.  
+    - Units controls, serving size text, and the standard card layout.  
+  - However, the numbers in those cards and in the coloured summary boxes are still **not reliable** (see next section).
+
+### 8.3 What is *still* broken or untrustworthy
+
+**1. History for old dates (14–16 November 2025)**  
+- When I inspected the live DB, there were **only 5 `FoodLog` rows total**, all much older (Sept and 12 Nov).  
+- There are **no rows at all** for 14–16 November, which means the meals the user created on those dates were **never written into `FoodLog`** (they lived only in `todaysFoods`).  
+- Because of that, the new date logic cannot “bring them back”: there is simply nothing in `FoodLog` for those dates to show.  
+- I did **not** attempt any data repair, because there are no DB rows to adjust; the only realistic way to re‑use those specific meals is to re‑create them via the UI.
+
+**2. Nutrition numbers for the burger (most recent tests)**  
+- The latest burger analyses now **show cards**, but the numbers are inconsistent:
+  - At various points the header totals have been wildly off (850 kcal, then 42 kcal).  
+  - The individual cards have also shown zeros or obviously wrong macros.  
+- Root cause (still unresolved):  
+  - We now have **three competing sources of truth** for totals:
+    1. The AI’s prose text (parsed by `extractNutritionData`).  
+    2. Any `total` object returned from the API (`result.total`).  
+    3. Recalculated totals from the items we build (`recalculateNutritionFromItems`).  
+  - The current code tries to be “helpful” by mixing these:
+    - It parses the prose text for a headline summary.  
+    - It then builds items from prose, which may have incomplete macros or parsing errors.  
+    - Earlier in this session, `applyStructuredItems` was calling `applyRecalculatedNutrition` immediately, which could overwrite a decent AI total with bad zeros from partially parsed items.  
+    - My last change removed that immediate overwrite, but because I couldn’t see the live private numbers, I **could not confirm** that the burger totals are now correct on production.
+- **Bottom line for the next agent:**  
+  - Do **not** trust the current burger numbers as “correct”; treat this as an open bug.  
+  - The parsing layer is now quite complex and brittle. It may be simpler and safer to:
+    - Tighten the `/api/analyze-food` response so it **always** returns a clean `items[]` + `total` JSON structure.  
+    - In the UI, **only** trust that JSON for cards and totals, and stop scraping the prose entirely.  
+  - Whatever approach you take, please test with the user’s real burger image and keep them in the loop in plain language.
+
+**3. Units / energy toggles not fully validated end‑to‑end**  
+- `energyUnit` and `volumeUnit` are wired in, but under time pressure I focused mainly on getting the burger cards to appear.  
+- I have **not** done a full regression sweep for:
+  - Eggs, crackers, orange juice, and other starters from `data/foods-starter.ts`.  
+  - Mobile behaviour (iPhone), where the user has historically seen subtle regressions.  
+- It’s possible there are edge‑case bugs in the new toggles (especially interactions between unit changes and servings). Treat that code as “experimental” until you test it thoroughly.
+
+### 8.4 Guidance for the next agent
+
+- **Please honour the user’s constraints:**
+  - They are **not** a developer and do not want to read technical monologues. Keep explanations short and plain.  
+  - Their biggest fear is “cards disappearing” or numbers silently changing; any change that touches cards or totals must be tested with **real entries** (e.g. burgers, eggs, crackers) on the live site.  
+  - They want one issue solved **completely** before you move on to the next.
+- **Recommended plan from here:**
+  1. **Stabilise nutrition truth source**  
+     - Decide a single source of truth for totals (`result.total` from the API is ideal).  
+     - Update the UI so the coloured header cards and the ingredient cards both derive numbers from that source only.  
+     - Remove or drastically simplify `extractNutritionData` and the prose‑based macro scraping once you rely on JSON.  
+  2. **Simplify the parsing path**  
+     - If you can, make `/api/analyze-food` always return a structured payload:
+       - `items[]` with per‑item macros and serving sizes.  
+       - `total` with summed macros.  
+     - In the front‑end, treat prose (`aiDescription`) as display‑only; never use it to compute numbers unless JSON is truly missing.  
+  3. **Retest the specific burger the user used in this session**  
+     - Confirm that:
+       - Cards appear for bun, patty, cheese, bacon, lettuce, tomato, sauce.  
+       - Macros per card are reasonable (no zeros unless genuinely unknown).  
+       - The header totals match the sum of the cards within rounding error.  
+  4. **Only after the above is solid**, revisit the units/toggles behaviour and the older “crackers / San Remo” entries if the user still cares about those historical records.
+
+Please **do not roll back** the `FoodLog.items` column or the `/api/food-log` date‑window fix; those are foundational for making the diary reliable long‑term, even though the burger numbers are still not right today.
