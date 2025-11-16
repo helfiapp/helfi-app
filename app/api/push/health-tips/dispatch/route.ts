@@ -326,13 +326,22 @@ CRITICAL RULES:
 5. Never diagnose or claim to cure anything. Use soft language like "may help", "you might consider", "many people with X find Y helpful".
 6. Include a brief safety note that reminds them to consider medications, allergies, and to talk with a clinician when appropriate—especially if you mention a supplement or strong change.
 7. Do NOT reveal your chain-of-thought. Only show the final recommendation and brief reasoning.
+8. In addition to the tip itself, create 3-4 concrete follow-up questions the user might naturally ask specifically about THIS tip. These questions must:
+   - Explicitly reference the main recommendation (for example, the specific food, supplement, or habit you suggested).
+   - Be practical and personalised (for example, about safety, interactions, alternatives, or how to tailor the advice to their routine or health issues).
+   - Avoid generic wording that could apply to any random health tip.
 
 RESPONSE FORMAT (JSON ONLY, no markdown, no extra text):
 {
   "title": "Short, specific title for the notification (5-9 words)",
   "category": "food" | "supplement" | "lifestyle",
   "tip": "1-3 short sentences with the main recommendation, explicitly referencing at least one detail from the snapshot above.",
-  "safetyNote": "1 short sentence with a sensible safety or medical caution."
+  "safetyNote": "1 short sentence with a sensible safety or medical caution.",
+  "suggestedQuestions": [
+    "First personalised follow-up question about this specific tip...",
+    "Second personalised follow-up question...",
+    "Third personalised follow-up question..."
+  ]
 }`
 
   return prompt
@@ -363,6 +372,7 @@ function extractTipJson(raw: string) {
       category?: string
       tip?: string
       safetyNote?: string
+      suggestedQuestions?: string[]
     }
   } catch {
     return null
@@ -593,6 +603,13 @@ export async function POST(req: NextRequest) {
     const costCents = wrapped.costCents
     const chargeCents = costCents * 2
 
+    const suggestedQuestions =
+      Array.isArray(parsed.suggestedQuestions) && parsed.suggestedQuestions.length > 0
+        ? parsed.suggestedQuestions
+            .filter((q) => typeof q === 'string' && q.trim().length > 0)
+            .slice(0, 4)
+        : []
+
     // Charge the user twice the underlying AI cost in credits
     const chargedOk = await creditManager.chargeCents(chargeCents)
     if (!chargedOk) {
@@ -610,7 +627,7 @@ export async function POST(req: NextRequest) {
       parsed.title.substring(0, 140),
       fullBody,
       category,
-      JSON.stringify({ rawContent }).slice(0, 10000),
+      JSON.stringify({ rawContent, suggestedQuestions }).slice(0, 10000),
       costCents,
       chargeCents
     )

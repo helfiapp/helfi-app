@@ -13,6 +13,7 @@ interface VoiceChatContext {
   healthTipSummary?: string
   healthTipTitle?: string
   healthTipCategory?: string
+  healthTipSuggestedQuestions?: string[]
 }
 
 interface VoiceChatProps {
@@ -39,9 +40,19 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
   const hasHealthTipContext = !!context?.healthTipSummary
   const healthTipTitle = context?.healthTipTitle
   const healthTipCategory = context?.healthTipCategory
+  const healthTipSuggestedQuestions = context?.healthTipSuggestedQuestions
 
   const healthTipSuggestionQuestions = useMemo(() => {
     if (!hasHealthTipContext) return []
+
+    // Prefer AI-generated, tip-specific suggestions when available
+    if (Array.isArray(healthTipSuggestedQuestions) && healthTipSuggestedQuestions.length > 0) {
+      return healthTipSuggestedQuestions
+        .filter((q) => typeof q === 'string' && q.trim().length > 0)
+        .slice(0, 4)
+    }
+
+    // Fallback: template questions tied to the tip title + category
     const titleSnippet = healthTipTitle || 'this tip'
     const typeLabel =
       healthTipCategory === 'supplement'
@@ -55,7 +66,7 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
       `How could I adapt the "${titleSnippet}" tip to better fit my daily routine and preferences?`,
       `Based on my overall health data, what should I pay most attention to when following this "${titleSnippet}" tip?`,
     ]
-  }, [hasHealthTipContext, healthTipTitle, healthTipCategory])
+  }, [hasHealthTipContext, healthTipTitle, healthTipCategory, healthTipSuggestedQuestions])
   
   const endRef = useRef<HTMLDivElement | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)

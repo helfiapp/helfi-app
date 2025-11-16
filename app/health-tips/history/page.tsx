@@ -13,6 +13,7 @@ type HealthTip = {
   title: string
   body: string
   category: string
+  suggestedQuestions?: string[]
 }
 
 export default function HealthTipHistoryPage() {
@@ -154,6 +155,7 @@ export default function HealthTipHistoryPage() {
                                 healthTipSummary: `${tip.title}. ${tip.body}`,
                                 healthTipTitle: tip.title,
                                 healthTipCategory: tip.category,
+                                healthTipSuggestedQuestions: tip.suggestedQuestions,
                               }}
                             />
                           </div>

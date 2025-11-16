@@ -96,6 +96,7 @@ export async function GET(req: NextRequest) {
     category: string
     costCents: number | null
     chargeCents: number | null
+    suggestedQuestions: any
   }> = await prisma.$queryRawUnsafe(
     `SELECT 
        id,
@@ -105,7 +106,8 @@ export async function GET(req: NextRequest) {
        body,
        category,
        costCents,
-       chargeCents
+       chargeCents,
+       metadata->'suggestedQuestions' AS "suggestedQuestions"
      FROM HealthTips
      WHERE userId = $1 AND tipDate BETWEEN $2::date AND $3::date
      ORDER BY tipDate DESC, sentAt DESC`,
@@ -114,7 +116,19 @@ export async function GET(req: NextRequest) {
     end
   )
 
-  return NextResponse.json({ tips })
+  const tipsWithSuggestions = tips.map((tip) => {
+    const raw = tip.suggestedQuestions
+    const suggestions =
+      Array.isArray(raw) && raw.length > 0
+        ? raw.filter((q) => typeof q === 'string' && q.trim().length > 0).slice(0, 4)
+        : []
+    return {
+      ...tip,
+      suggestedQuestions: suggestions,
+    }
+  })
+
+  return NextResponse.json({ tips: tipsWithSuggestions })
 }
 
 
