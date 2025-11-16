@@ -116,11 +116,17 @@ async function logScheduleAttempt(entry: ScheduleLogRecord) {
   }
 }
 
-export async function scheduleReminderWithQStash(
+type ScheduleTarget = {
   userId: string,
   timeHHMM: string,
   timeZone: string
+  callbackPath: string
+}
+
+async function scheduleWithQStash(
+  target: ScheduleTarget
 ): Promise<{ scheduled: boolean; reason?: string; status?: number; responseBody?: string }> {
+  const { userId, timeHHMM, timeZone, callbackPath } = target
   const token = process.env.QSTASH_TOKEN || ''
   const deltaMinutes = minutesUntilNext(timeHHMM, timeZone)
   const notBeforeEpochSeconds = Math.floor((Date.now() + deltaMinutes * 60_000) / 1000)
@@ -164,7 +170,10 @@ export async function scheduleReminderWithQStash(
     return { scheduled: false, reason: 'missing_base_url' }
   }
 
-  const callbackUrl = `${base}/api/push/dispatch`
+  const normalizedPath = callbackPath.startsWith('/')
+    ? callbackPath
+    : `/${callbackPath}`
+  const callbackUrl = `${base}${normalizedPath}`
   const url = `https://qstash.upstash.io/v2/publish/${callbackUrl}`
 
   const body = JSON.stringify({ userId, reminderTime: timeHHMM, timezone: timeZone })
@@ -229,6 +238,32 @@ export async function scheduleReminderWithQStash(
     })
     return { scheduled: false, reason, status, responseBody }
   }
+}
+
+export async function scheduleReminderWithQStash(
+  userId: string,
+  timeHHMM: string,
+  timeZone: string
+): Promise<{ scheduled: boolean; reason?: string; status?: number; responseBody?: string }> {
+  return scheduleWithQStash({
+    userId,
+    timeHHMM,
+    timeZone,
+    callbackPath: '/api/push/dispatch',
+  })
+}
+
+export async function scheduleHealthTipWithQStash(
+  userId: string,
+  timeHHMM: string,
+  timeZone: string
+): Promise<{ scheduled: boolean; reason?: string; status?: number; responseBody?: string }> {
+  return scheduleWithQStash({
+    userId,
+    timeHHMM,
+    timeZone,
+    callbackPath: '/api/push/health-tips/dispatch',
+  })
 }
 
 /**
