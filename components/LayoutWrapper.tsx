@@ -48,6 +48,16 @@ function DesktopSidebar() {
           </a>
           
           <a
+            href="/health-tips"
+            className="text-gray-700 hover:text-helfi-green hover:bg-gray-50 group flex items-center px-2 py-2 text-base font-medium rounded-md"
+          >
+            <svg className="text-gray-400 group-hover:text-helfi-green mr-3 h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7H7m0 0V5a2 2 0 012-2h6m-8 4v6m0 0h6m-6 0H5a2 2 0 01-2-2V7m10-4h2a2 2 0 012 2v8a2 2 0 01-2 2h-2m0 0H9m4 0v2a2 2 0 01-2 2H9" />
+            </svg>
+            Health Tips
+          </a>
+          
+          <a
             href="/food"
             className="text-gray-700 hover:text-helfi-green hover:bg-gray-50 group flex items-center px-2 py-2 text-base font-medium rounded-md"
           >
