@@ -743,7 +743,21 @@ const applyStructuredItems = (
     return num
   }
 
-  const updateItemField = (index: number, field: 'name' | 'brand' | 'serving_size' | 'servings' | 'calories' | 'protein_g' | 'carbs_g' | 'fat_g' | 'fiber_g' | 'sugar_g', value: any) => {
+  const updateItemField = (
+    index: number,
+    field:
+      | 'name'
+      | 'brand'
+      | 'serving_size'
+      | 'servings'
+      | 'calories'
+      | 'protein_g'
+      | 'carbs_g'
+      | 'fat_g'
+      | 'fiber_g'
+      | 'sugar_g',
+    value: any,
+  ) => {
     const itemsCopy = [...analyzedItems]
     if (!itemsCopy[index]) return
 
@@ -756,11 +770,34 @@ const applyStructuredItems = (
     } else if (field === 'serving_size') {
       itemsCopy[index].serving_size = String(value || '').trim()
     } else if (field === 'servings') {
-      // Snap servings to appropriate step:
-      // - Discrete units (eggs/slices) => step = 1 / quantity-per-serving
-      // - Otherwise => 0.25
+      // Snap servings to a step that stays in sync with the "Units" control.
+      // - Discrete items (eggs, slices, crackers): 1 whole unit at a time
+      // - Volume/weight items (oz, ml, g): 1 oz or 10 ml steps converted back to servings
+      // - Fallback: gentle 0.25 step when we can't parse the unit
       const meta = parseServingUnitMetadata(itemsCopy[index].serving_size || '')
-      const step = meta && isDiscreteUnitLabel(meta.unitLabel) ? (1 / meta.quantity) : 0.25
+      let step = 0.25
+      if (meta && meta.quantity && meta.quantity > 0) {
+        if (isDiscreteUnitLabel(meta.unitLabel)) {
+          // e.g. 1 egg per serving => step 1 serving; 2 crackers per serving => 0.5 serving
+          step = 1 / meta.quantity
+        } else {
+          const label = (meta.unitLabel || '').toLowerCase()
+          const hasOunces = /oz|ounce/.test(label)
+          const isVolumeUnit = isVolumeBasedUnitLabel(meta.unitLabel)
+          // Match the Units control logic: unitsPerServing and unitStep
+          const unitsPerServingLocal =
+            hasOunces && volumeUnit === 'ml' ? meta.quantity * OZ_TO_ML : meta.quantity
+          let unitStepLocal = 1
+          if (hasOunces) {
+            unitStepLocal = volumeUnit === 'ml' ? 10 : 1
+          } else if (isVolumeUnit) {
+            unitStepLocal = 10
+          }
+          if (unitsPerServingLocal > 0) {
+            step = unitStepLocal / unitsPerServingLocal
+          }
+        }
+      }
       const clamped = clampNumber(value, 0, 20)
       const snapped = step > 0 ? Math.round(clamped / step) * step : clamped
       itemsCopy[index].servings = snapped
