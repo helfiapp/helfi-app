@@ -603,7 +603,7 @@ export async function POST(req: NextRequest) {
 
     await prisma.$executeRawUnsafe(
       `INSERT INTO HealthTips (id, userId, tipDate, sentAt, title, body, category, metadata, costCents, chargeCents)
-       VALUES ($1,$2,$3::date,NOW(),$4,$5,$6,$7,$8,$9)`,
+       VALUES ($1,$2,$3::date,NOW(),$4,$5,$6,$7::jsonb,$8,$9)`,
       tipId,
       userId,
       localDateString,
