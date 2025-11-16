@@ -46,6 +46,7 @@ export default function HealthTipsPage() {
   const [focusLifestyle, setFocusLifestyle] = useState(true)
   const [timezoneOptions, setTimezoneOptions] = useState<string[]>([])
   const [timezoneQuery, setTimezoneQuery] = useState('')
+  const [showTimezoneDropdown, setShowTimezoneDropdown] = useState(false)
 
   useEffect(() => {
     ;(async () => {
@@ -389,12 +390,18 @@ export default function HealthTipsPage() {
                       value={timezoneQuery}
                       onChange={(e) => {
                         setTimezoneQuery(e.target.value)
+                        setShowTimezoneDropdown(true)
+                      }}
+                      onFocus={() => {
+                        if (enabled && timezoneOptions.length > 0) {
+                          setShowTimezoneDropdown(true)
+                        }
                       }}
                       placeholder="Start typing e.g. Australia/Melbourne"
                       className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
                       disabled={!enabled}
                     />
-                    {enabled && filteredTimezones.length > 0 && (
+                    {enabled && showTimezoneDropdown && filteredTimezones.length > 0 && (
                       <div className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg">
                         {filteredTimezones.map((tzValue) => (
                           <button
@@ -403,6 +410,7 @@ export default function HealthTipsPage() {
                             onClick={() => {
                               setTimezone(tzValue)
                               setTimezoneQuery(tzValue)
+                              setShowTimezoneDropdown(false)
                             }}
                             className="w-full text-left px-3 py-2 text-xs text-gray-800 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700"
                           >
