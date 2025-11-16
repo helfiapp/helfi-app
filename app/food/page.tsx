@@ -2284,6 +2284,58 @@ Please add nutritional information manually if needed.`);
                     <h3 className="text-xl font-semibold text-gray-900 mb-2">Food Analysis</h3>
                   </div>
 
+                  {/* Compact edit controls at the top when editing an existing entry */}
+                  {editingEntry && (
+                    <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                      <div className="text-xs sm:text-sm text-gray-500">
+                        Editing a saved entry
+                      </div>
+                      <div className="flex flex-wrap gap-2 justify-start sm:justify-end">
+                        <button
+                          type="button"
+                          onClick={() => updateFoodEntry()}
+                          disabled={isAnalyzing}
+                          className="px-3 py-1.5 rounded-full bg-emerald-500 text-white text-xs sm:text-sm font-medium shadow-sm hover:bg-emerald-600 disabled:opacity-60"
+                        >
+                          Save changes
+                        </button>
+                        <button
+                          type="button"
+                          onClick={reanalyzeCurrentEntry}
+                          disabled={isAnalyzing}
+                          className="px-3 py-1.5 rounded-full bg-blue-100 text-blue-800 text-xs sm:text-sm font-medium border border-blue-200 hover:bg-blue-200 disabled:opacity-60"
+                        >
+                          Re-analyze
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPhotoFile(null)
+                            setPhotoPreview(null)
+                            setAiDescription('')
+                            setShowAiResult(false)
+                            setIsEditingDescription(false)
+                            setEditedDescription('')
+                            setAnalyzedItems([])
+                            setAnalyzedTotal(null)
+                            setHealthWarning(null)
+                            setHealthAlternatives(null)
+                          }}
+                          className="px-3 py-1.5 rounded-full bg-gray-100 text-gray-700 text-xs sm:text-sm font-medium border border-gray-200 hover:bg-gray-200"
+                        >
+                          Delete photo
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleCancelEditing}
+                          className="px-3 py-1.5 rounded-full bg-white text-gray-700 text-xs sm:text-sm font-medium border border-gray-300 hover:bg-gray-50"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Meal Summary - Single sentence at top */}
                   {mealSummary && (
                     <div className="mb-4 px-4 py-3 bg-emerald-50 border border-emerald-100 rounded-xl text-sm sm:text-base text-emerald-900 leading-relaxed">

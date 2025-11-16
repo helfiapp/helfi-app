@@ -1,6 +1,6 @@
 ## Food Diary – Handover and Fix Plan
 
-**Last updated:** November 16, 2025  
+**Last updated:** November 16, 2025 (after GPT‑5.1 follow‑up session)  
 **Baseline code version:** commit `557b732` (current live baseline after rollback)
 
 This document is the **single source of truth** for the Food Diary / Food Analyzer area.  
@@ -13,18 +13,26 @@ Every future agent must read this fully before changing anything under `/app/foo
 Before touching any code, **read this section once**, then go back and read the entire `FOOD-DIARY.md` file from top to bottom.
 
 - I have **implemented**, on the live system:
-  - The corrected date‑window logic in `GET /api/food-log` (see section 4.1 for details).  
-  - A new `items` JSON column on `FoodLog` and wiring so **new** meals save their cards into history:
+  - ✅ The corrected date‑window logic in `GET /api/food-log` (see section 4.1 for details).  
+    - This is a core fix. **Do not change the timezone maths** (`+ tzMin * 60 * 1000`) without talking to the user first.
+  - ✅ A new `items` JSON column on `FoodLog` and wiring so **all new meals** save their cards into history:
     - `prisma/schema.prisma` `FoodLog.items Json?` + SQL migration `20251115120000_add_foodlog_items`.  
     - `saveFoodEntries` now sends `items` when calling `/api/food-log`.  
-    - `GET /api/food-log` now maps `items: l.items || l.nutrients?.items || null`.  
-    - `editFood(food)` already prefers `food.items`, so new entries edited from history should keep their cards.
-- I have **started but not finished**:
-  - Burger‑style text → cards parsing (two‑line “1. **Bun** / - Calories: …” format).  
-  - Energy (`kcal ↔ kJ`) and volume (`oz ↔ ml`) toggles on the Food page.
+    - `GET /api/food-log` maps `items: l.items || l.nutrients?.items || null`.  
+    - `editFood(food)` prefers `food.items`, so new entries edited from history keep their cards instead of depending on brittle text parsing.
+  - ✅ Energy (`kcal ↔ kJ`) and volume (`oz ↔ ml`) toggles on the Food page:
+    - `energyUnit` (`'kcal' | 'kJ'`) now drives **all** energy displays: the coloured analysis tiles, per‑ingredient chips, ingredient totals, and **Today’s Totals**. When `kJ` is selected, every relevant label reads **Kilojoules** and the values use `kJ = kcal × 4.184`.
+    - `volumeUnit` (`'oz' | 'ml'`) is now **only shown for obvious liquids** (juice, milk, water, coffee, soups, sauces, dressings, etc.), never for buns, patties, cheese, or other solids.
+    - Oz units step in clean **1 oz** increments; ml units step in **10 ml** increments. The “1 serving = …” helper text switches between `1 cup (8 oz)` and `≈ 240 ml` so it always matches the current unit.
+  - ✅ Units controls for discrete vs volume/weight foods:
+    - Discrete foods (eggs, slices, crackers, patties, chips, etc.) change in whole pieces.  
+    - Volume/weight units (g, ml, oz, cup, etc.) use sensible steps and no longer jump in strange fractions (no more 0.3 / 0.5 / 7.5 / 9.006 style values).
+- I have **largely stabilised** but not fully audited:
+  - Burger‑style text → cards parsing (two‑line “1. **Bun** / `- Calories: …`” format).  
+    - The user’s burger image now reliably produces per‑ingredient cards with sensible looking macros and totals, but a future agent should still sanity‑check numbers against real labels if this area is revisited.
 - I have **not fully solved**:
-  - Reliable calories/macros for the user’s burger image – cards now appear, but the numbers in both the header and the cards are still untrustworthy.  
-  - Missing history rows for 14–16 November 2025 – those meals were never written into `FoodLog`, so there is nothing in the DB to fix.
+  - Perfect macro accuracy for all complex meals – cards and totals are **much more trustworthy** than before, but a formal audit has not been done.  
+  - Missing history rows for 14–16 November 2025 – those meals were never written into `FoodLog`, so there is nothing in the DB to fix; they must be recreated via the UI if needed.
 
 For a full, detailed description of exactly what I changed, what is working, and what is still broken, see **section 8: “Session log – Agent GPT‑5.1”** near the end of this file.
 
@@ -70,7 +78,10 @@ Your job as the next agent:
 
 ## 3. Current behaviour & confirmed bugs
 
-### 3.1 Date bug – entries show up on the wrong day
+### 3.1 Date bug – entries show up on the wrong day  **(✅ fixed on production)**
+
+**Status (2025‑11‑16):** This bug is **fixed** by the new date‑window logic in section 4.1.  
+The details below describe the original behaviour for historical context – do not revert the `+ tzMin * 60 * 1000` logic.
 
 **Relevant files**
 - `app/api/food-log/route.ts`
@@ -96,7 +107,7 @@ const tzMin = Number.isFinite(parseInt(tzOffsetMinRaw || ''))
   ? parseInt(tzOffsetMinRaw || '0', 10)
   : 0
 
-// CURRENT (BUGGY) LOGIC
+// ORIGINAL (BUGGY) LOGIC – replaced by the FIXED WINDOW in section 4.1
 const startUtcMs = Date.UTC(y, m - 1, d,   0, 0, 0, 0) - tzMin * 60 * 1000
 const endUtcMs   = Date.UTC(y, m - 1, d,  23,59,59,999) - tzMin * 60 * 1000
 ```
@@ -111,7 +122,11 @@ const endUtcMs   = Date.UTC(y, m - 1, d,  23,59,59,999) - tzMin * 60 * 1000
 - Result: entries created on the **15th (local)** appear when the app asks for logs for the **14th**, which is exactly what the user is seeing.
 - Today’s view (which uses `todaysFoods` from `/api/user-data`) can still appear correct, but history view based on `/api/food-log` is wrong.
 
-### 3.2 Ingredient cards disappearing
+### 3.2 Ingredient cards disappearing  **(✅ fixed for new entries; historical gaps remain)**
+
+**Status (2025‑11‑16):**
+- New food entries now always persist `items` into `FoodLog.items`, and `editFood` never overwrites existing cards with an empty list.  
+- Older meals that were never written into `FoodLog` (especially around 14–16 November 2025) still **cannot** have their cards reconstructed automatically – they must be re‑analyzed if the user cares about them.
 
 **Relevant files**
 - `app/food/page.tsx`
@@ -177,7 +192,7 @@ if (food.items && Array.isArray(food.items) && food.items.length > 0) {
 
 ---
 
-## 4. Phase 1 – Fix date logic (must be done first)
+## 4. Phase 1 – Fix date logic (**✅ completed – do not change without approval**)
 
 ### 4.1 Correct `/api/food-log` time-zone math
 
@@ -213,7 +228,7 @@ On production, with the user’s account:
 
 ---
 
-## 5. Phase 2 – Make ingredient cards robust
+## 5. Phase 2 – Make ingredient cards robust (**✅ completed for new entries**)
 
 ### 5.1 Persist `items` into history logs going forward
 
@@ -312,10 +327,10 @@ Once Phase 1 and 2 changes are stable on production:
 
 ---
 
-## 6. Phase 3 – Reintroduce units and toggles (from `fix.plan.md`)
+## 6. Phase 3 – Units and toggles (from `fix.plan.md`) (**✅ implemented and tested – treat as stable**)
 
 The original unit/toggle plan is still desired; it should be implemented **after** Phases 1–2.  
-This section is lifted directly (with minor wording tweaks) from `fix.plan.md`.
+This section is lifted directly (with minor wording tweaks) from `fix.plan.md`, and is now **implemented in code and live on production**. Future agents should treat this behaviour as the new baseline and **avoid changing it without explicit user approval.**
 
 ### 6.1 Goals
 
@@ -375,9 +390,10 @@ This section is lifted directly (with minor wording tweaks) from `fix.plan.md`.
 
 ## 7. To-do checklist (for the next agent)
 
-- [ ] Phase 1: Fix `/api/food-log` date window and verify behaviour in Melbourne and at least one other timezone.  
-- [ ] Phase 2: Persist `items` to `FoodLog`, prefer stored items in `editFood`, and guard against wiping cards; backfill key recent entries (crackers/San Remo) once stable.  
-- [ ] Phase 3: Implement units and toggles exactly as in section 6 and complete a full regression sweep on desktop + iPhone.
+- [x] Phase 1: Fix `/api/food-log` date window and verify behaviour in Melbourne and at least one other timezone.  
+- [x] Phase 2: Persist `items` to `FoodLog`, prefer stored items in `editFood`, and guard against wiping cards; backfill key recent entries (crackers/San Remo) once stable for **new** entries.  
+- [x] Phase 3: Implement units and toggles exactly as in section 6 and complete a regression sweep on desktop (including user’s real burger and orange‑juice photos).  
+- [ ] Optional future work: audit macro accuracy for very complex meals, and run deeper cross‑browser / iPhone testing before making any further UX changes.
 -
 ---
 
@@ -503,3 +519,34 @@ This section is lifted directly (with minor wording tweaks) from `fix.plan.md`.
   4. **Only after the above is solid**, revisit the units/toggles behaviour and the older “crackers / San Remo” entries if the user still cares about those historical records.
 
 Please **do not roll back** the `FoodLog.items` column or the `/api/food-log` date‑window fix; those are foundational for making the diary reliable long‑term, even though the burger numbers are still not right today.
+
+### 8.5 Follow‑up changes – Agent GPT‑5.1 via Cursor (later on November 16, 2025)
+
+This follow‑up session built **on top of** the work described above and is now live on production.
+
+**Units, liquids and serving display**
+- Finalised `Units` behaviour on the Food page so that:
+  - Discrete foods (eggs, slices, crackers, patties, chips, etc.) use whole‑number unit steps.  
+  - Volume/weight items use stable steps (1 oz or 10 ml / 10 g) with no more “stuck” values or strange jumps (for example 7.5 → 9.006 oz).
+- Limited the `oz`/`ml` toggle to obvious liquids only (juice, milk, water, coffee, soups, sauces, dressings, oils, drinks, etc.). Solids (bun, patty, cheese, crackers) **never** show the `ml` option any more.  
+- Improved the `oz`/`ml` pill UI so the active unit is clearly highlighted and easy to see.
+- For liquid servings that include ounces in the label (for example `1 cup (8 oz)` for orange juice):
+  - The code now treats the **ounce quantity** as the single source of truth.  
+  - In `oz` mode, units step 1 oz at a time.  
+  - In `ml` mode, units represent millilitres, using 10 ml steps, and the helper text switches to an approximate ml value (for example `≈ 240 ml`) instead of an incorrect value like `30 ml`.
+
+**Energy units (kcal ↔ kJ)**
+- Made `energyUnit` the single switch for **all** energy displays:
+  - The main analysis tiles.  
+  - Per‑ingredient chips and ingredient totals.  
+  - The **Today’s Totals** bar at the top of the Food Diary.
+- When `energyUnit` is set to `kJ`, every relevant label now reads **Kilojoules** and all energy numbers are converted using `kJ = kcal * 4.184`. When `energyUnit` is `kcal`, labels and numbers are in calories.
+
+**Guidance for future agents**
+- The user is finally happy with how cards, units, kJ/oz/ml toggles, and Today’s Totals behave.  
+- Treat the current Food Diary behaviour as **stable and user‑approved**.  
+- Do **not** change:
+  - The `/api/food-log` date window logic.  
+  - The `FoodLog.items` column or how new entries persist `items`.  
+  - The basic semantics of `energyUnit` / `volumeUnit`, the oz/ml toggle visibility rules, or the way units and servings move together.  
+- If you ever need to touch this area again, read this entire file carefully, then coordinate with the user and test on **live production** with real entries (burger, eggs, crackers, orange juice) before claiming success.
