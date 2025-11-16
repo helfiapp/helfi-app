@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import PageHeader from '@/components/PageHeader'
@@ -45,6 +45,7 @@ export default function HealthTipsPage() {
   const [focusSupplements, setFocusSupplements] = useState(true)
   const [focusLifestyle, setFocusLifestyle] = useState(true)
   const [timezoneOptions, setTimezoneOptions] = useState<string[]>([])
+  const [timezoneQuery, setTimezoneQuery] = useState('')
 
   useEffect(() => {
     ;(async () => {
@@ -74,6 +75,7 @@ export default function HealthTipsPage() {
           setTime2(data.time2)
           setTime3(data.time3)
           setTimezone(data.timezone)
+          setTimezoneQuery(data.timezone)
           setFrequency(data.frequency)
           setFocusFood(data.focusFood)
           setFocusSupplements(data.focusSupplements)
@@ -149,8 +151,20 @@ export default function HealthTipsPage() {
     setTimezoneOptions(fallback)
     if (!timezone) {
       setTimezone(fallback[0])
+      setTimezoneQuery(fallback[0])
     }
   }, [timezone])
+
+  const filteredTimezones = useMemo(() => {
+    if (!timezoneOptions.length) return []
+    const query = (timezoneQuery || '').trim().toLowerCase()
+    if (!query) {
+      return timezoneOptions.slice(0, 50)
+    }
+    return timezoneOptions
+      .filter((tz) => tz.toLowerCase().includes(query))
+      .slice(0, 50)
+  }, [timezoneOptions, timezoneQuery])
 
   const handleSaveSettings = async () => {
     setSaving(true)
@@ -369,26 +383,37 @@ export default function HealthTipsPage() {
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Timezone
                   </label>
-                  <select
-                    value={timezone}
-                    onChange={(e) => setTimezone(e.target.value)}
-                    className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
-                    disabled={!enabled}
-                  >
-                    {timezoneOptions.length === 0 ? (
-                      <option value={timezone || 'UTC'}>
-                        {timezone || 'Detecting timezones…'}
-                      </option>
-                    ) : (
-                      timezoneOptions.map((tzValue) => (
-                        <option key={tzValue} value={tzValue}>
-                          {tzValue}
-                        </option>
-                      ))
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={timezoneQuery}
+                      onChange={(e) => {
+                        setTimezoneQuery(e.target.value)
+                      }}
+                      placeholder="Start typing e.g. Australia/Melbourne"
+                      className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                      disabled={!enabled}
+                    />
+                    {enabled && filteredTimezones.length > 0 && (
+                      <div className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg">
+                        {filteredTimezones.map((tzValue) => (
+                          <button
+                            key={tzValue}
+                            type="button"
+                            onClick={() => {
+                              setTimezone(tzValue)
+                              setTimezoneQuery(tzValue)
+                            }}
+                            className="w-full text-left px-3 py-2 text-xs text-gray-800 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700"
+                          >
+                            {tzValue}
+                          </button>
+                        ))}
+                      </div>
                     )}
-                  </select>
+                  </div>
                   <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    Choose your local timezone so tips arrive at the right local time (for example:{' '}
+                    Start typing your city or region and pick the closest match (for example:{' '}
                     <span className="font-mono">Australia/Melbourne</span> or{' '}
                     <span className="font-mono">America/New_York</span>).
                   </p>
