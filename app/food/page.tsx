@@ -911,7 +911,8 @@ const applyStructuredItems = (
                 photo: l.imageUrl || null,
                 nutrition: l.nutrients || null,
                 items: (l as any).items || (l.nutrients as any)?.items || null,
-                localDate: selectedDate,
+                // Prefer explicit localDate from the server when present
+                localDate: (l as any).localDate || selectedDate,
               }));
               if (mapped.length > 0) {
                 setTodaysFoods(mapped);
@@ -993,6 +994,7 @@ const applyStructuredItems = (
             photo: l.imageUrl || null,
             nutrition: l.nutrients || null,
             items: (l as any).items || (l.nutrients as any)?.items || null,
+            localDate: (l as any).localDate || selectedDate,
           }));
           setHistoryFoods(mapped);
         } else {
@@ -1050,6 +1052,9 @@ const applyStructuredItems = (
                 nutrition: last.nutrition,
                 imageUrl: last.photo || null,
                 items: last.items || null,
+                // Pin the exact calendar day the user was viewing when saving,
+                // so history never drifts due to timezone calculations.
+                localDate: last.localDate || selectedDate,
               }),
             }).catch(() => {});
           }

@@ -171,6 +171,7 @@ model FoodLog {
   description String?
   nutrients   Json?
   items       Json?      // Structured ingredient list for robust card editing
+  localDate   String?    // Local calendar date (YYYY-MM-DD) to avoid timezone drift in history
   createdAt   DateTime @default(now())
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 

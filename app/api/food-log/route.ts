@@ -36,10 +36,18 @@ export async function GET(request: NextRequest) {
     const start = new Date(startUtcMs)
     const end = new Date(endUtcMs)
 
+    // Prefer the explicit localDate column when present so entries never drift to the wrong day.
+    // For older rows that predate localDate, fall back to the createdAt time-window.
     const logs = await prisma.foodLog.findMany({
       where: {
         userId: user.id,
-        createdAt: { gte: start, lte: end },
+        OR: [
+          { localDate: dateStr },
+          {
+            localDate: null,
+            createdAt: { gte: start, lte: end },
+          },
+        ],
       },
       orderBy: { createdAt: 'desc' },
     })
@@ -64,7 +72,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { description, nutrition, imageUrl, items } = body || {}
+    const { description, nutrition, imageUrl, items, localDate } = body || {}
     const name = (description || '')
       .toString()
       .split('\n')[0]
@@ -81,6 +89,7 @@ export async function POST(request: NextRequest) {
         imageUrl: imageUrl || null,
         nutrients: nutrition || null,
         items: items || null,
+        localDate: localDate || null,
       },
     })
 
