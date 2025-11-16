@@ -82,6 +82,17 @@ async function ensureTables() {
 }
 
 async function buildUserHealthContext(userId: string) {
+  // Ensure FoodLog has the lightweight 'items' column used by the Prisma client.
+  // This mirrors the standalone migration 20251115120000_add_foodlog_items but runs defensively
+  // so we don't depend on manual migration runs in production.
+  try {
+    await prisma.$executeRawUnsafe(
+      `ALTER TABLE "FoodLog" ADD COLUMN IF NOT EXISTS "items" JSONB`
+    )
+  } catch (e) {
+    console.error('[HEALTH_TIPS] Failed to ensure FoodLog.items column', e)
+  }
+
   // Health situations and selected issues
   const [healthSituationsGoal, selectedIssuesGoal, supplements, medications, recentFoodLogs] =
     await Promise.all([
