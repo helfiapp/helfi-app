@@ -49,7 +49,7 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
     if (Array.isArray(healthTipSuggestedQuestions) && healthTipSuggestedQuestions.length > 0) {
       return healthTipSuggestedQuestions
         .filter((q) => typeof q === 'string' && q.trim().length > 0)
-        .slice(0, 4)
+        .slice(0, 3)
     }
 
     // Fallback: template questions tied to the tip title + category
@@ -64,7 +64,6 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
       `Can you explain how the "${titleSnippet}" ${typeLabel} fits with my current health issues?`,
       `Are there any safety concerns, interactions, or situations where I should avoid following this "${titleSnippet}" tip?`,
       `How could I adapt the "${titleSnippet}" tip to better fit my daily routine and preferences?`,
-      `Based on my overall health data, what should I pay most attention to when following this "${titleSnippet}" tip?`,
     ]
   }, [hasHealthTipContext, healthTipTitle, healthTipCategory, healthTipSuggestedQuestions])
   

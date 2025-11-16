@@ -107,7 +107,7 @@ export async function GET() {
     const raw = tip.suggestedQuestions
     const suggestions =
       Array.isArray(raw) && raw.length > 0
-        ? raw.filter((q) => typeof q === 'string' && q.trim().length > 0).slice(0, 4)
+        ? raw.filter((q) => typeof q === 'string' && q.trim().length > 0).slice(0, 3)
         : []
     return {
       ...tip,
