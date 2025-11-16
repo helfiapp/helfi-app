@@ -203,6 +203,16 @@ export default function HealthTipsPage() {
 
   const isHistoryPage = pathname === '/health-tips/history'
 
+  const sortedTips = useMemo(() => {
+    return [...tips].sort((a, b) => {
+      const aTime = new Date(a.sentAt).getTime()
+      const bTime = new Date(b.sentAt).getTime()
+      return bTime - aTime
+    })
+  }, [tips])
+  const visibleTips = sortedTips.slice(0, 2)
+  const hasMoreTips = sortedTips.length > 2
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
       <PageHeader title="Health Tips" backHref="/more" />
@@ -257,7 +267,7 @@ export default function HealthTipsPage() {
             </div>
           ) : (
             <div className="space-y-4">
-              {tips.map((tip) => (
+              {visibleTips.map((tip) => (
                 <article
                   key={tip.id}
                   className="border border-gray-200 dark:border-gray-700 rounded-xl p-4 bg-white dark:bg-gray-800/70"
@@ -277,8 +287,29 @@ export default function HealthTipsPage() {
                   <p className="text-sm text-gray-800 dark:text-gray-100 whitespace-pre-line">
                     {tip.body}
                   </p>
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 dark:border-gray-700 pt-3">
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      Do you have any questions about this tip?
+                    </span>
+                    <Link
+                      href={`/insights?source=health-tip&tipId=${encodeURIComponent(tip.id)}`}
+                      className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-helfi-green text-white hover:bg-helfi-green/90 transition-colors"
+                    >
+                      Ask AI
+                    </Link>
+                  </div>
                 </article>
               ))}
+              {hasMoreTips && (
+                <div className="pt-2">
+                  <Link
+                    href="/health-tips/history"
+                    className="block w-full text-center text-sm font-medium text-helfi-green hover:text-helfi-green/80 border border-helfi-green/40 rounded-lg py-2 bg-emerald-50/40 hover:bg-emerald-50 transition-colors"
+                  >
+                    View more tips
+                  </Link>
+                </div>
+              )}
             </div>
           )}
         </section>
