@@ -1,5 +1,5 @@
 'use client'
-import { Cog6ToothIcon, UserCircleIcon } from '@heroicons/react/24/outline'
+import { Cog6ToothIcon, UserIcon } from '@heroicons/react/24/outline'
 
 import React, { useState, useEffect } from 'react'
 import { useSession, signOut } from 'next-auth/react'
@@ -177,8 +177,8 @@ export default function Profile() {
                 priority
               />
             ) : (
-              <div className="w-24 h-24 rounded-full bg-emerald-50 flex items-center justify-center mx-auto mb-4">
-                <UserCircleIcon className="w-12 h-12 text-helfi-green" aria-hidden="true" />
+              <div className="w-24 h-24 rounded-full bg-helfi-green flex items-center justify-center mx-auto mb-4">
+                <UserIcon className="w-12 h-12 text-white" aria-hidden="true" />
               </div>
             )}
             <Link href="/profile/image" className="text-helfi-green hover:underline">

@@ -11,7 +11,7 @@ import { useUserData } from '@/components/providers/UserDataProvider';
 import MobileMoreMenu from '@/components/MobileMoreMenu';
 import UsageMeter from '@/components/UsageMeter';
 import InsightsProgressBar from '@/components/InsightsProgressBar';
-import { UserCircleIcon } from '@heroicons/react/24/outline';
+import { UserIcon } from '@heroicons/react/24/outline';
 
 // Auth-enabled onboarding flow
 
@@ -5244,27 +5244,27 @@ export default function Onboarding() {
                       className="w-9 h-9 rounded-full border-2 border-helfi-green shadow-sm object-cover"
                     />
                   ) : (
-                    <div className="w-9 h-9 rounded-full border-2 border-helfi-green bg-white shadow-sm flex items-center justify-center">
-                      <UserCircleIcon className="w-5 h-5 text-helfi-green" aria-hidden="true" />
+                    <div className="w-9 h-9 rounded-full bg-helfi-green shadow-sm flex items-center justify-center">
+                      <UserIcon className="w-5 h-5 text-white" aria-hidden="true" />
                     </div>
                   )}
                 </button>
                 {dropdownOpen && (
                   <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-100 animate-fade-in">
                     <div className="flex items-center px-4 py-3 border-b border-gray-100">
-                      {hasProfileImage ? (
-                        <Image
-                          src={userImage}
-                          alt="Profile"
-                          width={40}
-                          height={40}
-                          className="w-10 h-10 rounded-full object-cover mr-3"
-                        />
-                      ) : (
-                        <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center mr-3">
-                          <UserCircleIcon className="w-6 h-6 text-helfi-green" aria-hidden="true" />
-                        </div>
-                      )}
+                    {hasProfileImage ? (
+                      <Image
+                        src={userImage}
+                        alt="Profile"
+                        width={40}
+                        height={40}
+                        className="w-10 h-10 rounded-full object-cover mr-3"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-helfi-green flex items-center justify-center mr-3">
+                        <UserIcon className="w-6 h-6 text-white" aria-hidden="true" />
+                      </div>
+                    )}
                       <div>
                         <div className="font-semibold text-gray-900">{userName}</div>
                         <div className="text-xs text-gray-500">{session?.user?.email || 'user@email.com'}</div>

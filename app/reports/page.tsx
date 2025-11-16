@@ -5,7 +5,7 @@ import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import Image from 'next/image'
-import { UserCircleIcon } from '@heroicons/react/24/outline'
+import { UserIcon } from '@heroicons/react/24/outline'
 import { useUserData } from '@/components/providers/UserDataProvider'
 import MobileMoreMenu from '@/components/MobileMoreMenu'
 
@@ -93,8 +93,8 @@ export default function Reports() {
                   className="w-12 h-12 rounded-full border-2 border-helfi-green shadow-sm object-cover"
                 />
               ) : (
-                <div className="w-12 h-12 rounded-full border-2 border-helfi-green bg-white shadow-sm flex items-center justify-center">
-                  <UserCircleIcon className="w-7 h-7 text-helfi-green" aria-hidden="true" />
+                <div className="w-12 h-12 rounded-full bg-helfi-green shadow-sm flex items-center justify-center">
+                  <UserIcon className="w-6 h-6 text-white" aria-hidden="true" />
                 </div>
               )}
             </button>
@@ -110,8 +110,8 @@ export default function Reports() {
                       className="w-10 h-10 rounded-full object-cover mr-3"
                     />
                   ) : (
-                    <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center mr-3">
-                      <UserCircleIcon className="w-6 h-6 text-helfi-green" aria-hidden="true" />
+                    <div className="w-10 h-10 rounded-full bg-helfi-green flex items-center justify-center mr-3">
+                      <UserIcon className="w-5 h-5 text-white" aria-hidden="true" />
                     </div>
                   )}
                   <div>
