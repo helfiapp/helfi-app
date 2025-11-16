@@ -2388,6 +2388,12 @@ Please add nutritional information manually if needed.`);
                           if (isVolumeUnit) return 10
                           return 1
                         })()
+                        const unitsDisplay = (() => {
+                          const raw = (item.servings ?? 1) * unitsPerServing
+                          if (!Number.isFinite(raw)) return 0
+                          // Show whole-number units to keep the control intuitive (7, 8, 9 oz, etc.)
+                          return Math.round(raw)
+                        })()
                         
                         return (
                           <div key={index} className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
@@ -2504,9 +2510,10 @@ Please add nutritional information manually if needed.`);
                                     <div className="flex items-center gap-2">
                                       <button
                                         onClick={() => {
-                                          const currentUnits = (item.servings ?? 1) * unitsPerServing
+                                          const currentUnits = unitsDisplay
                                           const nextUnits = Math.max(0, currentUnits - unitStep)
-                                          const servingsFromUnits = nextUnits / unitsPerServing
+                                          const servingsFromUnits =
+                                            unitsPerServing > 0 ? nextUnits / unitsPerServing : 0
                                           updateItemField(index, 'servings', Math.max(0, servingsFromUnits))
                                         }}
                                         className="w-7 h-7 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-md text-gray-700"
@@ -2517,27 +2524,23 @@ Please add nutritional information manually if needed.`);
                                         type="number"
                                         min={0}
                                         step={unitStep}
-                                        value={formatNumberInputValue((item.servings ?? 1) * unitsPerServing)}
+                                        value={formatNumberInputValue(unitsDisplay)}
                                         onChange={(e) => {
-                                          const units = Number(e.target.value)
-                                          if (Number.isFinite(units) && units >= 0) {
-                                            const rawServings = units / unitsPerServing
-                                            const servingStep = isDiscreteUnitLabel(servingUnitMeta.unitLabel)
-                                              ? (1 / servingUnitMeta.quantity)
-                                              : 0.25
-                                            const snapped = servingStep > 0
-                                              ? Math.round(rawServings / servingStep) * servingStep
-                                              : rawServings
-                                            updateItemField(index, 'servings', Math.max(0, snapped))
-                                          }
+                                          const raw = Number(e.target.value)
+                                          if (!Number.isFinite(raw)) return
+                                          const clampedUnits = Math.max(0, Math.round(raw))
+                                          const servingsFromUnits =
+                                            unitsPerServing > 0 ? clampedUnits / unitsPerServing : 0
+                                          updateItemField(index, 'servings', servingsFromUnits)
                                         }}
                                         className="w-24 px-2 py-1 border border-gray-300 rounded-lg text-base font-semibold text-gray-900 text-center focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                                       />
                                       <button
                                         onClick={() => {
-                                          const currentUnits = (item.servings ?? 1) * unitsPerServing
+                                          const currentUnits = unitsDisplay
                                           const nextUnits = currentUnits + unitStep
-                                          const servingsFromUnits = nextUnits / unitsPerServing
+                                          const servingsFromUnits =
+                                            unitsPerServing > 0 ? nextUnits / unitsPerServing : 0
                                           updateItemField(index, 'servings', servingsFromUnits)
                                         }}
                                         className="w-7 h-7 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-md text-gray-700"
