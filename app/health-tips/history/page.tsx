@@ -4,6 +4,7 @@ import React, { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import PageHeader from '@/components/PageHeader'
+import VoiceChat from '@/components/VoiceChat'
 
 type HealthTip = {
   id: string
@@ -18,6 +19,7 @@ export default function HealthTipHistoryPage() {
   const pathname = usePathname()
   const [tips, setTips] = useState<HealthTip[]>([])
   const [loading, setLoading] = useState(false)
+  const [expandedTipId, setExpandedTipId] = useState<string | null>(null)
 
   useEffect(() => {
     const load = async () => {
@@ -130,6 +132,30 @@ export default function HealthTipHistoryPage() {
                         <p className="text-sm text-gray-800 dark:text-gray-100 whitespace-pre-line">
                           {tip.body}
                         </p>
+                        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 dark:border-gray-700 pt-3">
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            Do you have any questions about this tip?
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setExpandedTipId((current) => (current === tip.id ? null : tip.id))
+                            }
+                            className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-helfi-green text-white hover:bg-helfi-green/90 transition-colors"
+                          >
+                            Ask AI
+                          </button>
+                        </div>
+                        {expandedTipId === tip.id && (
+                          <div className="mt-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900/60 overflow-hidden">
+                            <VoiceChat
+                              className="h-80"
+                              context={{
+                                healthTipSummary: `${tip.title}. ${tip.body}`,
+                              }}
+                            />
+                          </div>
+                        )}
                       </article>
                     ))}
                   </div>

@@ -2,15 +2,19 @@
 
 import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState, useCallback } from 'react'
 
+interface VoiceChatContext {
+  symptoms?: string[]
+  duration?: string
+  notes?: string
+  analysisResult?: any
+  issueSlug?: string
+  section?: string
+  // Optional: summary of a specific health tip to keep the AI focused on that advice
+  healthTipSummary?: string
+}
+
 interface VoiceChatProps {
-  context?: {
-    symptoms?: string[]
-    duration?: string
-    notes?: string
-    analysisResult?: any
-    issueSlug?: string
-    section?: string
-  }
+  context?: VoiceChatContext
   onCostEstimate?: (cost: number) => void
   className?: string
 }

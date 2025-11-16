@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation'
 import PageHeader from '@/components/PageHeader'
 import UsageMeter from '@/components/UsageMeter'
 import FeatureUsageDisplay from '@/components/FeatureUsageDisplay'
+import VoiceChat from '@/components/VoiceChat'
 
 type HealthTip = {
   id: string
@@ -49,6 +50,7 @@ export default function HealthTipsPage() {
   const [timezoneOptions, setTimezoneOptions] = useState<string[]>([])
   const [timezoneQuery, setTimezoneQuery] = useState('')
   const [showTimezoneDropdown, setShowTimezoneDropdown] = useState(false)
+  const [expandedTipId, setExpandedTipId] = useState<string | null>(null)
 
   useEffect(() => {
     ;(async () => {
@@ -291,13 +293,26 @@ export default function HealthTipsPage() {
                     <span className="text-xs text-gray-500 dark:text-gray-400">
                       Do you have any questions about this tip?
                     </span>
-                    <Link
-                      href={`/insights?source=health-tip&tipId=${encodeURIComponent(tip.id)}`}
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setExpandedTipId((current) => (current === tip.id ? null : tip.id))
+                      }
                       className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium bg-helfi-green text-white hover:bg-helfi-green/90 transition-colors"
                     >
                       Ask AI
-                    </Link>
+                    </button>
                   </div>
+                  {expandedTipId === tip.id && (
+                    <div className="mt-3 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-900/60 overflow-hidden">
+                      <VoiceChat
+                        className="h-80"
+                        context={{
+                          healthTipSummary: `${tip.title}. ${tip.body}`,
+                        }}
+                      />
+                    </div>
+                  )}
                 </article>
               ))}
               {hasMoreTips && (

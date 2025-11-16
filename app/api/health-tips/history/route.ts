@@ -97,7 +97,15 @@ export async function GET(req: NextRequest) {
     costCents: number | null
     chargeCents: number | null
   }> = await prisma.$queryRawUnsafe(
-    `SELECT id, tipDate, sentAt, title, body, category, costCents, chargeCents
+    `SELECT 
+       id,
+       tipDate AS "tipDate",
+       sentAt AS "sentAt",
+       title,
+       body,
+       category,
+       costCents,
+       chargeCents
      FROM HealthTips
      WHERE userId = $1 AND tipDate BETWEEN $2::date AND $3::date
      ORDER BY tipDate DESC, sentAt DESC`,

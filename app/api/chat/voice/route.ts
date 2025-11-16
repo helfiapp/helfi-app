@@ -307,7 +307,14 @@ export async function POST(req: NextRequest) {
 
     // Load full user context
     const context = await loadFullUserContext(session.user.id)
-    const systemPrompt = buildSystemPrompt(context)
+    let systemPrompt = buildSystemPrompt(context)
+
+    // Optional additional focus: a health tip summary passed from inline chat (e.g. on Health Tips page)
+    const healthTipSummary =
+      typeof body?.healthTipSummary === 'string' ? body.healthTipSummary.trim() : ''
+    if (healthTipSummary) {
+      systemPrompt += `\n\nCURRENT HEALTH TIP CONTEXT (IMPORTANT):\n${healthTipSummary}\n\nWhen the user asks questions in this chat, assume they are asking follow-up questions about this specific tip unless they clearly change the subject.`
+    }
 
     const accept = (req.headers.get('accept') || '').toLowerCase()
     const wantsStream = accept.includes('text/event-stream')
