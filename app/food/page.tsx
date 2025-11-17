@@ -3994,8 +3994,8 @@ Please add nutritional information manually if needed.`);
                           </div>
                         )}
 
-                        {/* Nutrition Cards - Adjusted Width for Perfect Height Match */}
-                        <div className="flex-1 sm:max-w-xs">
+                        {/* Nutrition Cards - Match Today's Totals styling and use more horizontal space */}
+                        <div className="flex-1 sm:max-w-md lg:max-w-lg">
                           {(() => {
                             // Use ingredient cards as the single source of truth for per-meal totals.
                             // Fall back to stored totals only when items are missing (older entries).
@@ -4018,24 +4018,28 @@ Please add nutritional information manually if needed.`);
                             })()
 
                             return (
-                              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
                                 {NUTRIENT_DISPLAY_ORDER.map((key) => {
                                   const meta = NUTRIENT_CARD_META[key]
                                   const rawValue = (summaryTotals as any)?.[key] ?? 0
+                                  const displayValue = formatNutrientValue(key, Number(rawValue))
+                                  const headerLabel =
+                                    key === 'calories' && energyUnit === 'kJ'
+                                      ? 'Kilojoules'
+                                      : meta.label
+
                                   return (
                                     <div
                                       key={`${food.id}-${key}`}
-                                      className={`bg-gradient-to-br ${meta.gradient} rounded-lg p-2 border border-white/60 flex items-center justify-center`}
+                                      className={`bg-gradient-to-br ${meta.gradient} border border-white/60 rounded-lg p-3 shadow-sm`}
                                     >
-                                      <div className="text-center">
-                                        <div className={`text-lg font-bold ${meta.accent}`}>
-                                          {formatNutrientValue(key, Number(rawValue))}
-                                        </div>
-                                        <div
-                                          className={`text-xs font-medium ${meta.accent} uppercase tracking-wide`}
-                                        >
-                                          {meta.label}
-                                        </div>
+                                      <div
+                                        className={`text-xs ${meta.accent} mb-1 font-medium uppercase tracking-wide`}
+                                      >
+                                        {headerLabel}
+                                      </div>
+                                      <div className="text-lg font-semibold text-gray-900">
+                                        {displayValue}
                                       </div>
                                     </div>
                                   )
