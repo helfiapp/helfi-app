@@ -585,6 +585,7 @@ export default function FoodDiary() {
   const [showIngredientOptions, setShowIngredientOptions] = useState<string | null>(null)
   const [editingEntry, setEditingEntry] = useState<any>(null)
   const [originalEditingEntry, setOriginalEditingEntry] = useState<any>(null)
+  const [showEditActionsMenu, setShowEditActionsMenu] = useState(false)
 
   const descriptionTextareaRef = useRef<HTMLTextAreaElement | null>(null)
 
@@ -861,12 +862,15 @@ const applyStructuredItems = (
       if (!target.closest('.ingredient-options-dropdown')) {
         setShowIngredientOptions(null);
       }
+      if (!target.closest('.edit-actions-menu')) {
+        setShowEditActionsMenu(false);
+      }
     }
-    if (dropdownOpen || showPhotoOptions || showEntryOptions || showIngredientOptions) {
+    if (dropdownOpen || showPhotoOptions || showEntryOptions || showIngredientOptions || showEditActionsMenu) {
       document.addEventListener('mousedown', handleClick);
       return () => document.removeEventListener('mousedown', handleClick);
     }
-  }, [dropdownOpen, showPhotoOptions, showEntryOptions, showIngredientOptions]);
+  }, [dropdownOpen, showPhotoOptions, showEntryOptions, showIngredientOptions, showEditActionsMenu]);
 
 
 
@@ -1659,6 +1663,19 @@ Please add nutritional information manually if needed.`);
     setShowPhotoOptions(false)
   }
 
+  const handleDeletePhoto = () => {
+    setPhotoFile(null)
+    setPhotoPreview(null)
+    setAiDescription('')
+    setShowAiResult(false)
+    setIsEditingDescription(false)
+    setEditedDescription('')
+    setAnalyzedItems([])
+    setAnalyzedTotal(null)
+    setHealthWarning(null)
+    setHealthAlternatives(null)
+  }
+
   const exitEditingSession = () => {
     resetAnalyzerPanel()
     setEditingEntry(null)
@@ -2293,11 +2310,11 @@ Please add nutritional information manually if needed.`);
 
                   {/* Compact edit controls at the top when editing an existing entry */}
                   {editingEntry && (
-                    <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <div className="mb-4 flex items-center justify-between gap-2">
                       <div className="text-xs sm:text-sm text-gray-500">
                         Editing a saved entry
                       </div>
-                      <div className="flex flex-wrap gap-2 justify-start sm:justify-end">
+                      <div className="flex items-center gap-2">
                         <button
                           type="button"
                           onClick={() => updateFoodEntry()}
@@ -2306,39 +2323,58 @@ Please add nutritional information manually if needed.`);
                         >
                           Save changes
                         </button>
-                        <button
-                          type="button"
-                          onClick={reanalyzeCurrentEntry}
-                          disabled={isAnalyzing}
-                          className="px-3 py-1.5 rounded-full bg-blue-100 text-blue-800 text-xs sm:text-sm font-medium border border-blue-200 hover:bg-blue-200 disabled:opacity-60"
-                        >
-                          Re-analyze
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setPhotoFile(null)
-                            setPhotoPreview(null)
-                            setAiDescription('')
-                            setShowAiResult(false)
-                            setIsEditingDescription(false)
-                            setEditedDescription('')
-                            setAnalyzedItems([])
-                            setAnalyzedTotal(null)
-                            setHealthWarning(null)
-                            setHealthAlternatives(null)
-                          }}
-                          className="px-3 py-1.5 rounded-full bg-gray-100 text-gray-700 text-xs sm:text-sm font-medium border border-gray-200 hover:bg-gray-200"
-                        >
-                          Delete photo
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleCancelEditing}
-                          className="px-3 py-1.5 rounded-full bg-white text-gray-700 text-xs sm:text-sm font-medium border border-gray-300 hover:bg-gray-50"
-                        >
-                          Cancel
-                        </button>
+                        <div className="relative edit-actions-menu">
+                          <button
+                            type="button"
+                            onClick={() => setShowEditActionsMenu((v) => !v)}
+                            className="p-2 rounded-full border border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                            aria-label="More edit actions"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M12 5.25a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 8a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 8a1.5 1.5 0 110-3 1.5 1.5 0 010 3z"
+                              />
+                            </svg>
+                          </button>
+                          {showEditActionsMenu && (
+                            <div className="absolute right-0 mt-2 w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-30">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setShowEditActionsMenu(false)
+                                  handleEditDescriptionClick()
+                                }}
+                                className="w-full text-left px-3 py-2 text-xs sm:text-sm text-gray-700 hover:bg-gray-50"
+                              >
+                                Edit description
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setShowEditActionsMenu(false)
+                                  reanalyzeCurrentEntry()
+                                }}
+                                disabled={isAnalyzing}
+                                className="w-full text-left px-3 py-2 text-xs sm:text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+                              >
+                                Re-analyze
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setShowEditActionsMenu(false)
+                                  handleDeletePhoto()
+                                }}
+                                className="w-full text-left px-3 py-2 text-xs sm:text-sm text-red-600 hover:bg-red-50"
+                              >
+                                Delete photo
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   )}
@@ -2886,66 +2922,38 @@ Please add nutritional information manually if needed.`);
                       </>
                     )}
                   </button>
-                  <button
-                    onClick={handleEditDescriptionClick}
-                    className="w-full py-3 px-4 bg-amber-500 hover:bg-amber-600 text-white font-medium rounded-xl transition-colors duration-200 flex items-center justify-center"
-                  >
-                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
-                    Edit Description
-                  </button>
-                  <button
-                    onClick={() => {
-                      setPhotoFile(null)
-                      setPhotoPreview(null)
-                      setAiDescription('')
-                      setShowAiResult(false)
-                      setIsEditingDescription(false)
-                      setEditedDescription('')
-                      setAnalyzedItems([])
-                      setAnalyzedTotal(null)
-                      setHealthWarning(null)
-                      setHealthAlternatives(null)
-                    }}
-                    className="w-full py-3 px-4 bg-gray-500 hover:bg-gray-600 text-white font-medium rounded-xl transition-colors duration-200 flex items-center justify-center"
-                  >
-                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                    Delete Photo
-                  </button>
-                  {editingEntry && (
+                  {!editingEntry && (
                     <>
                       <button
-                        onClick={reanalyzeCurrentEntry}
-                        disabled={isAnalyzing}
-                        className="w-full py-3 px-4 bg-blue-100 hover:bg-blue-200 text-blue-800 font-medium rounded-xl transition-colors duration-200 flex items-center justify-center border border-blue-200 disabled:opacity-60"
+                        onClick={handleEditDescriptionClick}
+                        className="w-full py-3 px-4 bg-amber-500 hover:bg-amber-600 text-white font-medium rounded-xl transition-colors duration-200 flex items-center justify-center"
                       >
                         <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                         </svg>
-                        Re-Analyze
+                        Edit Description
                       </button>
                       <button
-                        onClick={handleDoneEditing}
-                        className="w-full py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-colors duration-200 flex items-center justify-center"
+                        onClick={handleDeletePhoto}
+                        className="w-full py-3 px-4 bg-gray-500 hover:bg-gray-600 text-white font-medium rounded-xl transition-colors duration-200 flex items-center justify-center"
                       >
                         <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                         </svg>
-                        Done
-                      </button>
-                      <button
-                        onClick={handleCancelEditing}
-                        className="w-full py-3 px-4 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium rounded-xl transition-colors duration-200 flex items-center justify-center"
-                      >
-                        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                        Cancel changes
+                        Delete Photo
                       </button>
                     </>
+                  )}
+                  {editingEntry && (
+                    <button
+                      onClick={handleCancelEditing}
+                      className="w-full py-3 px-4 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium rounded-xl transition-colors duration-200 flex items-center justify-center"
+                    >
+                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                      Cancel changes
+                    </button>
                   )}
                 </div>
               </div>
