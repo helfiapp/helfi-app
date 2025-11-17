@@ -3996,22 +3996,53 @@ Please add nutritional information manually if needed.`);
 
                         {/* Nutrition Cards - Adjusted Width for Perfect Height Match */}
                         <div className="flex-1 sm:max-w-xs">
-                          {food.nutrition && (
-                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                              {NUTRIENT_DISPLAY_ORDER.map((key) => {
-                                const meta = NUTRIENT_CARD_META[key]
-                                const rawValue = (food.nutrition as any)?.[key] ?? 0
-                                return (
-                                  <div key={`${food.id}-${key}`} className={`bg-gradient-to-br ${meta.gradient} rounded-lg p-2 border border-white/60 flex items-center justify-center`}>
-                                    <div className="text-center">
-                                      <div className={`text-lg font-bold ${meta.accent}`}>{formatNutrientValue(key, Number(rawValue))}</div>
-                                      <div className={`text-xs font-medium ${meta.accent} uppercase tracking-wide`}>{meta.label}</div>
+                          {(() => {
+                            // Use ingredient cards as the single source of truth for per-meal totals.
+                            // Fall back to stored totals only when items are missing (older entries).
+                            const summaryTotals = (() => {
+                              if (Array.isArray(food.items) && food.items.length > 0) {
+                                const recalculated = recalculateNutritionFromItems(food.items)
+                                if (recalculated) return recalculated
+                              }
+                              return (
+                                sanitizeNutritionTotals((food as any).total) ||
+                                sanitizeNutritionTotals(food.nutrition) || {
+                                  calories: 0,
+                                  protein: 0,
+                                  carbs: 0,
+                                  fat: 0,
+                                  fiber: 0,
+                                  sugar: 0,
+                                }
+                              )
+                            })()
+
+                            return (
+                              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                {NUTRIENT_DISPLAY_ORDER.map((key) => {
+                                  const meta = NUTRIENT_CARD_META[key]
+                                  const rawValue = (summaryTotals as any)?.[key] ?? 0
+                                  return (
+                                    <div
+                                      key={`${food.id}-${key}`}
+                                      className={`bg-gradient-to-br ${meta.gradient} rounded-lg p-2 border border-white/60 flex items-center justify-center`}
+                                    >
+                                      <div className="text-center">
+                                        <div className={`text-lg font-bold ${meta.accent}`}>
+                                          {formatNutrientValue(key, Number(rawValue))}
+                                        </div>
+                                        <div
+                                          className={`text-xs font-medium ${meta.accent} uppercase tracking-wide`}
+                                        >
+                                          {meta.label}
+                                        </div>
+                                      </div>
                                     </div>
-                                  </div>
-                                )
-                              })}
-                            </div>
-                          )}
+                                  )
+                                })}
+                              </div>
+                            )
+                          })()}
                         </div>
                       </div>
                     </div>
