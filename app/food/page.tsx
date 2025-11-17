@@ -2323,6 +2323,13 @@ Please add nutritional information manually if needed.`);
                         >
                           Save changes
                         </button>
+                        <button
+                          type="button"
+                          onClick={handleCancelEditing}
+                          className="px-3 py-1.5 rounded-full bg-white text-gray-700 text-xs sm:text-sm font-medium border border-gray-300 hover:bg-gray-50"
+                        >
+                          Cancel
+                        </button>
                         <div className="relative edit-actions-menu">
                           <button
                             type="button"
