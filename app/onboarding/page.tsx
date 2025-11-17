@@ -11,7 +11,7 @@ import { useUserData } from '@/components/providers/UserDataProvider';
 import MobileMoreMenu from '@/components/MobileMoreMenu';
 import UsageMeter from '@/components/UsageMeter';
 import InsightsProgressBar from '@/components/InsightsProgressBar';
-import { UserIcon } from '@heroicons/react/24/outline';
+import { UserIcon, QuestionMarkCircleIcon } from '@heroicons/react/24/outline';
 
 // Auth-enabled onboarding flow
 
@@ -237,6 +237,7 @@ function GenderStep({ onNext, initial, initialAgreed }: { onNext: (data: any) =>
 
 const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { onNext: (data: any) => void, onBack: () => void, initial?: any }) {
   const [weight, setWeight] = useState(initial?.weight || '');
+  const [age, setAge] = useState(initial?.age || '');
   const [height, setHeight] = useState(initial?.height || '');
   const [feet, setFeet] = useState(initial?.feet || '');
   const [inches, setInches] = useState(initial?.inches || '');
@@ -246,6 +247,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
   const handleNext = useCallback(() => {
     const data = { 
       weight, 
+      age,
       height: unit === 'metric' ? height : `${feet}'${inches}"`, 
       feet, 
       inches, 
@@ -294,6 +296,18 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
         placeholder={`Weight (${unit === 'metric' ? 'kg' : 'lbs'})`}
         value={weight}
         onChange={e => setWeight(e.target.value)}
+      />
+      <h2 className="text-2xl font-bold mb-2">How old are you?</h2>
+      <p className="mb-4 text-gray-600">Age helps us set safe calorie and nutrition targets for you.</p>
+      <input
+        className="w-full rounded-lg border border-gray-300 px-3 py-2 mb-4 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+        type="number"
+        inputMode="numeric"
+        min={1}
+        max={120}
+        placeholder="Age (years)"
+        value={age}
+        onChange={e => setAge(e.target.value)}
       />
       <h2 className="text-2xl font-bold mb-4">How tall are you?</h2>
       <p className="mb-4 text-gray-600">Height helps us calculate key health metrics.</p>
@@ -344,7 +358,10 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
             >
               <div className="flex items-center justify-center gap-2">
                 <span className="text-sm font-medium">{type.charAt(0).toUpperCase() + type.slice(1)}</span>
-                <span className="text-xs bg-gray-200 text-gray-600 rounded-full w-5 h-5 flex items-center justify-center cursor-help hover:bg-gray-300 transition-colors border border-gray-300">?</span>
+                <QuestionMarkCircleIcon
+                  className="w-4 h-4 text-gray-400 group-hover:text-gray-700"
+                  aria-hidden="true"
+                />
               </div>
               <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-800 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none w-48 z-10">
                 {bodyTypeDescriptions[type as keyof typeof bodyTypeDescriptions]}
