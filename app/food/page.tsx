@@ -2303,88 +2303,89 @@ Please add nutritional information manually if needed.`);
                 
                 {/* Premium Nutrition Display */}
                 <div className="p-4 sm:p-6">
-                  {/* Title + editing state + compact controls (all in one row) */}
-                  <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
+                  {/* Title row with inline editing label */}
+                  <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+                    <div className="flex flex-wrap items-baseline gap-2">
                       <h3 className="text-xl font-semibold text-gray-900">Food Analysis</h3>
                       {editingEntry && (
-                        <p className="mt-0.5 text-xs sm:text-sm text-gray-500">
+                        <span className="text-xs sm:text-sm text-gray-500">
                           Editing a saved entry
-                        </p>
+                        </span>
                       )}
                     </div>
-                    {editingEntry && (
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => updateFoodEntry()}
-                          disabled={isAnalyzing}
-                          className="px-3 py-1.5 rounded-full bg-emerald-500 text-white text-xs sm:text-sm font-medium shadow-sm hover:bg-emerald-600 disabled:opacity-60"
-                        >
-                          Save changes
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleCancelEditing}
-                          className="px-3 py-1.5 rounded-full bg-white text-gray-700 text-xs sm:text-sm font-medium border border-gray-300 hover:bg-gray-50"
-                        >
-                          Cancel
-                        </button>
-                        <div className="relative edit-actions-menu">
-                          <button
-                            type="button"
-                            onClick={() => setShowEditActionsMenu((v) => !v)}
-                            className="p-2 rounded-full border border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
-                            aria-label="More edit actions"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M12 5.25a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 8a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 8a1.5 1.5 0 110-3 1.5 1.5 0 010 3z"
-                              />
-                            </svg>
-                          </button>
-                          {showEditActionsMenu && (
-                            <div className="absolute right-0 mt-2 w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-30">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setShowEditActionsMenu(false)
-                                  handleEditDescriptionClick()
-                                }}
-                                className="w-full text-left px-3 py-2 text-xs sm:text-sm text-gray-700 hover:bg-gray-50"
-                              >
-                                Edit description
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setShowEditActionsMenu(false)
-                                  reanalyzeCurrentEntry()
-                                }}
-                                disabled={isAnalyzing}
-                                className="w-full text-left px-3 py-2 text-xs sm:text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-60"
-                              >
-                                Re-analyze
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setShowEditActionsMenu(false)
-                                  handleDeletePhoto()
-                                }}
-                                className="w-full text-left px-3 py-2 text-xs sm:text-sm text-red-600 hover:bg-red-50"
-                              >
-                                Delete photo
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
                   </div>
+                  {/* Compact controls row */}
+                  {editingEntry && (
+                    <div className="mb-4 flex items-center gap-2 justify-start sm:justify-end">
+                      <button
+                        type="button"
+                        onClick={() => updateFoodEntry()}
+                        disabled={isAnalyzing}
+                        className="px-3 py-1.5 rounded-full bg-emerald-500 text-white text-xs sm:text-sm font-medium shadow-sm hover:bg-emerald-600 disabled:opacity-60"
+                      >
+                        Save changes
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCancelEditing}
+                        className="px-3 py-1.5 rounded-full bg-white text-gray-700 text-xs sm:text-sm font-medium border border-gray-300 hover:bg-gray-50"
+                      >
+                        Cancel
+                      </button>
+                      <div className="relative edit-actions-menu">
+                        <button
+                          type="button"
+                          onClick={() => setShowEditActionsMenu((v) => !v)}
+                          className="p-2 rounded-full border border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                          aria-label="More edit actions"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M12 5.25a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 8a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 8a1.5 1.5 0 110-3 1.5 1.5 0 010 3z"
+                            />
+                          </svg>
+                        </button>
+                        {showEditActionsMenu && (
+                          <div className="absolute right-0 mt-2 w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-30">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowEditActionsMenu(false)
+                                handleEditDescriptionClick()
+                              }}
+                              className="w-full text-left px-3 py-2 text-xs sm:text-sm text-gray-700 hover:bg-gray-50"
+                            >
+                              Edit description
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowEditActionsMenu(false)
+                                reanalyzeCurrentEntry()
+                              }}
+                              disabled={isAnalyzing}
+                              className="w-full text-left px-3 py-2 text-xs sm:text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+                            >
+                              Re-analyze
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowEditActionsMenu(false)
+                                handleDeletePhoto()
+                              }}
+                              className="w-full text-left px-3 py-2 text-xs sm:text-sm text-red-600 hover:bg-red-50"
+                            >
+                              Delete photo
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Meal Summary - Single sentence at top */}
                   {mealSummary && (
