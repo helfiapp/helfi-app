@@ -586,6 +586,7 @@ export default function FoodDiary() {
   const [editingEntry, setEditingEntry] = useState<any>(null)
   const [originalEditingEntry, setOriginalEditingEntry] = useState<any>(null)
   const [showEditActionsMenu, setShowEditActionsMenu] = useState(false)
+  const [expandedItemIndex, setExpandedItemIndex] = useState<number | null>(null)
 
   const descriptionTextareaRef = useRef<HTMLTextAreaElement | null>(null)
 
@@ -871,6 +872,15 @@ const applyStructuredItems = (
       return () => document.removeEventListener('mousedown', handleClick);
     }
   }, [dropdownOpen, showPhotoOptions, showEntryOptions, showIngredientOptions, showEditActionsMenu]);
+
+  // When items change, default to first item expanded for multi-ingredient meals.
+  useEffect(() => {
+    if (analyzedItems && analyzedItems.length > 1) {
+      setExpandedItemIndex(0)
+    } else {
+      setExpandedItemIndex(null)
+    }
+  }, [analyzedItems])
 
 
 
@@ -2393,7 +2403,7 @@ Please add nutritional information manually if needed.`);
                   )}
 
                   {analyzedNutrition && (
-                    <div className="mb-6 mt-3 sticky top-0 sm:top-2 z-20 bg-white/90 supports-[backdrop-filter]:bg-white/60 backdrop-blur rounded-lg p-1 sm:p-2">
+                    <div className="mb-6 mt-3 rounded-lg p-1 sm:p-2 bg-white/90 supports-[backdrop-filter]:bg-white/60 backdrop-blur">
                       <div className="flex justify-end mb-1 pr-1">
                         <div className="inline-flex items-center text-[11px] sm:text-xs bg-gray-100 rounded-full p-0.5 border border-gray-200">
                           <button
@@ -3528,7 +3538,7 @@ Please add nutritional information manually if needed.`);
         <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 overflow-visible">
           {/* Daily Totals Row */}
           {(isViewingToday ? todaysFoods : (historyFoods || [])).length > 0 && (
-            <div className="sticky top-0 z-20 -mx-4 sm:-mx-6 px-4 sm:px-6 pb-3 mb-4 bg-white">
+            <div className="mb-4">
               {(() => {
                 const source = isViewingToday ? todaysFoods : (historyFoods || [])
 
