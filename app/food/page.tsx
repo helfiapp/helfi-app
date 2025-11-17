@@ -2303,20 +2303,18 @@ Please add nutritional information manually if needed.`);
                 
                 {/* Premium Nutrition Display */}
                 <div className="p-4 sm:p-6">
-                  {/* Title row with inline editing label */}
-                  <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
-                    <div className="flex flex-wrap items-baseline gap-2">
-                      <h3 className="text-xl font-semibold text-gray-900">Food Analysis</h3>
-                      {editingEntry && (
-                        <span className="text-xs sm:text-sm text-gray-500">
-                          Editing a saved entry
-                        </span>
-                      )}
-                    </div>
+                  {/* Title row with hard-right editing label */}
+                  <div className="mb-2 flex items-baseline justify-between gap-2">
+                    <h3 className="text-xl font-semibold text-gray-900">Food Analysis</h3>
+                    {editingEntry && (
+                      <span className="text-xs sm:text-sm text-gray-500 text-right">
+                        Editing a saved entry
+                      </span>
+                    )}
                   </div>
-                  {/* Compact controls row */}
+                  {/* Compact controls row (aligned hard right) */}
                   {editingEntry && (
-                    <div className="mb-4 flex items-center gap-2 justify-start sm:justify-end">
+                    <div className="mb-4 flex items-center gap-2 justify-end">
                       <button
                         type="button"
                         onClick={() => updateFoodEntry()}
