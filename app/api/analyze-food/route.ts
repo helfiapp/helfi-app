@@ -210,6 +210,15 @@ CRITICAL FOR MEALS WITH MULTIPLE COMPONENTS:
 - If unsure about a component, estimate conservatively but include it in your totals
 - For mixed dishes (salads, soups, stews), break down the main ingredients and sum them
 
+PACKAGED / BRANDED FOODS (VERY IMPORTANT):
+- First, decide if this describes a packaged or branded product (box, bag, packet, bottle, can, branded rolls/bread/cereal, etc.).
+- If it is packaged and a NUTRITION LABEL is mentioned, treat that label as the SINGLE SOURCE OF TRUTH for calories, protein, carbs, fat, fiber and sugar.
+- Do NOT "re-estimate" or adjust the numbers away from the label just because the portion looks small or large – copy the label values faithfully.
+- If the description includes both "Per serving" and "Per 100 g", use the "Per serving" values and the serving size wording from the label (e.g. "1 roll (60g)").
+- For branded items, put the product brand in the "brand" field (e.g. "Tip Top", "Heinz") and the generic food name in "name" (e.g. "Hot dog roll").
+- For packets with multiple identical units (e.g. 6 hot dog rolls), nutrition in ITEMS_JSON for EACH ITEM should be PER ONE ROLL by default with "servings": 1 (the app will multiply when the user eats more than one).
+- If the text clearly says the person ate multiple units (e.g. "2 hot dog rolls"), keep the serving_size as on the label (per 1 roll) and set "servings" accordingly (e.g. 2).
+
 Keep your explanation concise (2-3 sentences) and ALWAYS include a single nutrition line at the end in this exact format:
 
 Calories: [number], Protein: [g], Carbs: [g], Fat: [g]
@@ -325,6 +334,15 @@ PORTION CUES:
 - Use plate size, utensil size, and hand-size cues to estimate grams or household measures
 - Do not double count overlapping items; base your estimate on visible evidence
 - Ignore inedible items. Only include a drink if clearly visible as part of the meal
+
+PACKAGED / BRANDED FOODS (VERY IMPORTANT):
+- First, decide if the photo shows a packaged or branded product (box, bag, packet, bottle, can, bread or rolls in a bag, cereal box, etc.).
+- If any NUTRITION LABEL is visible on the front, back or side of the packaging, you MUST treat the label as the PRIMARY source of nutrition values.
+- Mentally zoom in and carefully read the serving size and PER-SERVING values from the label; copy those numbers exactly into the item’s calories, protein_g, carbs_g, fat_g, fiber_g and sugar_g.
+- If both "Per serving" and "Per 100 g" are shown, use the "Per serving" values and the printed serving size wording (e.g. "1 roll (60g)", "2 crackers (20g)").
+- Do NOT invent or "correct" the label; if the label looks surprising, still trust it over your own visual estimate.
+- Put the brand name from the packaging (e.g. "Tip Top", "Heinz") into the "brand" field and a generic food name into "name" (e.g. "Hot dog roll", "Wholemeal bread slice").
+- For packets with multiple identical units (e.g. 6 hot dog rolls), nutrition in ITEMS_JSON for EACH ITEM should be PER ONE UNIT by default with "servings": 1. If the person clearly ate multiple units, keep serving_size as the label’s per-unit portion and adjust "servings" (e.g. 2 rolls eaten -> servings: 2).
 
 CRITICAL STRUCTURED OUTPUT RULES:
 - ALWAYS return the ITEMS_JSON block and include fiber_g and sugar_g for each item (do not leave as 0 unless truly 0).
