@@ -873,12 +873,13 @@ const applyStructuredItems = (
     }
   }, [dropdownOpen, showPhotoOptions, showEntryOptions, showIngredientOptions, showEditActionsMenu]);
 
-  // Reset which ingredient card is expanded whenever we start/finish editing an entry.
+  // Reset which ingredient card is expanded whenever we switch which entry is being edited.
   // Multi-ingredient meals will start with all cards collapsed; single-ingredient meals
-  // remain fully open by default via the rendering logic.
+  // remain fully open by default via the rendering logic. This effect keys off the entry id
+  // so it does NOT fire on every minor edit (which would collapse the open card).
   useEffect(() => {
     setExpandedItemIndex(null)
-  }, [editingEntry])
+  }, [editingEntry?.id])
 
 
 
@@ -2486,7 +2487,16 @@ Please add nutritional information manually if needed.`);
                           fiber_g: totalFiber,
                           sugar_g: totalSugar,
                         };
-                        const servingUnitMeta = parseServingUnitMetadata(item.serving_size || '')
+                        // Prefer an explicit serving_size from the item; if missing, try to
+                        // derive one from the name in parentheses, e.g. "Grilled Salmon (6 oz)"
+                        const servingSizeLabel = (() => {
+                          const direct = (item.serving_size && String(item.serving_size).trim()) || ''
+                          if (direct) return direct
+                          const name = String(item.name || '')
+                          const m = name.match(/\(([^)]+)\)/)
+                          return m && m[1] ? m[1].trim() : ''
+                        })()
+                        const servingUnitMeta = parseServingUnitMetadata(servingSizeLabel || '')
                         const quickAddDelta = servingUnitMeta ? 1 / servingUnitMeta.quantity : null
                         const quickAddHalfDelta = quickAddDelta ? quickAddDelta / 2 : null
                         const hasOunces = servingUnitMeta
@@ -2497,7 +2507,7 @@ Please add nutritional information manually if needed.`);
                           : false
                         const baseOunces = (() => {
                           if (!hasOunces) return null
-                          const raw = String(item.serving_size || '')
+                          const raw = String(servingSizeLabel || '')
                           const m = raw.match(/(\d+(?:\.\d+)?)\s*oz/i)
                           if (!m) return null
                           const v = parseFloat(m[1])
@@ -2543,15 +2553,15 @@ Please add nutritional information manually if needed.`);
                           return Math.round(raw)
                         })()
                         const servingSizeDisplay = (() => {
-                          if (!item.serving_size) return 'N/A'
+                          if (!servingSizeLabel) return 'N/A'
                           if (hasOunces && activeVolumeUnit === 'ml') {
                             const oz = baseOunces ?? (servingUnitMeta?.quantity || 0)
-                            if (!oz || oz <= 0) return item.serving_size
+                            if (!oz || oz <= 0) return servingSizeLabel
                             const ml = oz * OZ_TO_ML
                             const roundedMl = Math.round(ml / 10) * 10
                             return `≈ ${roundedMl} ml`
                           }
-                          return item.serving_size
+                          return servingSizeLabel
                         })()
 
                         const isMultiIngredient = analyzedItems.length > 1
@@ -2577,7 +2587,7 @@ Please add nutritional information manually if needed.`);
                                       <div className="text-sm text-gray-600 mt-0.5">Brand: {item.brand}</div>
                                     )}
                                     <div className="text-sm text-gray-500 mt-1">
-                                      Serving size: {item.serving_size || 'Not specified'}
+                                      Serving size: {servingSizeLabel || 'Not specified'}
                                     </div>
                                   </>
                                 )}
@@ -2757,7 +2767,7 @@ Please add nutritional information manually if needed.`);
                             {isExpanded && (
                             <div className="space-y-2">
                               <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                                {item.serving_size ? `Per 1 serving (= ${item.serving_size})` : 'Per serving'}
+                                {servingSizeLabel ? `Per 1 serving (= ${servingSizeLabel})` : 'Per serving'}
                               </div>
                               <div className="flex flex-wrap gap-2">
                                 {ITEM_NUTRIENT_META.map((meta) => {
