@@ -3733,29 +3733,8 @@ Please add nutritional information manually if needed.`);
                   return Number.isFinite(num) ? num : 0
                 }
 
-                // ⚠️ GUARD RAIL: Today’s Totals must always be rebuilt from ingredient cards.
-                // DO NOT revert this to older nutrition objects. Fiber/sugar accuracy depends on this.
-                const deriveItemsForEntry = (entry: any) => {
-                  if (entry?.items && Array.isArray(entry.items) && entry.items.length > 0) {
-                    return entry.items
-                  }
-                  if (entry?.description) {
-                    // Rebuild ingredient cards from stored analysis text when needed.
-                    // This mirrors the Edit Entry view so users always see consistent numbers.
-                    const structured = extractStructuredItemsFromAnalysis(entry.description)
-                    if (structured?.items?.length) {
-                      return enrichItemsFromStarter(structured.items)
-                    }
-                    const prose = extractItemsFromTextEstimates(entry.description)
-                    if (prose?.items?.length) {
-                      return enrichItemsFromStarter(prose.items)
-                    }
-                  }
-                  return null
-                }
-
                 const convertStoredTotals = (input: any) => {
-                  // Fallback only. If you touch this, confirm Today’s Totals still matches the Edit modal exactly.
+                  // Canonical conversion helper – keeps Today's Totals in sync with the entry cards.
                   if (!input) return null
                   return {
                     calories: safeNumber(input.calories ?? input.calories_g ?? input.kcal),
@@ -3768,18 +3747,6 @@ Please add nutritional information manually if needed.`);
                 }
 
                 const totals = source.reduce((acc: Record<typeof NUTRIENT_DISPLAY_ORDER[number], number>, item: any) => {
-                  const derivedItems = deriveItemsForEntry(item)
-                  const recalculated = derivedItems ? recalculateNutritionFromItems(derivedItems) : null
-                  if (recalculated) {
-                    acc.calories += recalculated.calories || 0
-                    acc.protein += recalculated.protein || 0
-                    acc.carbs += recalculated.carbs || 0
-                    acc.fat += recalculated.fat || 0
-                    acc.fiber += recalculated.fiber || 0
-                    acc.sugar += recalculated.sugar || 0
-                    return acc
-                  }
-
                   const storedTotals = convertStoredTotals(item?.total) || convertStoredTotals(item?.nutrition) || {
                     calories: 0,
                     protein: 0,
