@@ -1103,15 +1103,18 @@ const applyStructuredItems = (
       // Update context immediately for instant UI updates
       updateUserData({ todaysFoods: updatedFoods });
       console.log('🚀 PERFORMANCE: Food updated in cache instantly - UI responsive!');
-      
-      // Background save to database (don't wait for response)
+
+      const appendHistory = options?.appendHistory !== false;
+
+      // Background save to user-data endpoint (don't wait for response)
       fetch('/api/user-data', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          todaysFoods: updatedFoods
+          todaysFoods: updatedFoods,
+          appendHistory
         }),
       }).then(response => {
         if (!response.ok) {
@@ -1127,27 +1130,6 @@ const applyStructuredItems = (
         setShowSavedToast(true);
         setTimeout(() => setShowSavedToast(false), 1500);
       } catch {}
-      // Fire-and-forget history append (skip for edits/deletes)
-      if (options?.appendHistory !== false) {
-        try {
-          const last = updatedFoods[0];
-          if (last) {
-            fetch('/api/food-log', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                description: last.description,
-                nutrition: last.nutrition,
-                imageUrl: last.photo || null,
-                items: last.items || null,
-                // Pin the exact calendar day the user was viewing when saving,
-                // so history never drifts due to timezone calculations.
-                localDate: last.localDate || selectedDate,
-              }),
-            }).catch(() => {});
-          }
-        } catch {}
-      }
     } catch (error) {
       console.error('Error in saveFoodEntries:', error);
     }
@@ -1923,7 +1905,7 @@ Please add nutritional information manually if needed.`);
   const deleteFood = async (foodId: number) => {
     const updatedFoods = todaysFoods.filter(food => food.id !== foodId);
     setTodaysFoods(updatedFoods);
-    await saveFoodEntries(updatedFoods);
+    await saveFoodEntries(updatedFoods, { appendHistory: false });
     setShowEntryOptions(null);
   };
 

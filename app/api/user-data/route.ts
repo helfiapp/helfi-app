@@ -646,7 +646,7 @@ export async function POST(request: NextRequest) {
           }
         })
         
-        // Store new food data
+        // Store new food data for fast \"today\" view
         await prisma.healthGoal.create({
           data: {
             userId: user.id,
@@ -656,6 +656,40 @@ export async function POST(request: NextRequest) {
           }
         })
         console.log('Stored todays foods data successfully')
+
+        // Also append the latest entry into FoodLog for reliable history,
+        // but only when explicitly allowed by the caller.
+        const appendHistory = data.appendHistory !== false
+        if (appendHistory && data.todaysFoods.length > 0) {
+          const last = data.todaysFoods[0]
+          if (last && (last.description || last.nutrition || last.photo)) {
+            try {
+              const rawDescription = (last.description || '').toString()
+              const name =
+                rawDescription
+                  .split('\\n')[0]
+                  .split('Calories:')[0]
+                  .split(',')[0]
+                  .split('.')[0]
+                  .trim() || 'Food item'
+
+              await prisma.foodLog.create({
+                data: {
+                  userId: user.id,
+                  name,
+                  description: rawDescription || null,
+                  imageUrl: last.photo || null,
+                  nutrients: last.nutrition || null,
+                  items: Array.isArray(last.items) && last.items.length > 0 ? last.items : null,
+                  localDate: (last.localDate as string | null) || null,
+                },
+              })
+              console.log('Appended latest food entry to FoodLog for history view')
+            } catch (foodLogError) {
+              console.warn('FoodLog append failed (non-blocking):', foodLogError)
+            }
+          }
+        }
       }
     } catch (error) {
       console.error('Error storing todays foods data:', error)
