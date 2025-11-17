@@ -2092,7 +2092,7 @@ Please add nutritional information manually if needed.`);
 
       {/* Main Content */}
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8 pb-24 md:pb-8">
+        <div className="max-w-4xl mx-auto px-3 sm:px-6 py-6 sm:py-8 pb-24 md:pb-8">
         
         {/* Instruction Text - Hidden during edit mode */}
         {!isEditingDescription && (
@@ -2177,7 +2177,7 @@ Please add nutritional information manually if needed.`);
 
                 {/* Food Processing Area */}
         {showAddFood && (
-          <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+          <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 mb-6">
             
             {/* Photo Analysis Flow */}
             {photoPreview && !showAiResult && !isEditingDescription && (
