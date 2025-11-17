@@ -576,6 +576,11 @@ export default function FoodDiary() {
   const [healthAlternatives, setHealthAlternatives] = useState<string | null>(null)
   const [showAddIngredientModal, setShowAddIngredientModal] = useState<boolean>(false)
   const [ingredientSearchQuery, setIngredientSearchQuery] = useState<string>('') 
+  const [officialSearchQuery, setOfficialSearchQuery] = useState<string>('')
+  const [officialResults, setOfficialResults] = useState<any[]>([])
+  const [officialSource, setOfficialSource] = useState<'openfoodfacts' | 'usda'>('openfoodfacts')
+  const [officialLoading, setOfficialLoading] = useState<boolean>(false)
+  const [officialError, setOfficialError] = useState<string | null>(null)
   
   // Manual food entry states
   const [manualFoodName, setManualFoodName] = useState('')
@@ -689,6 +694,76 @@ export default function FoodDiary() {
     }
     setShowAddIngredientModal(false)
     setIngredientSearchQuery('')
+  }
+
+  const addIngredientFromOfficial = (item: any) => {
+    if (!item) return
+    const newItem = {
+      name: item.name || 'Unknown food',
+      brand: item.brand ?? null,
+      serving_size: item.serving_size || '',
+      servings: 1,
+      calories: item.calories ?? null,
+      protein_g: item.protein_g ?? null,
+      carbs_g: item.carbs_g ?? null,
+      fat_g: item.fat_g ?? null,
+      fiber_g: item.fiber_g ?? null,
+      sugar_g: item.sugar_g ?? null,
+    }
+    const next = [...analyzedItems, newItem]
+    setAnalyzedItems(next)
+    applyRecalculatedNutrition(next)
+    if (editingEntry) {
+      try {
+        const updatedNutrition = recalculateNutritionFromItems(next)
+        const updatedEntry = {
+          ...editingEntry,
+          items: next,
+          nutrition: updatedNutrition,
+          total: convertTotalsForStorage(updatedNutrition),
+        }
+        setEditingEntry(updatedEntry)
+        setTodaysFoods(prev => prev.map(food => (food.id === editingEntry.id ? updatedEntry : food)))
+      } catch {}
+    }
+    setShowAddIngredientModal(false)
+    setIngredientSearchQuery('')
+    setOfficialSearchQuery('')
+    setOfficialResults([])
+    setOfficialError(null)
+  }
+
+  const handleOfficialSearch = async (source: 'openfoodfacts' | 'usda') => {
+    if (!officialSearchQuery.trim()) {
+      setOfficialError('Please enter a product name or barcode to search.')
+      return
+    }
+    setOfficialError(null)
+    setOfficialLoading(true)
+    setOfficialResults([])
+    setOfficialSource(source)
+    try {
+      const params = new URLSearchParams({
+        source,
+        q: officialSearchQuery.trim(),
+      })
+      const res = await fetch(`/api/food-data?${params.toString()}`, {
+        method: 'GET',
+      })
+      if (!res.ok) {
+        const text = await res.text()
+        console.error('Food data search failed:', text)
+        setOfficialError('Unable to fetch official data right now. Please try again.')
+        return
+      }
+      const data = await res.json()
+      setOfficialResults(Array.isArray(data.items) ? data.items : [])
+    } catch (err) {
+      console.error('Food data search error:', err)
+      setOfficialError('Something went wrong while searching. Please try again.')
+    } finally {
+      setOfficialLoading(false)
+    }
   }
 
 const applyStructuredItems = (
@@ -2956,8 +3031,85 @@ Please add nutritional information manually if needed.`);
                               </div>
                             ))}
                           </div>
-                          <div className="mt-3 text-xs text-gray-500">
-                            This is a starter list. We can connect USDA FoodData Central next.
+                          <div className="mt-4 pt-3 border-t border-gray-100">
+                            <div className="text-sm font-medium text-gray-900 mb-2">
+                              Search official food databases
+                            </div>
+                            <p className="text-xs text-gray-500 mb-2">
+                              Look up branded products (Open Food Facts) or single foods (USDA). Start typing a product
+                              name or barcode, then choose which database to search.
+                            </p>
+                            <div className="flex flex-col sm:flex-row gap-2">
+                              <input
+                                type="text"
+                                value={officialSearchQuery}
+                                onChange={(e) => setOfficialSearchQuery(e.target.value)}
+                                placeholder="e.g., \"Tip Top hamburger bun\" or \"9300633900000\""
+                                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm"
+                              />
+                              <div className="flex gap-2">
+                                <button
+                                  type="button"
+                                  disabled={officialLoading}
+                                  onClick={() => handleOfficialSearch('openfoodfacts')}
+                                  className="px-3 py-2 text-xs font-medium rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60"
+                                >
+                                  Packaged (OFF)
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={officialLoading}
+                                  onClick={() => handleOfficialSearch('usda')}
+                                  className="px-3 py-2 text-xs font-medium rounded-lg bg-slate-800 text-white hover:bg-slate-900 disabled:opacity-60"
+                                >
+                                  Single food (USDA)
+                                </button>
+                              </div>
+                            </div>
+                            {officialError && <div className="mt-2 text-xs text-red-600">{officialError}</div>}
+                            {officialLoading && (
+                              <div className="mt-2 text-xs text-gray-500">Searching databases…</div>
+                            )}
+                            {!officialLoading && !officialError && officialResults.length > 0 && (
+                              <div className="mt-3 max-h-60 overflow-y-auto space-y-2">
+                                {officialResults.map((r, idx) => (
+                                  <div
+                                    key={`${r.source}-${r.id}-${idx}`}
+                                    className="flex items-start justify-between rounded-lg border border-gray-200 px-3 py-2"
+                                  >
+                                    <div className="min-w-0">
+                                      <div className="text-sm font-semibold text-gray-900 truncate">
+                                        {r.name}
+                                        {r.brand ? ` – ${r.brand}` : ''}
+                                      </div>
+                                      <div className="mt-0.5 text-xs text-gray-600">
+                                        {r.serving_size ? `Serving: ${r.serving_size} • ` : ''}
+                                        {r.calories != null && !Number.isNaN(Number(r.calories)) && (
+                                          <span>{Math.round(Number(r.calories))} kcal</span>
+                                        )}
+                                        {r.protein_g != null && (
+                                          <span className="ml-2">{`${r.protein_g} g protein`}</span>
+                                        )}
+                                        {r.carbs_g != null && (
+                                          <span className="ml-2">{`${r.carbs_g} g carbs`}</span>
+                                        )}
+                                        {r.fat_g != null && <span className="ml-2">{`${r.fat_g} g fat`}</span>}
+                                      </div>
+                                      <div className="mt-1 text-[11px] text-gray-400">
+                                        Source: {r.source === 'openfoodfacts' ? 'Open Food Facts' : 'USDA FoodData Central'}
+                                      </div>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => addIngredientFromOfficial(r)}
+                                      className="ml-3 px-3 py-1.5 rounded-md bg-emerald-600 text-white text-xs hover:bg-emerald-700"
+                                    >
+                                      Add
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
