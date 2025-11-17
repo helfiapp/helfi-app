@@ -3528,7 +3528,7 @@ Please add nutritional information manually if needed.`);
         <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 overflow-visible">
           {/* Daily Totals Row */}
           {(isViewingToday ? todaysFoods : (historyFoods || [])).length > 0 && (
-            <div className="mb-4">
+            <div className="sticky top-0 z-20 -mx-4 sm:-mx-6 px-4 sm:px-6 pb-3 mb-4 bg-white">
               {(() => {
                 const source = isViewingToday ? todaysFoods : (historyFoods || [])
 
