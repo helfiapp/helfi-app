@@ -2567,35 +2567,43 @@ Please add nutritional information manually if needed.`);
                                 <div className="font-semibold text-gray-900 text-base">
                                   {item.name || 'Unknown Food'}
                                 </div>
-                                {item.brand && (
-                                  <div className="text-sm text-gray-600 mt-0.5">Brand: {item.brand}</div>
+                                {(!isMultiIngredient || isExpanded) && (
+                                  <>
+                                    {item.brand && (
+                                      <div className="text-sm text-gray-600 mt-0.5">Brand: {item.brand}</div>
+                                    )}
+                                    <div className="text-sm text-gray-500 mt-1">
+                                      Serving size: {item.serving_size || 'Not specified'}
+                                    </div>
+                                  </>
                                 )}
-                                <div className="text-sm text-gray-500 mt-1">
-                                  Serving size: {item.serving_size || 'Not specified'}
-                                </div>
                               </div>
                               <div className="ml-3 flex items-center gap-1">
-                                <button
-                                  onClick={() => {
-                                    setEditingItemIndex(index);
-                                    setShowItemEditModal(true);
-                                  }}
-                                  className="p-2 text-gray-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                                  title="Adjust details"
-                                >
-                                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                  </svg>
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteItem(index)}
-                                  className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                  title="Delete ingredient"
-                                >
-                                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 7h12M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2m-7 0l1 12a2 2 0 002 2h2a2 2 0 002-2l1-12" />
-                                  </svg>
-                                </button>
+                                {(!isMultiIngredient || isExpanded) && (
+                                  <>
+                                    <button
+                                      onClick={() => {
+                                        setEditingItemIndex(index);
+                                        setShowItemEditModal(true);
+                                      }}
+                                      className="p-2 text-gray-600 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                                      title="Adjust details"
+                                    >
+                                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                      </svg>
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteItem(index)}
+                                      className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                      title="Delete ingredient"
+                                    >
+                                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 7h12M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2m-7 0l1 12a2 2 0 002 2h2a2 2 0 002-2l1-12" />
+                                      </svg>
+                                    </button>
+                                  </>
+                                )}
                                 {isMultiIngredient && (
                                   <button
                                     onClick={() => {
@@ -2775,6 +2783,7 @@ Please add nutritional information manually if needed.`);
                             </div>
                             )}
 
+                            {isExpanded && (
                             <div className="mt-3 bg-gray-50 border border-gray-100 rounded-lg px-3 py-2 text-xs text-gray-600">
                               <div className="font-medium text-gray-700">Totals for {formattedServings}</div>
                               <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
@@ -2798,6 +2807,7 @@ Please add nutritional information manually if needed.`);
                                 })}
                               </div>
                             </div>
+                            )}
                           </div>
                         );
                       })}
