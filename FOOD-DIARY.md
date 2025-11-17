@@ -1,7 +1,7 @@
 ## Food Diary – Handover and Fix Plan
 
-**Last updated:** November 16, 2025 (after GPT‑5.1 follow‑up session)  
-**Baseline code version:** commit `557b732` (current live baseline after rollback)
+**Last updated:** November 17, 2025 (after GPT‑5.1 ingredient‑editing UX session)  
+**Baseline code version:** commit `557b732` (rollback starting point – current live behaviour is built on top of this; see session log for later commits)
 
 This document is the **single source of truth** for the Food Diary / Food Analyzer area.  
 Every future agent must read this fully before changing anything under `/app/food` or the related APIs.
@@ -393,8 +393,13 @@ This section is lifted directly (with minor wording tweaks) from `fix.plan.md`, 
 - [x] Phase 1: Fix `/api/food-log` date window and verify behaviour in Melbourne and at least one other timezone.  
 - [x] Phase 2: Persist `items` to `FoodLog`, prefer stored items in `editFood`, and guard against wiping cards; backfill key recent entries (crackers/San Remo) once stable for **new** entries.  
 - [x] Phase 3: Implement units and toggles exactly as in section 6 and complete a regression sweep on desktop (including user’s real burger and orange‑juice photos).  
-- [ ] Optional future work: audit macro accuracy for very complex meals, and run deeper cross‑browser / iPhone testing before making any further UX changes.
--
+- [x] Ingredient editing UX: add compact top‑of‑screen controls when editing an entry (Save changes / Cancel + 3‑dot menu for Edit description / Re‑analyze / Delete photo), and introduce collapsible ingredient cards so that multi‑ingredient meals start with all items closed and only one card expanded at a time.  
+- [x] Mobile layout polish for the Food page: reduce left/right padding, remove the outer “square within a square” background container, and keep Today’s Totals as a normal (non‑sticky) section so editing flows feel natural on iPhone.  
+- [ ] Stabilise nutrition truth source for complex meals (especially the burger): choose a single source of truth for totals (ideally structured JSON from `/api/analyze-food`) and simplify/remove prose‑based scraping as described in section 8.3.  
+- [ ] Auto‑save editing: remove the need for a manual “Save changes” button by safely auto‑saving card and description edits (Google Docs style) while protecting against accidental data loss.  
+- [ ] Unified description + ingredients box: allow the main food description and ingredient list to be edited in one place, with dynamic nutrition updates when the description changes (for example, changing “beef sausage” to “pork sausage”).  
+- [ ] Optional future work: audit macro accuracy for very complex meals and run deeper cross‑browser / iPhone testing before making any further UX changes.
+
 ---
 
 ## 8. Session log – Agent GPT‑5.1 (this session, November 16, 2025)
@@ -550,3 +555,28 @@ This follow‑up session built **on top of** the work described above and is now
   - The `FoodLog.items` column or how new entries persist `items`.  
   - The basic semantics of `energyUnit` / `volumeUnit`, the oz/ml toggle visibility rules, or the way units and servings move together.  
 - If you ever need to touch this area again, read this entire file carefully, then coordinate with the user and test on **live production** with real entries (burger, eggs, crackers, orange juice) before claiming success.
+
+### 8.6 Follow‑up changes – Agent GPT‑5.1 via Cursor (November 17, 2025 – ingredient editing UX)
+
+This session focused on **making the Food Diary easier to edit** without changing the underlying units/toggles logic.
+
+**Ingredient cards – expand/collapse behaviour**
+- Multi‑ingredient meals now show a **compact list of ingredients** when you tap Edit:
+  - Each row only shows the ingredient name on the left and a small triangle on the right.  
+  - Tapping the triangle expands that card to reveal the full controls (servings, Units, per‑serving chips, and “Totals for …” box), plus the edit and delete icons.  
+  - Only **one card is expanded at a time**; expanding one ingredient automatically collapses the others, so you can always see the nutrition tiles while adjusting a specific ingredient.  
+- Single‑ingredient meals keep their card **fully open** by default so you can see everything at a glance.
+
+**Edit controls at the top of the analysis panel**
+- When editing an existing entry, the Food Analysis panel now shows a **compact control bar at the top**:
+  - Visible buttons: **Save changes** and **Cancel**.  
+  - A 3‑dot menu on the right with: **Edit description**, **Re‑analyze**, and **Delete photo**.  
+- The goal is to avoid long scrolling: all important editing actions are reachable immediately at the top while the existing bottom‑of‑panel controls remain familiar.
+
+**Sticky headers and scrolling**
+- Based on user feedback, **Today’s Totals is no longer sticky** – it scrolls like a normal section because that page is read‑only.  
+- The per‑meal nutrition strip inside Edit mode is also non‑sticky now; instead, the new expand/collapse system keeps the view simple while still letting the user watch the nutrition tiles update as they adjust one ingredient at a time.
+
+**Mobile layout tweaks for the Food page**
+- Reduced horizontal padding and removed an extra background panel to get rid of the “square within a square” look on phones, allowing ingredient cards and photos to use more of the screen width.  
+- These are visual/spacing improvements only; they do **not** change the behaviour of units, toggles, or nutrition calculations.
