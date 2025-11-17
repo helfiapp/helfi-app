@@ -2177,7 +2177,9 @@ Please add nutritional information manually if needed.`);
 
                 {/* Food Processing Area */}
         {showAddFood && (
-          <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 mb-6">
+          // Outer wrapper now has no extra background so the inner Food Analysis
+          // card can stretch closer to the screen edges on mobile.
+          <div className="mb-6">
             
             {/* Photo Analysis Flow */}
             {photoPreview && !showAiResult && !isEditingDescription && (
