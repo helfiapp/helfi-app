@@ -3044,7 +3044,7 @@ Please add nutritional information manually if needed.`);
                                 type="text"
                                 value={officialSearchQuery}
                                 onChange={(e) => setOfficialSearchQuery(e.target.value)}
-                                placeholder="e.g., \"Tip Top hamburger bun\" or \"9300633900000\""
+                                placeholder={'e.g., "Tip Top hamburger bun" or "9300633900000"'}
                                 className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm"
                               />
                               <div className="flex gap-2">
