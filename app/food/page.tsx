@@ -2108,7 +2108,7 @@ Please add nutritional information manually if needed.`);
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1">
         <div className="max-w-4xl mx-auto px-3 sm:px-6 py-6 sm:py-8 pb-24 md:pb-8">
         
         {/* Instruction Text - Hidden during edit mode */}
