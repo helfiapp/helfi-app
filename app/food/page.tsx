@@ -873,9 +873,15 @@ const applyStructuredItems = (
     }
   }, [dropdownOpen, showPhotoOptions, showEntryOptions, showIngredientOptions, showEditActionsMenu]);
 
-  // When items change, default to first item expanded for multi-ingredient meals.
+  // When items change:
+  // - Single-ingredient meals: keep the card open by default
+  // - Multi-ingredient meals: start with all cards collapsed
   useEffect(() => {
-    if (analyzedItems && analyzedItems.length > 1) {
+    if (!analyzedItems || analyzedItems.length === 0) {
+      setExpandedItemIndex(null)
+      return
+    }
+    if (analyzedItems.length === 1) {
       setExpandedItemIndex(0)
     } else {
       setExpandedItemIndex(null)
@@ -2559,10 +2565,16 @@ Please add nutritional information manually if needed.`);
                         const isMultiIngredient = analyzedItems.length > 1
                         const isExpanded = !isMultiIngredient || expandedItemIndex === index
                         
+                        const cardPaddingClass =
+                          isMultiIngredient && !isExpanded ? 'py-2.5 px-4' : 'p-4'
+
                         return (
-                          <div key={index} className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
+                          <div
+                            key={index}
+                            className={`bg-white rounded-xl border border-gray-200 shadow-sm ${cardPaddingClass}`}
+                          >
                             {/* Header row with basic info and actions */}
-                            <div className="flex items-start justify-between mb-2">
+                            <div className={`flex items-start justify-between ${isMultiIngredient && !isExpanded ? 'mb-1' : 'mb-2'}`}>
                               <div className="flex-1">
                                 <div className="font-semibold text-gray-900 text-base">
                                   {item.name || 'Unknown Food'}
