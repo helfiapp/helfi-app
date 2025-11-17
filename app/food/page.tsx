@@ -873,20 +873,12 @@ const applyStructuredItems = (
     }
   }, [dropdownOpen, showPhotoOptions, showEntryOptions, showIngredientOptions, showEditActionsMenu]);
 
-  // When items change:
-  // - Single-ingredient meals: keep the card open by default
-  // - Multi-ingredient meals: start with all cards collapsed
+  // Reset which ingredient card is expanded whenever we start/finish editing an entry.
+  // Multi-ingredient meals will start with all cards collapsed; single-ingredient meals
+  // remain fully open by default via the rendering logic.
   useEffect(() => {
-    if (!analyzedItems || analyzedItems.length === 0) {
-      setExpandedItemIndex(null)
-      return
-    }
-    if (analyzedItems.length === 1) {
-      setExpandedItemIndex(0)
-    } else {
-      setExpandedItemIndex(null)
-    }
-  }, [analyzedItems])
+    setExpandedItemIndex(null)
+  }, [editingEntry])
 
 
 
