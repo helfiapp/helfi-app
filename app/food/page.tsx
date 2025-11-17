@@ -2303,17 +2303,17 @@ Please add nutritional information manually if needed.`);
                 
                 {/* Premium Nutrition Display */}
                 <div className="p-4 sm:p-6">
-                  {/* Food Title */}
-                  <div className="mb-4">
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2">Food Analysis</h3>
-                  </div>
-
-                  {/* Compact edit controls at the top when editing an existing entry */}
-                  {editingEntry && (
-                    <div className="mb-4 flex items-center justify-between gap-2">
-                      <div className="text-xs sm:text-sm text-gray-500">
-                        Editing a saved entry
-                      </div>
+                  {/* Title + editing state + compact controls (all in one row) */}
+                  <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <h3 className="text-xl font-semibold text-gray-900">Food Analysis</h3>
+                      {editingEntry && (
+                        <p className="mt-0.5 text-xs sm:text-sm text-gray-500">
+                          Editing a saved entry
+                        </p>
+                      )}
+                    </div>
+                    {editingEntry && (
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
@@ -2383,8 +2383,8 @@ Please add nutritional information manually if needed.`);
                           )}
                         </div>
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
 
                   {/* Meal Summary - Single sentence at top */}
                   {mealSummary && (
