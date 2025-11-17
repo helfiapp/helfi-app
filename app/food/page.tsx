@@ -2555,10 +2555,14 @@ Please add nutritional information manually if needed.`);
                           }
                           return item.serving_size
                         })()
+
+                        const isMultiIngredient = analyzedItems.length > 1
+                        const isExpanded = !isMultiIngredient || expandedItemIndex === index
                         
                         return (
                           <div key={index} className="bg-white rounded-xl p-4 border border-gray-200 shadow-sm">
-                            <div className="flex items-start justify-between mb-3">
+                            {/* Header row with basic info and actions */}
+                            <div className="flex items-start justify-between mb-2">
                               <div className="flex-1">
                                 <div className="font-semibold text-gray-900 text-base">
                                   {item.name || 'Unknown Food'}
@@ -2592,10 +2596,29 @@ Please add nutritional information manually if needed.`);
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 7h12M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2m-7 0l1 12a2 2 0 002 2h2a2 2 0 002-2l1-12" />
                                   </svg>
                                 </button>
+                                {isMultiIngredient && (
+                                  <button
+                                    onClick={() => {
+                                      setExpandedItemIndex(expandedItemIndex === index ? null : index)
+                                    }}
+                                    className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                                    title={isExpanded ? 'Collapse' : 'Expand'}
+                                  >
+                                    <svg
+                                      className={`w-4 h-4 transform transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                  </button>
+                                )}
                               </div>
                             </div>
                             
                             {/* Serving Controls */}
+                            {isExpanded && (
                             <div className="flex flex-col gap-3 mb-3 pb-3 border-b border-gray-100">
                               <div className="flex items-center gap-3">
                               <span className="text-sm text-gray-600">Servings:</span>
@@ -2716,36 +2739,41 @@ Please add nutritional information manually if needed.`);
                                 </div>
                               )}
                             </div>
+                            )}
                             
                             {/* Per-serving nutrition */}
-                            <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
-                              {item.serving_size ? `Per 1 serving (= ${item.serving_size})` : 'Per serving'}
+                            {isExpanded && (
+                            <div className="space-y-2">
+                              <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                                {item.serving_size ? `Per 1 serving (= ${item.serving_size})` : 'Per serving'}
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                {ITEM_NUTRIENT_META.map((meta) => {
+                                  const rawValue = item?.[meta.field as keyof typeof item]
+                                  const numeric = typeof rawValue === 'number' ? rawValue : Number(rawValue)
+                                  const displayValue =
+                                    meta.key === 'calories'
+                                      ? formatEnergyValue(numeric, energyUnit)
+                                      : formatMacroValue(numeric, 'g')
+                                  const labelText =
+                                    meta.key === 'calories'
+                                      ? energyUnit === 'kJ'
+                                        ? 'Kilojoules'
+                                        : 'Calories'
+                                      : meta.label
+                                  return (
+                                    <div
+                                      key={`${meta.field}-${index}`}
+                                      className="px-3 py-1 rounded-full bg-gray-100 border border-gray-200 text-[11px] font-medium text-gray-700 flex items-center gap-1"
+                                    >
+                                      <span className={`font-semibold ${meta.accent}`}>{displayValue}</span>
+                                      <span className="uppercase text-gray-500">{labelText}</span>
+                                    </div>
+                                  )
+                                })}
+                              </div>
                             </div>
-                            <div className="flex flex-wrap gap-2">
-                              {ITEM_NUTRIENT_META.map((meta) => {
-                                const rawValue = item?.[meta.field as keyof typeof item]
-                                const numeric = typeof rawValue === 'number' ? rawValue : Number(rawValue)
-                                const displayValue =
-                                  meta.key === 'calories'
-                                    ? formatEnergyValue(numeric, energyUnit)
-                                    : formatMacroValue(numeric, 'g')
-                                const labelText =
-                                  meta.key === 'calories'
-                                    ? energyUnit === 'kJ'
-                                      ? 'Kilojoules'
-                                      : 'Calories'
-                                    : meta.label
-                                return (
-                                  <div
-                                    key={`${meta.field}-${index}`}
-                                    className="px-3 py-1 rounded-full bg-gray-100 border border-gray-200 text-[11px] font-medium text-gray-700 flex items-center gap-1"
-                                  >
-                                    <span className={`font-semibold ${meta.accent}`}>{displayValue}</span>
-                                    <span className="uppercase text-gray-500">{labelText}</span>
-                                  </div>
-                                )
-                              })}
-                            </div>
+                            )}
 
                             <div className="mt-3 bg-gray-50 border border-gray-100 rounded-lg px-3 py-2 text-xs text-gray-600">
                               <div className="font-medium text-gray-700">Totals for {formattedServings}</div>
