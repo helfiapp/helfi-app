@@ -1255,7 +1255,8 @@ const applyStructuredItems = (
         setTodaysFoods(prev => {
           const prevIds = new Set(prev.map((f: any) => typeof f.id === 'number' ? f.id : Number(f.id)));
           const newIds = new Set(deduped.map((f: any) => typeof f.id === 'number' ? f.id : Number(f.id)));
-          const idsMatch = prevIds.size === newIds.size && [...prevIds].every(id => newIds.has(id));
+          const prevIdsArray = Array.from(prevIds);
+          const idsMatch = prevIds.size === newIds.size && prevIdsArray.every(id => newIds.has(id));
           return idsMatch ? prev : deduped;
         });
       } else {
@@ -1432,7 +1433,8 @@ const applyStructuredItems = (
         : selectedDate
 
       console.log('📝 saveFoodEntries called:', {
-        entryCount: updatedFoods.length,
+        entryCount: dedupedFoods.length,
+        originalCount: updatedFoods.length,
         appendHistory,
         selectedDate,
         latestLocalDate: latest?.localDate,
