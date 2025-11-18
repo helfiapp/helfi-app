@@ -2901,60 +2901,87 @@ Please add nutritional information manually if needed.`);
                     </div>
                   )}
 
-                  {analyzedNutrition && (
-                    <div className="mb-6 mt-3 rounded-lg p-1 sm:p-2 bg-white/90 supports-[backdrop-filter]:bg-white/60 backdrop-blur">
-                      <div className="flex justify-end mb-1 pr-1">
-                        <div className="inline-flex items-center text-[11px] sm:text-xs bg-gray-100 rounded-full p-0.5 border border-gray-200">
-                          <button
-                            type="button"
-                            onClick={() => setEnergyUnit('kcal')}
-                            className={`px-2 py-0.5 rounded-full ${
-                              energyUnit === 'kcal'
-                                ? 'bg-white text-gray-900 shadow-sm'
-                                : 'text-gray-500'
-                            }`}
-                          >
-                            kcal
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setEnergyUnit('kJ')}
-                            className={`px-2 py-0.5 rounded-full ${
-                              energyUnit === 'kJ'
-                                ? 'bg-white text-gray-900 shadow-sm'
-                                : 'text-gray-500'
-                            }`}
-                          >
-                            kJ
-                          </button>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-4">
-                        {NUTRIENT_DISPLAY_ORDER.map((key) => {
-                          const meta = NUTRIENT_CARD_META[key]
-                          const rawValue = (analyzedNutrition as any)?.[key] ?? 0
-                          const displayValue = formatNutrientValue(key, Number(rawValue))
-                          const headerLabel =
-                            key === 'calories' && energyUnit === 'kJ' ? 'Kilojoules' : meta.label
-                          return (
-                            <div
-                              key={key}
-                              className={`bg-gradient-to-br ${meta.gradient} border border-white/60 rounded-xl p-2 sm:p-4 text-center shadow-sm`}
+                  {analyzedNutrition && (() => {
+                    // Create macro segments for the circle chart
+                    const macroSegments: MacroSegment[] = [
+                      { key: 'protein', label: 'Protein', grams: (analyzedNutrition as any)?.protein || 0, color: '#ef4444' }, // red
+                      { key: 'fibre', label: 'Fibre', grams: (analyzedNutrition as any)?.fiber || 0, color: '#93c5fd' }, // light blue
+                      { key: 'carbs', label: 'Carbs', grams: (analyzedNutrition as any)?.carbs || 0, color: '#22c55e' }, // green
+                      { key: 'sugar', label: 'Sugar', grams: (analyzedNutrition as any)?.sugar || 0, color: '#f97316' }, // orange
+                      { key: 'fat', label: 'Fat', grams: (analyzedNutrition as any)?.fat || 0, color: '#6366f1' }, // purple
+                    ]
+                    
+                    const caloriesValue = (analyzedNutrition as any)?.calories || 0
+                    const caloriesInUnit = energyUnit === 'kJ' ? Math.round(caloriesValue * 4.184) : Math.round(caloriesValue)
+                    
+                    return (
+                      <div className="mb-6 mt-3 rounded-lg p-4 sm:p-6 bg-white/90 supports-[backdrop-filter]:bg-white/60 backdrop-blur">
+                        <div className="flex justify-end mb-4">
+                          <div className="inline-flex items-center text-[11px] sm:text-xs bg-gray-100 rounded-full p-0.5 border border-gray-200">
+                            <button
+                              type="button"
+                              onClick={() => setEnergyUnit('kcal')}
+                              className={`px-2 py-0.5 rounded-full ${
+                                energyUnit === 'kcal'
+                                  ? 'bg-white text-gray-900 shadow-sm'
+                                  : 'text-gray-500'
+                              }`}
                             >
-                              <div
-                                className={`text-xs font-medium uppercase tracking-wide ${meta.accent} mb-1`}
-                              >
-                                {headerLabel}
-                              </div>
-                              <div className="text-xl sm:text-2xl font-bold text-gray-900">
-                                {displayValue}
+                              kcal
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setEnergyUnit('kJ')}
+                              className={`px-2 py-0.5 rounded-full ${
+                                energyUnit === 'kJ'
+                                  ? 'bg-white text-gray-900 shadow-sm'
+                                  : 'text-gray-500'
+                              }`}
+                            >
+                              kJ
+                            </button>
+                          </div>
+                        </div>
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 sm:gap-8">
+                          {/* Circle chart with calories in center */}
+                          <div className="flex-shrink-0">
+                            <div className="relative inline-block">
+                              <MacroRing macros={macroSegments} showLegend={false} size="large" />
+                              <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                                <div className="text-2xl sm:text-3xl font-bold text-gray-900">
+                                  {caloriesInUnit}
+                                </div>
+                                <div className="text-xs text-gray-500 mt-0.5">
+                                  {energyUnit}
+                                </div>
                               </div>
                             </div>
-                          )
-                        })}
+                          </div>
+                          
+                          {/* Macro breakdown list */}
+                          <div className="flex-1">
+                            <div className="text-sm text-gray-600 mb-3 font-medium">Macro breakdown</div>
+                            <div className="space-y-2">
+                              {macroSegments.map((macro) => {
+                                const displayValue = macro.grams > 0 ? Math.round(macro.grams) : 0
+                                return (
+                                  <div key={macro.key} className="flex items-center gap-2 text-sm text-gray-700">
+                                    <span
+                                      className="inline-block w-3 h-3 rounded-full shrink-0"
+                                      style={{ backgroundColor: macro.color }}
+                                    />
+                                    <span>
+                                      {macro.label} {displayValue} g
+                                    </span>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )
+                  })()}
 
                   {/* Detected Items with Brand, Serving Size, and Edit Controls */}
                   {analyzedItems && analyzedItems.length > 0 ? (
