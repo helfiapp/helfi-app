@@ -1294,12 +1294,28 @@ const applyStructuredItems = (
                 return id;
               }));
               
+              // Also enrich existing cached entries with dbId from database
+              // This ensures delete functionality works even for cached entries
+              const enrichedCached = deduped.map((cachedEntry: any) => {
+                const cachedId = typeof cachedEntry.id === 'number' ? cachedEntry.id : Number(cachedEntry.id);
+                // Find matching database entry by timestamp
+                const dbEntry = logs.find((l: any) => {
+                  const logId = new Date(l.createdAt).getTime();
+                  return logId === cachedId;
+                });
+                // If we found a match and cached entry doesn't have dbId, add it
+                if (dbEntry && !cachedEntry.dbId) {
+                  return { ...cachedEntry, dbId: dbEntry.id };
+                }
+                return cachedEntry;
+              });
+              
               const missingEntries = logs.filter((l: any) => {
                 const logId = new Date(l.createdAt).getTime();
                 return !cachedIds.has(logId);
               });
               
-              if (missingEntries.length > 0) {
+              if (missingEntries.length > 0 || enrichedCached.some((e: any, i: number) => e.dbId !== deduped[i]?.dbId)) {
                 console.log('⚠️ Found entries in database that were missing from cache:', missingEntries.length);
                 const mappedMissing = missingEntries.map((l: any) => ({
                   id: new Date(l.createdAt).getTime(),
@@ -1313,11 +1329,11 @@ const applyStructuredItems = (
                   localDate: (l as any).localDate || selectedDate,
                 }));
                 
-                // Merge missing entries with existing cached entries
-                const merged = [...mappedMissing, ...deduped];
+                // Merge missing entries with enriched cached entries
+                const merged = [...mappedMissing, ...enrichedCached];
                 setTodaysFoods(merged);
                 
-                // Update cache with merged data
+                // Update cache with merged data (including dbId for future loads)
                 try {
                   fetch('/api/user-data', {
                     method: 'POST',
@@ -1325,6 +1341,9 @@ const applyStructuredItems = (
                     body: JSON.stringify({ todaysFoods: merged, appendHistory: false })
                   }).catch(() => {})
                 } catch {}
+              } else if (enrichedCached.length > 0) {
+                // Even if no missing entries, update with enriched dbIds
+                setTodaysFoods(enrichedCached);
               }
             }
           } catch (error) {
@@ -2454,6 +2473,29 @@ Please add nutritional information manually if needed.`);
 
 
   const deleteFood = async (foodId: number) => {
+    // Find the entry being deleted to check if it has a database ID
+    const entryToDelete = todaysFoods.find(food => food.id === foodId);
+    const dbId = (entryToDelete as any)?.dbId;
+    
+    // If entry has a database ID, delete it from the database first
+    if (dbId) {
+      try {
+        await fetch('/api/food-log/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: dbId }),
+        }).then(async (r) => {
+          if (!r.ok) {
+            throw new Error('delete_failed')
+          }
+        });
+      } catch (error) {
+        console.error('Failed to delete entry from database:', error);
+        // Continue with local deletion even if DB delete fails
+      }
+    }
+    
+    // Remove from local state and update cache
     const updatedFoods = todaysFoods.filter(food => food.id !== foodId);
     setTodaysFoods(updatedFoods);
     await saveFoodEntries(updatedFoods, { appendHistory: false });
