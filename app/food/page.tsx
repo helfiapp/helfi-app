@@ -181,7 +181,7 @@ function TargetRing({ label, valueLabel, percent, tone }: RingProps) {
   // For primary we currently don't use this component, but we keep support
   // for a simple single-colour ring.
   const isTarget = tone === 'target'
-  const strokeWidth = 10
+  const strokeWidth = 8
   const svgSize = 120
 
   const parts = (valueLabel || '').split(' ')
@@ -208,7 +208,7 @@ function TargetRing({ label, valueLabel, percent, tone }: RingProps) {
                 fill="none"
                 strokeDasharray={circumference}
                 strokeDashoffset={0}
-                strokeLinecap="round"
+                strokeLinecap="butt"
                 transform={`rotate(-90 ${svgSize / 2} ${svgSize / 2})`}
               />
               {/* Used (red) overlay */}
@@ -222,7 +222,7 @@ function TargetRing({ label, valueLabel, percent, tone }: RingProps) {
                   fill="none"
                   strokeDasharray={`${usedLength} ${circumference}`}
                   strokeDashoffset={0}
-                  strokeLinecap="round"
+                  strokeLinecap="butt"
                   transform={`rotate(-90 ${svgSize / 2} ${svgSize / 2})`}
                 />
               )}
@@ -238,7 +238,7 @@ function TargetRing({ label, valueLabel, percent, tone }: RingProps) {
               fill="none"
               strokeDasharray={`${clamped * circumference} ${circumference}`}
               strokeDashoffset={0}
-              strokeLinecap="round"
+              strokeLinecap="butt"
               transform={`rotate(-90 ${svgSize / 2} ${svgSize / 2})`}
             />
           )}
