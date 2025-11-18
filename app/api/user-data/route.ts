@@ -188,6 +188,7 @@ export async function GET(request: NextRequest) {
       weight: user.weight?.toString() || '',
       height: user.height?.toString() || '',
       bodyType: user.bodyType?.toLowerCase() || '',
+      birthdate: profileInfoData.dateOfBirth || '',
       exerciseFrequency: exerciseData.exerciseFrequency || '',
       exerciseTypes: exerciseData.exerciseTypes || [],
       goals: selectedGoals.length
@@ -317,6 +318,29 @@ export async function POST(request: NextRequest) {
     }
     
     console.timeEnd('⏱️ User Lookup/Creation')
+
+    // Load existing profile info record for merging purposes (date of birth, etc.)
+    let existingProfileInfoData: Record<string, any> | null = null
+    try {
+      const storedProfileInfo = await prisma.healthGoal.findFirst({
+        where: {
+          userId: user.id,
+          name: '__PROFILE_INFO_DATA__'
+        }
+      })
+      if (storedProfileInfo?.category) {
+        existingProfileInfoData = JSON.parse(storedProfileInfo.category)
+      }
+    } catch (error) {
+      console.warn('⚠️ Failed to load existing profile info data:', error)
+    }
+
+    const normalizedBirthdate =
+      typeof data.birthdate === 'string' ? data.birthdate.trim() : ''
+    const birthdateChanged = Boolean(
+      normalizedBirthdate &&
+        normalizedBirthdate !== (existingProfileInfoData?.dateOfBirth || '')
+    )
 
     // SIMPLIFIED APPROACH: Update each piece of data individually with proper error handling
     // This avoids complex transactions that were causing constraint violations
@@ -698,22 +722,48 @@ export async function POST(request: NextRequest) {
 
     // 7. Handle profileInfo data from profile page - store as special health goal
     try {
-      if (data.profileInfo) {
-        console.log('POST /api/user-data - Handling profileInfo data:', data.profileInfo)
+      const incomingProfileInfo =
+        data.profileInfo && typeof data.profileInfo === 'object'
+          ? data.profileInfo
+          : null
+
+      let shouldUpdateProfileInfo = false
+      let profileInfoPayload: Record<string, any> | null = null
+
+      if (incomingProfileInfo) {
+        shouldUpdateProfileInfo = true
+        profileInfoPayload = {
+          ...(existingProfileInfoData || {}),
+          ...incomingProfileInfo,
+        }
+      }
+
+      if (normalizedBirthdate) {
+        if (!profileInfoPayload) {
+          profileInfoPayload = { ...(existingProfileInfoData || {}) }
+        }
+        if (profileInfoPayload.dateOfBirth !== normalizedBirthdate) {
+          profileInfoPayload.dateOfBirth = normalizedBirthdate
+          shouldUpdateProfileInfo = true
+        }
+      }
+
+      if (shouldUpdateProfileInfo && profileInfoPayload) {
+        console.log('POST /api/user-data - Handling profileInfo data:', profileInfoPayload)
         
         // Update basic User fields if available in profileInfo
         const profileUpdateData: any = {}
+        const firstName = profileInfoPayload.firstName || ''
+        const lastName = profileInfoPayload.lastName || ''
         
         // Handle name concatenation
-        if (data.profileInfo.firstName || data.profileInfo.lastName) {
-          const firstName = data.profileInfo.firstName || ''
-          const lastName = data.profileInfo.lastName || ''
+        if (firstName || lastName) {
           profileUpdateData.name = `${firstName} ${lastName}`.trim()
         }
         
         // Handle gender
-        if (data.profileInfo.gender) {
-          profileUpdateData.gender = data.profileInfo.gender.toUpperCase() === 'MALE' ? 'MALE' : 'FEMALE'
+        if (profileInfoPayload.gender) {
+          profileUpdateData.gender = profileInfoPayload.gender.toUpperCase() === 'MALE' ? 'MALE' : 'FEMALE'
         }
         
         // Update User model with basic profile data
@@ -737,7 +787,7 @@ export async function POST(request: NextRequest) {
           data: {
             userId: user.id,
             name: '__PROFILE_INFO_DATA__',
-            category: JSON.stringify(data.profileInfo),
+            category: JSON.stringify(profileInfoPayload),
             currentRating: 0,
           }
         })
@@ -842,7 +892,15 @@ export async function POST(request: NextRequest) {
         if (data.supplements) changedTypes.push('supplements')
         if (data.medications) changedTypes.push('medications')
         if (data.goals) changedTypes.push('health_goals')
-        if (data.gender || data.weight || data.height || data.bodyType) changedTypes.push('profile')
+        const profileFieldsUpdated = Boolean(
+          data.gender ||
+            data.weight ||
+            data.height ||
+            data.bodyType ||
+            birthdateChanged ||
+            (data.profileInfo && typeof data.profileInfo === 'object')
+        )
+        if (profileFieldsUpdated) changedTypes.push('profile')
         if (data.exerciseFrequency || data.exerciseTypes) changedTypes.push('exercise')
         if (data.bloodResults) changedTypes.push('blood_results')
         if (data.todaysFoods) changedTypes.push('food')

@@ -11,7 +11,7 @@ import { useUserData } from '@/components/providers/UserDataProvider';
 import MobileMoreMenu from '@/components/MobileMoreMenu';
 import UsageMeter from '@/components/UsageMeter';
 import InsightsProgressBar from '@/components/InsightsProgressBar';
-import { UserIcon, QuestionMarkCircleIcon } from '@heroicons/react/24/outline';
+import { UserIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 
 // Auth-enabled onboarding flow
 
@@ -357,15 +357,11 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
                 <span className="text-sm font-medium">
                   {type.charAt(0).toUpperCase() + type.slice(1)}
                 </span>
-                <span
-                  className={`inline-flex items-center justify-center rounded-full border ${
-                    bodyType === type
-                      ? 'border-white/80 bg-white/10'
-                      : 'border-gray-300 bg-white group-hover:bg-gray-50'
-                  } w-5 h-5`}
-                >
-                  <QuestionMarkCircleIcon
-                    className="w-3 h-3"
+                <span className="inline-flex items-center justify-center">
+                  <InformationCircleIcon
+                    className={`w-5 h-5 ${
+                      bodyType === type ? 'text-white' : 'text-helfi-green'
+                    }`}
                     aria-hidden="true"
                   />
                 </span>
@@ -391,7 +387,17 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
         <div className="flex space-x-3">
           <button 
             className="text-gray-600 hover:text-gray-900 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors"
-            onClick={() => onNext({ weight: weight || '0', height: height || '0', feet: feet || '0', inches: inches || '0', bodyType: bodyType || 'not specified', unit })}
+            onClick={() =>
+              onNext({
+                weight: weight || '0',
+                height: height || '0',
+                feet: feet || '0',
+                inches: inches || '0',
+                bodyType: bodyType || 'not specified',
+                unit,
+                birthdate: birthdate || '',
+              })
+            }
           >
             Skip
           </button>
