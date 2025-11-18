@@ -247,9 +247,28 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
   const [bodyType, setBodyType] = useState(initial?.bodyType || '');
   const [unit, setUnit] = useState<'metric' | 'imperial'>('metric');
 
-  // Initialise dropdowns from any existing birthdate value
+  // Keep local state in sync when initial data loads or changes,
+  // but avoid overwriting any values the user has already edited on this step.
   useEffect(() => {
-    if (initial?.birthdate && typeof initial.birthdate === 'string') {
+    if (!initial) return;
+
+    if (!weight && initial.weight) {
+      setWeight(initial.weight);
+    }
+    if (!height && initial.height) {
+      setHeight(initial.height);
+    }
+    if (!feet && initial.feet) {
+      setFeet(initial.feet);
+    }
+    if (!inches && initial.inches) {
+      setInches(initial.inches);
+    }
+    if (!bodyType && initial.bodyType) {
+      setBodyType(initial.bodyType);
+    }
+
+    if (!birthYear && !birthMonth && !birthDay && typeof initial.birthdate === 'string') {
       const [y, m, d] = initial.birthdate.split('-');
       if (y && m && d) {
         setBirthYear(y);
@@ -257,7 +276,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
         setBirthDay(d);
       }
     }
-  }, [initial?.birthdate]);
+  }, [initial, weight, height, feet, inches, bodyType, birthYear, birthMonth, birthDay]);
 
   const today = new Date();
   const currentYear = today.getFullYear();
@@ -445,9 +464,6 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
           </select>
         </div>
       </div>
-      <p className="text-xs text-gray-500 mb-4">
-        You can only choose real birthdates (no future years).
-      </p>
       <h2 className="text-2xl font-bold mb-4">How tall are you?</h2>
       <p className="mb-4 text-gray-600">Height helps us calculate key health metrics.</p>
       <div className="mb-4">
