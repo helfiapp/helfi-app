@@ -1,7 +1,7 @@
 import 'server-only'
 
 export interface NormalizedFoodItem {
-  source: 'openfoodfacts' | 'usda'
+  source: 'openfoodfacts' | 'usda' | 'fatsecret'
   id: string
   name: string
   brand?: string | null
@@ -21,6 +21,8 @@ const OPENFOODFACTS_USER_AGENT =
   process.env.OPENFOODFACTS_USER_AGENT || 'helfi-app/1.0 (support@helfi.ai)'
 
 const USDA_API_KEY = process.env.USDA_API_KEY
+const FATSECRET_CLIENT_ID = process.env.FATSECRET_CLIENT_ID
+const FATSECRET_CLIENT_SECRET = process.env.FATSECRET_CLIENT_SECRET
 
 function parseNumber(value: any): number | null {
   const n = typeof value === 'number' ? value : Number(value)
@@ -247,6 +249,227 @@ export async function searchUsdaFoods(
     console.warn('USDA API error', err)
     return []
   }
+}
+
+// FatSecret Platform API
+
+interface FatSecretFood {
+  food_id: string
+  food_name: string
+  food_type: string
+  brand_name?: string
+  food_description?: string
+  servings?: {
+    serving: Array<{
+      serving_id: string
+      serving_description: string
+      serving_url: string
+      metric_serving_amount: string
+      metric_serving_unit: string
+      number_of_units: string
+      measurement_description: string
+      calories: string
+      carbohydrate: string
+      protein: string
+      fat: string
+      saturated_fat?: string
+      polyunsaturated_fat?: string
+      monounsaturated_fat?: string
+      cholesterol?: string
+      sodium?: string
+      potassium?: string
+      fiber?: string
+      sugar?: string
+    }>
+  }
+}
+
+interface FatSecretSearchResponse {
+  foods?: {
+    food?: FatSecretFood[]
+    total_results?: string
+    max_results?: string
+    page_number?: string
+  }
+}
+
+function normalizeFatSecretFood(food: FatSecretFood): NormalizedFoodItem | null {
+  if (!food || !food.food_name) return null
+
+  // Use the first serving as default, or try to find a standard serving
+  const servings = food.servings?.serving || []
+  if (servings.length === 0) return null
+
+  // Prefer "100 g" or "1 serving" if available, otherwise use first serving
+  const preferredServing = servings.find(
+    (s) =>
+      s.measurement_description?.toLowerCase().includes('100 g') ||
+      s.measurement_description?.toLowerCase().includes('serving')
+  ) || servings[0]
+
+  const parseValue = (val: string | undefined): number | null => {
+    if (!val) return null
+    const num = parseFloat(val)
+    return Number.isFinite(num) ? num : null
+  }
+
+  return {
+    source: 'fatsecret',
+    id: food.food_id,
+    name: food.food_name,
+    brand: food.brand_name || null,
+    serving_size: preferredServing.measurement_description || preferredServing.serving_description || '1 serving',
+    calories: parseValue(preferredServing.calories),
+    protein_g: parseValue(preferredServing.protein),
+    carbs_g: parseValue(preferredServing.carbohydrate),
+    fat_g: parseValue(preferredServing.fat),
+    fiber_g: parseValue(preferredServing.fiber),
+    sugar_g: parseValue(preferredServing.sugar),
+  }
+}
+
+async function getFatSecretAccessToken(): Promise<string | null> {
+  if (!FATSECRET_CLIENT_ID || !FATSECRET_CLIENT_SECRET) {
+    console.warn('FatSecret credentials not configured')
+    return null
+  }
+
+  try {
+    // FatSecret uses OAuth 2.0 client credentials flow
+    const params = new URLSearchParams({
+      grant_type: 'client_credentials',
+      scope: 'basic',
+    })
+
+    const auth = Buffer.from(`${FATSECRET_CLIENT_ID}:${FATSECRET_CLIENT_SECRET}`).toString('base64')
+
+    const res = await fetch('https://oauth.fatsecret.com/connect/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Authorization: `Basic ${auth}`,
+      },
+      body: params.toString(),
+      cache: 'no-store',
+    })
+
+    if (!res.ok) {
+      const errorText = await res.text()
+      console.warn('FatSecret token request failed', res.status, errorText.substring(0, 200))
+      return null
+    }
+
+    const data = await res.json()
+    return data.access_token || null
+  } catch (err) {
+    console.warn('FatSecret token error', err)
+    return null
+  }
+}
+
+export async function searchFatSecretFoods(
+  query: string,
+  opts: { pageSize?: number } = {},
+): Promise<NormalizedFoodItem[]> {
+  if (!FATSECRET_CLIENT_ID || !FATSECRET_CLIENT_SECRET) {
+    console.warn('FatSecret credentials not configured; skipping FatSecret lookup')
+    return []
+  }
+
+  const pageSize = opts.pageSize ?? 5
+  if (!query.trim()) return []
+
+  const accessToken = await getFatSecretAccessToken()
+  if (!accessToken) {
+    console.warn('Failed to obtain FatSecret access token')
+    return []
+  }
+
+  try {
+    const params = new URLSearchParams({
+      method: 'foods.search',
+      search_expression: query,
+      max_results: String(pageSize),
+      format: 'json',
+    })
+
+    const url = `https://platform.fatsecret.com/rest/server.api?${params.toString()}`
+
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      cache: 'no-store',
+      next: { revalidate: 0 },
+    })
+
+    if (!res.ok) {
+      const errorText = await res.text()
+      console.warn('FatSecret search failed', res.status, errorText.substring(0, 200))
+      return []
+    }
+
+    const data: FatSecretSearchResponse = await res.json()
+    const foods: FatSecretFood[] = data.foods?.food || []
+
+    const normalized: NormalizedFoodItem[] = []
+    for (const f of foods) {
+      const n = normalizeFatSecretFood(f)
+      if (n) normalized.push(n)
+    }
+    return normalized
+  } catch (err) {
+    console.warn('FatSecret API error', err)
+    return []
+  }
+}
+
+// Enhanced lookup function that tries multiple sources with fallback
+export async function lookupFoodNutrition(
+  query: string,
+  options?: {
+    preferSource?: 'usda' | 'fatsecret' | 'openfoodfacts'
+    maxResults?: number
+  },
+): Promise<NormalizedFoodItem[]> {
+  const maxResults = options?.maxResults ?? 3
+  const preferSource = options?.preferSource || 'usda'
+
+  // Try sources in order of preference
+  const sources: Array<() => Promise<NormalizedFoodItem[]>> = []
+
+  if (preferSource === 'usda') {
+    sources.push(() => searchUsdaFoods(query, { pageSize: maxResults }))
+    sources.push(() => searchFatSecretFoods(query, { pageSize: maxResults }))
+    sources.push(() => searchOpenFoodFactsByQuery(query, { pageSize: maxResults }))
+  } else if (preferSource === 'fatsecret') {
+    sources.push(() => searchFatSecretFoods(query, { pageSize: maxResults }))
+    sources.push(() => searchUsdaFoods(query, { pageSize: maxResults }))
+    sources.push(() => searchOpenFoodFactsByQuery(query, { pageSize: maxResults }))
+  } else {
+    sources.push(() => searchOpenFoodFactsByQuery(query, { pageSize: maxResults }))
+    sources.push(() => searchUsdaFoods(query, { pageSize: maxResults }))
+    sources.push(() => searchFatSecretFoods(query, { pageSize: maxResults }))
+  }
+
+  // Try each source until we get results
+  for (const sourceFn of sources) {
+    try {
+      const results = await sourceFn()
+      if (results && results.length > 0) {
+        console.log(`✅ Found ${results.length} results from ${results[0].source} for query: ${query}`)
+        return results
+      }
+    } catch (err) {
+      console.warn(`⚠️ Source lookup failed, trying next:`, err)
+      continue
+    }
+  }
+
+  console.warn(`⚠️ No results found from any source for query: ${query}`)
+  return []
 }
 
 

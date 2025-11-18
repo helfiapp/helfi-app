@@ -14,6 +14,7 @@ import { CreditManager, CREDIT_COSTS } from '@/lib/credit-system';
 import OpenAI from 'openai';
 import { chatCompletionWithCost } from '@/lib/metered-openai';
 import { costCentsEstimateFromText } from '@/lib/cost-meter';
+import { lookupFoodNutrition } from '@/lib/food-data';
 
 // Best-effort relaxed JSON parsing to handle minor LLM formatting issues
 function parseItemsJsonRelaxed(raw: string): any | null {
@@ -760,6 +761,89 @@ CRITICAL REQUIREMENTS:
 
     if (resp.items && resp.items.length > 0 && !resp.total) {
       resp.total = computeTotalsFromItems(resp.items);
+    }
+
+    // ENHANCE ITEMS WITH USDA/FATSECRET DATA: Look up each ingredient in nutrition databases
+    // This improves accuracy by using real nutrition data instead of AI estimates
+    if (resp.items && Array.isArray(resp.items) && resp.items.length > 0) {
+      try {
+        console.log('🔍 Enhancing items with USDA/FatSecret nutrition data...');
+        const enhancedItems = await Promise.all(
+          resp.items.map(async (item: any) => {
+            // Skip lookup if item already has complete nutrition data
+            if (
+              item.calories &&
+              item.protein_g &&
+              item.carbs_g &&
+              item.fat_g &&
+              item.calories > 0 &&
+              (item.protein_g > 0 || item.carbs_g > 0 || item.fat_g > 0)
+            ) {
+              console.log(`✅ Item "${item.name}" already has nutrition data, skipping lookup`);
+              return item;
+            }
+
+            // Build search query from item name and brand
+            const searchQuery = item.brand
+              ? `${item.brand} ${item.name}`
+              : item.name || '';
+
+            if (!searchQuery.trim()) {
+              return item;
+            }
+
+            try {
+              // Try USDA first, then FatSecret, then OpenFoodFacts (with fallback)
+              const dbResults = await lookupFoodNutrition(searchQuery, {
+                preferSource: 'usda',
+                maxResults: 1,
+              });
+
+              if (dbResults && dbResults.length > 0) {
+                const dbItem = dbResults[0];
+                console.log(`✅ Found ${dbItem.source} data for "${item.name}":`, {
+                  calories: dbItem.calories,
+                  protein: dbItem.protein_g,
+                  carbs: dbItem.carbs_g,
+                  fat: dbItem.fat_g,
+                });
+
+                // Enhance item with database nutrition data
+                // Preserve serving_size and servings from OpenAI, but use DB nutrition values
+                return {
+                  ...item,
+                  calories: dbItem.calories ?? item.calories ?? 0,
+                  protein_g: dbItem.protein_g ?? item.protein_g ?? 0,
+                  carbs_g: dbItem.carbs_g ?? item.carbs_g ?? 0,
+                  fat_g: dbItem.fat_g ?? item.fat_g ?? 0,
+                  fiber_g: dbItem.fiber_g ?? item.fiber_g ?? 0,
+                  sugar_g: dbItem.sugar_g ?? item.sugar_g ?? 0,
+                  // Update serving_size if DB has a better one
+                  serving_size: dbItem.serving_size || item.serving_size || '1 serving',
+                };
+              } else {
+                console.log(`⚠️ No database match found for "${item.name}", using OpenAI values`);
+                return item;
+              }
+            } catch (lookupError) {
+              console.warn(`⚠️ Database lookup failed for "${item.name}":`, lookupError);
+              return item; // Fall back to OpenAI values
+            }
+          })
+        );
+
+        // Update items and recalculate total
+        resp.items = enhancedItems;
+        resp.total = computeTotalsFromItems(enhancedItems);
+
+        console.log('✅ Enhanced items with database nutrition data:', {
+          itemCount: enhancedItems.length,
+          totalCalories: resp.total?.calories,
+        });
+      } catch (enhanceError) {
+        console.warn('⚠️ Item enhancement failed (non-fatal):', enhanceError);
+        // Continue with original items if enhancement fails
+      }
     }
 
     // HEALTH COMPATIBILITY CHECK: Analyze food against user's health data
