@@ -246,6 +246,9 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
   const [inches, setInches] = useState(initial?.inches || '');
   const [bodyType, setBodyType] = useState(initial?.bodyType || '');
   const [unit, setUnit] = useState<'metric' | 'imperial'>('metric');
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showUpdatePopup, setShowUpdatePopup] = useState(false);
+  const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
 
   // Keep local state in sync when initial data loads or changes,
   // but avoid overwriting any values the user has already edited on this step.
@@ -330,18 +333,103 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
     }
   }, [birthYear, birthMonth, birthDay]);
 
-  const handleNext = useCallback(() => {
-    const data = { 
-      weight, 
-      birthdate,
-      height: unit === 'metric' ? height : `${feet}'${inches}"`, 
-      feet, 
-      inches, 
-      bodyType, 
-      unit 
+  // Track when basic profile values differ from what we initially loaded
+  useEffect(() => {
+    const initialWeight = initial?.weight || '';
+    const initialHeight = initial?.height || '';
+    const initialFeet = initial?.feet || '';
+    const initialInches = initial?.inches || '';
+    const initialBodyType = initial?.bodyType || '';
+    const initialBirthdate = initial?.birthdate || '';
+
+    const changed =
+      (weight || '') !== (initialWeight || '') ||
+      (height || '') !== (initialHeight || '') ||
+      (feet || '') !== (initialFeet || '') ||
+      (inches || '') !== (initialInches || '') ||
+      (bodyType || '') !== (initialBodyType || '') ||
+      (birthdate || '') !== (initialBirthdate || '');
+
+    const hasAny =
+      !!(weight || height || feet || inches || bodyType || birthdate);
+
+    setHasUnsavedChanges(changed && hasAny);
+  }, [weight, height, feet, inches, bodyType, birthdate, initial]);
+
+  // Warn if the user tries to close the tab or browser with unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue =
+          'You have unsaved changes. Please update your insights before leaving.';
+        return e.returnValue;
+      }
     };
-    onNext(data);
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  const buildPayload = () => ({
+    weight,
+    birthdate,
+    height: unit === 'metric' ? height : `${feet}'${inches}"`,
+    feet,
+    inches,
+    bodyType,
+    unit,
+  });
+
+  const handleNext = useCallback(() => {
+    onNext(buildPayload());
   }, [weight, birthdate, height, feet, inches, bodyType, unit, onNext]);
+
+  const handleUpdateInsights = async () => {
+    setIsGeneratingInsights(true);
+    try {
+      const response = await fetch('/api/user-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildPayload()),
+      });
+
+      if (response.ok) {
+        setHasUnsavedChanges(false);
+        setTimeout(() => {
+          setShowUpdatePopup(false);
+          setIsGeneratingInsights(false);
+        }, 2000);
+      } else {
+        alert('Failed to update insights. Please try again.');
+        setIsGeneratingInsights(false);
+      }
+    } catch (error) {
+      console.error('Error updating insights:', error);
+      alert('Failed to update insights. Please try again.');
+      setIsGeneratingInsights(false);
+    }
+  };
+
+  const handleNextWithGuard = () => {
+    if (hasUnsavedChanges) {
+      if (!showUpdatePopup) {
+        setShowUpdatePopup(true);
+      }
+      return;
+    }
+    handleNext();
+  };
+
+  const handleBackWithGuard = () => {
+    if (hasUnsavedChanges) {
+      if (!showUpdatePopup) {
+        setShowUpdatePopup(true);
+      }
+      return;
+    }
+    onBack();
+  };
 
   const handleUnitChange = useCallback((newUnit: 'metric' | 'imperial') => {
     setUnit(newUnit);
@@ -540,8 +628,35 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
           </button>
         </div>
       </div>
+      {/* Manual Update Insights Button - Show if there are unsaved changes */}
+      {hasUnsavedChanges && (
+        <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <div className="font-medium text-yellow-900 mb-1">Update Insights</div>
+              <div className="text-sm text-yellow-700">
+                You&apos;ve changed your basic health details. Update your insights so all recommendations stay in sync.
+              </div>
+            </div>
+            <button
+              onClick={() => setShowUpdatePopup(true)}
+              disabled={isGeneratingInsights}
+              className="ml-4 px-4 py-2 bg-helfi-green text-white rounded-lg hover:bg-helfi-green/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed font-medium text-sm whitespace-nowrap"
+            >
+              {isGeneratingInsights ? (
+                <>
+                  <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2"></span>
+                  Updating...
+                </>
+              ) : (
+                'Update Insights'
+              )}
+            </button>
+          </div>
+        </div>
+      )}
       <div className="flex justify-between">
-        <button className="border border-green-600 text-green-600 px-6 py-3 rounded-lg hover:bg-green-600 hover:text-white transition-colors" onClick={onBack}>Back</button>
+        <button className="border border-green-600 text-green-600 px-6 py-3 rounded-lg hover:bg-green-600 hover:text-white transition-colors" onClick={handleBackWithGuard}>Back</button>
         <div className="flex space-x-3">
           <button 
             className="text-gray-600 hover:text-gray-900 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors"
@@ -561,12 +676,20 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
           </button>
           <button 
             className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors" 
-            onClick={handleNext}
+            onClick={handleNextWithGuard}
           >
             Next
           </button>
         </div>
       </div>
+      <UpdateInsightsPopup
+        isOpen={showUpdatePopup}
+        onClose={() => {
+          setShowUpdatePopup(false);
+        }}
+        onUpdateInsights={handleUpdateInsights}
+        isGenerating={isGeneratingInsights}
+      />
     </div>
   );
 });
