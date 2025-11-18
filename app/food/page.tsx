@@ -182,6 +182,10 @@ function TargetRing({ label, valueLabel, percent, tone }: RingProps) {
   const strokeWidth = 10
   const svgSize = 120
 
+  const parts = (valueLabel || '').split(' ')
+  const mainValue = parts[0] || valueLabel
+  const unitPart = parts.slice(1).join(' ')
+
   const remainingFraction = isTarget ? 1 - clamped : 0
   const usedFraction = isTarget ? clamped : 1
 
@@ -252,7 +256,12 @@ function TargetRing({ label, valueLabel, percent, tone }: RingProps) {
         </svg>
         {/* Center value */}
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-          <div className="text-xl font-bold text-gray-900">{valueLabel}</div>
+          <div className="text-xl font-bold text-gray-900">{mainValue}</div>
+          {unitPart && (
+            <div className="text-xs text-gray-500 mt-0.5">
+              {unitPart}
+            </div>
+          )}
         </div>
       </div>
       <div className="mt-2 text-xs font-semibold text-gray-700 uppercase tracking-wide">
@@ -326,12 +335,12 @@ function MacroRing({
       </svg>
       {showLegend && (
         <>
-          <div className="text-xs text-gray-500 mb-1">Macro breakdown</div>
-          <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-gray-600">
+          <div className="text-sm text-gray-600 mb-2 font-medium">Macro breakdown</div>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm text-gray-700">
             {macros.map((m) => (
               <div key={m.key} className="flex items-center gap-1">
                 <span
-                  className="inline-block w-2 h-2 rounded-full"
+                  className="inline-block w-3 h-3 rounded-full"
                   style={{ backgroundColor: m.color }}
                 />
                 <span>
@@ -4166,27 +4175,19 @@ Please add nutritional information manually if needed.`);
                 .sort((a: any, b: any) => (b?.id || 0) - (a?.id || 0))
                 .map((food) => (
                 <div key={food.id} className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-visible">
-                  {/* Mobile-Optimized Layout */}
+                  {/* Collapsed header row */}
                   <div className="p-4 hover:bg-gray-50 transition-colors">
-                    {/* Title (up to 2 lines) */}
-                    <div className="mb-1">
-                      <div className="flex items-start gap-3 flex-1">
-                        <h3 className="font-medium text-gray-900 text-sm sm:text-base leading-snug line-clamp-2">
-                          {food.description.split('\n')[0].split('Calories:')[0]
-                            .replace(/^(I'm unable to see.*?but I can provide a general estimate for|Based on.*?,|This image shows|I can see|The food appears to be|This appears to be)/i, '')
-                            .split('.')[0]
-                            .trim()
-                            .replace(/^./, (match: string) => match.toUpperCase())}
-                        </h3>
-                      </div>
-                    </div>
-                    
-                    {/* Utility Row: time (left) + actions (right) */}
-                    <div className="flex items-center justify-between mb-1">
-                      <p className="text-xs sm:text-sm text-gray-500">
-                        {formatTimeWithAMPM(food.time)}
+                    <div className="flex items-center gap-3">
+                      <p className="flex-1 text-sm sm:text-base text-gray-900 truncate">
+                        {food.description.split('\n')[0].split('Calories:')[0]
+                          .replace(/^(I'm unable to see.*?but I can provide a general estimate for|Based on.*?,|This image shows|I can see|The food appears to be|This appears to be)/i, '')
+                          .trim()
+                          .replace(/^./, (match: string) => match.toUpperCase())}
                       </p>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <p className="text-xs sm:text-sm text-gray-500">
+                          {formatTimeWithAMPM(food.time)}
+                        </p>
                         {/* 3-Dot Options Menu */}
                         <div className="relative entry-options-dropdown">
                           <button
@@ -4254,16 +4255,18 @@ Please add nutritional information manually if needed.`);
                           </svg>
                         </button>
                       </div>
-                    </div>
-                    
-                    {/* Nutrition Row removed in collapsed view (still shown in expanded view) */}
+                      </div>
                   </div>
 
                   {/* Expandable Content */}
                   {expandedEntries[food.id.toString()] && (
                     <div className="border-t border-gray-100 p-4 bg-gray-50">
+                      {/* Full description when expanded */}
+                      <p className="mb-3 text-sm text-gray-800 whitespace-pre-line">
+                        {food.description.split('Calories:')[0].trim()}
+                      </p>
                       <div className="flex flex-col sm:flex-row gap-4">
-                        {/* Food Image - Perfectly Sized to Match Nutrition Cards */}
+                        {/* Food Image */}
                         {food.photo && (
                           <div className="w-full sm:w-32 sm:flex-shrink-0 mb-4 sm:mb-0">
                             <div className="relative">
