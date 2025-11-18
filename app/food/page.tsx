@@ -167,7 +167,7 @@ type RingProps = {
   label: string
   valueLabel: string
   percent: number
-  tone: 'primary' | 'secondary'
+  tone: 'primary' | 'secondary' | 'target'
 }
 
 function TargetRing({ label, valueLabel, percent, tone }: RingProps) {
@@ -175,8 +175,16 @@ function TargetRing({ label, valueLabel, percent, tone }: RingProps) {
   const circumference = 2 * Math.PI * radius
   const clamped = Math.max(0, Math.min(percent, 1))
   const offset = circumference - clamped * circumference
-  const trackColor = tone === 'primary' ? 'text-emerald-100' : 'text-gray-100'
-  const progressColor = tone === 'primary' ? 'text-emerald-500' : 'text-gray-400'
+  let trackColor = 'text-gray-100'
+  let progressColor = 'text-gray-400'
+
+  if (tone === 'primary') {
+    trackColor = 'text-gray-100'
+    progressColor = 'text-emerald-500'
+  } else if (tone === 'target') {
+    trackColor = 'text-emerald-200' // remaining
+    progressColor = 'text-red-500' // used
+  }
 
   return (
     <div className="flex flex-col items-center">
@@ -206,6 +214,83 @@ function TargetRing({ label, valueLabel, percent, tone }: RingProps) {
       </svg>
       <div className="text-sm font-semibold text-gray-900">{valueLabel}</div>
       <div className="text-xs text-gray-500">{label}</div>
+    </div>
+  )
+}
+
+type MacroSegment = {
+  key: string
+  label: string
+  grams: number
+  color: string
+}
+
+function MacroRing({ macros, showLegend = true, size = 'large' }: { macros: MacroSegment[]; showLegend?: boolean; size?: 'large' | 'small' }) {
+  const positive = macros.filter((m) => m.grams && m.grams > 0)
+  const total = positive.reduce((sum, m) => sum + m.grams, 0)
+  const radius = size === 'small' ? 22 : 32
+  const circumference = 2 * Math.PI * radius
+  const svgSize = size === 'small' ? 64 : 88
+
+  let currentAngle = -90
+  const circles =
+    total > 0
+      ? positive.map((m) => {
+          const fraction = m.grams / total
+          const length = fraction * circumference
+          const dashArray = `${length} ${circumference}`
+          const rotation = currentAngle
+          currentAngle += fraction * 360
+          return (
+            <circle
+              key={m.key}
+              cx={svgSize / 2}
+              cy={svgSize / 2}
+              r={radius}
+              strokeWidth={size === 'small' ? 7 : 8}
+              stroke={m.color}
+              fill="none"
+              strokeDasharray={dashArray}
+              strokeDashoffset={0}
+              strokeLinecap="butt"
+              transform={`rotate(${rotation} ${svgSize / 2} ${svgSize / 2})`}
+            />
+          )
+        })
+      : null
+
+  return (
+    <div className="flex flex-col items-center">
+      <svg width={svgSize} height={svgSize} className="mb-1">
+        <circle
+          cx={svgSize / 2}
+          cy={svgSize / 2}
+          r={radius}
+          strokeWidth={size === 'small' ? 7 : 8}
+          stroke="#e5e7eb"
+          fill="none"
+        />
+        {circles}
+      </svg>
+      {showLegend && (
+        <>
+          <div className="text-xs text-gray-500 mb-1">Macro breakdown</div>
+          <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-gray-600">
+            {macros.map((m) => (
+              <div key={m.key} className="flex items-center gap-1">
+                <span
+                  className="inline-block w-2 h-2 rounded-full"
+                  style={{ backgroundColor: m.color }}
+                />
+                <span>
+                  {m.label}{' '}
+                  {m.grams > 0 ? `${Math.round(m.grams)}g` : '0g'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   )
 }
@@ -3885,6 +3970,14 @@ Please add nutritional information manually if needed.`);
                 const percentOfTarget =
                   targetCalories && targetCalories > 0 ? consumedKcal / targetCalories : 0
 
+                const macroSegments: MacroSegment[] = [
+                  { key: 'protein', label: 'Protein', grams: totals.protein || 0, color: '#ef4444' }, // red
+                  { key: 'carbs', label: 'Carbs', grams: totals.carbs || 0, color: '#22c55e' }, // green
+                  { key: 'fat', label: 'Fat', grams: totals.fat || 0, color: '#3b82f6' }, // blue
+                  { key: 'fiber', label: 'Fiber', grams: totals.fiber || 0, color: '#f97316' }, // orange
+                  { key: 'sugar', label: 'Sugar', grams: totals.sugar || 0, color: '#ec4899' }, // pink
+                ]
+
                 return (
                   <div className="space-y-4">
                     {/* Daily rings header */}
@@ -3924,84 +4017,37 @@ Please add nutritional information manually if needed.`);
                         </p>
                       ) : (
                         <div className="grid grid-cols-2 gap-4">
-                          <TargetRing
-                            label="Consumed"
-                            valueLabel={
-                              consumedInUnit !== null
-                                ? `${Math.round(consumedInUnit)} ${energyUnit}`
-                                : '\u2014'
-                            }
-                            percent={percentOfTarget || 0}
-                            tone="primary"
-                          />
-                          <TargetRing
-                            label={
-                              targetInUnit !== null
-                                ? 'AI daily target'
-                                : 'Complete Health Setup'
-                            }
-                            valueLabel={
-                              targetInUnit !== null
-                                ? `${Math.round(targetInUnit)} ${energyUnit}`
-                                : 'Set up profile'
-                            }
-                            percent={1}
-                            tone="secondary"
-                          />
+                          <MacroRing macros={macroSegments} />
+                          <div className="flex flex-col items-center">
+                            <TargetRing
+                              label={
+                                targetInUnit !== null
+                                  ? 'Daily allowance'
+                                  : 'Complete Health Setup'
+                              }
+                              valueLabel={
+                                targetInUnit !== null && consumedInUnit !== null
+                                  ? `${Math.round(consumedInUnit)} / ${Math.round(
+                                      targetInUnit,
+                                    )} ${energyUnit}`
+                                  : 'Set up profile'
+                              }
+                              percent={percentOfTarget || 0}
+                              tone="target"
+                            />
+                            <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-gray-600">
+                              <div className="flex items-center gap-1">
+                                <span className="inline-block w-2 h-2 rounded-full bg-red-500" />
+                                <span>Used</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" />
+                                <span>Remaining</span>
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       )}
-                    </div>
-
-                    {/* Legacy nutrient tiles - keep for desktop / tablet users */}
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="text-lg font-semibold text-gray-800">
-                        {isViewingToday ? "Today's Totals" : 'Totals'}
-                      </div>
-                      <div className="inline-flex items-center text-[11px] sm:text-xs bg-gray-100 rounded-full p-0.5 border border-gray-200">
-                        <button
-                          type="button"
-                          onClick={() => setEnergyUnit('kcal')}
-                          className={`px-2 py-0.5 rounded-full ${
-                            energyUnit === 'kcal'
-                              ? 'bg-white text-gray-900 shadow-sm'
-                              : 'text-gray-500'
-                          }`}
-                        >
-                          kcal
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setEnergyUnit('kJ')}
-                          className={`px-2 py-0.5 rounded-full ${
-                            energyUnit === 'kJ'
-                              ? 'bg-white text-gray-900 shadow-sm'
-                              : 'text-gray-500'
-                          }`}
-                        >
-                          kJ
-                        </button>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-                      {NUTRIENT_DISPLAY_ORDER.map((key) => {
-                        const meta = NUTRIENT_CARD_META[key]
-                        const displayValue = formatNutrientValue(key, totals[key])
-                        const headerLabel =
-                          key === 'calories' && energyUnit === 'kJ' ? 'Kilojoules' : meta.label
-                        return (
-                          <div
-                            key={key}
-                            className={`bg-gradient-to-br ${meta.gradient} border border-white/60 rounded-lg p-3 shadow-sm`}
-                          >
-                            <div
-                              className={`text-xs ${meta.accent} mb-1 font-medium uppercase tracking-wide`}
-                            >
-                              {headerLabel}
-                            </div>
-                            <div className="text-lg font-semibold text-gray-900">{displayValue}</div>
-                          </div>
-                        )
-                      })}
                     </div>
                   </div>
                 )
@@ -4150,7 +4196,7 @@ Please add nutritional information manually if needed.`);
                           </div>
                         )}
 
-                        {/* Nutrition Cards - Match Today's Totals styling and use more horizontal space */}
+                        {/* Per-meal macro ring + legend */}
                         <div className="flex-1 sm:max-w-md lg:max-w-lg">
                           {(() => {
                             // Use ingredient cards as the single source of truth for per-meal totals.
@@ -4173,35 +4219,40 @@ Please add nutritional information manually if needed.`);
                               )
                             })()
 
-                            return (
-                              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-                                {NUTRIENT_DISPLAY_ORDER.map((key) => {
-                                  const meta = NUTRIENT_CARD_META[key]
-                                  const rawValue = (summaryTotals as any)?.[key] ?? 0
-                                  const displayValue = formatNutrientValue(key, Number(rawValue))
-                                  const headerLabel =
-                                    key === 'calories' && energyUnit === 'kJ'
-                                      ? 'Kilojoules'
-                                      : meta.label
+                            const mealMacros: MacroSegment[] = [
+                              {
+                                key: 'protein',
+                                label: 'Protein',
+                                grams: (summaryTotals as any)?.protein ?? 0,
+                                color: '#ef4444',
+                              },
+                              {
+                                key: 'carbs',
+                                label: 'Carbs',
+                                grams: (summaryTotals as any)?.carbs ?? 0,
+                                color: '#22c55e',
+                              },
+                              {
+                                key: 'fat',
+                                label: 'Fat',
+                                grams: (summaryTotals as any)?.fat ?? 0,
+                                color: '#3b82f6',
+                              },
+                              {
+                                key: 'fiber',
+                                label: 'Fiber',
+                                grams: (summaryTotals as any)?.fiber ?? 0,
+                                color: '#f97316',
+                              },
+                              {
+                                key: 'sugar',
+                                label: 'Sugar',
+                                grams: (summaryTotals as any)?.sugar ?? 0,
+                                color: '#ec4899',
+                              },
+                            ]
 
-                                  return (
-                                    <div
-                                      key={`${food.id}-${key}`}
-                                      className={`bg-gradient-to-br ${meta.gradient} border border-white/60 rounded-lg p-3 shadow-sm`}
-                                    >
-                                      <div
-                                        className={`text-xs ${meta.accent} mb-1 font-medium uppercase tracking-wide`}
-                                      >
-                                        {headerLabel}
-                                      </div>
-                                      <div className="text-lg font-semibold text-gray-900">
-                                        {displayValue}
-                                      </div>
-                                    </div>
-                                  )
-                                })}
-                              </div>
-                            )
+                            return <MacroRing macros={mealMacros} showLegend />
                           })()}
                         </div>
                       </div>
