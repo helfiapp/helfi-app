@@ -174,10 +174,11 @@ function TargetRing({ label, valueLabel, percent, tone }: RingProps) {
   const radius = 44
   const circumference = 2 * Math.PI * radius
   const clamped = Math.max(0, Math.min(percent, 1))
-  const offset = circumference - clamped * circumference
 
   // For Consumed/primary we keep a solid green ring.
-  // For Remaining/target we draw a two-tone red/green ring using the percent.
+  // For Remaining/target we draw a two-tone red/green ring where:
+  // - green represents the remaining allowance
+  // - red represents what has already been used
   const isTarget = tone === 'target'
   const strokeWidth = 10
   const svgSize = 120
@@ -186,8 +187,9 @@ function TargetRing({ label, valueLabel, percent, tone }: RingProps) {
   const mainValue = parts[0] || valueLabel
   const unitPart = parts.slice(1).join(' ')
 
-  const remainingFraction = isTarget ? 1 - clamped : 0
-  const usedFraction = isTarget ? clamped : 1
+  // For target rings, `percent` is the remaining fraction (0–1)
+  const remainingFraction = isTarget ? clamped : 0
+  const usedFraction = isTarget ? 1 - clamped : 1
 
   const usedLength = usedFraction * circumference
   const remainingLength = remainingFraction * circumference
@@ -202,7 +204,7 @@ function TargetRing({ label, valueLabel, percent, tone }: RingProps) {
             cy={svgSize / 2}
             r={radius}
             strokeWidth={strokeWidth}
-            stroke="#e5e7eb"
+            stroke="transparent"
             fill="none"
           />
           {isTarget ? (
@@ -4031,17 +4033,21 @@ Please add nutritional information manually if needed.`);
 
                 const consumedKcal = totals.calories || 0
                 const targetCalories = dailyTargets.calories
+                const remainingKcal =
+                  targetCalories && targetCalories > 0
+                    ? Math.max(0, targetCalories - consumedKcal)
+                    : 0
                 const consumedInUnit = convertKcalToUnit(consumedKcal, energyUnit)
                 const targetInUnit = convertKcalToUnit(targetCalories, energyUnit)
-                const percentOfTarget =
-                  targetCalories && targetCalories > 0 ? consumedKcal / targetCalories : 0
+                const percentRemaining =
+                  targetCalories && targetCalories > 0 ? remainingKcal / targetCalories : 0
 
                 const macroSegments: MacroSegment[] = [
                   { key: 'protein', label: 'Protein', grams: totals.protein || 0, color: '#ef4444' }, // red
+                  { key: 'fibre', label: 'Fibre', grams: totals.fiber || 0, color: '#93c5fd' }, // light blue
                   { key: 'carbs', label: 'Carbs', grams: totals.carbs || 0, color: '#22c55e' }, // green
-                  { key: 'sugar', label: 'Sugar', grams: totals.sugar || 0, color: '#ec4899' }, // pink
-                  { key: 'fiber', label: 'Fibre', grams: totals.fiber || 0, color: '#93c5fd' }, // light blue
-                  { key: 'fat', label: 'Fat', grams: totals.fat || 0, color: '#3b82f6' }, // blue
+                  { key: 'sugar', label: 'Sugar', grams: totals.sugar || 0, color: '#f97316' }, // orange
+                  { key: 'fat', label: 'Fat', grams: totals.fat || 0, color: '#6366f1' }, // purple
                 ]
 
                 return (
@@ -4128,7 +4134,7 @@ Please add nutritional information manually if needed.`);
                                     )} ${energyUnit}`
                                   : '—'
                               }
-                              percent={percentOfTarget || 0}
+                              percent={percentRemaining || 0}
                               tone="target"
                             />
                             {targetInUnit !== null && (
@@ -4141,11 +4147,11 @@ Please add nutritional information manually if needed.`);
                             )}
                             <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-gray-600">
                               <div className="flex items-center gap-1">
-                                <span className="inline-block w-2 h-2 rounded-full bg-red-500" />
+                                <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500 shrink-0" />
                                 <span>Used</span>
                               </div>
                               <div className="flex items-center gap-1">
-                                <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" />
+                                <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
                                 <span>Remaining</span>
                               </div>
                             </div>
@@ -4325,6 +4331,12 @@ Please add nutritional information manually if needed.`);
                                 color: '#ef4444',
                               },
                               {
+                                key: 'fibre',
+                                label: 'Fibre',
+                                grams: (summaryTotals as any)?.fiber ?? 0,
+                                color: '#93c5fd',
+                              },
+                              {
                                 key: 'carbs',
                                 label: 'Carbs',
                                 grams: (summaryTotals as any)?.carbs ?? 0,
@@ -4334,19 +4346,13 @@ Please add nutritional information manually if needed.`);
                                 key: 'sugar',
                                 label: 'Sugar',
                                 grams: (summaryTotals as any)?.sugar ?? 0,
-                                color: '#ec4899',
-                              },
-                              {
-                                key: 'fiber',
-                                label: 'Fibre',
-                                grams: (summaryTotals as any)?.fiber ?? 0,
-                                color: '#93c5fd',
+                                color: '#f97316',
                               },
                               {
                                 key: 'fat',
                                 label: 'Fat',
                                 grams: (summaryTotals as any)?.fat ?? 0,
-                                color: '#3b82f6',
+                                color: '#6366f1',
                               },
                             ]
 
@@ -4355,22 +4361,89 @@ Please add nutritional information manually if needed.`);
                             )
 
                             return (
-                              <button
-                                type="button"
-                                className="flex flex-col items-center focus:outline-none"
-                                onClick={() =>
-                                  setMacroPopup({
-                                    title: 'Meal macro breakdown',
-                                    energyLabel:
-                                      Number.isFinite(mealEnergyKcal) && mealEnergyKcal > 0
-                                        ? `${Math.round(mealEnergyKcal)} kcal`
-                                        : undefined,
-                                    macros: mealMacros,
-                                  })
-                                }
-                              >
-                                <MacroRing macros={mealMacros} showLegend={false} size="small" />
-                              </button>
+                              <div className="flex flex-col sm:flex-row gap-4 items-start">
+                                <button
+                                  type="button"
+                                  className="flex flex-col items-center flex-shrink-0 focus:outline-none"
+                                  onClick={() =>
+                                    setMacroPopup({
+                                      title: 'Meal macro breakdown',
+                                      energyLabel:
+                                        Number.isFinite(mealEnergyKcal) && mealEnergyKcal > 0
+                                          ? `${Math.round(mealEnergyKcal)} kcal`
+                                          : undefined,
+                                      macros: mealMacros,
+                                    })
+                                  }
+                                >
+                                  <MacroRing macros={mealMacros} showLegend={false} size="large" />
+                                  <div className="mt-2 text-sm font-semibold text-gray-700">
+                                    Macro breakdown
+                                  </div>
+                                </button>
+                                <div className="flex-1">
+                                  <p className="mb-3 text-sm text-gray-800 whitespace-pre-line">
+                                    {food.description.split('Calories:')[0].trim()}
+                                  </p>
+                                  <div className="space-y-2 text-sm text-gray-700">
+                                    <div className="flex items-center gap-2">
+                                      <span className="inline-block w-3 h-3 rounded-full bg-red-500" />
+                                      <span>
+                                        Protein{' '}
+                                        {Number.isFinite((summaryTotals as any)?.protein)
+                                          ? `${Math.round(
+                                              (summaryTotals as any)?.protein as number,
+                                            )} g`
+                                          : '—'}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="inline-block w-3 h-3 rounded-full bg-blue-300" />
+                                      <span>
+                                        Fibre{' '}
+                                        {Number.isFinite((summaryTotals as any)?.fiber)
+                                          ? `${Math.round(
+                                              (summaryTotals as any)?.fiber as number,
+                                            )} g`
+                                          : '—'}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="inline-block w-3 h-3 rounded-full bg-emerald-500" />
+                                      <span>
+                                        Carbs{' '}
+                                        {Number.isFinite((summaryTotals as any)?.carbs)
+                                          ? `${Math.round(
+                                              (summaryTotals as any)?.carbs as number,
+                                            )} g`
+                                          : '—'}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="inline-block w-3 h-3 rounded-full bg-amber-500" />
+                                      <span>
+                                        Sugar{' '}
+                                        {Number.isFinite((summaryTotals as any)?.sugar)
+                                          ? `${Math.round(
+                                              (summaryTotals as any)?.sugar as number,
+                                            )} g`
+                                          : '—'}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="inline-block w-3 h-3 rounded-full bg-indigo-500" />
+                                      <span>
+                                        Fat{' '}
+                                        {Number.isFinite((summaryTotals as any)?.fat)
+                                          ? `${Math.round(
+                                              (summaryTotals as any)?.fat as number,
+                                            )} g`
+                                          : '—'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
                             )
                           })()}
                         </div>
