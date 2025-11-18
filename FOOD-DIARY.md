@@ -398,6 +398,17 @@ This section is lifted directly (with minor wording tweaks) from `fix.plan.md`, 
 - [ ] Stabilise nutrition truth source for complex meals (especially the burger): choose a single source of truth for totals (ideally structured JSON from `/api/analyze-food`) and simplify/remove prose‑based scraping as described in section 8.3.  
 - [ ] Auto‑save editing: remove the need for a manual “Save changes” button by safely auto‑saving card and description edits (Google Docs style) while protecting against accidental data loss.  
 - [ ] Unified description + ingredients box: allow the main food description and ingredient list to be edited in one place, with dynamic nutrition updates when the description changes (for example, changing “beef sausage” to “pork sausage”).  
+- [ ] Daily calorie & macro targets (**new**): compute per‑day energy and macro targets from Health Setup data (gender, weight, height, **birthdate/age**, goals, and health issues) and surface them as clear “circles” or tiles in the Food Diary. Keep the calculation logic on the backend (or a shared util), and ensure the same targets are reused across Food Diary, Dashboard, and Insights.  
+- [ ] Visual “rings / circles” for Food Diary (**design discussion in 9.1**): implement Cronometer‑style circles showing Calories, Protein, Carbs, Fat/Sugar (consumed vs target vs remaining). The user is open to:  
+  - Option A – circles at the very top of the **Food Diary** page (above “Today’s Totals”),  
+  - Option B – circles on the **Dashboard** only, or  
+  - Option C – **both** places.  
+  You must confirm their preference before building; default suggestion from this agent was to start with circles on the Food Diary page, then mirror to Dashboard if the user likes them.  
+- [ ] Meal duplication across days (**design discussion in 9.2**): add a safe way to copy meals instead of re‑taking photos every day. The user specifically wants:  
+  - At least a **“Copy yesterday to today”** action for the whole day.  
+  - Ideally the ability to copy a **single meal** from one date to another.  
+  - Longer‑term, a **“make this a regular breakfast”** option so the same meal can be reused daily without manual copying.  
+  All copy operations must preserve ingredient cards (`items`) and totals exactly, and must not create hidden duplicates in the database.  
 - [ ] Optional future work: audit macro accuracy for very complex meals and run deeper cross‑browser / iPhone testing before making any further UX changes.
 
 ---
@@ -555,7 +566,6 @@ This follow‑up session built **on top of** the work described above and is now
   - The `FoodLog.items` column or how new entries persist `items`.  
   - The basic semantics of `energyUnit` / `volumeUnit`, the oz/ml toggle visibility rules, or the way units and servings move together.  
 - If you ever need to touch this area again, read this entire file carefully, then coordinate with the user and test on **live production** with real entries (burger, eggs, crackers, orange juice) before claiming success.
-
 ### 8.6 Follow‑up changes – Agent GPT‑5.1 via Cursor (November 17, 2025 – ingredient editing UX)
 
 This session focused on **making the Food Diary easier to edit** without changing the underlying units/toggles logic.
@@ -580,3 +590,91 @@ This session focused on **making the Food Diary easier to edit** without changin
 **Mobile layout tweaks for the Food page**
 - Reduced horizontal padding and removed an extra background panel to get rid of the “square within a square” look on phones, allowing ingredient cards and photos to use more of the screen width.  
 - These are visual/spacing improvements only; they do **not** change the behaviour of units, toggles, or nutrition calculations.
+
+---
+
+## 9. Future roadmap – calorie “circles” and daily meal copying
+
+The user has started planning the **next major upgrade** to the Food Diary, inspired by Cronometer. These ideas are **not implemented yet** and should be treated as a design brief for a future agent.
+
+### 9.1 Daily targets & circles (hardest task – should go first)
+
+- The user wants Helfi to give them **personalised daily calorie and macro targets**, then show progress visually (similar to Cronometer’s rings).  
+- Targets should be based on:
+  - Gender and **birthdate** (age),  
+  - Weight and height,  
+  - Activity / exercise frequency,  
+  - Health goals and health issues (e.g. weight loss vs muscle gain, diabetes, etc.).  
+- These targets should feed:
+  - A set of **circles / rings** showing Consumed vs Target vs Remaining for calories and key macros, and  
+  - The logic used by Insights / other parts of the app so numbers stay consistent everywhere.  
+- Open decisions you **must confirm with the user**:
+  - **Where the circles live:**
+    - Option A – at the top of the **Food Diary** page (above “Today’s Totals”).  
+    - Option B – on the **Dashboard** only.  
+    - Option C – **both** Dashboard and Food Diary.  
+  - **Exact visual style:** the user likes Cronometer‑style rings but wants a clean, modern Helfi‑branded version.
+- Important prerequisite: at the moment, **date of birth is captured in the Health Setup UI but is not persisted in the database**.  
+  - A future agent must first decide where to store it (likely in the existing profile info JSON or a new `User` field) and wire it through `/api/user-data` so age is reliable before using it for calorie targets.
+
+#### 9.1.1 Detailed ring behaviour and placement
+
+- **Primary home = Food Diary page (mobile‑first):**
+  - Replace the six large “Today’s Totals” tiles with a **compact ring header** at the top of the Food Diary page.  
+  - On mobile, this header should look and feel similar to Cronometer’s energy summary strip: circles with clear labels and values that leave most of the screen for the actual diary entries (Breakfast, Lunch, Dinner, Snacks).  
+
+- **When there is no wearable (Fitbit / Apple Watch) connected:**
+  - Show at least **one ring for “Consumed” calories** for the day (kcal / kJ toggle still respected).  
+  - Show a second **“AI daily target” ring** that represents the recommended calorie/macronutrient allowance for the day:
+    - This target must be computed from Health Setup data (gender, age from birthdate, weight, height, exercise level, goals, health issues).  
+    - AI should pick *sensible* total calories and macro splits for that person, and these targets should be reused across Food Diary, Dashboard and Insights so numbers stay consistent.  
+
+- **When a wearable is connected and providing energy data:**
+  - Upgrade the header to **three rings**, similar to Cronometer:  
+    - **Consumed** – food energy eaten today.  
+    - **Burned** – energy expenditure from the wearable (and any other exercise data).  
+    - **Deficit** – AI‑calculated difference between Burned and Consumed, compared against the user’s daily target.  
+  - Behavioural rule: if wearable data is temporarily unavailable, gracefully fall back to the “no wearable” two‑ring mode instead of showing broken values.
+
+- **Dashboard integration:**
+  - The same ring summary should appear on the **Dashboard** only when there is **actual food data in the diary for that day**.  
+  - If there is no food data yet today, the Dashboard can show a gentle prompt to add food rather than empty rings.  
+
+- **Design rules:**
+  - Visual style should be “Cronometer‑inspired but clearly Helfi”: clean rings, friendly colours, and labels that are easy to read at a glance.  
+  - Rings should be tap‑able to show more details (macros, remaining vs target, etc.) but tapping is optional; the default view must already be useful without interaction.
+
+#### 9.1.2 Food Diary mobile navigation (Cronometer‑style)
+
+- When the user taps **Food** in the global bottom nav, the app should switch into a **Food‑focused navigation mode** on mobile.  
+- Proposed Food nav layout (bottom bar) once the Food page is active:
+  - `Diary` – today’s Food Diary (date selector + rings + meal sections).  
+  - `Favourites` – quick access to frequently used meals/foods.  
+  - `+` (large central button) – opens a “quick add” sheet.  
+  - `Targets` – shows the user’s daily calorie and macro targets, with explanations.  
+  - `More` – any additional food‑related options we add later.
+
+- **Quick add sheet (opened from the big + button):**
+  - `Suggest Food` – AI‑generated suggestions based on the user’s health data and targets.  
+  - `Add Food` – opens the existing “Add Food Entry” flow (photo + manual entry options).  
+  - `Scan Food` – barcode scanning for packaged foods.  
+  - **Intentionally omitted for now** (can be added later if the user requests):  
+    - `Add Biometric`  
+    - `Add Note`  
+    - `Add Exercise`  
+
+- Implementation rule: do **not** change any of this nav yet without updating this file and confirming with the user. All Food Diary navigation changes must be planned here first so future agents never lose track of the intended design.
+
+### 9.2 Copying meals across days (after targets are in place)
+
+- The user frequently eats the **same meals on multiple days** and wants an easier way than re‑taking photos or re‑entering everything.  
+- Desired features (in roughly this order):
+  1. A **“Copy yesterday to today”** button that duplicates all meals from the previous day into today’s Food Diary.  
+  2. The ability to copy a **single meal** from one date to another (for example, copying “Breakfast 2 Jan” to “Breakfast 5 Jan”).  
+  3. Longer‑term: a **“make this a regular breakfast”** / template feature so favourite meals can be added in one tap without referring to a specific date.
+- Constraints:
+  - Copying must carry over the full ingredient `items` array, servings, units, and totals exactly (no partial copies, no recalculation drift).  
+  - The history table (`FoodLog`) should not end up with confusing duplicates; consider explicit flags or linking copied entries back to their originals if needed.  
+  - All copying behaviour must respect the fixed `localDate` logic so meals stay pinned to the day the user expects.
+
+The user prefers tackling the **hardest problems first**, so a future agent should start with **daily targets + circles**, then add **copy‑meals** functionality once targets are solid and trusted. Remember to discuss these options with the user in simple, non‑technical language before implementing anything.

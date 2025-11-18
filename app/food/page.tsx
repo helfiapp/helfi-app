@@ -19,6 +19,7 @@ import UsageMeter from '@/components/UsageMeter'
 import FeatureUsageDisplay from '@/components/FeatureUsageDisplay'
 import CreditPurchaseModal from '@/components/CreditPurchaseModal'
 import { STARTER_FOODS, StarterFood } from '@/data/foods-starter'
+import { calculateDailyTargets } from '@/lib/daily-targets'
 
 const NUTRIENT_DISPLAY_ORDER: Array<'calories' | 'protein' | 'carbs' | 'fat' | 'fiber' | 'sugar'> = ['calories', 'protein', 'carbs', 'fat', 'fiber', 'sugar']
 
@@ -143,6 +144,13 @@ const formatEnergyValue = (value: number | null | undefined, unit: 'kcal' | 'kJ'
   return `${rounded} ${unit}`
 }
 
+function convertKcalToUnit(value: number | null | undefined, unit: 'kcal' | 'kJ'): number | null {
+  if (value === null || value === undefined) return null
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric)) return null
+  return unit === 'kJ' ? numeric * KCAL_TO_KJ : numeric
+}
+
 const formatNumberInputValue = (value: any) => {
   if (value === null || value === undefined || Number.isNaN(value)) return ''
   return value
@@ -153,6 +161,53 @@ const extractBaseMealDescription = (value: string | null | undefined) => {
   const withoutNutrition = value.replace(/Calories:[\s\S]*/i, '').trim()
   const firstLine = withoutNutrition.split('\n').map((line) => line.trim()).find(Boolean)
   return firstLine || value.trim()
+}
+
+type RingProps = {
+  label: string
+  valueLabel: string
+  percent: number
+  tone: 'primary' | 'secondary'
+}
+
+function TargetRing({ label, valueLabel, percent, tone }: RingProps) {
+  const radius = 32
+  const circumference = 2 * Math.PI * radius
+  const clamped = Math.max(0, Math.min(percent, 1))
+  const offset = circumference - clamped * circumference
+  const trackColor = tone === 'primary' ? 'text-emerald-100' : 'text-gray-100'
+  const progressColor = tone === 'primary' ? 'text-emerald-500' : 'text-gray-400'
+
+  return (
+    <div className="flex flex-col items-center">
+      <svg width="88" height="88" className="mb-1">
+        <circle
+          cx="44"
+          cy="44"
+          r={radius}
+          strokeWidth="8"
+          className={trackColor}
+          stroke="currentColor"
+          fill="none"
+        />
+        <circle
+          cx="44"
+          cy="44"
+          r={radius}
+          strokeWidth="8"
+          className={progressColor}
+          stroke="currentColor"
+          fill="none"
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          transform="rotate(-90 44 44)"
+        />
+      </svg>
+      <div className="text-sm font-semibold text-gray-900">{valueLabel}</div>
+      <div className="text-xs text-gray-500">{label}</div>
+    </div>
+  )
 }
 
 const parseServingQuantity = (input: string) => {
@@ -622,6 +677,32 @@ export default function FoodDiary() {
   const [hasPaidAccess, setHasPaidAccess] = useState<boolean>(false)
   const [energyUnit, setEnergyUnit] = useState<'kcal' | 'kJ'>('kcal')
   const [volumeUnit, setVolumeUnit] = useState<'oz' | 'ml'>('oz')
+
+  const dailyTargets = useMemo(() => {
+    if (!userData) return { calories: null, protein: null, carbs: null, fat: null }
+    const weightKg =
+      typeof userData.weight === 'string'
+        ? parseFloat(userData.weight)
+        : typeof userData.weight === 'number'
+        ? userData.weight
+        : null
+    const heightCm =
+      typeof userData.height === 'string'
+        ? parseFloat(userData.height)
+        : typeof userData.height === 'number'
+        ? userData.height
+        : null
+    const goalsArray = Array.isArray(userData.goals) ? userData.goals : []
+
+    return calculateDailyTargets({
+      gender: userData.gender,
+      birthdate: (userData as any).birthdate || userData.profileInfo?.dateOfBirth,
+      weightKg: Number.isFinite(weightKg || NaN) ? (weightKg as number) : null,
+      heightCm: Number.isFinite(heightCm || NaN) ? (heightCm as number) : null,
+      exerciseFrequency: (userData as any).exerciseFrequency,
+      goals: goalsArray,
+    })
+  }, [userData])
 
   const applyRecalculatedNutrition = (items: any[]) => {
     const recalculated = recalculateNutritionFromItems(items)
@@ -3797,10 +3878,85 @@ Please add nutritional information manually if needed.`);
                   return acc
                 }, { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0 })
 
+                const consumedKcal = totals.calories || 0
+                const targetCalories = dailyTargets.calories
+                const consumedInUnit = convertKcalToUnit(consumedKcal, energyUnit)
+                const targetInUnit = convertKcalToUnit(targetCalories, energyUnit)
+                const percentOfTarget =
+                  targetCalories && targetCalories > 0 ? consumedKcal / targetCalories : 0
+
                 return (
-                  <div>
+                  <div className="space-y-4">
+                    {/* Daily rings header */}
+                    <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 mb-2">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="text-sm font-semibold text-gray-800">
+                          {isViewingToday ? 'Today\u2019s energy summary' : 'Energy summary'}
+                        </div>
+                        <div className="inline-flex items-center text-[11px] sm:text-xs bg-gray-100 rounded-full p-0.5 border border-gray-200">
+                          <button
+                            type="button"
+                            onClick={() => setEnergyUnit('kcal')}
+                            className={`px-2 py-0.5 rounded-full ${
+                              energyUnit === 'kcal'
+                                ? 'bg-white text-gray-900 shadow-sm'
+                                : 'text-gray-500'
+                            }`}
+                          >
+                            kcal
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEnergyUnit('kJ')}
+                            className={`px-2 py-0.5 rounded-full ${
+                              energyUnit === 'kJ'
+                                ? 'bg-white text-gray-900 shadow-sm'
+                                : 'text-gray-500'
+                            }`}
+                          >
+                            kJ
+                          </button>
+                        </div>
+                      </div>
+                      {source.length === 0 ? (
+                        <p className="text-xs text-gray-500">
+                          Add a meal to see how today compares to your daily targets.
+                        </p>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-4">
+                          <TargetRing
+                            label="Consumed"
+                            valueLabel={
+                              consumedInUnit !== null
+                                ? `${Math.round(consumedInUnit)} ${energyUnit}`
+                                : '\u2014'
+                            }
+                            percent={percentOfTarget || 0}
+                            tone="primary"
+                          />
+                          <TargetRing
+                            label={
+                              targetInUnit !== null
+                                ? 'AI daily target'
+                                : 'Complete Health Setup'
+                            }
+                            valueLabel={
+                              targetInUnit !== null
+                                ? `${Math.round(targetInUnit)} ${energyUnit}`
+                                : 'Set up profile'
+                            }
+                            percent={1}
+                            tone="secondary"
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Legacy nutrient tiles - keep for desktop / tablet users */}
                     <div className="flex items-center justify-between mb-2">
-                      <div className="text-lg font-semibold text-gray-800">{isViewingToday ? "Today's Totals" : 'Totals'}</div>
+                      <div className="text-lg font-semibold text-gray-800">
+                        {isViewingToday ? "Today's Totals" : 'Totals'}
+                      </div>
                       <div className="inline-flex items-center text-[11px] sm:text-xs bg-gray-100 rounded-full p-0.5 border border-gray-200">
                         <button
                           type="button"
