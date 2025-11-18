@@ -1,3 +1,193 @@
+## Emergency follow-up – Agent GPT‑5.1 High (November 19, 2025)
+
+> **Status after this session (honest summary)**  
+> - Entries for past dates (e.g. **18/11/2025**) still **disappear after a full page refresh**, even though they look correct immediately after saving.  
+> - Today’s view continues to work because it reads from the `todaysFoods` snapshot, but the permanent history table (`FoodLog`) is **not reliably getting rows** for the user’s new meals.  
+> - I have **not** changed the core timezone logic or database schema from the previous stable handover; all work here was around the save pipeline and UI behaviour.
+
+This section documents **exactly** what I changed and observed so that the next agent:
+
+- Understands the current code paths and DB state.  
+- Does **not** repeat these same experiments.  
+- Can design a cleaner, more reliable fix with minimal new regressions.
+
+---
+
+### A. Changes I made in this session (do not re‑attempt these blindly)
+
+#### A.1 Save pipeline in `app/food/page.tsx` – `saveFoodEntries`
+
+File: `app/food/page.tsx`  
+Function: `saveFoodEntries(updatedFoods, options?)`
+
+1. **Original behaviour (from previous agent, simplified):**
+   - Immediately updated context via `updateUserData({ todaysFoods: updatedFoods })`.  
+   - Posted to `/api/user-data` with:
+     - `todaysFoods: updatedFoods`  
+     - `appendHistory` flag (default `true`)  
+   - Backend (`POST /api/user-data`) used `appendHistory` to optionally append the latest entry (`todaysFoods[0]`) into the `FoodLog` table.
+
+2. **My first change (attempt to separate “today snapshot” from “history append”):**
+   - Still called `updateUserData({ todaysFoods: updatedFoods })`.  
+   - **Forced** the `/api/user-data` call to use `appendHistory: false` so that endpoint would **only** update the `__TODAYS_FOODS_DATA__` snapshot and **not** touch `FoodLog`.  
+   - Added a **new direct call** to `/api/food-log`:
+     - Payload: `{ description, nutrition, imageUrl, items, localDate }`.  
+     - `localDate` taken from `latest.localDate` or `selectedDate`.  
+   - Rationale: make the permanent history writes go through one dedicated endpoint instead of two separate paths.
+
+3. **Follow‑up change (to avoid completely disabling the existing history path):**
+   - Restored `appendHistory` to be **passed through** to `/api/user-data` again:
+     - `body: { todaysFoods: updatedFoods, appendHistory }`.  
+   - **Kept** the new direct `/api/food-log` POST when `appendHistory === true`.  
+   - Effect: for a “new” entry we now have a **belt‑and‑suspenders** approach:
+     - `/api/user-data` may append to `FoodLog` (existing logic).  
+     - `/api/food-log` is also called explicitly.
+
+4. **Key detail for future agents:**  
+   - As of my last commit, `saveFoodEntries`:
+     - Always updates `todaysFoods` in context.  
+     - Always posts the full `updatedFoods` array to `/api/user-data` with `appendHistory` from the caller.  
+     - Additionally posts the **latest entry only** to `/api/food-log` when `appendHistory` is true.
+   - Callers:
+     - `addFoodEntry(...)` calls `saveFoodEntries(updatedFoods)` (so `appendHistory` defaults to `true`).  
+     - `updateFoodEntry(...)` and deletes call `saveFoodEntries(..., { appendHistory: false })` to avoid creating new history rows on edits/deletes.
+
+#### A.2 Adding immediate history UI for non‑today dates – `addFoodEntry`
+
+File: `app/food/page.tsx`  
+Function: `addFoodEntry(description, method, nutrition?)`
+
+Changes:
+
+- After constructing `newEntry` (with `localDate: selectedDate`), I **kept**:
+  - `const updatedFoods = [newEntry, ...todaysFoods]`  
+  - `setTodaysFoods(updatedFoods)`  
+  - `await saveFoodEntries(updatedFoods)`  
+- I **added** logic so that when the user is **not** viewing today (`!isViewingToday`), the newly created entry is also pushed into the `historyFoods` state:
+
+  - `setHistoryFoods(prev => [mappedNewEntry, ...prev])`  
+  - `mappedNewEntry` copies the UI fields (`description`, `time`, `method`, `photo`, `nutrition`, `items`, `localDate`) but leaves `dbId` undefined (because the DB id from `FoodLog` is not known yet).
+
+Goal: stop the just‑saved entry from “vanishing” immediately on non‑today dates before a reload.
+
+#### A.3 History loading & de‑duplication – `loadHistory` effect
+
+File: `app/food/page.tsx`  
+Effect: `useEffect(() => { ... }, [selectedDate, isViewingToday])`
+
+Existing behaviour:
+
+- For non‑today dates, it fetches `/api/food-log?date=${selectedDate}&tz=${tz}`.  
+- Maps each `FoodLog` row into `historyFoods` entries with:
+  - `id` from `createdAt.getTime()`,  
+  - `dbId` from `FoodLog.id`,  
+  - `description`, `time`, `method`, `photo`, `nutrition`, `items`, and `localDate`.
+
+My change:
+
+- After mapping, I added a **client‑side de‑dupe pass**:
+  - Build a key for each entry:  
+    `key = (localDate + description + time + photo).toLowerCase()`.  
+  - Use a `Set` to keep only the **first** entry for each key.  
+  - Store the resulting `deduped` array in `historyFoods`.
+
+Reason: once I turned on **both** `/api/user-data` append and direct `/api/food-log` writes, the same meal could surface twice in `FoodLog`; this de‑dupe is a defensive layer so the UI only shows one copy.
+
+#### A.4 Entry options menu placement (Edit/Delete)
+
+File: `app/food/page.tsx`  
+Section: 3‑dot “entry options” menu for each meal.
+
+- Original: menu container used `className="absolute right-0 mt-2 ..."` so the dropdown **opened below** the 3‑dot button.  
+- Problem: on smaller screens / near the bottom of the list, the Delete option was partially off‑screen and the user could not scroll to it.  
+- Change: switched to an **upwards** menu by using:  
+  - `className="absolute right-0 bottom-full mb-2 ..."`  
+- Result: Edit / Delete now appear **above** the 3‑dot button so both actions are accessible.
+
+#### A.5 Database inspection (Prisma direct, read‑only)
+
+From the repo root I ran small Node scripts using Prisma (no schema changes) to inspect the **live database**:
+
+1. **Listing recent `FoodLog` rows:**
+   - Command (simplified): queried `prisma.foodLog.findMany({ orderBy: { createdAt: 'desc' }, take: 25 })`.  
+   - Finding:
+     - For the current user (`email: "hendra16.icloud@gmail.com"`, `userId: "cmhmym0f60000r1lg61btiolp"`), there was **only one row**:  
+       - `description: "DEBUG TEST ENTRY description"`  
+       - `localDate: "2025-11-18"`  
+       - `createdAt: "2025-11-17T13:52:13.477Z"`  
+     - All other `FoodLog` rows belonged to older test users (`info@sonicweb.com.au`, etc.) and had `localDate = null`.
+
+2. **Listing recent users:**
+   - Command: `prisma.user.findMany({ select: { id, email, name, createdAt }, orderBy: { createdAt: 'desc' }, take: 10 })`.  
+   - Confirmed the current user ids/emails and correlated them with the `FoodLog` rows above.
+
+3. **Important side effect:**  
+   - I **did** create a single debug row in `FoodLog` for the current user with description `"DEBUG TEST ENTRY description"` and `localDate: "2025-11-18"`.  
+   - This was done to confirm that `FoodLog` writes for that user worked in principle.  
+   - There are **no other** `FoodLog` rows for that user as of this session, which explains why the 18th consistently shows empty history after refresh: the history view depends solely on `FoodLog`, which currently has almost no data for them.
+
+> Future agent note: please either delete or ignore this `"DEBUG TEST ENTRY description"` row once you have your own tests in place; it is harmless but may clutter analytics.
+
+---
+
+### B. Behaviour observed with the user (what still fails)
+
+From multiple live tests with the user (all on production, Melbourne time):
+
+1. **Saving on a past date (e.g. 18/11/2025):**
+   - User selects **18/11/2025** in the date selector.  
+   - Adds a new meal (e.g. burger, grilled salmon).  
+   - Immediately after saving, the entry **appears** under Meals for that date (thanks to local state updates).  
+   - After a manual **browser refresh**:
+     - The app reloads on **today’s date** (e.g. 19/11/2025) showing the new meal under **Today’s Meals** (coming from `todaysFoods`).  
+     - When the user navigates back to **18/11/2025**, the Meals section shows **“No food entries yet for this date”**.
+
+2. **Duplication while I was experimenting:**
+   - At one point (before de‑dupe and before I restored `appendHistory` to `/api/user-data`), the user observed **duplicate entries** for the same burger on 18/11.  
+   - After subsequent changes (and dedupe), the duplicates disappeared, but the core issue remained: entries for 18/11 still vanish from the **history** view after a full reload.
+
+3. **Key conclusion from behaviour + DB queries:**
+   - Today’s view is driven by `todaysFoods` (stored in a hidden `__TODAYS_FOODS_DATA__` health goal). That data **does** contain the user’s recent meals.  
+   - The history view (`/food?date=YYYY-MM-DD` for non‑today) is driven purely by `FoodLog` rows matching that `localDate` window.  
+   - For the current user, `FoodLog` has virtually **no rows** for recent dates, which is why selecting 18/11 after a refresh always yields an empty history, regardless of how many entries “looked” saved earlier.
+
+---
+
+### C. Current state after my session (for the next agent)
+
+1. **Schema & timezone logic:**  
+   - `prisma/schema.prisma` `FoodLog` model (including `items Json?`) is **unchanged** from the previous handover.  
+   - `GET /api/food-log` retains the **fixed** timezone math (`+ tzMin * 60 * 1000`) as documented in this file. I did **not** modify that.
+
+2. **Front‑end save pipeline:**  
+   - `saveFoodEntries` now:
+     - Updates `todaysFoods` in context.  
+     - Posts `todaysFoods` to `/api/user-data` with a configurable `appendHistory` flag.  
+     - **Also** posts the latest entry directly to `/api/food-log` when `appendHistory` is true.  
+   - `addFoodEntry` also pushes a mapped copy of the new entry into `historyFoods` when the user is viewing a non‑today date so that it does not disappear immediately before reload.
+
+3. **History UI:**  
+   - `loadHistory` de‑duplicates entries client‑side but otherwise still relies entirely on `/api/food-log` → `FoodLog`.
+
+4. **Reality check:**  
+   - Despite the extra writes and UI tweaks, **new meals for past dates are still not reliably appearing in `FoodLog` for the user**, as confirmed by Prisma queries.  
+   - As a result, the **core user‑visible bug remains**:  
+     - Meals entered for 18/11 look fine until a full page reload, then vanish from the 18th and reappear only under “today” via `todaysFoods`.
+
+5. **Recommended next steps (for a future agent):**
+   - **Do not** simply add more save calls; instead, instrument and trace the existing ones:
+     - Add robust logging (with user id + selected date + localDate) inside:
+       - `POST /api/user-data` where it appends to `FoodLog`.  
+       - `POST /api/food-log` itself.  
+     - Confirm whether those endpoints are being called from the browser at all and whether they succeed or 401/500 on the live site.  
+   - Consider a **simpler, single source of truth** approach:
+     - One authoritative “save meal” endpoint that accepts `{ date, items, totals }` and writes both `todaysFoods` and `FoodLog` server‑side in a transaction.  
+     - The client would call this once per save instead of juggling multiple endpoints.
+
+Until then, please treat my changes as **exploratory** and not as a final fix; the bug is real, reproducible, and still affecting the user’s daily experience.
+
+---
+
 ## Food Diary – Handover and Fix Plan
 
 **Last updated:** November 17, 2025 (after GPT‑5.1 ingredient‑editing UX session)  

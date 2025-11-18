@@ -61,18 +61,79 @@ export async function GET(request: NextRequest) {
 
 // Append a log entry (non-blocking usage recommended)
 export async function POST(request: NextRequest) {
+  const startTime = Date.now()
+  let userId: string | null = null
+  let userEmail: string | null = null
+  
   try {
+    console.log('📥 POST /api/food-log - Request received')
+    
     const session = await getServerSession(authOptions)
     if (!session?.user?.email) {
+      console.error('❌ POST /api/food-log - Authentication failed: no session or email')
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
-    const user = await prisma.user.findUnique({ where: { email: session.user.email } })
+    
+    userEmail = session.user.email
+    console.log('✅ POST /api/food-log - Authenticated user:', userEmail)
+    
+    const user = await prisma.user.findUnique({ where: { email: userEmail } })
     if (!user) {
+      console.error('❌ POST /api/food-log - User not found:', userEmail)
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
+    
+    userId = user.id
+    console.log('✅ POST /api/food-log - Found user:', { userId, email: userEmail })
 
     const body = await request.json()
     const { description, nutrition, imageUrl, items, localDate } = body || {}
+    
+    // Validate and normalize localDate - must be YYYY-MM-DD format
+    let normalizedLocalDate: string | null = null
+    if (localDate && typeof localDate === 'string' && localDate.length >= 8) {
+      // Check if it matches YYYY-MM-DD format
+      const datePattern = /^\d{4}-\d{2}-\d{2}$/
+      if (datePattern.test(localDate)) {
+        normalizedLocalDate = localDate
+      } else {
+        console.warn('⚠️ POST /api/food-log - Invalid localDate format, attempting to parse:', localDate)
+        // Try to parse and reformat
+        try {
+          const parsed = new Date(localDate)
+          if (!isNaN(parsed.getTime())) {
+            const y = parsed.getFullYear()
+            const m = String(parsed.getMonth() + 1).padStart(2, '0')
+            const d = String(parsed.getDate()).padStart(2, '0')
+            normalizedLocalDate = `${y}-${m}-${d}`
+            console.log('✅ POST /api/food-log - Normalized localDate:', normalizedLocalDate)
+          }
+        } catch (e) {
+          console.error('❌ POST /api/food-log - Failed to parse localDate:', localDate, e)
+        }
+      }
+    }
+    
+    if (!normalizedLocalDate) {
+      console.warn('⚠️ POST /api/food-log - No valid localDate provided, entry will not be queryable by date:', {
+        providedLocalDate: localDate,
+        type: typeof localDate,
+      })
+    }
+    
+    console.log('📦 POST /api/food-log - Request body:', {
+      hasDescription: !!description,
+      descriptionLength: description?.toString().length || 0,
+      descriptionPreview: description?.toString().substring(0, 100) || '',
+      hasNutrition: !!nutrition,
+      hasImageUrl: !!imageUrl,
+      hasItems: Array.isArray(items) && items.length > 0,
+      itemCount: Array.isArray(items) ? items.length : 0,
+      providedLocalDate: localDate || 'MISSING',
+      normalizedLocalDate: normalizedLocalDate || 'NULL',
+      localDateType: typeof localDate,
+    })
+    
     const name = (description || '')
       .toString()
       .split('\n')[0]
@@ -80,6 +141,16 @@ export async function POST(request: NextRequest) {
       .split(',')[0]
       .split('.')[0]
       .trim() || 'Food item'
+
+    console.log('💾 POST /api/food-log - Creating FoodLog entry:', {
+      userId,
+      name,
+      localDate: normalizedLocalDate,
+      hasDescription: !!description,
+      hasNutrition: !!nutrition,
+      hasImageUrl: !!imageUrl,
+      hasItems: Array.isArray(items) && items.length > 0,
+    })
 
     const created = await prisma.foodLog.create({
       data: {
@@ -89,8 +160,17 @@ export async function POST(request: NextRequest) {
         imageUrl: imageUrl || null,
         nutrients: nutrition || null,
         items: items || null,
-        localDate: localDate || null,
+        localDate: normalizedLocalDate,
       },
+    })
+
+    const duration = Date.now() - startTime
+    console.log('✅ POST /api/food-log - Successfully created FoodLog entry:', {
+      foodLogId: created.id,
+      userId,
+      localDate: created.localDate,
+      createdAt: created.createdAt.toISOString(),
+      durationMs: duration,
     })
 
     // Trigger background regeneration of nutrition insights
@@ -107,8 +187,29 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, id: created.id })
   } catch (error) {
-    console.error('POST /api/food-log error', error)
-    return NextResponse.json({ error: 'Failed to save log' }, { status: 500 })
+    const duration = Date.now() - startTime
+    console.error('❌ POST /api/food-log - Error:', {
+      error,
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      userId,
+      userEmail,
+      durationMs: duration,
+    })
+    
+    // Provide more detailed error information
+    if (error instanceof Error) {
+      console.error('❌ Error details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+      })
+    }
+    
+    return NextResponse.json({ 
+      error: 'Failed to save log',
+      details: error instanceof Error ? error.message : String(error)
+    }, { status: 500 })
   }
 }
 

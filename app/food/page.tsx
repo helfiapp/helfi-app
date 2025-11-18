@@ -1354,49 +1354,74 @@ const applyStructuredItems = (
       // for edits/deletes.
       const appendHistory = options?.appendHistory !== false
 
-      // 2) Persist today's foods snapshot (fast "today" view) via /api/user-data.
-      //    We now ALWAYS send appendHistory: false here so this endpoint does not
-      //    try to create FoodLog rows itself. History writes are handled by the
-      //    dedicated /api/food-log endpoint below.
-      fetch('/api/user-data', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          todaysFoods: updatedFoods,
-          appendHistory,
-        }),
+      // Determine the localDate for logging and saving
+      const latest = Array.isArray(updatedFoods) && updatedFoods.length > 0 ? updatedFoods[0] : null
+      const targetLocalDate = latest && typeof latest?.localDate === 'string' && latest.localDate.length >= 8
+        ? latest.localDate
+        : selectedDate
+
+      console.log('📝 saveFoodEntries called:', {
+        entryCount: updatedFoods.length,
+        appendHistory,
+        selectedDate,
+        latestLocalDate: latest?.localDate,
+        targetLocalDate,
+        hasDescription: !!latest?.description,
+        hasNutrition: !!latest?.nutrition,
+        hasItems: Array.isArray(latest?.items) && latest.items.length > 0,
       })
-        .then((response) => {
-          if (!response.ok) {
-            console.error('Background save to /api/user-data failed - UI already updated')
-          } else {
-            console.log('🚀 PERFORMANCE: Food saved to todaysFoods snapshot in background')
-          }
-        })
-        .catch((error) => {
-          console.error('Background save to /api/user-data error:', error)
+
+      // 2) Persist today's foods snapshot (fast "today" view) via /api/user-data.
+      //    We send appendHistory: false here so this endpoint does NOT try to create
+      //    FoodLog rows itself. History writes are handled exclusively by the
+      //    dedicated /api/food-log endpoint below to avoid conflicts.
+      try {
+        const userDataResponse = await fetch('/api/user-data', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            todaysFoods: updatedFoods,
+            appendHistory: false, // Always false - we handle FoodLog separately
+          }),
         })
 
-      // 3) For brand new entries, also write directly into the permanent FoodLog
-      //    history table via /api/food-log. This path is what the history view
-      //    (and "yesterday" after midnight) reads from, so we keep it rock‑solid.
-      if (appendHistory && Array.isArray(updatedFoods) && updatedFoods.length > 0) {
-        const latest = updatedFoods[0]
+        if (!userDataResponse.ok) {
+          const errorText = await userDataResponse.text()
+          console.error('❌ Failed to save todaysFoods snapshot:', {
+            status: userDataResponse.status,
+            statusText: userDataResponse.statusText,
+            error: errorText,
+          })
+        } else {
+          console.log('✅ Saved todaysFoods snapshot successfully')
+        }
+      } catch (userDataError) {
+        console.error('❌ Error saving todaysFoods snapshot:', userDataError)
+      }
+
+      // 3) For brand new entries, write directly into the permanent FoodLog
+      //    history table via /api/food-log. This is the SINGLE SOURCE OF TRUTH
+      //    for history view (and "yesterday" after midnight).
+      if (appendHistory && latest) {
         try {
           const payload = {
             description: (latest?.description || '').toString(),
             nutrition: latest?.nutrition || null,
             imageUrl: latest?.photo || null,
-            items:
-              Array.isArray(latest?.items) && latest.items.length > 0 ? latest.items : null,
+            items: Array.isArray(latest?.items) && latest.items.length > 0 ? latest.items : null,
             // Always pin to the calendar date the user was viewing when they saved
-            localDate:
-              typeof latest?.localDate === 'string' && latest.localDate.length >= 8
-                ? latest.localDate
-                : selectedDate,
+            localDate: targetLocalDate,
           }
+
+          console.log('📤 Sending FoodLog POST request:', {
+            localDate: payload.localDate,
+            descriptionLength: payload.description.length,
+            hasNutrition: !!payload.nutrition,
+            hasImageUrl: !!payload.imageUrl,
+            itemCount: Array.isArray(payload.items) ? payload.items.length : 0,
+          })
 
           const res = await fetch('/api/food-log', {
             method: 'POST',
@@ -1407,13 +1432,34 @@ const applyStructuredItems = (
           })
 
           if (!res.ok) {
-            console.error('❌ Failed to append entry to FoodLog history:', await res.text())
+            const errorText = await res.text()
+            console.error('❌ Failed to save entry to FoodLog:', {
+              status: res.status,
+              statusText: res.statusText,
+              error: errorText,
+              payload: {
+                localDate: payload.localDate,
+                descriptionPreview: payload.description.substring(0, 50),
+              },
+            })
           } else {
-            console.log('✅ Appended entry to FoodLog history for date', payload.localDate)
+            const result = await res.json().catch(() => ({}))
+            console.log('✅ Successfully saved entry to FoodLog:', {
+              localDate: payload.localDate,
+              foodLogId: result.id,
+              descriptionPreview: payload.description.substring(0, 50),
+            })
           }
         } catch (historyError) {
-          console.error('❌ Error while appending to FoodLog history:', historyError)
+          console.error('❌ Exception while saving to FoodLog:', {
+            error: historyError,
+            message: historyError instanceof Error ? historyError.message : String(historyError),
+            stack: historyError instanceof Error ? historyError.stack : undefined,
+            targetLocalDate,
+          })
         }
+      } else {
+        console.log('ℹ️ Skipping FoodLog save (appendHistory=false or no latest entry)')
       }
 
       // 4) Show a brief visual confirmation
@@ -1422,7 +1468,11 @@ const applyStructuredItems = (
         setTimeout(() => setShowSavedToast(false), 1500)
       } catch {}
     } catch (error) {
-      console.error('Error in saveFoodEntries:', error)
+      console.error('❌ Fatal error in saveFoodEntries:', {
+        error,
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      })
     }
   }
 
