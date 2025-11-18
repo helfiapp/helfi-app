@@ -3121,7 +3121,7 @@ Please add nutritional information manually if needed.`);
                           {/* Macro breakdown list - single column on mobile, 2 column on desktop */}
                           <div className="flex-1">
                             <div className="text-sm text-gray-600 mb-1.5 sm:mb-2 font-medium">Macro breakdown</div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-sm text-gray-700">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-2 gap-y-2 text-sm text-gray-700">
                               {displayMacros.map((macro) => {
                                 const displayValue = macro.grams > 0 ? Math.round(macro.grams) : 0
                                 return (
