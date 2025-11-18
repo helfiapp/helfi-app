@@ -40,10 +40,21 @@ export async function GET(request: NextRequest) {
     const tzMin = Number.isFinite(parseInt(tzOffsetMinRaw || ''))
       ? parseInt(tzOffsetMinRaw || '0', 10)
       : 0
+    
+    // CRITICAL FIX: Use a wider window to catch entries that might be on the boundary
+    // Query from start of requested day to end of next day, then filter precisely
+    // This ensures we don't miss entries due to timezone or timing issues
     const startUtcMs = Date.UTC(y, (m || 1) - 1, d || 1, 0, 0, 0, 0) + tzMin * 60 * 1000
     const endUtcMs = Date.UTC(y, (m || 1) - 1, d || 1, 23, 59, 59, 999) + tzMin * 60 * 1000
+    
+    // Also create a wider query window (extend by 12 hours on each side to catch boundary cases)
+    const queryStartMs = startUtcMs - (12 * 60 * 60 * 1000) // 12 hours before
+    const queryEndMs = endUtcMs + (12 * 60 * 60 * 1000) // 12 hours after
+    
     const start = new Date(startUtcMs)
     const end = new Date(endUtcMs)
+    const queryStart = new Date(queryStartMs)
+    const queryEnd = new Date(queryEndMs)
 
     // 🛡️ GUARD RAIL: Food Diary Entry Query (CRITICAL - DO NOT MODIFY WITHOUT READING GUARD_RAILS.md)
     // 
@@ -72,13 +83,13 @@ export async function GET(request: NextRequest) {
           { localDate: dateStr },
           {
             localDate: null,
-            createdAt: { gte: start, lte: end },
+            createdAt: { gte: queryStart, lte: queryEnd },
           },
-          // Include entries created within the date window (even if localDate is set incorrectly)
-          // This ensures we don't lose entries due to date mismatches
+          // Include entries created within the wider query window (even if localDate is set incorrectly)
+          // This ensures we don't lose entries due to date mismatches or timezone issues
           // DO NOT REMOVE THIS CONDITION - it prevents entries from disappearing
           {
-            createdAt: { gte: start, lte: end },
+            createdAt: { gte: queryStart, lte: queryEnd },
           },
         ],
       },
@@ -93,11 +104,34 @@ export async function GET(request: NextRequest) {
       // If localDate matches exactly, include it
       if (log.localDate === dateStr) return true;
       
-      // If localDate is null or doesn't match, check if createdAt falls within the date window
-      // This uses the timezone-adjusted window we calculated above
+      // If localDate is null or doesn't match, check the actual calendar date of createdAt
+      // CRITICAL: Use the user's timezone to determine the calendar date, not UTC
+      // This ensures entries are matched to the correct day regardless of timezone issues
       if (!log.localDate || log.localDate !== dateStr) {
+        // Convert createdAt to user's local date using their timezone offset
+        const logDate = new Date(log.createdAt.getTime() - (tzMin * 60 * 1000));
+        const logYear = logDate.getUTCFullYear();
+        const logMonth = logDate.getUTCMonth();
+        const logDay = logDate.getUTCDate();
+        
+        // Compare with requested date
+        const [reqYear, reqMonth, reqDay] = dateStr.split('-').map((v) => parseInt(v, 10));
+        const matchesDate = logYear === reqYear && logMonth === (reqMonth - 1) && logDay === reqDay;
+        
+        // Also check UTC window as fallback (for entries created exactly at boundaries)
         const logTime = log.createdAt.getTime();
-        return logTime >= start.getTime() && logTime <= end.getTime();
+        const isInWindow = logTime >= start.getTime() && logTime <= end.getTime();
+        
+        // Include if either the calendar date matches OR it's within the UTC window
+        const shouldInclude = matchesDate || isInWindow;
+        
+        // Debug logging for entries that might be filtered out incorrectly
+        if (!shouldInclude && log.localDate && log.localDate !== dateStr) {
+          const logDateStr = `${logYear}-${String(logMonth + 1).padStart(2, '0')}-${String(logDay).padStart(2, '0')}`;
+          console.log(`⚠️ Entry filtered out: localDate=${log.localDate}, createdAt date=${logDateStr}, requested=${dateStr}, matchesDate=${matchesDate}, inWindow=${isInWindow}`);
+        }
+        
+        return shouldInclude;
       }
       
       return false;
@@ -111,6 +145,22 @@ export async function GET(request: NextRequest) {
     )
 
     console.log(`📊 GET /api/food-log - Found ${uniqueLogs.length} entries for date ${dateStr} (from ${logs.length} total matches)`)
+    
+    // Debug: Log entries that were filtered out to help diagnose missing entries
+    if (logs.length > uniqueLogs.length) {
+      const filteredOut = logs.filter((log) => {
+        const inUnique = uniqueLogs.some((u) => u.id === log.id);
+        return !inUnique;
+      });
+      console.log(`⚠️ Filtered out ${filteredOut.length} entries that didn't match date ${dateStr}:`, 
+        filteredOut.map((l) => ({
+          id: l.id,
+          localDate: l.localDate,
+          createdAt: l.createdAt.toISOString(),
+          name: l.name?.substring(0, 30)
+        }))
+      );
+    }
     
     return NextResponse.json({ success: true, logs: uniqueLogs })
   } catch (error) {
