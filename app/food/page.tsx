@@ -4350,7 +4350,7 @@ Please add nutritional information manually if needed.`);
                             )
 
                             return (
-                              <div className="flex flex-col sm:flex-row gap-4 items-start">
+                              <div className="flex flex-row gap-4 items-start">
                                 <button
                                   type="button"
                                   className="flex flex-col items-center flex-shrink-0 focus:outline-none"
@@ -4371,9 +4371,6 @@ Please add nutritional information manually if needed.`);
                                   </div>
                                 </button>
                                 <div className="flex-1">
-                                  <p className="mb-3 text-sm text-gray-800 whitespace-pre-line">
-                                    {food.description.split('Calories:')[0].trim()}
-                                  </p>
                                   <div className="space-y-2 text-sm text-gray-700">
                                     <div className="flex items-center gap-2">
                                       <span className="inline-block w-3 h-3 rounded-full bg-red-500" />
