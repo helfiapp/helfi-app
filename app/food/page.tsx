@@ -997,16 +997,26 @@ const applyStructuredItems = (
   let finalTotal = sanitizeNutritionTotals(totalFromApi)
   const allowTextFallback = options?.allowTextFallback ?? true
 
+  console.log('🔍 applyStructuredItems called:', {
+    itemsFromApiCount: Array.isArray(itemsFromApi) ? itemsFromApi.length : 0,
+    hasTotalFromApi: !!totalFromApi,
+    totalFromApiPreview: totalFromApi ? JSON.stringify(totalFromApi).substring(0, 100) : 'null',
+    finalTotalAfterSanitize: finalTotal ? JSON.stringify(finalTotal) : 'null',
+    hasAnalysisText: !!analysisText,
+  })
+
   if (!finalItems.length && analysisText) {
     const fallback = extractStructuredItemsFromAnalysis(analysisText)
     if (fallback?.items?.length) {
       finalItems = fallback.items
       finalTotal = sanitizeNutritionTotals(fallback.total) || finalTotal
+      console.log('✅ Extracted items from structured analysis:', finalItems.length)
     } else {
       const prose = extractItemsFromTextEstimates(analysisText)
       if (prose?.items?.length) {
         finalItems = prose.items
         finalTotal = sanitizeNutritionTotals(prose.total) || finalTotal
+        console.log('✅ Extracted items from text estimates:', finalItems.length)
       }
     }
   }
@@ -1014,18 +1024,46 @@ const applyStructuredItems = (
   const enrichedItems = finalItems.length > 0 ? enrichItemsFromStarter(finalItems) : []
   setAnalyzedItems(enrichedItems)
 
+  console.log('📊 Processing totals:', {
+    enrichedItemsCount: enrichedItems.length,
+    hasFinalTotal: !!finalTotal,
+    finalTotalValue: finalTotal ? JSON.stringify(finalTotal) : 'null',
+  })
+
+  // Priority order for totals:
+  // 1. API-provided total (most reliable)
+  // 2. Recalculated from items (if items have nutrition data)
+  // 3. Extracted from analysis text (fallback)
   let totalsToUse = finalTotal
   if (!totalsToUse && enrichedItems.length > 0) {
     totalsToUse = recalculateNutritionFromItems(enrichedItems)
+    console.log('📊 Recalculated totals from items:', totalsToUse ? JSON.stringify(totalsToUse) : 'null')
   }
   if (!totalsToUse && analysisText && allowTextFallback) {
     totalsToUse = sanitizeNutritionTotals(extractNutritionData(analysisText))
+    console.log('📊 Extracted totals from text:', totalsToUse ? JSON.stringify(totalsToUse) : 'null')
   }
 
+  // CRITICAL FIX: Always set totals if we have items, even if totals are zero
+  // This prevents the UI from showing all zeros when items exist but totals weren't calculated
   if (totalsToUse) {
     setAnalyzedNutrition(totalsToUse)
     setAnalyzedTotal(convertTotalsForStorage(totalsToUse))
-  } else if (!analyzedNutrition) {
+    console.log('✅ Set nutrition totals:', JSON.stringify(totalsToUse))
+  } else if (enrichedItems.length > 0) {
+    // If we have items but no totals, recalculate one more time as a last resort
+    const lastResortTotals = recalculateNutritionFromItems(enrichedItems)
+    if (lastResortTotals) {
+      setAnalyzedNutrition(lastResortTotals)
+      setAnalyzedTotal(convertTotalsForStorage(lastResortTotals))
+      console.log('⚠️ Using last-resort recalculated totals:', JSON.stringify(lastResortTotals))
+    } else {
+      console.warn('⚠️ No totals available despite having items - setting to null')
+      setAnalyzedNutrition(null)
+      setAnalyzedTotal(null)
+    }
+  } else {
+    console.log('ℹ️ No items and no totals - setting to null')
     setAnalyzedNutrition(null)
     setAnalyzedTotal(null)
   }
