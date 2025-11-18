@@ -14,7 +14,7 @@ import { CreditManager, CREDIT_COSTS } from '@/lib/credit-system';
 import OpenAI from 'openai';
 import { chatCompletionWithCost } from '@/lib/metered-openai';
 import { costCentsEstimateFromText } from '@/lib/cost-meter';
-import { lookupFoodNutrition } from '@/lib/food-data';
+// NOTE: USDA/FatSecret lookup removed from AI analysis - kept only for manual ingredient lookup via /api/food-data
 
 // Best-effort relaxed JSON parsing to handle minor LLM formatting issues
 function parseItemsJsonRelaxed(raw: string): any | null {
@@ -763,131 +763,10 @@ CRITICAL REQUIREMENTS:
       resp.total = computeTotalsFromItems(resp.items);
     }
 
-    // ENHANCE ITEMS WITH USDA/FATSECRET DATA: Look up each ingredient in nutrition databases
-    // This improves accuracy by using real nutrition data instead of AI estimates
-    if (resp.items && Array.isArray(resp.items) && resp.items.length > 0) {
-      try {
-        console.log('🔍 Enhancing items with USDA/FatSecret nutrition data...');
-        const enhancedItems = await Promise.all(
-          resp.items.map(async (item: any) => {
-            // Skip lookup if item already has good nutrition data (don't overwrite with potentially worse DB data)
-            // Only enhance if the item is missing significant nutrition data
-            const hasGoodData = 
-              item.calories != null && 
-              item.calories > 0 && 
-              (item.protein_g != null || item.carbs_g != null || item.fat_g != null);
-            
-            if (hasGoodData) {
-              console.log(`✅ Item "${item.name}" already has good nutrition data (${item.calories} cal), skipping lookup`);
-              return item;
-            }
-
-            // Build search query from item name and brand
-            const searchQuery = item.brand
-              ? `${item.brand} ${item.name}`
-              : item.name || '';
-
-            if (!searchQuery.trim()) {
-              return item;
-            }
-
-            try {
-              // Try USDA first, then FatSecret, then OpenFoodFacts (with fallback)
-              const dbResults = await lookupFoodNutrition(searchQuery, {
-                preferSource: 'usda',
-                maxResults: 1,
-              });
-
-              if (dbResults && dbResults.length > 0) {
-                const dbItem = dbResults[0];
-                
-                // Only use database values if they're actually valid (not null/undefined/0)
-                // This prevents overwriting good OpenAI estimates with null/zero database values
-                const hasValidDbData = 
-                  (dbItem.calories != null && dbItem.calories > 0) ||
-                  (dbItem.protein_g != null && dbItem.protein_g > 0) ||
-                  (dbItem.carbs_g != null && dbItem.carbs_g > 0) ||
-                  (dbItem.fat_g != null && dbItem.fat_g > 0);
-                
-                if (hasValidDbData) {
-                  console.log(`✅ Found ${dbItem.source} data for "${item.name}":`, {
-                    calories: dbItem.calories,
-                    protein: dbItem.protein_g,
-                    carbs: dbItem.carbs_g,
-                    fat: dbItem.fat_g,
-                  });
-
-                  // Enhance item with database nutrition data
-                  // Only replace values if database has valid data, otherwise keep OpenAI values
-                  return {
-                    ...item,
-                    calories: (dbItem.calories != null && dbItem.calories > 0) ? dbItem.calories : (item.calories ?? 0),
-                    protein_g: (dbItem.protein_g != null && dbItem.protein_g >= 0) ? dbItem.protein_g : (item.protein_g ?? 0),
-                    carbs_g: (dbItem.carbs_g != null && dbItem.carbs_g >= 0) ? dbItem.carbs_g : (item.carbs_g ?? 0),
-                    fat_g: (dbItem.fat_g != null && dbItem.fat_g >= 0) ? dbItem.fat_g : (item.fat_g ?? 0),
-                    fiber_g: (dbItem.fiber_g != null && dbItem.fiber_g >= 0) ? dbItem.fiber_g : (item.fiber_g ?? 0),
-                    sugar_g: (dbItem.sugar_g != null && dbItem.sugar_g >= 0) ? dbItem.sugar_g : (item.sugar_g ?? 0),
-                    // Update serving_size if DB has a better one
-                    serving_size: dbItem.serving_size || item.serving_size || '1 serving',
-                  };
-                } else {
-                  console.log(`⚠️ Database returned invalid/null data for "${item.name}", keeping OpenAI values`);
-                  return item;
-                }
-              } else {
-                console.log(`⚠️ No database match found for "${item.name}", using OpenAI values`);
-                return item;
-              }
-            } catch (lookupError) {
-              console.warn(`⚠️ Database lookup failed for "${item.name}":`, lookupError);
-              return item; // Fall back to OpenAI values
-            }
-          })
-        );
-
-        // Update items and recalculate total
-        resp.items = enhancedItems;
-        
-        // Recalculate total from enhanced items, but preserve original total if recalculation fails or is zero
-        const recalculatedTotal = computeTotalsFromItems(enhancedItems);
-        if (recalculatedTotal && (
-          recalculatedTotal.calories > 0 || 
-          recalculatedTotal.protein_g > 0 || 
-          recalculatedTotal.carbs_g > 0 || 
-          recalculatedTotal.fat_g > 0
-        )) {
-          resp.total = recalculatedTotal;
-          console.log('✅ Enhanced items with database nutrition data:', {
-            itemCount: enhancedItems.length,
-            totalCalories: resp.total?.calories,
-            source: 'recalculated from enhanced items'
-          });
-        } else if (resp.total && (
-          resp.total.calories > 0 || 
-          resp.total.protein_g > 0 || 
-          resp.total.carbs_g > 0 || 
-          resp.total.fat_g > 0
-        )) {
-          // Keep original total if recalculation failed but original was good
-          console.log('⚠️ Recalculated total was zero, keeping original total:', {
-            itemCount: enhancedItems.length,
-            originalTotalCalories: resp.total?.calories,
-            recalculatedTotalCalories: recalculatedTotal?.calories
-          });
-        } else {
-          // Last resort: use recalculated even if zero (better than nothing)
-          resp.total = recalculatedTotal;
-          console.warn('⚠️ Both original and recalculated totals are zero/invalid:', {
-            itemCount: enhancedItems.length,
-            originalTotal: resp.total,
-            recalculatedTotal
-          });
-        }
-      } catch (enhanceError) {
-        console.warn('⚠️ Item enhancement failed (non-fatal):', enhanceError);
-        // Continue with original items if enhancement fails
-      }
-    }
+    // NOTE: USDA/FatSecret database enhancement removed from AI photo analysis flow
+    // These databases are still available via /api/food-data for manual ingredient lookup
+    // The AI analysis works better without database interference - it provides accurate
+    // estimates based on visual analysis and portion sizes, which databases can't match.
 
     // HEALTH COMPATIBILITY CHECK: Analyze food against user's health data
     try {
