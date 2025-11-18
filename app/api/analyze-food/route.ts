@@ -350,16 +350,68 @@ CRITICAL STRUCTURED OUTPUT RULES:
 - For discrete items like bacon or bread slices, count visible slices and use that count for servings.
 - **CRITICAL: Use REALISTIC nutrition values based on standard food databases (USDA, nutrition labels, etc.). Do NOT underestimate calories or macros.**
 
-REALISTIC NUTRITION REFERENCE VALUES (use these as guidance):
-- Burger bun (standard sesame): ~150 calories, 5g protein, 28g carbs, 3g fat per bun
-- Beef patty (cooked, 6 oz / 170g): ~400 calories, 30g protein, 0g carbs, 30g fat
-- Cheese slice (American/Cheddar): ~100 calories, 6g protein, 1g carbs, 9g fat per slice
-- Bacon (cooked, 2 slices): ~80 calories, 6g protein, 0g carbs, 7g fat
-- Chicken breast (cooked, 6 oz): ~280 calories, 54g protein, 0g carbs, 6g fat
-- Rice (cooked, 1 cup): ~220 calories, 4g protein, 45g carbs, 0.5g fat
+REALISTIC NUTRITION REFERENCE VALUES (use these as guidance for accurate analysis):
+
+PROTEINS (cooked unless noted):
+- Chicken breast (6 oz / 170g): ~280 calories, 54g protein, 0g carbs, 6g fat
+- Chicken thigh (3 oz): ~180 calories, 22g protein, 0g carbs, 9g fat
+- Ground beef 80/20 (6 oz cooked): ~400 calories, 30g protein, 0g carbs, 30g fat
+- Ground beef 90/10 (6 oz cooked): ~300 calories, 35g protein, 0g carbs, 15g fat
+- Salmon fillet (6 oz): ~350 calories, 40g protein, 0g carbs, 18g fat
+- Tuna steak (6 oz): ~250 calories, 50g protein, 0g carbs, 2g fat
+- Pork chop (6 oz): ~350 calories, 40g protein, 0g carbs, 18g fat
 - Large egg: ~70 calories, 6g protein, 0.5g carbs, 5g fat
+- Bacon (cooked, 2 slices): ~80 calories, 6g protein, 0g carbs, 7g fat
+- Sausage link (pork, cooked): ~150 calories, 7g protein, 1g carbs, 13g fat
+
+CARBOHYDRATES:
+- White rice (cooked, 1 cup): ~220 calories, 4g protein, 45g carbs, 0.5g fat
+- Brown rice (cooked, 1 cup): ~220 calories, 5g protein, 46g carbs, 2g fat
+- Pasta (cooked, 1 cup): ~220 calories, 8g protein, 43g carbs, 1g fat
+- White bread slice: ~80 calories, 2g protein, 15g carbs, 1g fat
+- Whole wheat bread slice: ~80 calories, 4g protein, 15g carbs, 1g fat
+- Burger bun (sesame): ~150 calories, 5g protein, 28g carbs, 3g fat
+- Potato (medium, baked): ~160 calories, 4g protein, 37g carbs, 0g fat
+- Sweet potato (medium, baked): ~180 calories, 4g protein, 41g carbs, 0g fat
+- Oats (cooked, 1 cup): ~150 calories, 6g protein, 27g carbs, 3g fat
+
+DAIRY:
+- Cheese slice (American/Cheddar): ~100 calories, 6g protein, 1g carbs, 9g fat
+- Mozzarella (1 oz): ~80 calories, 6g protein, 1g carbs, 6g fat
+- Milk whole (1 cup): ~150 calories, 8g protein, 12g carbs, 8g fat
+- Milk 2% (1 cup): ~120 calories, 8g protein, 12g carbs, 5g fat
+- Greek yogurt (1 cup): ~150 calories, 20g protein, 9g carbs, 4g fat
+- Butter (1 tbsp): ~100 calories, 0g protein, 0g carbs, 11g fat
+
+VEGETABLES (cooked unless raw):
+- Broccoli (1 cup): ~55 calories, 4g protein, 11g carbs, 0.5g fat
+- Spinach (1 cup cooked): ~40 calories, 5g protein, 7g carbs, 0g fat
+- Carrots (1 cup): ~50 calories, 1g protein, 12g carbs, 0g fat
+- Green beans (1 cup): ~40 calories, 2g protein, 9g carbs, 0g fat
+- Bell pepper (1 medium): ~30 calories, 1g protein, 7g carbs, 0g fat
+- Tomato (1 medium): ~25 calories, 1g protein, 5g carbs, 0g fat
+- Lettuce (1 cup shredded): ~5 calories, 0.5g protein, 1g carbs, 0g fat
+- Onion (1 medium): ~45 calories, 1g protein, 11g carbs, 0g fat
+
+FRUITS:
 - Medium banana: ~105 calories, 1g protein, 27g carbs, 0.4g fat
-- Bread slice (white): ~80 calories, 2g protein, 15g carbs, 1g fat
+- Apple (medium): ~95 calories, 0.5g protein, 25g carbs, 0.3g fat
+- Orange (medium): ~60 calories, 1g protein, 15g carbs, 0g fat
+- Berries (1 cup mixed): ~80 calories, 1g protein, 20g carbs, 0.5g fat
+- Avocado (1 medium): ~240 calories, 3g protein, 13g carbs, 22g fat
+
+FATS & CONDIMENTS:
+- Olive oil (1 tbsp): ~120 calories, 0g protein, 0g carbs, 14g fat
+- Mayonnaise (1 tbsp): ~100 calories, 0g protein, 0g carbs, 11g fat
+- Salad dressing (2 tbsp): ~120 calories, 0g protein, 2g carbs, 12g fat
+- Ketchup (1 tbsp): ~15 calories, 0g protein, 4g carbs, 0g fat
+- Mustard (1 tbsp): ~5 calories, 0g protein, 1g carbs, 0g fat
+
+COMMON MEAL COMPONENTS:
+- Pizza slice (cheese, 1/8 of 14"): ~250 calories, 12g protein, 30g carbs, 10g fat
+- Tortilla wrap (large): ~150 calories, 4g protein, 25g carbs, 4g fat
+- Noodles (ramen, cooked): ~190 calories, 4g protein, 27g carbs, 7g fat
+- Soup (chicken noodle, 1 cup): ~75 calories, 4g protein, 7g carbs, 3g fat
 
 **ACCURACY REQUIREMENTS:**
 - A typical burger with bun + 6oz patty + cheese + bacon should total 600-900 calories, NOT 40-50 calories
