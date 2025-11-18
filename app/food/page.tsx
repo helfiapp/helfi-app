@@ -1318,16 +1318,22 @@ const applyStructuredItems = (
     loadHistory();
   }, [selectedDate, isViewingToday]);
 
-  // Save food entries to database and update context (OPTIMIZED)
+  // Save food entries to database and update context (OPTIMIZED + RELIABLE HISTORY)
   const saveFoodEntries = async (updatedFoods: any[], options?: { appendHistory?: boolean }) => {
     try {
-      // Update context immediately for instant UI updates
-      updateUserData({ todaysFoods: updatedFoods });
-      console.log('🚀 PERFORMANCE: Food updated in cache instantly - UI responsive!');
+      // 1) Update context immediately for instant UI updates
+      updateUserData({ todaysFoods: updatedFoods })
+      console.log('🚀 PERFORMANCE: Food updated in cache instantly - UI responsive!')
 
-      const appendHistory = options?.appendHistory !== false;
+      // We only want to create a new history row when this save represents
+      // a *new* entry (not edits or deletes). Callers pass appendHistory: false
+      // for edits/deletes.
+      const appendHistory = options?.appendHistory !== false
 
-      // Background save to user-data endpoint (don't wait for response)
+      // 2) Persist today's foods snapshot (fast "today" view) via /api/user-data.
+      //    We now ALWAYS send appendHistory: false here so this endpoint does not
+      //    try to create FoodLog rows itself. History writes are handled by the
+      //    dedicated /api/food-log endpoint below.
       fetch('/api/user-data', {
         method: 'POST',
         headers: {
@@ -1335,26 +1341,66 @@ const applyStructuredItems = (
         },
         body: JSON.stringify({
           todaysFoods: updatedFoods,
-          appendHistory
+          appendHistory: false,
         }),
-      }).then(response => {
-        if (!response.ok) {
-          console.error('Background save failed - but UI already updated');
-        } else {
-          console.log('🚀 PERFORMANCE: Food saved to database in background');
+      })
+        .then((response) => {
+          if (!response.ok) {
+            console.error('Background save to /api/user-data failed - UI already updated')
+          } else {
+            console.log('🚀 PERFORMANCE: Food saved to todaysFoods snapshot in background')
+          }
+        })
+        .catch((error) => {
+          console.error('Background save to /api/user-data error:', error)
+        })
+
+      // 3) For brand new entries, also write directly into the permanent FoodLog
+      //    history table via /api/food-log. This path is what the history view
+      //    (and "yesterday" after midnight) reads from, so we keep it rock‑solid.
+      if (appendHistory && Array.isArray(updatedFoods) && updatedFoods.length > 0) {
+        const latest = updatedFoods[0]
+        try {
+          const payload = {
+            description: (latest?.description || '').toString(),
+            nutrition: latest?.nutrition || null,
+            imageUrl: latest?.photo || null,
+            items:
+              Array.isArray(latest?.items) && latest.items.length > 0 ? latest.items : null,
+            // Always pin to the calendar date the user was viewing when they saved
+            localDate:
+              typeof latest?.localDate === 'string' && latest.localDate.length >= 8
+                ? latest.localDate
+                : selectedDate,
+          }
+
+          const res = await fetch('/api/food-log', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload),
+          })
+
+          if (!res.ok) {
+            console.error('❌ Failed to append entry to FoodLog history:', await res.text())
+          } else {
+            console.log('✅ Appended entry to FoodLog history for date', payload.localDate)
+          }
+        } catch (historyError) {
+          console.error('❌ Error while appending to FoodLog history:', historyError)
         }
-      }).catch(error => {
-        console.error('Background save error:', error);
-      });
-      // Show a brief visual confirmation
+      }
+
+      // 4) Show a brief visual confirmation
       try {
-        setShowSavedToast(true);
-        setTimeout(() => setShowSavedToast(false), 1500);
+        setShowSavedToast(true)
+        setTimeout(() => setShowSavedToast(false), 1500)
       } catch {}
     } catch (error) {
-      console.error('Error in saveFoodEntries:', error);
+      console.error('Error in saveFoodEntries:', error)
     }
-  };
+  }
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
