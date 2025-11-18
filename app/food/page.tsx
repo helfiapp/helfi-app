@@ -1850,11 +1850,33 @@ Please add nutritional information manually if needed.`);
       total: analyzedTotal || null // Store total nutrition
     };
     
-    const updatedFoods = [newEntry, ...todaysFoods];
-    setTodaysFoods(updatedFoods);
-    
+    const updatedFoods = [newEntry, ...todaysFoods]
+    setTodaysFoods(updatedFoods)
+
+    // If the user is viewing a non‑today date (e.g. yesterday), keep the
+    // visible history list in sync so the new entry doesn't "disappear"
+    // immediately after saving.
+    if (!isViewingToday) {
+      setHistoryFoods((prev: any[] | null) => {
+        const base = Array.isArray(prev) ? prev : []
+        const mapped = {
+          id: newEntry.id,
+          dbId: undefined,
+          description: newEntry.description,
+          time: newEntry.time,
+          method: newEntry.method,
+          photo: newEntry.photo,
+          nutrition: newEntry.nutrition,
+          items: newEntry.items,
+          localDate: newEntry.localDate,
+          total: newEntry.total || null,
+        }
+        return [mapped, ...base]
+      })
+    }
+
     // Save to database (this triggers background insight regeneration)
-    await saveFoodEntries(updatedFoods);
+    await saveFoodEntries(updatedFoods)
     
     // Show subtle notification that insights are updating
     setInsightsNotification({
