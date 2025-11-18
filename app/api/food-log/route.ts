@@ -45,6 +45,22 @@ export async function GET(request: NextRequest) {
     const start = new Date(startUtcMs)
     const end = new Date(endUtcMs)
 
+    // 🛡️ GUARD RAIL: Food Diary Entry Query (CRITICAL - DO NOT MODIFY WITHOUT READING GUARD_RAILS.md)
+    // 
+    // This query prevents entries from disappearing due to date filtering issues.
+    // See GUARD_RAILS.md section 3 for full documentation of the bug and fix.
+    //
+    // DO NOT:
+    // - Remove any of the OR conditions below
+    // - Filter by localDate alone without checking createdAt
+    // - Make the query more restrictive
+    // - Remove the filtering/deduplication steps below
+    //
+    // DO:
+    // - Query broadly to catch entries with missing/incorrect localDate
+    // - Filter precisely after querying to ensure correct date
+    // - Always deduplicate results
+    //
     // Prefer the explicit localDate column when present so entries never drift to the wrong day.
     // For older rows that predate localDate, fall back to the createdAt time-window.
     // CRITICAL FIX: Query more broadly to catch entries that might have incorrect localDate
@@ -60,6 +76,7 @@ export async function GET(request: NextRequest) {
           },
           // Include entries created within the date window (even if localDate is set incorrectly)
           // This ensures we don't lose entries due to date mismatches
+          // DO NOT REMOVE THIS CONDITION - it prevents entries from disappearing
           {
             createdAt: { gte: start, lte: end },
           },
@@ -68,8 +85,10 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' },
     })
     
+    // 🛡️ GUARD RAIL: Post-Query Filtering (REQUIRED)
     // Filter to ensure we only return entries for the requested date
     // This handles entries that might have incorrect localDate values
+    // DO NOT remove this filtering step - it ensures accuracy after broad query
     const filteredLogs = logs.filter((log) => {
       // If localDate matches exactly, include it
       if (log.localDate === dateStr) return true;
@@ -84,7 +103,9 @@ export async function GET(request: NextRequest) {
       return false;
     })
     
+    // 🛡️ GUARD RAIL: Deduplication (REQUIRED)
     // Remove duplicates (in case an entry matches multiple OR conditions)
+    // DO NOT remove this step - multiple OR conditions can return same entry multiple times
     const uniqueLogs = filteredLogs.filter((log, index, self) => 
       index === self.findIndex((l) => l.id === log.id)
     )

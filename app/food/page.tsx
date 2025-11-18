@@ -1217,6 +1217,21 @@ const applyStructuredItems = (
 
 
 
+  // 🛡️ GUARD RAIL: Food Diary Entry Loading
+  // CRITICAL: This section prevents entries from disappearing due to date filtering issues.
+  // See GUARD_RAILS.md section 3 for full documentation.
+  // 
+  // DO NOT:
+  // - Remove the database verification step below
+  // - Make date filtering stricter
+  // - Skip the fallback to /api/food-log
+  // - Assume cached data is always complete
+  //
+  // DO:
+  // - Always verify cached entries against database
+  // - Merge missing entries back into cache
+  // - Handle missing/incorrect localDate gracefully
+  //
   // Load today's foods from context data (no API calls needed!)
   useEffect(() => {
     if (isViewingToday && userData?.todaysFoods) {
@@ -1260,9 +1275,11 @@ const applyStructuredItems = (
           return idsMatch ? prev : deduped;
         });
         
-        // CRITICAL FIX: Always verify with database to catch entries that might have been
-        // saved but filtered out due to missing/incorrect localDate
-        // This ensures we don't lose entries that exist in FoodLog but not in cache
+        // 🛡️ GUARD RAIL: Database Verification (REQUIRED - DO NOT REMOVE)
+        // CRITICAL: Always verify cached entries against database to catch entries that might have been
+        // saved but filtered out due to missing/incorrect localDate. This ensures we don't lose entries
+        // that exist in FoodLog but not in cache. This verification step prevents the "missing entries"
+        // bug that occurred on Jan 19, 2025. See GUARD_RAILS.md section 3 for details.
         (async () => {
           try {
             const tz = new Date().getTimezoneOffset();

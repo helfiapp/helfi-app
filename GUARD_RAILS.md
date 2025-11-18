@@ -189,7 +189,113 @@ the user.
 
 ---
 
-## 3. Rules for Future Modifications
+## 3. Food Diary Entry Loading & Date Filtering
+
+**Protected files:**
+- `app/food/page.tsx` (lines ~1220-1420 - food entry loading logic)
+- `app/api/food-log/route.ts` (lines ~8-95 - GET endpoint for retrieving entries)
+
+### 3.1 Critical Issue: Missing Entries Due to Date Filtering
+
+**Problem History:**
+On January 19th, 2025, food diary entries disappeared because entries were being filtered out when `localDate` was missing or incorrect. The cached entries were filtered strictly by `localDate`, and entries without proper `localDate` values were lost from view.
+
+**Root Cause:**
+- Entries saved to the database might have missing or incorrect `localDate` values
+- Frontend filtering was too strict - entries without matching `localDate` were filtered out
+- Backend query only checked exact `localDate` matches, missing entries with incorrect dates
+- No verification step to reconcile cached entries with database entries
+
+### 3.2 Required Safeguards
+
+**Frontend (`app/food/page.tsx`):**
+
+1. **Always verify cached entries against database:**
+   - When loading today's entries from cache, ALWAYS make a background API call to `/api/food-log` to verify
+   - Compare cached entry IDs with database entry IDs
+   - If database has entries missing from cache, merge them back in
+   - This prevents entries from being lost due to filtering
+
+2. **Never rely solely on cached data:**
+   - Cached `todaysFoods` is for performance, not reliability
+   - Always have a fallback to load from `/api/food-log` API
+   - If cached entries are filtered out (empty array), immediately load from database
+
+3. **Handle missing `localDate` gracefully:**
+   - When `localDate` is missing, fall back to parsing timestamp from entry `id`
+   - Don't filter out entries just because `localDate` is missing
+   - Always merge database entries back into cache with proper `localDate` set
+
+**Backend (`app/api/food-log/route.ts`):**
+
+1. **Query broadly, filter precisely:**
+   - Query MUST include entries created within the date window, even if `localDate` doesn't match
+   - Use OR conditions to catch entries with:
+     - Correct `localDate` matching requested date
+     - Null `localDate` but `createdAt` within date window
+     - Incorrect `localDate` but `createdAt` within date window
+   - After querying, filter results to ensure only entries for requested date are returned
+   - Remove duplicates before returning results
+
+2. **Never filter by `localDate` alone:**
+   - Always check `createdAt` timestamp as fallback
+   - Entries might have been saved with wrong `localDate` due to timezone issues or bugs
+   - The `createdAt` timestamp is the source of truth for when entry was actually created
+
+3. **Deduplication is required:**
+   - Multiple OR conditions might return the same entry multiple times
+   - Always deduplicate by entry `id` before returning results
+
+### 3.3 What Agents Must NOT Do
+
+**DO NOT:**
+- Remove the database verification step in the frontend loading logic
+- Make date filtering stricter or more restrictive
+- Remove the fallback OR conditions in the backend query
+- Filter entries out solely based on `localDate` mismatch
+- Remove deduplication logic
+- Assume cached data is always complete or correct
+- Skip the database check "for performance" - reliability is more important
+
+**DO:**
+- Always verify cached entries against database
+- Query broadly, filter precisely
+- Handle missing `localDate` gracefully
+- Merge missing entries back into cache
+- Test with entries that have missing/incorrect `localDate` values
+
+### 3.4 Testing Requirements
+
+Before modifying food diary loading logic, agents must test:
+
+1. **Entries with correct `localDate`:**
+   - Should load from cache instantly
+   - Should verify against database in background
+   - Should appear correctly
+
+2. **Entries with missing `localDate`:**
+   - Should still appear (fallback to timestamp parsing)
+   - Should be merged back into cache with `localDate` set
+   - Should persist correctly
+
+3. **Entries with incorrect `localDate`:**
+   - Should still appear if `createdAt` matches date
+   - Should be corrected in cache
+   - Should not be lost
+
+4. **Empty cache scenario:**
+   - Should load directly from database
+   - Should populate cache correctly
+   - Should work reliably
+
+5. **Cross-day boundary:**
+   - Entries created late at night should appear on correct date
+   - Timezone handling must be correct
+   - Date filtering must account for user's timezone
+
+---
+
+## 4. Rules for Future Modifications
 
 Before changing anything in the protected areas above, an agent **must**:
 
