@@ -1292,20 +1292,44 @@ const applyStructuredItems = (
         const tz = new Date().getTimezoneOffset();
         const res = await fetch(`/api/food-log?date=${selectedDate}&tz=${tz}`);
         if (res.ok) {
-          const json = await res.json();
-          const logs = Array.isArray(json.logs) ? json.logs : [];
+          const json = await res.json()
+          const logs = Array.isArray(json.logs) ? json.logs : []
+
           const mapped = logs.map((l: any) => ({
             id: new Date(l.createdAt).getTime(), // UI key and sorting by timestamp
             dbId: l.id, // actual database id for delete operations
             description: l.description || l.name,
-            time: new Date(l.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            time: new Date(l.createdAt).toLocaleTimeString([], {
+              hour: '2-digit',
+              minute: '2-digit',
+            }),
             method: l.imageUrl ? 'photo' : 'text',
             photo: l.imageUrl || null,
             nutrition: l.nutrients || null,
             items: (l as any).items || (l.nutrients as any)?.items || null,
             localDate: (l as any).localDate || selectedDate,
-          }));
-          setHistoryFoods(mapped);
+          }))
+
+          // De‑duplicate any accidental duplicate rows (e.g. from multiple
+          // history append paths) so the user only sees one copy of each meal.
+          const seen = new Set<string>()
+          const deduped: any[] = []
+          for (const entry of mapped) {
+            const key = [
+              entry.localDate,
+              entry.description,
+              entry.time,
+              entry.photo || '',
+            ]
+              .join('|')
+              .toLowerCase()
+            if (!seen.has(key)) {
+              seen.add(key)
+              deduped.push(entry)
+            }
+          }
+
+          setHistoryFoods(deduped)
         } else {
           setHistoryFoods([]);
         }
@@ -1341,7 +1365,7 @@ const applyStructuredItems = (
         },
         body: JSON.stringify({
           todaysFoods: updatedFoods,
-          appendHistory: false,
+          appendHistory,
         }),
       })
         .then((response) => {
