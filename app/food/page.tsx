@@ -1238,8 +1238,26 @@ const applyStructuredItems = (
           return false;
         }
       });
-      if (Array.isArray(onlySelectedDate) && onlySelectedDate.length > 0) {
-        setTodaysFoods(onlySelectedDate);
+      
+      // Deduplicate entries by ID to prevent duplicates from context updates
+      const seenIds = new Set<number>();
+      const deduped = onlySelectedDate.filter((item: any) => {
+        const id = typeof item.id === 'number' ? item.id : Number(item.id);
+        if (seenIds.has(id)) {
+          return false;
+        }
+        seenIds.add(id);
+        return true;
+      });
+      
+      if (Array.isArray(deduped) && deduped.length > 0) {
+        // Only update if the data actually changed to prevent unnecessary re-renders
+        setTodaysFoods(prev => {
+          const prevIds = new Set(prev.map((f: any) => typeof f.id === 'number' ? f.id : Number(f.id)));
+          const newIds = new Set(deduped.map((f: any) => typeof f.id === 'number' ? f.id : Number(f.id)));
+          const idsMatch = prevIds.size === newIds.size && [...prevIds].every(id => newIds.has(id));
+          return idsMatch ? prev : deduped;
+        });
       } else {
         // Fallback: if provider cache is empty, load from food-log API for the selected date
         (async () => {
@@ -1383,9 +1401,24 @@ const applyStructuredItems = (
   // Save food entries to database and update context (OPTIMIZED + RELIABLE HISTORY)
   const saveFoodEntries = async (updatedFoods: any[], options?: { appendHistory?: boolean }) => {
     try {
-      // 1) Update context immediately for instant UI updates
-      updateUserData({ todaysFoods: updatedFoods })
-      console.log('🚀 PERFORMANCE: Food updated in cache instantly - UI responsive!')
+      // 1) Deduplicate before updating context to prevent duplicates
+      const seenIds = new Set<number>();
+      const dedupedFoods = updatedFoods.filter((food: any) => {
+        const id = typeof food.id === 'number' ? food.id : Number(food.id);
+        if (seenIds.has(id)) {
+          console.log('⚠️ Duplicate entry detected in saveFoodEntries, removing:', id);
+          return false;
+        }
+        seenIds.add(id);
+        return true;
+      });
+      
+      // 2) Update context immediately for instant UI updates (with deduplicated array)
+      updateUserData({ todaysFoods: dedupedFoods })
+      console.log('🚀 PERFORMANCE: Food updated in cache instantly - UI responsive!', {
+        originalCount: updatedFoods.length,
+        dedupedCount: dedupedFoods.length
+      })
 
       // We only want to create a new history row when this save represents
       // a *new* entry (not edits or deletes). Callers pass appendHistory: false
@@ -1420,7 +1453,7 @@ const applyStructuredItems = (
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            todaysFoods: updatedFoods,
+            todaysFoods: dedupedFoods, // Use deduplicated array
             appendHistory: false, // Always false - we handle FoodLog separately
           }),
         })
@@ -1961,6 +1994,13 @@ Please add nutritional information manually if needed.`);
       items: analyzedItems && analyzedItems.length > 0 ? analyzedItems : null, // Store structured items
       total: analyzedTotal || null // Store total nutrition
     };
+    
+    // Prevent duplicates: check if entry with same ID already exists
+    const existingById = todaysFoods.find(food => food.id === newEntry.id);
+    if (existingById) {
+      console.log('⚠️ Entry with same ID already exists, skipping duplicate');
+      return;
+    }
     
     const updatedFoods = [newEntry, ...todaysFoods]
     setTodaysFoods(updatedFoods)
