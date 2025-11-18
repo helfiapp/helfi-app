@@ -1259,8 +1259,63 @@ const applyStructuredItems = (
           const idsMatch = prevIds.size === newIds.size && prevIdsArray.every(id => newIds.has(id));
           return idsMatch ? prev : deduped;
         });
+        
+        // CRITICAL FIX: Always verify with database to catch entries that might have been
+        // saved but filtered out due to missing/incorrect localDate
+        // This ensures we don't lose entries that exist in FoodLog but not in cache
+        (async () => {
+          try {
+            const tz = new Date().getTimezoneOffset();
+            const res = await fetch(`/api/food-log?date=${selectedDate}&tz=${tz}`);
+            if (res.ok) {
+              const json = await res.json();
+              const logs = Array.isArray(json.logs) ? json.logs : [];
+              
+              // Check if database has entries that aren't in our cached list
+              const cachedIds = new Set(deduped.map((f: any) => {
+                const id = typeof f.id === 'number' ? f.id : Number(f.id);
+                return id;
+              }));
+              
+              const missingEntries = logs.filter((l: any) => {
+                const logId = new Date(l.createdAt).getTime();
+                return !cachedIds.has(logId);
+              });
+              
+              if (missingEntries.length > 0) {
+                console.log('⚠️ Found entries in database that were missing from cache:', missingEntries.length);
+                const mappedMissing = missingEntries.map((l: any) => ({
+                  id: new Date(l.createdAt).getTime(),
+                  dbId: l.id,
+                  description: l.description || l.name,
+                  time: new Date(l.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                  method: l.imageUrl ? 'photo' : 'text',
+                  photo: l.imageUrl || null,
+                  nutrition: l.nutrients || null,
+                  items: (l as any).items || (l.nutrients as any)?.items || null,
+                  localDate: (l as any).localDate || selectedDate,
+                }));
+                
+                // Merge missing entries with existing cached entries
+                const merged = [...mappedMissing, ...deduped];
+                setTodaysFoods(merged);
+                
+                // Update cache with merged data
+                try {
+                  fetch('/api/user-data', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ todaysFoods: merged, appendHistory: false })
+                  }).catch(() => {})
+                } catch {}
+              }
+            }
+          } catch (error) {
+            console.error('Error verifying entries from database:', error);
+          }
+        })();
       } else {
-        // Fallback: if provider cache is empty, load from food-log API for the selected date
+        // Fallback: if provider cache is empty or filtered out, load from food-log API for the selected date
         (async () => {
           try {
             const tz = new Date().getTimezoneOffset();
@@ -1287,7 +1342,7 @@ const applyStructuredItems = (
                   fetch('/api/user-data', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ todaysFoods: mapped })
+                    body: JSON.stringify({ todaysFoods: mapped, appendHistory: false })
                   }).catch(() => {})
                 } catch {}
               } else {
@@ -1314,7 +1369,7 @@ const applyStructuredItems = (
                       fetch('/api/user-data', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ todaysFoods: byDate })
+                        body: JSON.stringify({ todaysFoods: byDate, appendHistory: false })
                       }).catch(() => {})
                     } catch {}
                   }
@@ -1326,6 +1381,42 @@ const applyStructuredItems = (
           }
         })();
       }
+    } else if (isViewingToday) {
+      // If no cached data, load directly from database
+      (async () => {
+        try {
+          const tz = new Date().getTimezoneOffset();
+          const res = await fetch(`/api/food-log?date=${selectedDate}&tz=${tz}`);
+          if (res.ok) {
+            const json = await res.json();
+            const logs = Array.isArray(json.logs) ? json.logs : [];
+            const mapped = logs.map((l: any) => ({
+              id: new Date(l.createdAt).getTime(),
+              dbId: l.id,
+              description: l.description || l.name,
+              time: new Date(l.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              method: l.imageUrl ? 'photo' : 'text',
+              photo: l.imageUrl || null,
+              nutrition: l.nutrients || null,
+              items: (l as any).items || (l.nutrients as any)?.items || null,
+              localDate: (l as any).localDate || selectedDate,
+            }));
+            if (mapped.length > 0) {
+              setTodaysFoods(mapped);
+              // Persist localDate back to user data for stability
+              try {
+                fetch('/api/user-data', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ todaysFoods: mapped, appendHistory: false })
+                }).catch(() => {})
+              } catch {}
+            }
+          }
+        } catch (error) {
+          console.error('Error loading food entries:', error);
+        }
+      })();
     }
   }, [userData, isViewingToday, selectedDate]);
 

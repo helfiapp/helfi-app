@@ -47,6 +47,8 @@ export async function GET(request: NextRequest) {
 
     // Prefer the explicit localDate column when present so entries never drift to the wrong day.
     // For older rows that predate localDate, fall back to the createdAt time-window.
+    // CRITICAL FIX: Query more broadly to catch entries that might have incorrect localDate
+    // We'll filter them properly below
     const logs = await prisma.foodLog.findMany({
       where: {
         userId: user.id,
@@ -56,12 +58,40 @@ export async function GET(request: NextRequest) {
             localDate: null,
             createdAt: { gte: start, lte: end },
           },
+          // Include entries created within the date window (even if localDate is set incorrectly)
+          // This ensures we don't lose entries due to date mismatches
+          {
+            createdAt: { gte: start, lte: end },
+          },
         ],
       },
       orderBy: { createdAt: 'desc' },
     })
+    
+    // Filter to ensure we only return entries for the requested date
+    // This handles entries that might have incorrect localDate values
+    const filteredLogs = logs.filter((log) => {
+      // If localDate matches exactly, include it
+      if (log.localDate === dateStr) return true;
+      
+      // If localDate is null or doesn't match, check if createdAt falls within the date window
+      // This uses the timezone-adjusted window we calculated above
+      if (!log.localDate || log.localDate !== dateStr) {
+        const logTime = log.createdAt.getTime();
+        return logTime >= start.getTime() && logTime <= end.getTime();
+      }
+      
+      return false;
+    })
+    
+    // Remove duplicates (in case an entry matches multiple OR conditions)
+    const uniqueLogs = filteredLogs.filter((log, index, self) => 
+      index === self.findIndex((l) => l.id === log.id)
+    )
 
-    return NextResponse.json({ success: true, logs })
+    console.log(`📊 GET /api/food-log - Found ${uniqueLogs.length} entries for date ${dateStr} (from ${logs.length} total matches)`)
+    
+    return NextResponse.json({ success: true, logs: uniqueLogs })
   } catch (error) {
     console.error('GET /api/food-log error', error)
     return NextResponse.json({ error: 'Failed to load logs' }, { status: 500 })
