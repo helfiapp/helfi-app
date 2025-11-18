@@ -274,13 +274,13 @@ function MacroRing({
 }: {
   macros: MacroSegment[]
   showLegend?: boolean
-  size?: 'large' | 'small'
+  size?: 'large' | 'small' | 'xlarge'
 }) {
   const positive = macros.filter((m) => m.grams && m.grams > 0)
   const total = positive.reduce((sum, m) => sum + m.grams, 0)
-  const radius = size === 'small' ? 26 : 44
+  const radius = size === 'small' ? 26 : size === 'xlarge' ? 56 : 44
   const circumference = 2 * Math.PI * radius
-  const svgSize = size === 'small' ? 80 : 120
+  const svgSize = size === 'small' ? 80 : size === 'xlarge' ? 150 : 120
 
   let currentAngle = -90
   const circles =
@@ -297,7 +297,7 @@ function MacroRing({
               cx={svgSize / 2}
               cy={svgSize / 2}
               r={radius}
-              strokeWidth={size === 'small' ? 7 : 8}
+              strokeWidth={size === 'small' ? 7 : size === 'xlarge' ? 10 : 8}
               stroke={m.color}
               fill="none"
               strokeDasharray={dashArray}
@@ -316,7 +316,7 @@ function MacroRing({
           cx={svgSize / 2}
           cy={svgSize / 2}
           r={radius}
-          strokeWidth={size === 'small' ? 7 : 8}
+          strokeWidth={size === 'small' ? 7 : size === 'xlarge' ? 10 : 8}
           stroke="#e5e7eb"
           fill="none"
         />
@@ -3102,11 +3102,11 @@ Please add nutritional information manually if needed.`);
                             </button>
                           </div>
                         </div>
-                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 sm:gap-8">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-3">
                           {/* Circle chart with calories in center */}
                           <div className="flex-shrink-0">
                             <div className="relative inline-block">
-                              <MacroRing macros={macroSegments} showLegend={false} size="large" />
+                              <MacroRing macros={macroSegments} showLegend={false} size="xlarge" />
                               <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
                                 <div className="text-2xl sm:text-3xl font-bold text-gray-900">
                                   {caloriesInUnit}
@@ -3118,10 +3118,10 @@ Please add nutritional information manually if needed.`);
                             </div>
                           </div>
                           
-                          {/* Macro breakdown list - 2 column layout */}
+                          {/* Macro breakdown list - single column on mobile, 2 column on desktop */}
                           <div className="flex-1">
-                            <div className="text-sm text-gray-600 mb-3 font-medium">Macro breakdown</div>
-                            <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm text-gray-700">
+                            <div className="text-sm text-gray-600 mb-1.5 sm:mb-2 font-medium">Macro breakdown</div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-sm text-gray-700">
                               {displayMacros.map((macro) => {
                                 const displayValue = macro.grams > 0 ? Math.round(macro.grams) : 0
                                 return (
