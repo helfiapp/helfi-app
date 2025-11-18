@@ -348,6 +348,24 @@ CRITICAL STRUCTURED OUTPUT RULES:
 - ALWAYS return the ITEMS_JSON block and include fiber_g and sugar_g for each item (do not leave as 0 unless truly 0).
 - Use household measures and add ounce equivalents in parentheses where appropriate (e.g., "1 cup (8 oz)").
 - For discrete items like bacon or bread slices, count visible slices and use that count for servings.
+- **CRITICAL: Use REALISTIC nutrition values based on standard food databases (USDA, nutrition labels, etc.). Do NOT underestimate calories or macros.**
+
+REALISTIC NUTRITION REFERENCE VALUES (use these as guidance):
+- Burger bun (standard sesame): ~150 calories, 5g protein, 28g carbs, 3g fat per bun
+- Beef patty (cooked, 6 oz / 170g): ~400 calories, 30g protein, 0g carbs, 30g fat
+- Cheese slice (American/Cheddar): ~100 calories, 6g protein, 1g carbs, 9g fat per slice
+- Bacon (cooked, 2 slices): ~80 calories, 6g protein, 0g carbs, 7g fat
+- Chicken breast (cooked, 6 oz): ~280 calories, 54g protein, 0g carbs, 6g fat
+- Rice (cooked, 1 cup): ~220 calories, 4g protein, 45g carbs, 0.5g fat
+- Large egg: ~70 calories, 6g protein, 0.5g carbs, 5g fat
+- Medium banana: ~105 calories, 1g protein, 27g carbs, 0.4g fat
+- Bread slice (white): ~80 calories, 2g protein, 15g carbs, 1g fat
+
+**ACCURACY REQUIREMENTS:**
+- A typical burger with bun + 6oz patty + cheese + bacon should total 600-900 calories, NOT 40-50 calories
+- Always cross-check your totals: if a meal looks substantial, the calories should reflect that
+- If your calculated total seems too low, re-check each component's nutrition values
+- Use standard serving sizes and realistic nutrition databases
 
 OUTPUT REQUIREMENTS:
 - Keep explanation to 2-3 sentences
@@ -362,12 +380,7 @@ Calories: [number], Protein: [g], Carbs: [g], Fat: [g]
 ${preferMultiDetect ? `The image likely contains multiple foods or components - analyze each one carefully, calculate nutrition for each, then sum the totals.
 ` : ''}
 
-IMPORTANT: Different sizes have different nutrition values:
-- Large egg: ~70 calories, 6g protein
-- Medium egg: ~55 calories, 5g protein  
-- Small egg: ~45 calories, 4g protein
-
-Examples:
+Examples with REALISTIC values:
 "Medium banana (1 whole)
 Calories: 105, Protein: 1g, Carbs: 27g, Fat: 0g"
 
@@ -377,7 +390,10 @@ Calories: 485, Protein: 45g, Carbs: 45g, Fat: 8g"
 "Caesar salad with grilled chicken (large)
 Calories: 520, Protein: 35g, Carbs: 18g, Fat: 32g"
 
-Estimate portion size carefully from the image and calculate nutrition accordingly. For meals, sum all components. End your response with the nutrition line exactly once as shown.
+"Burger with bun, 6oz beef patty, cheese, bacon, lettuce, tomato
+Calories: 780, Protein: 47g, Carbs: 29g, Fat: 49g"
+
+Estimate portion size carefully from the image and calculate nutrition accordingly using REALISTIC values. For meals, sum all components. End your response with the nutrition line exactly once as shown.
 ${wantStructured ? `
 After your explanation and the one-line totals above, also include a compact JSON block between <ITEMS_JSON> and </ITEMS_JSON> with this exact shape for any detected foods:
 <ITEMS_JSON>{"items":[{"name":"string","brand":"string or null","serving_size":"string (e.g., '1 slice', '40g', '1 cup (8 oz)')","servings":1,"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"sugar_g":0}],"total":{"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"sugar_g":0}}</ITEMS_JSON>
@@ -657,8 +673,10 @@ CRITICAL REQUIREMENTS:
                   '{"items":[{"name":"string","brand":null,"serving_size":"string","servings":1,"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"sugar_g":0}],' +
                   '"total":{"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"sugar_g":0}}\n\n' +
                   'Rules:\n' +
-                  '- Use PER-SERVING nutrition values for each item.\n' +
+                  '- Use PER-SERVING nutrition values for each item based on REALISTIC standard nutrition databases.\n' +
                   '- The "total" object must be the sum of all items multiplied by their servings.\n' +
+                  '- Use realistic values: burger bun ~150 cal, 6oz beef patty ~400 cal, cheese slice ~100 cal, bacon (2 slices) ~80 cal.\n' +
+                  '- A typical burger should total 600-900 calories, NOT 40-50 calories.\n' +
                   '- If you are unsure about fiber or sugar, set them to 0.\n' +
                   '- Respond with JSON ONLY, no backticks, no comments, no extra text.\n\n' +
                   'Analysis text:\n' +
