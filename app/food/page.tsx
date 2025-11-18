@@ -167,53 +167,97 @@ type RingProps = {
   label: string
   valueLabel: string
   percent: number
-  tone: 'primary' | 'secondary' | 'target'
+  tone: 'primary' | 'target'
 }
 
 function TargetRing({ label, valueLabel, percent, tone }: RingProps) {
-  const radius = 32
+  const radius = 44
   const circumference = 2 * Math.PI * radius
   const clamped = Math.max(0, Math.min(percent, 1))
   const offset = circumference - clamped * circumference
-  let trackColor = 'text-gray-100'
-  let progressColor = 'text-gray-400'
 
-  if (tone === 'primary') {
-    trackColor = 'text-gray-100'
-    progressColor = 'text-emerald-500'
-  } else if (tone === 'target') {
-    trackColor = 'text-emerald-200' // remaining
-    progressColor = 'text-red-500' // used
-  }
+  // For Consumed/primary we keep a solid green ring.
+  // For Remaining/target we draw a two-tone red/green ring using the percent.
+  const isTarget = tone === 'target'
+  const strokeWidth = 10
+  const svgSize = 120
+
+  const remainingFraction = isTarget ? 1 - clamped : 0
+  const usedFraction = isTarget ? clamped : 1
+
+  const usedLength = usedFraction * circumference
+  const remainingLength = remainingFraction * circumference
 
   return (
     <div className="flex flex-col items-center">
-      <svg width="88" height="88" className="mb-1">
-        <circle
-          cx="44"
-          cy="44"
-          r={radius}
-          strokeWidth="8"
-          className={trackColor}
-          stroke="currentColor"
-          fill="none"
-        />
-        <circle
-          cx="44"
-          cy="44"
-          r={radius}
-          strokeWidth="8"
-          className={progressColor}
-          stroke="currentColor"
-          fill="none"
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
-          transform="rotate(-90 44 44)"
-        />
-      </svg>
-      <div className="text-sm font-semibold text-gray-900">{valueLabel}</div>
-      <div className="text-xs text-gray-500">{label}</div>
+      <div className="relative inline-block">
+        <svg width={svgSize} height={svgSize}>
+          {/* Base track */}
+          <circle
+            cx={svgSize / 2}
+            cy={svgSize / 2}
+            r={radius}
+            strokeWidth={strokeWidth}
+            stroke="#e5e7eb"
+            fill="none"
+          />
+          {isTarget ? (
+            <>
+              {/* Used (red) */}
+              {usedFraction > 0 && (
+                <circle
+                  cx={svgSize / 2}
+                  cy={svgSize / 2}
+                  r={radius}
+                  strokeWidth={strokeWidth}
+                  stroke="#ef4444"
+                  fill="none"
+                  strokeDasharray={`${usedLength} ${circumference}`}
+                  strokeDashoffset={0}
+                  strokeLinecap="round"
+                  transform={`rotate(-90 ${svgSize / 2} ${svgSize / 2})`}
+                />
+              )}
+              {/* Remaining (carb green) */}
+              {remainingFraction > 0 && (
+                <circle
+                  cx={svgSize / 2}
+                  cy={svgSize / 2}
+                  r={radius}
+                  strokeWidth={strokeWidth}
+                  stroke="#22c55e"
+                  fill="none"
+                  strokeDasharray={`${remainingLength} ${circumference}`}
+                  strokeDashoffset={usedLength}
+                  strokeLinecap="round"
+                  transform={`rotate(-90 ${svgSize / 2} ${svgSize / 2})`}
+                />
+              )}
+            </>
+          ) : (
+            // Consumed ring – single green circle
+            <circle
+              cx={svgSize / 2}
+              cy={svgSize / 2}
+              r={radius}
+              strokeWidth={strokeWidth}
+              stroke="#22c55e"
+              fill="none"
+              strokeDasharray={circumference}
+              strokeDashoffset={circumference - clamped * circumference}
+              strokeLinecap="round"
+              transform={`rotate(-90 ${svgSize / 2} ${svgSize / 2})`}
+            />
+          )}
+        </svg>
+        {/* Center value */}
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+          <div className="text-xl font-bold text-gray-900">{valueLabel}</div>
+        </div>
+      </div>
+      <div className="mt-2 text-xs font-semibold text-gray-700 uppercase tracking-wide">
+        {label}
+      </div>
     </div>
   )
 }
@@ -225,12 +269,20 @@ type MacroSegment = {
   color: string
 }
 
-function MacroRing({ macros, showLegend = true, size = 'large' }: { macros: MacroSegment[]; showLegend?: boolean; size?: 'large' | 'small' }) {
+function MacroRing({
+  macros,
+  showLegend = true,
+  size = 'large',
+}: {
+  macros: MacroSegment[]
+  showLegend?: boolean
+  size?: 'large' | 'small'
+}) {
   const positive = macros.filter((m) => m.grams && m.grams > 0)
   const total = positive.reduce((sum, m) => sum + m.grams, 0)
-  const radius = size === 'small' ? 22 : 32
+  const radius = size === 'small' ? 26 : 44
   const circumference = 2 * Math.PI * radius
-  const svgSize = size === 'small' ? 64 : 88
+  const svgSize = size === 'small' ? 80 : 120
 
   let currentAngle = -90
   const circles =
@@ -762,6 +814,11 @@ export default function FoodDiary() {
   const [hasPaidAccess, setHasPaidAccess] = useState<boolean>(false)
   const [energyUnit, setEnergyUnit] = useState<'kcal' | 'kJ'>('kcal')
   const [volumeUnit, setVolumeUnit] = useState<'oz' | 'ml'>('oz')
+  const [macroPopup, setMacroPopup] = useState<{
+    title: string
+    energyLabel?: string
+    macros: MacroSegment[]
+  } | null>(null)
 
   const dailyTargets = useMemo(() => {
     if (!userData) return { calories: null, protein: null, carbs: null, fat: null }
@@ -3973,9 +4030,9 @@ Please add nutritional information manually if needed.`);
                 const macroSegments: MacroSegment[] = [
                   { key: 'protein', label: 'Protein', grams: totals.protein || 0, color: '#ef4444' }, // red
                   { key: 'carbs', label: 'Carbs', grams: totals.carbs || 0, color: '#22c55e' }, // green
-                  { key: 'fat', label: 'Fat', grams: totals.fat || 0, color: '#3b82f6' }, // blue
-                  { key: 'fiber', label: 'Fiber', grams: totals.fiber || 0, color: '#f97316' }, // orange
                   { key: 'sugar', label: 'Sugar', grams: totals.sugar || 0, color: '#ec4899' }, // pink
+                  { key: 'fiber', label: 'Fibre', grams: totals.fiber || 0, color: '#93c5fd' }, // light blue
+                  { key: 'fat', label: 'Fat', grams: totals.fat || 0, color: '#3b82f6' }, // blue
                 ]
 
                 return (
@@ -4017,24 +4074,62 @@ Please add nutritional information manually if needed.`);
                         </p>
                       ) : (
                         <div className="grid grid-cols-2 gap-4">
-                          <MacroRing macros={macroSegments} />
+                          {/* Consumed macro ring */}
+                          <button
+                            type="button"
+                            className="flex flex-col items-center focus:outline-none"
+                            onClick={() =>
+                              setMacroPopup({
+                                title: "Today's macro breakdown",
+                                energyLabel:
+                                  consumedInUnit !== null
+                                    ? `${Math.round(consumedInUnit)} ${energyUnit}`
+                                    : undefined,
+                                macros: macroSegments,
+                              })
+                            }
+                          >
+                            <div className="relative inline-block">
+                              <MacroRing macros={macroSegments} showLegend={false} size="large" />
+                              <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                                <div className="text-xl font-bold text-gray-900">
+                                  {consumedInUnit !== null
+                                    ? Math.round(consumedInUnit)
+                                    : '—'}
+                                </div>
+                                <div className="text-xs text-gray-500 mt-0.5">
+                                  {energyUnit}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="mt-2 text-xs font-semibold text-gray-700 uppercase tracking-wide">
+                              Consumed
+                            </div>
+                          </button>
+
+                          {/* Remaining allowance ring */}
                           <div className="flex flex-col items-center">
                             <TargetRing
-                              label={
-                                targetInUnit !== null
-                                  ? 'Daily allowance'
-                                  : 'Complete Health Setup'
-                              }
+                              label="Remaining"
                               valueLabel={
                                 targetInUnit !== null && consumedInUnit !== null
-                                  ? `${Math.round(consumedInUnit)} / ${Math.round(
-                                      targetInUnit,
+                                  ? `${Math.max(
+                                      0,
+                                      Math.round(targetInUnit - consumedInUnit),
                                     )} ${energyUnit}`
-                                  : 'Set up profile'
+                                  : '—'
                               }
                               percent={percentOfTarget || 0}
                               tone="target"
                             />
+                            {targetInUnit !== null && (
+                              <div className="mt-1 text-[11px] text-gray-500">
+                                Daily allowance:{' '}
+                                <span className="font-semibold">
+                                  {Math.round(targetInUnit)} {energyUnit}
+                                </span>
+                              </div>
+                            )}
                             <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-gray-600">
                               <div className="flex items-center gap-1">
                                 <span className="inline-block w-2 h-2 rounded-full bg-red-500" />
@@ -4196,7 +4291,7 @@ Please add nutritional information manually if needed.`);
                           </div>
                         )}
 
-                        {/* Per-meal macro ring + legend */}
+                        {/* Per-meal macro ring */}
                         <div className="flex-1 sm:max-w-md lg:max-w-lg">
                           {(() => {
                             // Use ingredient cards as the single source of truth for per-meal totals.
@@ -4233,26 +4328,47 @@ Please add nutritional information manually if needed.`);
                                 color: '#22c55e',
                               },
                               {
-                                key: 'fat',
-                                label: 'Fat',
-                                grams: (summaryTotals as any)?.fat ?? 0,
-                                color: '#3b82f6',
-                              },
-                              {
-                                key: 'fiber',
-                                label: 'Fiber',
-                                grams: (summaryTotals as any)?.fiber ?? 0,
-                                color: '#f97316',
-                              },
-                              {
                                 key: 'sugar',
                                 label: 'Sugar',
                                 grams: (summaryTotals as any)?.sugar ?? 0,
                                 color: '#ec4899',
                               },
+                              {
+                                key: 'fiber',
+                                label: 'Fibre',
+                                grams: (summaryTotals as any)?.fiber ?? 0,
+                                color: '#93c5fd',
+                              },
+                              {
+                                key: 'fat',
+                                label: 'Fat',
+                                grams: (summaryTotals as any)?.fat ?? 0,
+                                color: '#3b82f6',
+                              },
                             ]
 
-                            return <MacroRing macros={mealMacros} showLegend />
+                            const mealEnergyKcal = Number(
+                              (summaryTotals as any)?.calories ?? 0,
+                            )
+
+                            return (
+                              <button
+                                type="button"
+                                className="flex flex-col items-center focus:outline-none"
+                                onClick={() =>
+                                  setMacroPopup({
+                                    title: 'Meal macro breakdown',
+                                    energyLabel:
+                                      Number.isFinite(mealEnergyKcal) && mealEnergyKcal > 0
+                                        ? `${Math.round(mealEnergyKcal)} kcal`
+                                        : undefined,
+                                    macros: mealMacros,
+                                  })
+                                }
+                              >
+                                <MacroRing macros={mealMacros} showLegend={false} size="small" />
+                              </button>
+                            )
                           })()}
                         </div>
                       </div>
@@ -4264,6 +4380,52 @@ Please add nutritional information manually if needed.`);
           )}
         </div>
         )}
+
+      {/* Macro breakdown popup */}
+      {macroPopup && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+          onClick={() => setMacroPopup(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between mb-3">
+              <div>
+                <h2 className="text-base sm:text-lg font-semibold text-gray-900">
+                  {macroPopup.title}
+                </h2>
+                {macroPopup.energyLabel && (
+                  <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
+                    Total energy: {macroPopup.energyLabel}
+                  </p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setMacroPopup(null)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <span className="sr-only">Close</span>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="flex flex-col items-center">
+              <MacroRing macros={macroPopup.macros} showLegend size="large" />
+              <button
+                type="button"
+                onClick={() => setMacroPopup(null)}
+                className="mt-4 inline-flex items-center justify-center px-4 py-2 text-sm font-medium rounded-full bg-gray-900 text-white hover:bg-gray-800"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
         {/* Full Size Image Modal */}
         {fullSizeImage && (
