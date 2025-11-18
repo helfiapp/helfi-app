@@ -4902,6 +4902,9 @@ export default function Onboarding() {
   const [profileImage, setProfileImage] = useState<string>('');
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [showFirstTimeModal, setShowFirstTimeModal] = useState(false);
+  // Track if the user has dismissed the first-time modal during this visit,
+  // so they can actually complete the intake instead of being stuck.
+  const [firstTimeModalDismissed, setFirstTimeModalDismissed] = useState(false);
   const [usageMeterRefresh, setUsageMeterRefresh] = useState(0);
 
   const stepNames = [
@@ -4992,23 +4995,25 @@ export default function Onboarding() {
     }
   };
 
-  // If user is clearly new or incomplete, show the health-setup modal every time
-  // they visit onboarding until the basic profile + goals are complete.
+  // If user is clearly new or incomplete, show the health-setup modal whenever
+  // they arrive on this page, but allow them to dismiss it for the current visit
+  // so they can actually complete the steps.
   useEffect(() => {
     if (status !== 'authenticated' || !dataLoaded) return;
     try {
       const hasBasic = form && form.gender && form.weight && form.height;
       const hasGoals = Array.isArray(form?.goals) && form.goals.length > 0;
       const needsSetup = !(hasBasic && hasGoals);
+      const shouldForceModal = needsSetup && !firstTimeModalDismissed;
 
-      if (needsSetup && !showFirstTimeModal) {
+      if (shouldForceModal && !showFirstTimeModal) {
         setShowFirstTimeModal(true);
-      } else if (!needsSetup && showFirstTimeModal) {
-        // Auto-hide if data arrived and user is complete
+      } else if (!shouldForceModal && showFirstTimeModal) {
+        // Auto-hide when user is complete or has dismissed it for this visit
         setShowFirstTimeModal(false);
       }
     } catch {}
-  }, [status, form, showFirstTimeModal, dataLoaded]);
+  }, [status, form, showFirstTimeModal, dataLoaded, firstTimeModalDismissed]);
 
   // Optimized debounced save function
   const debouncedSave = useCallback(async (data: any) => {
@@ -5189,7 +5194,10 @@ export default function Onboarding() {
     window.location.replace('/dashboard?deferred=1');
   };
 
-  const handleContinueFirstTime = () => setShowFirstTimeModal(false);
+  const handleContinueFirstTime = () => {
+    setFirstTimeModalDismissed(true);
+    setShowFirstTimeModal(false);
+  };
 
   // Refresh UsageMeter when credits are updated elsewhere
   useEffect(() => {
