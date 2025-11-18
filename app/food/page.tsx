@@ -175,10 +175,11 @@ function TargetRing({ label, valueLabel, percent, tone }: RingProps) {
   const circumference = 2 * Math.PI * radius
   const clamped = Math.max(0, Math.min(percent, 1))
 
-  // For Consumed/primary we keep a solid green ring.
-  // For Remaining/target we draw a two-tone red/green ring where:
+  // For Remaining/target we draw a two-tone ring where:
+  // - red represents what has already been used (consumed)
   // - green represents the remaining allowance
-  // - red represents what has already been used
+  // For primary we currently don't use this component, but we keep support
+  // for a simple single-colour ring.
   const isTarget = tone === 'target'
   const strokeWidth = 10
   const svgSize = 120
@@ -187,29 +188,30 @@ function TargetRing({ label, valueLabel, percent, tone }: RingProps) {
   const mainValue = parts[0] || valueLabel
   const unitPart = parts.slice(1).join(' ')
 
-  // For target rings, `percent` is the remaining fraction (0–1)
-  const remainingFraction = isTarget ? clamped : 0
-  const usedFraction = isTarget ? 1 - clamped : 1
-
+  // For target rings, `percent` is the *used* fraction (0–1)
+  const usedFraction = clamped
   const usedLength = usedFraction * circumference
-  const remainingLength = remainingFraction * circumference
 
   return (
     <div className="flex flex-col items-center">
       <div className="relative inline-block">
         <svg width={svgSize} height={svgSize}>
-          {/* Base track */}
-          <circle
-            cx={svgSize / 2}
-            cy={svgSize / 2}
-            r={radius}
-            strokeWidth={strokeWidth}
-            stroke="transparent"
-            fill="none"
-          />
           {isTarget ? (
             <>
-              {/* Used (red) */}
+              {/* Remaining allowance (green) – full circle */}
+              <circle
+                cx={svgSize / 2}
+                cy={svgSize / 2}
+                r={radius}
+                strokeWidth={strokeWidth}
+                stroke="#22c55e"
+                fill="none"
+                strokeDasharray={circumference}
+                strokeDashoffset={0}
+                strokeLinecap="round"
+                transform={`rotate(-90 ${svgSize / 2} ${svgSize / 2})`}
+              />
+              {/* Used (red) overlay */}
               {usedFraction > 0 && (
                 <circle
                   cx={svgSize / 2}
@@ -224,24 +226,9 @@ function TargetRing({ label, valueLabel, percent, tone }: RingProps) {
                   transform={`rotate(-90 ${svgSize / 2} ${svgSize / 2})`}
                 />
               )}
-              {/* Remaining (carb green) */}
-              {remainingFraction > 0 && (
-                <circle
-                  cx={svgSize / 2}
-                  cy={svgSize / 2}
-                  r={radius}
-                  strokeWidth={strokeWidth}
-                  stroke="#22c55e"
-                  fill="none"
-                  strokeDasharray={`${remainingLength} ${circumference}`}
-                  strokeDashoffset={usedLength}
-                  strokeLinecap="round"
-                  transform={`rotate(-90 ${svgSize / 2} ${svgSize / 2})`}
-                />
-              )}
             </>
           ) : (
-            // Consumed ring – single green circle
+            // Primary/consumed ring – single green circle showing `percent`
             <circle
               cx={svgSize / 2}
               cy={svgSize / 2}
@@ -249,8 +236,8 @@ function TargetRing({ label, valueLabel, percent, tone }: RingProps) {
               strokeWidth={strokeWidth}
               stroke="#22c55e"
               fill="none"
-              strokeDasharray={circumference}
-              strokeDashoffset={circumference - clamped * circumference}
+              strokeDasharray={`${clamped * circumference} ${circumference}`}
+              strokeDashoffset={0}
               strokeLinecap="round"
               transform={`rotate(-90 ${svgSize / 2} ${svgSize / 2})`}
             />
@@ -4039,8 +4026,10 @@ Please add nutritional information manually if needed.`);
                     : 0
                 const consumedInUnit = convertKcalToUnit(consumedKcal, energyUnit)
                 const targetInUnit = convertKcalToUnit(targetCalories, energyUnit)
-                const percentRemaining =
-                  targetCalories && targetCalories > 0 ? remainingKcal / targetCalories : 0
+                const percentUsed =
+                  targetCalories && targetCalories > 0
+                    ? Math.min(1, consumedKcal / targetCalories)
+                    : 0
 
                 const macroSegments: MacroSegment[] = [
                   { key: 'protein', label: 'Protein', grams: totals.protein || 0, color: '#ef4444' }, // red
@@ -4134,7 +4123,7 @@ Please add nutritional information manually if needed.`);
                                     )} ${energyUnit}`
                                   : '—'
                               }
-                              percent={percentRemaining || 0}
+                              percent={percentUsed || 0}
                               tone="target"
                             />
                             {targetInUnit !== null && (
