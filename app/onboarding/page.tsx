@@ -371,6 +371,33 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [hasUnsavedChanges]);
 
+  // Expose unsaved state globally so the header "Go To Dashboard" link can respect it
+  useEffect(() => {
+    try {
+      (window as any).__helfiOnboardingPhysicalHasUnsavedChanges = hasUnsavedChanges;
+    } catch {
+      // ignore
+    }
+    return () => {
+      try {
+        (window as any).__helfiOnboardingPhysicalHasUnsavedChanges = false;
+      } catch {
+        // ignore
+      }
+    };
+  }, [hasUnsavedChanges]);
+
+  // Listen for global requests to open the Update Insights popup (e.g. from the header)
+  useEffect(() => {
+    const handler = (event: MessageEvent) => {
+      if (event?.data?.type === 'OPEN_PHYSICAL_UPDATE_POPUP') {
+        setShowUpdatePopup(true);
+      }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, []);
+
   const buildPayload = () => ({
     weight,
     birthdate,
@@ -5511,6 +5538,24 @@ export default function Onboarding() {
               href="/dashboard"
               className="flex items-center text-gray-600 hover:text-gray-900"
               title="back button to Dashboard"
+              onClick={(e) => {
+                try {
+                  // If we're on the Physical step and there are unsaved changes,
+                  // show the Update Insights popup instead of navigating away.
+                  const hasPhysicalUnsaved =
+                    step === 1 &&
+                    (window as any).__helfiOnboardingPhysicalHasUnsavedChanges;
+                  if (hasPhysicalUnsaved) {
+                    e.preventDefault();
+                    window.postMessage(
+                      { type: 'OPEN_PHYSICAL_UPDATE_POPUP' },
+                      '*'
+                    );
+                  }
+                } catch {
+                  // If anything goes wrong, fall back to normal navigation
+                }
+              }}
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
