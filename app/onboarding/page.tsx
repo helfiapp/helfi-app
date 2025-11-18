@@ -238,11 +238,78 @@ function GenderStep({ onNext, initial, initialAgreed }: { onNext: (data: any) =>
 const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { onNext: (data: any) => void, onBack: () => void, initial?: any }) {
   const [weight, setWeight] = useState(initial?.weight || '');
   const [birthdate, setBirthdate] = useState(initial?.birthdate || '');
+  const [birthYear, setBirthYear] = useState('');
+  const [birthMonth, setBirthMonth] = useState('');
+  const [birthDay, setBirthDay] = useState('');
   const [height, setHeight] = useState(initial?.height || '');
   const [feet, setFeet] = useState(initial?.feet || '');
   const [inches, setInches] = useState(initial?.inches || '');
   const [bodyType, setBodyType] = useState(initial?.bodyType || '');
   const [unit, setUnit] = useState<'metric' | 'imperial'>('metric');
+
+  // Initialise dropdowns from any existing birthdate value
+  useEffect(() => {
+    if (initial?.birthdate && typeof initial.birthdate === 'string') {
+      const [y, m, d] = initial.birthdate.split('-');
+      if (y && m && d) {
+        setBirthYear(y);
+        setBirthMonth(m);
+        setBirthDay(d);
+      }
+    }
+  }, [initial?.birthdate]);
+
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const minYear = currentYear - 110; // sensible lower bound for age
+
+  const daysInMonth = React.useMemo(() => {
+    if (!birthYear || !birthMonth) {
+      return 31;
+    }
+    const y = parseInt(birthYear, 10);
+    const m = parseInt(birthMonth, 10);
+    if (!Number.isFinite(y) || !Number.isFinite(m)) return 31;
+    return new Date(y, m, 0).getDate();
+  }, [birthYear, birthMonth]);
+
+  // Clamp day if month/year change to a month with fewer days
+  useEffect(() => {
+    if (!birthDay) return;
+    const max = daysInMonth;
+    const d = parseInt(birthDay, 10);
+    if (Number.isFinite(d) && d > max) {
+      setBirthDay(String(max).padStart(2, '0'));
+    }
+  }, [daysInMonth, birthDay]);
+
+  // Keep canonical birthdate string in sync with dropdowns and block future dates
+  useEffect(() => {
+    if (birthYear && birthMonth && birthDay) {
+      const y = parseInt(birthYear, 10);
+      const m = parseInt(birthMonth, 10);
+      const d = parseInt(birthDay, 10);
+
+      if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) {
+        return;
+      }
+
+      const candidate = new Date(y, m - 1, d);
+      const now = new Date();
+
+      if (candidate > now) {
+        // Don’t allow future birthdates – keep current value until user picks a valid date
+        return;
+      }
+
+      const yyyy = String(y).padStart(4, '0');
+      const mm = String(m).padStart(2, '0');
+      const dd = String(d).padStart(2, '0');
+      setBirthdate(`${yyyy}-${mm}-${dd}`);
+    } else {
+      setBirthdate('');
+    }
+  }, [birthYear, birthMonth, birthDay]);
 
   const handleNext = useCallback(() => {
     const data = { 
@@ -298,14 +365,89 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
         onChange={e => setWeight(e.target.value)}
       />
       <h2 className="text-2xl font-bold mb-2">What is your date of birth?</h2>
-      <p className="mb-4 text-gray-600">We’ll calculate your age from your birthdate to set safe calorie and nutrition targets.</p>
-      <input
-        className="w-full rounded-lg border border-gray-300 px-3 py-2 mb-4 focus:border-green-500 focus:ring-1 focus:ring-green-500"
-        type="date"
-        placeholder="Date of birth"
-        value={birthdate}
-        onChange={e => setBirthdate(e.target.value)}
-      />
+      <p className="mb-4 text-gray-600">
+        We’ll calculate your age from your birthdate to set safe calorie and nutrition targets.
+      </p>
+      <div className="grid grid-cols-3 gap-3 mb-2">
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Day</label>
+          <select
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-green-500 focus:ring-1 focus:ring-green-500 bg-white"
+            value={birthDay}
+            onChange={(e) => setBirthDay(e.target.value)}
+          >
+            <option value="">Day</option>
+            {Array.from({ length: daysInMonth }, (_, idx) => {
+              const dayNumber = idx + 1;
+              const value = String(dayNumber).padStart(2, '0');
+              const isFutureDay =
+                birthYear === String(currentYear) &&
+                birthMonth === String(today.getMonth() + 1).padStart(2, '0') &&
+                dayNumber > today.getDate();
+              return (
+                <option key={value} value={value} disabled={isFutureDay}>
+                  {dayNumber}
+                </option>
+              );
+            })}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Month</label>
+          <select
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-green-500 focus:ring-1 focus:ring-green-500 bg-white"
+            value={birthMonth}
+            onChange={(e) => setBirthMonth(e.target.value)}
+          >
+            <option value="">Month</option>
+            {[
+              { value: '01', label: 'Jan' },
+              { value: '02', label: 'Feb' },
+              { value: '03', label: 'Mar' },
+              { value: '04', label: 'Apr' },
+              { value: '05', label: 'May' },
+              { value: '06', label: 'Jun' },
+              { value: '07', label: 'Jul' },
+              { value: '08', label: 'Aug' },
+              { value: '09', label: 'Sep' },
+              { value: '10', label: 'Oct' },
+              { value: '11', label: 'Nov' },
+              { value: '12', label: 'Dec' },
+            ].map((month) => {
+              const monthNumber = parseInt(month.value, 10);
+              const isFutureMonth =
+                birthYear === String(currentYear) &&
+                monthNumber > today.getMonth() + 1;
+              return (
+                <option key={month.value} value={month.value} disabled={isFutureMonth}>
+                  {month.label}
+                </option>
+              );
+            })}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Year</label>
+          <select
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-green-500 focus:ring-1 focus:ring-green-500 bg-white"
+            value={birthYear}
+            onChange={(e) => setBirthYear(e.target.value)}
+          >
+            <option value="">Year</option>
+            {Array.from({ length: currentYear - minYear + 1 }, (_, idx) => {
+              const year = currentYear - idx;
+              return (
+                <option key={year} value={String(year)}>
+                  {year}
+                </option>
+              );
+            })}
+          </select>
+        </div>
+      </div>
+      <p className="text-xs text-gray-500 mb-4">
+        You can only choose real birthdates (no future years).
+      </p>
       <h2 className="text-2xl font-bold mb-4">How tall are you?</h2>
       <p className="mb-4 text-gray-600">Height helps us calculate key health metrics.</p>
       <div className="mb-4">
