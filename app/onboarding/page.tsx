@@ -237,7 +237,7 @@ function GenderStep({ onNext, initial, initialAgreed }: { onNext: (data: any) =>
 
 const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { onNext: (data: any) => void, onBack: () => void, initial?: any }) {
   const [weight, setWeight] = useState(initial?.weight || '');
-  const [age, setAge] = useState(initial?.age || '');
+  const [birthdate, setBirthdate] = useState(initial?.birthdate || '');
   const [height, setHeight] = useState(initial?.height || '');
   const [feet, setFeet] = useState(initial?.feet || '');
   const [inches, setInches] = useState(initial?.inches || '');
@@ -247,7 +247,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
   const handleNext = useCallback(() => {
     const data = { 
       weight, 
-      age,
+      birthdate,
       height: unit === 'metric' ? height : `${feet}'${inches}"`, 
       feet, 
       inches, 
@@ -255,7 +255,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
       unit 
     };
     onNext(data);
-  }, [weight, height, feet, inches, bodyType, unit, onNext]);
+  }, [weight, birthdate, height, feet, inches, bodyType, unit, onNext]);
 
   const handleUnitChange = useCallback((newUnit: 'metric' | 'imperial') => {
     setUnit(newUnit);
@@ -297,17 +297,14 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
         value={weight}
         onChange={e => setWeight(e.target.value)}
       />
-      <h2 className="text-2xl font-bold mb-2">How old are you?</h2>
-      <p className="mb-4 text-gray-600">Age helps us set safe calorie and nutrition targets for you.</p>
+      <h2 className="text-2xl font-bold mb-2">What is your date of birth?</h2>
+      <p className="mb-4 text-gray-600">We’ll calculate your age from your birthdate to set safe calorie and nutrition targets.</p>
       <input
         className="w-full rounded-lg border border-gray-300 px-3 py-2 mb-4 focus:border-green-500 focus:ring-1 focus:ring-green-500"
-        type="number"
-        inputMode="numeric"
-        min={1}
-        max={120}
-        placeholder="Age (years)"
-        value={age}
-        onChange={e => setAge(e.target.value)}
+        type="date"
+        placeholder="Date of birth"
+        value={birthdate}
+        onChange={e => setBirthdate(e.target.value)}
       />
       <h2 className="text-2xl font-bold mb-4">How tall are you?</h2>
       <p className="mb-4 text-gray-600">Height helps us calculate key health metrics.</p>
@@ -357,9 +354,13 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
               onClick={() => handleBodyTypeChange(type)}
             >
               <div className="flex items-center justify-center gap-2">
-                <span className="text-sm font-medium">{type.charAt(0).toUpperCase() + type.slice(1)}</span>
+                <span className="text-sm font-medium">
+                  {type.charAt(0).toUpperCase() + type.slice(1)}
+                </span>
                 <QuestionMarkCircleIcon
-                  className="w-4 h-4 text-gray-400 group-hover:text-gray-700"
+                  className={`w-4 h-4 ${
+                    bodyType === type ? 'text-white' : 'text-gray-400 group-hover:text-gray-700'
+                  }`}
                   aria-hidden="true"
                 />
               </div>
