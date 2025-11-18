@@ -628,30 +628,18 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
           </button>
         </div>
       </div>
-      {/* Manual Update Insights Button - Show if there are unsaved changes */}
+      {/* Unsaved changes banner - purely informational, real action happens in the popup when you try to leave */}
       {hasUnsavedChanges && (
         <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <div className="font-medium text-yellow-900 mb-1">Update Insights</div>
+          <div className="flex items-start gap-2">
+            <div className="mt-1 h-2 w-2 rounded-full bg-yellow-500" />
+            <div>
+              <div className="font-medium text-yellow-900 mb-1">Changes not in insights yet</div>
               <div className="text-sm text-yellow-700">
-                You&apos;ve changed your basic health details. Update your insights so all recommendations stay in sync.
+                We&apos;ve noticed you updated your basic health details. When you leave this step, we&apos;ll ask if you&apos;d like to
+                update your insights so everything stays in sync.
               </div>
             </div>
-            <button
-              onClick={() => setShowUpdatePopup(true)}
-              disabled={isGeneratingInsights}
-              className="ml-4 px-4 py-2 bg-helfi-green text-white rounded-lg hover:bg-helfi-green/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed font-medium text-sm whitespace-nowrap"
-            >
-              {isGeneratingInsights ? (
-                <>
-                  <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2"></span>
-                  Updating...
-                </>
-              ) : (
-                'Update Insights'
-              )}
-            </button>
           </div>
         </div>
       )}
