@@ -16,7 +16,6 @@ model User {
   gender                 Gender?
   weight                 Float?
   height                 Float?
-  age                    Int?
   bodyType               BodyType?
   exerciseFrequency      String?
   exerciseTypes          String[]

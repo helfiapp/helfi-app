@@ -62,7 +62,6 @@ export async function GET(request: NextRequest) {
       gender: user.gender,
       weight: user.weight,
       height: user.height,
-      age: (user as any).age,
       bodyType: user.bodyType,
       exerciseFrequency: user.exerciseFrequency,
       exerciseTypes: user.exerciseTypes,
@@ -188,7 +187,6 @@ export async function GET(request: NextRequest) {
       gender: user.gender?.toLowerCase() || '',
       weight: user.weight?.toString() || '',
       height: user.height?.toString() || '',
-      age: (user as any).age != null ? String((user as any).age) : '',
       bodyType: user.bodyType?.toLowerCase() || '',
       exerciseFrequency: exerciseData.exerciseFrequency || '',
       exerciseTypes: exerciseData.exerciseTypes || [],
@@ -229,7 +227,6 @@ export async function GET(request: NextRequest) {
       gender: onboardingData.gender,
       weight: onboardingData.weight,
       height: onboardingData.height,
-      age: onboardingData.age,
       bodyType: onboardingData.bodyType,
       exerciseFrequency: onboardingData.exerciseFrequency,
       exerciseTypes: onboardingData.exerciseTypes,
@@ -284,7 +281,6 @@ export async function POST(request: NextRequest) {
       hasGender: !!data.gender,
       hasWeight: !!data.weight,
       hasHeight: !!data.height,
-      hasAge: !!data.age,
       hasBodyType: !!data.bodyType,
       hasGoals: !!data.goals,
       hasSupplements: !!data.supplements,
@@ -346,12 +342,6 @@ export async function POST(request: NextRequest) {
         const heightNum = parseFloat(data.height.toString())
         if (!isNaN(heightNum)) {
           updateData.height = heightNum
-        }
-      }
-      if (data.age !== undefined && data.age !== null && data.age !== '') {
-        const ageNum = parseInt(data.age.toString(), 10)
-        if (!isNaN(ageNum)) {
-          ;(updateData as any).age = ageNum
         }
       }
       if (data.bodyType && data.bodyType.trim() !== '') {
@@ -852,7 +842,7 @@ export async function POST(request: NextRequest) {
         if (data.supplements) changedTypes.push('supplements')
         if (data.medications) changedTypes.push('medications')
         if (data.goals) changedTypes.push('health_goals')
-        if (data.gender || data.weight || data.height || data.age || data.bodyType) changedTypes.push('profile')
+        if (data.gender || data.weight || data.height || data.bodyType) changedTypes.push('profile')
         if (data.exerciseFrequency || data.exerciseTypes) changedTypes.push('exercise')
         if (data.bloodResults) changedTypes.push('blood_results')
         if (data.todaysFoods) changedTypes.push('food')
@@ -946,16 +936,15 @@ export async function DELETE(request: NextRequest) {
     })
 
     // Reset user profile data
-      await prisma.user.update({
-        where: { id: user.id },
-        data: {
-          gender: null,
-          weight: null,
-          height: null,
-          bodyType: null,
-          age: null
-        }
-      })
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        gender: null,
+        weight: null,
+        height: null,
+        bodyType: null
+      }
+    })
 
     console.log('Successfully deleted all user data for:', userEmail)
     return NextResponse.json({ success: true, message: 'All data deleted successfully' })
