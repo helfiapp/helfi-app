@@ -357,12 +357,18 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
                 <span className="text-sm font-medium">
                   {type.charAt(0).toUpperCase() + type.slice(1)}
                 </span>
-                <QuestionMarkCircleIcon
-                  className={`w-4 h-4 ${
-                    bodyType === type ? 'text-white' : 'text-gray-400 group-hover:text-gray-700'
-                  }`}
-                  aria-hidden="true"
-                />
+                <span
+                  className={`inline-flex items-center justify-center rounded-full border ${
+                    bodyType === type
+                      ? 'border-white/80 bg-white/10'
+                      : 'border-gray-300 bg-white group-hover:bg-gray-50'
+                  } w-5 h-5`}
+                >
+                  <QuestionMarkCircleIcon
+                    className="w-3 h-3"
+                    aria-hidden="true"
+                  />
+                </span>
               </div>
               <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-800 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none w-48 z-10">
                 {bodyTypeDescriptions[type as keyof typeof bodyTypeDescriptions]}
