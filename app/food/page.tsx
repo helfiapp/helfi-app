@@ -20,6 +20,7 @@ import FeatureUsageDisplay from '@/components/FeatureUsageDisplay'
 import CreditPurchaseModal from '@/components/CreditPurchaseModal'
 import { STARTER_FOODS, StarterFood } from '@/data/foods-starter'
 import { calculateDailyTargets } from '@/lib/daily-targets'
+import { SolidMacroRing } from '@/components/SolidMacroRing'
 
 const NUTRIENT_DISPLAY_ORDER: Array<'calories' | 'protein' | 'carbs' | 'fat' | 'fiber' | 'sugar'> = ['calories', 'protein', 'carbs', 'fat', 'fiber', 'sugar']
 
@@ -3993,63 +3994,80 @@ Please add nutritional information manually if needed.`);
                   {/* Nutrition Cards - Match Main Page Style - Circular Design */}
                   {analyzedNutrition && (
                     <div className="flex flex-wrap justify-center gap-4 sm:gap-6">
-                      {/* Calories */}
+                      {/* Calories - Teal */}
                       {analyzedNutrition.calories !== null && analyzedNutrition.calories !== undefined && (
                         <div className="flex flex-col items-center">
-                          <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-teal-50 border-2 border-teal-100 flex flex-col items-center justify-center shadow-sm">
-                            <div className="text-xl sm:text-2xl font-bold text-teal-600">{analyzedNutrition.calories}</div>
-                          </div>
-                          <div className="mt-2 text-xs font-medium text-teal-600 uppercase tracking-wide">Calories</div>
+                          <SolidMacroRing
+                            label="Calories"
+                            value={analyzedNutrition.calories}
+                            color="#0d9488" // teal-600
+                          />
+                          <div className="mt-2 text-xs font-bold text-gray-400 uppercase tracking-wide">Calories</div>
                         </div>
                       )}
                       
-                      {/* Protein */}
+                      {/* Protein - Red */}
                       {analyzedNutrition.protein !== null && analyzedNutrition.protein !== undefined && (
                         <div className="flex flex-col items-center">
-                          <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-red-50 border-2 border-red-100 flex flex-col items-center justify-center shadow-sm">
-                            <div className="text-xl sm:text-2xl font-bold text-red-600">{analyzedNutrition.protein}g</div>
-                          </div>
-                          <div className="mt-2 text-xs font-medium text-red-600 uppercase tracking-wide">Protein</div>
+                          <SolidMacroRing
+                            label="Protein"
+                            value={analyzedNutrition.protein}
+                            unit="g"
+                            color="#ef4444" // red-500
+                          />
+                          <div className="mt-2 text-xs font-bold text-gray-400 uppercase tracking-wide">Protein</div>
                         </div>
                       )}
                       
-                      {/* Carbs */}
+                      {/* Carbs - Green */}
                       {analyzedNutrition.carbs !== null && analyzedNutrition.carbs !== undefined && (
                         <div className="flex flex-col items-center">
-                          <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-green-50 border-2 border-green-100 flex flex-col items-center justify-center shadow-sm">
-                            <div className="text-xl sm:text-2xl font-bold text-green-600">{analyzedNutrition.carbs}g</div>
-                          </div>
-                          <div className="mt-2 text-xs font-medium text-green-600 uppercase tracking-wide">Carbs</div>
+                          <SolidMacroRing
+                            label="Carbs"
+                            value={analyzedNutrition.carbs}
+                            unit="g"
+                            color="#22c55e" // green-500
+                          />
+                          <div className="mt-2 text-xs font-bold text-gray-400 uppercase tracking-wide">Carbs</div>
                         </div>
                       )}
                       
-                      {/* Fat */}
+                      {/* Fat - Purple (Indigo) */}
                       {analyzedNutrition.fat !== null && analyzedNutrition.fat !== undefined && (
                         <div className="flex flex-col items-center">
-                          <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-indigo-50 border-2 border-indigo-100 flex flex-col items-center justify-center shadow-sm">
-                            <div className="text-xl sm:text-2xl font-bold text-indigo-600">{analyzedNutrition.fat}g</div>
-                          </div>
-                          <div className="mt-2 text-xs font-medium text-indigo-600 uppercase tracking-wide">Fat</div>
+                          <SolidMacroRing
+                            label="Fat"
+                            value={analyzedNutrition.fat}
+                            unit="g"
+                            color="#6366f1" // indigo-500
+                          />
+                          <div className="mt-2 text-xs font-bold text-gray-400 uppercase tracking-wide">Fat</div>
                         </div>
                       )}
                       
-                      {/* Fiber */}
+                      {/* Fiber - Blue */}
                       {(analyzedNutrition as any)?.fiber !== null && (analyzedNutrition as any)?.fiber !== undefined && (
                         <div className="flex flex-col items-center">
-                          <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-blue-50 border-2 border-blue-100 flex flex-col items-center justify-center shadow-sm">
-                            <div className="text-xl sm:text-2xl font-bold text-blue-600">{(analyzedNutrition as any).fiber}g</div>
-                          </div>
-                          <div className="mt-2 text-xs font-medium text-blue-600 uppercase tracking-wide">Fiber</div>
+                          <SolidMacroRing
+                            label="Fiber"
+                            value={(analyzedNutrition as any).fiber}
+                            unit="g"
+                            color="#3b82f6" // blue-500
+                          />
+                          <div className="mt-2 text-xs font-bold text-gray-400 uppercase tracking-wide">Fiber</div>
                         </div>
                       )}
                       
-                      {/* Sugar */}
+                      {/* Sugar - Orange */}
                       {(analyzedNutrition as any)?.sugar !== null && (analyzedNutrition as any)?.sugar !== undefined && (
                         <div className="flex flex-col items-center">
-                          <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-orange-50 border-2 border-orange-100 flex flex-col items-center justify-center shadow-sm">
-                            <div className="text-xl sm:text-2xl font-bold text-orange-600">{(analyzedNutrition as any).sugar}g</div>
-                          </div>
-                          <div className="mt-2 text-xs font-medium text-orange-600 uppercase tracking-wide">Sugar</div>
+                          <SolidMacroRing
+                            label="Sugar"
+                            value={(analyzedNutrition as any).sugar}
+                            unit="g"
+                            color="#f97316" // orange-500
+                          />
+                          <div className="mt-2 text-xs font-bold text-gray-400 uppercase tracking-wide">Sugar</div>
                         </div>
                       )}
                     </div>
