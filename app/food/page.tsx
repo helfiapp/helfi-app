@@ -3123,7 +3123,7 @@ Please add nutritional information manually if needed.`);
                           {/* Macro breakdown list - single column on mobile, 2 column on desktop */}
                           <div className="flex-1">
                             <div className="text-sm text-gray-600 mb-1.5 sm:mb-2 font-medium">Macro breakdown</div>
-                            <div className="flex flex-col sm:flex-row sm:gap-1 text-sm text-gray-700">
+                            <div className="flex flex-col sm:flex-row sm:gap-3 text-sm text-gray-700">
                               {/* Left column: Protein, Carbs, Fat */}
                               <div className="space-y-2">
                                 {leftColumnMacros.map((macro) => {
