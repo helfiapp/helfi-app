@@ -1278,7 +1278,8 @@ const applyStructuredItems = (
           const idsMatch = prevIds.size === newIds.size && prevIdsArray.every(id => newIds.has(id));
           return idsMatch ? prev : deduped;
         });
-        setFoodDiaryLoaded(true) // Mark as loaded once data is set from context
+        // Mark as loaded once data is set from context
+        setFoodDiaryLoaded(true);
         
         // 🛡️ GUARD RAIL: Database Verification (REQUIRED - DO NOT REMOVE)
         // CRITICAL: Always verify cached entries against database to catch entries that might have been
@@ -1416,9 +1417,15 @@ const applyStructuredItems = (
                   }
                 } catch {}
               }
+              // Mark as loaded after fallback attempts complete
+              setFoodDiaryLoaded(true);
+            } else {
+              // Mark as loaded even if API call fails
+              setFoodDiaryLoaded(true);
             }
           } catch {
-            // ignore
+            // Mark as loaded even on error to prevent infinite loading state
+            setFoodDiaryLoaded(true);
           }
         })();
       }
@@ -1453,11 +1460,21 @@ const applyStructuredItems = (
                 }).catch(() => {})
               } catch {}
             }
+            // Mark as loaded after database load completes (even if no entries)
+            setFoodDiaryLoaded(true);
+          } else {
+            // Mark as loaded even if API call fails
+            setFoodDiaryLoaded(true);
           }
         } catch (error) {
           console.error('Error loading food entries:', error);
+          // Mark as loaded even on error to prevent infinite loading state
+          setFoodDiaryLoaded(true);
         }
       })();
+    } else {
+      // Not viewing today - mark as loaded (history will be loaded separately)
+      setFoodDiaryLoaded(true);
     }
   }, [userData, isViewingToday, selectedDate]);
 
@@ -1474,10 +1491,12 @@ const applyStructuredItems = (
     const loadHistory = async () => {
       if (isViewingToday) {
         setHistoryFoods(null);
+        setFoodDiaryLoaded(true); // Already loaded via today's foods
         return;
       }
       try {
         setIsLoadingHistory(true);
+        setFoodDiaryLoaded(false); // Reset loading state when switching dates
         const tz = new Date().getTimezoneOffset();
         const res = await fetch(`/api/food-log?date=${selectedDate}&tz=${tz}`);
         if (res.ok) {
@@ -1519,11 +1538,17 @@ const applyStructuredItems = (
           }
 
           setHistoryFoods(deduped)
+          // Mark as loaded after history load completes
+          setFoodDiaryLoaded(true);
         } else {
           setHistoryFoods([]);
+          // Mark as loaded even if API call fails or returns no entries
+          setFoodDiaryLoaded(true);
         }
       } catch (e) {
         setHistoryFoods([]);
+        // Mark as loaded even on error to prevent infinite loading state
+        setFoodDiaryLoaded(true);
       } finally {
         setIsLoadingHistory(false);
       }
@@ -2327,10 +2352,25 @@ Please add nutritional information manually if needed.`);
       setOriginalEditingEntry(null)
       
       // CRITICAL FIX: Ensure we return to main view properly
+      // Don't call resetAnalyzerPanel() as it clears showAddFood which hides entries
       setIsEditingDescription(false)
       setShowAiResult(false)
-      setShowAddFood(false)
-      resetAnalyzerPanel()
+      // Keep showAddFood as is - don't reset it to prevent entries from disappearing
+      // Only reset analyzer-specific states
+      setPhotoFile(null)
+      setPhotoPreview(null)
+      setAiDescription('')
+      setAnalyzedItems([])
+      setAnalyzedNutrition(null)
+      setAnalyzedTotal(null)
+      setHealthWarning(null)
+      setHealthAlternatives(null)
+      setShowPhotoOptions(false)
+    } else {
+      // If no entry was being edited, just exit edit mode
+      setIsEditingDescription(false)
+      setEditingEntry(null)
+      setOriginalEditingEntry(null)
     }
   }
 
