@@ -782,6 +782,9 @@ export default function FoodDiary() {
   const [editingEntry, setEditingEntry] = useState<any>(null)
   const [originalEditingEntry, setOriginalEditingEntry] = useState<any>(null)
   const [showEditActionsMenu, setShowEditActionsMenu] = useState(false)
+  
+  // New loading state
+  const [hasLoaded, setHasLoaded] = useState(false)
   const [expandedItemIndex, setExpandedItemIndex] = useState<number | null>(null)
 
   const descriptionTextareaRef = useRef<HTMLTextAreaElement | null>(null)
@@ -1275,6 +1278,7 @@ const applyStructuredItems = (
           const idsMatch = prevIds.size === newIds.size && prevIdsArray.every(id => newIds.has(id));
           return idsMatch ? prev : deduped;
         });
+        setHasLoaded(true) // Mark as loaded once data is set from context
         
         // 🛡️ GUARD RAIL: Database Verification (REQUIRED - DO NOT REMOVE)
         // CRITICAL: Always verify cached entries against database to catch entries that might have been
@@ -2182,21 +2186,8 @@ Please add nutritional information manually if needed.`);
     }, 2000);
     
     // Reset all form states
-    setNewFoodText('');
-    setPhotoFile(null);
-    setPhotoPreview(null);
-    setAiDescription('');
-    setShowAiResult(false);
-    setIsEditingDescription(false);
-    setEditedDescription('');
-    setShowAddFood(false);
-    setShowPhotoOptions(false);
-    setAnalyzedNutrition(null);
-    setAnalyzedItems([]);
-    setAnalyzedTotal(null);
-    setHealthWarning(null);
-    setHealthAlternatives(null);
-    setEditingEntry(null);
+    resetAnalyzerPanel()
+    setEditingEntry(null)
   };
 
   // New function to update existing entries with AI re-analysis
@@ -2225,21 +2216,8 @@ Please add nutritional information manually if needed.`);
     await saveFoodEntries(updatedFoods, { appendHistory: false });
     
     // Reset all form states
-    setNewFoodText('');
-    setPhotoFile(null);
-    setPhotoPreview(null);
-    setAiDescription('');
-    setShowAiResult(false);
-    setIsEditingDescription(false);
-    setEditedDescription('');
-    setShowAddFood(false);
-    setShowPhotoOptions(false);
-    setAnalyzedNutrition(null);
-    setAnalyzedItems([]);
-    setAnalyzedTotal(null);
-    setHealthWarning(null);
-    setHealthAlternatives(null);
-    setEditingEntry(null);
+    resetAnalyzerPanel()
+    setEditingEntry(null)
   };
 
   const reanalyzeCurrentEntry = async () => {
@@ -2343,7 +2321,16 @@ Please add nutritional information manually if needed.`);
   const handleCancelEditing = () => {
     const restored = revertEditingChanges()
     if (restored) {
-      exitEditingSession()
+      // Just exit session, don't toggle isEditingDescription manually
+      // revertEditingChanges already manages state restoration
+      setEditingEntry(null)
+      setOriginalEditingEntry(null)
+      
+      // CRITICAL FIX: Ensure we return to main view properly
+      setIsEditingDescription(false)
+      setShowAiResult(false)
+      setShowAddFood(false)
+      resetAnalyzerPanel()
     }
   }
 
@@ -4367,8 +4354,13 @@ Please add nutritional information manually if needed.`);
           </div>
         )}
 
-        {/* Today's Food Entries - Hide during editing */}
-        {!editingEntry && !isEditingDescription && (
+        {/* Loading State - Prevent Empty Flash */}
+        {!hasLoaded ? (
+          <div className="bg-white rounded-lg shadow-sm p-12 flex flex-col items-center justify-center">
+            <div className="w-10 h-10 border-4 border-emerald-100 border-t-emerald-500 rounded-full animate-spin mb-4"></div>
+            <div className="text-gray-500 font-medium">Loading your food diary...</div>
+          </div>
+        ) : (
         <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 overflow-visible">
           {/* Daily Totals Row */}
           {(isViewingToday ? todaysFoods : (historyFoods || [])).length > 0 && (
