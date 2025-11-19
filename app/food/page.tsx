@@ -4076,6 +4076,32 @@ Please add nutritional information manually if needed.`);
                     </h1>
                   </div>
 
+                  {/* Enhanced Description Section - Moved right after title */}
+                  <div className="space-y-4">
+                    <label className="block text-lg font-medium text-gray-900">
+                      Food Description
+                    </label>
+                    <textarea
+                      ref={descriptionTextareaRef}
+                      value={editedDescription}
+                      onChange={(e) => {
+                        setEditedDescription(e.target.value);
+                        e.target.style.height = 'auto';
+                        e.target.style.height = `${e.target.scrollHeight}px`;
+                      }}
+                      onFocus={(e) => {
+                        e.target.style.height = 'auto';
+                        e.target.style.height = `${e.target.scrollHeight}px`;
+                      }}
+                      className="w-full min-h-[8rem] px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 text-base resize-none bg-white shadow-sm font-normal leading-relaxed whitespace-pre-wrap"
+                      style={{ overflow: 'hidden' }}
+                      placeholder="Enter a detailed description of the food item..."
+                    />
+                    <p className="text-sm text-gray-600 font-normal">
+                      Change the food description and click on the 'Re-Analyze' button.
+                    </p>
+                  </div>
+
                   {/* Nutrition Cards - Match Main Page Style - Circular Design */}
                   {analyzedNutrition && (
                     <div className="flex flex-wrap justify-center gap-4 sm:gap-6">
@@ -4157,32 +4183,6 @@ Please add nutritional information manually if needed.`);
                       )}
                     </div>
                   )}
-
-                  {/* Enhanced Description Section */}
-                  <div className="space-y-4">
-                    <label className="block text-lg font-medium text-gray-900">
-                      Food Description
-                    </label>
-                    <textarea
-                      ref={descriptionTextareaRef}
-                      value={editedDescription}
-                      onChange={(e) => {
-                        setEditedDescription(e.target.value);
-                        e.target.style.height = 'auto';
-                        e.target.style.height = `${e.target.scrollHeight}px`;
-                      }}
-                      onFocus={(e) => {
-                        e.target.style.height = 'auto';
-                        e.target.style.height = `${e.target.scrollHeight}px`;
-                      }}
-                      className="w-full min-h-[8rem] px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 text-base resize-none bg-white shadow-sm font-normal leading-relaxed whitespace-pre-wrap"
-                      style={{ overflow: 'hidden' }}
-                      placeholder="Enter a detailed description of the food item..."
-                    />
-                    <p className="text-sm text-gray-600 font-normal">
-                      Change the food description and click on the 'Re-Analyze' button.
-                    </p>
-                  </div>
                   
                   {/* Full-Width Action Buttons (new entries and editing entries) */}
                   <div className="space-y-3">
