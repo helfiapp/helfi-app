@@ -3020,9 +3020,13 @@ Please add nutritional information manually if needed.`);
             {/* AI Analysis Result - Premium Cronometer-style UI */}
             {showAiResult && (
               <div className="bg-white rounded-2xl shadow-lg border border-gray-100">
-                {/* Photo Section */}
+                {/* Photo Section - full width image for mobile / non-editing */}
                 {photoPreview && (
-                  <div className="p-4 border-b border-gray-100 flex justify-center">
+                  <div
+                    className={`p-4 border-b border-gray-100 flex justify-center ${
+                      editingEntry ? 'lg:hidden' : ''
+                    }`}
+                  >
                     <div className="relative w-full">
                       {foodImagesLoading[photoPreview] && (
                         <div className="absolute inset-0 bg-gray-100 rounded-xl flex items-center justify-center">
@@ -3039,8 +3043,18 @@ Please add nutritional information manually if needed.`);
                         }`}
                         loading="eager"
                         priority
-                        onLoad={() => setFoodImagesLoading((prev: Record<string, boolean>) => ({ ...prev, [photoPreview]: false }))}
-                        onLoadStart={() => setFoodImagesLoading((prev: Record<string, boolean>) => ({ ...prev, [photoPreview]: true }))}
+                        onLoad={() =>
+                          setFoodImagesLoading((prev: Record<string, boolean>) => ({
+                            ...prev,
+                            [photoPreview]: false,
+                          }))
+                        }
+                        onLoadStart={() =>
+                          setFoodImagesLoading((prev: Record<string, boolean>) => ({
+                            ...prev,
+                            [photoPreview]: true,
+                          }))
+                        }
                       />
                     </div>
                   </div>
@@ -3165,7 +3179,127 @@ Please add nutritional information manually if needed.`);
                     </div>
                   )}
 
-                  {analyzedNutrition && !isEditingDescription && (() => {
+                  {/* Desktop-only compact photo + macro layout when editing an entry */}
+                  {editingEntry && photoPreview && analyzedNutrition && (
+                    <div className="hidden lg:flex gap-6 mb-6 items-start">
+                      <div className="w-1/2 max-w-md">
+                        <div className="relative rounded-2xl overflow-hidden border border-gray-100 bg-gray-50">
+                          <Image
+                            src={photoPreview}
+                            alt="Analyzed food"
+                            width={420}
+                            height={315}
+                            className="w-full aspect-[4/3] object-cover"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex justify-end mb-3">
+                          <div className="inline-flex items-center text-[11px] sm:text-xs bg-gray-100 rounded-full p-0.5 border border-gray-200">
+                            <button
+                              type="button"
+                              onClick={() => setEnergyUnit('kcal')}
+                              className={`px-2 py-0.5 rounded-full ${
+                                energyUnit === 'kcal'
+                                  ? 'bg-white text-gray-900 shadow-sm'
+                                  : 'text-gray-500'
+                              }`}
+                            >
+                              kcal
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setEnergyUnit('kJ')}
+                              className={`px-2 py-0.5 rounded-full ${
+                                energyUnit === 'kJ'
+                                  ? 'bg-white text-gray-900 shadow-sm'
+                                  : 'text-gray-500'
+                              }`}
+                            >
+                              kJ
+                            </button>
+                          </div>
+                        </div>
+                        {(() => {
+                          const macroSegments: MacroSegment[] = [
+                            {
+                              key: 'protein',
+                              label: 'Protein',
+                              grams: (analyzedNutrition as any)?.protein || 0,
+                              color: '#ef4444',
+                            },
+                            {
+                              key: 'fibre',
+                              label: 'Fibre',
+                              grams: (analyzedNutrition as any)?.fiber || 0,
+                              color: '#93c5fd',
+                            },
+                            {
+                              key: 'carbs',
+                              label: 'Carbs',
+                              grams: (analyzedNutrition as any)?.carbs || 0,
+                              color: '#22c55e',
+                            },
+                            {
+                              key: 'sugar',
+                              label: 'Sugar',
+                              grams: (analyzedNutrition as any)?.sugar || 0,
+                              color: '#f97316',
+                            },
+                            {
+                              key: 'fat',
+                              label: 'Fat',
+                              grams: (analyzedNutrition as any)?.fat || 0,
+                              color: '#6366f1',
+                            },
+                          ]
+
+                          const caloriesValue = (analyzedNutrition as any)?.calories || 0
+                          const caloriesInUnit =
+                            energyUnit === 'kJ'
+                              ? Math.round(caloriesValue * 4.184)
+                              : Math.round(caloriesValue)
+
+                          return (
+                            <div className="flex items-start gap-5">
+                              <div className="flex flex-col items-center flex-shrink-0">
+                                <div className="relative inline-block">
+                                  <MacroRing macros={macroSegments} showLegend={false} size="xlarge" />
+                                  <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                                    <div className="text-2xl sm:text-3xl font-bold text-gray-900">
+                                      {caloriesInUnit}
+                                    </div>
+                                    <div className="text-xs text-gray-500 mt-0.5">{energyUnit}</div>
+                                  </div>
+                                </div>
+                                <div className="text-sm text-gray-600 mt-2 font-medium">Macro breakdown</div>
+                              </div>
+                              <div className="flex-1 flex flex-col justify-center py-1">
+                                <div className="space-y-1.5 text-sm text-gray-700">
+                                  {macroSegments.map((macro) => {
+                                    const displayValue = macro.grams > 0 ? Math.round(macro.grams) : 0
+                                    return (
+                                      <div key={macro.key} className="flex items-center gap-2">
+                                        <span
+                                          className="inline-block w-3 h-3 rounded-full shrink-0"
+                                          style={{ backgroundColor: macro.color }}
+                                        />
+                                        <span>
+                                          {macro.label} {displayValue} g
+                                        </span>
+                                      </div>
+                                    )
+                                  })}
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        })()}
+                      </div>
+                    </div>
+                  )}
+
+                  {analyzedNutrition && (() => {
                     // Create macro segments for the circle chart
                     const macroSegments: MacroSegment[] = [
                       { key: 'protein', label: 'Protein', grams: (analyzedNutrition as any)?.protein || 0, color: '#ef4444' }, // red
@@ -3188,10 +3322,15 @@ Please add nutritional information manually if needed.`);
                     ].filter(Boolean) as MacroSegment[]
                     
                     const caloriesValue = (analyzedNutrition as any)?.calories || 0
-                    const caloriesInUnit = energyUnit === 'kJ' ? Math.round(caloriesValue * 4.184) : Math.round(caloriesValue)
+                    const caloriesInUnit =
+                      energyUnit === 'kJ' ? Math.round(caloriesValue * 4.184) : Math.round(caloriesValue)
                     
                     return (
-                      <div className="mb-6 mt-3 rounded-lg p-4 sm:p-6 bg-white/90 supports-[backdrop-filter]:bg-white/60 backdrop-blur">
+                      <div
+                        className={`mb-6 mt-3 rounded-lg p-4 sm:p-6 bg-white/90 supports-[backdrop-filter]:bg-white/60 backdrop-blur ${
+                          editingEntry ? 'lg:hidden' : ''
+                        }`}
+                      >
                         <div className="flex justify-end mb-4">
                           <div className="inline-flex items-center text-[11px] sm:text-xs bg-gray-100 rounded-full p-0.5 border border-gray-200">
                             <button
