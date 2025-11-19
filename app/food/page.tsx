@@ -784,7 +784,7 @@ export default function FoodDiary() {
   const [showEditActionsMenu, setShowEditActionsMenu] = useState(false)
   
   // New loading state
-  const [hasLoaded, setHasLoaded] = useState(false)
+  const [foodDiaryLoaded, setFoodDiaryLoaded] = useState(false)
   const [expandedItemIndex, setExpandedItemIndex] = useState<number | null>(null)
 
   const descriptionTextareaRef = useRef<HTMLTextAreaElement | null>(null)
@@ -1278,7 +1278,7 @@ const applyStructuredItems = (
           const idsMatch = prevIds.size === newIds.size && prevIdsArray.every(id => newIds.has(id));
           return idsMatch ? prev : deduped;
         });
-        setHasLoaded(true) // Mark as loaded once data is set from context
+        setFoodDiaryLoaded(true) // Mark as loaded once data is set from context
         
         // 🛡️ GUARD RAIL: Database Verification (REQUIRED - DO NOT REMOVE)
         // CRITICAL: Always verify cached entries against database to catch entries that might have been
@@ -4355,7 +4355,7 @@ Please add nutritional information manually if needed.`);
         )}
 
         {/* Loading State - Prevent Empty Flash */}
-        {!hasLoaded ? (
+        {!foodDiaryLoaded ? (
           <div className="bg-white rounded-lg shadow-sm p-12 flex flex-col items-center justify-center">
             <div className="w-10 h-10 border-4 border-emerald-100 border-t-emerald-500 rounded-full animate-spin mb-4"></div>
             <div className="text-gray-500 font-medium">Loading your food diary...</div>
