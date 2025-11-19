@@ -3104,9 +3104,9 @@ Please add nutritional information manually if needed.`);
                             </button>
                           </div>
                         </div>
-                        <div className="flex flex-row items-center gap-3">
+                        <div className="flex flex-row items-start gap-4">
                           {/* Circle chart with calories in center */}
-                          <div className="flex-shrink-0">
+                          <div className="flex flex-col items-center flex-shrink-0">
                             <div className="relative inline-block">
                               <MacroRing macros={macroSegments} showLegend={false} size="xlarge" />
                               <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
@@ -3118,46 +3118,26 @@ Please add nutritional information manually if needed.`);
                                 </div>
                               </div>
                             </div>
+                            <div className="text-sm text-gray-600 mt-2 font-medium">Macro breakdown</div>
                           </div>
                           
-                          {/* Macro breakdown list - 2 column on mobile and desktop */}
-                          <div className="flex-1">
-                            <div className="text-sm text-gray-600 mb-1.5 sm:mb-2 font-medium">Macro breakdown</div>
-                            <div className="flex flex-row gap-3 text-sm text-gray-700">
-                              {/* Left column: Protein, Carbs, Fat */}
-                              <div className="space-y-2">
-                                {leftColumnMacros.map((macro) => {
-                                  const displayValue = macro.grams > 0 ? Math.round(macro.grams) : 0
-                                  return (
-                                    <div key={macro.key} className="flex items-center gap-1">
-                                      <span
-                                        className="inline-block w-3 h-3 rounded-full shrink-0"
-                                        style={{ backgroundColor: macro.color }}
-                                      />
-                                      <span>
-                                        {macro.label} {displayValue} g
-                                      </span>
-                                    </div>
-                                  )
-                                })}
-                              </div>
-                              {/* Right column: Fibre, Sugar */}
-                              <div className="space-y-2">
-                                {rightColumnMacros.map((macro) => {
-                                  const displayValue = macro.grams > 0 ? Math.round(macro.grams) : 0
-                                  return (
-                                    <div key={macro.key} className="flex items-center gap-1">
-                                      <span
-                                        className="inline-block w-3 h-3 rounded-full shrink-0"
-                                        style={{ backgroundColor: macro.color }}
-                                      />
-                                      <span>
-                                        {macro.label} {displayValue} g
-                                      </span>
-                                    </div>
-                                  )
-                                })}
-                              </div>
+                          {/* Macro breakdown list - single column vertical list */}
+                          <div className="flex-1 flex flex-col justify-center py-2">
+                            <div className="space-y-1 text-sm text-gray-700">
+                              {macroSegments.map((macro) => {
+                                const displayValue = macro.grams > 0 ? Math.round(macro.grams) : 0
+                                return (
+                                  <div key={macro.key} className="flex items-center gap-2">
+                                    <span
+                                      className="inline-block w-3 h-3 rounded-full shrink-0"
+                                      style={{ backgroundColor: macro.color }}
+                                    />
+                                    <span>
+                                      {macro.label} {displayValue} g
+                                    </span>
+                                  </div>
+                                )
+                              })}
                             </div>
                           </div>
                         </div>
