@@ -3500,12 +3500,18 @@ Please add nutritional information manually if needed.`);
                             : servingUnitMeta.unitLabelSingular
                           : null
                         const unitStep = (() => {
-                          if (!servingUnitMeta || !servingUnitMeta.quantity || servingUnitMeta.quantity <= 0) return 1
-                          if (isDiscreteUnitLabel(servingUnitMeta.unitLabel)) return 1
-                          if (hasOunces) {
-                            return activeVolumeUnit === 'ml' ? 10 : 1
-                          }
-                          if (isVolumeUnit) return 10
+                          /**
+                           * GUARD RAIL: Unit step MUST always be exactly 1.
+                           *
+                           * The "Units" +/- control under Detected Foods must change in whole
+                           * units only: 1 → 2 → 3 → 4, etc. Past agents tried to make this
+                           * jump in 10s for volume units (e.g. ml, cups), which caused the
+                           * value to jump from 1 straight to 10 on a single click.
+                           *
+                           * The user has explicitly requested that this behaviour never
+                           * change again. Do NOT modify this without explicit written
+                           * approval from the user.
+                           */
                           return 1
                         })()
                         const unitsDisplay = (() => {
