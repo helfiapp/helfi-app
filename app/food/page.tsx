@@ -4779,6 +4779,10 @@ Please add nutritional information manually if needed.`);
                             const mealEnergyKcal = Number(
                               (summaryTotals as any)?.calories ?? 0,
                             )
+                            
+                            const mealEnergyInUnit = energyUnit === 'kJ' 
+                              ? Math.round(mealEnergyKcal * 4.184) 
+                              : Math.round(mealEnergyKcal)
 
                             return (
                               <div className="flex flex-row gap-4 items-start">
@@ -4796,7 +4800,19 @@ Please add nutritional information manually if needed.`);
                                     })
                                   }
                                 >
-                                  <MacroRing macros={mealMacros} showLegend={false} size="large" />
+                                  <div className="relative inline-block">
+                                    <MacroRing macros={mealMacros} showLegend={false} size="large" />
+                                    <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                                      <div className="text-xl font-bold text-gray-900">
+                                        {Number.isFinite(mealEnergyKcal) && mealEnergyKcal > 0
+                                          ? mealEnergyInUnit
+                                          : '—'}
+                                      </div>
+                                      <div className="text-xs text-gray-500 mt-0.5">
+                                        {energyUnit}
+                                      </div>
+                                    </div>
+                                  </div>
                                   <div className="mt-2 text-sm font-semibold text-gray-700">
                                     Macro breakdown
                                   </div>
