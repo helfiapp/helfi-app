@@ -296,13 +296,38 @@ export async function POST(request: NextRequest) {
     //   console.warn('⚠️ POST /api/food-log - localDate column check (safe to ignore if exists):', migrationError)
     // }
     
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.email) {
-      console.error('❌ POST /api/food-log - Authentication failed: no session or email')
+    // Robust auth: try session first, then JWT token (same pattern as /api/analyze-food)
+    let session = await getServerSession(authOptions)
+    userEmail = session?.user?.email ?? null
+    let usedTokenFallback = false
+
+    if (!userEmail) {
+      try {
+        const token = await getToken({
+          req: request,
+          secret: process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET || 'helfi-secret-key-production-2024',
+        })
+        if (token?.email) {
+          userEmail = String(token.email)
+          usedTokenFallback = true
+        }
+      } catch (tokenError) {
+        console.error('❌ POST /api/food-log - JWT auth fallback failed:', tokenError)
+      }
+    }
+
+    console.log('POST /api/food-log auth result:', {
+      hasSession: !!session,
+      sessionEmail: session?.user?.email ?? null,
+      resolvedEmail: userEmail,
+      usedTokenFallback,
+    })
+
+    if (!userEmail) {
+      console.error('❌ POST /api/food-log - Authentication failed: no session or token email')
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
     
-    userEmail = session.user.email
     console.log('✅ POST /api/food-log - Authenticated user:', userEmail)
     
     const user = await prisma.user.findUnique({ where: { email: userEmail } })
