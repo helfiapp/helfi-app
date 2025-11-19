@@ -3990,66 +3990,66 @@ Please add nutritional information manually if needed.`);
                     </h1>
                   </div>
 
-                  {/* Nutrition Cards - Match Main Page Style */}
+                  {/* Nutrition Cards - Match Main Page Style - Circular Design */}
                   {analyzedNutrition && (
-                    <div className="grid grid-cols-2 sm:grid-cols-6 gap-3 sm:gap-4">
+                    <div className="flex flex-wrap justify-center gap-4 sm:gap-6">
                       {/* Calories */}
                       {analyzedNutrition.calories !== null && analyzedNutrition.calories !== undefined && (
-                        <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-3 sm:p-4 border border-orange-200">
-                          <div className="text-center">
-                            <div className="text-xl sm:text-2xl font-bold text-orange-600">{analyzedNutrition.calories}</div>
-                            <div className="text-xs font-medium text-orange-500 uppercase tracking-wide">Calories</div>
+                        <div className="flex flex-col items-center">
+                          <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-teal-50 border-2 border-teal-100 flex flex-col items-center justify-center shadow-sm">
+                            <div className="text-xl sm:text-2xl font-bold text-teal-600">{analyzedNutrition.calories}</div>
                           </div>
+                          <div className="mt-2 text-xs font-medium text-teal-600 uppercase tracking-wide">Calories</div>
                         </div>
                       )}
                       
                       {/* Protein */}
                       {analyzedNutrition.protein !== null && analyzedNutrition.protein !== undefined && (
-                        <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-3 sm:p-4 border border-blue-200">
-                          <div className="text-center">
-                            <div className="text-xl sm:text-2xl font-bold text-blue-600">{analyzedNutrition.protein}g</div>
-                            <div className="text-xs font-medium text-blue-500 uppercase tracking-wide">Protein</div>
+                        <div className="flex flex-col items-center">
+                          <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-red-50 border-2 border-red-100 flex flex-col items-center justify-center shadow-sm">
+                            <div className="text-xl sm:text-2xl font-bold text-red-600">{analyzedNutrition.protein}g</div>
                           </div>
+                          <div className="mt-2 text-xs font-medium text-red-600 uppercase tracking-wide">Protein</div>
                         </div>
                       )}
                       
                       {/* Carbs */}
                       {analyzedNutrition.carbs !== null && analyzedNutrition.carbs !== undefined && (
-                        <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-3 sm:p-4 border border-green-200">
-                          <div className="text-center">
+                        <div className="flex flex-col items-center">
+                          <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-green-50 border-2 border-green-100 flex flex-col items-center justify-center shadow-sm">
                             <div className="text-xl sm:text-2xl font-bold text-green-600">{analyzedNutrition.carbs}g</div>
-                            <div className="text-xs font-medium text-green-500 uppercase tracking-wide">Carbs</div>
                           </div>
+                          <div className="mt-2 text-xs font-medium text-green-600 uppercase tracking-wide">Carbs</div>
                         </div>
                       )}
                       
                       {/* Fat */}
                       {analyzedNutrition.fat !== null && analyzedNutrition.fat !== undefined && (
-                        <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-3 sm:p-4 border border-purple-200">
-                          <div className="text-center">
-                            <div className="text-xl sm:text-2xl font-bold text-purple-600">{analyzedNutrition.fat}g</div>
-                            <div className="text-xs font-medium text-purple-500 uppercase tracking-wide">Fat</div>
+                        <div className="flex flex-col items-center">
+                          <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-indigo-50 border-2 border-indigo-100 flex flex-col items-center justify-center shadow-sm">
+                            <div className="text-xl sm:text-2xl font-bold text-indigo-600">{analyzedNutrition.fat}g</div>
                           </div>
+                          <div className="mt-2 text-xs font-medium text-indigo-600 uppercase tracking-wide">Fat</div>
                         </div>
                       )}
                       
                       {/* Fiber */}
                       {(analyzedNutrition as any)?.fiber !== null && (analyzedNutrition as any)?.fiber !== undefined && (
-                        <div className="bg-gradient-to-br from-amber-50 to-amber-100 rounded-xl p-3 sm:p-4 border border-amber-200">
-                          <div className="text-center">
-                            <div className="text-xl sm:text-2xl font-bold text-amber-600">{(analyzedNutrition as any).fiber}g</div>
-                            <div className="text-xs font-medium text-amber-500 uppercase tracking-wide">Fiber</div>
+                        <div className="flex flex-col items-center">
+                          <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-blue-50 border-2 border-blue-100 flex flex-col items-center justify-center shadow-sm">
+                            <div className="text-xl sm:text-2xl font-bold text-blue-600">{(analyzedNutrition as any).fiber}g</div>
                           </div>
+                          <div className="mt-2 text-xs font-medium text-blue-600 uppercase tracking-wide">Fiber</div>
                         </div>
                       )}
                       
                       {/* Sugar */}
                       {(analyzedNutrition as any)?.sugar !== null && (analyzedNutrition as any)?.sugar !== undefined && (
-                        <div className="bg-gradient-to-br from-pink-50 to-pink-100 rounded-xl p-3 sm:p-4 border border-pink-200">
-                          <div className="text-center">
-                            <div className="text-xl sm:text-2xl font-bold text-pink-600">{(analyzedNutrition as any).sugar}g</div>
-                            <div className="text-xs font-medium text-pink-500 uppercase tracking-wide">Sugar</div>
+                        <div className="flex flex-col items-center">
+                          <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-orange-50 border-2 border-orange-100 flex flex-col items-center justify-center shadow-sm">
+                            <div className="text-xl sm:text-2xl font-bold text-orange-600">{(analyzedNutrition as any).sugar}g</div>
                           </div>
+                          <div className="mt-2 text-xs font-medium text-orange-600 uppercase tracking-wide">Sugar</div>
                         </div>
                       )}
                     </div>
@@ -4081,57 +4081,55 @@ Please add nutritional information manually if needed.`);
                     </p>
                   </div>
                   
-                  {/* Full-Width Action Buttons (new entries) */}
-                  {!editingEntry && (
-                    <div className="space-y-3">
-                      <button
-                        onClick={reanalyzeCurrentEntry}
-                        disabled={isAnalyzing}
-                        className="w-full py-4 px-6 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-all duration-300 flex items-center justify-center shadow-sm hover:shadow-md disabled:shadow-none"
-                      >
-                        {isAnalyzing ? (
-                          <>
-                            <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            <span className="font-normal">Re-Analyzing...</span>
-                          </>
-                        ) : (
-                          <>
-                            <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
-                            <span className="font-normal">Re-Analyze with AI (uses 1 credit)</span>
-                          </>
-                        )}
-                      </button>
-                      <button
-                        onClick={resetAnalyzerPanel}
-                        className="w-full py-3 px-4 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium rounded-xl transition-all duration-300 flex items-center justify-center"
-                      >
-                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                        Cancel
-                      </button>
-                      <button
-                        onClick={() => {
-                          // For new (unsaved) analyses, Done should simply close
-                          // the description editor and return to the analysis view
-                          setIsEditingDescription(false)
-                          setShowAiResult(true)
-                          setShowAddFood(true)
-                        }}
-                        className="w-full py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-all duration-300 flex items-center justify-center"
-                      >
-                        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        Done
-                      </button>
-                    </div>
-                  )}
+                  {/* Full-Width Action Buttons (new entries and editing entries) */}
+                  <div className="space-y-3">
+                    <button
+                      onClick={reanalyzeCurrentEntry}
+                      disabled={isAnalyzing}
+                      className="w-full py-4 px-6 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-all duration-300 flex items-center justify-center shadow-sm hover:shadow-md disabled:shadow-none"
+                    >
+                      {isAnalyzing ? (
+                        <>
+                          <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          <span className="font-normal">Re-Analyzing...</span>
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          <span className="font-normal">Re-Analyze with AI (uses 1 credit)</span>
+                        </>
+                      )}
+                    </button>
+                    <button
+                      onClick={resetAnalyzerPanel}
+                      className="w-full py-3 px-4 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium rounded-xl transition-all duration-300 flex items-center justify-center"
+                    >
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => {
+                        // For new (unsaved) analyses, Done should simply close
+                        // the description editor and return to the analysis view
+                        setIsEditingDescription(false)
+                        setShowAiResult(true)
+                        setShowAddFood(true)
+                      }}
+                      className="w-full py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-all duration-300 flex items-center justify-center"
+                    >
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      Done
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
