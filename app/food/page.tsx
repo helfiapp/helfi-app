@@ -1238,9 +1238,10 @@ const applyStructuredItems = (
   //
   // Load today's foods from context data (no API calls needed!)
   useEffect(() => {
-    if (isViewingToday && userData?.todaysFoods) {
+    // Try to load from cache first (works for both today and past dates)
+    if (userData?.todaysFoods) {
       console.log('🚀 PERFORMANCE: Using cached foods from context - instant load!');
-      // Filter to only entries created on the selected (today) date using the entry timestamp id
+      // Filter to only entries created on the selected date using the entry timestamp id
       const onlySelectedDate = userData.todaysFoods.filter((item: any) => {
         try {
           // Prefer explicit localDate stamp if present
@@ -1270,14 +1271,20 @@ const applyStructuredItems = (
       });
       
       if (Array.isArray(deduped) && deduped.length > 0) {
-        // Only update if the data actually changed to prevent unnecessary re-renders
-        setTodaysFoods(prev => {
-          const prevIds = new Set(prev.map((f: any) => typeof f.id === 'number' ? f.id : Number(f.id)));
-          const newIds = new Set(deduped.map((f: any) => typeof f.id === 'number' ? f.id : Number(f.id)));
-          const prevIdsArray = Array.from(prevIds);
-          const idsMatch = prevIds.size === newIds.size && prevIdsArray.every(id => newIds.has(id));
-          return idsMatch ? prev : deduped;
-        });
+        // Update the appropriate state based on whether we're viewing today or a past date
+        if (isViewingToday) {
+          // Only update if the data actually changed to prevent unnecessary re-renders
+          setTodaysFoods(prev => {
+            const prevIds = new Set(prev.map((f: any) => typeof f.id === 'number' ? f.id : Number(f.id)));
+            const newIds = new Set(deduped.map((f: any) => typeof f.id === 'number' ? f.id : Number(f.id)));
+            const prevIdsArray = Array.from(prevIds);
+            const idsMatch = prevIds.size === newIds.size && prevIdsArray.every(id => newIds.has(id));
+            return idsMatch ? prev : deduped;
+          });
+        } else {
+          // For past dates, set historyFoods
+          setHistoryFoods(deduped);
+        }
         // Mark as loaded once data is set from context
         setFoodDiaryLoaded(true);
         
@@ -1337,7 +1344,12 @@ const applyStructuredItems = (
                 
                 // Merge missing entries with enriched cached entries
                 const merged = [...mappedMissing, ...enrichedCached];
-                setTodaysFoods(merged);
+                // Update the appropriate state based on whether we're viewing today or a past date
+                if (isViewingToday) {
+                  setTodaysFoods(merged);
+                } else {
+                  setHistoryFoods(merged);
+                }
                 
                 // Update cache with merged data (including dbId for future loads)
                 try {
@@ -1349,7 +1361,11 @@ const applyStructuredItems = (
                 } catch {}
               } else if (enrichedCached.length > 0) {
                 // Even if no missing entries, update with enriched dbIds
-                setTodaysFoods(enrichedCached);
+                if (isViewingToday) {
+                  setTodaysFoods(enrichedCached);
+                } else {
+                  setHistoryFoods(enrichedCached);
+                }
               }
             }
           } catch (error) {
@@ -1378,7 +1394,12 @@ const applyStructuredItems = (
                 localDate: (l as any).localDate || selectedDate,
               }));
               if (mapped.length > 0) {
-                setTodaysFoods(mapped);
+                // Update the appropriate state based on whether we're viewing today or a past date
+                if (isViewingToday) {
+                  setTodaysFoods(mapped);
+                } else {
+                  setHistoryFoods(mapped);
+                }
                 // Persist localDate back to user data for stability
                 try {
                   fetch('/api/user-data', {
@@ -1405,7 +1426,12 @@ const applyStructuredItems = (
                     }
                   })
                   if (byDate.length > 0) {
-                    setTodaysFoods(byDate)
+                    // Update the appropriate state based on whether we're viewing today or a past date
+                    if (isViewingToday) {
+                      setTodaysFoods(byDate);
+                    } else {
+                      setHistoryFoods(byDate);
+                    }
                     // Persist localDate back to user data so future loads are stable
                     try {
                       fetch('/api/user-data', {
@@ -1450,7 +1476,12 @@ const applyStructuredItems = (
               localDate: (l as any).localDate || selectedDate,
             }));
             if (mapped.length > 0) {
-              setTodaysFoods(mapped);
+              // Update the appropriate state based on whether we're viewing today or a past date
+              if (isViewingToday) {
+                setTodaysFoods(mapped);
+              } else {
+                setHistoryFoods(mapped);
+              }
               // Persist localDate back to user data for stability
               try {
                 fetch('/api/user-data', {
@@ -1472,10 +1503,9 @@ const applyStructuredItems = (
           setFoodDiaryLoaded(true);
         }
       })();
-    } else {
-      // Not viewing today - mark as loaded (history will be loaded separately)
-      setFoodDiaryLoaded(true);
     }
+    // Note: For non-today dates, history loading is handled by the separate useEffect below
+    // Don't set foodDiaryLoaded here - let the history useEffect handle it
   }, [userData, isViewingToday, selectedDate]);
 
   // Auto-rebuild ingredient cards from aiDescription when needed
