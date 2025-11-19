@@ -3104,7 +3104,7 @@ Please add nutritional information manually if needed.`);
                             </button>
                           </div>
                         </div>
-                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-3">
+                        <div className="flex flex-row items-center gap-3">
                           {/* Circle chart with calories in center */}
                           <div className="flex-shrink-0">
                             <div className="relative inline-block">
@@ -3120,10 +3120,10 @@ Please add nutritional information manually if needed.`);
                             </div>
                           </div>
                           
-                          {/* Macro breakdown list - single column on mobile, 2 column on desktop */}
+                          {/* Macro breakdown list - 2 column on mobile and desktop */}
                           <div className="flex-1">
                             <div className="text-sm text-gray-600 mb-1.5 sm:mb-2 font-medium">Macro breakdown</div>
-                            <div className="flex flex-col sm:flex-row sm:gap-3 text-sm text-gray-700">
+                            <div className="flex flex-row gap-3 text-sm text-gray-700">
                               {/* Left column: Protein, Carbs, Fat */}
                               <div className="space-y-2">
                                 {leftColumnMacros.map((macro) => {
