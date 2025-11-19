@@ -3463,77 +3463,12 @@ Please add nutritional information manually if needed.`);
                           return m && m[1] ? m[1].trim() : ''
                         })()
                         const servingUnitMeta = parseServingUnitMetadata(servingSizeLabel || '')
-                        const quickAddDelta = servingUnitMeta ? 1 / servingUnitMeta.quantity : null
-                        const quickAddHalfDelta = quickAddDelta ? quickAddDelta / 2 : null
-                        const hasOunces = servingUnitMeta
-                          ? /oz|ounce/.test((servingUnitMeta.unitLabel || '').toLowerCase())
-                          : false
-                        const isVolumeUnit = servingUnitMeta
-                          ? isVolumeBasedUnitLabel(servingUnitMeta.unitLabel)
-                          : false
-                        const baseOunces = (() => {
-                          if (!hasOunces) return null
-                          const raw = String(servingSizeLabel || '')
-                          const m = raw.match(/(\d+(?:\.\d+)?)\s*oz/i)
+                        const gramsPerServing = (() => {
+                          if (!servingSizeLabel) return null
+                          const m = servingSizeLabel.match(/(\d+(?:\.\d+)?)\s*g\b/i)
                           if (!m) return null
                           const v = parseFloat(m[1])
                           return Number.isFinite(v) && v > 0 ? v : null
-                        })()
-                        const isLikelyLiquidName = (() => {
-                          const n = String(item.name || '').toLowerCase()
-                          return /juice|milk|water|coffee|tea|smoothie|shake|soda|soft drink|cola|coke|soup|broth|stock|sauce|dressing|oil|vinegar|wine|beer|drink|beverage/.test(
-                            n,
-                          )
-                        })()
-                        const showVolumeToggle = hasOunces && isVolumeUnit && isLikelyLiquidName
-                        const activeVolumeUnit = showVolumeToggle ? volumeUnit : 'oz'
-                        const unitsPerServing = servingUnitMeta
-                          ? hasOunces
-                            ? activeVolumeUnit === 'ml'
-                              ? (baseOunces ?? servingUnitMeta.quantity) * OZ_TO_ML
-                              : baseOunces ?? servingUnitMeta.quantity
-                            : servingUnitMeta.quantity
-                          : 1
-                        const displayUnitLabel = servingUnitMeta
-                          ? hasOunces && isVolumeUnit
-                            ? activeVolumeUnit
-                            : servingUnitMeta.unitLabelSingular
-                          : null
-                        const unitStep = (() => {
-                          /**
-                           * GUARD RAIL: Unit step MUST always be exactly 1.
-                           *
-                           * The "Units" +/- control under Detected Foods must change in whole
-                           * units only: 1 → 2 → 3 → 4, etc. Past agents tried to make this
-                           * jump in 10s for volume units (e.g. ml, cups), which caused the
-                           * value to jump from 1 straight to 10 on a single click.
-                           *
-                           * The user has explicitly requested that this behaviour never
-                           * change again. Do NOT modify this without explicit written
-                           * approval from the user.
-                           */
-                          return 1
-                        })()
-                        const unitsDisplay = (() => {
-                          const raw = (item.servings ?? 1) * unitsPerServing
-                          if (!Number.isFinite(raw)) return 0
-                          // For ml, show a rounded multiple of 10 (e.g. 240 ml instead of 236.56 ml)
-                          if (activeVolumeUnit === 'ml') {
-                            return Math.round(raw / 10) * 10
-                          }
-                          // For oz (and other units), whole-number units (7, 8, 9 oz, etc.)
-                          return Math.round(raw)
-                        })()
-                        const servingSizeDisplay = (() => {
-                          if (!servingSizeLabel) return 'N/A'
-                          if (hasOunces && activeVolumeUnit === 'ml') {
-                            const oz = baseOunces ?? (servingUnitMeta?.quantity || 0)
-                            if (!oz || oz <= 0) return servingSizeLabel
-                            const ml = oz * OZ_TO_ML
-                            const roundedMl = Math.round(ml / 10) * 10
-                            return `≈ ${roundedMl} ml`
-                          }
-                          return servingSizeLabel
                         })()
 
                         const isMultiIngredient = analyzedItems.length > 1
@@ -3613,126 +3548,63 @@ Please add nutritional information manually if needed.`);
                             
                             {/* Serving Controls */}
                             {isExpanded && (
-                            <div className="flex flex-col gap-3 mb-3 pb-3 border-b border-gray-100">
-                              <div className="flex items-center gap-3">
-                              <span className="text-sm text-gray-600">Servings:</span>
-                              <div className="flex items-center gap-2">
-                                <button
-                                  onClick={() => {
-                                    const current = analyzedItems[index]?.servings || 1
-                                    const step = (servingUnitMeta && isDiscreteUnitLabel(servingUnitMeta.unitLabel)) 
-                                      ? (1 / servingUnitMeta.quantity) 
-                                      : 0.25
-                                    const next = Math.max(0, current - step)
-                                    updateItemField(index, 'servings', next)
-                                  }}
-                                  className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-medium transition-colors"
-                                >
-                                  -
-                                </button>
-                                <input
-                                  type="number"
-                                  min={0}
-                                  step={(servingUnitMeta && isDiscreteUnitLabel(servingUnitMeta.unitLabel)) ? (1 / servingUnitMeta.quantity) : 0.25}
-                                  value={formatNumberInputValue(item.servings ?? 1)}
-                                  onChange={(e) => updateItemField(index, 'servings', e.target.value)}
-                                  className="w-20 px-2 py-1 border border-gray-300 rounded-lg text-base font-semibold text-gray-900 text-center focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                />
-                                <button
-                                  onClick={() => {
-                                    const current = analyzedItems[index]?.servings || 1
-                                    const step = (servingUnitMeta && isDiscreteUnitLabel(servingUnitMeta.unitLabel)) 
-                                      ? (1 / servingUnitMeta.quantity) 
-                                      : 0.25
-                                    const next = current + step
-                                    updateItemField(index, 'servings', next)
-                                  }}
-                                  className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-medium transition-colors"
-                                >
-                                  +
-                                </button>
-                              </div>
-                              </div>
-                              {servingUnitMeta && (
-                                <div className="flex flex-col gap-1">
-                                <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
-                                  <span>
-                                    Units{displayUnitLabel ? ` (${displayUnitLabel})` : ''}:
-                                  </span>
-                                  {showVolumeToggle && (
-                                      <div className="inline-flex items-center text-[11px] sm:text-xs bg-gray-100 rounded-full px-1.5 py-0.5 border border-gray-200">
-                                        <button
-                                          type="button"
-                                          onClick={() => setVolumeUnit('oz')}
-                                          className={`px-2 py-0.5 rounded-full ${
-                                            activeVolumeUnit === 'oz'
-                                              ? 'bg-emerald-500 text-white shadow-sm border border-emerald-500'
-                                              : 'bg-transparent text-gray-500'
-                                          }`}
-                                        >
-                                          oz
-                                        </button>
-                                        <button
-                                          type="button"
-                                          onClick={() => setVolumeUnit('ml')}
-                                          className={`px-2 py-0.5 rounded-full ${
-                                            activeVolumeUnit === 'ml'
-                                              ? 'bg-emerald-500 text-white shadow-sm border border-emerald-500'
-                                              : 'bg-transparent text-gray-500'
-                                          }`}
-                                        >
-                                          ml
-                                        </button>
-                                      </div>
-                                    )}
-                                    <div className="flex items-center gap-2">
-                                      <button
-                                        onClick={() => {
-                                          const currentUnits = unitsDisplay
-                                          const nextUnits = Math.max(0, currentUnits - unitStep)
-                                          const servingsFromUnits =
-                                            unitsPerServing > 0 ? nextUnits / unitsPerServing : 0
-                                          updateItemField(index, 'servings', Math.max(0, servingsFromUnits))
-                                        }}
-                                        className="w-7 h-7 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-md text-gray-700"
-                                      >
-                                        -
-                                      </button>
-                                      <input
-                                        type="number"
-                                        min={0}
-                                        step={unitStep}
-                                        value={formatNumberInputValue(unitsDisplay)}
-                                        onChange={(e) => {
-                                          const raw = Number(e.target.value)
-                                          if (!Number.isFinite(raw)) return
-                                          const clampedUnits = Math.max(0, Math.round(raw))
-                                          const servingsFromUnits =
-                                            unitsPerServing > 0 ? clampedUnits / unitsPerServing : 0
-                                          updateItemField(index, 'servings', servingsFromUnits)
-                                        }}
-                                        className="w-24 px-2 py-1 border border-gray-300 rounded-lg text-base font-semibold text-gray-900 text-center focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                      />
-                                      <button
-                                        onClick={() => {
-                                          const currentUnits = unitsDisplay
-                                          const nextUnits = currentUnits + unitStep
-                                          const servingsFromUnits =
-                                            unitsPerServing > 0 ? nextUnits / unitsPerServing : 0
-                                          updateItemField(index, 'servings', servingsFromUnits)
-                                        }}
-                                        className="w-7 h-7 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-md text-gray-700"
-                                      >
-                                        +
-                                      </button>
-                                    </div>
-                                    <span className="text-xs text-gray-500 w-full sm:w-auto">
-                                      1 serving = {servingSizeDisplay}
-                                    </span>
+                              <div className="flex flex-col gap-2 mb-3 pb-3 border-b border-gray-100">
+                                <div className="flex items-center gap-3">
+                                  <span className="text-sm text-gray-600">Servings:</span>
+                                  <div className="flex items-center gap-2">
+                                    <button
+                                      onClick={() => {
+                                        const current = analyzedItems[index]?.servings || 1
+                                        const step =
+                                          servingUnitMeta && isDiscreteUnitLabel(servingUnitMeta.unitLabel)
+                                            ? 1
+                                            : 0.25
+                                        const next = Math.max(0, current - step)
+                                        updateItemField(index, 'servings', next)
+                                      }}
+                                      className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-medium transition-colors"
+                                    >
+                                      -
+                                    </button>
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      step={
+                                        servingUnitMeta && isDiscreteUnitLabel(servingUnitMeta.unitLabel)
+                                          ? 1
+                                          : 0.25
+                                      }
+                                      value={formatNumberInputValue(item.servings ?? 1)}
+                                      onChange={(e) => updateItemField(index, 'servings', e.target.value)}
+                                      className="w-20 px-2 py-1 border border-gray-300 rounded-lg text-base font-semibold text-gray-900 text-center focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                    />
+                                    <button
+                                      onClick={() => {
+                                        const current = analyzedItems[index]?.servings || 1
+                                        const step =
+                                          servingUnitMeta && isDiscreteUnitLabel(servingUnitMeta.unitLabel)
+                                            ? 1
+                                            : 0.25
+                                        const next = current + step
+                                        updateItemField(index, 'servings', next)
+                                      }}
+                                      className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-medium transition-colors"
+                                    >
+                                      +
+                                    </button>
                                   </div>
                                 </div>
-                              )}
-                            </div>
+                                <div className="text-xs text-gray-500">
+                                  {servingSizeLabel
+                                    ? `1 serving = ${servingSizeLabel}`
+                                    : 'Serving size not specified'}
+                                </div>
+                                {gramsPerServing && (
+                                  <div className="text-xs text-gray-500">
+                                    Total amount ≈ {Math.round(gramsPerServing * servingsCount)} g
+                                  </div>
+                                )}
+                              </div>
                             )}
                             
                             {/* Per-serving nutrition */}
