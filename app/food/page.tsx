@@ -3379,7 +3379,7 @@ Please add nutritional information manually if needed.`);
                   })()}
 
                   {/* Description Field - now appears after the photo + macro block */}
-                  {isEditingDescription && (
+                  {(editingEntry || isEditingDescription) && (
                     <div className="mb-6 space-y-4">
                       <label className="block text-lg font-medium text-gray-900">
                         Food Description
