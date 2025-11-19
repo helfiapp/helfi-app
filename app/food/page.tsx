@@ -786,8 +786,9 @@ export default function FoodDiary() {
   // New loading state
   const [foodDiaryLoaded, setFoodDiaryLoaded] = useState(false)
   const [expandedItemIndex, setExpandedItemIndex] = useState<number | null>(null)
-
+ 
   const descriptionTextareaRef = useRef<HTMLTextAreaElement | null>(null)
+  const editPhotoInputRef = useRef<HTMLInputElement | null>(null)
 
   const [foodImagesLoading, setFoodImagesLoading] = useState<{[key: string]: boolean}>({})
   const [expandedEntries, setExpandedEntries] = useState<{[key: string]: boolean}>({})
@@ -3020,14 +3021,22 @@ Please add nutritional information manually if needed.`);
             {/* AI Analysis Result - Premium Cronometer-style UI */}
             {showAiResult && (
               <div className="bg-white rounded-2xl shadow-lg border border-gray-100">
-                {/* Photo Section - full width image for mobile / non-editing */}
+                {/* Photo Section - full width image for mobile / non-editing.
+                    When editing an entry, clicking the image lets you change the photo. */}
                 {photoPreview && (
                   <div
                     className={`p-4 border-b border-gray-100 flex justify-center ${
                       editingEntry ? 'lg:hidden' : ''
                     }`}
                   >
-                    <div className="relative w-full">
+                    <div
+                      className={`relative w-full ${editingEntry ? 'cursor-pointer group' : ''}`}
+                      onClick={() => {
+                        if (editingEntry && editPhotoInputRef.current) {
+                          editPhotoInputRef.current.click()
+                        }
+                      }}
+                    >
                       {foodImagesLoading[photoPreview] && (
                         <div className="absolute inset-0 bg-gray-100 rounded-xl flex items-center justify-center">
                           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
@@ -3056,6 +3065,27 @@ Please add nutritional information manually if needed.`);
                           }))
                         }
                       />
+                      {editingEntry && (
+                        <>
+                          <div className="hidden lg:flex absolute inset-0 rounded-xl bg-black/20 items-center justify-center group-hover:bg-black/30 transition-colors pointer-events-none" />
+                          <div className="hidden lg:flex absolute inset-0 items-center justify-center pointer-events-none">
+                            <span className="px-3 py-1.5 rounded-full bg-white/90 text-xs font-medium text-gray-800 shadow-sm">
+                              Click to change photo
+                            </span>
+                          </div>
+                          <input
+                            ref={editPhotoInputRef}
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={async (e) => {
+                              await handlePhotoUpload(e)
+                              setShowAiResult(false)
+                              setIsEditingDescription(false)
+                            }}
+                          />
+                        </>
+                      )}
                     </div>
                   </div>
                 )}
@@ -3089,58 +3119,6 @@ Please add nutritional information manually if needed.`);
                       >
                         Cancel
                       </button>
-                      <div className="relative edit-actions-menu">
-                        <button
-                          type="button"
-                          onClick={() => setShowEditActionsMenu((v) => !v)}
-                          className="p-2 rounded-full border border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
-                          aria-label="More edit actions"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M12 5.25a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 8a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 8a1.5 1.5 0 110-3 1.5 1.5 0 010 3z"
-                            />
-                          </svg>
-                        </button>
-                        {showEditActionsMenu && (
-                          <div className="absolute right-0 mt-2 w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-30">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setShowEditActionsMenu(false)
-                                handleEditDescriptionClick()
-                              }}
-                              className="w-full text-left px-3 py-2 text-xs sm:text-sm text-gray-700 hover:bg-gray-50"
-                            >
-                              Edit description
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setShowEditActionsMenu(false)
-                                reanalyzeCurrentEntry()
-                              }}
-                              disabled={isAnalyzing}
-                              className="w-full text-left px-3 py-2 text-xs sm:text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-60"
-                            >
-                              Re-analyze
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setShowEditActionsMenu(false)
-                                handleDeletePhoto()
-                              }}
-                              className="w-full text-left px-3 py-2 text-xs sm:text-sm text-red-600 hover:bg-red-50"
-                            >
-                              Delete photo
-                            </button>
-                          </div>
-                        )}
-                      </div>
                     </div>
                   )}
 
@@ -4501,8 +4479,8 @@ Please add nutritional information manually if needed.`);
           </div>
         ) : (
         <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 overflow-visible">
-          {/* Daily Totals Row */}
-          {(isViewingToday ? todaysFoods : (historyFoods || [])).length > 0 && (
+          {/* Daily Totals Row - only show on main diary view, not while editing an entry */}
+          {!editingEntry && (isViewingToday ? todaysFoods : (historyFoods || [])).length > 0 && (
             <div className="mb-4">
               {(() => {
                 const source = isViewingToday ? todaysFoods : (historyFoods || [])
