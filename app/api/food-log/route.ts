@@ -6,6 +6,9 @@ import { triggerBackgroundRegeneration } from '@/lib/insights/regeneration-servi
 
 // Fetch logs for a specific date (YYYY-MM-DD)
 export async function GET(request: NextRequest) {
+  let dateStr: string | null = null;
+  let tzOffsetMinRaw: string | null = null;
+  
   try {
     // Ensure localDate column exists (forward-compatible migration)
     // This prevents "column does not exist" errors if migration hasn't run
@@ -22,21 +25,43 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
-    const dateStr = searchParams.get('date') // YYYY-MM-DD (local date)
-    const tzOffsetMinRaw = searchParams.get('tz') // minutes: same as new Date().getTimezoneOffset()
+    dateStr = searchParams.get('date') // YYYY-MM-DD (local date)
+    tzOffsetMinRaw = searchParams.get('tz') // minutes: same as new Date().getTimezoneOffset()
+    
+    console.log(`📥 GET /api/food-log - Request: date=${dateStr}, tz=${tzOffsetMinRaw}, user=${session.user.email}`);
+    
     if (!dateStr) {
+      console.error('❌ GET /api/food-log - Missing date parameter');
       return NextResponse.json({ error: 'Missing date' }, { status: 400 })
+    }
+
+    // At this point, dateStr is guaranteed to be non-null
+    const validatedDateStr: string = dateStr;
+
+    // Validate date format (YYYY-MM-DD)
+    const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+    if (!datePattern.test(validatedDateStr)) {
+      console.error(`❌ GET /api/food-log - Invalid date format: ${validatedDateStr}`);
+      return NextResponse.json({ error: 'Invalid date format. Expected YYYY-MM-DD' }, { status: 400 })
     }
 
     const user = await prisma.user.findUnique({ where: { email: session.user.email } })
     if (!user) {
+      console.error(`❌ GET /api/food-log - User not found: ${session.user.email}`);
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
     // Build a UTC window that corresponds to the user's local day
     // tz is minutes difference between local time and UTC (Date.getTimezoneOffset()).
     // To get the correct UTC window for the local date, we ADD the offset.
-    const [y, m, d] = dateStr.split('-').map((v) => parseInt(v, 10))
+    const [y, m, d] = validatedDateStr.split('-').map((v) => parseInt(v, 10))
+    
+    // Validate parsed date values
+    if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d) || m < 1 || m > 12 || d < 1 || d > 31) {
+      console.error(`❌ GET /api/food-log - Invalid date values: y=${y}, m=${m}, d=${d}`);
+      return NextResponse.json({ error: 'Invalid date values' }, { status: 400 })
+    }
+    
     const tzMin = Number.isFinite(parseInt(tzOffsetMinRaw || ''))
       ? parseInt(tzOffsetMinRaw || '0', 10)
       : 0
@@ -80,7 +105,7 @@ export async function GET(request: NextRequest) {
       where: {
         userId: user.id,
         OR: [
-          { localDate: dateStr },
+          { localDate: validatedDateStr },
           {
             localDate: null,
             createdAt: { gte: queryStart, lte: queryEnd },
@@ -101,40 +126,59 @@ export async function GET(request: NextRequest) {
     // This handles entries that might have incorrect localDate values
     // DO NOT remove this filtering step - it ensures accuracy after broad query
     const filteredLogs = logs.filter((log) => {
-      // If localDate matches exactly, include it
-      if (log.localDate === dateStr) return true;
-      
-      // If localDate is null or doesn't match, check the actual calendar date of createdAt
-      // CRITICAL: Use the user's timezone to determine the calendar date, not UTC
-      // This ensures entries are matched to the correct day regardless of timezone issues
-      if (!log.localDate || log.localDate !== dateStr) {
-        // Convert createdAt to user's local date using their timezone offset
-        const logDate = new Date(log.createdAt.getTime() - (tzMin * 60 * 1000));
-        const logYear = logDate.getUTCFullYear();
-        const logMonth = logDate.getUTCMonth();
-        const logDay = logDate.getUTCDate();
+      try {
+        // If localDate matches exactly, include it
+        if (log.localDate === validatedDateStr) return true;
         
-        // Compare with requested date
-        const [reqYear, reqMonth, reqDay] = dateStr.split('-').map((v) => parseInt(v, 10));
-        const matchesDate = logYear === reqYear && logMonth === (reqMonth - 1) && logDay === reqDay;
-        
-        // Also check UTC window as fallback (for entries created exactly at boundaries)
-        const logTime = log.createdAt.getTime();
-        const isInWindow = logTime >= start.getTime() && logTime <= end.getTime();
-        
-        // Include if either the calendar date matches OR it's within the UTC window
-        const shouldInclude = matchesDate || isInWindow;
-        
-        // Debug logging for entries that might be filtered out incorrectly
-        if (!shouldInclude && log.localDate && log.localDate !== dateStr) {
-          const logDateStr = `${logYear}-${String(logMonth + 1).padStart(2, '0')}-${String(logDay).padStart(2, '0')}`;
-          console.log(`⚠️ Entry filtered out: localDate=${log.localDate}, createdAt date=${logDateStr}, requested=${dateStr}, matchesDate=${matchesDate}, inWindow=${isInWindow}`);
+        // If localDate is null or doesn't match, check the actual calendar date of createdAt
+        // CRITICAL: Use the user's timezone to determine the calendar date, not UTC
+        // This ensures entries are matched to the correct day regardless of timezone issues
+        if (!log.localDate || log.localDate !== validatedDateStr) {
+          // Safety check: createdAt must exist and be a valid date
+          if (!log.createdAt) {
+            console.warn(`⚠️ Entry ${log.id} has no createdAt, skipping date check`);
+            return false;
+          }
+          
+          // Ensure createdAt is a Date object
+          const createdAtDate = log.createdAt instanceof Date ? log.createdAt : new Date(log.createdAt);
+          if (isNaN(createdAtDate.getTime())) {
+            console.warn(`⚠️ Entry ${log.id} has invalid createdAt: ${log.createdAt}, skipping date check`);
+            return false;
+          }
+          
+          // Convert createdAt to user's local date using their timezone offset
+          const logDate = new Date(createdAtDate.getTime() - (tzMin * 60 * 1000));
+          const logYear = logDate.getUTCFullYear();
+          const logMonth = logDate.getUTCMonth();
+          const logDay = logDate.getUTCDate();
+          
+          // Compare with requested date
+          const [reqYear, reqMonth, reqDay] = validatedDateStr.split('-').map((v) => parseInt(v, 10));
+          const matchesDate = logYear === reqYear && logMonth === (reqMonth - 1) && logDay === reqDay;
+          
+          // Also check UTC window as fallback (for entries created exactly at boundaries)
+          const logTime = createdAtDate.getTime();
+          const isInWindow = logTime >= start.getTime() && logTime <= end.getTime();
+          
+          // Include if either the calendar date matches OR it's within the UTC window
+          const shouldInclude = matchesDate || isInWindow;
+          
+          // Debug logging for entries that might be filtered out incorrectly
+          if (!shouldInclude && log.localDate && log.localDate !== validatedDateStr) {
+            const logDateStr = `${logYear}-${String(logMonth + 1).padStart(2, '0')}-${String(logDay).padStart(2, '0')}`;
+            console.log(`⚠️ Entry filtered out: localDate=${log.localDate}, createdAt date=${logDateStr}, requested=${validatedDateStr}, matchesDate=${matchesDate}, inWindow=${isInWindow}`);
+          }
+          
+          return shouldInclude;
         }
         
-        return shouldInclude;
+        return false;
+      } catch (error) {
+        console.error(`❌ Error filtering log entry ${log.id}:`, error);
+        // On error, exclude the entry to prevent breaking the entire response
+        return false;
       }
-      
-      return false;
     })
     
     // 🛡️ GUARD RAIL: Deduplication (REQUIRED)
@@ -144,7 +188,7 @@ export async function GET(request: NextRequest) {
       index === self.findIndex((l) => l.id === log.id)
     )
 
-    console.log(`📊 GET /api/food-log - Found ${uniqueLogs.length} entries for date ${dateStr} (from ${logs.length} total matches)`)
+    console.log(`📊 GET /api/food-log - Found ${uniqueLogs.length} entries for date ${validatedDateStr} (from ${logs.length} total matches)`)
     
     // Debug: Log entries that were filtered out to help diagnose missing entries
     if (logs.length > uniqueLogs.length) {
@@ -152,7 +196,7 @@ export async function GET(request: NextRequest) {
         const inUnique = uniqueLogs.some((u) => u.id === log.id);
         return !inUnique;
       });
-      console.log(`⚠️ Filtered out ${filteredOut.length} entries that didn't match date ${dateStr}:`, 
+      console.log(`⚠️ Filtered out ${filteredOut.length} entries that didn't match date ${validatedDateStr}:`, 
         filteredOut.map((l) => ({
           id: l.id,
           localDate: l.localDate,
@@ -162,10 +206,20 @@ export async function GET(request: NextRequest) {
       );
     }
     
+    console.log(`✅ GET /api/food-log - Success: Returning ${uniqueLogs.length} entries for date ${validatedDateStr}`);
     return NextResponse.json({ success: true, logs: uniqueLogs })
   } catch (error) {
-    console.error('GET /api/food-log error', error)
-    return NextResponse.json({ error: 'Failed to load logs' }, { status: 500 })
+    console.error('❌ GET /api/food-log - Error:', {
+      error,
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      dateStr: dateStr || 'null',
+      tzOffsetMinRaw: tzOffsetMinRaw || 'null'
+    });
+    return NextResponse.json({ 
+      error: 'Failed to load logs',
+      details: error instanceof Error ? error.message : String(error)
+    }, { status: 500 })
   }
 }
 
