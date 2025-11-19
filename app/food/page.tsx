@@ -3151,137 +3151,120 @@ Please add nutritional information manually if needed.`);
                     </div>
                   )}
 
-                  {/* Description Field - Appears right after title/meal summary when editing */}
-                  {isEditingDescription && (
-                    <div className="mb-6 space-y-4">
-                      <label className="block text-lg font-medium text-gray-900">
-                        Food Description
-                      </label>
-                      <textarea
-                        ref={descriptionTextareaRef}
-                        value={editedDescription}
-                        onChange={(e) => {
-                          setEditedDescription(e.target.value);
-                          e.target.style.height = 'auto';
-                          e.target.style.height = `${e.target.scrollHeight}px`;
-                        }}
-                        onFocus={(e) => {
-                          e.target.style.height = 'auto';
-                          e.target.style.height = `${e.target.scrollHeight}px`;
-                        }}
-                        className="w-full min-h-[8rem] px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 text-base resize-none bg-white shadow-sm font-normal leading-relaxed whitespace-pre-wrap"
-                        style={{ overflow: 'hidden' }}
-                        placeholder="Enter a detailed description of the food item..."
-                      />
-                      <p className="text-sm text-gray-600 font-normal">
-                        Change the food description and click on the 'Re-Analyze' button.
-                      </p>
-                    </div>
-                  )}
-
                   {/* Desktop-only compact photo + macro layout when editing an entry */}
                   {editingEntry && photoPreview && analyzedNutrition && (
-                    <div className="hidden lg:flex gap-6 mb-6 items-start">
-                      <div className="w-1/2 max-w-md">
-                        <div className="relative rounded-2xl overflow-hidden border border-gray-100 bg-gray-50">
-                          <Image
-                            src={photoPreview}
-                            alt="Analyzed food"
-                            width={420}
-                            height={315}
-                            className="w-full aspect-[4/3] object-cover"
-                          />
-                        </div>
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex justify-end mb-3">
-                          <div className="inline-flex items-center text-[11px] sm:text-xs bg-gray-100 rounded-full p-0.5 border border-gray-200">
-                            <button
-                              type="button"
-                              onClick={() => setEnergyUnit('kcal')}
-                              className={`px-2 py-0.5 rounded-full ${
-                                energyUnit === 'kcal'
-                                  ? 'bg-white text-gray-900 shadow-sm'
-                                  : 'text-gray-500'
-                              }`}
-                            >
-                              kcal
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setEnergyUnit('kJ')}
-                              className={`px-2 py-0.5 rounded-full ${
-                                energyUnit === 'kJ'
-                                  ? 'bg-white text-gray-900 shadow-sm'
-                                  : 'text-gray-500'
-                              }`}
-                            >
-                              kJ
-                            </button>
+                    <div className="hidden lg:block mb-6">
+                      <div className="flex gap-6 items-start">
+                        <div className="w-1/2 max-w-md">
+                          <div className="relative rounded-2xl overflow-hidden border border-gray-100 bg-gray-50">
+                            <Image
+                              src={photoPreview}
+                              alt="Analyzed food"
+                              width={420}
+                              height={315}
+                              className="w-full aspect-[4/3] object-cover"
+                            />
                           </div>
                         </div>
-                        {(() => {
-                          const macroSegments: MacroSegment[] = [
-                            {
-                              key: 'protein',
-                              label: 'Protein',
-                              grams: (analyzedNutrition as any)?.protein || 0,
-                              color: '#ef4444',
-                            },
-                            {
-                              key: 'fibre',
-                              label: 'Fibre',
-                              grams: (analyzedNutrition as any)?.fiber || 0,
-                              color: '#93c5fd',
-                            },
-                            {
-                              key: 'carbs',
-                              label: 'Carbs',
-                              grams: (analyzedNutrition as any)?.carbs || 0,
-                              color: '#22c55e',
-                            },
-                            {
-                              key: 'sugar',
-                              label: 'Sugar',
-                              grams: (analyzedNutrition as any)?.sugar || 0,
-                              color: '#f97316',
-                            },
-                            {
-                              key: 'fat',
-                              label: 'Fat',
-                              grams: (analyzedNutrition as any)?.fat || 0,
-                              color: '#6366f1',
-                            },
-                          ]
+                        <div className="flex-1">
+                          <div className="flex justify-end mb-3">
+                            <div className="inline-flex items-center text-[11px] sm:text-xs bg-gray-100 rounded-full p-0.5 border border-gray-200">
+                              <button
+                                type="button"
+                                onClick={() => setEnergyUnit('kcal')}
+                                className={`px-2 py-0.5 rounded-full ${
+                                  energyUnit === 'kcal'
+                                    ? 'bg-white text-gray-900 shadow-sm'
+                                    : 'text-gray-500'
+                                }`}
+                              >
+                                kcal
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEnergyUnit('kJ')}
+                                className={`px-2 py-0.5 rounded-full ${
+                                  energyUnit === 'kJ'
+                                    ? 'bg-white text-gray-900 shadow-sm'
+                                    : 'text-gray-500'
+                                }`}
+                              >
+                                kJ
+                              </button>
+                            </div>
+                          </div>
+                          {(() => {
+                            const macroSegments: MacroSegment[] = [
+                              {
+                                key: 'protein',
+                                label: 'Protein',
+                                grams: (analyzedNutrition as any)?.protein || 0,
+                                color: '#ef4444',
+                              },
+                              {
+                                key: 'fibre',
+                                label: 'Fibre',
+                                grams: (analyzedNutrition as any)?.fiber || 0,
+                                color: '#93c5fd',
+                              },
+                              {
+                                key: 'carbs',
+                                label: 'Carbs',
+                                grams: (analyzedNutrition as any)?.carbs || 0,
+                                color: '#22c55e',
+                              },
+                              {
+                                key: 'sugar',
+                                label: 'Sugar',
+                                grams: (analyzedNutrition as any)?.sugar || 0,
+                                color: '#f97316',
+                              },
+                              {
+                                key: 'fat',
+                                label: 'Fat',
+                                grams: (analyzedNutrition as any)?.fat || 0,
+                                color: '#6366f1',
+                              },
+                            ]
 
-                          const caloriesValue = (analyzedNutrition as any)?.calories || 0
-                          const caloriesInUnit =
-                            energyUnit === 'kJ'
-                              ? Math.round(caloriesValue * 4.184)
-                              : Math.round(caloriesValue)
+                            const caloriesValue = (analyzedNutrition as any)?.calories || 0
+                            const caloriesInUnit =
+                              energyUnit === 'kJ'
+                                ? Math.round(caloriesValue * 4.184)
+                                : Math.round(caloriesValue)
 
-                          return (
-                            <div className="flex items-start gap-5">
-                              <div className="flex flex-col items-center flex-shrink-0">
-                                <div className="relative inline-block">
-                                  <MacroRing macros={macroSegments} showLegend={false} size="xlarge" />
-                                  <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                                    <div className="text-2xl sm:text-3xl font-bold text-gray-900">
-                                      {caloriesInUnit}
+                            return (
+                              <div className="flex flex-col">
+                                <div className="flex items-center gap-5">
+                                  <div className="flex flex-col items-center flex-shrink-0">
+                                    <div className="relative inline-block">
+                                      <MacroRing
+                                        macros={macroSegments}
+                                        showLegend={false}
+                                        size="xlarge"
+                                      />
+                                      <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                                        <div className="text-2xl sm:text-3xl font-bold text-gray-900">
+                                          {caloriesInUnit}
+                                        </div>
+                                        <div className="text-xs text-gray-500 mt-0.5">
+                                          {energyUnit}
+                                        </div>
+                                      </div>
                                     </div>
-                                    <div className="text-xs text-gray-500 mt-0.5">{energyUnit}</div>
                                   </div>
                                 </div>
-                                <div className="text-sm text-gray-600 mt-2 font-medium">Macro breakdown</div>
-                              </div>
-                              <div className="flex-1 flex flex-col justify-center py-1">
-                                <div className="space-y-1.5 text-sm text-gray-700">
+                                {/* Horizontal macro chips under the photo+circle row */}
+                                <div className="mt-4 flex flex-wrap gap-3">
                                   {macroSegments.map((macro) => {
                                     const displayValue = macro.grams > 0 ? Math.round(macro.grams) : 0
                                     return (
-                                      <div key={macro.key} className="flex items-center gap-2">
+                                      <div
+                                        key={macro.key}
+                                        className="inline-flex items-center gap-2 rounded-full bg-gray-100 border border-gray-200 px-3 py-1 text-sm text-gray-800"
+                                      >
                                         <span
-                                          className="inline-block w-3 h-3 rounded-full shrink-0"
+                                          className="inline-block w-3 h-3 rounded-full"
                                           style={{ backgroundColor: macro.color }}
                                         />
                                         <span>
@@ -3292,13 +3275,14 @@ Please add nutritional information manually if needed.`);
                                   })}
                                 </div>
                               </div>
-                            </div>
-                          )
-                        })()}
+                            )
+                          })()}
+                        </div>
                       </div>
                     </div>
                   )}
 
+                  {/* Mobile + non-editing macro layout (photo on top, circle + vertical labels beneath) */}
                   {analyzedNutrition && (() => {
                     // Create macro segments for the circle chart
                     const macroSegments: MacroSegment[] = [
@@ -3326,11 +3310,7 @@ Please add nutritional information manually if needed.`);
                       energyUnit === 'kJ' ? Math.round(caloriesValue * 4.184) : Math.round(caloriesValue)
                     
                     return (
-                      <div
-                        className={`mb-6 mt-3 rounded-lg p-4 sm:p-6 bg-white/90 supports-[backdrop-filter]:bg-white/60 backdrop-blur ${
-                          editingEntry ? 'lg:hidden' : ''
-                        }`}
-                      >
+                      <div className={`mb-6 mt-3 rounded-lg p-4 sm:p-6 bg-white/90 supports-[backdrop-filter]:bg-white/60 backdrop-blur ${editingEntry ? 'lg:hidden' : ''}`}>
                         <div className="flex justify-end mb-4">
                           <div className="inline-flex items-center text-[11px] sm:text-xs bg-gray-100 rounded-full p-0.5 border border-gray-200">
                             <button
@@ -3397,6 +3377,34 @@ Please add nutritional information manually if needed.`);
                       </div>
                     )
                   })()}
+
+                  {/* Description Field - now appears after the photo + macro block */}
+                  {isEditingDescription && (
+                    <div className="mb-6 space-y-4">
+                      <label className="block text-lg font-medium text-gray-900">
+                        Food Description
+                      </label>
+                      <textarea
+                        ref={descriptionTextareaRef}
+                        value={editedDescription}
+                        onChange={(e) => {
+                          setEditedDescription(e.target.value);
+                          e.target.style.height = 'auto';
+                          e.target.style.height = `${e.target.scrollHeight}px`;
+                        }}
+                        onFocus={(e) => {
+                          e.target.style.height = 'auto';
+                          e.target.style.height = `${e.target.scrollHeight}px`;
+                        }}
+                        className="w-full min-h-[8rem] px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 text-base resize-none bg-white shadow-sm font-normal leading-relaxed whitespace-pre-wrap"
+                        style={{ overflow: 'hidden' }}
+                        placeholder="Enter a detailed description of the food item..."
+                      />
+                      <p className="text-sm text-gray-600 font-normal">
+                        Change the food description and click on the 'Re-Analyze' button.
+                      </p>
+                    </div>
+                  )}
 
                   {/* Detected Items with Brand, Serving Size, and Edit Controls */}
                   {analyzedItems && analyzedItems.length > 0 && !isEditingDescription ? (
@@ -4703,6 +4711,10 @@ Please add nutritional information manually if needed.`);
               })()}
             </div>
           )}
+
+          {/* Hide energy summary + meals while editing an entry to keep the user focused on editing */}
+          {!editingEntry && (
+            <>
           <h3 className="text-lg font-semibold mb-4">{isViewingToday ? "Today's Meals" : 'Meals'}</h3>
           
           {(isViewingToday ? todaysFoods : (historyFoods || [])).length === 0 ? (
@@ -5005,6 +5017,8 @@ Please add nutritional information manually if needed.`);
                 </div>
               ))}
             </div>
+          )}
+            </>
           )}
         </div>
         )}
