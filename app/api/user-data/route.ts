@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
+import { getToken } from 'next-auth/jwt'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { precomputeIssueSectionsForUser, precomputeQuickSectionsForUser } from '@/lib/insights/issue-engine'
@@ -12,28 +13,44 @@ export async function GET(request: NextRequest) {
     console.log('Request URL:', request.url)
     console.log('Request headers:', Object.fromEntries(request.headers.entries()))
     
-    // Get NextAuth session - App Router automatically handles request context
-    const session = await getServerSession(authOptions)
-    
+    // Get NextAuth session - with JWT fallback (same pattern as /api/analyze-food)
+    let session = await getServerSession(authOptions)
+    let userEmail: string | null = session?.user?.email ?? null
+    let usedTokenFallback = false
+
+    if (!userEmail) {
+      try {
+        const token = await getToken({
+          req: request,
+          secret: process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET || 'helfi-secret-key-production-2024',
+        })
+        if (token?.email) {
+          userEmail = String(token.email)
+          usedTokenFallback = true
+        }
+      } catch (tokenError) {
+        console.error('GET /api/user-data - JWT fallback failed:', tokenError)
+      }
+    }
+
     console.log('NextAuth session result:', session)
     console.log('Session user:', session?.user)
-    console.log('Session user email:', session?.user?.email)
+    console.log('Resolved user email (session/JWT):', userEmail, 'usedTokenFallback:', usedTokenFallback)
     
-    if (!session?.user?.email) {
-      console.log('GET Authentication failed - no valid session found')
+    if (!userEmail) {
+      console.log('GET Authentication failed - no valid session or token found')
       console.log('Session:', session)
       console.log('Request headers:', Object.fromEntries(request.headers.entries()))
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
     
-    const userEmail = session.user.email
-    console.log('GET /api/user-data - NextAuth session found for:', userEmail)
+    console.log('GET /api/user-data - Authenticated for:', userEmail)
 
     // Get user data by email with better error handling
     let user
     try {
       user = await prisma.user.findUnique({
-        where: { email: userEmail },
+      where: { email: userEmail },
         include: {
           healthGoals: true,
           supplements: true,
@@ -258,20 +275,36 @@ export async function POST(request: NextRequest) {
     console.log('POST /api/user-data - Starting SIMPLIFIED approach...')
     
     // Get NextAuth session
-    const session = await getServerSession(authOptions)
+    let session = await getServerSession(authOptions)
+    let userEmail: string | null = session?.user?.email ?? null
+    let usedTokenFallback = false
+
+    if (!userEmail) {
+      try {
+        const token = await getToken({
+          req: request,
+          secret: process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET || 'helfi-secret-key-production-2024',
+        })
+        if (token?.email) {
+          userEmail = String(token.email)
+          usedTokenFallback = true
+        }
+      } catch (tokenError) {
+        console.error('POST /api/user-data - JWT fallback failed:', tokenError)
+      }
+    }
     
     console.timeEnd('⏱️ Authentication Check')
     console.log('NextAuth session result:', session)
     console.log('Session user:', session?.user)
-    console.log('Session user email:', session?.user?.email)
+    console.log('Resolved user email (session/JWT):', userEmail, 'usedTokenFallback:', usedTokenFallback)
     
-    if (!session?.user?.email) {
+    if (!userEmail) {
       console.timeEnd('⏱️ Total API Processing Time')
-      console.log('❌ POST Authentication failed - no valid session found')
+      console.log('❌ POST Authentication failed - no valid session or token found')
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
     
-    const userEmail = session.user.email
     console.log('✅ POST /api/user-data - Authenticated user:', userEmail)
 
     console.time('⏱️ Parse Request Data')

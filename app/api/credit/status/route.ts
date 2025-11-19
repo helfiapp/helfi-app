@@ -1,17 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
+import { getToken } from 'next-auth/jwt'
 import { authOptions } from '@/lib/auth'
 import { CreditManager } from '@/lib/credit-system'
 import { prisma } from '@/lib/prisma'
 
 export async function GET(_req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.email) {
+    let session = await getServerSession(authOptions)
+    let userEmail: string | null = session?.user?.email ?? null
+    let usedTokenFallback = false
+
+    if (!userEmail) {
+      try {
+        const token = await getToken({
+          req: _req,
+          secret: process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET || 'helfi-secret-key-production-2024',
+        })
+        if (token?.email) {
+          userEmail = String(token.email)
+          usedTokenFallback = true
+        }
+      } catch (tokenError) {
+        console.error('/api/credit/status - JWT fallback failed:', tokenError)
+      }
+    }
+
+    if (!userEmail) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+
     const user = await prisma.user.findUnique({ 
-      where: { email: session.user.email }, 
+      where: { email: userEmail }, 
       include: { subscription: true, creditTopUps: true } 
     })
     if (!user) {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth/next'
+import { getServerSession } from 'next-auth'
+import { getToken } from 'next-auth/jwt'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { triggerBackgroundRegeneration } from '@/lib/insights/regeneration-service'
@@ -8,6 +9,7 @@ import { triggerBackgroundRegeneration } from '@/lib/insights/regeneration-servi
 export async function GET(request: NextRequest) {
   let dateStr: string | null = null;
   let tzOffsetMinRaw: string | null = null;
+  let userEmail: string | null = null;
   
   try {
     console.log('📥 GET /api/food-log - Starting request handler');
@@ -26,25 +28,38 @@ export async function GET(request: NextRequest) {
     let session;
     try {
       session = await getServerSession(authOptions);
+      userEmail = session?.user?.email ?? null;
       console.log('✅ GET /api/food-log - Session retrieved:', session ? 'authenticated' : 'not authenticated');
     } catch (sessionError) {
-      console.error('❌ GET /api/food-log - Error getting session:', sessionError);
-      return NextResponse.json({ 
-        error: 'Authentication failed',
-        details: sessionError instanceof Error ? sessionError.message : String(sessionError)
-      }, { status: 500 })
+      console.error('❌ GET /api/food-log - Error getting session (will try JWT fallback):', sessionError);
     }
-    
-    if (!session?.user?.email) {
-      console.error('❌ GET /api/food-log - No session or email');
+
+    // Fallback to reading JWT directly if getServerSession was unreliable (same pattern as /api/analyze-food)
+    let usedTokenFallback = false;
+    if (!userEmail) {
+      try {
+        const token = await getToken({
+          req: request,
+          secret: process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET || 'helfi-secret-key-production-2024',
+        });
+        if (token?.email) {
+          userEmail = String(token.email);
+          usedTokenFallback = true;
+        }
+      } catch (tokenError) {
+        console.error('❌ GET /api/food-log - Error reading JWT token for auth fallback:', tokenError);
+      }
+    }
+
+    if (!userEmail) {
+      console.error('❌ GET /api/food-log - Authentication failed: no session or email (after JWT fallback)');
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
     const { searchParams } = new URL(request.url)
     dateStr = searchParams.get('date') // YYYY-MM-DD (local date)
     tzOffsetMinRaw = searchParams.get('tz') // minutes: same as new Date().getTimezoneOffset()
-    
-    console.log(`📥 GET /api/food-log - Request: date=${dateStr}, tz=${tzOffsetMinRaw}, user=${session.user.email}`);
+    console.log(`📥 GET /api/food-log - Request: date=${dateStr}, tz=${tzOffsetMinRaw}, user=${userEmail}`);
     
     if (!dateStr) {
       console.error('❌ GET /api/food-log - Missing date parameter');
@@ -61,10 +76,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid date format. Expected YYYY-MM-DD' }, { status: 400 })
     }
 
-    console.log('👤 GET /api/food-log - Looking up user:', session.user.email);
+    console.log('👤 GET /api/food-log - Looking up user:', userEmail);
     let user;
     try {
-      user = await prisma.user.findUnique({ where: { email: session.user.email } });
+      user = await prisma.user.findUnique({ where: { email: userEmail } });
       console.log('✅ GET /api/food-log - User lookup result:', user ? 'found' : 'not found');
     } catch (userError) {
       console.error('❌ GET /api/food-log - Error looking up user:', userError);
