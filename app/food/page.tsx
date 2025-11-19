@@ -1240,24 +1240,35 @@ const applyStructuredItems = (
   useEffect(() => {
     // Try to load from cache first (works for both today and past dates)
     if (userData?.todaysFoods) {
-      console.log('🚀 PERFORMANCE: Using cached foods from context - instant load!');
+      console.log(`🚀 PERFORMANCE: Checking cache for date ${selectedDate}, isViewingToday: ${isViewingToday}`);
+      console.log(`📦 Cache contains ${userData.todaysFoods.length} total entries`);
       // Filter to only entries created on the selected date using the entry timestamp id
       const onlySelectedDate = userData.todaysFoods.filter((item: any) => {
         try {
           // Prefer explicit localDate stamp if present
           if (typeof item.localDate === 'string' && item.localDate.length >= 8) {
-            return item.localDate === selectedDate;
+            const matches = item.localDate === selectedDate;
+            if (matches) {
+              console.log(`✅ Cache match by localDate: ${item.localDate} === ${selectedDate}`);
+            }
+            return matches;
           }
           const d = new Date(typeof item.id === 'number' ? item.id : Number(item.id));
           const y = d.getFullYear();
           const m = String(d.getMonth() + 1).padStart(2, '0');
           const day = String(d.getDate()).padStart(2, '0');
           const itemDate = `${y}-${m}-${day}`;
-          return itemDate === selectedDate;
-        } catch {
+          const matches = itemDate === selectedDate;
+          if (matches) {
+            console.log(`✅ Cache match by timestamp: ${itemDate} === ${selectedDate}`);
+          }
+          return matches;
+        } catch (e) {
+          console.log(`❌ Error filtering cache entry:`, e);
           return false;
         }
       });
+      console.log(`📊 Found ${onlySelectedDate.length} entries in cache for date ${selectedDate}`);
       
       // Deduplicate entries by ID to prevent duplicates from context updates
       const seenIds = new Set<number>();
@@ -1525,12 +1536,26 @@ const applyStructuredItems = (
         return;
       }
       try {
+        console.log(`🔍 Loading history for date: ${selectedDate}, isViewingToday: ${isViewingToday}`);
         setIsLoadingHistory(true);
         setFoodDiaryLoaded(false); // Reset loading state when switching dates
         const tz = new Date().getTimezoneOffset();
-        const res = await fetch(`/api/food-log?date=${selectedDate}&tz=${tz}`);
+        const apiUrl = `/api/food-log?date=${selectedDate}&tz=${tz}`;
+        console.log(`📡 Fetching from API: ${apiUrl}`);
+        const res = await fetch(apiUrl);
+        console.log(`📡 API response status: ${res.status}, ok: ${res.ok}`);
         if (res.ok) {
           const json = await res.json()
+          console.log(`📦 API response data:`, { 
+            success: json.success, 
+            logsCount: Array.isArray(json.logs) ? json.logs.length : 0,
+            logs: Array.isArray(json.logs) ? json.logs.map((l: any) => ({
+              id: l.id,
+              name: l.name?.substring(0, 30),
+              localDate: l.localDate,
+              createdAt: l.createdAt
+            })) : []
+          });
           const logs = Array.isArray(json.logs) ? json.logs : []
 
           const mapped = logs.map((l: any) => ({
@@ -1567,15 +1592,18 @@ const applyStructuredItems = (
             }
           }
 
+          console.log(`✅ Setting historyFoods with ${deduped.length} entries for date ${selectedDate}`);
           setHistoryFoods(deduped)
           // Mark as loaded after history load completes
           setFoodDiaryLoaded(true);
         } else {
+          console.log(`⚠️ API call failed or returned no entries for date ${selectedDate}, status: ${res.status}`);
           setHistoryFoods([]);
           // Mark as loaded even if API call fails or returns no entries
           setFoodDiaryLoaded(true);
         }
       } catch (e) {
+        console.error(`❌ Error loading history for date ${selectedDate}:`, e);
         setHistoryFoods([]);
         // Mark as loaded even on error to prevent infinite loading state
         setFoodDiaryLoaded(true);
