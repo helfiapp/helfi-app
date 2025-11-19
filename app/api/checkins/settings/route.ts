@@ -11,21 +11,21 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
   // Ensure table exists with full schema
-  await prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS CheckinSettings (
-      userId TEXT PRIMARY KEY,
-      time1 TEXT NOT NULL,
-      time2 TEXT NOT NULL,
-      time3 TEXT NOT NULL,
-      timezone TEXT NOT NULL,
-      frequency INTEGER NOT NULL DEFAULT 3
-    )
-  `)
+  // await prisma.$executeRawUnsafe(`
+  //   CREATE TABLE IF NOT EXISTS CheckinSettings (
+  //     userId TEXT PRIMARY KEY,
+  //     time1 TEXT NOT NULL,
+  //     time2 TEXT NOT NULL,
+  //     time3 TEXT NOT NULL,
+  //     timezone TEXT NOT NULL,
+  //     frequency INTEGER NOT NULL DEFAULT 3
+  //   )
+  // `)
   
-  // Migrate old schema if needed
-  await prisma.$executeRawUnsafe(`ALTER TABLE CheckinSettings ADD COLUMN IF NOT EXISTS time2 TEXT NOT NULL DEFAULT '18:00'`).catch(() => {})
-  await prisma.$executeRawUnsafe(`ALTER TABLE CheckinSettings ADD COLUMN IF NOT EXISTS time3 TEXT NOT NULL DEFAULT '21:00'`).catch(() => {})
-  await prisma.$executeRawUnsafe(`ALTER TABLE CheckinSettings ADD COLUMN IF NOT EXISTS frequency INTEGER NOT NULL DEFAULT 3`).catch(() => {})
+  // // Migrate old schema if needed
+  // await prisma.$executeRawUnsafe(`ALTER TABLE CheckinSettings ADD COLUMN IF NOT EXISTS time2 TEXT NOT NULL DEFAULT '18:00'`).catch(() => {})
+  // await prisma.$executeRawUnsafe(`ALTER TABLE CheckinSettings ADD COLUMN IF NOT EXISTS time3 TEXT NOT NULL DEFAULT '21:00'`).catch(() => {})
+  // await prisma.$executeRawUnsafe(`ALTER TABLE CheckinSettings ADD COLUMN IF NOT EXISTS frequency INTEGER NOT NULL DEFAULT 3`).catch(() => {})
 
   // Load user's settings
   const rows: Array<{ time1: string; time2: string; time3: string; timezone: string; frequency: number }> =
@@ -92,33 +92,33 @@ export async function POST(req: NextRequest) {
   // Auto-create table with full schema
   try {
     console.log('Saving CheckinSettings for', user.id, { time1, time2, time3, timezone, frequency })
-    await prisma.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS CheckinSettings (
-        userId TEXT PRIMARY KEY,
-        time1 TEXT NOT NULL,
-        time2 TEXT NOT NULL,
-        time3 TEXT NOT NULL,
-        timezone TEXT NOT NULL,
-        frequency INTEGER NOT NULL DEFAULT 3
-      )
-    `)
+    // await prisma.$executeRawUnsafe(`
+    //   CREATE TABLE IF NOT EXISTS CheckinSettings (
+    //     userId TEXT PRIMARY KEY,
+    //     time1 TEXT NOT NULL,
+    //     time2 TEXT NOT NULL,
+    //     time3 TEXT NOT NULL,
+    //     timezone TEXT NOT NULL,
+    //     frequency INTEGER NOT NULL DEFAULT 3
+    //   )
+    // `)
     
-    // Migrate old schema if needed
-    await prisma.$executeRawUnsafe(`ALTER TABLE CheckinSettings ADD COLUMN IF NOT EXISTS time2 TEXT NOT NULL DEFAULT '18:00'`).catch(() => {})
-    await prisma.$executeRawUnsafe(`ALTER TABLE CheckinSettings ADD COLUMN IF NOT EXISTS time3 TEXT NOT NULL DEFAULT '21:00'`).catch(() => {})
-    await prisma.$executeRawUnsafe(`ALTER TABLE CheckinSettings ADD COLUMN IF NOT EXISTS frequency INTEGER NOT NULL DEFAULT 3`).catch(() => {})
+    // // Migrate old schema if needed
+    // await prisma.$executeRawUnsafe(`ALTER TABLE CheckinSettings ADD COLUMN IF NOT EXISTS time2 TEXT NOT NULL DEFAULT '18:00'`).catch(() => {})
+    // await prisma.$executeRawUnsafe(`ALTER TABLE CheckinSettings ADD COLUMN IF NOT EXISTS time3 TEXT NOT NULL DEFAULT '21:00'`).catch(() => {})
+    // await prisma.$executeRawUnsafe(`ALTER TABLE CheckinSettings ADD COLUMN IF NOT EXISTS frequency INTEGER NOT NULL DEFAULT 3`).catch(() => {})
     
-    // Migrate existing records that only have time1
-    await prisma.$executeRawUnsafe(`
-      UPDATE CheckinSettings 
-      SET time2 = COALESCE(NULLIF(time2, ''), '18:00'),
-          time3 = COALESCE(NULLIF(time3, ''), '21:00'),
-          frequency = COALESCE(frequency, 3)
-      WHERE time2 IS NULL OR time2 = '' OR time3 IS NULL OR time3 = ''
-    `).catch(() => {})
+    // // Migrate existing records that only have time1
+    // await prisma.$executeRawUnsafe(`
+    //   UPDATE CheckinSettings 
+    //   SET time2 = COALESCE(NULLIF(time2, ''), '18:00'),
+    //       time3 = COALESCE(NULLIF(time3, ''), '21:00'),
+    //       frequency = COALESCE(frequency, 3)
+    //   WHERE time2 IS NULL OR time2 = '' OR time3 IS NULL OR time3 = ''
+    // `).catch(() => {})
 
     // Save settings
-    await prisma.$executeRawUnsafe(
+    await prisma.$queryRawUnsafe(
       `INSERT INTO CheckinSettings (userId, time1, time2, time3, timezone, frequency)
        VALUES ($1,$2,$3,$4,$5,$6)
        ON CONFLICT (userId) DO UPDATE SET 

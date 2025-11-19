@@ -27,43 +27,43 @@ export async function GET() {
   }
 
   // Ensure table exists with full schema
-  await prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS HealthTipSettings (
-      userId TEXT PRIMARY KEY,
-      enabled BOOLEAN NOT NULL DEFAULT true,
-      time1 TEXT NOT NULL,
-      time2 TEXT NOT NULL,
-      time3 TEXT NOT NULL,
-      timezone TEXT NOT NULL,
-      frequency INTEGER NOT NULL DEFAULT 1,
-      focusFood BOOLEAN NOT NULL DEFAULT true,
-      focusSupplements BOOLEAN NOT NULL DEFAULT true,
-      focusLifestyle BOOLEAN NOT NULL DEFAULT true
-    )
-  `)
+  // await prisma.$executeRawUnsafe(`
+  //   CREATE TABLE IF NOT EXISTS HealthTipSettings (
+  //     userId TEXT PRIMARY KEY,
+  //     enabled BOOLEAN NOT NULL DEFAULT true,
+  //     time1 TEXT NOT NULL,
+  //     time2 TEXT NOT NULL,
+  //     time3 TEXT NOT NULL,
+  //     timezone TEXT NOT NULL,
+  //     frequency INTEGER NOT NULL DEFAULT 1,
+  //     focusFood BOOLEAN NOT NULL DEFAULT true,
+  //     focusSupplements BOOLEAN NOT NULL DEFAULT true,
+  //     focusLifestyle BOOLEAN NOT NULL DEFAULT true
+  //   )
+  // `)
 
-  // Defensive migrations for new columns in case table was created with an older shape
-  await prisma.$executeRawUnsafe(
-    `ALTER TABLE HealthTipSettings ADD COLUMN IF NOT EXISTS enabled BOOLEAN NOT NULL DEFAULT true`
-  ).catch(() => {})
-  await prisma.$executeRawUnsafe(
-    `ALTER TABLE HealthTipSettings ADD COLUMN IF NOT EXISTS time2 TEXT NOT NULL DEFAULT '15:30'`
-  ).catch(() => {})
-  await prisma.$executeRawUnsafe(
-    `ALTER TABLE HealthTipSettings ADD COLUMN IF NOT EXISTS time3 TEXT NOT NULL DEFAULT '20:30'`
-  ).catch(() => {})
-  await prisma.$executeRawUnsafe(
-    `ALTER TABLE HealthTipSettings ADD COLUMN IF NOT EXISTS frequency INTEGER NOT NULL DEFAULT 1`
-  ).catch(() => {})
-  await prisma.$executeRawUnsafe(
-    `ALTER TABLE HealthTipSettings ADD COLUMN IF NOT EXISTS focusFood BOOLEAN NOT NULL DEFAULT true`
-  ).catch(() => {})
-  await prisma.$executeRawUnsafe(
-    `ALTER TABLE HealthTipSettings ADD COLUMN IF NOT EXISTS focusSupplements BOOLEAN NOT NULL DEFAULT true`
-  ).catch(() => {})
-  await prisma.$executeRawUnsafe(
-    `ALTER TABLE HealthTipSettings ADD COLUMN IF NOT EXISTS focusLifestyle BOOLEAN NOT NULL DEFAULT true`
-  ).catch(() => {})
+  // // Defensive migrations for new columns in case table was created with an older shape
+  // await prisma.$executeRawUnsafe(
+  //   `ALTER TABLE HealthTipSettings ADD COLUMN IF NOT EXISTS enabled BOOLEAN NOT NULL DEFAULT true`
+  // ).catch(() => {})
+  // await prisma.$executeRawUnsafe(
+  //   `ALTER TABLE HealthTipSettings ADD COLUMN IF NOT EXISTS time2 TEXT NOT NULL DEFAULT '15:30'`
+  // ).catch(() => {})
+  // await prisma.$executeRawUnsafe(
+  //   `ALTER TABLE HealthTipSettings ADD COLUMN IF NOT EXISTS time3 TEXT NOT NULL DEFAULT '20:30'`
+  // ).catch(() => {})
+  // await prisma.$executeRawUnsafe(
+  //   `ALTER TABLE HealthTipSettings ADD COLUMN IF NOT EXISTS frequency INTEGER NOT NULL DEFAULT 1`
+  // ).catch(() => {})
+  // await prisma.$executeRawUnsafe(
+  //   `ALTER TABLE HealthTipSettings ADD COLUMN IF NOT EXISTS focusFood BOOLEAN NOT NULL DEFAULT true`
+  // ).catch(() => {})
+  // await prisma.$executeRawUnsafe(
+  //   `ALTER TABLE HealthTipSettings ADD COLUMN IF NOT EXISTS focusSupplements BOOLEAN NOT NULL DEFAULT true`
+  // ).catch(() => {})
+  // await prisma.$executeRawUnsafe(
+  //   `ALTER TABLE HealthTipSettings ADD COLUMN IF NOT EXISTS focusLifestyle BOOLEAN NOT NULL DEFAULT true`
+  // ).catch(() => {})
 
   const rows: Array<{
     enabled: boolean
@@ -171,45 +171,45 @@ export async function POST(req: NextRequest) {
   focusLifestyle = focusLifestyle !== false
 
   try {
-    await prisma.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS HealthTipSettings (
-        userId TEXT PRIMARY KEY,
-        enabled BOOLEAN NOT NULL DEFAULT true,
-        time1 TEXT NOT NULL,
-        time2 TEXT NOT NULL,
-        time3 TEXT NOT NULL,
-        timezone TEXT NOT NULL,
-        frequency INTEGER NOT NULL DEFAULT 1,
-        focusFood BOOLEAN NOT NULL DEFAULT true,
-        focusSupplements BOOLEAN NOT NULL DEFAULT true,
-        focusLifestyle BOOLEAN NOT NULL DEFAULT true
-      )
-    `)
+    // await prisma.$executeRawUnsafe(`
+    //   CREATE TABLE IF NOT EXISTS HealthTipSettings (
+    //     userId TEXT PRIMARY KEY,
+    //     enabled BOOLEAN NOT NULL DEFAULT true,
+    //     time1 TEXT NOT NULL,
+    //     time2 TEXT NOT NULL,
+    //     time3 TEXT NOT NULL,
+    //     timezone TEXT NOT NULL,
+    //     frequency INTEGER NOT NULL DEFAULT 1,
+    //     focusFood BOOLEAN NOT NULL DEFAULT true,
+    //     focusSupplements BOOLEAN NOT NULL DEFAULT true,
+    //     focusLifestyle BOOLEAN NOT NULL DEFAULT true
+    //   )
+    // `)
 
-    // Defensive migrations
-    await prisma.$executeRawUnsafe(
-      `ALTER TABLE HealthTipSettings ADD COLUMN IF NOT EXISTS enabled BOOLEAN NOT NULL DEFAULT true`
-    ).catch(() => {})
-    await prisma.$executeRawUnsafe(
-      `ALTER TABLE HealthTipSettings ADD COLUMN IF NOT EXISTS time2 TEXT NOT NULL DEFAULT '15:30'`
-    ).catch(() => {})
-    await prisma.$executeRawUnsafe(
-      `ALTER TABLE HealthTipSettings ADD COLUMN IF NOT EXISTS time3 TEXT NOT NULL DEFAULT '20:30'`
-    ).catch(() => {})
-    await prisma.$executeRawUnsafe(
-      `ALTER TABLE HealthTipSettings ADD COLUMN IF NOT EXISTS frequency INTEGER NOT NULL DEFAULT 1`
-    ).catch(() => {})
-    await prisma.$executeRawUnsafe(
-      `ALTER TABLE HealthTipSettings ADD COLUMN IF NOT EXISTS focusFood BOOLEAN NOT NULL DEFAULT true`
-    ).catch(() => {})
-    await prisma.$executeRawUnsafe(
-      `ALTER TABLE HealthTipSettings ADD COLUMN IF NOT EXISTS focusSupplements BOOLEAN NOT NULL DEFAULT true`
-    ).catch(() => {})
-    await prisma.$executeRawUnsafe(
-      `ALTER TABLE HealthTipSettings ADD COLUMN IF NOT EXISTS focusLifestyle BOOLEAN NOT NULL DEFAULT true`
-    ).catch(() => {})
+    // // Defensive migrations
+    // await prisma.$executeRawUnsafe(
+    //   `ALTER TABLE HealthTipSettings ADD COLUMN IF NOT EXISTS enabled BOOLEAN NOT NULL DEFAULT true`
+    // ).catch(() => {})
+    // await prisma.$executeRawUnsafe(
+    //   `ALTER TABLE HealthTipSettings ADD COLUMN IF NOT EXISTS time2 TEXT NOT NULL DEFAULT '15:30'`
+    // ).catch(() => {})
+    // await prisma.$executeRawUnsafe(
+    //   `ALTER TABLE HealthTipSettings ADD COLUMN IF NOT EXISTS time3 TEXT NOT NULL DEFAULT '20:30'`
+    // ).catch(() => {})
+    // await prisma.$executeRawUnsafe(
+    //   `ALTER TABLE HealthTipSettings ADD COLUMN IF NOT EXISTS frequency INTEGER NOT NULL DEFAULT 1`
+    // ).catch(() => {})
+    // await prisma.$executeRawUnsafe(
+    //   `ALTER TABLE HealthTipSettings ADD COLUMN IF NOT EXISTS focusFood BOOLEAN NOT NULL DEFAULT true`
+    // ).catch(() => {})
+    // await prisma.$executeRawUnsafe(
+    //   `ALTER TABLE HealthTipSettings ADD COLUMN IF NOT EXISTS focusSupplements BOOLEAN NOT NULL DEFAULT true`
+    // ).catch(() => {})
+    // await prisma.$executeRawUnsafe(
+    //   `ALTER TABLE HealthTipSettings ADD COLUMN IF NOT EXISTS focusLifestyle BOOLEAN NOT NULL DEFAULT true`
+    // ).catch(() => {})
 
-    await prisma.$executeRawUnsafe(
+    await prisma.$queryRawUnsafe(
       `INSERT INTO HealthTipSettings (userId, enabled, time1, time2, time3, timezone, frequency, focusFood, focusSupplements, focusLifestyle)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
        ON CONFLICT (userId) DO UPDATE SET

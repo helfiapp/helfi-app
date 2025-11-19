@@ -15,20 +15,20 @@ export async function GET() {
   }
 
   // Ensure tips table exists
-  await prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS HealthTips (
-      id TEXT PRIMARY KEY,
-      userId TEXT NOT NULL,
-      tipDate DATE NOT NULL,
-      sentAt TIMESTAMP NOT NULL DEFAULT NOW(),
-      title TEXT NOT NULL,
-      body TEXT NOT NULL,
-      category TEXT NOT NULL,
-      metadata JSONB,
-      costCents INTEGER,
-      chargeCents INTEGER
-    )
-  `)
+  // await prisma.$executeRawUnsafe(`
+  //   CREATE TABLE IF NOT EXISTS HealthTips (
+  //     id TEXT PRIMARY KEY,
+  //     userId TEXT NOT NULL,
+  //     tipDate DATE NOT NULL,
+  //     sentAt TIMESTAMP NOT NULL DEFAULT NOW(),
+  //     title TEXT NOT NULL,
+  //     body TEXT NOT NULL,
+  //     category TEXT NOT NULL,
+  //     metadata JSONB,
+  //     costCents INTEGER,
+  //     chargeCents INTEGER
+  //   )
+  // `)
 
   // Try to align "today" with the same timezone used for scheduling health tips
   let effectiveTimezone =
@@ -36,20 +36,20 @@ export async function GET() {
 
   try {
     // Ensure settings table exists so we can safely query the timezone
-    await prisma.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS HealthTipSettings (
-        userId TEXT PRIMARY KEY,
-        enabled BOOLEAN NOT NULL DEFAULT true,
-        time1 TEXT NOT NULL,
-        time2 TEXT NOT NULL,
-        time3 TEXT NOT NULL,
-        timezone TEXT NOT NULL,
-        frequency INTEGER NOT NULL DEFAULT 1,
-        focusFood BOOLEAN NOT NULL DEFAULT true,
-        focusSupplements BOOLEAN NOT NULL DEFAULT true,
-        focusLifestyle BOOLEAN NOT NULL DEFAULT true
-      )
-    `)
+    // await prisma.$executeRawUnsafe(`
+    //   CREATE TABLE IF NOT EXISTS HealthTipSettings (
+    //     userId TEXT PRIMARY KEY,
+    //     enabled BOOLEAN NOT NULL DEFAULT true,
+    //     time1 TEXT NOT NULL,
+    //     time2 TEXT NOT NULL,
+    //     time3 TEXT NOT NULL,
+    //     timezone TEXT NOT NULL,
+    //     frequency INTEGER NOT NULL DEFAULT 1,
+    //     focusFood BOOLEAN NOT NULL DEFAULT true,
+    //     focusSupplements BOOLEAN NOT NULL DEFAULT true,
+    //     focusLifestyle BOOLEAN NOT NULL DEFAULT true
+    //   )
+    // `)
 
     const rows: Array<{ timezone: string }> = await prisma.$queryRawUnsafe(
       `SELECT timezone FROM HealthTipSettings WHERE userId = $1`,
