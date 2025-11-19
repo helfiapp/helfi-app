@@ -33,12 +33,12 @@ export async function POST(req: NextRequest) {
     }
 
     // Ensure subscription exists
-    await prisma.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS PushSubscriptions (
-        userId TEXT PRIMARY KEY,
-        subscription JSONB NOT NULL
-      )
-    `)
+    // await prisma.$executeRawUnsafe(`
+    //   CREATE TABLE IF NOT EXISTS PushSubscriptions (
+    //     userId TEXT PRIMARY KEY,
+    //     subscription JSONB NOT NULL
+    //   )
+    // `)
     const rows: Array<{ subscription: any }> = await prisma.$queryRawUnsafe(
       `SELECT subscription FROM PushSubscriptions WHERE userId = $1`,
       userId
@@ -48,16 +48,16 @@ export async function POST(req: NextRequest) {
     }
 
     // Load the latest reminder settings for this user to validate stale schedules
-    await prisma.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS CheckinSettings (
-        userId TEXT PRIMARY KEY,
-        time1 TEXT NOT NULL,
-        time2 TEXT NOT NULL,
-        time3 TEXT NOT NULL,
-        timezone TEXT NOT NULL,
-        frequency INTEGER NOT NULL DEFAULT 3
-      )
-    `)
+    // await prisma.$executeRawUnsafe(`
+    //   CREATE TABLE IF NOT EXISTS CheckinSettings (
+    //     userId TEXT PRIMARY KEY,
+    //     time1 TEXT NOT NULL,
+    //     time2 TEXT NOT NULL,
+    //     time3 TEXT NOT NULL,
+    //     timezone TEXT NOT NULL,
+    //     frequency INTEGER NOT NULL DEFAULT 3
+    //   )
+    // `)
     const settingsRows: Array<{ time1: string; time2: string; time3: string; timezone: string; frequency: number | null }> =
       await prisma.$queryRawUnsafe(
         `SELECT time1, time2, time3, timezone, frequency FROM CheckinSettings WHERE userId = $1`,
@@ -107,15 +107,15 @@ export async function POST(req: NextRequest) {
     webpush.setVapidDetails('mailto:support@helfi.ai', publicKey, privateKey)
 
     // Delivery log table for de-duplication
-    await prisma.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS ReminderDeliveryLog (
-        userId TEXT NOT NULL,
-        reminderTime TEXT NOT NULL,
-        sentDate DATE NOT NULL,
-        sentAt TIMESTAMP NOT NULL DEFAULT NOW(),
-        PRIMARY KEY (userId, reminderTime, sentDate)
-      )
-    `)
+    // await prisma.$executeRawUnsafe(`
+    //   CREATE TABLE IF NOT EXISTS ReminderDeliveryLog (
+    //     userId TEXT NOT NULL,
+    //     reminderTime TEXT NOT NULL,
+    //     sentDate DATE NOT NULL,
+    //     sentAt TIMESTAMP NOT NULL DEFAULT NOW(),
+    //     PRIMARY KEY (userId, reminderTime, sentDate)
+    //   )
+    // `)
 
     // Compute local date for de-dup (based on the user's tz)
     const now = new Date()
@@ -142,7 +142,7 @@ export async function POST(req: NextRequest) {
         url: '/check-in',
       })
       await webpush.sendNotification(rows[0].subscription, payload)
-      await prisma.$executeRawUnsafe(
+      await prisma.$queryRawUnsafe(
         `INSERT INTO ReminderDeliveryLog (userId, reminderTime, sentDate, sentAt)
          VALUES ($1, $2, $3::date, NOW())
          ON CONFLICT (userId, reminderTime, sentDate) DO UPDATE SET sentAt = NOW()`,

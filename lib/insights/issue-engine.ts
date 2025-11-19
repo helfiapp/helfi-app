@@ -319,7 +319,7 @@ async function upsertSectionCache(params: {
   if (!result) return
   try {
     await ensureSectionCacheTable()
-    await prisma.$executeRawUnsafe(
+    await prisma.$queryRawUnsafe(
       'INSERT INTO "InsightsSectionCache" ("userId","slug","section","mode","rangeKey","result","updatedAt") VALUES ($1,$2,$3,$4,$5,$6::jsonb,NOW())\n         ON CONFLICT ("userId","slug","section","mode","rangeKey") DO UPDATE SET "result" = EXCLUDED."result", "updatedAt" = NOW()',
       userId,
       slug,

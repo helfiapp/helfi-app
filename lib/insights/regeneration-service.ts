@@ -202,7 +202,7 @@ async function markSectionsStale(userId: string, sections: IssueSectionKey[]): P
     // Mark each section for each issue as stale
     for (const issueSlug of issueNames) {
       for (const section of sections) {
-        await prisma.$executeRawUnsafe(
+        await prisma.$queryRawUnsafe(
           `INSERT INTO "InsightsMetadata" ("userId", "issueSlug", "section", "status", "dataFingerprint", "updatedAt") 
            VALUES ($1, $2, $3, 'stale', '', NOW())
            ON CONFLICT ("userId", "issueSlug", "section") 
@@ -232,7 +232,7 @@ async function updateMetadataAfterGeneration(
     await ensureMetadataTable()
     const fingerprint = await getCurrentDataFingerprint(userId)
 
-    await prisma.$executeRawUnsafe(
+    await prisma.$queryRawUnsafe(
       `INSERT INTO "InsightsMetadata" ("userId", "issueSlug", "section", "lastGeneratedAt", "dataFingerprint", "status", "updatedAt")
        VALUES ($1, $2, $3, NOW(), $4, 'fresh', NOW())
        ON CONFLICT ("userId", "issueSlug", "section")
@@ -289,7 +289,7 @@ export async function triggerBackgroundRegeneration(event: DataChangeEvent): Pro
 
         for (const issueSlug of issueNames) {
           for (const section of affectedSections) {
-            await prisma.$executeRawUnsafe(
+            await prisma.$queryRawUnsafe(
               `UPDATE "InsightsMetadata" SET "status" = 'generating', "updatedAt" = NOW() 
                WHERE "userId" = $1 AND "issueSlug" = $2 AND "section" = $3`,
               userId,

@@ -46,45 +46,45 @@ type ScheduleLogRecord = {
 
 async function logScheduleAttempt(entry: ScheduleLogRecord) {
   try {
-    await prisma.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS QstashScheduleLog (
-        id TEXT PRIMARY KEY,
-        createdAt TIMESTAMP NOT NULL DEFAULT NOW(),
-        userId TEXT,
-        reminderTime TEXT,
-        timezone TEXT,
-        deltaMinutes INTEGER,
-        notBeforeEpochSeconds BIGINT,
-        scheduled BOOLEAN NOT NULL,
-        httpStatus INTEGER,
-        reason TEXT,
-        responseSnippet TEXT,
-        callbackUrl TEXT
-      )
-    `)
-    await prisma.$executeRawUnsafe(`ALTER TABLE QstashScheduleLog ADD COLUMN IF NOT EXISTS callbackUrl TEXT`).catch(
-      () => {}
-    )
-    await prisma.$executeRawUnsafe(
-      `ALTER TABLE QstashScheduleLog ADD COLUMN IF NOT EXISTS responseSnippet TEXT`
-    ).catch(() => {})
-    await prisma.$executeRawUnsafe(`ALTER TABLE QstashScheduleLog ADD COLUMN IF NOT EXISTS reason TEXT`).catch(
-      () => {}
-    )
-    await prisma.$executeRawUnsafe(`ALTER TABLE QstashScheduleLog ADD COLUMN IF NOT EXISTS httpStatus INTEGER`).catch(
-      () => {}
-    )
-    await prisma.$executeRawUnsafe(
-      `ALTER TABLE QstashScheduleLog ADD COLUMN IF NOT EXISTS notBeforeEpochSeconds BIGINT`
-    ).catch(() => {})
-    await prisma.$executeRawUnsafe(`ALTER TABLE QstashScheduleLog ADD COLUMN IF NOT EXISTS deltaMinutes INTEGER`).catch(
-      () => {}
-    )
-    await prisma.$executeRawUnsafe(`ALTER TABLE QstashScheduleLog ADD COLUMN IF NOT EXISTS scheduled BOOLEAN`).catch(
-      () => {}
-    )
+    // await prisma.$executeRawUnsafe(`
+    //   CREATE TABLE IF NOT EXISTS QstashScheduleLog (
+    //     id TEXT PRIMARY KEY,
+    //     createdAt TIMESTAMP NOT NULL DEFAULT NOW(),
+    //     userId TEXT,
+    //     reminderTime TEXT,
+    //     timezone TEXT,
+    //     deltaMinutes INTEGER,
+    //     notBeforeEpochSeconds BIGINT,
+    //     scheduled BOOLEAN NOT NULL,
+    //     httpStatus INTEGER,
+    //     reason TEXT,
+    //     responseSnippet TEXT,
+    //     callbackUrl TEXT
+    //   )
+    // `)
+    // await prisma.$executeRawUnsafe(`ALTER TABLE QstashScheduleLog ADD COLUMN IF NOT EXISTS callbackUrl TEXT`).catch(
+    //   () => {}
+    // )
+    // await prisma.$executeRawUnsafe(
+    //   `ALTER TABLE QstashScheduleLog ADD COLUMN IF NOT EXISTS responseSnippet TEXT`
+    // ).catch(() => {})
+    // await prisma.$executeRawUnsafe(`ALTER TABLE QstashScheduleLog ADD COLUMN IF NOT EXISTS reason TEXT`).catch(
+    //   () => {}
+    // )
+    // await prisma.$executeRawUnsafe(`ALTER TABLE QstashScheduleLog ADD COLUMN IF NOT EXISTS httpStatus INTEGER`).catch(
+    //   () => {}
+    // )
+    // await prisma.$executeRawUnsafe(
+    //   `ALTER TABLE QstashScheduleLog ADD COLUMN IF NOT EXISTS notBeforeEpochSeconds BIGINT`
+    // ).catch(() => {})
+    // await prisma.$executeRawUnsafe(`ALTER TABLE QstashScheduleLog ADD COLUMN IF NOT EXISTS deltaMinutes INTEGER`).catch(
+    //   () => {}
+    // )
+    // await prisma.$executeRawUnsafe(`ALTER TABLE QstashScheduleLog ADD COLUMN IF NOT EXISTS scheduled BOOLEAN`).catch(
+    //   () => {}
+    // )
 
-    await prisma.$executeRawUnsafe(
+    await prisma.$queryRawUnsafe(
       `INSERT INTO QstashScheduleLog (
         id,
         createdAt,

@@ -55,36 +55,36 @@ export async function POST(req: NextRequest) {
   webpush.setVapidDetails('mailto:support@helfi.ai', publicKey, privateKey)
 
   // Ensure required tables exist with full schema
-  await prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS CheckinSettings (
-      userId TEXT PRIMARY KEY,
-      time1 TEXT NOT NULL,
-      time2 TEXT NOT NULL,
-      time3 TEXT NOT NULL,
-      timezone TEXT NOT NULL,
-      frequency INTEGER NOT NULL DEFAULT 3
-    )
-  `)
-  await prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS PushSubscriptions (
-      userId TEXT PRIMARY KEY,
-      subscription JSONB NOT NULL
-    )
-  `)
-  await prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS ReminderDeliveryLog (
-      userId TEXT NOT NULL,
-      reminderTime TEXT NOT NULL,
-      sentDate DATE NOT NULL,
-      sentAt TIMESTAMP NOT NULL DEFAULT NOW(),
-      PRIMARY KEY (userId, reminderTime, sentDate)
-    )
-  `)
+  // await prisma.$executeRawUnsafe(`
+  //   CREATE TABLE IF NOT EXISTS CheckinSettings (
+  //     userId TEXT PRIMARY KEY,
+  //     time1 TEXT NOT NULL,
+  //     time2 TEXT NOT NULL,
+  //     time3 TEXT NOT NULL,
+  //     timezone TEXT NOT NULL,
+  //     frequency INTEGER NOT NULL DEFAULT 3
+  //   )
+  // `)
+  // await prisma.$executeRawUnsafe(`
+  //   CREATE TABLE IF NOT EXISTS PushSubscriptions (
+  //     userId TEXT PRIMARY KEY,
+  //     subscription JSONB NOT NULL
+  //   )
+  // `)
+  // await prisma.$executeRawUnsafe(`
+  //   CREATE TABLE IF NOT EXISTS ReminderDeliveryLog (
+  //     userId TEXT NOT NULL,
+  //     reminderTime TEXT NOT NULL,
+  //     sentDate DATE NOT NULL,
+  //     sentAt TIMESTAMP NOT NULL DEFAULT NOW(),
+  //     PRIMARY KEY (userId, reminderTime, sentDate)
+  //   )
+  // `)
   
-  // Migrate old schema if needed
-  await prisma.$executeRawUnsafe(`ALTER TABLE CheckinSettings ADD COLUMN IF NOT EXISTS time2 TEXT NOT NULL DEFAULT '18:00'`).catch(() => {})
-  await prisma.$executeRawUnsafe(`ALTER TABLE CheckinSettings ADD COLUMN IF NOT EXISTS time3 TEXT NOT NULL DEFAULT '21:00'`).catch(() => {})
-  await prisma.$executeRawUnsafe(`ALTER TABLE CheckinSettings ADD COLUMN IF NOT EXISTS frequency INTEGER NOT NULL DEFAULT 3`).catch(() => {})
+  // // Migrate old schema if needed
+  // await prisma.$executeRawUnsafe(`ALTER TABLE CheckinSettings ADD COLUMN IF NOT EXISTS time2 TEXT NOT NULL DEFAULT '18:00'`).catch(() => {})
+  // await prisma.$executeRawUnsafe(`ALTER TABLE CheckinSettings ADD COLUMN IF NOT EXISTS time3 TEXT NOT NULL DEFAULT '21:00'`).catch(() => {})
+  // await prisma.$executeRawUnsafe(`ALTER TABLE CheckinSettings ADD COLUMN IF NOT EXISTS frequency INTEGER NOT NULL DEFAULT 3`).catch(() => {})
 
   // Load all users with subscriptions and their reminder settings
   const rows: Array<{
@@ -118,19 +118,19 @@ export async function POST(req: NextRequest) {
 
   // Log scheduler execution to database for tracking
   try {
-    await prisma.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS SchedulerLogs (
-        id TEXT PRIMARY KEY,
-        timestamp TIMESTAMP NOT NULL DEFAULT NOW(),
-        utcTime TEXT NOT NULL,
-        usersProcessed INTEGER NOT NULL,
-        notificationsSent INTEGER NOT NULL,
-        errors INTEGER NOT NULL,
-        debugInfo JSONB
-      )
-    `)
+    // await prisma.$executeRawUnsafe(`
+    //   CREATE TABLE IF NOT EXISTS SchedulerLogs (
+    //     id TEXT PRIMARY KEY,
+    //     timestamp TIMESTAMP NOT NULL DEFAULT NOW(),
+    //     utcTime TEXT NOT NULL,
+    //     usersProcessed INTEGER NOT NULL,
+    //     notificationsSent INTEGER NOT NULL,
+    //     errors INTEGER NOT NULL,
+    //     debugInfo JSONB
+    //   )
+    // `)
     const logId = crypto.randomUUID()
-    await prisma.$executeRawUnsafe(
+    await prisma.$queryRawUnsafe(
       `INSERT INTO SchedulerLogs (id, timestamp, utcTime, usersProcessed, notificationsSent, errors, debugInfo)
        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       logId,
@@ -259,7 +259,7 @@ export async function POST(req: NextRequest) {
       })
       await webpush.sendNotification(r.subscription, payload)
       sentTo.push(r.userId ?? 'unknown')
-      await prisma.$executeRawUnsafe(
+      await prisma.$queryRawUnsafe(
         `INSERT INTO ReminderDeliveryLog (userId, reminderTime, sentDate, sentAt)
          VALUES ($1, $2, $3::date, NOW())
          ON CONFLICT (userId, reminderTime, sentDate) DO UPDATE SET sentAt = NOW()`,
@@ -288,7 +288,7 @@ export async function POST(req: NextRequest) {
       LIMIT 1
     `)
     if (recentLogs.length > 0) {
-      await prisma.$executeRawUnsafe(`
+      await prisma.$queryRawUnsafe(`
         UPDATE SchedulerLogs 
         SET notificationsSent = $1, errors = $2, debugInfo = $3::jsonb
         WHERE id = $4
