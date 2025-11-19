@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
     }
     
     if (!user) {
-      console.error(`❌ GET /api/food-log - User not found: ${session.user.email}`);
+      console.error(`❌ GET /api/food-log - User not found: ${userEmail}`);
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
