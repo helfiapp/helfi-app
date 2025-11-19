@@ -96,7 +96,24 @@ export async function GET(_req: NextRequest) {
       },
     })
   } catch (err) {
-    return NextResponse.json({ error: 'server_error' }, { status: 500 })
+    console.error('Error in /api/credit/status:', err)
+    // Degrade gracefully: hide meter but do not break the page.
+    return NextResponse.json({
+      percentUsed: 0,
+      refreshAt: null,
+      plan: null,
+      hasAccess: false,
+      monthlyCapCents: 0,
+      monthlyUsedCents: 0,
+      topUps: [],
+      totalAvailableCents: 0,
+      credits: {
+        total: 0,
+        dailyRemaining: 0,
+        additionalRemaining: 0,
+      },
+      degraded: true,
+    })
   }
 }
 

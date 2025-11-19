@@ -258,7 +258,45 @@ export async function GET(_req: NextRequest) {
     })
   } catch (err) {
     console.error('Error fetching feature usage:', err)
-    return NextResponse.json({ error: 'server_error' }, { status: 500 })
+    // Degrade gracefully: return zeros so UI can still render without errors.
+    return NextResponse.json({
+      featureUsage: {
+        symptomAnalysis: {
+          count: 0,
+          costPerUse: CREDIT_COSTS.SYMPTOM_ANALYSIS,
+          label: 'total',
+        },
+        foodAnalysis: {
+          count: 0,
+          costPerUse: CREDIT_COSTS.FOOD_ANALYSIS,
+          label: 'total',
+        },
+        interactionAnalysis: {
+          count: 0,
+          costPerUse: CREDIT_COSTS.INTERACTION_ANALYSIS,
+          label: 'total',
+        },
+        medicalImageAnalysis: {
+          count: 0,
+          costPerUse: CREDIT_COSTS.MEDICAL_IMAGE_ANALYSIS,
+          label: 'total',
+        },
+        insightsGeneration: {
+          count: 0,
+          costPerUse: CREDIT_COSTS.INSIGHTS_GENERATION,
+          label: 'total',
+        },
+        healthTips: {
+          count: 0,
+          costPerUse: 0,
+          label: 'total',
+          totalCredits: 0,
+        },
+      },
+      hasSubscription: false,
+      actualCreditsUsed: 0,
+      degraded: true,
+    })
   }
 }
 

@@ -489,12 +489,17 @@ CRITICAL REQUIREMENTS:
     // Check if user has used their free food analysis
     const hasUsedFreeFood = (currentUser as any).hasUsedFreeFoodAnalysis || false;
     
+    // TEMPORARY SAFETY: Do not block analyses if billing/credits are misconfigured.
+    // When billing is fully stable again, set BILLING_ENFORCED back to true and
+    // restore strict credit checks.
+    const BILLING_ENFORCED = false;
+
     // Allow if: Premium subscription OR has purchased credits OR hasn't used free use yet
     let allowViaFreeUse = false;
     if (!isPremium && !hasPurchasedCredits && !hasUsedFreeFood && !isReanalysis) {
       // First time use - allow free
       allowViaFreeUse = true;
-    } else if (!isPremium && !hasPurchasedCredits) {
+    } else if (BILLING_ENFORCED && !isPremium && !hasPurchasedCredits) {
       // No subscription, no credits, and already used free - require payment
       return NextResponse.json(
         { 
@@ -538,8 +543,8 @@ CRITICAL REQUIREMENTS:
     const model = 'gpt-4o';
     const maxTokens = 600;
 
-    // Wallet pre-check (skip if allowed via free use)
-    if (!allowViaFreeUse) {
+    // Wallet pre-check (skip if allowed via free use OR billing checks are disabled)
+    if (BILLING_ENFORCED && !allowViaFreeUse) {
       const cm = new CreditManager(currentUser.id);
       const promptText = Array.isArray(messages)
         ? messages
@@ -565,9 +570,10 @@ CRITICAL REQUIREMENTS:
       }
     }
 
-    // Pre-charge a minimal credit immediately upon analysis start (skip for free trial)
+    // Pre-charge a minimal credit immediately upon analysis start (skip for free trial
+    // or when billing checks are disabled)
     let prechargedCents = 0;
-    if (!allowViaFreeUse) {
+    if (BILLING_ENFORCED && !allowViaFreeUse) {
       try {
         const cm = new CreditManager(currentUser.id);
         const immediate = CREDIT_COSTS.FOOD_ANALYSIS; // 1 credit upfront
@@ -950,8 +956,9 @@ Your recommendations:`;
       // Don't fail the entire request if health check fails
     }
 
-    // Charge wallet for all costs (food analysis + health checks) - skip if allowed via free use
-    if (!allowViaFreeUse) {
+    // Charge wallet for all costs (food analysis + health checks)
+    // Skip if allowed via free use OR when billing checks are disabled.
+    if (BILLING_ENFORCED && !allowViaFreeUse) {
       try {
         const cm = new CreditManager(currentUser.id);
         // Charge the remainder after the upfront 1-credit pre-charge
