@@ -3062,13 +3062,15 @@ Please add nutritional information manually if needed.`);
                     ]
                     
                     // Organize macros for 2-column layout: Left column (Protein, Carbs, Fat), Right column (Fibre, Sugar)
-                    // Grid fills left column first, then right column, so order matters
-                    const displayMacros: MacroSegment[] = [
-                      macroSegments.find(m => m.key === 'protein'),   // Left column, row 1
-                      macroSegments.find(m => m.key === 'fibre'),      // Right column, row 1
-                      macroSegments.find(m => m.key === 'carbs'),      // Left column, row 2
-                      macroSegments.find(m => m.key === 'sugar'),      // Right column, row 2
-                      macroSegments.find(m => m.key === 'fat'),        // Left column, row 3
+                    const leftColumnMacros = [
+                      macroSegments.find(m => m.key === 'protein'),
+                      macroSegments.find(m => m.key === 'carbs'),
+                      macroSegments.find(m => m.key === 'fat'),
+                    ].filter(Boolean) as MacroSegment[]
+                    
+                    const rightColumnMacros = [
+                      macroSegments.find(m => m.key === 'fibre'),
+                      macroSegments.find(m => m.key === 'sugar'),
                     ].filter(Boolean) as MacroSegment[]
                     
                     const caloriesValue = (analyzedNutrition as any)?.calories || 0
@@ -3121,21 +3123,41 @@ Please add nutritional information manually if needed.`);
                           {/* Macro breakdown list - single column on mobile, 2 column on desktop */}
                           <div className="flex-1">
                             <div className="text-sm text-gray-600 mb-1.5 sm:mb-2 font-medium">Macro breakdown</div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-2 gap-y-2 text-sm text-gray-700">
-                              {displayMacros.map((macro) => {
-                                const displayValue = macro.grams > 0 ? Math.round(macro.grams) : 0
-                                return (
-                                  <div key={macro.key} className="flex items-center gap-1">
-                                    <span
-                                      className="inline-block w-3 h-3 rounded-full shrink-0"
-                                      style={{ backgroundColor: macro.color }}
-                                    />
-                                    <span>
-                                      {macro.label} {displayValue} g
-                                    </span>
-                                  </div>
-                                )
-                              })}
+                            <div className="flex flex-col sm:flex-row sm:gap-1 text-sm text-gray-700">
+                              {/* Left column: Protein, Carbs, Fat */}
+                              <div className="space-y-2">
+                                {leftColumnMacros.map((macro) => {
+                                  const displayValue = macro.grams > 0 ? Math.round(macro.grams) : 0
+                                  return (
+                                    <div key={macro.key} className="flex items-center gap-1">
+                                      <span
+                                        className="inline-block w-3 h-3 rounded-full shrink-0"
+                                        style={{ backgroundColor: macro.color }}
+                                      />
+                                      <span>
+                                        {macro.label} {displayValue} g
+                                      </span>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                              {/* Right column: Fibre, Sugar */}
+                              <div className="space-y-2">
+                                {rightColumnMacros.map((macro) => {
+                                  const displayValue = macro.grams > 0 ? Math.round(macro.grams) : 0
+                                  return (
+                                    <div key={macro.key} className="flex items-center gap-1">
+                                      <span
+                                        className="inline-block w-3 h-3 rounded-full shrink-0"
+                                        style={{ backgroundColor: macro.color }}
+                                      />
+                                      <span>
+                                        {macro.label} {displayValue} g
+                                      </span>
+                                    </div>
+                                  )
+                                })}
+                              </div>
                             </div>
                           </div>
                         </div>
