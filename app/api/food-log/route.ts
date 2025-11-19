@@ -10,17 +10,33 @@ export async function GET(request: NextRequest) {
   let tzOffsetMinRaw: string | null = null;
   
   try {
+    console.log('📥 GET /api/food-log - Starting request handler');
+    
     // Ensure localDate column exists (forward-compatible migration)
     // This prevents "column does not exist" errors if migration hasn't run
     try {
       await prisma.$executeRawUnsafe('ALTER TABLE "FoodLog" ADD COLUMN IF NOT EXISTS "localDate" TEXT')
+      console.log('✅ GET /api/food-log - Verified localDate column exists');
     } catch (migrationError) {
       // Safe to ignore if column already exists or other migration issues
       console.warn('⚠️ GET /api/food-log - localDate column check (safe to ignore if exists):', migrationError)
     }
     
-    const session = await getServerSession(authOptions)
+    console.log('🔐 GET /api/food-log - Getting session...');
+    let session;
+    try {
+      session = await getServerSession(authOptions);
+      console.log('✅ GET /api/food-log - Session retrieved:', session ? 'authenticated' : 'not authenticated');
+    } catch (sessionError) {
+      console.error('❌ GET /api/food-log - Error getting session:', sessionError);
+      return NextResponse.json({ 
+        error: 'Authentication failed',
+        details: sessionError instanceof Error ? sessionError.message : String(sessionError)
+      }, { status: 500 })
+    }
+    
     if (!session?.user?.email) {
+      console.error('❌ GET /api/food-log - No session or email');
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
@@ -45,7 +61,19 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid date format. Expected YYYY-MM-DD' }, { status: 400 })
     }
 
-    const user = await prisma.user.findUnique({ where: { email: session.user.email } })
+    console.log('👤 GET /api/food-log - Looking up user:', session.user.email);
+    let user;
+    try {
+      user = await prisma.user.findUnique({ where: { email: session.user.email } });
+      console.log('✅ GET /api/food-log - User lookup result:', user ? 'found' : 'not found');
+    } catch (userError) {
+      console.error('❌ GET /api/food-log - Error looking up user:', userError);
+      return NextResponse.json({ 
+        error: 'Database error',
+        details: userError instanceof Error ? userError.message : String(userError)
+      }, { status: 500 })
+    }
+    
     if (!user) {
       console.error(`❌ GET /api/food-log - User not found: ${session.user.email}`);
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
@@ -101,25 +129,36 @@ export async function GET(request: NextRequest) {
     // For older rows that predate localDate, fall back to the createdAt time-window.
     // CRITICAL FIX: Query more broadly to catch entries that might have incorrect localDate
     // We'll filter them properly below
-    const logs = await prisma.foodLog.findMany({
-      where: {
-        userId: user.id,
-        OR: [
-          { localDate: validatedDateStr },
-          {
-            localDate: null,
-            createdAt: { gte: queryStart, lte: queryEnd },
-          },
-          // Include entries created within the wider query window (even if localDate is set incorrectly)
-          // This ensures we don't lose entries due to date mismatches or timezone issues
-          // DO NOT REMOVE THIS CONDITION - it prevents entries from disappearing
-          {
-            createdAt: { gte: queryStart, lte: queryEnd },
-          },
-        ],
-      },
-      orderBy: { createdAt: 'desc' },
-    })
+    console.log('🔍 GET /api/food-log - Querying database for entries...');
+    let logs;
+    try {
+      logs = await prisma.foodLog.findMany({
+        where: {
+          userId: user.id,
+          OR: [
+            { localDate: validatedDateStr },
+            {
+              localDate: null,
+              createdAt: { gte: queryStart, lte: queryEnd },
+            },
+            // Include entries created within the wider query window (even if localDate is set incorrectly)
+            // This ensures we don't lose entries due to date mismatches or timezone issues
+            // DO NOT REMOVE THIS CONDITION - it prevents entries from disappearing
+            {
+              createdAt: { gte: queryStart, lte: queryEnd },
+            },
+          ],
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+      console.log(`✅ GET /api/food-log - Database query returned ${logs.length} entries`);
+    } catch (queryError) {
+      console.error('❌ GET /api/food-log - Database query error:', queryError);
+      return NextResponse.json({ 
+        error: 'Database query failed',
+        details: queryError instanceof Error ? queryError.message : String(queryError)
+      }, { status: 500 })
+    }
     
     // 🛡️ GUARD RAIL: Post-Query Filtering (REQUIRED)
     // Filter to ensure we only return entries for the requested date
