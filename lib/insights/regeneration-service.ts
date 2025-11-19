@@ -69,18 +69,18 @@ function getAffectedSections(changeType: DataChangeEvent['changeType']): IssueSe
  */
 async function ensureMetadataTable() {
   try {
-    await prisma.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS "InsightsMetadata" (
-        "userId" TEXT NOT NULL,
-        "issueSlug" TEXT NOT NULL,
-        "section" TEXT NOT NULL,
-        "lastGeneratedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        "dataFingerprint" TEXT NOT NULL,
-        "status" TEXT NOT NULL DEFAULT 'fresh',
-        "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        PRIMARY KEY ("userId", "issueSlug", "section")
-      )
-    `)
+    // await prisma.$executeRawUnsafe(`
+    //   CREATE TABLE IF NOT EXISTS "InsightsMetadata" (
+    //     "userId" TEXT NOT NULL,
+    //     "issueSlug" TEXT NOT NULL,
+    //     "section" TEXT NOT NULL,
+    //     "lastGeneratedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    //     "dataFingerprint" TEXT NOT NULL,
+    //     "status" TEXT NOT NULL DEFAULT 'fresh',
+    //     "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    //     PRIMARY KEY ("userId", "issueSlug", "section")
+    //   )
+    // `)
   } catch (error) {
     console.warn('[regeneration-service] Failed to ensure metadata table', error)
   }

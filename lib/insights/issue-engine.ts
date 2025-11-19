@@ -148,9 +148,9 @@ let sectionCacheTableEnsured = false
 async function ensureSectionCacheTable() {
   if (sectionCacheTableEnsured) return
   try {
-    await prisma.$executeRawUnsafe(
-      'CREATE TABLE IF NOT EXISTS "InsightsSectionCache" ("userId" TEXT NOT NULL, "slug" TEXT NOT NULL, "section" TEXT NOT NULL, "mode" TEXT NOT NULL, "rangeKey" TEXT NOT NULL, "result" JSONB NOT NULL, "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(), PRIMARY KEY ("userId","slug","section","mode","rangeKey"))'
-    )
+    // await prisma.$executeRawUnsafe(
+    //   'CREATE TABLE IF NOT EXISTS "InsightsSectionCache" ("userId" TEXT NOT NULL, "slug" TEXT NOT NULL, "section" TEXT NOT NULL, "mode" TEXT NOT NULL, "rangeKey" TEXT NOT NULL, "result" JSONB NOT NULL, "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(), PRIMARY KEY ("userId","slug","section","mode","rangeKey"))'
+    // )
     sectionCacheTableEnsured = true
   } catch (error) {
     console.error('[insights.cache] Failed to ensure cache table', error)

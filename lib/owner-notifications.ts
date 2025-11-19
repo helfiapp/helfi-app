@@ -73,12 +73,12 @@ async function getOwnerSubscription(): Promise<any | null> {
 
   try {
     // Ensure table exists
-    await prisma.$executeRawUnsafe(`
-      CREATE TABLE IF NOT EXISTS PushSubscriptions (
-        userId TEXT PRIMARY KEY,
-        subscription JSONB NOT NULL
-      )
-    `)
+    // await prisma.$executeRawUnsafe(`
+    //   CREATE TABLE IF NOT EXISTS PushSubscriptions (
+    //     userId TEXT PRIMARY KEY,
+    //     subscription JSONB NOT NULL
+    //   )
+    // `)
 
     const rows: Array<{ subscription: any }> = await prisma.$queryRawUnsafe(
       `SELECT subscription FROM PushSubscriptions WHERE userId = $1`,
@@ -182,15 +182,15 @@ export async function notifyOwner(options: NotificationOptions): Promise<void> {
         if (res.ok) {
           // Log enqueue
           try {
-            await prisma.$executeRawUnsafe(`
-              CREATE TABLE IF NOT EXISTS OwnerPushLog (
-                createdAt TIMESTAMP NOT NULL DEFAULT NOW(),
-                event TEXT,
-                userEmail TEXT,
-                status TEXT,
-                info TEXT
-              )
-            `)
+            // await prisma.$executeRawUnsafe(`
+            //   CREATE TABLE IF NOT EXISTS OwnerPushLog (
+            //     createdAt TIMESTAMP NOT NULL DEFAULT NOW(),
+            //     event TEXT,
+            //     userEmail TEXT,
+            //     status TEXT,
+            //     info TEXT
+            //   )
+            // `)
             await prisma.$executeRawUnsafe(
               `INSERT INTO OwnerPushLog (event, userEmail, status, info) VALUES ($1, $2, $3, $4)`,
               options.event,
@@ -233,15 +233,15 @@ export async function notifyOwner(options: NotificationOptions): Promise<void> {
     // Send notification (don't await to avoid blocking)
     webpush.sendNotification(subscription, payloadJson).then(async () => {
       try {
-        await prisma.$executeRawUnsafe(`
-          CREATE TABLE IF NOT EXISTS OwnerPushLog (
-            createdAt TIMESTAMP NOT NULL DEFAULT NOW(),
-            event TEXT,
-            userEmail TEXT,
-            status TEXT,
-            info TEXT
-          )
-        `)
+        // await prisma.$executeRawUnsafe(`
+        //   CREATE TABLE IF NOT EXISTS OwnerPushLog (
+        //     createdAt TIMESTAMP NOT NULL DEFAULT NOW(),
+        //     event TEXT,
+        //     userEmail TEXT,
+        //     status TEXT,
+        //     info TEXT
+        //   )
+        // `)
         await prisma.$executeRawUnsafe(
           `INSERT INTO OwnerPushLog (event, userEmail, status, info) VALUES ($1, $2, $3, $4)`,
           options.event,
