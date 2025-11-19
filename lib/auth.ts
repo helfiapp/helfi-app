@@ -203,22 +203,22 @@ export const authOptions: NextAuthOptions = {
 
         const email = credentials.email.toLowerCase()
         // Ensure DB has new columns used by the app (forward-compatible, no-op if exists)
-        try {
-          await prisma.$executeRawUnsafe('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "termsAccepted" BOOLEAN DEFAULT false')
-        } catch (e) {
-          console.warn('termsAccepted column ensure failed (safe to ignore if already exists):', e)
-        }
-        // Ensure wallet metering columns exist to prevent Prisma SELECT errors during login
-        try {
-          await prisma.$executeRawUnsafe('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "walletMonthlyUsedCents" INTEGER NOT NULL DEFAULT 0')
-        } catch (e) {
-          console.warn('walletMonthlyUsedCents ensure failed (safe to ignore if already exists):', e)
-        }
-        try {
-          await prisma.$executeRawUnsafe('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "walletMonthlyResetAt" TIMESTAMP(3)')
-        } catch (e) {
-          console.warn('walletMonthlyResetAt ensure failed (safe to ignore if already exists):', e)
-        }
+        // try {
+        //   await prisma.$executeRawUnsafe('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "termsAccepted" BOOLEAN DEFAULT false')
+        // } catch (e) {
+        //   console.warn('termsAccepted column ensure failed (safe to ignore if already exists):', e)
+        // }
+        // // Ensure wallet metering columns exist to prevent Prisma SELECT errors during login
+        // try {
+        //   await prisma.$executeRawUnsafe('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "walletMonthlyUsedCents" INTEGER NOT NULL DEFAULT 0')
+        // } catch (e) {
+        //   console.warn('walletMonthlyUsedCents ensure failed (safe to ignore if already exists):', e)
+        // }
+        // try {
+        //   await prisma.$executeRawUnsafe('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "walletMonthlyResetAt" TIMESTAMP(3)')
+        // } catch (e) {
+        //   console.warn('walletMonthlyResetAt ensure failed (safe to ignore if already exists):', e)
+        // }
         // Find or create user deterministically; do not return null on transient DB issues
         let user = await prisma.user.findUnique({ where: { email } }).catch((e) => {
           console.error('⚠️ prisma.user.findUnique failed:', e)
@@ -280,16 +280,16 @@ export const authOptions: NextAuthOptions = {
       if (account?.provider === 'google') {
         try {
           // Ensure wallet metering columns exist (avoid column-missing errors on fresh DBs)
-          try {
-            await prisma.$executeRawUnsafe('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "walletMonthlyUsedCents" INTEGER NOT NULL DEFAULT 0')
-          } catch (e) {
-            console.warn('walletMonthlyUsedCents ensure failed (safe to ignore if already exists):', e)
-          }
-          try {
-            await prisma.$executeRawUnsafe('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "walletMonthlyResetAt" TIMESTAMP(3)')
-          } catch (e) {
-            console.warn('walletMonthlyResetAt ensure failed (safe to ignore if already exists):', e)
-          }
+          // try {
+          //   await prisma.$executeRawUnsafe('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "walletMonthlyUsedCents" INTEGER NOT NULL DEFAULT 0')
+          // } catch (e) {
+          //   console.warn('walletMonthlyUsedCents ensure failed (safe to ignore if already exists):', e)
+          // }
+          // try {
+          //   await prisma.$executeRawUnsafe('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "walletMonthlyResetAt" TIMESTAMP(3)')
+          // } catch (e) {
+          //   console.warn('walletMonthlyResetAt ensure failed (safe to ignore if already exists):', e)
+          // }
           // Find or create user for Google OAuth
           let dbUser = await prisma.user.findUnique({
             where: { email: user.email! }

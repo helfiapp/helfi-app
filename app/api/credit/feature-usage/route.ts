@@ -178,48 +178,49 @@ export async function GET(_req: NextRequest) {
     let healthTipsLabel: 'monthly' | 'total' = 'total'
 
     try {
-      await prisma.$executeRawUnsafe(`
-        CREATE TABLE IF NOT EXISTS HealthTips (
-          id TEXT PRIMARY KEY,
-          userId TEXT NOT NULL,
-          tipDate DATE NOT NULL,
-          sentAt TIMESTAMP NOT NULL DEFAULT NOW(),
-          title TEXT NOT NULL,
-          body TEXT NOT NULL,
-          category TEXT,
-          metadata JSONB,
-          costCents INTEGER,
-          chargeCents INTEGER
-        )
-      `)
+      // Skip HealthTips query if table doesn't exist (avoid runtime DDL)
+      // await prisma.$executeRawUnsafe(`
+      //   CREATE TABLE IF NOT EXISTS HealthTips (
+      //     id TEXT PRIMARY KEY,
+      //     userId TEXT NOT NULL,
+      //     tipDate DATE NOT NULL,
+      //     sentAt TIMESTAMP NOT NULL DEFAULT NOW(),
+      //     title TEXT NOT NULL,
+      //     body TEXT NOT NULL,
+      //     category TEXT,
+      //     metadata JSONB,
+      //     costCents INTEGER,
+      //     chargeCents INTEGER
+      //   )
+      // `)
 
-      if (hasSubscription && monthlyStartDate) {
-        const startStr = monthlyStartDate.toISOString().slice(0, 10)
-        const rows: Array<{ count: number; credits: number }> = await prisma.$queryRawUnsafe(
-          `SELECT COUNT(*)::int AS count, COALESCE(SUM(chargeCents),0)::int AS credits
-           FROM HealthTips
-           WHERE userId = $1 AND tipDate >= $2::date`,
-          user.id,
-          startStr
-        )
-        if (rows.length > 0) {
-          healthTipsCount = Number(rows[0].count || 0)
-          healthTipsCredits = Number(rows[0].credits || 0)
-        }
-        healthTipsLabel = 'monthly'
-      } else {
-        const rows: Array<{ count: number; credits: number }> = await prisma.$queryRawUnsafe(
-          `SELECT COUNT(*)::int AS count, COALESCE(SUM($2),0)::int AS credits
-           FROM (SELECT chargeCents as amount FROM HealthTips WHERE userId = $1) AS t`,
-          user.id,
-          1 // ensure type inference works without BigInt
-        )
-        if (rows.length > 0) {
-          healthTipsCount = Number(rows[0].count || 0)
-          healthTipsCredits = Number(rows[0].credits || 0)
-        }
-        healthTipsLabel = 'total'
-      }
+      // if (hasSubscription && monthlyStartDate) {
+      //   const startStr = monthlyStartDate.toISOString().slice(0, 10)
+      //   const rows: Array<{ count: number; credits: number }> = await prisma.$queryRawUnsafe(
+      //     `SELECT COUNT(*)::int AS count, COALESCE(SUM(chargeCents),0)::int AS credits
+      //      FROM HealthTips
+      //      WHERE userId = $1 AND tipDate >= $2::date`,
+      //     user.id,
+      //     startStr
+      //   )
+      //   if (rows.length > 0) {
+      //     healthTipsCount = Number(rows[0].count || 0)
+      //     healthTipsCredits = Number(rows[0].credits || 0)
+      //   }
+      //   healthTipsLabel = 'monthly'
+      // } else {
+      //   const rows: Array<{ count: number; credits: number }> = await prisma.$queryRawUnsafe(
+      //     `SELECT COUNT(*)::int AS count, COALESCE(SUM($2),0)::int AS credits
+      //      FROM (SELECT chargeCents as amount FROM HealthTips WHERE userId = $1) AS t`,
+      //     user.id,
+      //     1 // ensure type inference works without BigInt
+      //   )
+      //   if (rows.length > 0) {
+      //     healthTipsCount = Number(rows[0].count || 0)
+      //     healthTipsCredits = Number(rows[0].credits || 0)
+      //   }
+      //   healthTipsLabel = 'total'
+      // }
     } catch (e) {
       console.error('Error calculating health tips usage', e)
     }

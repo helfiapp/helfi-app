@@ -14,13 +14,13 @@ export async function GET(request: NextRequest) {
     
     // Ensure localDate column exists (forward-compatible migration)
     // This prevents "column does not exist" errors if migration hasn't run
-    try {
-      await prisma.$executeRawUnsafe('ALTER TABLE "FoodLog" ADD COLUMN IF NOT EXISTS "localDate" TEXT')
-      console.log('✅ GET /api/food-log - Verified localDate column exists');
-    } catch (migrationError) {
-      // Safe to ignore if column already exists or other migration issues
-      console.warn('⚠️ GET /api/food-log - localDate column check (safe to ignore if exists):', migrationError)
-    }
+    // try {
+    //   await prisma.$executeRawUnsafe('ALTER TABLE "FoodLog" ADD COLUMN IF NOT EXISTS "localDate" TEXT')
+    //   console.log('✅ GET /api/food-log - Verified localDate column exists');
+    // } catch (migrationError) {
+    //   // Safe to ignore if column already exists or other migration issues
+    //   console.warn('⚠️ GET /api/food-log - localDate column check (safe to ignore if exists):', migrationError)
+    // }
     
     console.log('🔐 GET /api/food-log - Getting session...');
     let session;
@@ -273,13 +273,13 @@ export async function POST(request: NextRequest) {
     
     // Ensure localDate column exists (forward-compatible migration)
     // This prevents "column does not exist" errors if migration hasn't run
-    try {
-      await prisma.$executeRawUnsafe('ALTER TABLE "FoodLog" ADD COLUMN IF NOT EXISTS "localDate" TEXT')
-      console.log('✅ POST /api/food-log - Verified localDate column exists')
-    } catch (migrationError) {
-      // Safe to ignore if column already exists or other migration issues
-      console.warn('⚠️ POST /api/food-log - localDate column check (safe to ignore if exists):', migrationError)
-    }
+    // try {
+    //   await prisma.$executeRawUnsafe('ALTER TABLE "FoodLog" ADD COLUMN IF NOT EXISTS "localDate" TEXT')
+    //   console.log('✅ POST /api/food-log - Verified localDate column exists')
+    // } catch (migrationError) {
+    //   // Safe to ignore if column already exists or other migration issues
+    //   console.warn('⚠️ POST /api/food-log - localDate column check (safe to ignore if exists):', migrationError)
+    // }
     
     const session = await getServerSession(authOptions)
     if (!session?.user?.email) {
