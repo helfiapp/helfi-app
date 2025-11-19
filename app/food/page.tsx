@@ -3137,7 +3137,35 @@ Please add nutritional information manually if needed.`);
                     </div>
                   )}
 
-                  {analyzedNutrition && (() => {
+                  {/* Description Field - Appears right after title/meal summary when editing */}
+                  {isEditingDescription && (
+                    <div className="mb-6 space-y-4">
+                      <label className="block text-lg font-medium text-gray-900">
+                        Food Description
+                      </label>
+                      <textarea
+                        ref={descriptionTextareaRef}
+                        value={editedDescription}
+                        onChange={(e) => {
+                          setEditedDescription(e.target.value);
+                          e.target.style.height = 'auto';
+                          e.target.style.height = `${e.target.scrollHeight}px`;
+                        }}
+                        onFocus={(e) => {
+                          e.target.style.height = 'auto';
+                          e.target.style.height = `${e.target.scrollHeight}px`;
+                        }}
+                        className="w-full min-h-[8rem] px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 text-base resize-none bg-white shadow-sm font-normal leading-relaxed whitespace-pre-wrap"
+                        style={{ overflow: 'hidden' }}
+                        placeholder="Enter a detailed description of the food item..."
+                      />
+                      <p className="text-sm text-gray-600 font-normal">
+                        Change the food description and click on the 'Re-Analyze' button.
+                      </p>
+                    </div>
+                  )}
+
+                  {analyzedNutrition && !isEditingDescription && (() => {
                     // Create macro segments for the circle chart
                     const macroSegments: MacroSegment[] = [
                       { key: 'protein', label: 'Protein', grams: (analyzedNutrition as any)?.protein || 0, color: '#ef4444' }, // red
@@ -3232,7 +3260,7 @@ Please add nutritional information manually if needed.`);
                   })()}
 
                   {/* Detected Items with Brand, Serving Size, and Edit Controls */}
-                  {analyzedItems && analyzedItems.length > 0 ? (
+                  {analyzedItems && analyzedItems.length > 0 && !isEditingDescription ? (
                     <div className="mb-6 space-y-3">
                       <div className="mb-2 flex items-center justify-between">
                         <div className="text-sm font-medium text-gray-600">Detected Foods:</div>
@@ -4062,178 +4090,44 @@ Please add nutritional information manually if needed.`);
               </div>
             )}
 
-            {/* Clean Edit Interface - Improved UX Design */}
+            {/* Action buttons for editing description - shown when isEditingDescription is true */}
             {isEditingDescription && (
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="p-4 sm:p-6 space-y-6">
-                  {/* Simple Food Title Only */}
-                  <div className="border-b border-gray-100 pb-4">
-                    <h1 className="text-xl sm:text-2xl font-medium text-gray-900">
-                      {(() => {
-                        const title = editedDescription.split('\n')[0].split('Calories:')[0].trim().split(',')[0].split('.')[0] || 'Food Item';
-                        return title.replace(/^./, (match: string) => match.toUpperCase());
-                      })()}
-                    </h1>
-                  </div>
-
-                  {/* Enhanced Description Section - Moved right after title */}
-                  <div className="space-y-4">
-                    <label className="block text-lg font-medium text-gray-900">
-                      Food Description
-                    </label>
-                    <textarea
-                      ref={descriptionTextareaRef}
-                      value={editedDescription}
-                      onChange={(e) => {
-                        setEditedDescription(e.target.value);
-                        e.target.style.height = 'auto';
-                        e.target.style.height = `${e.target.scrollHeight}px`;
-                      }}
-                      onFocus={(e) => {
-                        e.target.style.height = 'auto';
-                        e.target.style.height = `${e.target.scrollHeight}px`;
-                      }}
-                      className="w-full min-h-[8rem] px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 text-base resize-none bg-white shadow-sm font-normal leading-relaxed whitespace-pre-wrap"
-                      style={{ overflow: 'hidden' }}
-                      placeholder="Enter a detailed description of the food item..."
-                    />
-                    <p className="text-sm text-gray-600 font-normal">
-                      Change the food description and click on the 'Re-Analyze' button.
-                    </p>
-                  </div>
-
-                  {/* Nutrition Cards - Match Main Page Style - Circular Design */}
-                  {analyzedNutrition && (
-                    <div className="flex flex-wrap justify-center gap-4 sm:gap-6">
-                      {/* Calories - Teal */}
-                      {analyzedNutrition.calories !== null && analyzedNutrition.calories !== undefined && (
-                        <div className="flex flex-col items-center">
-                          <SolidMacroRing
-                            label="Calories"
-                            value={analyzedNutrition.calories}
-                            color="#0d9488" // teal-600
-                          />
-                          <div className="mt-2 text-xs font-bold text-gray-400 uppercase tracking-wide">Calories</div>
-                        </div>
-                      )}
-                      
-                      {/* Protein - Red */}
-                      {analyzedNutrition.protein !== null && analyzedNutrition.protein !== undefined && (
-                        <div className="flex flex-col items-center">
-                          <SolidMacroRing
-                            label="Protein"
-                            value={analyzedNutrition.protein}
-                            unit="g"
-                            color="#ef4444" // red-500
-                          />
-                          <div className="mt-2 text-xs font-bold text-gray-400 uppercase tracking-wide">Protein</div>
-                        </div>
-                      )}
-                      
-                      {/* Carbs - Green */}
-                      {analyzedNutrition.carbs !== null && analyzedNutrition.carbs !== undefined && (
-                        <div className="flex flex-col items-center">
-                          <SolidMacroRing
-                            label="Carbs"
-                            value={analyzedNutrition.carbs}
-                            unit="g"
-                            color="#22c55e" // green-500
-                          />
-                          <div className="mt-2 text-xs font-bold text-gray-400 uppercase tracking-wide">Carbs</div>
-                        </div>
-                      )}
-                      
-                      {/* Fat - Purple (Indigo) */}
-                      {analyzedNutrition.fat !== null && analyzedNutrition.fat !== undefined && (
-                        <div className="flex flex-col items-center">
-                          <SolidMacroRing
-                            label="Fat"
-                            value={analyzedNutrition.fat}
-                            unit="g"
-                            color="#6366f1" // indigo-500
-                          />
-                          <div className="mt-2 text-xs font-bold text-gray-400 uppercase tracking-wide">Fat</div>
-                        </div>
-                      )}
-                      
-                      {/* Fiber - Blue */}
-                      {(analyzedNutrition as any)?.fiber !== null && (analyzedNutrition as any)?.fiber !== undefined && (
-                        <div className="flex flex-col items-center">
-                          <SolidMacroRing
-                            label="Fiber"
-                            value={(analyzedNutrition as any).fiber}
-                            unit="g"
-                            color="#3b82f6" // blue-500
-                          />
-                          <div className="mt-2 text-xs font-bold text-gray-400 uppercase tracking-wide">Fiber</div>
-                        </div>
-                      )}
-                      
-                      {/* Sugar - Orange */}
-                      {(analyzedNutrition as any)?.sugar !== null && (analyzedNutrition as any)?.sugar !== undefined && (
-                        <div className="flex flex-col items-center">
-                          <SolidMacroRing
-                            label="Sugar"
-                            value={(analyzedNutrition as any).sugar}
-                            unit="g"
-                            color="#f97316" // orange-500
-                          />
-                          <div className="mt-2 text-xs font-bold text-gray-400 uppercase tracking-wide">Sugar</div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  
-                  {/* Full-Width Action Buttons (new entries and editing entries) */}
-                  <div className="space-y-3">
-                    <button
-                      onClick={reanalyzeCurrentEntry}
-                      disabled={isAnalyzing}
-                      className="w-full py-4 px-6 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-all duration-300 flex items-center justify-center shadow-sm hover:shadow-md disabled:shadow-none"
-                    >
-                      {isAnalyzing ? (
-                        <>
-                          <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
-                          <span className="font-normal">Re-Analyzing...</span>
-                        </>
-                      ) : (
-                        <>
-                          <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                          <span className="font-normal">Re-Analyze with AI (uses 1 credit)</span>
-                        </>
-                      )}
-                    </button>
-                    <button
-                      onClick={resetAnalyzerPanel}
-                      className="w-full py-3 px-4 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium rounded-xl transition-all duration-300 flex items-center justify-center"
-                    >
-                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              <div className="space-y-3 mt-4">
+                <button
+                  onClick={reanalyzeCurrentEntry}
+                  disabled={isAnalyzing}
+                  className="w-full py-4 px-6 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-all duration-300 flex items-center justify-center shadow-sm hover:shadow-md disabled:shadow-none"
+                >
+                  {isAnalyzing ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
-                      Cancel
-                    </button>
-                    <button
-                      onClick={() => {
-                        // For new (unsaved) analyses, Done should simply close
-                        // the description editor and return to the analysis view
-                        setIsEditingDescription(false)
-                        setShowAiResult(true)
-                        setShowAddFood(true)
-                      }}
-                      className="w-full py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-all duration-300 flex items-center justify-center"
-                    >
-                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <span className="font-normal">Re-Analyzing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
-                      Done
-                    </button>
-                  </div>
-                </div>
+                      <span className="font-normal">Re-Analyze with AI (uses 1 credit)</span>
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => {
+                    setIsEditingDescription(false)
+                    setShowAiResult(true)
+                    setShowAddFood(true)
+                  }}
+                  className="w-full py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-all duration-300 flex items-center justify-center"
+                >
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  Done
+                </button>
               </div>
             )}
 
