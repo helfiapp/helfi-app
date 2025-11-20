@@ -2425,11 +2425,14 @@ Please add nutritional information manually if needed.`);
       setHealthWarning(null)
       setHealthAlternatives(null)
       setShowPhotoOptions(false)
+      // When cancelling an edit, close the add/edit panel so we return to the main diary view
+      setShowAddFood(false)
     } else {
       // If no entry was being edited, just exit edit mode
       setIsEditingDescription(false)
       setEditingEntry(null)
       setOriginalEditingEntry(null)
+      setShowAddFood(false)
     }
   }
 
@@ -3546,7 +3549,13 @@ Please add nutritional information manually if needed.`);
                               </div>
                             </div>
                             
-                            {/* Serving Controls */}
+                            {/* Serving Controls
+                                GUARD RAIL SUMMARY:
+                                - This UI intentionally exposes ONE editable number: Servings.
+                                - 1 serving is defined by `servingSizeLabel` (e.g. "1/2 cup (45 g)").
+                                - When gramsPerServing is known, we also show a read-only "Total ≈ X g" line.
+                                - Do NOT re-introduce a second editable "Units" field or change the meaning of
+                                  "1 serving" without explicit written approval from the user. */}
                             {isExpanded && (
                               <div className="flex flex-col gap-2 mb-3 pb-3 border-b border-gray-100">
                                 <div className="flex items-center gap-3">
