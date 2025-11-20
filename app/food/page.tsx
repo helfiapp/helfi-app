@@ -2687,8 +2687,8 @@ Please add nutritional information manually if needed.`);
 
     // Split into lines and drop the first non-empty line so we don't repeat
     // the same sentence in both the green title and the body text.
-    const lines = source.split('\n').map((l) => l.trim())
-    const firstIndex = lines.findIndex((l) => l.length > 0)
+    const lines = source.split('\n').map((l: string) => l.trim())
+    const firstIndex = lines.findIndex((l: string) => l.length > 0)
     if (firstIndex === -1) return ''
 
     const bodyLines = lines.slice(firstIndex + 1)
