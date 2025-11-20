@@ -174,6 +174,16 @@ const extractBaseMealDescription = (value: string | null | undefined) => {
   if (!value) return ''
   const withoutNutrition = value.replace(/Calories:[\s\S]*/i, '').trim()
   const firstLine = withoutNutrition.split('\n').map((line) => line.trim()).find(Boolean)
+  // If the first line contains multiple comma-separated items (like ingredient lists),
+  // try to extract just the main meal name (first item or a simplified version)
+  if (firstLine && firstLine.includes(',')) {
+    // Try to find a simple meal name before the comma
+    const firstPart = firstLine.split(',')[0].trim();
+    // If it looks like a serving size or ingredient detail, skip it
+    if (firstPart && !/^\d+\.?\s*(oz|g|ml|cup|cups|slice|slices|piece|pieces)/i.test(firstPart)) {
+      return firstPart;
+    }
+  }
   return firstLine || value.trim()
 }
 
@@ -2661,12 +2671,37 @@ Please add nutritional information manually if needed.`);
   //   the full technical breakdown, nutrition line, or ITEMS_JSON block.
   // - Do NOT switch this back to rendering the raw `aiDescription` string or you will
   //   expose internal formatting and confuse users.
+  // - `foodTitle` should be a simple meal name (e.g., "Burger"), not a list of all ingredients.
   const foodTitle = useMemo(() => {
+    // First priority: Extract simple title from AI description (before nutrition info)
+    if (aiDescription) {
+      const simpleTitle = extractBaseMealDescription(aiDescription);
+      // Only use if it's a reasonable length (not the full ingredient list)
+      if (simpleTitle && simpleTitle.length < 100 && !simpleTitle.includes(',')) {
+        return simpleTitle;
+      }
+    }
+    // Second priority: Use first item's name as simple title
+    if (analyzedItems && analyzedItems.length > 0) {
+      const firstItem = analyzedItems[0];
+      const itemName = firstItem?.name ? String(firstItem.name).trim() : '';
+      if (itemName) {
+        // Clean up the name - remove any nutrition info in parentheses
+        const cleanName = itemName.replace(/\([^)]*(calories?|protein|carbs?|fat|fibre|fiber|sugar)[^)]*\)/gi, '').trim();
+        return cleanName || itemName;
+      }
+    }
+    // Third priority: Extract from editing entry description
+    if (editingEntry?.description) {
+      const simpleTitle = extractBaseMealDescription(editingEntry.description || '');
+      if (simpleTitle && simpleTitle.length < 100) {
+        return simpleTitle;
+      }
+    }
+    // Last resort: Use meal summary (full ingredient list) only if nothing else available
     if (mealSummary) return mealSummary;
-    if (editingEntry?.description) return extractBaseMealDescription(editingEntry.description || '');
-    if (aiDescription) return extractBaseMealDescription(aiDescription);
     return '';
-  }, [mealSummary, editingEntry, aiDescription]);
+  }, [mealSummary, editingEntry, aiDescription, analyzedItems]);
 
   const foodDescriptionText = useMemo(() => {
     if (aiDescription && aiDescription.trim()) {
