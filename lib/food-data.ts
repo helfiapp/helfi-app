@@ -204,20 +204,28 @@ function normalizeUsdaFood(food: UsdaFood): NormalizedFoodItem | null {
 
 export async function searchUsdaFoods(
   query: string,
-  opts: { pageSize?: number } = {},
+  opts: { pageSize?: number; dataType?: 'branded' | 'generic' | 'all' } = {},
 ): Promise<NormalizedFoodItem[]> {
   if (!USDA_API_KEY) {
     console.warn('USDA_API_KEY not configured; skipping USDA lookup')
     return []
   }
   const pageSize = opts.pageSize ?? 5
+  const dataType = opts.dataType ?? 'all'
+  const dataTypeParam =
+    dataType === 'branded'
+      ? 'Branded'
+      : dataType === 'generic'
+      ? ['Survey (FNDDS)', 'SR Legacy'].join(',')
+      : ['Branded', 'Survey (FNDDS)', 'SR Legacy'].join(',')
+
   if (!query.trim()) return []
 
   const params = new URLSearchParams({
     api_key: USDA_API_KEY,
     query,
     pageSize: String(pageSize),
-    dataType: ['Branded', 'Survey (FNDDS)', 'SR Legacy'].join(','),
+    dataType: dataTypeParam,
   })
 
   const url = `https://api.nal.usda.gov/fdc/v1/foods/search?${params.toString()}`

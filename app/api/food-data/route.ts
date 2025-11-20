@@ -13,6 +13,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const source = (searchParams.get('source') || '').toLowerCase()
     const query = (searchParams.get('q') || '').trim()
+    const kind = (searchParams.get('kind') || '').toLowerCase()
 
     if (!query) {
       return NextResponse.json(
@@ -31,7 +32,9 @@ export async function GET(request: NextRequest) {
     } else if (source === 'openfoodfacts') {
       items = await searchOpenFoodFactsByQuery(query, { pageSize: 5 })
     } else if (source === 'usda') {
-      items = await searchUsdaFoods(query, { pageSize: 5 })
+      const dataType =
+        kind === 'packaged' ? 'branded' : kind === 'single' ? 'generic' : 'all'
+      items = await searchUsdaFoods(query, { pageSize: 5, dataType })
     } else if (source === 'fatsecret') {
       items = await searchFatSecretFoods(query, { pageSize: 5 })
     } else {

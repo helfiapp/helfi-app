@@ -18,7 +18,7 @@ import MobileMoreMenu from '@/components/MobileMoreMenu'
 import UsageMeter from '@/components/UsageMeter'
 import FeatureUsageDisplay from '@/components/FeatureUsageDisplay'
 import CreditPurchaseModal from '@/components/CreditPurchaseModal'
-import { STARTER_FOODS, StarterFood } from '@/data/foods-starter'
+import { STARTER_FOODS } from '@/data/foods-starter'
 import { calculateDailyTargets } from '@/lib/daily-targets'
 import { SolidMacroRing } from '@/components/SolidMacroRing'
 
@@ -766,10 +766,9 @@ export default function FoodDiary() {
   const [healthWarning, setHealthWarning] = useState<string | null>(null)
   const [healthAlternatives, setHealthAlternatives] = useState<string | null>(null)
   const [showAddIngredientModal, setShowAddIngredientModal] = useState<boolean>(false)
-  const [ingredientSearchQuery, setIngredientSearchQuery] = useState<string>('') 
   const [officialSearchQuery, setOfficialSearchQuery] = useState<string>('')
   const [officialResults, setOfficialResults] = useState<any[]>([])
-  const [officialSource, setOfficialSource] = useState<'openfoodfacts' | 'usda'>('openfoodfacts')
+  const [officialSource, setOfficialSource] = useState<'packaged' | 'single'>('packaged')
   const [officialLoading, setOfficialLoading] = useState<boolean>(false)
   const [officialError, setOfficialError] = useState<string | null>(null)
   
@@ -855,15 +854,6 @@ export default function FoodDiary() {
     setAnalyzedTotal(convertTotalsForStorage(recalculated))
   }
 
-  const filteredStarterFoods = useMemo(() => {
-    const q = ingredientSearchQuery.trim().toLowerCase()
-    if (!q) return STARTER_FOODS
-    return STARTER_FOODS.filter(f =>
-      f.name.toLowerCase().includes(q) ||
-      (f.brand || '').toLowerCase().includes(q)
-    )
-  }, [ingredientSearchQuery])
-
   const handleDeleteItem = (index: number) => {
     const item = analyzedItems[index]
     const name = item?.name || 'this ingredient'
@@ -887,39 +877,6 @@ export default function FoodDiary() {
         setTodaysFoods(prev => prev.map(food => (food.id === editingEntry.id ? updatedEntry : food)))
       } catch {}
     }
-  }
-
-  const addIngredientFromStarter = (food: StarterFood) => {
-    const newItem = {
-      name: food.name,
-      brand: food.brand ?? null,
-      serving_size: food.serving_size,
-      servings: 1,
-      calories: food.calories,
-      protein_g: food.protein_g,
-      carbs_g: food.carbs_g,
-      fat_g: food.fat_g,
-      fiber_g: food.fiber_g ?? 0,
-      sugar_g: food.sugar_g ?? 0,
-    }
-    const next = [...analyzedItems, newItem]
-    setAnalyzedItems(next)
-    applyRecalculatedNutrition(next)
-    if (editingEntry) {
-      try {
-        const updatedNutrition = recalculateNutritionFromItems(next)
-        const updatedEntry = {
-          ...editingEntry,
-          items: next,
-          nutrition: updatedNutrition,
-          total: convertTotalsForStorage(updatedNutrition),
-        }
-        setEditingEntry(updatedEntry)
-        setTodaysFoods(prev => prev.map(food => (food.id === editingEntry.id ? updatedEntry : food)))
-      } catch {}
-    }
-    setShowAddIngredientModal(false)
-    setIngredientSearchQuery('')
   }
 
   const addIngredientFromOfficial = (item: any) => {
@@ -953,13 +910,12 @@ export default function FoodDiary() {
       } catch {}
     }
     setShowAddIngredientModal(false)
-    setIngredientSearchQuery('')
     setOfficialSearchQuery('')
     setOfficialResults([])
     setOfficialError(null)
   }
 
-  const handleOfficialSearch = async (source: 'openfoodfacts' | 'usda') => {
+  const handleOfficialSearch = async (mode: 'packaged' | 'single') => {
     if (!officialSearchQuery.trim()) {
       setOfficialError('Please enter a product name or barcode to search.')
       return
@@ -967,11 +923,12 @@ export default function FoodDiary() {
     setOfficialError(null)
     setOfficialLoading(true)
     setOfficialResults([])
-    setOfficialSource(source)
+    setOfficialSource(mode)
     try {
       const params = new URLSearchParams({
-        source,
+        source: 'usda',
         q: officialSearchQuery.trim(),
+        kind: mode,
       })
       const res = await fetch(`/api/food-data?${params.toString()}`, {
         method: 'GET',
@@ -3743,7 +3700,15 @@ Please add nutritional information manually if needed.`);
                 {/* Add Ingredient Modal */}
                 {showAddIngredientModal && (
                   <div className="fixed inset-0 z-50">
-                    <div className="absolute inset-0 bg-black/30" onClick={() => setShowAddIngredientModal(false)}></div>
+                    <div
+                      className="absolute inset-0 bg-black/30"
+                      onClick={() => {
+                        setShowAddIngredientModal(false)
+                        setOfficialSearchQuery('')
+                        setOfficialResults([])
+                        setOfficialError(null)
+                      }}
+                    ></div>
                     <div className="absolute inset-0 flex items-start sm:items-center justify-center mt-10 sm:mt-0">
                       <div className="w-[92%] max-w-lg bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
                         <div className="p-4 border-b border-gray-100 flex items-center justify-between">
@@ -3755,110 +3720,120 @@ Please add nutritional information manually if needed.`);
                           </button>
                         </div>
                         <div className="p-4">
-                          <input
-                            type="text"
-                            value={ingredientSearchQuery}
-                            onChange={(e) => setIngredientSearchQuery(e.target.value)}
-                            placeholder="Search starter foods (e.g., egg, bacon, rice)"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                          />
-                          <div className="mt-3 max-h-80 overflow-y-auto divide-y divide-gray-100">
-                            {filteredStarterFoods.map((f, i) => (
-                              <div key={`${f.name}-${i}`} className="py-3 flex items-center justify-between">
-                                <div className="min-w-0">
-                                  <div className="font-medium text-gray-900 truncate">{f.name}{f.brand ? ` – ${f.brand}` : ''}</div>
-                                  <div className="text-xs text-gray-600 mt-0.5">
-                                    {f.serving_size} • {Math.round(f.calories)} cal, {f.protein_g}g protein, {f.carbs_g}g carbs, {f.fat_g}g fat
-                                  </div>
-                                </div>
-                                <button
-                                  onClick={() => addIngredientFromStarter(f)}
-                                  className="ml-3 whitespace-nowrap px-3 py-1.5 rounded-md bg-emerald-600 text-white text-sm hover:bg-emerald-700"
-                                >
-                                  Add
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                          <div className="mt-4 pt-3 border-t border-gray-100">
-                            <div className="text-sm font-medium text-gray-900 mb-2">
-                              Search official food databases
-                            </div>
-                            <p className="text-xs text-gray-500 mb-2">
-                              Look up branded products (Open Food Facts) or single foods (USDA). Start typing a product
-                              name or barcode, then choose which database to search.
-                            </p>
+                          <div className="space-y-2">
+                            <label className="block text-sm font-medium text-gray-900">
+                              Search foods (USDA)
+                            </label>
                             <div className="flex flex-col sm:flex-row gap-2">
                               <input
                                 type="text"
                                 value={officialSearchQuery}
                                 onChange={(e) => setOfficialSearchQuery(e.target.value)}
-                                placeholder={'e.g., "Tip Top hamburger bun" or "9300633900000"'}
+                                placeholder={'e.g., Carman\'s toasted muesli or \"oatmeal\"'}
                                 className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm"
                               />
                               <div className="flex gap-2">
                                 <button
                                   type="button"
                                   disabled={officialLoading}
-                                  onClick={() => handleOfficialSearch('openfoodfacts')}
-                                  className="px-3 py-2 text-xs font-medium rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60"
+                                  onClick={() => handleOfficialSearch('packaged')}
+                                  className={`px-3 py-2 text-xs font-medium rounded-lg border ${
+                                    officialSource === 'packaged'
+                                      ? 'bg-emerald-600 text-white border-emerald-600'
+                                      : 'bg-white text-gray-700 border-gray-300'
+                                  } disabled:opacity-60`}
                                 >
-                                  Packaged (OFF)
+                                  Packaged
                                 </button>
                                 <button
                                   type="button"
                                   disabled={officialLoading}
-                                  onClick={() => handleOfficialSearch('usda')}
-                                  className="px-3 py-2 text-xs font-medium rounded-lg bg-slate-800 text-white hover:bg-slate-900 disabled:opacity-60"
+                                  onClick={() => handleOfficialSearch('single')}
+                                  className={`px-3 py-2 text-xs font-medium rounded-lg border ${
+                                    officialSource === 'single'
+                                      ? 'bg-slate-800 text-white border-slate-800'
+                                      : 'bg-white text-gray-700 border-gray-300'
+                                  } disabled:opacity-60`}
                                 >
-                                  Single food (USDA)
+                                  Single food
                                 </button>
                               </div>
                             </div>
-                            {officialError && <div className="mt-2 text-xs text-red-600">{officialError}</div>}
-                            {officialLoading && (
-                              <div className="mt-2 text-xs text-gray-500">Searching databases…</div>
-                            )}
-                            {!officialLoading && !officialError && officialResults.length > 0 && (
-                              <div className="mt-3 max-h-60 overflow-y-auto space-y-2">
-                                {officialResults.map((r, idx) => (
-                                  <div
-                                    key={`${r.source}-${r.id}-${idx}`}
-                                    className="flex items-start justify-between rounded-lg border border-gray-200 px-3 py-2"
-                                  >
-                                    <div className="min-w-0">
-                                      <div className="text-sm font-semibold text-gray-900 truncate">
-                                        {r.name}
-                                        {r.brand ? ` – ${r.brand}` : ''}
-                                      </div>
-                                      <div className="mt-0.5 text-xs text-gray-600">
-                                        {r.serving_size ? `Serving: ${r.serving_size} • ` : ''}
-                                        {r.calories != null && !Number.isNaN(Number(r.calories)) && (
-                                          <span>{Math.round(Number(r.calories))} kcal</span>
-                                        )}
-                                        {r.protein_g != null && (
-                                          <span className="ml-2">{`${r.protein_g} g protein`}</span>
-                                        )}
-                                        {r.carbs_g != null && (
-                                          <span className="ml-2">{`${r.carbs_g} g carbs`}</span>
-                                        )}
-                                        {r.fat_g != null && <span className="ml-2">{`${r.fat_g} g fat`}</span>}
-                                      </div>
-                                      <div className="mt-1 text-[11px] text-gray-400">
-                                        Source: {r.source === 'openfoodfacts' ? 'Open Food Facts' : 'USDA FoodData Central'}
-                                      </div>
+                            <p className="text-xs text-gray-500">
+                              Results are powered by USDA FoodData Central. Use the toggles to focus on packaged
+                              products or generic single foods.
+                            </p>
+                          </div>
+                          {officialError && <div className="mt-3 text-xs text-red-600">{officialError}</div>}
+                          {officialLoading && (
+                            <div className="mt-3 text-xs text-gray-500">Searching USDA…</div>
+                          )}
+                          {!officialLoading && !officialError && officialResults.length > 0 && (
+                            <div className="mt-3 max-h-80 overflow-y-auto space-y-2">
+                              {officialResults.map((r, idx) => (
+                                <div
+                                  key={`${r.source}-${r.id}-${idx}`}
+                                  className="flex items-start justify-between rounded-lg border border-gray-200 px-3 py-2"
+                                >
+                                  <div className="min-w-0">
+                                    <div className="text-sm font-semibold text-gray-900 truncate">
+                                      {r.name}
+                                      {r.brand ? ` – ${r.brand}` : ''}
                                     </div>
-                                    <button
-                                      type="button"
-                                      onClick={() => addIngredientFromOfficial(r)}
-                                      className="ml-3 px-3 py-1.5 rounded-md bg-emerald-600 text-white text-xs hover:bg-emerald-700"
-                                    >
-                                      Add
-                                    </button>
+                                    <div className="mt-0.5 text-xs text-gray-600">
+                                      {r.serving_size ? `Serving: ${r.serving_size} • ` : ''}
+                                      {r.calories != null && !Number.isNaN(Number(r.calories)) && (
+                                        <span>{Math.round(Number(r.calories))} kcal</span>
+                                      )}
+                                      {r.protein_g != null && (
+                                        <span className="ml-2">{`${r.protein_g} g protein`}</span>
+                                      )}
+                                      {r.carbs_g != null && (
+                                        <span className="ml-2">{`${r.carbs_g} g carbs`}</span>
+                                      )}
+                                      {r.fat_g != null && <span className="ml-2">{`${r.fat_g} g fat`}</span>}
+                                    </div>
+                                    <div className="mt-1 text-[11px] text-gray-400">
+                                      Source: USDA FoodData Central
+                                    </div>
                                   </div>
-                                ))}
-                              </div>
-                            )}
+                                  <button
+                                    type="button"
+                                    onClick={() => addIngredientFromOfficial(r)}
+                                    className="ml-3 px-3 py-1.5 rounded-md bg-emerald-600 text-white text-xs hover:bg-emerald-700"
+                                  >
+                                    Add
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {!officialLoading && !officialError && officialResults.length === 0 && officialSearchQuery.trim() && (
+                            <div className="mt-4 text-xs text-gray-500">
+                              Can't find your food? You can use AI photo analysis instead.
+                            </div>
+                          )}
+                          <div className="mt-4 pt-3 border-t border-gray-100 space-y-2">
+                            <div className="text-sm font-medium text-gray-900">
+                              Or use AI photo analysis
+                            </div>
+                            <p className="text-xs text-gray-500">
+                              Take a clear photo of the food or package and let Helfi estimate the nutrition using AI.
+                            </p>
+                            <label className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium cursor-pointer hover:bg-emerald-700">
+                              📷 Use AI photo instead
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(e) => {
+                                  handlePhotoUpload(e)
+                                  setShowAddIngredientModal(false)
+                                  setShowAddFood(true)
+                                  setShowPhotoOptions(false)
+                                }}
+                              />
+                            </label>
                           </div>
                         </div>
                       </div>
@@ -4208,7 +4183,7 @@ Please add nutritional information manually if needed.`);
                                       className="w-full px-3 py-2 text-left text-red-600 hover:bg-red-50 flex items-center text-sm"
                                     >
                                       <svg className="w-3 h-3 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1 1h-4a1 1 0 00-1 1v3M4 7h16" />
                                       </svg>
                                       Delete
                                     </button>
