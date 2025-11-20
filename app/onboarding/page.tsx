@@ -481,13 +481,13 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
           className={`px-3 py-1 rounded-l ${unit === 'metric' ? 'bg-helfi-green text-white' : 'bg-gray-100'}`} 
           onClick={() => handleUnitChange('metric')}
         >
-          kg/cm
+          kg
         </button>
         <button 
           className={`px-3 py-1 rounded-r ${unit === 'imperial' ? 'bg-helfi-green text-white' : 'bg-gray-100'}`} 
           onClick={() => handleUnitChange('imperial')}
         >
-          lbs/in
+          lbs
         </button>
       </div>
       <input
