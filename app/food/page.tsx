@@ -2676,9 +2676,8 @@ Please add nutritional information manually if needed.`);
   }, [mealSummary, editingEntry, aiDescription]);
 
   const foodDescriptionText = useMemo(() => {
-    // Prefer the latest AI description if present, otherwise fall back to the
-    // saved entry description. In both cases we sanitize so the user only sees
-    // a short, friendly summary instead of the full technical analysis.
+    // Prefer the latest AI description if present (current analysis view),
+    // otherwise fall back to any saved description on an existing entry.
     const source =
       (aiDescription && aiDescription.trim()) ||
       (editingEntry?.description && String(editingEntry.description).trim()) ||
@@ -2686,15 +2685,20 @@ Please add nutritional information manually if needed.`);
 
     if (!source) return ''
 
-    const trimmed = source
-    const looksLikeAnalysis = /Calories\s*:/i.test(trimmed) || /<ITEMS_JSON>/i.test(trimmed)
-    if (looksLikeAnalysis) {
-      const base = extractBaseMealDescription(trimmed)
-      return base || trimmed
-    }
-    // For non-analysis text (fallback errors, manual notes), show as-is.
-    return trimmed
-  }, [aiDescription, editingEntry]);
+    // Split into lines and drop the first non-empty line so we don't repeat
+    // the same sentence in both the green title and the body text.
+    const lines = source.split('\n').map((l) => l.trim())
+    const firstIndex = lines.findIndex((l) => l.length > 0)
+    if (firstIndex === -1) return ''
+
+    const bodyLines = lines.slice(firstIndex + 1)
+    const body = bodyLines.join('\n').trim()
+
+    // If there's no extra body (e.g. user only entered a short free‑text
+    // description), just show that single line in the body and let the title
+    // stay as-is.
+    return body || lines[firstIndex]
+  }, [aiDescription, editingEntry])
 
   // Debug logging to track state changes
   useEffect(() => {
