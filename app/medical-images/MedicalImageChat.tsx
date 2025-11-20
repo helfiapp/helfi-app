@@ -22,11 +22,12 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const endRef = useRef<HTMLDivElement | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Debounced resize to keep composer smooth
+  // Debounced resize to keep composer smooth (match SymptomChat)
   const resizeTextarea = useCallback(() => {
     if (resizeTimeoutRef.current) {
       clearTimeout(resizeTimeoutRef.current)
@@ -42,7 +43,7 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
     }, 50)
   }, [])
 
-  // Load any existing chat history (per device)
+  // Load existing chat history
   useEffect(() => {
     try {
       const saved = localStorage.getItem(storageKey)
@@ -50,33 +51,33 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
         const parsed = JSON.parse(saved)
         if (Array.isArray(parsed)) {
           setMessages(
-            parsed.filter(
-              (m: any) =>
-                m &&
-                typeof m.content === 'string' &&
-                (m.role === 'user' || m.role === 'assistant')
-            ).slice(-24)
+            parsed
+              .filter(
+                (m: any) =>
+                  m && typeof m.content === 'string' && (m.role === 'user' || m.role === 'assistant')
+              )
+              .slice(-24)
           )
         }
       }
     } catch {}
   }, [storageKey])
 
-  // Persist messages
+  // Persist chat history
   useEffect(() => {
     try {
       localStorage.setItem(storageKey, JSON.stringify(messages))
     } catch {}
   }, [messages, storageKey])
 
-  // Always scroll to bottom inside chat container
+  // Scroll to bottom inside chat container
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
     container.scrollTop = container.scrollHeight
   }, [messages, loading])
 
-  // Auto-resize textarea
+  // Auto-resize textarea with debounce
   useEffect(() => {
     resizeTextarea()
   }, [input, resizeTextarea])
@@ -122,10 +123,7 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
 
       const res = await fetch('/api/medical-images/chat', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'text/event-stream',
-        },
+        headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
         body: JSON.stringify({
           message: text,
           analysisResult,
@@ -137,7 +135,6 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
         const decoder = new TextDecoder()
         let buffer = ''
         let hasAssistant = false
-
         while (true) {
           const { value, done } = await reader.read()
           if (done) break
@@ -166,9 +163,7 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
       } else {
         const data = await res.json().catch(() => null)
         const textOut = data?.assistant as string | undefined
-        if (textOut) {
-          setMessages((prev) => [...prev, { role: 'assistant', content: textOut }])
-        }
+        if (textOut) setMessages((prev) => [...prev, { role: 'assistant', content: textOut }])
       }
     } catch (err) {
       setError((err as Error).message)
@@ -205,73 +200,172 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
           <div className="text-sm text-gray-400">
             Ask follow‑ups like:
             <div className="mt-3 flex flex-wrap gap-2">
-              <span className="inline-flex items-center px-2 py-1 rounded-full bg-gray-100 text-gray-700 text-xs">
-                What does the most likely condition actually mean?
-              </span>
-              <span className="inline-flex items-center px-2 py-1 rounded-full bg-gray-100 text-gray-700 text-xs">
-                Which red flags mean I should see a doctor urgently?
-              </span>
-              <span className="inline-flex items-center px-2 py-1 rounded-full bg-gray-100 text-gray-700 text-xs">
-                What everyday things can make this better or worse?
-              </span>
+              {[
+                'What should I do about these red flags?',
+                'Can you explain the most likely condition in more detail?',
+                'When should I see a doctor about this image?',
+                'What everyday things can make this better or worse?',
+              ].map((q) => (
+                <button
+                  key={q}
+                  onClick={() => setInput(q)}
+                  className="text-left px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded-xl text-sm text-gray-700 transition-colors"
+                  type="button"
+                >
+                  {q}
+                </button>
+              ))}
             </div>
           </div>
         )}
 
         {messages.map((m, idx) => (
-          <div key={idx} className="flex">
-            <div
-              className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm leading-relaxed whitespace-pre-wrap ${
-                m.role === 'user'
-                  ? 'ml-auto bg-helfi-green text-white rounded-br-sm'
-                  : 'mr-auto bg-gray-100 text-gray-900 rounded-bl-sm'
-              }`}
-            >
-              {m.content}
+          <div key={idx} className={`flex gap-4 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
+            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
+              {m.role === 'user' ? (
+                <svg className="w-5 h-5 text-gray-600" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5 text-gray-600" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
+                </svg>
+              )}
+            </div>
+            <div className={`flex-1 min-w-0 ${m.role === 'user' ? 'text-right' : ''}`}>
+              <div
+                className={`inline-block max-w-full px-4 py-2.5 rounded-2xl ${
+                  m.role === 'user'
+                    ? 'bg-gray-900 text-white'
+                    : 'bg-gray-100 text-gray-900'
+                }`}
+                style={{ wordWrap: 'break-word', overflowWrap: 'break-word' }}
+              >
+                <div
+                  className="text-sm leading-relaxed break-words"
+                  style={{ whiteSpace: 'pre-wrap' }}
+                >
+                  {m.content.split('\n').map((line, i) => {
+                    const trimmed = line.trim()
+                    if (!trimmed) {
+                      return <div key={i} className="h-3" />
+                    }
+
+                    // Section headings in **bold**
+                    if (trimmed.startsWith('**') && trimmed.endsWith('**') && trimmed.length > 4) {
+                      return (
+                        <div
+                          key={i}
+                          className="font-bold text-gray-900 mb-2 mt-3 first:mt-0"
+                        >
+                          {trimmed.slice(2, -2)}
+                        </div>
+                      )
+                    }
+
+                    // Numbered list
+                    const numberedMatch = trimmed.match(/^(\d+)\.\s+(.+)$/)
+                    if (numberedMatch) {
+                      return (
+                        <div key={i} className="ml-4 mb-1.5">
+                          <span className="font-medium">{numberedMatch[1]}.</span>{' '}
+                          {numberedMatch[2]}
+                        </div>
+                      )
+                    }
+
+                    // Bullet list
+                    const bulletMatch = trimmed.match(/^[-•*]\s+(.+)$/)
+                    if (bulletMatch) {
+                      return (
+                        <div key={i} className="ml-4 mb-1.5">
+                          <span className="mr-2">•</span> {bulletMatch[1]}
+                        </div>
+                      )
+                    }
+
+                    // Inline bold handling for **text**
+                    const parts = trimmed.split(/(\*\*.*?\*\*)/g)
+                    return (
+                      <div key={i} className="mb-2">
+                        {parts.map((part, j) => {
+                          if (part.startsWith('**') && part.endsWith('**')) {
+                            return (
+                              <strong key={j} className="font-semibold">
+                                {part.slice(2, -2)}
+                              </strong>
+                            )
+                          }
+                          return <span key={j}>{part}</span>
+                        })}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
             </div>
           </div>
         ))}
 
         {loading && (
-          <div className="text-xs text-gray-400">
-            Thinking…
+          <div className="flex gap-4">
+            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
+              <svg className="w-5 h-5 text-gray-600" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <div className="inline-block px-4 py-2.5 rounded-2xl bg-gray-100">
+                <div className="flex gap-1">
+                  <span
+                    className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                    style={{ animationDelay: '0ms' }}
+                  ></span>
+                  <span
+                    className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                    style={{ animationDelay: '150ms' }}
+                  ></span>
+                  <span
+                    className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                    style={{ animationDelay: '300ms' }}
+                  ></span>
+                </div>
+              </div>
+            </div>
           </div>
         )}
-
-        {error && (
-          <div className="text-xs text-red-600">
-            {error}
-          </div>
-        )}
-
-        <div />
+        <div ref={endRef} />
       </div>
 
-      <form onSubmit={handleSubmit} className="border-t border-gray-200 bg-gray-50 px-3 py-2">
-        <div className="flex items-end gap-2 max-w-3xl mx-auto">
-          <div className="flex-1">
-            <label htmlFor="medical-chat-input" className="sr-only">
-              Message AI about your medical image analysis
-            </label>
+      <form className="border-t border-gray-200 px-4 py-3 bg-white" onSubmit={handleSubmit}>
+        <div className="flex items-center gap-2">
+          <div className="flex-1 relative flex items-center">
             <textarea
-              id="medical-chat-input"
               ref={textareaRef}
-              rows={1}
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={(event) => {
+                setInput(event.target.value)
+                resizeTextarea()
+              }}
               onKeyDown={onComposerKeyDown}
               placeholder="Message AI about your medical image analysis"
-              className="w-full resize-none rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-helfi-green focus:outline-none focus:ring-2 focus:ring-helfi-green/30"
+              rows={1}
+              className="w-full rounded-2xl border-0 bg-gray-100 px-4 py-3 pr-12 text-[15px] leading-6 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-0 resize-none transition-all duration-200 min-h-[52px] max-h-[200px]"
+              style={{ height: '52px' }}
             />
           </div>
           <button
             type="submit"
-            disabled={loading}
-            className="inline-flex items-center justify-center rounded-xl bg-helfi-green px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-helfi-green/90 disabled:opacity-60 disabled:cursor-not-allowed"
+            disabled={loading || !input.trim()}
+            className="flex-shrink-0 w-10 h-10 rounded-full bg-gray-900 text-white flex items-center justify-center hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            aria-label="Send message"
           >
-            Send
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+            </svg>
           </button>
         </div>
+        {error && <div className="mt-2 text-xs text-red-600">{error}</div>}
       </form>
     </section>
   )
