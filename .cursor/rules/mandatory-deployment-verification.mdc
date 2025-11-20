@@ -6,6 +6,8 @@ After pushing code to GitHub, ALWAYS run ./scripts/check-deployment-status.sh
 
 The script will wait until deployment completes (READY or ERROR)
 
+You have full access to Vercel via full access token so use it to view the deployment
+
 NEVER report "deployment in progress" or "deployment building" to the user
 
 ONLY report success when deployment state is READY

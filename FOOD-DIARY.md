@@ -783,6 +783,93 @@ This session focused on **making the Food Diary easier to edit** without changin
 
 ---
 
+### 8.7 Follow‑up changes – Agent GPT‑5.1 via Cursor (November 19–20, 2025 – Food Diary + Health Setup polish)
+
+These changes are **user‑approved and live on production**. Future agents should treat them as stable and **must not modify them** without explicit confirmation from the user and a careful reread of this file.
+
+**Food Diary – Analysis layout & editing behaviour**
+- ✅ **Food Description is read‑only and consistently placed**
+  - “Food Analysis” now shows a **Food Description** section directly under the title bar.  
+  - The primary meal title (brand + food name + serving size) appears as a green pill under the “Food Description” heading, followed by a plain‑text description.  
+  - The old editable description textarea and helper text (“Change the food description and click on the ‘Re‑Analyze’ button”) plus the dedicated “Edit Description / Re‑Analyze” flow have been removed.  
+  - **Do not** re‑introduce editable free‑text description in this panel without a new plan agreed with the user.
+- ✅ **Desktop vs mobile layout for analysis**
+  - **Desktop:** Food Description spans the top; below it, a two‑column row shows **image on the left** and **macro ring + chips on the right**, and the full ingredient cards sit **directly underneath** that row.  
+  - **Mobile:** the order is **photo → Food Description → macro breakdown (circle + list) → ingredient cards**, so when the user adjusts servings on a card the macro numbers stay visible just above.  
+  - This structure is deliberate; do not move macros below the cards on mobile or separate the image/macros row from the cards on desktop.
+
+**Food Diary – cancel/delete behaviour**
+- ✅ **Canceling an edit returns to the main Food Diary view**
+  - Pressing **Cancel** when editing an existing entry (including photo‑based meals and manual entries) now:
+    - Restores the original entry values (via `revertEditingChanges`).  
+    - Clears editing state (`editingEntry`, `originalEditingEntry`, `isEditingDescription`, analyzer state).  
+    - Closes the add/edit panel (`showAddFood` set to `false`) so the user is taken back to the normal Food Diary list (energy summary + meals).  
+  - The Manual Food Entry card’s small “✕ / Cancel” button also just closes the card and returns to the diary, without popping open any extra forms.
+- ✅ **Deleting a photo after analysis behaves like cancel**
+  - When a meal has been analyzed from a photo, using **Delete Photo** now calls the same reset helper used by Cancel: all analyzer state is cleared and the user is returned to the main Food Diary view.  
+  - **Do not** change Delete Photo to keep the manual entry panel open or to leave the user “stuck” inside the analysis card.
+
+**Food Diary – ingredient macros & totals**
+- ✅ **Per‑ingredient macro chips track Servings**
+  - Inside each ingredient card, the coloured chips (e.g. `200 kcal`, `5g Protein`, `23g Carbs`, `8g Fat`, `4g Fibre`, `5g Sugar`) now reflect the **totals for the current Servings value**, not just “per 1 serving”.  
+  - When the user changes Servings (via `‑` / `+` or direct number input), these chips recompute in real time from `totalsByField` so the chips, the “Totals for …” label, and serving controls always agree.  
+  - **Do not** switch these chips back to per‑serving values; they are intended to show total macros for the chosen amount.
+- ✅ **Removed redundant text‑only totals row**
+  - The old grey “Totals for 1 serving – 200 kcal calories, 5g protein, 23g carbs, …” text block under each card has been removed to avoid duplication.  
+  - The new chip row labelled “Totals for X serving(s)” replaces that function and must remain the single source of truth for per‑ingredient totals.
+
+**Food Diary – Add Ingredient modal & data sources**
+- ✅ **Starter foods list removed – USDA is now the primary source**
+  - The “Add ingredient” modal no longer shows the local `STARTER_FOODS` list or a generic “Search starter foods (e.g., egg, bacon, rice)” section.  
+  - All new ingredients are sourced from **USDA FoodData Central** via `/api/food-data`, using the existing `lib/food-data.ts` helper functions.  
+  - The modal is now split into:
+    - A **USDA search bar** at the top with two toggles: **Packaged** and **Single food**.  
+    - Below that, a list of normalized USDA results showing name, optional brand, serving size, macros, and a Source label (“USDA FoodData Central”).  
+  - Clicking **Add** on a result creates a new ingredient card with `serving_size`, per‑serving macros and `servings = 1`.  
+  - **Do not** reintroduce the old generic starter list or change USDA to a secondary source without discussing it with the user.
+- ✅ **Backend wiring for USDA search**
+  - `lib/food-data.ts` `searchUsdaFoods` now accepts an extra `dataType` option (`'branded' | 'generic' | 'all'`) and uses it to build the `dataType` parameter for USDA (`Branded`, `Survey (FNDDS)`, `SR Legacy`).  
+  - `GET /api/food-data` accepts a `kind` query parameter:
+    - `kind=packaged` → calls `searchUsdaFoods(query, { pageSize: 5, dataType: 'branded' })`.  
+    - `kind=single`   → calls `searchUsdaFoods(query, { pageSize: 5, dataType: 'generic' })`.  
+    - `source=auto` still prefers USDA but is not used by the Add Ingredient UI.  
+  - **Do not** bypass this normalization by calling USDA directly from the client; always use `/api/food-data`.
+- ✅ **AI photo fallback when USDA can’t find a match**
+  - If USDA search returns no useful items, the modal shows an **“Or use AI photo analysis”** section with a **“📷 Add Image”** button.  
+  - Choosing this lets the user select or capture a photo; the modal closes, the main Food Analysis flow opens with that photo, and the existing OpenAI food‑analysis pipeline is used to build cards and totals.  
+  - **Do not** remove or repurpose this fallback; it is the sanctioned way to handle foods that USDA can’t identify.
+
+**Health Setup – Physical step (weight & height units)**
+- ✅ **Weight toggle labels and behaviour (kg ↔ lbs)**
+  - The unit toggle above “Enter your current weight” now shows **kg** and **lbs** only (no more `kg/cm` or `lbs/in`).  
+  - Tapping the toggle **converts the stored value**, not just the label:
+    - Metric → Imperial: `weight_kg × 2.20462`, rounded to the nearest whole pound.  
+    - Imperial → Metric: `weight_lbs ÷ 2.20462`, rounded to the nearest whole kilogram.  
+  - The input placeholder updates dynamically to `Weight (kg)` or `Weight (lbs)` to match.  
+  - **Do not** change this behaviour back to a non‑converting label switch.
+- ✅ **Height toggle (cm ↔ ft/in) with live conversion**
+  - The “How tall are you?” section now has its own unit toggle to the right: **cm** vs **ft/in**, sharing the same `unit` state as weight.  
+  - When switching:
+    - Metric → Imperial: existing centimetres are converted to feet and inches (`totalInches = cm / 2.54`; `feet = floor(totalInches / 12)`; `inches = round(totalInches − feet×12)`), and the **Feet/Inches** boxes are populated.  
+    - Imperial → Metric: existing feet/inches are converted back to centimetres (`totalInches = feet×12 + inches`; `cm = totalInches × 2.54`), and the single **Height (cm)** box is filled with the rounded value.  
+  - The `height` field stored in the payload remains:
+    - Metric: raw centimetre string.  
+    - Imperial: a human‑readable string in the existing format (`5'10"`), plus separate `feet` and `inches` fields for reference.  
+  - **Do not** break this round‑trip behaviour; users rely on being able to flip units without losing or corrupting their numbers.
+
+**General guidance for future agents**
+- ✅ **No‑touch zones established in this session**
+  - Food Diary:  
+    - Cancel / Delete Photo flows that always take the user back to the main diary view.  
+    - Food Analysis layout (Food Description placement, desktop vs mobile ordering, macro‑above‑cards structure).  
+    - Ingredient macro chips as the single authoritative per‑ingredient totals display.  
+    - USDA‑only Add Ingredient search with Packaged / Single toggles and AI photo fallback.  
+  - Health Setup → Physical step:  
+    - Weight/height unit toggles and their conversion logic.  
+  - Before changing any of these, **explain the exact change to the user in simple terms, get written approval, and update this document**.
+
+---
+
 ## 9. Future roadmap – calorie “circles” and daily meal copying
 
 The user has started planning the **next major upgrade** to the Food Diary, inspired by Cronometer. These ideas are **not implemented yet** and should be treated as a design brief for a future agent.

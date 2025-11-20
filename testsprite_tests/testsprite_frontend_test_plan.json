@@ -2,164 +2,156 @@
   {
     "id": "TC001",
     "title": "Google OAuth Authentication Success",
-    "description": "Verify that a user can authenticate successfully using Google OAuth login flow with email verification.",
+    "description": "Verify that users can successfully authenticate using Google OAuth and are redirected to the onboarding flow if first time.",
     "category": "functional",
     "priority": "High",
     "steps": [
       {
         "type": "action",
-        "description": "Navigate to login page"
+        "description": "Navigate to the login page"
       },
       {
         "type": "action",
-        "description": "Click on Google OAuth login button"
-      },
-      {
-        "type": "assertion",
-        "description": "Check that Google OAuth prompts the user to select or enter an account"
+        "description": "Select 'Sign in with Google' option"
       },
       {
         "type": "action",
-        "description": "Complete Google login with valid Google account credentials"
+        "description": "Provide valid Google account credentials"
       },
       {
         "type": "assertion",
-        "description": "Verify that user is redirected back to Helfi and authenticated session is established"
+        "description": "User is authenticated and redirected to the onboarding multi-step flow if new user"
       },
       {
         "type": "assertion",
-        "description": "Check email verification status is confirmed"
+        "description": "User session is established with appropriate user data"
       }
     ]
   },
   {
     "id": "TC002",
-    "title": "Magic Link Authentication Success",
-    "description": "Verify user can request and use a Magic Link sent by email to authenticate successfully.",
+    "title": "Magic Link Authentication Email Verification",
+    "description": "Ensure that users receive a valid magic link for email login and the link verifies user email for authentication.",
     "category": "functional",
     "priority": "High",
     "steps": [
       {
         "type": "action",
-        "description": "Navigate to login page"
+        "description": "Navigate to the login page"
       },
       {
         "type": "action",
-        "description": "Input a registered email address in Magic Link field"
-      },
-      {
-        "type": "action",
-        "description": "Submit Magic Link request"
+        "description": "Submit a valid registered email address for magic link"
       },
       {
         "type": "assertion",
-        "description": "Verify that an email containing the Magic Link is received"
+        "description": "Magic link email is sent to the user with a valid link"
       },
       {
         "type": "action",
-        "description": "Click on Magic Link in the email"
+        "description": "Click the magic link from email"
       },
       {
         "type": "assertion",
-        "description": "Verify user is authenticated and redirected to onboarding or dashboard"
+        "description": "User is authenticated after successful email verification and redirected appropriately"
       }
     ]
   },
   {
     "id": "TC003",
-    "title": "Onboarding Flow Completion",
-    "description": "Validate that a new user can complete the multi-step onboarding flow including physical metrics and health goals without errors.",
-    "category": "functional",
+    "title": "Authentication Failure with Invalid Credentials",
+    "description": "Verify that the system rejects authentication attempts with invalid Google credentials or invalid magic link/email.",
+    "category": "error handling",
     "priority": "High",
     "steps": [
       {
         "type": "action",
-        "description": "Login as a new user"
-      },
-      {
-        "type": "action",
-        "description": "Proceed through onboarding steps: SignUp, Physical Metrics, Health Goals, Medications, Supplements, Review"
+        "description": "Attempt to sign in with incorrect Google OAuth credentials"
       },
       {
         "type": "assertion",
-        "description": "At each step, verify required fields are validated"
+        "description": "Access is denied with an appropriate error message"
       },
       {
         "type": "action",
-        "description": "Submit all onboarding steps with valid data"
+        "description": "Submit an unregistered email for magic link request"
       },
       {
         "type": "assertion",
-        "description": "Upon completion, verify user is redirected to dashboard"
+        "description": "User is informed that the email is not recognized and no magic link is sent"
+      },
+      {
+        "type": "action",
+        "description": "Use an expired or tampered magic link to attempt login"
+      },
+      {
+        "type": "assertion",
+        "description": "Authentication fails and user is prompted to retry login"
       }
     ]
   },
   {
     "id": "TC004",
-    "title": "Dashboard Data Display and Interaction",
-    "description": "Ensure the main dashboard correctly displays up-to-date health metrics and supports user interaction with quick action shortcuts.",
+    "title": "Dashboard Displays Accurate Health Metrics",
+    "description": "Verify the dashboard shows the latest user health data and visualizations, including weight, sleep, mood, energy and symptoms.",
     "category": "functional",
     "priority": "High",
     "steps": [
       {
         "type": "action",
-        "description": "Login and navigate to the dashboard"
+        "description": "Login and navigate to user dashboard"
       },
       {
         "type": "assertion",
-        "description": "Verify weight, sleep, mood, energy, symptoms, supplements metrics are accurately displayed"
+        "description": "Dashboard displays health overview metrics with accurate values reflecting user data"
+      },
+      {
+        "type": "assertion",
+        "description": "Recent data visualizations and charts are rendered correctly"
       },
       {
         "type": "action",
-        "description": "Interact with quick action buttons (e.g. add check-in, upload photo)"
+        "description": "Interact with any quick action shortcuts on dashboard (such as check-in or add symptom)"
       },
       {
         "type": "assertion",
-        "description": "Confirm appropriate modals or pages open and actions are functional"
-      },
-      {
-        "type": "assertion",
-        "description": "Check data visualization charts render correctly with valid data"
+        "description": "Actions trigger correct navigation and updates"
       }
     ]
   },
   {
     "id": "TC005",
-    "title": "Health Tracking Daily Check-in Success",
-    "description": "Test creating, updating, and retrieving daily health check-ins including weight, mood, sleep, symptoms, supplements, and medications.",
+    "title": "Health Tracking Daily Check-In Data Integrity",
+    "description": "Ensure daily check-ins for metrics including weight, sleep, mood, energy, symptoms, supplements, and medications are recorded, stored, and retrievable without loss or corruption.",
     "category": "functional",
     "priority": "High",
     "steps": [
       {
         "type": "action",
-        "description": "Login and navigate to health tracking page"
+        "description": "Login and navigate to health tracking module"
       },
       {
         "type": "action",
-        "description": "Enter valid data for weight, mood, sleep, energy, symptoms, supplements, and medications"
-      },
-      {
-        "type": "action",
-        "description": "Submit the daily check-in"
+        "description": "Submit daily check-in entries for weight, sleep hours, mood rating, energy levels, symptom descriptions, supplements taken, and medications"
       },
       {
         "type": "assertion",
-        "description": "Verify that data is saved without errors and reflected in dashboard"
+        "description": "Check-in data is accepted and confirmed by the system"
       },
       {
         "type": "action",
-        "description": "Retrieve past check-in history"
+        "description": "Navigate to check-in history page"
       },
       {
         "type": "assertion",
-        "description": "Confirm historical entries are accurate and complete"
+        "description": "All submitted check-in data is retrievable and correctly displayed"
       }
     ]
   },
   {
     "id": "TC006",
-    "title": "Food Photo Analysis Accuracy",
-    "description": "Verify AI-powered food photo analysis correctly identifies ingredients and provides nutritional information with high accuracy for diverse food types.",
+    "title": "Food Photo Analysis for Ingredient Recognition",
+    "description": "Test that AI-powered food photo analysis correctly identifies ingredients and provides accurate nutritional breakdowns.",
     "category": "functional",
     "priority": "High",
     "steps": [
@@ -169,55 +161,71 @@
       },
       {
         "type": "action",
-        "description": "Upload clear photo of a complex meal"
+        "description": "Upload a variety of clear food photos with known ingredients"
       },
       {
         "type": "assertion",
-        "description": "Verify AI returns detected ingredients list with nutritional breakdown"
+        "description": "System returns detected ingredients with high accuracy"
+      },
+      {
+        "type": "assertion",
+        "description": "Nutritional content (calories, macros, vitamins) is displayed matching expected values"
       },
       {
         "type": "action",
-        "description": "Upload blurry or partial food photo"
+        "description": "Upload a photo with mixed or complex food items"
       },
       {
         "type": "assertion",
-        "description": "Check AI handles poor quality image gracefully and returns best-effort analysis or error message"
+        "description": "System handles complex images and returns reasonable ingredient predictions"
+      },
+      {
+        "type": "action",
+        "description": "Upload an invalid or corrupted image file"
+      },
+      {
+        "type": "assertion",
+        "description": "System provides clear error handling and prompts user to retry"
       }
     ]
   },
   {
     "id": "TC007",
     "title": "AI-Generated Health Insights Relevance",
-    "description": "Ensure AI generates personalized and relevant health insights and recommendations based on the user's logged data.",
+    "description": "Validate that AI-generated insights are personalized based on user data and provide actionable recommendations.",
     "category": "functional",
     "priority": "High",
     "steps": [
       {
         "type": "action",
-        "description": "Login and access the insights page"
-      },
-      {
-        "type": "assertion",
-        "description": "Verify AI-generated insights are displayed with clear explanations"
+        "description": "Login and navigate to insights section"
       },
       {
         "type": "action",
-        "description": "Modify user health data (e.g. add new symptoms or supplement)"
-      },
-      {
-        "type": "action",
-        "description": "Request regeneration of insights"
+        "description": "Trigger AI insight generation based on current user health data"
       },
       {
         "type": "assertion",
-        "description": "Confirm updated insights reflect new data and are personalized"
+        "description": "Insights displayed are relevant to user's health metrics, supplements, and goals"
+      },
+      {
+        "type": "assertion",
+        "description": "Recommendations are actionable and clearly stated"
+      },
+      {
+        "type": "action",
+        "description": "Request regeneration of specific insight to check system responsiveness"
+      },
+      {
+        "type": "assertion",
+        "description": "Updated insight is generated and replaces previous one correctly"
       }
     ]
   },
   {
     "id": "TC008",
-    "title": "Supplements and Medications Management",
-    "description": "Test photo recognition of supplements, dosage and timing management, and interaction safety checking features.",
+    "title": "Supplements and Medications Management with Image Recognition",
+    "description": "Verify supplement and medication tracking supports photo recognition, dosage management, timing schedules, and interaction safety checks.",
     "category": "functional",
     "priority": "High",
     "steps": [
@@ -227,30 +235,42 @@
       },
       {
         "type": "action",
-        "description": "Upload clear photo of supplement packaging"
+        "description": "Upload photos of supplements and medications"
       },
       {
         "type": "assertion",
-        "description": "Verify AI identifies supplement name and dosage details correctly"
+        "description": "System correctly identifies supplement/medication names and details from images"
       },
       {
         "type": "action",
-        "description": "Input timing and dosage for supplements and medications"
-      },
-      {
-        "type": "action",
-        "description": "Trigger interaction safety checks"
+        "description": "Enter dosage and timing information for supplements and medications"
       },
       {
         "type": "assertion",
-        "description": "Verify interaction warnings or confirmations are displayed appropriately"
+        "description": "Input data is accepted and saved accurately"
+      },
+      {
+        "type": "action",
+        "description": "Trigger interaction safety check between current supplements and medications"
+      },
+      {
+        "type": "assertion",
+        "description": "System presents warnings or confirmations about possible interactions properly"
+      },
+      {
+        "type": "action",
+        "description": "Input invalid or unrecognized supplement photos"
+      },
+      {
+        "type": "assertion",
+        "description": "System handles errors gracefully, prompting user to retry or manually input data"
       }
     ]
   },
   {
     "id": "TC009",
-    "title": "Lab Report and Medical Image Upload and AI Extraction",
-    "description": "Validate users can upload PDF lab reports and medical images successfully and that AI extracts key biomarker data accurately.",
+    "title": "Lab Report and Medical Image Upload and AI Analysis",
+    "description": "Ensure users can upload PDF lab reports and medical images, which are processed with AI to extract key biomarkers accurately.",
     "category": "functional",
     "priority": "High",
     "steps": [
@@ -260,362 +280,344 @@
       },
       {
         "type": "action",
-        "description": "Upload a sample lab report PDF"
+        "description": "Upload valid PDF lab reports"
       },
       {
         "type": "assertion",
-        "description": "Verify AI extracts biomarker values correctly and displays them"
+        "description": "AI extracts relevant biomarkers and displays them to the user"
       },
       {
         "type": "action",
-        "description": "Navigate to medical images upload page"
-      },
-      {
-        "type": "action",
-        "description": "Upload sample medical image files"
+        "description": "Upload medical images (e.g., X-rays, scans)"
       },
       {
         "type": "assertion",
-        "description": "Confirm AI analyzes images and outputs relevant health information"
+        "description": "System processes images and extracts analysis results appropriately"
+      },
+      {
+        "type": "action",
+        "description": "Upload corrupted or unsupported format files"
+      },
+      {
+        "type": "assertion",
+        "description": "System returns informative error messages and prevents data corruption"
       }
     ]
   },
   {
     "id": "TC010",
-    "title": "Conversational AI Assistant Chat and Voice",
-    "description": "Test the responsiveness and accuracy of the health AI assistant through both chat and voice interfaces.",
+    "title": "Conversational AI Assistant Chat and Voice Query Handling",
+    "description": "Verify that the conversational AI supports text chat and voice input, providing relevant and helpful health information.",
     "category": "functional",
     "priority": "High",
     "steps": [
       {
         "type": "action",
-        "description": "Navigate to AI chat interface"
+        "description": "Navigate to AI assistant chat interface"
       },
       {
         "type": "action",
-        "description": "Send health query in chat text"
+        "description": "Enter a variety of health-related text queries"
       },
       {
         "type": "assertion",
-        "description": "Verify AI responds with relevant and helpful answer"
+        "description": "Assistant responds appropriately with accurate and personalized information"
       },
       {
         "type": "action",
-        "description": "Use voice input to ask a health question"
+        "description": "Use voice input feature to ask health queries"
       },
       {
         "type": "assertion",
-        "description": "Confirm AI transcribes voice correctly and provides appropriate answer"
+        "description": "Voice recognition works correctly and returns valid responses"
+      },
+      {
+        "type": "action",
+        "description": "Send invalid or ambiguous queries"
+      },
+      {
+        "type": "assertion",
+        "description": "AI handles queries gracefully by asking for clarification or providing best effort answers"
       }
     ]
   },
   {
     "id": "TC011",
-    "title": "Stripe Billing and Subscription Workflow",
-    "description": "Validate subscription purchase, credit purchase, and billing updates work correctly with Stripe integration.",
+    "title": "Billing and Subscription Management via Stripe",
+    "description": "Validate subscription purchases, credit acquisitions, and accurate billing integration with Stripe, ensuring user balances update accordingly.",
     "category": "functional",
     "priority": "High",
     "steps": [
       {
         "type": "action",
-        "description": "Navigate to billing page"
+        "description": "Navigate to billing and subscription page"
       },
       {
         "type": "action",
-        "description": "Initiate subscription purchase flow"
-      },
-      {
-        "type": "action",
-        "description": "Complete payment information and submit"
+        "description": "Initiate a new subscription purchase using valid payment details"
       },
       {
         "type": "assertion",
-        "description": "Verify subscription status is updated and confirmation is shown"
+        "description": "Stripe checkout session is created and user is redirected correctly"
       },
       {
         "type": "action",
-        "description": "Purchase usage credits via credit purchase modal"
+        "description": "Complete payment process"
       },
       {
         "type": "assertion",
-        "description": "Confirm credits are added to user account balance"
+        "description": "User subscription status updates and features unlock as expected"
+      },
+      {
+        "type": "action",
+        "description": "Purchase usage credits and verify balance increments"
+      },
+      {
+        "type": "assertion",
+        "description": "Credits are correctly reflected in user's account"
+      },
+      {
+        "type": "action",
+        "description": "Simulate Stripe payment failures and webhook errors"
+      },
+      {
+        "type": "assertion",
+        "description": "System handles errors, provides informative messages, and prevents incorrect state changes"
       }
     ]
   },
   {
     "id": "TC012",
-    "title": "Device Integration and Auto Data Sync",
-    "description": "Ensure health devices like Fitbit can be authorized, synced automatically, and health data updates appear in the app.",
+    "title": "Device Integration Data Sync for Fitbit",
+    "description": "Test automatic synchronization of health data from Fitbit device and refresh data without user intervention.",
     "category": "functional",
     "priority": "High",
     "steps": [
       {
         "type": "action",
-        "description": "Navigate to devices integration page"
+        "description": "Navigate to device integration page"
       },
       {
         "type": "action",
-        "description": "Authorize Fitbit account via OAuth flow"
+        "description": "Authorize integration with Fitbit account"
       },
       {
         "type": "assertion",
-        "description": "Verify device status shows connected"
+        "description": "Authorization completes successfully and status is displayed"
       },
       {
         "type": "action",
-        "description": "Trigger data sync or wait for automatic sync interval"
+        "description": "Trigger manual and automatic data sync events"
       },
       {
         "type": "assertion",
-        "description": "Confirm Fitbit data appears in user health metrics on dashboard"
+        "description": "Data is retrieved from Fitbit API and imported into user health metrics correctly"
+      },
+      {
+        "type": "action",
+        "description": "Simulate Fitbit API downtime or errors"
+      },
+      {
+        "type": "assertion",
+        "description": "System handles errors gracefully and retries accordingly"
       }
     ]
   },
   {
     "id": "TC013",
-    "title": "Push Notifications Delivery and Preference Respect",
-    "description": "Verify that push notifications and reminders are delivered promptly and respect the user's notification preferences.",
+    "title": "Push Notification Delivery and User Preference Respect",
+    "description": "Confirm push notifications and reminders are delivered timely and respect individual user notification settings.",
     "category": "functional",
     "priority": "Medium",
     "steps": [
       {
         "type": "action",
-        "description": "Set notification preferences to enabled"
+        "description": "Set user preferences for push notifications (enable and disable)"
       },
       {
         "type": "action",
-        "description": "Trigger event that should send a push notification"
+        "description": "Trigger events that send notifications (e.g., reminder for check-in, subscription renewal)"
       },
       {
         "type": "assertion",
-        "description": "Verify push notification is received on user device"
-      },
-      {
-        "type": "action",
-        "description": "Disable some or all notification preferences"
-      },
-      {
-        "type": "action",
-        "description": "Trigger notification event again"
+        "description": "Notifications are delivered when enabled"
       },
       {
         "type": "assertion",
-        "description": "Confirm no notification is received when preference is disabled"
+        "description": "No notifications are sent when user has disabled them"
+      },
+      {
+        "type": "action",
+        "description": "Unsubscribe and resubscribe to push notifications"
+      },
+      {
+        "type": "assertion",
+        "description": "Subscription status updates accordingly and notifications respect current setting"
       }
     ]
   },
   {
     "id": "TC014",
-    "title": "Data Privacy and Secure Authentication",
-    "description": "Test user data is protected during authentication and all personal health data APIs are secured.",
-    "category": "security",
+    "title": "Multi-step Onboarding Flow Completes Without Errors",
+    "description": "Verify that new users can complete all onboarding steps, input physical metrics and health goals, and transition smoothly to dashboard.",
+    "category": "functional",
     "priority": "High",
     "steps": [
       {
         "type": "action",
-        "description": "Attempt to access user health data API without authentication"
-      },
-      {
-        "type": "assertion",
-        "description": "Verify access is denied"
+        "description": "Complete Google OAuth or Magic Link login as a new user"
       },
       {
         "type": "action",
-        "description": "Authenticate via Google OAuth or Magic Link and access health data APIs"
-      },
-      {
-        "type": "assertion",
-        "description": "Confirm user data is returned only for authenticated user"
+        "description": "Navigate through each onboarding step: SignUp, Physical Metrics, Health Goals, Medications, Supplements, Review"
       },
       {
         "type": "action",
-        "description": "Check that passwordless flows do not expose sensitive data in URLs"
+        "description": "Provide valid inputs for all required fields in each step"
       },
       {
         "type": "assertion",
-        "description": "Verify tokens and sessions are securely handled"
+        "description": "Each onboarding step transitions correctly without error"
+      },
+      {
+        "type": "assertion",
+        "description": "At the end of onboarding, user is redirected to the main dashboard"
       }
     ]
   },
   {
     "id": "TC015",
-    "title": "Error Handling: Invalid Magic Link",
-    "description": "Ensure system handles invalid or expired Magic Link authentication attempts gracefully with user-friendly messages.",
-    "category": "error handling",
-    "priority": "Medium",
-    "steps": [
-      {
-        "type": "action",
-        "description": "Attempt login with an expired or tampered Magic Link"
-      },
-      {
-        "type": "assertion",
-        "description": "Verify error message informs user about invalid or expired link"
-      },
-      {
-        "type": "action",
-        "description": "Allow user to request a new Magic Link"
-      },
-      {
-        "type": "assertion",
-        "description": "Confirm new Magic Link request succeeds"
-      }
-    ]
-  },
-  {
-    "id": "TC016",
-    "title": "Admin Panel User Management Access Control",
-    "description": "Validate that only admin users can access the admin panel and perform user and ticket management operations.",
-    "category": "security",
+    "title": "Admin Panel User and Ticket Management",
+    "description": "Check that admin users can view, create, modify, and delete user accounts and support tickets consistent with access controls.",
+    "category": "functional",
     "priority": "High",
     "steps": [
-      {
-        "type": "action",
-        "description": "Login with non-admin user"
-      },
-      {
-        "type": "action",
-        "description": "Attempt to access admin panel URL"
-      },
-      {
-        "type": "assertion",
-        "description": "Verify access is denied or redirected"
-      },
       {
         "type": "action",
         "description": "Login as admin user"
       },
       {
         "type": "action",
-        "description": "Access admin panel"
+        "description": "Navigate to Admin Panel"
+      },
+      {
+        "type": "action",
+        "description": "Access user management interface and perform CRUD operations on user accounts"
       },
       {
         "type": "assertion",
-        "description": "Confirm admin is able to view and manage users and tickets"
+        "description": "All user management actions succeed and data updates persist"
+      },
+      {
+        "type": "action",
+        "description": "Access support tickets, view details and update ticket status"
+      },
+      {
+        "type": "assertion",
+        "description": "Ticket management actions work as expected with correct data updates"
+      },
+      {
+        "type": "action",
+        "description": "Attempt admin actions with non-admin user"
+      },
+      {
+        "type": "assertion",
+        "description": "Access is denied enforcing proper role-based access control"
+      }
+    ]
+  },
+  {
+    "id": "TC016",
+    "title": "Error Handling for API Failures Across Modules",
+    "description": "Validate that the application gracefully handles API errors across critical modules including authentication, AI analysis, billing, and device sync.",
+    "category": "error handling",
+    "priority": "High",
+    "steps": [
+      {
+        "type": "action",
+        "description": "Simulate backend API failures such as network errors or server errors in authentication, food analysis, and billing endpoints"
+      },
+      {
+        "type": "assertion",
+        "description": "Frontend displays meaningful error messages without crashing"
+      },
+      {
+        "type": "action",
+        "description": "Retry failed operations and observe recovery behavior"
+      },
+      {
+        "type": "assertion",
+        "description": "System recovers and completes operations if possible"
       }
     ]
   },
   {
     "id": "TC017",
-    "title": "Supplement Interaction Safety Edge Cases",
-    "description": "Test supplement and medication interaction checks handle complex edge cases including multiple overlapping interactions.",
+    "title": "Profile Management Image Upload Validations",
+    "description": "Verify that user profile image uploads succeed with valid images and reject invalid files, enforcing size and format constraints.",
     "category": "functional",
     "priority": "Medium",
     "steps": [
       {
         "type": "action",
-        "description": "Add multiple supplements and medications with known interactions"
+        "description": "Navigate to profile image upload page"
       },
       {
         "type": "action",
-        "description": "Trigger interaction safety check"
+        "description": "Upload a valid image file within allowed size and format"
       },
       {
         "type": "assertion",
-        "description": "Verify that all relevant interactions and warnings are displayed to the user"
+        "description": "Image uploads successfully and displays on user profile"
       },
       {
         "type": "action",
-        "description": "Add unknown or new supplements"
+        "description": "Upload an invalid file type (e.g., .exe, corrupted image)"
       },
       {
         "type": "assertion",
-        "description": "Confirm system handles unknown supplements gracefully, prompting for caution"
+        "description": "System rejects upload with an appropriate error message"
+      },
+      {
+        "type": "action",
+        "description": "Upload an image exceeding size limits"
+      },
+      {
+        "type": "assertion",
+        "description": "User receives clear feedback regarding file size limit"
       }
     ]
   },
   {
     "id": "TC018",
-    "title": "Credit System Enforcement and Limits",
-    "description": "Verify daily and monthly usage limits for AI features enforced correctly with credit deduction and reporting.",
+    "title": "Credit System Usage and Limits Enforcement",
+    "description": "Ensure the AI feature credit system tracks usage accurately and enforces daily/monthly limits with appropriate user notifications.",
     "category": "functional",
     "priority": "High",
     "steps": [
       {
         "type": "action",
-        "description": "Use AI-powered features consuming credits repeatedly"
+        "description": "Trigger AI feature usage that consumes credits"
       },
       {
         "type": "assertion",
-        "description": "Verify credits are deducted accurately on each usage"
+        "description": "Credit balance decreases correctly according to feature cost"
       },
       {
         "type": "action",
-        "description": "Attempt to use AI features after exhausting daily/monthly credit limits"
+        "description": "Attempt to use AI features after exceeding daily or monthly credit limits"
       },
       {
         "type": "assertion",
-        "description": "Confirm system prevents further usage and notifies user of exhaustion"
+        "description": "System prevents usage and notifies user about limit reached"
       },
       {
         "type": "action",
-        "description": "Purchase additional credits and verify balance updates"
+        "description": "Purchase additional credits and verify balances update"
       },
       {
         "type": "assertion",
-        "description": "Confirm user can resume AI feature usage"
-      }
-    ]
-  },
-  {
-    "id": "TC019",
-    "title": "Symptom Logging and AI Pattern Analysis",
-    "description": "Verify symptoms can be logged with descriptions and photos, and AI analyzes patterns and trends effectively.",
-    "category": "functional",
-    "priority": "Medium",
-    "steps": [
-      {
-        "type": "action",
-        "description": "Navigate to symptoms logging page"
-      },
-      {
-        "type": "action",
-        "description": "Enter symptom description and upload related photo"
-      },
-      {
-        "type": "action",
-        "description": "Submit symptom log"
-      },
-      {
-        "type": "assertion",
-        "description": "Verify symptom is recorded and visible in history"
-      },
-      {
-        "type": "action",
-        "description": "Access symptom AI analysis feature"
-      },
-      {
-        "type": "assertion",
-        "description": "Confirm AI provides pattern detection or trend insights based on symptom data"
-      }
-    ]
-  },
-  {
-    "id": "TC020",
-    "title": "Waitlist Signup Functionality",
-    "description": "Validate the waitlist signup API and UI allow users to register for early access smoothly.",
-    "category": "functional",
-    "priority": "Low",
-    "steps": [
-      {
-        "type": "action",
-        "description": "Navigate to waitlist signup page or form"
-      },
-      {
-        "type": "action",
-        "description": "Enter valid email and submit"
-      },
-      {
-        "type": "assertion",
-        "description": "Verify confirmation message is shown"
-      },
-      {
-        "type": "action",
-        "description": "Attempt duplicate signup with same email"
-      },
-      {
-        "type": "assertion",
-        "description": "Confirm duplicate entries are rejected or notified"
+        "description": "User is able to use features again once credits are available"
       }
     ]
   }

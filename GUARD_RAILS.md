@@ -264,7 +264,46 @@ On January 19th, 2025, food diary entries disappeared because entries were being
 - Merge missing entries back into cache
 - Test with entries that have missing/incorrect `localDate` values
 
-### 3.4 Testing Requirements
+### 3.4 Detected Foods Portion Controls (Servings UI)
+
+**Protected file:**
+- `app/food/page.tsx` (Detected Foods card in the Food Analysis edit view)
+
+This section controls **how portion sizes are edited for each detected ingredient** (e.g. Carman's Toasted Muesli).
+The current design has been carefully agreed with the user and must **not** be changed without explicit written
+approval.
+
+#### 3.4.1 Current Behaviour (Must Stay)
+
+- Each ingredient shows a **single editable field: `Servings`**.
+- The serving size label (from the database) is displayed as:
+  - `1 serving = 1/2 cup (45 g)` (example)
+- There is **no separate editable "Units" field**. Portions are always edited in terms of servings only.
+- When grams are known, the UI also shows a **read‑only total line**, e.g.:
+  - `Total amount ≈ 180 g` (calculated as `servings × gramsPerServing`).
+- Changing `Servings` updates:
+  - The per‑serving and total nutrition cards.
+  - The in‑memory `editingEntry` so Today's Totals remain accurate while editing.
+
+#### 3.4.2 What Agents MUST NOT Do
+
+- Do **NOT** re‑introduce an editable "Units" control (e.g. cups / ml / ounces) as a second number.
+- Do **NOT** make the servings step jump in large increments (e.g. 1 → 10) or anything other than:
+  - Whole numbers for discrete items (pieces, slices, etc.).
+  - Reasonable fractional steps (e.g. 0.25) for continuous units.
+- Do **NOT** remove or hide the "1 serving = …" label or the total grams line.
+- Do **NOT** change the underlying meaning of one serving without also updating the database entry and
+  clearly explaining this to the user.
+
+If you believe the portion‑control UI must change, you **must**:
+1. Explain the proposed change to the user in simple, non‑technical language.
+2. Get explicit written approval.
+3. Re‑test that:
+   - Servings behave intuitively (1, 2, 3, …).
+   - The total grams line remains correct.
+   - Nutrition totals match the expected math.
+
+### 3.5 Testing Requirements
 
 Before modifying food diary loading logic, agents must test:
 

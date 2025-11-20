@@ -996,6 +996,41 @@ const applyStructuredItems = (
     }
   }
 
+  // 🛡️ SAFETY NET: If we still have no items but we do have a usable total from the
+  // API or text, create a single synthetic item so "Detected Foods" never ends up
+  // card‑less. This keeps the macro circle and the cards in sync while providing at
+  // least one editable card for the meal.
+  if (!finalItems.length && analysisText) {
+    // Prefer API/JSON totals; fall back to a prose-extracted line only when needed.
+    const textTotals = sanitizeNutritionTotals(extractNutritionData(analysisText))
+    const baseTotals = finalTotal || textTotals
+
+    // Only create a fallback item when we have real nutrition numbers and the
+    // analysis does not look like a billing/credit error message.
+    const looksLikeError =
+      /insufficient credits|trial limit|temporarily unavailable|failed to analyze/i.test(
+        analysisText,
+      )
+
+    if (baseTotals && !looksLikeError) {
+      const baseName = extractBaseMealDescription(analysisText) || 'Food item'
+      const syntheticItem: any = {
+        name: baseName,
+        brand: null,
+        serving_size: '',
+        servings: 1,
+        calories: baseTotals.calories ?? null,
+        protein_g: baseTotals.protein ?? null,
+        carbs_g: baseTotals.carbs ?? null,
+        fat_g: baseTotals.fat ?? null,
+        fiber_g: baseTotals.fiber ?? null,
+        sugar_g: baseTotals.sugar ?? null,
+      }
+      finalItems = [syntheticItem]
+      console.log('🛡️ Created synthetic fallback item to avoid cardless analysis')
+    }
+  }
+
   const enrichedItems = finalItems.length > 0 ? enrichItemsFromStarter(finalItems) : []
   setAnalyzedItems(enrichedItems)
 
@@ -1005,7 +1040,7 @@ const applyStructuredItems = (
     finalTotalValue: finalTotal ? JSON.stringify(finalTotal) : 'null',
   })
 
-  // Priority order for totals (updated):
+  // Priority order for totals:
   // 1. Recalculated from enriched items (so the circle always matches the cards the user sees)
   // 2. API-provided total (if item-based recalculation is missing or clearly zero)
   // 3. Extracted from analysis text (fallback)
