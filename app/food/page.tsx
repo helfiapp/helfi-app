@@ -863,6 +863,13 @@ export default function FoodDiary() {
 
   const applyRecalculatedNutrition = (items: any[]) => {
     const recalculated = recalculateNutritionFromItems(items)
+    // Guard rail: only overwrite the original AI totals when we have a
+    // meaningful recalculation (non‑zero calories). This prevents cases where
+    // partial or missing per‑item macros would cause all headline numbers to
+    // drop to 0 as soon as the user tweaks a serving value.
+    if (!recalculated || (recalculated.calories ?? 0) <= 0) {
+      return
+    }
     setAnalyzedNutrition(recalculated)
     setAnalyzedTotal(convertTotalsForStorage(recalculated))
   }
