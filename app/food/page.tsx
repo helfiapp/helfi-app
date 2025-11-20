@@ -2669,23 +2669,24 @@ Please add nutritional information manually if needed.`);
   }, [mealSummary, editingEntry, aiDescription]);
 
   const foodDescriptionText = useMemo(() => {
-    if (aiDescription && aiDescription.trim()) {
-      const trimmed = aiDescription.trim();
-      // If this looks like a successful AI analysis (contains nutrition/structured markers),
-      // show only the base human-friendly description line. This prevents long technical
-      // blocks from appearing in the UI while keeping the underlying `aiDescription`
-      // intact for parsing and history.
-      const looksLikeAnalysis =
-        /Calories\s*:/i.test(trimmed) || /<ITEMS_JSON>/i.test(trimmed);
-      if (looksLikeAnalysis) {
-        const base = extractBaseMealDescription(trimmed);
-        return base || trimmed;
-      }
-      // For non-analysis text (fallback or manual notes), show the full message.
-      return trimmed;
+    // Prefer the latest AI description if present, otherwise fall back to the
+    // saved entry description. In both cases we sanitize so the user only sees
+    // a short, friendly summary instead of the full technical analysis.
+    const source =
+      (aiDescription && aiDescription.trim()) ||
+      (editingEntry?.description && String(editingEntry.description).trim()) ||
+      ''
+
+    if (!source) return ''
+
+    const trimmed = source
+    const looksLikeAnalysis = /Calories\s*:/i.test(trimmed) || /<ITEMS_JSON>/i.test(trimmed)
+    if (looksLikeAnalysis) {
+      const base = extractBaseMealDescription(trimmed)
+      return base || trimmed
     }
-    if (editingEntry?.description) return editingEntry.description;
-    return '';
+    // For non-analysis text (fallback errors, manual notes), show as-is.
+    return trimmed
   }, [aiDescription, editingEntry]);
 
   // Debug logging to track state changes
