@@ -3821,7 +3821,7 @@ Please add nutritional information manually if needed.`);
                               Take a clear photo of the food or package and let Helfi estimate the nutrition using AI.
                             </p>
                             <label className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium cursor-pointer hover:bg-emerald-700">
-                              📷 Add Image
+                              Add Image
                               <input
                                 type="file"
                                 accept="image/*"
