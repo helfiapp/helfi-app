@@ -2625,7 +2625,14 @@ Please add nutritional information manually if needed.`);
 
   const mealSummary = useMemo(() => buildMealSummaryFromItems(analyzedItems), [analyzedItems])
 
-  // Read-only Food Description content used for both desktop and mobile layouts
+  // Read-only Food Description content used for both desktop and mobile layouts.
+  // IMPORTANT:
+  // - `foodTitle` and `foodDescriptionText` MUST stay de-coupled from the raw AI string shape.
+  // - Many agents have changed the OpenAI prompt over time; we intentionally *sanitize*
+  //   the AI response so the user only sees a short, friendly description rather than
+  //   the full technical breakdown, nutrition line, or ITEMS_JSON block.
+  // - Do NOT switch this back to rendering the raw `aiDescription` string or you will
+  //   expose internal formatting and confuse users.
   const foodTitle = useMemo(() => {
     if (mealSummary) return mealSummary;
     if (editingEntry?.description) return extractBaseMealDescription(editingEntry.description || '');
@@ -2634,7 +2641,21 @@ Please add nutritional information manually if needed.`);
   }, [mealSummary, editingEntry, aiDescription]);
 
   const foodDescriptionText = useMemo(() => {
-    if (aiDescription && aiDescription.trim()) return aiDescription.trim();
+    if (aiDescription && aiDescription.trim()) {
+      const trimmed = aiDescription.trim();
+      // If this looks like a successful AI analysis (contains nutrition/structured markers),
+      // show only the base human-friendly description line. This prevents long technical
+      // blocks from appearing in the UI while keeping the underlying `aiDescription`
+      // intact for parsing and history.
+      const looksLikeAnalysis =
+        /Calories\s*:/i.test(trimmed) || /<ITEMS_JSON>/i.test(trimmed);
+      if (looksLikeAnalysis) {
+        const base = extractBaseMealDescription(trimmed);
+        return base || trimmed;
+      }
+      // For non-analysis text (fallback or manual notes), show the full message.
+      return trimmed;
+    }
     if (editingEntry?.description) return editingEntry.description;
     return '';
   }, [aiDescription, editingEntry]);
