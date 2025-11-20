@@ -2672,52 +2672,58 @@ Please add nutritional information manually if needed.`);
   // - Do NOT switch this back to rendering the raw `aiDescription` string or you will
   //   expose internal formatting and confuse users.
   // - `foodTitle` should be a simple meal name (e.g., "Burger"), not a list of all ingredients.
+  // - Title comes from first detected item name, NOT from mealSummary (which lists all ingredients)
   const foodTitle = useMemo(() => {
-    // First priority: Extract simple title from AI description (before nutrition info)
-    if (aiDescription) {
-      const simpleTitle = extractBaseMealDescription(aiDescription);
-      // Only use if it's a reasonable length (not the full ingredient list)
-      if (simpleTitle && simpleTitle.length < 100 && !simpleTitle.includes(',')) {
-        return simpleTitle;
-      }
-    }
-    // Second priority: Use first item's name as simple title
+    // First priority: Use first item's name as simple title (this is what was working before)
     if (analyzedItems && analyzedItems.length > 0) {
       const firstItem = analyzedItems[0];
       const itemName = firstItem?.name ? String(firstItem.name).trim() : '';
       if (itemName) {
-        // Clean up the name - remove any nutrition info in parentheses
-        const cleanName = itemName.replace(/\([^)]*(calories?|protein|carbs?|fat|fibre|fiber|sugar)[^)]*\)/gi, '').trim();
+        // Clean up the name - remove any nutrition info in parentheses and serving sizes
+        const cleanName = itemName
+          .replace(/\([^)]*(calories?|protein|carbs?|fat|fibre|fiber|sugar)[^)]*\)/gi, '')
+          .replace(/\([^)]*\)/g, '') // Remove any remaining parentheses
+          .trim();
         return cleanName || itemName;
+      }
+    }
+    // Second priority: Try to extract meal name from AI description (extract just the food name, not full sentence)
+    if (aiDescription) {
+      const firstLine = extractBaseMealDescription(aiDescription);
+      // If it's a sentence like "This image shows a burger...", extract just "burger"
+      if (firstLine && firstLine.toLowerCase().includes('shows a ')) {
+        const match = firstLine.match(/shows a\s+([^,.:]+)/i);
+        if (match && match[1]) {
+          return match[1].trim();
+        }
+      }
+      // If it's a simple name without commas, use it
+      if (firstLine && firstLine.length < 50 && !firstLine.includes(',')) {
+        return firstLine;
       }
     }
     // Third priority: Extract from editing entry description
     if (editingEntry?.description) {
       const simpleTitle = extractBaseMealDescription(editingEntry.description || '');
-      if (simpleTitle && simpleTitle.length < 100) {
+      if (simpleTitle && simpleTitle.length < 50 && !simpleTitle.includes(',')) {
         return simpleTitle;
       }
     }
-    // Last resort: Use meal summary (full ingredient list) only if nothing else available
-    if (mealSummary) return mealSummary;
     return '';
-  }, [mealSummary, editingEntry, aiDescription, analyzedItems]);
+  }, [editingEntry, aiDescription, analyzedItems]);
 
   const foodDescriptionText = useMemo(() => {
     if (aiDescription && aiDescription.trim()) {
       const trimmed = aiDescription.trim();
-      // If this looks like a successful AI analysis (contains nutrition/structured markers),
-      // show only the base human-friendly description line. This prevents long technical
-      // blocks from appearing in the UI while keeping the underlying `aiDescription`
-      // intact for parsing and history.
-      const looksLikeAnalysis =
-        /Calories\s*:/i.test(trimmed) || /<ITEMS_JSON>/i.test(trimmed);
-      if (looksLikeAnalysis) {
-        const base = extractBaseMealDescription(trimmed);
-        return base || trimmed;
-      }
-      // For non-analysis text (fallback or manual notes), show the full message.
-      return trimmed;
+      // Show the full AI description text, but clean up technical parts
+      // Remove ITEMS_JSON blocks and nutrition summary lines for cleaner display
+      let cleaned = trimmed
+        .replace(/<ITEMS_JSON>[\s\S]*?<\/ITEMS_JSON>/gi, '')
+        .replace(/Calories:\s*\d+[\s\S]*$/i, '') // Remove nutrition summary line at end
+        .trim();
+      
+      // If we have a cleaned description, return it; otherwise return original
+      return cleaned || trimmed;
     }
     if (editingEntry?.description) return editingEntry.description;
     return '';
