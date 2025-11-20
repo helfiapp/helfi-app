@@ -2675,6 +2675,20 @@ Please add nutritional information manually if needed.`);
 
   const mealSummary = useMemo(() => buildMealSummaryFromItems(analyzedItems), [analyzedItems])
 
+  // Read-only Food Description content used for both desktop and mobile layouts
+  const foodTitle = useMemo(() => {
+    if (mealSummary) return mealSummary;
+    if (editingEntry?.description) return extractBaseMealDescription(editingEntry.description || '');
+    if (aiDescription) return extractBaseMealDescription(aiDescription);
+    return '';
+  }, [mealSummary, editingEntry, aiDescription]);
+
+  const foodDescriptionText = useMemo(() => {
+    if (aiDescription && aiDescription.trim()) return aiDescription.trim();
+    if (editingEntry?.description) return editingEntry.description;
+    return '';
+  }, [aiDescription, editingEntry]);
+
   // Debug logging to track state changes
   useEffect(() => {
     console.log('🔍 State Debug:', {
@@ -3125,10 +3139,22 @@ Please add nutritional information manually if needed.`);
                     </div>
                   )}
 
-                  {/* Meal Summary - Single sentence at top */}
-                  {mealSummary && (
-                    <div className="mb-4 px-4 py-3 bg-emerald-50 border border-emerald-100 rounded-xl text-sm sm:text-base text-emerald-900 leading-relaxed">
-                      {mealSummary}
+                  {/* Food Description - read-only summary (desktop & mobile) */}
+                  {(foodTitle || foodDescriptionText) && (
+                    <div className="mb-4 space-y-2">
+                      <div className="block text-lg font-medium text-gray-900">
+                        Food Description
+                      </div>
+                      {foodTitle && (
+                        <div className="px-4 py-3 bg-emerald-50 border border-emerald-100 rounded-xl text-sm sm:text-base text-emerald-900 leading-relaxed">
+                          {foodTitle}
+                        </div>
+                      )}
+                      {foodDescriptionText && (
+                        <p className="text-sm sm:text-base text-gray-700 leading-relaxed whitespace-pre-wrap">
+                          {foodDescriptionText}
+                        </p>
+                      )}
                     </div>
                   )}
 
@@ -3396,34 +3422,6 @@ Please add nutritional information manually if needed.`);
                       </div>
                     )
                   })()}
-
-                  {/* Description Field - now appears after the photo + macro block */}
-                  {(editingEntry || isEditingDescription) && (
-                    <div className="mb-6 space-y-4">
-                      <label className="block text-lg font-medium text-gray-900">
-                        Food Description
-                      </label>
-                      <textarea
-                        ref={descriptionTextareaRef}
-                        value={editedDescription}
-                        onChange={(e) => {
-                          setEditedDescription(e.target.value);
-                          e.target.style.height = 'auto';
-                          e.target.style.height = `${e.target.scrollHeight}px`;
-                        }}
-                        onFocus={(e) => {
-                          e.target.style.height = 'auto';
-                          e.target.style.height = `${e.target.scrollHeight}px`;
-                        }}
-                        className="w-full min-h-[8rem] px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 text-base resize-none bg-white shadow-sm font-normal leading-relaxed whitespace-pre-wrap"
-                        style={{ overflow: 'hidden' }}
-                        placeholder="Enter a detailed description of the food item..."
-                      />
-                      <p className="text-sm text-gray-600 font-normal">
-                        Change the food description and click on the 'Re-Analyze' button.
-                      </p>
-                    </div>
-                  )}
 
                   {/* Detected Items with Brand, Serving Size, and Edit Controls */}
                   {analyzedItems && analyzedItems.length > 0 && !isEditingDescription ? (
@@ -3921,26 +3919,15 @@ Please add nutritional information manually if needed.`);
                     )}
                   </button>
                   {!editingEntry && (
-                    <>
-                      <button
-                        onClick={handleEditDescriptionClick}
-                        className="w-full py-3 px-4 bg-amber-500 hover:bg-amber-600 text-white font-medium rounded-xl transition-colors duration-200 flex items-center justify-center"
-                      >
-                        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                        </svg>
-                        Edit Description
-                      </button>
-                      <button
-                        onClick={handleDeletePhoto}
-                        className="w-full py-3 px-4 bg-gray-500 hover:bg-gray-600 text-white font-medium rounded-xl transition-colors duration-200 flex items-center justify-center"
-                      >
-                        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                        Delete Photo
-                      </button>
-                    </>
+                    <button
+                      onClick={handleDeletePhoto}
+                      className="w-full py-3 px-4 bg-gray-500 hover:bg-gray-600 text-white font-medium rounded-xl transition-colors duration-200 flex items-center justify-center"
+                    >
+                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                      Delete Photo
+                    </button>
                   )}
                   {editingEntry && (
                     <button
@@ -4137,47 +4124,6 @@ Please add nutritional information manually if needed.`);
                     </div>
                   </div>
                 </div>
-              </div>
-            )}
-
-            {/* Action buttons for editing description - shown when isEditingDescription is true */}
-            {isEditingDescription && (
-              <div className="space-y-3 mt-4">
-                <button
-                  onClick={reanalyzeCurrentEntry}
-                  disabled={isAnalyzing}
-                  className="w-full py-4 px-6 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-all duration-300 flex items-center justify-center shadow-sm hover:shadow-md disabled:shadow-none"
-                >
-                  {isAnalyzing ? (
-                    <>
-                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      <span className="font-normal">Re-Analyzing...</span>
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      <span className="font-normal">Re-Analyze with AI (uses 1 credit)</span>
-                    </>
-                  )}
-                </button>
-                <button
-                  onClick={() => {
-                    setIsEditingDescription(false)
-                    setShowAiResult(true)
-                    setShowAddFood(true)
-                  }}
-                  className="w-full py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-all duration-300 flex items-center justify-center"
-                >
-                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Done
-                </button>
               </div>
             )}
 
