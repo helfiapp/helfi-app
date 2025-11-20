@@ -86,7 +86,18 @@ const buildMealSummaryFromItems = (items: any[] | null | undefined) => {
     const cleanName = stripNutritionFromName(item?.name ? String(item.name) : 'Food item')
     pieces.push(cleanName || 'Food item')
     if (item?.serving_size) {
-      pieces.push(`(${item.serving_size})`)
+      const servingRaw = String(item.serving_size || '').trim()
+      // Some LLM outputs (or prose fallbacks) store full macro lines like
+      // "150 calories, 5g protein, 28g carbs, 3g fat" in `serving_size`.
+      // Those should never appear in the green title area – we only want
+      // human-friendly portion cues like "1 bun (3 oz)" or "about 1 cup".
+      const hasMacroWords = /(calories?|protein|carbs?|fat|fibre|fiber|sugar)/i.test(servingRaw)
+      const hasPortionWords = /(cup|slice|oz|g|ml|tbsp|tsp|bowl|piece|serving|handful|spoon|bites?)/i.test(
+        servingRaw,
+      )
+      if (!hasMacroWords || hasPortionWords) {
+        pieces.push(`(${servingRaw})`)
+      }
     }
     return pieces.join(' ').replace(/\s+/g, ' ').trim()
   })
