@@ -86,14 +86,7 @@ const buildMealSummaryFromItems = (items: any[] | null | undefined) => {
     const cleanName = stripNutritionFromName(item?.name ? String(item.name) : 'Food item')
     pieces.push(cleanName || 'Food item')
     if (item?.serving_size) {
-      const servingRaw = String(item.serving_size || '').trim()
-      // Reuse the same nutrition-stripping logic for serving sizes. This lets
-      // us keep portion info like "1 bun (3 oz)" while dropping any embedded
-      // macro strings such as "150 calories, 5g protein, 28g carbs, 3g fat".
-      const cleanServing = stripNutritionFromName(servingRaw)
-      if (cleanServing) {
-        pieces.push(`(${cleanServing})`)
-      }
+      pieces.push(`(${item.serving_size})`)
     }
     return pieces.join(' ').replace(/\s+/g, ' ').trim()
   })
@@ -2676,29 +2669,24 @@ Please add nutritional information manually if needed.`);
   }, [mealSummary, editingEntry, aiDescription]);
 
   const foodDescriptionText = useMemo(() => {
-    // Prefer the latest AI description if present (current analysis view),
-    // otherwise fall back to any saved description on an existing entry.
-    const source =
-      (aiDescription && aiDescription.trim()) ||
-      (editingEntry?.description && String(editingEntry.description).trim()) ||
-      ''
-
-    if (!source) return ''
-
-    // Split into lines and drop the first non-empty line so we don't repeat
-    // the same sentence in both the green title and the body text.
-    const lines = source.split('\n').map((l: string) => l.trim())
-    const firstIndex = lines.findIndex((l: string) => l.length > 0)
-    if (firstIndex === -1) return ''
-
-    const bodyLines = lines.slice(firstIndex + 1)
-    const body = bodyLines.join('\n').trim()
-
-    // If there's no extra body (e.g. user only entered a short free‑text
-    // description), just show that single line in the body and let the title
-    // stay as-is.
-    return body || lines[firstIndex]
-  }, [aiDescription, editingEntry])
+    if (aiDescription && aiDescription.trim()) {
+      const trimmed = aiDescription.trim();
+      // If this looks like a successful AI analysis (contains nutrition/structured markers),
+      // show only the base human-friendly description line. This prevents long technical
+      // blocks from appearing in the UI while keeping the underlying `aiDescription`
+      // intact for parsing and history.
+      const looksLikeAnalysis =
+        /Calories\s*:/i.test(trimmed) || /<ITEMS_JSON>/i.test(trimmed);
+      if (looksLikeAnalysis) {
+        const base = extractBaseMealDescription(trimmed);
+        return base || trimmed;
+      }
+      // For non-analysis text (fallback or manual notes), show the full message.
+      return trimmed;
+    }
+    if (editingEntry?.description) return editingEntry.description;
+    return '';
+  }, [aiDescription, editingEntry]);
 
   // Debug logging to track state changes
   useEffect(() => {

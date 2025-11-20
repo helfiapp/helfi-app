@@ -769,48 +769,6 @@ CRITICAL REQUIREMENTS:
       resp.total = computeTotalsFromItems(resp.items);
     }
 
-    // FINAL SERVER-SIDE SAFETY: ensure totals never silently fall back to zero
-    // when the analysis text clearly contains a nutrition line. This protects
-    // against any future prompt/JSON shape changes that might break ITEMS_JSON
-    // without breaking the visible "Calories: N, Protein: Ng, Carbs: Ng, Fat: Ng"
-    // line the user sees.
-    try {
-      const totalsMatch =
-        analysis &&
-        analysis.match(
-          /Calories:\s*([\d\.]+)[^,\n]*,\s*Protein:\s*([\d\.]+)\s*g[^,\n]*,\s*Carbs:\s*([\d\.]+)\s*g[^,\n]*,\s*Fat:\s*([\d\.]+)\s*g/i,
-        )
-      if (totalsMatch) {
-        const calories = Number(totalsMatch[1])
-        const protein = Number(totalsMatch[2])
-        const carbs = Number(totalsMatch[3])
-        const fat = Number(totalsMatch[4])
-        if (
-          Number.isFinite(calories) &&
-          Number.isFinite(protein) &&
-          Number.isFinite(carbs) &&
-          Number.isFinite(fat) &&
-          calories > 0
-        ) {
-          const parsedLineTotal = {
-            calories: Math.round(calories),
-            protein_g: protein,
-            carbs_g: carbs,
-            fat_g: fat,
-            // Preserve any existing fiber/sugar values if present
-            fiber_g: resp.total?.fiber_g ?? null,
-            sugar_g: resp.total?.sugar_g ?? null,
-          }
-          if (!resp.total || (resp.total.calories ?? 0) <= 0) {
-            resp.total = parsedLineTotal
-            console.log('✅ Applied totals from nutrition line:', parsedLineTotal)
-          }
-        }
-      }
-    } catch (totalsErr) {
-      console.warn('⚠️ Failed to parse totals from nutrition line (non-fatal):', totalsErr)
-    }
-
     // NOTE: USDA/FatSecret database enhancement removed from AI photo analysis flow
     // These databases are still available via /api/food-data for manual ingredient lookup
     // The AI analysis works better without database interference - it provides accurate
