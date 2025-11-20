@@ -3614,20 +3614,19 @@ Please add nutritional information manually if needed.`);
                               </div>
                             )}
                             
-                            {/* Per-serving nutrition */}
+                            {/* Macro totals for this ingredient – updates as servings change */}
                             {isExpanded && (
                             <div className="space-y-2">
                               <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                                {servingSizeLabel ? `Per 1 serving (= ${servingSizeLabel})` : 'Per serving'}
+                                Totals for {formattedServings}
                               </div>
                               <div className="flex flex-wrap gap-2">
                                 {ITEM_NUTRIENT_META.map((meta) => {
-                                  const rawValue = item?.[meta.field as keyof typeof item]
-                                  const numeric = typeof rawValue === 'number' ? rawValue : Number(rawValue)
+                                  const totalValue = totalsByField[meta.field as keyof typeof totalsByField]
                                   const displayValue =
                                     meta.key === 'calories'
-                                      ? formatEnergyValue(numeric, energyUnit)
-                                      : formatMacroValue(numeric, 'g')
+                                      ? formatEnergyValue(totalValue, energyUnit)
+                                      : formatMacroValue(totalValue, 'g')
                                   const labelText =
                                     meta.key === 'calories'
                                       ? energyUnit === 'kJ'
@@ -3642,32 +3641,6 @@ Please add nutritional information manually if needed.`);
                                       <span className={`font-semibold ${meta.accent}`}>{displayValue}</span>
                                       <span className="uppercase text-gray-500">{labelText}</span>
                                     </div>
-                                  )
-                                })}
-                              </div>
-                            </div>
-                            )}
-
-                            {isExpanded && (
-                            <div className="mt-3 bg-gray-50 border border-gray-100 rounded-lg px-3 py-2 text-xs text-gray-600">
-                              <div className="font-medium text-gray-700">Totals for {formattedServings}</div>
-                              <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
-                                {ITEM_NUTRIENT_META.map((meta) => {
-                                  const value = totalsByField[meta.field as keyof typeof totalsByField]
-                                  const display =
-                                    meta.key === 'calories'
-                                      ? formatEnergyValue(value, energyUnit)
-                                      : formatMacroValue(value, 'g')
-                                  const labelText =
-                                    meta.key === 'calories'
-                                      ? energyUnit === 'kJ'
-                                        ? 'kilojoules'
-                                        : 'calories'
-                                      : meta.label.toLowerCase()
-                                  return (
-                                    <span key={`${meta.field}-total-${index}`} className="text-gray-700">
-                                      {display} {labelText}
-                                    </span>
                                   )
                                 })}
                               </div>
