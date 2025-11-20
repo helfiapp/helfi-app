@@ -120,6 +120,15 @@ export async function POST(req: NextRequest) {
                 "4) WHAT TO DO NEXT:\n" +
                 "- Explain practical next steps in plain language: when it might be okay to monitor at home, when to book a routine doctor or dermatologist appointment, and when to seek urgent or emergency care.\n" +
                 "- Be specific about timeframes (for example: “within the next few days”, “as soon as possible”, “go to emergency/ER now if…”).\n\n" +
+                "After you finish sections 1–4 above, append a compact JSON block between <STRUCTURED_JSON> and </STRUCTURED_JSON> with this exact shape:\n" +
+                "<STRUCTURED_JSON>{\"summary\":\"string\",\"possibleCauses\":[{\"name\":\"string\",\"whyLikely\":\"string\",\"confidence\":\"low|medium|high\"}],\"redFlags\":[\"string\"],\"nextSteps\":[\"string\"],\"disclaimer\":\"string\"}</STRUCTURED_JSON>\n" +
+                "Rules for the JSON:\n" +
+                "- \"summary\": 1–3 plain-language sentences describing what the image most likely shows overall.\n" +
+                "- \"possibleCauses\": 2–4 conditions ordered from most to least likely (use confidence high/medium/low to match that order).\n" +
+                "- \"whyLikely\": brief explanation focused on visible features in THIS image (color, shape, borders, distribution, etc.).\n" +
+                "- \"redFlags\": short bullet-style strings describing dangerous or urgent features related to what is seen.\n" +
+                "- \"nextSteps\": practical actions the user can take now (self-care, routine review, urgent care/emergency when needed).\n" +
+                "- \"disclaimer\": clear reminder that this is information only and not a diagnosis or a replacement for a real doctor.\n\n" +
                 "Important safety rules:\n" +
                 "- Do NOT give a formal diagnosis or claim certainty. Always frame explanations as possibilities based on what can be seen.\n" +
                 "- Do NOT tell the user that they do not need a doctor. Instead, explain when medical review would be sensible and reassuring.\n" +
@@ -147,11 +156,24 @@ export async function POST(req: NextRequest) {
           ]
         }
       ],
-      max_tokens: 700,
+      max_tokens: 900,
       temperature: 0.15
     } as any);
 
-    const analysis = wrapped.completion.choices[0]?.message?.content;
+    const analysisRaw = wrapped.completion.choices[0]?.message?.content || '';
+
+    // Extract optional structured JSON block (mirrors symptom analyzer pattern)
+    let structured: any = null;
+    let cleanAnalysis = analysisRaw;
+    try {
+      const m = analysisRaw.match(/<STRUCTURED_JSON>([\s\S]*?)<\/STRUCTURED_JSON>/i);
+      if (m && m[1]) {
+        structured = JSON.parse(m[1]);
+        cleanAnalysis = analysisRaw.replace(m[0], '').trim();
+      }
+    } catch (err) {
+      console.warn('Failed to parse medical STRUCTURED_JSON block:', err);
+    }
     
     // Charge wallet remainder (skip if allowed via free use)
     if (!allowViaFreeUse) {
@@ -193,12 +215,12 @@ export async function POST(req: NextRequest) {
         prompt: wrapped.promptTokens,
         completion: wrapped.completionTokens,
       },
-      analysis: analysis?.substring(0, 100) + '...'
+      analysis: cleanAnalysis.substring(0, 100) + '...'
     });
 
-    return NextResponse.json({
+    const resp: any = {
       success: true,
-      analysis,
+      analysis: cleanAnalysis,
       debug: {
         imageType: imageFile.type,
         imageSize: imageFile.size,
@@ -207,7 +229,23 @@ export async function POST(req: NextRequest) {
           completion: wrapped.completionTokens,
         }
       }
-    });
+    };
+
+    if (structured && typeof structured === 'object') {
+      resp.summary = structured.summary || null;
+      resp.possibleCauses = Array.isArray(structured.possibleCauses) ? structured.possibleCauses : [];
+      resp.redFlags = Array.isArray(structured.redFlags) ? structured.redFlags : [];
+      resp.nextSteps = Array.isArray(structured.nextSteps) ? structured.nextSteps : [];
+      resp.disclaimer =
+        structured.disclaimer ||
+        'This analysis is for information only and does not replace a real doctor’s examination. If symptoms worsen or you are worried, contact a licensed medical professional or emergency services.';
+    } else {
+      // Always include at least a basic disclaimer
+      resp.disclaimer =
+        'This analysis is for information only and does not replace a real doctor’s examination. If symptoms worsen or you are worried, contact a licensed medical professional or emergency services.';
+    }
+
+    return NextResponse.json(resp);
 
   } catch (error) {
     console.error('Vision API Error:', error);

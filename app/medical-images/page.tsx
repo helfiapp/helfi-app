@@ -9,12 +9,31 @@ import MobileMoreMenu from '@/components/MobileMoreMenu'
 import UsageMeter from '@/components/UsageMeter'
 import FeatureUsageDisplay from '@/components/FeatureUsageDisplay'
 import PageHeader from '@/components/PageHeader'
+import MedicalImageChat from './MedicalImageChat'
+
+type ConfidenceLevel = 'low' | 'medium' | 'high'
+
+type MedicalPossibleCause = {
+  name: string
+  whyLikely: string
+  confidence: ConfidenceLevel | string
+}
+
+type MedicalAnalysisResult = {
+  summary?: string | null
+  possibleCauses?: MedicalPossibleCause[]
+  redFlags?: string[]
+  nextSteps?: string[]
+  disclaimer?: string
+  analysisText?: string
+}
 
 export default function MedicalImagesPage() {
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false)
   const [analysis, setAnalysis] = useState<string | null>(null)
+  const [analysisResult, setAnalysisResult] = useState<MedicalAnalysisResult | null>(null)
   const [error, setError] = useState<string>('')
   const [showCreditsModal, setShowCreditsModal] = useState<boolean>(false)
   const [creditInfo, setCreditInfo] = useState<any>({
@@ -32,6 +51,7 @@ export default function MedicalImagesPage() {
     if (file) {
       setImageFile(file)
       setAnalysis(null)
+      setAnalysisResult(null)
       setError('')
       // Create preview
       const reader = new FileReader()
@@ -50,6 +70,7 @@ export default function MedicalImagesPage() {
 
     setError('')
     setAnalysis(null)
+    setAnalysisResult(null)
     setIsAnalyzing(true)
 
     try {
@@ -84,6 +105,17 @@ export default function MedicalImagesPage() {
       const result = await response.json()
       if (result.success && result.analysis) {
         setAnalysis(result.analysis)
+        const structured: MedicalAnalysisResult = {
+          summary: result.summary ?? null,
+          possibleCauses: Array.isArray(result.possibleCauses) ? result.possibleCauses : [],
+          redFlags: Array.isArray(result.redFlags) ? result.redFlags : [],
+          nextSteps: Array.isArray(result.nextSteps) ? result.nextSteps : [],
+          disclaimer:
+            result.disclaimer ||
+            'This analysis is for information only and is not a substitute for professional medical advice, diagnosis, or treatment. Always seek the advice of a qualified healthcare provider with any questions you may have regarding a medical condition.',
+          analysisText: result.analysis,
+        }
+        setAnalysisResult(structured)
         // Trigger usage meter refresh after successful analysis
         setUsageMeterRefresh(prev => prev + 1)
         try { window.dispatchEvent(new Event('credits:refresh')); } catch {}
@@ -101,6 +133,7 @@ export default function MedicalImagesPage() {
     setImageFile(null)
     setImagePreview(null)
     setAnalysis(null)
+    setAnalysisResult(null)
     setError('')
   }
 
@@ -219,15 +252,115 @@ export default function MedicalImagesPage() {
             </div>
 
             {/* Analysis Results */}
-            {analysis && (
-              <div className="mt-6 bg-gray-50 border border-gray-200 rounded-lg p-4 md:p-6">
-                <h2 className="text-lg font-semibold text-gray-900 mb-3">Analysis Results</h2>
-                <div className="prose prose-sm max-w-none">
-                  <p className="text-gray-700 whitespace-pre-line">{analysis}</p>
+            {(analysisResult || analysis) && (
+              <div className="mt-6 bg-gray-50 border border-gray-200 rounded-lg p-4 md:p-6 space-y-4">
+                <h2 className="text-lg font-semibold text-gray-900">Analysis Results</h2>
+
+                {/* Summary */}
+                {analysisResult?.summary && (
+                  <section>
+                    <h3 className="font-medium text-gray-900 mb-1">Summary</h3>
+                    <p className="text-sm text-gray-700 whitespace-pre-line">
+                      {analysisResult.summary}
+                    </p>
+                  </section>
+                )}
+
+                {/* Likely conditions (ordered high → medium → low) */}
+                {Array.isArray(analysisResult?.possibleCauses) &&
+                  analysisResult.possibleCauses.length > 0 && (
+                    <section>
+                      <h3 className="font-medium text-gray-900 mb-2">Likely conditions</h3>
+                      <ul className="space-y-2">
+                        {[...analysisResult.possibleCauses]
+                          .sort((a, b) => {
+                            const weight: Record<string, number> = { high: 3, medium: 2, low: 1 }
+                            const wa = weight[(a.confidence || 'medium').toLowerCase()] ?? 2
+                            const wb = weight[(b.confidence || 'medium').toLowerCase()] ?? 2
+                            return wb - wa
+                          })
+                          .map((c, idx) => {
+                            const level = (c.confidence || 'medium').toLowerCase()
+                            const badgeClasses =
+                              level === 'high'
+                                ? 'bg-red-100 text-red-800 border-red-200'
+                                : level === 'low'
+                                ? 'bg-gray-100 text-gray-700 border-gray-200'
+                                : 'bg-amber-100 text-amber-800 border-amber-200'
+                            const label =
+                              level === 'high' ? 'high' : level === 'low' ? 'low' : 'medium'
+                            return (
+                              <li
+                                key={`${c.name}-${idx}`}
+                                className="p-3 border border-gray-200 rounded-lg bg-white"
+                              >
+                                <div className="flex items-center justify-between gap-3">
+                                  <div className="font-medium text-gray-900">{c.name}</div>
+                                  <span
+                                    className={`text-xs px-2 py-0.5 rounded-full border ${badgeClasses}`}
+                                  >
+                                    {label}
+                                  </span>
+                                </div>
+                                {c.whyLikely && (
+                                  <div className="mt-1 text-sm text-gray-700">
+                                    {c.whyLikely}
+                                  </div>
+                                )}
+                              </li>
+                            )
+                          })}
+                      </ul>
+                    </section>
+                  )}
+
+                {/* Red flags */}
+                {Array.isArray(analysisResult?.redFlags) && analysisResult.redFlags.length > 0 && (
+                  <section>
+                    <h3 className="font-medium text-red-700 mb-2">Red‑flag signs to watch for</h3>
+                    <ul className="list-disc list-inside text-sm text-red-800 space-y-1">
+                      {analysisResult.redFlags.map((rf, idx) => (
+                        <li key={idx}>{rf}</li>
+                      ))}
+                    </ul>
+                  </section>
+                )}
+
+                {/* Next steps */}
+                {Array.isArray(analysisResult?.nextSteps) && analysisResult.nextSteps.length > 0 && (
+                  <section>
+                    <h3 className="font-medium text-gray-900 mb-2">What to do next</h3>
+                    <ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
+                      {analysisResult.nextSteps.map((step, idx) => (
+                        <li key={idx}>{step}</li>
+                      ))}
+                    </ul>
+                  </section>
+                )}
+
+                {/* Fallback detailed explanation if we have raw text but no structure */}
+                {!analysisResult?.summary &&
+                  (!analysisResult?.possibleCauses ||
+                    analysisResult.possibleCauses.length === 0) &&
+                  analysis && (
+                    <section>
+                      <p className="text-sm text-gray-700 whitespace-pre-line">{analysis}</p>
+                    </section>
+                  )}
+
+                {/* Disclaimer */}
+                <div className="mt-2 text-xs text-gray-500 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                  <strong>⚠️ Important:</strong>{' '}
+                  {analysisResult?.disclaimer ||
+                    'This analysis is for informational purposes only and is not a substitute for professional medical advice, diagnosis, or treatment. Always seek the advice of a qualified healthcare provider with any questions you may have regarding a medical condition.'}
                 </div>
-                <div className="mt-4 text-xs text-gray-500 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                  <strong>⚠️ Important:</strong> This analysis is for informational purposes only and is not a substitute for professional medical advice, diagnosis, or treatment. Always seek the advice of a qualified healthcare provider with any questions you may have regarding a medical condition.
-                </div>
+              </div>
+            )}
+
+            {/* Medical image chat – follows the analysis and is pre‑aware of it */}
+            {analysisResult && (
+              <div className="mt-6 bg-white rounded-lg shadow-sm border border-gray-200">
+                <MedicalImageChat analysisResult={analysisResult} />
               </div>
             )}
           </div>
