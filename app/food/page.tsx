@@ -2320,16 +2320,9 @@ Please add nutritional information manually if needed.`);
   }
 
   const handleDeletePhoto = () => {
-    setPhotoFile(null)
-    setPhotoPreview(null)
-    setAiDescription('')
-    setShowAiResult(false)
-    setIsEditingDescription(false)
-    setEditedDescription('')
-    setAnalyzedItems([])
-    setAnalyzedTotal(null)
-    setHealthWarning(null)
-    setHealthAlternatives(null)
+    // For new AI analyses, deleting the photo should behave like cancelling:
+    // clear the analyzer state and return to the main Food Diary view.
+    resetAnalyzerPanel()
   }
 
   const exitEditingSession = () => {
