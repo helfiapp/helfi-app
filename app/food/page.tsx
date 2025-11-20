@@ -62,6 +62,18 @@ const formatServingsDisplay = (value: number | null | undefined) => {
 const buildMealSummaryFromItems = (items: any[] | null | undefined) => {
   if (!Array.isArray(items) || items.length === 0) return ''
 
+  // Strip any embedded nutrition text from the item name so the green
+  // summary line stays clean (just names and portion sizes). Some LLM
+  // prompts have historically included things like "(150 calories, 5g
+  // protein, 28g carbs, 3g fat)" inside the name field – we never want
+  // those repeated in the title area.
+  const stripNutritionFromName = (raw: string) =>
+    String(raw || '')
+      // Remove parenthetical groups that look like nutrition info
+      .replace(/\([^)]*(calories?|protein|carbs?|fat|fibre|fiber|sugar)[^)]*\)/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+
   const summaryParts = items.map((item) => {
     const pieces: string[] = []
     const servings = Number(item?.servings)
@@ -71,7 +83,8 @@ const buildMealSummaryFromItems = (items: any[] | null | undefined) => {
     if (item?.brand) {
       pieces.push(String(item.brand))
     }
-    pieces.push(item?.name ? String(item.name) : 'Food item')
+    const cleanName = stripNutritionFromName(item?.name ? String(item.name) : 'Food item')
+    pieces.push(cleanName || 'Food item')
     if (item?.serving_size) {
       pieces.push(`(${item.serving_size})`)
     }
@@ -992,15 +1005,30 @@ const applyStructuredItems = (
     finalTotalValue: finalTotal ? JSON.stringify(finalTotal) : 'null',
   })
 
-  // Priority order for totals:
-  // 1. API-provided total (most reliable)
-  // 2. Recalculated from items (if items have nutrition data)
+  // Priority order for totals (updated):
+  // 1. Recalculated from enriched items (so the circle always matches the cards the user sees)
+  // 2. API-provided total (if item-based recalculation is missing or clearly zero)
   // 3. Extracted from analysis text (fallback)
-  let totalsToUse = finalTotal
-  if (!totalsToUse && enrichedItems.length > 0) {
-    totalsToUse = recalculateNutritionFromItems(enrichedItems)
-    console.log('📊 Recalculated totals from items:', totalsToUse ? JSON.stringify(totalsToUse) : 'null')
+  let totalsToUse: NutritionTotals | null = null
+
+  if (enrichedItems.length > 0) {
+    const fromItems = recalculateNutritionFromItems(enrichedItems)
+    console.log(
+      '📊 Recalculated totals from enriched items:',
+      fromItems ? JSON.stringify(fromItems) : 'null',
+    )
+    // Prefer totals from items when they have real calories; otherwise fall back to API total.
+    if (fromItems && (fromItems.calories ?? 0) > 0) {
+      totalsToUse = fromItems
+    } else if (finalTotal) {
+      totalsToUse = finalTotal
+      console.log('📊 Using API-provided totals as fallback:', JSON.stringify(finalTotal))
+    }
+  } else if (finalTotal) {
+    totalsToUse = finalTotal
+    console.log('📊 Using API-provided totals (no items available):', JSON.stringify(finalTotal))
   }
+
   if (!totalsToUse && analysisText && allowTextFallback) {
     totalsToUse = sanitizeNutritionTotals(extractNutritionData(analysisText))
     console.log('📊 Extracted totals from text:', totalsToUse ? JSON.stringify(totalsToUse) : 'null')
