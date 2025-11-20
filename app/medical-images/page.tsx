@@ -45,6 +45,7 @@ export default function MedicalImagesPage() {
     featureUsageToday: { foodAnalysis: 0, interactionAnalysis: 0 }
   })
   const [usageMeterRefresh, setUsageMeterRefresh] = useState<number>(0) // Trigger for UsageMeter refresh
+  const [hasPaidAccess, setHasPaidAccess] = useState<boolean>(false)
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -61,6 +62,26 @@ export default function MedicalImagesPage() {
       reader.readAsDataURL(file)
     }
   }
+
+  useEffect(() => {
+    const fetchCreditStatus = async () => {
+      try {
+        const res = await fetch(`/api/credit/status?t=${Date.now()}`, { cache: 'no-store' })
+        if (!res.ok) return
+        const data = await res.json()
+        const isPremium = data?.plan === 'PREMIUM'
+        const hasWalletCredits =
+          typeof data?.totalAvailableCents === 'number' && data.totalAvailableCents > 0
+        const hasLegacyCredits =
+          typeof data?.credits?.total === 'number' && data.credits.total > 0
+
+        setHasPaidAccess(Boolean(isPremium || hasWalletCredits || hasLegacyCredits))
+      } catch {
+        // ignore failures – fall back to showing free banner
+      }
+    }
+    fetchCreditStatus()
+  }, [usageMeterRefresh])
 
   const handleAnalyze = async () => {
     if (!imageFile) {
@@ -244,9 +265,11 @@ export default function MedicalImagesPage() {
             </div>
             <div className="mt-2">
               <p className="text-xs text-gray-500 mb-2">Typical cost: 2 credits</p>
-              <div className="text-[11px] text-blue-800 bg-blue-50 border border-blue-200 rounded px-2 py-1 mb-2">
-                Free accounts can try this AI feature once. After your free analysis, upgrade or buy credits to continue.
-              </div>
+              {!hasPaidAccess && (
+                <div className="text-[11px] text-blue-800 bg-blue-50 border border-blue-200 rounded px-2 py-1 mb-2">
+                  Free accounts can try this AI feature once. After your free analysis, upgrade or buy credits to continue.
+                </div>
+              )}
               <UsageMeter inline={true} refreshTrigger={usageMeterRefresh} />
               <FeatureUsageDisplay featureName="medicalImageAnalysis" featureLabel="Medical Image Analysis" refreshTrigger={usageMeterRefresh} />
             </div>

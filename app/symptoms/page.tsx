@@ -38,6 +38,7 @@ export default function SymptomAnalysisPage() {
   const [creditInfo, setCreditInfo] = useState<any>({ dailyUsed: 0, dailyLimit: 0, additionalCredits: 0, plan: 'FREE', creditCost: 1 })
   const [tagsExpanded, setTagsExpanded] = useState<boolean>(false)
   const [usageMeterRefresh, setUsageMeterRefresh] = useState<number>(0) // Trigger for UsageMeter refresh
+  const [hasPaidAccess, setHasPaidAccess] = useState<boolean>(false)
 
   // Progress phases shown while analyzing
   const phases = useMemo(() => [
@@ -64,6 +65,26 @@ export default function SymptomAnalysisPage() {
     }, 350)
     return () => clearInterval(timer)
   }, [isAnalyzing])
+
+  useEffect(() => {
+    const fetchCreditStatus = async () => {
+      try {
+        const res = await fetch(`/api/credit/status?t=${Date.now()}`, { cache: 'no-store' })
+        if (!res.ok) return
+        const data = await res.json()
+        const isPremium = data?.plan === 'PREMIUM'
+        const hasWalletCredits =
+          typeof data?.totalAvailableCents === 'number' && data.totalAvailableCents > 0
+        const hasLegacyCredits =
+          typeof data?.credits?.total === 'number' && data.credits.total > 0
+
+        setHasPaidAccess(Boolean(isPremium || hasWalletCredits || hasLegacyCredits))
+      } catch {
+        // ignore failures – fall back to showing free banner
+      }
+    }
+    fetchCreditStatus()
+  }, [usageMeterRefresh])
 
   const quickTags = [
     'Fever','Headache','Cough','Sore throat','Runny nose','Nasal congestion','Sneezing','Fatigue','Body aches','Chills','Night sweats',
@@ -237,9 +258,11 @@ export default function SymptomAnalysisPage() {
             </button>
             <div className="mt-2">
               <p className="text-xs text-gray-500 mb-2">Typical cost: 2-3 credits per analysis</p>
-              <div className="text-[11px] text-blue-800 bg-blue-50 border border-blue-200 rounded px-2 py-1 mb-2">
-                Free accounts can try this AI feature once. After your free analysis, upgrade or buy credits to continue.
-              </div>
+              {!hasPaidAccess && (
+                <div className="text-[11px] text-blue-800 bg-blue-50 border border-blue-200 rounded px-2 py-1 mb-2">
+                  Free accounts can try this AI feature once. After your free analysis, upgrade or buy credits to continue.
+                </div>
+              )}
               <UsageMeter inline={true} refreshTrigger={usageMeterRefresh} />
               <FeatureUsageDisplay featureName="symptomAnalysis" featureLabel="Symptom Analysis" refreshTrigger={usageMeterRefresh} />
             </div>

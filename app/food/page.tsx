@@ -2712,7 +2712,13 @@ Please add nutritional information manually if needed.`);
         const res = await fetch(`/api/credit/status?t=${Date.now()}`, { cache: 'no-store' })
         if (res.ok) {
           const data = await res.json()
-          setHasPaidAccess(Boolean(data?.hasAccess))
+          const isPremium = data?.plan === 'PREMIUM'
+          const hasWalletCredits =
+            typeof data?.totalAvailableCents === 'number' && data.totalAvailableCents > 0
+          const hasLegacyCredits =
+            typeof data?.credits?.total === 'number' && data.credits.total > 0
+
+          setHasPaidAccess(Boolean(isPremium || hasWalletCredits || hasLegacyCredits))
         }
       } catch {
         // ignore failures

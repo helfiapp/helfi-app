@@ -56,32 +56,33 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
         })
         if (res.ok) {
           const data = await res.json()
-          // Show usage meter if user has access (subscription OR credits)
-          if (data.hasAccess === true) {
-            setHasAccess(true)
-            if (typeof data.percentUsed === 'number') {
-              setWalletPercentUsed(data.percentUsed)
-            }
-            if (data.refreshAt) {
-              setWalletRefreshAt(data.refreshAt)
-            }
-            if (typeof data.totalAvailableCents === 'number') {
-              setTotalAvailableCents(data.totalAvailableCents)
-            }
-            if (typeof data.monthlyUsedCents === 'number') {
-              setMonthlyUsedCents(data.monthlyUsedCents)
-            }
-            if (typeof data.monthlyCapCents === 'number') {
-              setMonthlyCapCents(data.monthlyCapCents)
-            }
-            if (data.credits) {
-              if (typeof data.credits.total === 'number') setCreditsTotal(data.credits.total)
-              if (typeof data.credits.dailyRemaining === 'number') setCreditsDailyRemaining(data.credits.dailyRemaining)
-              if (typeof data.credits.additionalRemaining === 'number') setCreditsAdditionalRemaining(data.credits.additionalRemaining)
-            }
-          } else {
-            setHasAccess(false)
+          // Treat any successful status response for a logged‑in user as
+          // sufficient to show the meter. Billing enforcement lives in the
+          // analyzer APIs; this meter is purely a visibility/UX layer.
+          setHasAccess(true)
+
+          if (typeof data.percentUsed === 'number') {
+            setWalletPercentUsed(data.percentUsed)
           }
+          if (data.refreshAt) {
+            setWalletRefreshAt(data.refreshAt)
+          }
+          if (typeof data.totalAvailableCents === 'number') {
+            setTotalAvailableCents(data.totalAvailableCents)
+          }
+          if (typeof data.monthlyUsedCents === 'number') {
+            setMonthlyUsedCents(data.monthlyUsedCents)
+          }
+          if (typeof data.monthlyCapCents === 'number') {
+            setMonthlyCapCents(data.monthlyCapCents)
+          }
+          if (data.credits) {
+            if (typeof data.credits.total === 'number') setCreditsTotal(data.credits.total)
+            if (typeof data.credits.dailyRemaining === 'number') setCreditsDailyRemaining(data.credits.dailyRemaining)
+            if (typeof data.credits.additionalRemaining === 'number') setCreditsAdditionalRemaining(data.credits.additionalRemaining)
+          }
+        } else {
+          setHasAccess(false)
         }
       } catch {
         // ignore errors
