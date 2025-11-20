@@ -702,7 +702,16 @@ CRITICAL REQUIREMENTS:
       try {
         const m = analysis.match(/<ITEMS_JSON>([\s\S]*?)<\/ITEMS_JSON>/i);
         if (m && m[1]) {
-          const parsed = parseItemsJsonRelaxed(m[1].trim());
+          // Some model variants wrap the JSON payload in ```json fences even
+          // inside our <ITEMS_JSON>...</ITEMS_JSON> tag. Strip those wrappers
+          // before attempting relaxed JSON parsing so we don't silently drop
+          // otherwise valid ingredient data.
+          const rawBlock = m[1].trim();
+          const cleanedBlock = rawBlock
+            .replace(/```json/gi, '')
+            .replace(/```/g, '')
+            .trim();
+          const parsed = parseItemsJsonRelaxed(cleanedBlock);
           if (parsed && typeof parsed === 'object') {
             resp.items = Array.isArray(parsed.items) ? parsed.items : [];
             resp.total = typeof parsed.total === 'object' ? parsed.total : null;
@@ -747,7 +756,14 @@ CRITICAL REQUIREMENTS:
           } as any);
           totalCostCents += extractor.costCents;
           const text = extractor.completion.choices?.[0]?.message?.content?.trim() || '';
-          const parsed = text ? parseItemsJsonRelaxed(text) : null;
+          // Handle cases where the assistant still wraps JSON in ```json fences
+          // despite instructions to return raw JSON only.
+          const cleaned =
+            text
+              .replace(/```json/gi, '')
+              .replace(/```/g, '')
+              .trim() || '';
+          const parsed = cleaned ? parseItemsJsonRelaxed(cleaned) : null;
           if (parsed && typeof parsed === 'object') {
             const items = Array.isArray(parsed.items) ? parsed.items : [];
             const total = typeof parsed.total === 'object' ? parsed.total : null;
