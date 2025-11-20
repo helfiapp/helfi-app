@@ -38,28 +38,6 @@ export async function GET(_req: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    const isPremium = user.subscription?.plan === 'PREMIUM'
-    
-    // Check if user has purchased credits (non-expired)
-    const now = new Date()
-    const hasPurchasedCredits = user.creditTopUps.some(
-      (topUp: any) => topUp.expiresAt > now && (topUp.amountCents - topUp.usedCents) > 0
-    )
-    
-    // Only show usage meter if user has subscription OR purchased credits
-    if (!isPremium && !hasPurchasedCredits) {
-      return NextResponse.json({
-        plan: null,
-        percentUsed: 0,
-        refreshAt: null,
-        monthlyCapCents: 0,
-        monthlyUsedCents: 0,
-        topUps: [],
-        totalAvailableCents: 0,
-        hasAccess: false
-      })
-    }
-
     const cm = new CreditManager(user.id)
     const status = await cm.getWalletStatus()
     // For subscription users, credits come from wallet (monthlyCapCents - monthlyUsedCents + top-ups)
@@ -75,13 +53,17 @@ export async function GET(_req: NextRequest) {
     }
     
     // Compute next reset timestamp (1st of next month, UTC)
+    const now = new Date()
     const nextReset = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 0, 0))
 
     return NextResponse.json({
       percentUsed: status.percentUsed, // percentage of monthly wallet only
       refreshAt: nextReset.toISOString(),
       plan: status.plan, // Include plan to check if user has PREMIUM
-      hasAccess: true, // User has subscription or credits
+      // Expose usage meter to any authenticated user. Billing enforcement is
+      // handled separately; this flag only controls visibility of the UI
+      // progress bar, not whether analyses are allowed.
+      hasAccess: true,
       // Additional details for UI (kept minimal; no dollar values shown)
       monthlyCapCents: status.monthlyCapCents,
       monthlyUsedCents: status.monthlyUsedCents,
