@@ -250,6 +250,12 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
 
+  const parseNumber = (value: string): number | null => {
+    if (!value) return null;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  };
+
   // Keep local state in sync when initial data loads or changes,
   // but avoid overwriting any values the user has already edited on this step.
   useEffect(() => {
@@ -458,9 +464,48 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
     onBack();
   };
 
-  const handleUnitChange = useCallback((newUnit: 'metric' | 'imperial') => {
-    setUnit(newUnit);
-  }, []);
+  const handleUnitChange = useCallback(
+    (newUnit: 'metric' | 'imperial') => {
+      if (newUnit === unit) return;
+
+      if (newUnit === 'imperial') {
+        // Metric → imperial (kg → lbs, cm → ft/in)
+        const kg = parseNumber(weight);
+        if (kg != null) {
+          const lbs = kg * 2.20462;
+          setWeight(String(Math.round(lbs)));
+        }
+
+        const cmVal = parseNumber(height);
+        if (cmVal != null && cmVal > 0) {
+          const totalInches = cmVal / 2.54;
+          const wholeFeet = Math.floor(totalInches / 12);
+          const remainingInches = Math.round(totalInches - wholeFeet * 12);
+          setFeet(wholeFeet > 0 ? String(wholeFeet) : '');
+          setInches(remainingInches > 0 ? String(remainingInches) : '');
+        }
+      } else {
+        // Imperial → metric (lbs → kg, ft/in → cm)
+        const lbs = parseNumber(weight);
+        if (lbs != null) {
+          const kg = lbs / 2.20462;
+          setWeight(String(Math.round(kg)));
+        }
+
+        const ftVal = parseNumber(feet);
+        const inchVal = parseNumber(inches);
+        const totalInches =
+          (ftVal != null ? ftVal * 12 : 0) + (inchVal != null ? inchVal : 0);
+        if (totalInches > 0) {
+          const cmVal = totalInches * 2.54;
+          setHeight(String(Math.round(cmVal)));
+        }
+      }
+
+      setUnit(newUnit);
+    },
+    [unit, weight, height, feet, inches],
+  );
 
   const handleBodyTypeChange = useCallback((type: string) => {
     setBodyType(type);
@@ -581,6 +626,20 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
       </div>
       <h2 className="text-2xl font-bold mb-4">How tall are you?</h2>
       <p className="mb-4 text-gray-600">Height helps us calculate key health metrics.</p>
+      <div className="flex justify-end mb-2">
+        <button
+          className={`px-3 py-1 rounded-l ${unit === 'metric' ? 'bg-helfi-green text-white' : 'bg-gray-100'}`}
+          onClick={() => handleUnitChange('metric')}
+        >
+          cm
+        </button>
+        <button
+          className={`px-3 py-1 rounded-r ${unit === 'imperial' ? 'bg-helfi-green text-white' : 'bg-gray-100'}`}
+          onClick={() => handleUnitChange('imperial')}
+        >
+          ft/in
+        </button>
+      </div>
       <div className="mb-4">
         {unit === 'metric' ? (
           <input
