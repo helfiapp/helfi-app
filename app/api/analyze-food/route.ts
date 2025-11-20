@@ -744,18 +744,10 @@ CRITICAL REQUIREMENTS:
             ],
             max_tokens: 260,
             temperature: 0,
-        } as any);
+          } as any);
           totalCostCents += extractor.costCents;
           const text = extractor.completion.choices?.[0]?.message?.content?.trim() || '';
-          // Some models still wrap JSON in ```json ``` fences despite instructions.
-          // Strip those wrappers before running our relaxed JSON parser so we don't
-          // silently discard otherwise-valid structured items.
-          const cleaned =
-            text
-              .replace(/```json/gi, '')
-              .replace(/```/g, '')
-              .trim() || '';
-          const parsed = cleaned ? parseItemsJsonRelaxed(cleaned) : null;
+          const parsed = text ? parseItemsJsonRelaxed(text) : null;
           if (parsed && typeof parsed === 'object') {
             const items = Array.isArray(parsed.items) ? parsed.items : [];
             const total = typeof parsed.total === 'object' ? parsed.total : null;

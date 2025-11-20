@@ -685,66 +685,6 @@ const extractItemsFromTextEstimates = (analysis: string) => {
     return { items, total: null }
   }
 
-  // 4) Calorie-only narrative fallback for common meal patterns (e.g. burgers)
-  // This is intentionally conservative: we only parse phrases that clearly
-  // attribute calories to specific components (bun, patty, cheese, bacon,
-  // vegetables + sauce, etc.). Macros remain null so we don't fabricate
-  // protein/carb/fat splits – the overall macros still come from the main
-  // analysis total.
-  if (!items.length) {
-    const narrativeItems: any[] = []
-    const text = analysis.replace(/\s+/g, ' ')
-    const narrativeRegex =
-      /\b((?:burger\s+)?bun|beef\s+patty(?:\s*\([^)]*\))?|patty(?:\s*\([^)]*\))?|cheese|bacon|vegetables?\s*(?:and\s*sauce)?|veggies?\s*(?:and\s*sauce)?|vegetables?|sauce|lettuce|tomato(?:es)?)\b[^.]*?(?:is|are|adds?|add|contributes?|contribute)\s*(?:around|about|approximately|roughly|~)?\s*(\d+(?:\.\d+)?)\s*calories?/gi
-
-    let m: RegExpExecArray | null
-    while ((m = narrativeRegex.exec(text)) !== null) {
-      const rawLabel = m[1] || ''
-      const calories = Number(m[2])
-      if (!Number.isFinite(calories) || calories <= 0) continue
-
-      // Extract optional serving size from parentheses, e.g. "beef patty (6 oz)"
-      const servingMatch = rawLabel.match(/\(([^)]+)\)/)
-      const serving_size = servingMatch ? servingMatch[1].trim() : ''
-
-      // Clean up the display name
-      let name = rawLabel
-        .replace(/\(([^)]+)\)/g, '')
-        .replace(/\b(the|a|an)\b/gi, '')
-        .replace(/\bburger\b/gi, '')
-        .trim()
-      if (!name) {
-        name = 'Food item'
-      } else {
-        name = name.replace(/\b\w/g, (c) => c.toUpperCase())
-      }
-
-      narrativeItems.push({
-        name,
-        brand: null,
-        serving_size,
-        servings: 1,
-        calories,
-        protein_g: null,
-        carbs_g: null,
-        fat_g: null,
-        fiber_g: null,
-        sugar_g: null,
-      })
-    }
-
-    if (narrativeItems.length > 0) {
-      const total = narrativeItems.reduce(
-        (acc, it) => {
-          acc.calories += it.calories || 0
-          return acc
-        },
-        { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fiber_g: 0, sugar_g: 0 },
-      )
-      return { items: narrativeItems, total }
-    }
-  }
-
   if (!items.length) return null
 
   const total = items.reduce(
@@ -1044,59 +984,15 @@ const applyStructuredItems = (
     const fallback = extractStructuredItemsFromAnalysis(analysisText)
     if (fallback?.items?.length) {
       finalItems = fallback.items
-      // Only adopt totals from text when we don't already have a structured
-      // total from the API. This avoids overwriting good JSON totals with
-      // weaker prose-derived ones.
-      const fallbackTotal = sanitizeNutritionTotals(fallback.total)
-      if (!finalTotal && fallbackTotal) {
-        finalTotal = fallbackTotal
-      }
+      finalTotal = sanitizeNutritionTotals(fallback.total) || finalTotal
       console.log('✅ Extracted items from structured analysis:', finalItems.length)
     } else {
       const prose = extractItemsFromTextEstimates(analysisText)
       if (prose?.items?.length) {
         finalItems = prose.items
-        const proseTotal = sanitizeNutritionTotals(prose.total)
-        if (!finalTotal && proseTotal) {
-          finalTotal = proseTotal
-        }
+        finalTotal = sanitizeNutritionTotals(prose.total) || finalTotal
         console.log('✅ Extracted items from text estimates:', finalItems.length)
       }
-    }
-  }
-
-  // 🛡️ SAFETY NET: If we still have no items but we do have a usable total from the
-  // API or text, create a single synthetic item so "Detected Foods" never ends up
-  // card‑less. This keeps the macro circle and the cards in sync while providing at
-  // least one editable card for the meal.
-  if (!finalItems.length && analysisText) {
-    // Prefer API/JSON totals; fall back to a prose-extracted line only when needed.
-    const textTotals = sanitizeNutritionTotals(extractNutritionData(analysisText))
-    const baseTotals = finalTotal || textTotals
-
-    // Only create a fallback item when we have real nutrition numbers and the
-    // analysis does not look like a billing/credit error message.
-    const looksLikeError =
-      /insufficient credits|trial limit|temporarily unavailable|failed to analyze/i.test(
-        analysisText,
-      )
-
-    if (baseTotals && !looksLikeError) {
-      const baseName = extractBaseMealDescription(analysisText) || 'Food item'
-      const syntheticItem: any = {
-        name: baseName,
-        brand: null,
-        serving_size: '',
-        servings: 1,
-        calories: baseTotals.calories ?? null,
-        protein_g: baseTotals.protein ?? null,
-        carbs_g: baseTotals.carbs ?? null,
-        fat_g: baseTotals.fat ?? null,
-        fiber_g: baseTotals.fiber ?? null,
-        sugar_g: baseTotals.sugar ?? null,
-      }
-      finalItems = [syntheticItem]
-      console.log('🛡️ Created synthetic fallback item to avoid cardless analysis')
     }
   }
 
@@ -1109,7 +1005,7 @@ const applyStructuredItems = (
     finalTotalValue: finalTotal ? JSON.stringify(finalTotal) : 'null',
   })
 
-  // Priority order for totals:
+  // Priority order for totals (updated):
   // 1. Recalculated from enriched items (so the circle always matches the cards the user sees)
   // 2. API-provided total (if item-based recalculation is missing or clearly zero)
   // 3. Extracted from analysis text (fallback)
