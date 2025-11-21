@@ -78,6 +78,100 @@ const computeTotalsFromItems = (items: any[]): any | null => {
   };
 };
 
+// Heuristic correction for discrete foods where the serving label clearly
+// describes multiple units (e.g. "3 large eggs", "4 slices bacon") but the
+// calories/macros look like a single unit. This runs **after** we have parsed
+// ITEMS_JSON and before values are sent to the Food Diary UI.
+const harmonizeDiscretePortionItems = (items: any[]): { items: any[]; total: any | null } => {
+  if (!Array.isArray(items) || items.length === 0) {
+    return { items, total: null };
+  }
+
+  const cloned = items.map((item) => ({ ...item }));
+
+  const parseCountFromLabel = (label: string): number | null => {
+    if (!label) return null;
+    const lower = String(label).toLowerCase();
+    // Match patterns like:
+    // "approximately 3 large eggs", "about 4 slices", "3 rashers of bacon"
+    const m = lower.match(/(?:about|approximately|approx\.?|around)?\s*(\d+(?:\.\d+)?)/);
+    if (!m) return null;
+    const n = parseFloat(m[1]);
+    if (!Number.isFinite(n) || n <= 1) return null;
+    return n;
+  };
+
+  const containsAny = (text: string, keywords: string[]): boolean => {
+    const lower = text.toLowerCase();
+    return keywords.some((k) => lower.includes(k));
+  };
+
+  const EGG_KEYWORDS = ['egg', 'eggs', 'scrambled egg', 'scrambled eggs', 'omelette', 'omelet'];
+  const BACON_KEYWORDS = ['bacon', 'rasher', 'rashers', 'bacon strip', 'bacon strips'];
+
+  for (const item of cloned) {
+    const name = (item?.name || '') as string;
+    const servingSize = (item?.serving_size || '') as string;
+    const labelSource = `${name} ${servingSize}`.trim();
+    const count = parseCountFromLabel(servingSize || name);
+    if (!count || count <= 1) continue;
+
+    const calories = Number(item?.calories ?? 0);
+    const protein = Number(item?.protein_g ?? 0);
+    const carbs = Number(item?.carbs_g ?? 0);
+    const fat = Number(item?.fat_g ?? 0);
+    const fiber = Number(item?.fiber_g ?? 0);
+    const sugar = Number(item?.sugar_g ?? 0);
+
+    if (!Number.isFinite(calories) || calories <= 0) continue;
+
+    // Helper to safely scale a nutrient by a factor when it is a finite number.
+    const scale = (value: number, factor: number): number | null => {
+      if (!Number.isFinite(value) || value === 0) return value || null;
+      const v = value * factor;
+      return Number.isFinite(v) && v > 0 ? v : null;
+    };
+
+    // Eggs: label says "3 large eggs" etc, but calories ~= one egg (~70).
+    if (containsAny(labelSource, EGG_KEYWORDS)) {
+      // Treat values as per-egg if calories look like a single egg.
+      if (calories > 0 && calories <= 120) {
+        const newCalories = calories * count;
+        // Sanity range: 2–10 eggs worth of calories.
+        if (newCalories >= 120 && newCalories <= 800) {
+          item.calories = Math.round(newCalories);
+          item.protein_g = scale(protein, count);
+          item.carbs_g = scale(carbs, count);
+          item.fat_g = scale(fat, count);
+          item.fiber_g = scale(fiber, count);
+          item.sugar_g = scale(sugar, count);
+          continue;
+        }
+      }
+    }
+
+    // Bacon: label says "about 4 slices" etc, but calories ~= one slice (~40).
+    if (containsAny(labelSource, BACON_KEYWORDS)) {
+      if (calories > 0 && calories <= 60) {
+        const newCalories = calories * count;
+        // Sanity range: 2–12 slices worth of calories.
+        if (newCalories >= 80 && newCalories <= 600) {
+          item.calories = Math.round(newCalories);
+          item.protein_g = scale(protein, count);
+          item.carbs_g = scale(carbs, count);
+          item.fat_g = scale(fat, count);
+          item.fiber_g = scale(fiber, count);
+          item.sugar_g = scale(sugar, count);
+          continue;
+        }
+      }
+    }
+  }
+
+  const total = computeTotalsFromItems(cloned);
+  return { items: cloned, total };
+};
+
 // Initialize OpenAI client only when API key is available
 // Updated: 2025-06-26 - Ensure environment variable is properly loaded
 const getOpenAIClient = () => {
@@ -787,6 +881,22 @@ CRITICAL REQUIREMENTS:
 
     if (resp.items && resp.items.length > 0 && !resp.total) {
       resp.total = computeTotalsFromItems(resp.items);
+    }
+
+    // Final safety pass: if the AI has described a discrete portion like
+    // "3 large eggs" or "4 slices of bacon" but provided calories/macros that
+    // only match a single unit, scale those macros up so that the totals match
+    // the visible serving description. This does not touch the Food Diary UI
+    // or diary loading logic – it only corrects the structured items returned
+    // from this API.
+    if (resp.items && Array.isArray(resp.items) && resp.items.length > 0) {
+      const harmonized = harmonizeDiscretePortionItems(resp.items);
+      resp.items = harmonized.items;
+      if (harmonized.total) {
+        resp.total = harmonized.total;
+      } else if (!resp.total) {
+        resp.total = computeTotalsFromItems(resp.items);
+      }
     }
 
     // NOTE: USDA/FatSecret database enhancement removed from AI photo analysis flow
