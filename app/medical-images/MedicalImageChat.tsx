@@ -17,6 +17,12 @@ interface MedicalImageChatProps {
 }
 
 const SECTION_HEADINGS = [
+  // Current chat structure
+  '**Short answer**',
+  '**Why this matters**',
+  '**When to see a doctor**',
+  '**What you can do at home**',
+  // Legacy headings kept for backwards compatibility
   '**Summary of what the analysis found**',
   '**Most likely condition (high confidence)**',
   '**Other possible explanations (medium / low)**',
