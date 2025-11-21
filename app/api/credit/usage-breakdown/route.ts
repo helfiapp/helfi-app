@@ -4,6 +4,10 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { CREDIT_COSTS } from '@/lib/credit-system'
 
+// Usage breakdown reads per-user data and must be dynamic.
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export async function GET(_req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)

@@ -4,6 +4,10 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { CREDIT_COSTS } from '@/lib/credit-system'
 
+// This API depends on session headers and must never be statically rendered.
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export async function GET(_req: NextRequest) {
   let debugStage = 'start'
   try {

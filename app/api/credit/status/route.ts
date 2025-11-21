@@ -4,6 +4,10 @@ import { getToken } from 'next-auth/jwt'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
+// This API must always be dynamic because it depends on per-request auth headers.
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 // Direct mapping of subscription price → monthly wallet credits
 // Mirrors CreditManager.SUBSCRIPTION_CREDITS_MAP but kept local here to
 // avoid depending on wallet internals (display‑only endpoint).
