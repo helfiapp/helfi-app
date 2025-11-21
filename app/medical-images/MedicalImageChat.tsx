@@ -45,6 +45,14 @@ function normaliseMedicalChatContent(raw: string): string {
     text = text.replace(pattern, `\n${heading}\n`)
   }
 
+  // As a safety net, push any remaining **bold heading** patterns onto their own line.
+  // This helps when the model forgets to add line breaks (e.g. "...sentence.**Why this matters** More text")
+  // by turning them into:
+  //   ...sentence.
+  //   **Why this matters**
+  //   More text
+  text = text.replace(/(\*\*[A-Za-z][^*\n]{2,80}\*\*)/g, '\n$1\n')
+
   // Collapse any excessive blank lines so spacing stays neat.
   text = text.replace(/\n{3,}/g, '\n\n')
 
