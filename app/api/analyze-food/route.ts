@@ -489,10 +489,9 @@ CRITICAL REQUIREMENTS:
     // Check if user has used their free food analysis
     const hasUsedFreeFood = (currentUser as any).hasUsedFreeFoodAnalysis || false;
     
-    // TEMPORARY SAFETY: Do not block analyses if billing/credits are misconfigured.
-    // When billing is fully stable again, set BILLING_ENFORCED back to true and
-    // restore strict credit checks.
-    const BILLING_ENFORCED = false;
+    // Billing is now stable again – enforce credit checks for Food Analysis.
+    // This controls wallet pre-checks and charges; free trial logic still applies.
+    const BILLING_ENFORCED = true;
 
     // Allow if: Premium subscription OR has purchased credits OR hasn't used free use yet
     let allowViaFreeUse = false;
