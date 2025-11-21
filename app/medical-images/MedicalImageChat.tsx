@@ -16,6 +16,35 @@ interface MedicalImageChatProps {
   analysisResult: MedicalAnalysisResult
 }
 
+const SECTION_HEADINGS = [
+  '**Summary of what the analysis found**',
+  '**Most likely condition (high confidence)**',
+  '**Other possible explanations (medium / low)**',
+  '**Red-flag signs to watch for**',
+  '**What you can do next**',
+]
+
+function escapeForRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function normaliseMedicalChatContent(raw: string): string {
+  let text = raw || ''
+
+  // Ensure each major section heading appears on its own line so the UI
+  // can render it as a separate, nicely spaced block (even if the model
+  // streams everything in one long paragraph).
+  for (const heading of SECTION_HEADINGS) {
+    const pattern = new RegExp(escapeForRegExp(heading), 'g')
+    text = text.replace(pattern, `\n${heading}\n`)
+  }
+
+  // Collapse any excessive blank lines so spacing stays neat.
+  text = text.replace(/\n{3,}/g, '\n\n')
+
+  return text.trim()
+}
+
 export default function MedicalImageChat({ analysisResult }: MedicalImageChatProps) {
   const storageKey = useMemo(() => `helfi:medical-images:chat`, [])
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -245,22 +274,40 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
                   className="text-sm leading-relaxed break-words"
                   style={{ whiteSpace: 'pre-wrap' }}
                 >
-                  {m.content.split('\n').map((line, i) => {
+                  {normaliseMedicalChatContent(m.content).split('\n').map((line, i) => {
                     const trimmed = line.trim()
                     if (!trimmed) {
                       return <div key={i} className="h-3" />
                     }
 
-                    // Section headings in **bold**
-                    if (trimmed.startsWith('**') && trimmed.endsWith('**') && trimmed.length > 4) {
-                      return (
-                        <div
-                          key={i}
-                          className="font-bold text-gray-900 mb-2 mt-3 first:mt-0"
-                        >
-                          {trimmed.slice(2, -2)}
-                        </div>
-                      )
+                    // Section headings in **bold** – allow for cases where the model
+                    // keeps the heading and the first sentence on the same line.
+                    if (trimmed.startsWith('**')) {
+                      const endIndex = trimmed.indexOf('**', 2)
+                      if (endIndex > 2) {
+                        const headingText = trimmed.slice(2, endIndex)
+                        const rest = trimmed.slice(endIndex + 2).trim()
+
+                        if (!rest) {
+                          return (
+                            <div
+                              key={i}
+                              className="font-bold text-gray-900 mb-2 mt-3 first:mt-0"
+                            >
+                              {headingText}
+                            </div>
+                          )
+                        }
+
+                        return (
+                          <div key={i}>
+                            <div className="font-bold text-gray-900 mb-1 mt-3 first:mt-0">
+                              {headingText}
+                            </div>
+                            <div className="mb-2">{rest}</div>
+                          </div>
+                        )
+                      }
                     }
 
                     // Numbered list

@@ -98,6 +98,7 @@ export async function POST(req: NextRequest) {
       '- Simple, practical steps (for example: monitor at home, book a routine doctor/dermatologist visit, or seek urgent care).',
       '',
       'Formatting rules:',
+      '- Put each heading (the bold titles above) on its own line, with a blank line after it before the text or bullets for that section.',
       '- Use short paragraphs and bullet points, not one big block of text.',
       '- Use headings in **bold** exactly as shown above so they render as clear sections in the chat UI.',
       '- Keep language clear, supportive, and non-technical.',
