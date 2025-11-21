@@ -775,6 +775,7 @@ export default function FoodDiary() {
   const [showAddFood, setShowAddFood] = useState(false)
   const [showPhotoOptions, setShowPhotoOptions] = useState(false)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [analysisPhase, setAnalysisPhase] = useState<'idle' | 'preparing' | 'analyzing' | 'building'>('idle')
   const [isSavingEntry, setIsSavingEntry] = useState(false)
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
@@ -1965,6 +1966,7 @@ function sanitizeNutritionTotals(raw: any): NutritionTotals | null {
     if (!photoFile) return;
     
     setIsAnalyzing(true);
+    setAnalysisPhase('preparing');
     
     try {
       console.log('🔍 AGENT #6 DEBUG: Starting photo analysis...');
@@ -1996,6 +1998,7 @@ function sanitizeNutritionTotals(raw: any): NutritionTotals | null {
 
       // Step 3: API call with detailed logging
       console.log('🌐 Calling API endpoint...');
+      setAnalysisPhase('analyzing');
       const response = await fetch('/api/analyze-food', {
         method: 'POST',
         body: formData,
@@ -2021,6 +2024,7 @@ function sanitizeNutritionTotals(raw: any): NutritionTotals | null {
               featureUsageToday: { foodAnalysis: 0, interactionAnalysis: 0 }
             });
             setShowCreditsModal(true);
+            setAnalysisPhase('idle');
             setIsAnalyzing(false);
             return;
           } catch (parseError) {
@@ -2049,6 +2053,7 @@ function sanitizeNutritionTotals(raw: any): NutritionTotals | null {
       
       if (result.success && result.analysis) {
         console.log('🎉 SUCCESS: Real AI analysis received!');
+        setAnalysisPhase('building');
         setAiDescription(result.analysis);
         applyStructuredItems(result.items, result.total, result.analysis);
         // Set health warning and alternatives if present
@@ -2095,6 +2100,7 @@ Meanwhile, you can describe your food manually:
       setShowAiResult(true);
     } finally {
       setIsAnalyzing(false);
+      setAnalysisPhase('idle');
     }
   };
 
@@ -2106,6 +2112,7 @@ Meanwhile, you can describe your food manually:
     if (manualFoodType === 'multiple' && manualIngredients.every(ing => !ing.name.trim() || !ing.weight.trim())) return;
     
     setIsAnalyzing(true);
+    setAnalysisPhase('analyzing');
     
     try {
       console.log('🚀 PERFORMANCE: Starting fast text-based food analysis...');
@@ -2147,6 +2154,7 @@ Meanwhile, you can describe your food manually:
       const result = await response.json();
       
       if (result.analysis) {
+        setAnalysisPhase('building');
         setAiDescription(result.analysis);
         applyStructuredItems(result.items, result.total, result.analysis);
         // Set health warning and alternatives if present
@@ -2179,6 +2187,7 @@ Please add nutritional information manually if needed.`);
       setManualFoodType('single');
     } finally {
       setIsAnalyzing(false);
+      setAnalysisPhase('idle');
     }
   };
 
@@ -2322,6 +2331,7 @@ Please add nutritional information manually if needed.`);
     if (!descriptionToAnalyze) return;
 
     setIsAnalyzing(true);
+    setAnalysisPhase('analyzing');
     try {
       const response = await fetch('/api/analyze-food', {
         method: 'POST',
@@ -2340,6 +2350,7 @@ Please add nutritional information manually if needed.`);
       if (response.ok) {
         const result = await response.json();
         if (result.success && result.analysis) {
+          setAnalysisPhase('building');
           setAiDescription(result.analysis);
           applyStructuredItems(result.items, result.total, result.analysis);
           setHealthWarning(result.healthWarning || null);
@@ -2356,6 +2367,7 @@ Please add nutritional information manually if needed.`);
       console.error('Error re-analyzing food:', error);
     } finally {
       setIsAnalyzing(false);
+      setAnalysisPhase('idle');
     }
   };
 
@@ -3017,7 +3029,11 @@ Please add nutritional information manually if needed.`);
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
-                        AI is analyzing your food...
+                        {analysisPhase === 'preparing'
+                          ? 'Step 1 of 3: Preparing your photo...'
+                          : analysisPhase === 'analyzing'
+                            ? 'Step 2 of 3: AI is analyzing your food...'
+                            : 'Step 3 of 3: Building ingredient cards...'}
                       </div>
                     ) : (
                       '🤖 Analyze with AI'
@@ -4358,7 +4374,9 @@ Please add nutritional information manually if needed.`);
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
-                        Analyzing Food...
+                        {analysisPhase === 'building'
+                          ? 'Step 2 of 2: Building ingredient cards...'
+                          : 'Step 1 of 2: Analyzing food...'}
                       </>
                     ) : (
                       <>
