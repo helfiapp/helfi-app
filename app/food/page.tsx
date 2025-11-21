@@ -449,6 +449,60 @@ const isVolumeBasedUnitLabel = (label: string) => {
   return volumeKeywords.some((u) => l.includes(u))
 }
 
+// Align servings for discrete items (eggs, bacon slices) when the label clearly
+// states multiple pieces but macros look like a single piece.
+const DISCRETE_SERVING_RULES = [
+  {
+    key: 'eggs',
+    keywords: ['egg', 'eggs', 'omelet', 'omelette', 'scrambled egg'],
+    caloriesPerUnitFloor: 60,
+    proteinPerUnitFloor: 5,
+  },
+  {
+    key: 'bacon',
+    keywords: ['bacon', 'rasher', 'rashers', 'strip', 'strips'],
+    caloriesPerUnitFloor: 35,
+    proteinPerUnitFloor: 2,
+  },
+]
+
+const normalizeDiscreteServingsWithLabel = (items: any[]) => {
+  if (!Array.isArray(items)) return []
+  return items.map((item) => {
+    const next = { ...item }
+    const labelSource = `${item?.name || ''} ${item?.serving_size || ''}`.toLowerCase()
+    if (!labelSource.trim()) return next
+
+    const rule = DISCRETE_SERVING_RULES.find((r) =>
+      r.keywords.some((kw) => labelSource.includes(kw)),
+    )
+    if (!rule) return next
+
+    const meta = parseServingUnitMetadata(item?.serving_size || item?.name || '')
+    const qty = meta?.quantity
+    const unitLabel = meta?.unitLabel || meta?.unitLabelSingular || ''
+    const currentServings = Number.isFinite(Number(next.servings)) ? Number(next.servings) : 1
+
+    if (!qty || qty <= 1.001) return next
+    if (currentServings > 1.05) return next
+    if (!isDiscreteUnitLabel(unitLabel)) return next
+
+    const calories = Number(next.calories)
+    const protein = Number(next.protein_g)
+    const caloriesLow = !Number.isFinite(calories) || calories <= rule.caloriesPerUnitFloor * qty
+    const proteinLow =
+      rule.proteinPerUnitFloor === undefined
+        ? true
+        : !Number.isFinite(protein) || protein <= rule.proteinPerUnitFloor * qty
+
+    if (caloriesLow && proteinLow) {
+      next.servings = qty
+    }
+
+    return next
+  })
+}
+
 const extractStructuredItemsFromAnalysis = (analysis: string | null | undefined) => {
   if (!analysis) return null
   // Strategy:
@@ -479,7 +533,7 @@ const extractStructuredItemsFromAnalysis = (analysis: string | null | undefined)
     }
     if (payload && Array.isArray(payload.items)) {
       return {
-        items: payload.items,
+        items: normalizeDiscreteServingsWithLabel(payload.items),
         total: payload.total || null,
       }
     }
@@ -692,12 +746,15 @@ const extractItemsFromTextEstimates = (analysis: string) => {
         sugar_g: null,
       })
     }
-    return { items, total: null }
+    const normalizedFallback = normalizeDiscreteServingsWithLabel(items)
+    return { items: normalizedFallback, total: null }
   }
 
   if (!items.length) return null
 
-  const total = items.reduce(
+  const normalizedItems = normalizeDiscreteServingsWithLabel(items)
+
+  const total = normalizedItems.reduce(
     (acc, it) => {
       acc.calories += it.calories
       acc.protein_g += it.protein_g
@@ -709,7 +766,7 @@ const extractItemsFromTextEstimates = (analysis: string) => {
     },
     { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fiber_g: 0, sugar_g: 0 }
   )
-  return { items, total }
+  return { items: normalizedItems, total }
 }
 
 // Hook to remove items and recalc, optionally updating editingEntry
@@ -1016,10 +1073,12 @@ const applyStructuredItems = (
   }
 
   const enrichedItems = finalItems.length > 0 ? enrichItemsFromStarter(finalItems) : []
-  setAnalyzedItems(enrichedItems)
+  const normalizedItems =
+    enrichedItems.length > 0 ? normalizeDiscreteServingsWithLabel(enrichedItems) : []
+  setAnalyzedItems(normalizedItems)
 
   console.log('📊 Processing totals:', {
-    enrichedItemsCount: enrichedItems.length,
+    enrichedItemsCount: normalizedItems.length,
     hasFinalTotal: !!finalTotal,
     finalTotalValue: finalTotal ? JSON.stringify(finalTotal) : 'null',
   })
@@ -1030,8 +1089,8 @@ const applyStructuredItems = (
   // 3. Extracted from analysis text (fallback)
   let totalsToUse: NutritionTotals | null = null
 
-  if (enrichedItems.length > 0) {
-    const fromItems = recalculateNutritionFromItems(enrichedItems)
+  if (normalizedItems.length > 0) {
+    const fromItems = recalculateNutritionFromItems(normalizedItems)
     console.log(
       '📊 Recalculated totals from enriched items:',
       fromItems ? JSON.stringify(fromItems) : 'null',
@@ -1059,9 +1118,9 @@ const applyStructuredItems = (
     setAnalyzedNutrition(totalsToUse)
     setAnalyzedTotal(convertTotalsForStorage(totalsToUse))
     console.log('✅ Set nutrition totals:', JSON.stringify(totalsToUse))
-  } else if (enrichedItems.length > 0) {
+  } else if (normalizedItems.length > 0) {
     // If we have items but no totals, recalculate one more time as a last resort
-    const lastResortTotals = recalculateNutritionFromItems(enrichedItems)
+    const lastResortTotals = recalculateNutritionFromItems(normalizedItems)
     if (lastResortTotals) {
       setAnalyzedNutrition(lastResortTotals)
       setAnalyzedTotal(convertTotalsForStorage(lastResortTotals))
@@ -1077,7 +1136,7 @@ const applyStructuredItems = (
     setAnalyzedTotal(null)
   }
 
-  return { items: enrichedItems, total: totalsToUse }
+  return { items: normalizedItems, total: totalsToUse }
 }
 
   const clampNumber = (value: any, min: number, max: number) => {
