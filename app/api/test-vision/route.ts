@@ -243,9 +243,33 @@ export async function POST(req: NextRequest) {
         structured.disclaimer ||
         'This analysis is for information only and does not replace a real doctor’s examination. If symptoms worsen or you are worried, contact a licensed medical professional or emergency services.';
     } else {
-      // Always include at least a basic disclaimer
-      resp.disclaimer =
-        'This analysis is for information only and does not replace a real doctor’s examination. If symptoms worsen or you are worried, contact a licensed medical professional or emergency services.';
+      // If the model refused to analyse the image (for example, for a possibly serious lesion),
+      // replace the unhelpful refusal text with a clear, safety-focused message.
+      const refusal =
+        typeof cleanAnalysis === 'string' &&
+        /i['’]m sorry[, ]+i can['’]t assist with this request/i.test(cleanAnalysis);
+
+      if (refusal) {
+        resp.summary =
+          'This particular photo looks like something our AI provider is not allowed to analyse directly. Because images like this can sometimes indicate serious conditions, it is safer to have it checked in person.';
+        resp.possibleCauses = [];
+        resp.redFlags = [
+          'A new or changing mole or spot on the skin, especially one that looks very dark, irregular, or different from your other moles.',
+          'Any spot that is bleeding, crusting, painful, very itchy, or growing quickly.',
+        ];
+        resp.nextSteps = [
+          'Book an urgent appointment with a GP or dermatologist and show them this exact spot and photo.',
+          'Seek same-day or emergency care if the area is rapidly changing, very painful, or you feel generally unwell.',
+        ];
+        resp.disclaimer =
+          'Because this image could represent a serious condition, the AI is not allowed to give a guess. This is not a diagnosis. Please have a licensed doctor or dermatologist examine the area as soon as you can.';
+        // Avoid showing the raw refusal sentence in the UI.
+        resp.analysis = '';
+      } else {
+        // Always include at least a basic disclaimer
+        resp.disclaimer =
+          'This analysis is for information only and does not replace a real doctor’s examination. If symptoms worsen or you are worried, contact a licensed medical professional or emergency services.';
+      }
     }
 
     return NextResponse.json(resp);
