@@ -775,6 +775,7 @@ export default function FoodDiary() {
   const [showAddFood, setShowAddFood] = useState(false)
   const [showPhotoOptions, setShowPhotoOptions] = useState(false)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [isSavingEntry, setIsSavingEntry] = useState(false)
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [aiDescription, setAiDescription] = useState('')
@@ -2248,32 +2249,37 @@ Please add nutritional information manually if needed.`);
     }
 
     // Save to database (this triggers background insight regeneration)
-    await saveFoodEntries(updatedFoods)
-    
-    // Show subtle notification that insights are updating
-    setInsightsNotification({
-      show: true,
-      message: 'Updating insights...',
-      type: 'updating'
-    });
-    
-    // After a delay, show that insights have been updated
-    setTimeout(() => {
+    setIsSavingEntry(true)
+    try {
+      await saveFoodEntries(updatedFoods)
+      
+      // Show subtle notification that insights are updating
       setInsightsNotification({
         show: true,
-        message: 'Insights updated',
-        type: 'updated'
+        message: 'Updating insights...',
+        type: 'updating'
       });
       
-      // Auto-hide after 3 seconds
+      // After a delay, show that insights have been updated
       setTimeout(() => {
-        setInsightsNotification(null);
-      }, 3000);
-    }, 2000);
-    
-    // Reset all form states
-    resetAnalyzerPanel()
-    setEditingEntry(null)
+        setInsightsNotification({
+          show: true,
+          message: 'Insights updated',
+          type: 'updated'
+        });
+        
+        // Auto-hide after 3 seconds
+        setTimeout(() => {
+          setInsightsNotification(null);
+        }, 3000);
+      }, 2000);
+      
+      // Reset all form states
+      resetAnalyzerPanel()
+      setEditingEntry(null)
+    } finally {
+      setIsSavingEntry(false)
+    }
   };
 
   // New function to update existing entries with AI re-analysis
@@ -2298,12 +2304,17 @@ Please add nutritional information manually if needed.`);
       food.id === editingEntry.id ? updatedEntry : food
     );
     
-    setTodaysFoods(updatedFoods);
-    await saveFoodEntries(updatedFoods, { appendHistory: false });
-    
-    // Reset all form states
-    resetAnalyzerPanel()
-    setEditingEntry(null)
+    setIsSavingEntry(true)
+    try {
+      setTodaysFoods(updatedFoods);
+      await saveFoodEntries(updatedFoods, { appendHistory: false });
+      
+      // Reset all form states
+      resetAnalyzerPanel()
+      setEditingEntry(null)
+    } finally {
+      setIsSavingEntry(false)
+    }
   };
 
   const reanalyzeCurrentEntry = async () => {
@@ -3146,10 +3157,20 @@ Please add nutritional information manually if needed.`);
                       <button
                         type="button"
                         onClick={() => updateFoodEntry()}
-                        disabled={isAnalyzing}
+                        disabled={isAnalyzing || isSavingEntry}
                         className="px-3 py-1.5 rounded-full bg-emerald-500 text-white text-xs sm:text-sm font-medium shadow-sm hover:bg-emerald-600 disabled:opacity-60"
                       >
-                        Save changes
+                        {isSavingEntry ? (
+                          <span className="flex items-center gap-1.5">
+                            <svg className="animate-spin h-3.5 w-3.5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Saving…
+                          </span>
+                        ) : (
+                          'Save changes'
+                        )}
                       </button>
                       <button
                         type="button"
@@ -3911,16 +3932,20 @@ Please add nutritional information manually if needed.`);
                     onClick={() =>
                       editingEntry ? updateFoodEntry() : addFoodEntry(aiDescription, 'photo')
                     }
-                    disabled={isAnalyzing}
+                    disabled={isAnalyzing || isSavingEntry}
                     className="w-full py-3 px-4 bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-300 text-white font-medium rounded-xl transition-colors duration-200 flex items-center justify-center shadow-lg"
                   >
-                    {isAnalyzing ? (
+                    {isAnalyzing || isSavingEntry ? (
                       <>
                         <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
-                        Re-analyzing...
+                        {isAnalyzing
+                          ? 'Re-analyzing...'
+                          : editingEntry
+                            ? 'Saving changes...'
+                            : 'Saving to Food Diary...'}
                       </>
                     ) : (
                       <>
