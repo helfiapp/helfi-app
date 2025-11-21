@@ -348,6 +348,9 @@ for a change.
 - `app/api/credit/status/route.ts` (credits remaining bar – wallet status)
 - `app/api/credit/feature-usage/route.ts` (“This AI feature has been used X times…”)
 - `app/api/credit/usage-breakdown/route.ts` (admin/diagnostic usage breakdown)
+- **Do not undo the discrete-portion fix (Nov 22, 2025):**
+  - `app/food/page.tsx` now *scales macros instead of servings* for discrete items when the label states multiple pieces (e.g., “3 large eggs”, “4 slices bacon”). Servings stays at `1` to avoid “3 servings of 3 eggs”, while calories/macros are multiplied by the labeled count. **Leave this logic intact** unless the user explicitly requests a different design.
+- **Keep bagel starter data intact:** `data/foods-starter.ts` includes `Sesame Bagel` with standard macros so photo analyses have a reliable fallback. Do not remove or rename this entry without approval.
 
 ### 4.2 Absolute Rules for Agents
 
@@ -442,5 +445,4 @@ Before changing anything in the protected areas above, an agent **must**:
 
 If there is *any* doubt, the agent should **not** touch these flows and must ask the user
 for guidance first.
-
 

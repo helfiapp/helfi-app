@@ -168,6 +168,21 @@ const formatEnergyValue = (value: number | null | undefined, unit: 'kcal' | 'kJ'
   return `${rounded} ${unit}`
 }
 
+const formatServingSizeDisplay = (label: string, item: any) => {
+  const base = label && label.trim().length > 0 ? label.trim() : 'Not specified'
+  const macros: string[] = []
+  const kcal = Number(item?.calories)
+  const protein = Number(item?.protein_g)
+  const carbs = Number(item?.carbs_g)
+  const fat = Number(item?.fat_g)
+  if (Number.isFinite(kcal) && kcal > 0) macros.push(`${Math.round(kcal)} kcal`)
+  if (Number.isFinite(protein) && protein > 0) macros.push(`${Math.round(protein * 10) / 10}g protein`)
+  if (Number.isFinite(carbs) && carbs > 0) macros.push(`${Math.round(carbs * 10) / 10}g carbs`)
+  if (Number.isFinite(fat) && fat > 0) macros.push(`${Math.round(fat * 10) / 10}g fat`)
+  if (!macros.length) return base
+  return `${base} (${macros.join(', ')})`
+}
+
 function convertKcalToUnit(value: number | null | undefined, unit: 'kcal' | 'kJ'): number | null {
   if (value === null || value === undefined) return null
   const numeric = Number(value)
@@ -3748,7 +3763,7 @@ Please add nutritional information manually if needed.`);
                                       <div className="text-sm text-gray-600 mt-0.5">Brand: {item.brand}</div>
                                     )}
                                     <div className="text-sm text-gray-500 mt-1">
-                                      Serving size: {servingSizeLabel || 'Not specified'}
+                                      Serving size: {formatServingSizeDisplay(servingSizeLabel || '', item)}
                                     </div>
                                   </>
                                 )}
