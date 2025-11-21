@@ -7,11 +7,14 @@ import { CREDIT_COSTS } from '@/lib/credit-system'
 export async function GET(_req: NextRequest) {
   try {
     // Authentication: rely on standard session (same as usage‑breakdown).
+    let debugStage = 'start'
+    debugStage = 'resolve-session'
     const session = await getServerSession(authOptions)
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    debugStage = 'load-user'
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
       select: {
@@ -108,6 +111,7 @@ export async function GET(_req: NextRequest) {
     }
 
     return NextResponse.json({
+      debugStage: 'success',
       schemaVersion: 2,
       featureUsage,
       hasSubscription,
@@ -117,6 +121,7 @@ export async function GET(_req: NextRequest) {
     console.error('Error fetching feature usage:', err)
     // Degrade gracefully: return zeros so UI can still render without errors.
     return NextResponse.json({
+      debugStage: 'error',
       schemaVersion: 2,
       featureUsage: {
         symptomAnalysis: {

@@ -67,7 +67,9 @@ function computeNextResetAt(subscriptionStart: Date | null): string | null {
 
 export async function GET(_req: NextRequest) {
   try {
+    let debugStage = 'start'
     // 1) Resolve current user (session or JWT fallback)
+    debugStage = 'resolve-session'
     let session = await getServerSession(authOptions)
     let userEmail: string | null = session?.user?.email ?? null
 
@@ -90,6 +92,7 @@ export async function GET(_req: NextRequest) {
     }
 
     // 2) Load user with all fields needed for wallet + legacy credits
+    debugStage = 'load-user'
     const user = await prisma.user.findUnique({
       where: { email: userEmail },
       select: {
@@ -166,6 +169,7 @@ export async function GET(_req: NextRequest) {
 
     return NextResponse.json({
       schemaVersion: 2,
+      debugStage: 'success',
       percentUsed,
       refreshAt,
       plan: user.subscription?.plan ?? null,
@@ -191,6 +195,7 @@ export async function GET(_req: NextRequest) {
     // Degrade gracefully: zero credits but keep shape stable so UI can render.
     return NextResponse.json({
       schemaVersion: 2,
+      debugStage: 'error',
       percentUsed: 0,
       refreshAt: null,
       plan: null,
