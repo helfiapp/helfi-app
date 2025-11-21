@@ -51,8 +51,8 @@ export async function POST(req: NextRequest) {
 
     // Build system prompt with medical image analysis context
     const systemPrompt = [
-      'You are a careful, patient-friendly assistant helping users understand a recent medical image analysis.',
-      'You already have the analysis result from their Medical Image Analyzer. Use that as your context rather than re-diagnosing from scratch.',
+      'You are a careful, patient-friendly assistant helping users understand and ask follow-up questions about a recent medical image analysis.',
+      'You already have the analysis result from their Medical Image Analyzer. Treat that as background context that you silently keep in mind – the user has already seen those results above, so you do NOT need to repeat the whole analysis each time.',
       '',
       analysisResult.summary ? `Analysis summary: ${analysisResult.summary}` : '',
       Array.isArray(analysisResult.possibleCauses) && analysisResult.possibleCauses.length
@@ -71,36 +71,24 @@ export async function POST(req: NextRequest) {
             .join('\n')}`
         : '',
       Array.isArray(analysisResult.nextSteps) && analysisResult.nextSteps.length
-        ? `Suggested next steps:\n${analysisResult.nextSteps
+        ? `Suggested next steps from the analysis:\n${analysisResult.nextSteps
             .map((ns: string) => `- ${ns}`)
             .join('\n')}`
         : '',
       analysisResult.analysisText
-        ? `Full analysis text:\n${String(analysisResult.analysisText).slice(0, 1200)}`
+        ? `Full analysis text (for your reference only):\n${String(analysisResult.analysisText).slice(
+            0,
+            1200
+          )}`
         : '',
       '',
-      'When you answer, ALWAYS format your reply as short, scannable sections using **bold headings** and bullet points so it is easy to read in a chat bubble. Use this structure:',
+      'When you answer, focus on the user’s specific question, not on re-stating the full analysis.',
       '',
-      '**Summary of what the analysis found**',
-      '- 2–3 short sentences in plain language about what the image analysis is mainly saying.',
-      '',
-      '**Most likely condition (high confidence)**',
-      '- Name the condition that is most likely (the one marked [highest] in the context above or the one with highest confidence).',
-      '- Explain in simple terms why it is most likely based on what the analysis described.',
-      '',
-      '**Other possible explanations (medium / low)**',
-      '- Brief bullet points for the other listed conditions, making it clear they are less likely.',
-      '',
-      '**Red-flag signs to watch for**',
-      '- Bullet points describing warning signs from the analysis and what changes would be worrying.',
-      '',
-      '**What you can do next**',
-      '- Simple, practical steps (for example: monitor at home, book a routine doctor/dermatologist visit, or seek urgent care).',
-      '',
-      'Formatting rules:',
-      '- Put each heading (the bold titles above) on its own line, with a blank line after it before the text or bullets for that section.',
-      '- Use short paragraphs and bullet points, not one big block of text.',
-      '- Use headings in **bold** exactly as shown above so they render as clear sections in the chat UI.',
+      'Response guidelines:',
+      '- Start with a **Short answer** section that directly answers what they asked in 2–4 plain-language sentences.',
+      '- After that, add 1–3 short sections with **bold headings** that expand on what matters for their question (for example: **Why this matters**, **Possible risks if left untreated**, **When to see a doctor**, **What you can do at home**).',
+      '- Only pull in details from the analysis when they help answer the question; do NOT dump or repeat the whole original report.',
+      '- Use bullet points for lists so the reply is easy to scan in the chat bubble.',
       '- Keep language clear, supportive, and non-technical.',
       '',
       'Safety rules:',
