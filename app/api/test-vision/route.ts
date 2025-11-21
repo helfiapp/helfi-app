@@ -252,11 +252,33 @@ export async function POST(req: NextRequest) {
 
   } catch (error) {
     console.error('Vision API Error:', error);
-    
-    return NextResponse.json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-      debug: process.env.NODE_ENV === 'development' ? error : undefined
-    }, { status: 500 });
+
+    const anyErr = error as any;
+    const status = anyErr?.status ?? anyErr?.statusCode ?? anyErr?.response?.status;
+    const message = String(anyErr?.message || '');
+    const isQuotaOrRateLimit =
+      status === 429 ||
+      /exceeded your current quota/i.test(message) ||
+      /rate limit/i.test(message);
+
+    if (isQuotaOrRateLimit) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            'Our AI image analysis service is temporarily being limited by the AI provider. Your analysis could not be completed right now. Please wait a short time and try again.',
+        },
+        { status: 429 }
+      );
+    }
+
+    return NextResponse.json(
+      {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        debug: process.env.NODE_ENV === 'development' ? error : undefined,
+      },
+      { status: 500 }
+    );
   }
 } 
