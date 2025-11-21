@@ -165,6 +165,7 @@ export async function GET(_req: NextRequest) {
     const refreshAt = computeNextResetAt(user.subscription?.startDate ?? null)
 
     return NextResponse.json({
+      schemaVersion: 2,
       percentUsed,
       refreshAt,
       plan: user.subscription?.plan ?? null,
@@ -185,10 +186,11 @@ export async function GET(_req: NextRequest) {
         additionalRemaining: showLegacy ? additionalRemainingLegacy : 0,
       },
     })
-  } catch (err) {
+  } catch (err: any) {
     console.error('Error in /api/credit/status:', err)
     // Degrade gracefully: zero credits but keep shape stable so UI can render.
     return NextResponse.json({
+      schemaVersion: 2,
       percentUsed: 0,
       refreshAt: null,
       plan: null,
@@ -203,6 +205,7 @@ export async function GET(_req: NextRequest) {
         additionalRemaining: 0,
       },
       degraded: true,
+      errorType: err?.name || 'UnknownError',
     })
   }
 }

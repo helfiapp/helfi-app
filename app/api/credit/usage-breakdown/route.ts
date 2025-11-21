@@ -102,6 +102,7 @@ export async function GET(_req: NextRequest) {
 
     // Query actual usage from database since monthlyStartDate
     const breakdown: any = {
+      schemaVersion: 1,
       monthlyStartDate: monthlyStartDate?.toISOString() || null,
       walletMonthlyUsedCents: user.walletMonthlyUsedCents || 0,
       features: {},

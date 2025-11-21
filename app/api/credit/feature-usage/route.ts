@@ -108,14 +108,16 @@ export async function GET(_req: NextRequest) {
     }
 
     return NextResponse.json({
+      schemaVersion: 2,
       featureUsage,
       hasSubscription,
       actualCreditsUsed: user.walletMonthlyUsedCents || 0,
     })
-  } catch (err) {
+  } catch (err: any) {
     console.error('Error fetching feature usage:', err)
     // Degrade gracefully: return zeros so UI can still render without errors.
     return NextResponse.json({
+      schemaVersion: 2,
       featureUsage: {
         symptomAnalysis: {
           count: 0,
@@ -152,6 +154,7 @@ export async function GET(_req: NextRequest) {
       hasSubscription: false,
       actualCreditsUsed: 0,
       degraded: true,
+      errorType: err?.name || 'UnknownError',
     })
   }
 }
