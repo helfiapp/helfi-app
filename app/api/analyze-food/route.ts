@@ -11,6 +11,10 @@ import { getToken } from 'next-auth/jwt';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { CreditManager, CREDIT_COSTS } from '@/lib/credit-system';
+
+// Guard rail: this route powers the main Food Analyzer. Billing enforcement
+// (BILLING_ENFORCED) must remain true for production unless the user explicitly
+// asks to pause billing. Do not toggle it off as a "quick fix" for other bugs.
 import OpenAI from 'openai';
 import { chatCompletionWithCost } from '@/lib/metered-openai';
 import { costCentsEstimateFromText } from '@/lib/cost-meter';

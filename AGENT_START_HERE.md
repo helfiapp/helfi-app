@@ -16,7 +16,10 @@ Before pushing ANY code changes to GitHub, you MUST:
 
 3. ✅ **Test Your Changes**: Ensure code compiles and doesn't break existing functionality
 
-4. ✅ **Check Protected Code Areas**: Before modifying email functionality, read `WAITLIST_EMAIL_PROTECTION.md`. Before modifying health setup, onboarding, dashboard redirects, or insights gating, read `HEALTH_SETUP_PROTECTION.md`.
+4. ✅ **Check Protected Code Areas**:  
+   - Before modifying email functionality, read `WAITLIST_EMAIL_PROTECTION.md`.  
+   - Before modifying health setup, onboarding, dashboard redirects, or insights gating, read `HEALTH_SETUP_PROTECTION.md`.  
+   - Before touching the Food Analyzer, food diary loading, or ANY credit/billing logic (wallet, credits remaining bar, feature usage counters), read `GUARD_RAILS.md` and follow its rules.
 
 ## Why This Matters
 
@@ -31,6 +34,7 @@ Before pushing ANY code changes to GitHub, you MUST:
 - **Protected Code Areas**:
   - `WAITLIST_EMAIL_PROTECTION.md` (⚠️ Read before modifying email code)
   - `HEALTH_SETUP_PROTECTION.md` (⚠️ Read before modifying health setup / onboarding / insights code)
+  - `GUARD_RAILS.md` (⚠️ Read before touching Food Analyzer, food diary loading, or credit/billing system)
 - **Vercel Dashboard**: https://vercel.com/louie-veleskis-projects/helfi-app/deployments
 - **Project Name**: `helfi-app`
 - **Team ID**: `team_DLxtczVMOZUXhiInxhTSDrCs`

@@ -1,5 +1,11 @@
 import { prisma } from '@/lib/prisma';
 
+// ABSOLUTE GUARD RAIL:
+// `CreditManager` is the single source of truth for wallet credits and costs.
+// Do NOT "quick-fix" bugs by changing credit prices or bypassing charges here
+// without reading `GUARD_RAILS.md` (credits section) and getting explicit user
+// approval.
+//
 // Credit costs for different features
 export const CREDIT_COSTS = {
   FOOD_ANALYSIS: 1,

@@ -1,7 +1,17 @@
 'use client'
 import { Cog6ToothIcon, UserIcon } from '@heroicons/react/24/outline'
 /**
- * WARNING FOR FUTURE EDITS
+ * ABSOLUTE GUARD RAIL – READ BEFORE EDITING
+ *
+ * This file contains the main Food Analyzer + Food Diary experience. The user
+ * considers this flow “locked”. Do NOT change analysis logic, nutrition math,
+ * diary loading, or credit/billing behaviour here unless:
+ *   1) You have read `GUARD_RAILS.md` (Food Diary + Credits sections), and
+ *   2) The user has explicitly asked for the specific change you are making.
+ *
+ * It is safe to adjust small UI copy or layout around the feature, but any
+ * deeper logic changes require written approval.
+ *
  * This page expects AI responses to include ONE nutrition line exactly like:
  *   Calories: N, Protein: Ng, Carbs: Ng, Fat: Ng
  * The API enforces this and also has a fallback extractor.

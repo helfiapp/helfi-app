@@ -4,6 +4,11 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { CREDIT_COSTS } from '@/lib/credit-system'
 
+// ABSOLUTE GUARD RAIL:
+// This endpoint powers the "This AI feature has been used X times…" text.
+// Do NOT change how featureUsage is computed without reading `GUARD_RAILS.md`
+// and getting explicit user approval.
+//
 // This API depends on session headers and must never be statically rendered.
 export const dynamic = 'force-dynamic'
 export const revalidate = 0

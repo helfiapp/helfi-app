@@ -334,7 +334,54 @@ Before modifying food diary loading logic, agents must test:
 
 ---
 
-## 4. Rules for Future Modifications
+## 4. AI Food Analyzer & Credit/Billing System (Critical Lock)
+
+These flows have been broken repeatedly by past agents. The current behaviour
+is working and must be treated as **locked** unless the user explicitly asks
+for a change.
+
+### 4.1 Protected Files (AI Food Analyzer & Credits)
+
+- `app/food/page.tsx` (entire file – Food Analyzer UI + diary + AI flow)
+- `app/api/analyze-food/route.ts` (Food Analyzer backend / OpenAI calls)
+- `lib/credit-system.ts` (`CreditManager` and credit charging logic)
+- `app/api/credit/status/route.ts` (credits remaining bar – wallet status)
+- `app/api/credit/feature-usage/route.ts` (“This AI feature has been used X times…”)
+- `app/api/credit/usage-breakdown/route.ts` (admin/diagnostic usage breakdown)
+
+### 4.2 Absolute Rules for Agents
+
+Agents **must NOT**:
+
+- Disable billing by flipping booleans such as `BILLING_ENFORCED` to `false`
+  without explicit written approval from the user.
+- Change how remaining credits are calculated or displayed (wallet vs. legacy
+  credits) without:
+  - First asking the user for permission, and
+  - Gathering live JSON from:
+    - `https://helfi.ai/api/credit/status`
+    - `https://helfi.ai/api/credit/feature-usage`
+    - `https://helfi.ai/api/credit/usage-breakdown`
+- Edit the main Food Analyzer logic in `app/food/page.tsx` (analysis flow,
+  ingredient cards, serving controls, nutrition totals, or diary history)
+  unless the user has clearly requested a change to that specific behaviour.
+- Modify `CreditManager` in `lib/credit-system.ts` to “work around” bugs
+  elsewhere. Fix the real bug instead.
+
+If credits or usage counters ever look wrong, agents must:
+
+1. **Do not touch the Food Analyzer or credit code first.**
+2. Ask the user (in simple language) to open the three credit APIs in their
+   browser while logged in and paste the JSON (status, feature-usage,
+   usage-breakdown).
+3. Use those responses to diagnose the issue before proposing any code changes.
+
+Only after following the above and explaining the exact plan in plain English
+may an agent change any of the protected files in this section.
+
+---
+
+## 5. Rules for Future Modifications
 
 Before changing anything in the protected areas above, an agent **must**:
 

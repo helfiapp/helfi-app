@@ -4,6 +4,9 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { CREDIT_COSTS } from '@/lib/credit-system'
 
+// Guard rail: this endpoint is for diagnostics/admin use only. It should not be
+// changed to "patch over" wallet bugs; fix the underlying credit logic instead.
+//
 // Usage breakdown reads per-user data and must be dynamic.
 export const dynamic = 'force-dynamic'
 export const revalidate = 0

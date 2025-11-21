@@ -4,6 +4,12 @@ import { getToken } from 'next-auth/jwt'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
+// ABSOLUTE GUARD RAIL:
+// This endpoint powers the "Credits remaining" bar. Do NOT change credit
+// calculation rules or disable billing here without:
+//   1) Reading `GUARD_RAILS.md` (credits section), and
+//   2) Getting explicit written approval from the user.
+//
 // This API must always be dynamic because it depends on per-request auth headers.
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
