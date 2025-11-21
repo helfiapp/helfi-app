@@ -381,7 +381,51 @@ may an agent change any of the protected files in this section.
 
 ---
 
-## 5. Rules for Future Modifications
+## 5. Medical Image Analyzer & Chat (Locked)
+
+The Medical Image Analyzer has now been stabilised and tuned end‑to‑end:
+
+- Image upload, credit handling and analysis call  
+- Structured “Analysis Results” cards (Summary, Likely conditions, Red‑flags, What to do next, Disclaimer)  
+- Safety‑first handling when the AI provider refuses to analyse a high‑risk image  
+- The “Chat about your medical image” follow‑up assistant with headings and bullet formatting
+
+These flows are **considered complete** and must **not be changed** unless the user explicitly asks for a change to this area.
+
+### 5.1 Protected Files (Medical Image Analyzer)
+
+- `app/medical-images/page.tsx` (entire page – upload, Analyze button behaviour, Analysis Results layout, and how chat is wired in)
+- `app/medical-images/MedicalImageChat.tsx` (chat UI, formatting and reset behaviour)
+- `app/api/test-vision/route.ts` (medical image analysis backend, prompts, safety fallback when the provider refuses to analyse an image)
+- `app/api/medical-images/chat/route.ts` (chat backend using the analysis as context)
+
+### 5.2 Absolute Rules for Agents
+
+Agents **must NOT**:
+
+- Change the layout or structure of the Analysis Results cards (Summary, Likely conditions, Red‑flags, What to do next, Disclaimer) without explicit written approval from the user.  
+- Change how confidence levels are displayed or ordered for conditions (high → medium → low) unless the user has specifically requested a change to that behaviour.  
+- Modify the prompts or safety logic in `app/api/test-vision/route.ts` in a way that weakens the “see a real doctor” guidance when the provider refuses to analyse a potentially serious image.  
+- Alter the chat formatting rules (section headings, bullets, spacing) or how the chat uses the existing analysis as context, except when the user explicitly asks for a change to the medical image chat experience.  
+- Bypass or remove the guard rails that stop the model from diagnosing cancer or other life‑threatening conditions.
+
+Agents **may**:
+
+- Fix clear typos in user‑visible text (copy) if the meaning does not change.  
+- Add strictly internal comments (for other agents) that do not alter runtime behaviour.  
+- Update TypeScript types only if required by a framework upgrade, and only after confirming with the user.
+
+Any functional change to the Medical Image Analyzer or its chat must be:
+
+1. Explained to the user in simple, non‑technical language.  
+2. Explicitly approved in writing by the user.  
+3. Tested with:  
+   - A “normal” image (rash/HSV/benign‑looking lesion)  
+   - A clearly worrying image (suspicious mole or similar) to confirm that the safety fallback still guides the user to a real doctor.
+
+---
+
+## 6. Rules for Future Modifications
 
 Before changing anything in the protected areas above, an agent **must**:
 
