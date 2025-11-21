@@ -3017,6 +3017,37 @@ Please add nutritional information manually if needed.`);
                   height={300}
                   className="w-full max-w-sm aspect-square object-cover rounded-lg mx-auto shadow-lg mb-6"
                 />
+                {/* Always-visible 3-step tracker so progress feels clear even when AI is slow */}
+                <div className="mb-4">
+                  <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 text-[11px] sm:text-xs">
+                    {[
+                      { key: 'preparing' as const, label: 'Step 1 · Preparing photo' },
+                      { key: 'analyzing' as const, label: 'Step 2 · AI analyzing' },
+                      { key: 'building' as const, label: 'Step 3 · Building cards' },
+                    ].map((step, index) => {
+                      const isActive = isAnalyzing && analysisPhase === step.key
+                      const isCompleted =
+                        isAnalyzing &&
+                        ((analysisPhase === 'analyzing' && index === 0) ||
+                          (analysisPhase === 'building' && index < 2))
+                      const dotClass = isActive
+                        ? 'bg-purple-600'
+                        : isCompleted
+                        ? 'bg-purple-300'
+                        : 'bg-gray-300'
+                      const textClass = isActive
+                        ? 'text-purple-700 font-medium'
+                        : 'text-gray-500'
+                      
+                      return (
+                        <div key={step.key} className="flex items-center gap-1.5">
+                          <span className={`h-2.5 w-2.5 rounded-full ${dotClass}`} />
+                          <span className={textClass}>{step.label}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
                 <div className="space-y-3">
                   <button
                     onClick={analyzePhoto}
