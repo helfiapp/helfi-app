@@ -125,26 +125,15 @@ const harmonizeDiscretePortionItems = (items: any[]): { items: any[]; total: any
 
     if (!Number.isFinite(calories) || calories <= 0) continue;
 
-    // Helper to safely scale a nutrient by a factor when it is a finite number.
-    const scale = (value: number, factor: number): number | null => {
-      if (!Number.isFinite(value) || value === 0) return value || null;
-      const v = value * factor;
-      return Number.isFinite(v) && v > 0 ? v : null;
-    };
-
     // Eggs: label says "3 large eggs" etc, but calories ~= one egg (~70).
     if (containsAny(labelSource, EGG_KEYWORDS)) {
-      // Treat values as per-egg if calories look like a single egg.
+      // Treat values as per-egg if calories look like a single egg and we
+      // haven't already set a higher servings count. We then update the
+      // servings field so the UI and totals multiply correctly.
       if (calories > 0 && calories <= 120) {
-        const newCalories = calories * count;
-        // Sanity range: 2–10 eggs worth of calories.
-        if (newCalories >= 120 && newCalories <= 800) {
-          item.calories = Math.round(newCalories);
-          item.protein_g = scale(protein, count);
-          item.carbs_g = scale(carbs, count);
-          item.fat_g = scale(fat, count);
-          item.fiber_g = scale(fiber, count);
-          item.sugar_g = scale(sugar, count);
+        const currentServings = Number(item?.servings ?? 1);
+        if (!Number.isFinite(currentServings) || currentServings <= 1.5) {
+          item.servings = count;
           continue;
         }
       }
@@ -153,15 +142,9 @@ const harmonizeDiscretePortionItems = (items: any[]): { items: any[]; total: any
     // Bacon: label says "about 4 slices" etc, but calories ~= one slice (~40).
     if (containsAny(labelSource, BACON_KEYWORDS)) {
       if (calories > 0 && calories <= 60) {
-        const newCalories = calories * count;
-        // Sanity range: 2–12 slices worth of calories.
-        if (newCalories >= 80 && newCalories <= 600) {
-          item.calories = Math.round(newCalories);
-          item.protein_g = scale(protein, count);
-          item.carbs_g = scale(carbs, count);
-          item.fat_g = scale(fat, count);
-          item.fiber_g = scale(fiber, count);
-          item.sugar_g = scale(sugar, count);
+        const currentServings = Number(item?.servings ?? 1);
+        if (!Number.isFinite(currentServings) || currentServings <= 1.5) {
+          item.servings = count;
           continue;
         }
       }
