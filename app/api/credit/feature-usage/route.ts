@@ -5,9 +5,9 @@ import { prisma } from '@/lib/prisma'
 import { CREDIT_COSTS } from '@/lib/credit-system'
 
 export async function GET(_req: NextRequest) {
+  let debugStage = 'start'
   try {
     // Authentication: rely on standard session (same as usage‑breakdown).
-    let debugStage = 'start'
     debugStage = 'resolve-session'
     const session = await getServerSession(authOptions)
     if (!session?.user?.email) {
@@ -47,6 +47,7 @@ export async function GET(_req: NextRequest) {
 
     // Use live monthly counters where available, but fall back to lifetime totals
     // so that historical usage (before monthly fields existed) is still visible.
+    debugStage = 'prepare-counts'
     const foodMonthly = user.monthlyFoodAnalysisUsed || 0
     const foodLifetime = user.totalFoodAnalysisCount || 0
     const actualFoodUsage = Math.max(foodMonthly, foodLifetime)
@@ -121,7 +122,7 @@ export async function GET(_req: NextRequest) {
     console.error('Error fetching feature usage:', err)
     // Degrade gracefully: return zeros so UI can still render without errors.
     return NextResponse.json({
-      debugStage: 'error',
+      debugStage,
       schemaVersion: 2,
       featureUsage: {
         symptomAnalysis: {
@@ -160,6 +161,7 @@ export async function GET(_req: NextRequest) {
       actualCreditsUsed: 0,
       degraded: true,
       errorType: err?.name || 'UnknownError',
+      errorMessage: err?.message || 'Unknown error',
     })
   }
 }

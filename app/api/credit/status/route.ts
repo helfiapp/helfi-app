@@ -66,8 +66,8 @@ function computeNextResetAt(subscriptionStart: Date | null): string | null {
 }
 
 export async function GET(_req: NextRequest) {
+  let debugStage = 'start'
   try {
-    let debugStage = 'start'
     // 1) Resolve current user (session or JWT fallback)
     debugStage = 'resolve-session'
     let session = await getServerSession(authOptions)
@@ -129,6 +129,7 @@ export async function GET(_req: NextRequest) {
     const isPremium = user.subscription?.plan === 'PREMIUM'
 
     // 3) Wallet‑style credits (subscription + top‑ups)
+    debugStage = 'wallet-calc'
     const monthlyCapCents = monthlyCapFromSubscription(user.subscription)
     const monthlyUsedCents = user.walletMonthlyUsedCents || 0
     const monthlyRemainingCents = Math.max(0, monthlyCapCents - monthlyUsedCents)
@@ -151,6 +152,7 @@ export async function GET(_req: NextRequest) {
     }
 
     // 4) Legacy daily/additional credits (for truly free accounts)
+    debugStage = 'legacy-calc'
     const dailyRemainingLegacy = Math.max(
       0,
       (user.dailyAnalysisCredits || 0) - (user.dailyAnalysisUsed || 0)
@@ -165,6 +167,7 @@ export async function GET(_req: NextRequest) {
 
     const creditsTotal = showLegacy ? legacyTotal : totalAvailableCents
 
+    debugStage = 'compute-reset'
     const refreshAt = computeNextResetAt(user.subscription?.startDate ?? null)
 
     return NextResponse.json({
@@ -195,7 +198,7 @@ export async function GET(_req: NextRequest) {
     // Degrade gracefully: zero credits but keep shape stable so UI can render.
     return NextResponse.json({
       schemaVersion: 2,
-      debugStage: 'error',
+      debugStage,
       percentUsed: 0,
       refreshAt: null,
       plan: null,
@@ -211,6 +214,7 @@ export async function GET(_req: NextRequest) {
       },
       degraded: true,
       errorType: err?.name || 'UnknownError',
+      errorMessage: err?.message || 'Unknown error',
     })
   }
 }
