@@ -2,14 +2,74 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { getToken } from 'next-auth/jwt'
 import { authOptions } from '@/lib/auth'
-import { CreditManager } from '@/lib/credit-system'
 import { prisma } from '@/lib/prisma'
+
+// Direct mapping of subscription price → monthly wallet credits
+// Mirrors CreditManager.SUBSCRIPTION_CREDITS_MAP but kept local here to
+// avoid depending on wallet internals (display‑only endpoint).
+const SUBSCRIPTION_CREDITS_MAP: Record<number, number> = {
+  2000: 1000, // $20/month → 1,000 credits
+  3000: 1700, // $30/month → 1,700 credits
+  5000: 3000, // $50/month → 3,000 credits
+}
+
+function creditsForSubscriptionPrice(monthlyPriceCents: number | null | undefined): number {
+  if (!monthlyPriceCents) return 0
+  if (SUBSCRIPTION_CREDITS_MAP[monthlyPriceCents]) {
+    return SUBSCRIPTION_CREDITS_MAP[monthlyPriceCents]
+  }
+  // Fallback: 50% of price as credits if an unknown tier appears
+  const percent = Number(process.env.HELFI_WALLET_PLAN_PERCENT || '0.5')
+  const safePercent = percent > 0 && percent <= 1 ? percent : 0.5
+  return Math.floor(monthlyPriceCents * safePercent)
+}
+
+function monthlyCapFromSubscription(sub: any | null | undefined): number {
+  if (!sub?.plan) return 0
+  if (sub.monthlyPriceCents != null) {
+    return creditsForSubscriptionPrice(sub.monthlyPriceCents)
+  }
+  // Defensive fallback by plan name if price is missing
+  if (sub.plan === 'PREMIUM') return SUBSCRIPTION_CREDITS_MAP[2000] || 1000
+  return 0
+}
+
+function computeNextResetAt(subscriptionStart: Date | null): string | null {
+  try {
+    const now = new Date()
+    if (!subscriptionStart) {
+      // Calendar‑month reset: first day of next month (UTC)
+      const nextReset = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 0, 0))
+      return nextReset.toISOString()
+    }
+
+    // Align reset with subscription billing day (same logic as usage‑breakdown)
+    const subStartDate = new Date(subscriptionStart)
+    const startYear = subStartDate.getUTCFullYear()
+    const startMonth = subStartDate.getUTCMonth()
+    const startDay = subStartDate.getUTCDate()
+
+    const currentYear = now.getUTCFullYear()
+    const currentMonth = now.getUTCMonth()
+    const currentDay = now.getUTCDate()
+
+    let monthsSinceStart = (currentYear - startYear) * 12 + (currentMonth - startMonth)
+    if (currentDay >= startDay) {
+      monthsSinceStart += 1
+    }
+
+    const nextReset = new Date(Date.UTC(startYear, startMonth + monthsSinceStart, startDay, 0, 0, 0, 0))
+    return nextReset.toISOString()
+  } catch {
+    return null
+  }
+}
 
 export async function GET(_req: NextRequest) {
   try {
+    // 1) Resolve current user (session or JWT fallback)
     let session = await getServerSession(authOptions)
     let userEmail: string | null = session?.user?.email ?? null
-    let usedTokenFallback = false
 
     if (!userEmail) {
       try {
@@ -19,7 +79,6 @@ export async function GET(_req: NextRequest) {
         })
         if (token?.email) {
           userEmail = String(token.email)
-          usedTokenFallback = true
         }
       } catch (tokenError) {
         console.error('/api/credit/status - JWT fallback failed:', tokenError)
@@ -30,56 +89,105 @@ export async function GET(_req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const user = await prisma.user.findUnique({ 
-      where: { email: userEmail }, 
-      include: { subscription: true, creditTopUps: true } 
+    // 2) Load user with all fields needed for wallet + legacy credits
+    const user = await prisma.user.findUnique({
+      where: { email: userEmail },
+      select: {
+        id: true,
+        // Legacy daily/additional credits
+        dailyAnalysisCredits: true,
+        dailyAnalysisUsed: true,
+        additionalCredits: true,
+        // Wallet + subscription
+        walletMonthlyUsedCents: true,
+        subscription: {
+          select: {
+            plan: true,
+            monthlyPriceCents: true,
+            startDate: true,
+          },
+        },
+        creditTopUps: {
+          select: {
+            id: true,
+            amountCents: true,
+            usedCents: true,
+            expiresAt: true,
+          },
+        },
+      },
     })
+
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    const cm = new CreditManager(user.id)
-    const status = await cm.getWalletStatus()
-    // For subscription users, credits come from wallet (monthlyCapCents - monthlyUsedCents + top-ups)
-    // For non-subscription users with top-ups, also use wallet totalAvailableCents
-    // Only use old credit system (daily + additional) if no subscription and no top-ups
-    const hasSubscription = status.plan !== null
-    const walletCreditsTotal = status.totalAvailableCents // This includes monthly remaining + top-ups
-    
-    // Only fetch old credit system if needed (no subscription and no wallet credits)
-    let creditCounts = null
-    if (!hasSubscription && walletCreditsTotal === 0) {
-      creditCounts = await cm.checkCredits('SYMPTOM_ANALYSIS')
-    }
-    
-    // Compute next reset timestamp (1st of next month, UTC)
     const now = new Date()
-    const nextReset = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 0, 0))
+    const isPremium = user.subscription?.plan === 'PREMIUM'
+
+    // 3) Wallet‑style credits (subscription + top‑ups)
+    const monthlyCapCents = monthlyCapFromSubscription(user.subscription)
+    const monthlyUsedCents = user.walletMonthlyUsedCents || 0
+    const monthlyRemainingCents = Math.max(0, monthlyCapCents - monthlyUsedCents)
+
+    const activeTopUps = (user.creditTopUps || []).filter((t) => t.expiresAt > now)
+    const topUpsTotalAvailable = activeTopUps.reduce(
+      (sum, t) => sum + Math.max(0, t.amountCents - t.usedCents),
+      0
+    )
+    const topUpsTotalPurchased = activeTopUps.reduce((sum, t) => sum + t.amountCents, 0)
+    const topUpsTotalUsed = activeTopUps.reduce((sum, t) => sum + t.usedCents, 0)
+
+    const totalAvailableCents = monthlyRemainingCents + topUpsTotalAvailable
+
+    let percentUsed = 0
+    if (monthlyCapCents > 0) {
+      percentUsed = Math.min(100, Math.floor((monthlyUsedCents / monthlyCapCents) * 100))
+    } else if (topUpsTotalPurchased > 0) {
+      percentUsed = Math.min(100, Math.floor((topUpsTotalUsed / topUpsTotalPurchased) * 100))
+    }
+
+    // 4) Legacy daily/additional credits (for truly free accounts)
+    const dailyRemainingLegacy = Math.max(
+      0,
+      (user.dailyAnalysisCredits || 0) - (user.dailyAnalysisUsed || 0)
+    )
+    const additionalRemainingLegacy = user.additionalCredits || 0
+    const legacyTotal = dailyRemainingLegacy + additionalRemainingLegacy
+
+    // For subscription / wallet users, show wallet credits.
+    // For non‑subscription users without wallet credits, fall back to legacy.
+    const hasWalletCredits = totalAvailableCents > 0
+    const showLegacy = !isPremium && !hasWalletCredits
+
+    const creditsTotal = showLegacy ? legacyTotal : totalAvailableCents
+
+    const refreshAt = computeNextResetAt(user.subscription?.startDate ?? null)
 
     return NextResponse.json({
-      percentUsed: status.percentUsed, // percentage of monthly wallet only
-      refreshAt: nextReset.toISOString(),
-      plan: status.plan, // Include plan to check if user has PREMIUM
-      // Expose usage meter to any authenticated user. Billing enforcement is
-      // handled separately; this flag only controls visibility of the UI
-      // progress bar, not whether analyses are allowed.
+      percentUsed,
+      refreshAt,
+      plan: user.subscription?.plan ?? null,
+      // Any authenticated user can see the meter; billing enforcement happens in
+      // the analyzer APIs.
       hasAccess: true,
-      // Additional details for UI (kept minimal; no dollar values shown)
-      monthlyCapCents: status.monthlyCapCents,
-      monthlyUsedCents: status.monthlyUsedCents,
-      topUps: status.topUps, // [{ id, availableCents, expiresAt }]
-      totalAvailableCents: status.totalAvailableCents,
-      // Credits: Use wallet-based credits for subscription users or users with top-ups
-      // Otherwise fall back to old credit system (daily + additional)
+      monthlyCapCents,
+      monthlyUsedCents,
+      topUps: activeTopUps.map((t) => ({
+        id: t.id,
+        availableCents: Math.max(0, t.amountCents - t.usedCents),
+        expiresAt: t.expiresAt,
+      })),
+      totalAvailableCents,
       credits: {
-        total: walletCreditsTotal > 0 ? walletCreditsTotal : (creditCounts?.totalCreditsRemaining ?? 0),
-        dailyRemaining: hasSubscription ? 0 : (creditCounts?.dailyCreditsRemaining ?? 0),
-        additionalRemaining: hasSubscription ? 0 : (creditCounts?.additionalCreditsRemaining ?? 0),
+        total: creditsTotal,
+        dailyRemaining: showLegacy ? dailyRemainingLegacy : 0,
+        additionalRemaining: showLegacy ? additionalRemainingLegacy : 0,
       },
     })
   } catch (err) {
     console.error('Error in /api/credit/status:', err)
-    // Degrade gracefully: hide meter but do not break the page.
+    // Degrade gracefully: zero credits but keep shape stable so UI can render.
     return NextResponse.json({
       percentUsed: 0,
       refreshAt: null,
@@ -98,8 +206,4 @@ export async function GET(_req: NextRequest) {
     })
   }
 }
-
-
-
-
 

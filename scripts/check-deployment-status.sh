@@ -3,12 +3,13 @@
 # Usage: ./scripts/check-deployment-status.sh
 
 VERCEL_TOKEN="${VERCEL_TOKEN:-2MLfXoXXv8hIaHIE7lQcdQ39}"
-PROJECT_NAME="helfi-app"
-TEAM_ID="team_DLxtczVMOZUXhiInxhTSDrCs"
+# Use the canonical Helfi production project + team IDs from DEPLOYMENT_PROTOCOL.md
+PROJECT_ID="prj_0QdxIeqz4oIUEx7aAdLrsjGsqst7"
+TEAM_ID="team_pPRY3znvYPSvqemdfOEf3vAT"
 MAX_WAIT=300  # Maximum wait time in seconds (5 minutes)
 POLL_INTERVAL=5  # Check every 5 seconds
 
-echo "🔍 Checking latest deployment status for $PROJECT_NAME..."
+echo "🔍 Checking latest deployment status for Helfi production project..."
 echo "⏳ Waiting for deployment to complete (this may take 1-2 minutes)..."
 
 START_TIME=$(date +%s)
@@ -25,7 +26,7 @@ while true; do
   fi
 
   RESPONSE=$(curl -s -H "Authorization: Bearer $VERCEL_TOKEN" \
-    "https://api.vercel.com/v6/deployments?project=$PROJECT_NAME&teamId=$TEAM_ID&limit=1")
+    "https://api.vercel.com/v6/deployments?projectId=$PROJECT_ID&teamId=$TEAM_ID&limit=1")
 
   if echo "$RESPONSE" | grep -q '"error"'; then
     echo "❌ Error checking deployment status:"
