@@ -124,7 +124,7 @@ export async function POST(req: NextRequest) {
                 "<STRUCTURED_JSON>{\"summary\":\"string\",\"possibleCauses\":[{\"name\":\"string\",\"whyLikely\":\"string\",\"confidence\":\"low|medium|high\"}],\"redFlags\":[\"string\"],\"nextSteps\":[\"string\"],\"disclaimer\":\"string\"}</STRUCTURED_JSON>\n" +
                 "Rules for the JSON:\n" +
                 "- \"summary\": 1–3 plain-language sentences describing what the image most likely shows overall.\n" +
-                "- \"possibleCauses\": 2–4 conditions ordered from most to least likely (use confidence high/medium/low to match that order).\n" +
+                "- \"possibleCauses\": 2–4 conditions ordered from most to least likely. The first item should be tagged \"high\" confidence, any middle items \"medium\", and the last item \"low\" when there is more than one.\n" +
                 "- \"whyLikely\": brief explanation focused on visible features in THIS image (color, shape, borders, distribution, etc.).\n" +
                 "- \"redFlags\": short bullet-style strings describing dangerous or urgent features related to what is seen.\n" +
                 "- \"nextSteps\": practical actions the user can take now (self-care, routine review, urgent care/emergency when needed).\n" +

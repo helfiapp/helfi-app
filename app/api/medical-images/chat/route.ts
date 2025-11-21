@@ -58,8 +58,10 @@ export async function POST(req: NextRequest) {
       Array.isArray(analysisResult.possibleCauses) && analysisResult.possibleCauses.length
         ? `Likely conditions (from highest to lowest confidence):\n${analysisResult.possibleCauses
             .map(
-              (c: any) =>
-                `- ${c.name} (${c.confidence || 'unknown'}): ${c.whyLikely || ''}`.trim()
+              (c: any, index: number) =>
+                `- ${index === 0 ? '[highest]' : ''}${c.name} (${c.confidence || 'unknown'}): ${
+                  c.whyLikely || ''
+                }`.trim()
             )
             .join('\n')}`
         : '',
@@ -77,14 +79,33 @@ export async function POST(req: NextRequest) {
         ? `Full analysis text:\n${String(analysisResult.analysisText).slice(0, 1200)}`
         : '',
       '',
-      'Rules:',
-      '- Be concise, supportive, and non-alarming.',
-      '- Use clear, non-technical language suitable for a non-medical user.',
-      '- Reference specific parts of their analysis when relevant (for example, the highest-confidence condition or listed red flags).',
-      '- Do NOT provide a formal diagnosis or treatment plan.',
-      '- Always remind the user that this information does not replace a real doctor’s examination.',
+      'When you answer, ALWAYS format your reply as short, scannable sections using **bold headings** and bullet points so it is easy to read in a chat bubble. Use this structure:',
       '',
-      'If they ask what they should do, frame answers in terms of monitoring vs routine review vs urgent/emergency care, using the context above.',
+      '**Summary of what the analysis found**',
+      '- 2–3 short sentences in plain language about what the image analysis is mainly saying.',
+      '',
+      '**Most likely condition (high confidence)**',
+      '- Name the condition that is most likely (the one marked [highest] in the context above or the one with highest confidence).',
+      '- Explain in simple terms why it is most likely based on what the analysis described.',
+      '',
+      '**Other possible explanations (medium / low)**',
+      '- Brief bullet points for the other listed conditions, making it clear they are less likely.',
+      '',
+      '**Red-flag signs to watch for**',
+      '- Bullet points describing warning signs from the analysis and what changes would be worrying.',
+      '',
+      '**What you can do next**',
+      '- Simple, practical steps (for example: monitor at home, book a routine doctor/dermatologist visit, or seek urgent care).',
+      '',
+      'Formatting rules:',
+      '- Use short paragraphs and bullet points, not one big block of text.',
+      '- Use headings in **bold** exactly as shown above so they render as clear sections in the chat UI.',
+      '- Keep language clear, supportive, and non-technical.',
+      '',
+      'Safety rules:',
+      '- Do NOT provide a formal diagnosis or treatment plan.',
+      '- Do NOT say that a doctor is unnecessary; instead, explain when medical review would be sensible.',
+      '- Always remind the user that this information does not replace a real doctor’s examination.',
     ]
       .filter(Boolean)
       .join('\n')

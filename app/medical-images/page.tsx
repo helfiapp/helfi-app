@@ -289,29 +289,53 @@ export default function MedicalImagesPage() {
                   </section>
                 )}
 
-                {/* Likely conditions (ordered high → medium → low) */}
+                {/* Likely conditions (visually ranked: high → medium → low) */}
                 {Array.isArray(analysisResult?.possibleCauses) &&
                   analysisResult.possibleCauses.length > 0 && (
                     <section>
                       <h3 className="font-medium text-gray-900 mb-2">Likely conditions</h3>
                       <ul className="space-y-2">
-                        {[...analysisResult.possibleCauses]
-                          .sort((a, b) => {
+                        {(() => {
+                          const sorted = [...analysisResult.possibleCauses].sort((a, b) => {
                             const weight: Record<string, number> = { high: 3, medium: 2, low: 1 }
                             const wa = weight[(a.confidence || 'medium').toLowerCase()] ?? 2
                             const wb = weight[(b.confidence || 'medium').toLowerCase()] ?? 2
                             return wb - wa
                           })
-                          .map((c, idx) => {
-                            const level = (c.confidence || 'medium').toLowerCase()
+
+                          const hasExplicitHigh = sorted.some(
+                            (c) => String(c.confidence || '').toLowerCase() === 'high'
+                          )
+
+                          return sorted.map((c, idx) => {
+                            const raw = String(c.confidence || '').toLowerCase()
+
+                            // Normalise so there is always a clear "high" at the top
+                            // and a "low" at the bottom if we have more than one item.
+                            let level: ConfidenceLevel
+                            if (hasExplicitHigh) {
+                              // Respect the model's explicit labelling when a high is present.
+                              level =
+                                raw === 'high' || raw === 'medium' || raw === 'low'
+                                  ? (raw as ConfidenceLevel)
+                                  : 'medium'
+                            } else if (sorted.length === 1) {
+                              level = 'high'
+                            } else if (idx === 0) {
+                              level = 'high'
+                            } else if (idx === sorted.length - 1) {
+                              level = 'low'
+                            } else {
+                              level = 'medium'
+                            }
+
                             const badgeClasses =
                               level === 'high'
                                 ? 'bg-red-100 text-red-800 border-red-200'
                                 : level === 'low'
                                 ? 'bg-gray-100 text-gray-700 border-gray-200'
                                 : 'bg-amber-100 text-amber-800 border-amber-200'
-                            const label =
-                              level === 'high' ? 'high' : level === 'low' ? 'low' : 'medium'
+
                             return (
                               <li
                                 key={`${c.name}-${idx}`}
@@ -322,7 +346,7 @@ export default function MedicalImagesPage() {
                                   <span
                                     className={`text-xs px-2 py-0.5 rounded-full border ${badgeClasses}`}
                                   >
-                                    {label}
+                                    {level}
                                   </span>
                                 </div>
                                 {c.whyLikely && (
@@ -332,7 +356,8 @@ export default function MedicalImagesPage() {
                                 )}
                               </li>
                             )
-                          })}
+                          })
+                        })()}
                       </ul>
                     </section>
                   )}
