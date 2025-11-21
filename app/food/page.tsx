@@ -879,6 +879,7 @@ export default function FoodDiary() {
   const [editingEntry, setEditingEntry] = useState<any>(null)
   const [originalEditingEntry, setOriginalEditingEntry] = useState<any>(null)
   const [showEditActionsMenu, setShowEditActionsMenu] = useState(false)
+  const usdaFallbackAttemptedRef = useRef(false)
   
   // New loading state
   const [foodDiaryLoaded, setFoodDiaryLoaded] = useState(false)
@@ -1606,6 +1607,93 @@ const applyStructuredItems = (
     const allowTextFallback = editingEntry ? !editingEntry?.nutrition : true
     applyStructuredItems(null, null, aiDescription, { allowTextFallback })
   }, [aiDescription, analyzedItems, editingEntry])
+
+  // Reset USDA fallback attempt when starting a fresh analysis session
+  useEffect(() => {
+    usdaFallbackAttemptedRef.current = false
+  }, [aiDescription, analysisPhase])
+
+  // USDA fallback: if an item has no meaningful macros, try a one-shot USDA lookup to fill them.
+  useEffect(() => {
+    if (usdaFallbackAttemptedRef.current) return
+    if (!analyzedItems || analyzedItems.length === 0) return
+
+    const needsMacros = (it: any) => {
+      const cals = Number(it?.calories)
+      const protein = Number(it?.protein_g)
+      const carbs = Number(it?.carbs_g)
+      const fat = Number(it?.fat_g)
+      const hasAny =
+        (Number.isFinite(cals) && cals > 0) ||
+        (Number.isFinite(protein) && protein > 0) ||
+        (Number.isFinite(carbs) && carbs > 0) ||
+        (Number.isFinite(fat) && fat > 0)
+      return !hasAny
+    }
+
+    const indexesNeeding = analyzedItems
+      .map((it, idx) => (needsMacros(it) && (it?.name || '').trim().length >= 3 ? idx : -1))
+      .filter((idx) => idx >= 0)
+    if (!indexesNeeding.length) return
+
+    usdaFallbackAttemptedRef.current = true
+
+    ;(async () => {
+      try {
+        const updated = [...analyzedItems]
+        let changed = false
+        for (const idx of indexesNeeding) {
+          const name = (updated[idx]?.name || '').trim()
+          if (!name) continue
+          const params = new URLSearchParams({
+            source: 'usda',
+            q: name,
+            kind: 'single',
+          })
+          const res = await fetch(`/api/food-data?${params.toString()}`, { method: 'GET' })
+          if (!res.ok) continue
+          const data = await res.json()
+          const hit = Array.isArray(data.items) && data.items.length > 0 ? data.items[0] : null
+          if (!hit) continue
+          const macros = ['calories', 'protein_g', 'carbs_g', 'fat_g', 'fiber_g', 'sugar_g'] as const
+          const hasHitMacros = macros.some((m) => Number(hit[m]) > 0)
+          if (!hasHitMacros) continue
+          const next = { ...updated[idx] }
+          macros.forEach((m) => {
+            if (Number.isFinite(Number(hit[m]))) {
+              next[m] = Number(hit[m])
+            }
+          })
+          if (!next.serving_size && hit.serving_size) {
+            next.serving_size = hit.serving_size
+          }
+          updated[idx] = next
+          changed = true
+        }
+        if (changed) {
+          setAnalyzedItems(updated)
+          applyRecalculatedNutrition(updated)
+          if (editingEntry) {
+            try {
+              const updatedNutrition = recalculateNutritionFromItems(updated)
+              const refreshed = {
+                ...editingEntry,
+                items: updated,
+                nutrition: updatedNutrition,
+                total: convertTotalsForStorage(updatedNutrition),
+              }
+              setEditingEntry(refreshed)
+              setTodaysFoods((prev: any[]) =>
+                prev.map((f: any) => (f.id === editingEntry.id ? refreshed : f)),
+              )
+            } catch {}
+          }
+        }
+      } catch (err) {
+        console.warn('USDA fallback lookup failed:', err)
+      }
+    })()
+  }, [analyzedItems, editingEntry, analysisPhase])
 
   // Load history for non-today dates
   useEffect(() => {
