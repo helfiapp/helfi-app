@@ -1,6 +1,6 @@
 'use client'
 
-import { FormEvent, KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { FormEvent, KeyboardEvent, useCallback, useEffect, useRef, useState } from 'react'
 
 type ChatMessage = { role: 'user' | 'assistant'; content: string }
 
@@ -46,7 +46,6 @@ function normaliseMedicalChatContent(raw: string): string {
 }
 
 export default function MedicalImageChat({ analysisResult }: MedicalImageChatProps) {
-  const storageKey = useMemo(() => `helfi:medical-images:chat`, [])
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -71,33 +70,6 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
       textarea.style.overflowY = textarea.scrollHeight > maxHeight ? 'auto' : 'hidden'
     }, 50)
   }, [])
-
-  // Load existing chat history
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(storageKey)
-      if (saved) {
-        const parsed = JSON.parse(saved)
-        if (Array.isArray(parsed)) {
-          setMessages(
-            parsed
-              .filter(
-                (m: any) =>
-                  m && typeof m.content === 'string' && (m.role === 'user' || m.role === 'assistant')
-              )
-              .slice(-24)
-          )
-        }
-      }
-    } catch {}
-  }, [storageKey])
-
-  // Persist chat history
-  useEffect(() => {
-    try {
-      localStorage.setItem(storageKey, JSON.stringify(messages))
-    } catch {}
-  }, [messages, storageKey])
 
   // Scroll to bottom inside chat container
   useEffect(() => {
@@ -124,9 +96,6 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
       setLoading(true)
       setError(null)
       setMessages([])
-      try {
-        localStorage.removeItem(storageKey)
-      } catch {}
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -206,7 +175,9 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
       <header className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
         <div>
           <h3 className="text-sm font-semibold text-gray-900">Chat about your medical image</h3>
-          <p className="text-xs text-gray-500">Ask follow-up questions – history saved locally</p>
+          <p className="text-xs text-gray-500">
+            Ask follow-up questions – chat resets when you leave this page or run a new analysis
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <button

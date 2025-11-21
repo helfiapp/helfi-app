@@ -46,6 +46,8 @@ export default function MedicalImagesPage() {
   })
   const [usageMeterRefresh, setUsageMeterRefresh] = useState<number>(0) // Trigger for UsageMeter refresh
   const [hasPaidAccess, setHasPaidAccess] = useState<boolean>(false)
+  const [hasAnalyzedCurrentImage, setHasAnalyzedCurrentImage] = useState<boolean>(false)
+  const [analysisSessionId, setAnalysisSessionId] = useState<number>(0)
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -54,6 +56,7 @@ export default function MedicalImagesPage() {
       setAnalysis(null)
       setAnalysisResult(null)
       setError('')
+      setHasAnalyzedCurrentImage(false)
       // Create preview
       const reader = new FileReader()
       reader.onloadend = () => {
@@ -88,11 +91,16 @@ export default function MedicalImagesPage() {
       setError('Please select an image first')
       return
     }
+    if (hasAnalyzedCurrentImage) {
+      setError('This image has already been analyzed. Reset to analyze a new image.')
+      return
+    }
 
     setError('')
     setAnalysis(null)
     setAnalysisResult(null)
     setIsAnalyzing(true)
+    setHasAnalyzedCurrentImage(false)
 
     try {
       const formData = new FormData()
@@ -137,6 +145,8 @@ export default function MedicalImagesPage() {
           analysisText: result.analysis,
         }
         setAnalysisResult(structured)
+        setAnalysisSessionId(prev => prev + 1)
+        setHasAnalyzedCurrentImage(true)
         // Trigger usage meter refresh after successful analysis
         setUsageMeterRefresh(prev => prev + 1)
         try { window.dispatchEvent(new Event('credits:refresh')); } catch {}
@@ -156,6 +166,7 @@ export default function MedicalImagesPage() {
     setAnalysis(null)
     setAnalysisResult(null)
     setError('')
+    setHasAnalyzedCurrentImage(false)
   }
 
   return (
@@ -235,9 +246,9 @@ export default function MedicalImagesPage() {
             <div className="flex gap-3">
               <button
                 onClick={handleAnalyze}
-                disabled={!imageFile || isAnalyzing}
+                disabled={!imageFile || isAnalyzing || hasAnalyzedCurrentImage}
                 className={`flex-1 inline-flex items-center justify-center px-4 py-2 rounded-lg font-medium text-white transition-colors ${
-                  !imageFile || isAnalyzing
+                  !imageFile || isAnalyzing || hasAnalyzedCurrentImage
                     ? 'bg-gray-400 cursor-not-allowed'
                     : 'bg-helfi-green hover:bg-helfi-green/90'
                 }`}
@@ -405,10 +416,12 @@ export default function MedicalImagesPage() {
               </div>
             )}
 
-            {/* Medical image chat – follows the analysis and is pre‑aware of it */}
+            {/* Medical image chat – follows the analysis and is pre‑aware of it.
+                We key it by a simple incrementing session so the chat fully resets
+                whenever a new analysis is completed. */}
             {analysisResult && (
               <div className="mt-6 bg-white rounded-lg shadow-sm border border-gray-200">
-                <MedicalImageChat analysisResult={analysisResult} />
+                <MedicalImageChat key={analysisSessionId} analysisResult={analysisResult} />
               </div>
             )}
           </div>
