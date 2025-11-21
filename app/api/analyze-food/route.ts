@@ -542,7 +542,8 @@ CRITICAL REQUIREMENTS:
       );
     }
 
-    // Use the higher-accuracy model for both first pass and re-analysis
+    // Use the higher-accuracy model for both first pass and re-analysis.
+    // Temperature is set to 0 for maximum consistency between runs on the same meal.
     const model = 'gpt-4o';
     const maxTokens = 600;
 
@@ -602,7 +603,7 @@ CRITICAL REQUIREMENTS:
       model,
       messages,
       max_tokens: maxTokens,
-      temperature: 0.2,
+      temperature: 0,
     } as any);
 
     const response = primary.completion;
