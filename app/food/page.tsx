@@ -496,7 +496,23 @@ const normalizeDiscreteServingsWithLabel = (items: any[]) => {
         : !Number.isFinite(protein) || protein <= rule.proteinPerUnitFloor * qty
 
     if (caloriesLow && proteinLow) {
-      next.servings = qty
+      const fields: Array<keyof typeof next> = [
+        'calories',
+        'protein_g',
+        'carbs_g',
+        'fat_g',
+        'fiber_g',
+        'sugar_g',
+      ]
+      fields.forEach((f) => {
+        const v = next[f] as any
+        if (Number.isFinite(v)) {
+          next[f] = (Number(v) || 0) * qty
+        }
+      })
+      // Keep servings at 1 to avoid “3 servings of 3 eggs” confusion; macros now
+      // represent the whole labeled portion.
+      next.servings = Number.isFinite(currentServings) ? currentServings : 1
     }
 
     return next

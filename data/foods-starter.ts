@@ -17,6 +17,7 @@ export const STARTER_FOODS: StarterFood[] = [
   { name: 'Scrambled eggs', serving_size: '1 large egg', calories: 70, protein_g: 6, carbs_g: 0.4, fat_g: 5, fiber_g: 0, sugar_g: 0 },
   { name: 'Bacon', serving_size: '1 slice', calories: 42, protein_g: 3, carbs_g: 0.1, fat_g: 3.3, fiber_g: 0, sugar_g: 0 },
   { name: 'Bagel', serving_size: '1 whole', calories: 270, protein_g: 10, carbs_g: 53, fat_g: 1.5, fiber_g: 2, sugar_g: 6 },
+  { name: 'Sesame Bagel', serving_size: '1 whole', calories: 270, protein_g: 10, carbs_g: 53, fat_g: 1.5, fiber_g: 2, sugar_g: 6 },
   { name: 'Orange juice', serving_size: '8 oz', calories: 112, protein_g: 2, carbs_g: 26, fat_g: 0.5, fiber_g: 0.5, sugar_g: 21 },
   { name: 'Whole wheat toast', serving_size: '1 slice', calories: 80, protein_g: 4, carbs_g: 14, fat_g: 1, fiber_g: 2, sugar_g: 2 },
   { name: 'Butter', serving_size: '1 tbsp', calories: 102, protein_g: 0.1, carbs_g: 0, fat_g: 11.5, fiber_g: 0, sugar_g: 0 },
@@ -43,5 +44,4 @@ export const STARTER_FOODS: StarterFood[] = [
   { name: 'Black coffee', serving_size: '8 oz', calories: 2, protein_g: 0.3, carbs_g: 0, fat_g: 0, fiber_g: 0, sugar_g: 0 },
   { name: 'Whole milk', serving_size: '1 cup', calories: 150, protein_g: 8, carbs_g: 12, fat_g: 8, fiber_g: 0, sugar_g: 12 },
 ]
-
 
