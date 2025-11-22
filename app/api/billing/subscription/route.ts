@@ -170,16 +170,15 @@ export async function GET(request: NextRequest) {
       code: error?.code
     })
     
-    // Return detailed error in development, generic in production
-    const isDevelopment = process.env.NODE_ENV === 'development' || process.env.VERCEL_ENV === 'development'
-    
+    // Always return detailed error to help diagnose (we can remove later)
     return NextResponse.json({ 
       error: 'Failed to fetch subscription',
-      details: isDevelopment ? {
-        message: error?.message,
-        name: error?.name,
-        code: error?.code
-      } : undefined
+      details: {
+        message: error?.message || 'Unknown error',
+        name: error?.name || 'Error',
+        code: error?.code || 'NO_CODE',
+        stack: error?.stack ? error.stack.split('\n').slice(0, 5).join('\n') : 'No stack trace'
+      }
     }, { status: 500 })
   }
 }
