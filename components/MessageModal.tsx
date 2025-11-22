@@ -24,7 +24,7 @@ const MessageModal: React.FC<MessageModalProps> = ({
       icon: '✓',
       iconBg: 'bg-green-100',
       iconColor: 'text-green-600',
-      button: 'bg-helfi-green hover:bg-helfi-green/90'
+      button: 'bg-helfi-green hover:bg-helfi-green-dark'
     },
     error: {
       icon: '✕',
