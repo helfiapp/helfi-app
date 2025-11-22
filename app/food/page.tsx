@@ -169,6 +169,8 @@ const enrichItemsFromCuratedUsda = (items: any[]) => {
       const db = findMatch(it?.name || '')
       if (!db) return it
       const next = { ...it }
+      // Normalize the label to the curated entry name (e.g., "Burger bun")
+      next.name = db.name
       if (!next.serving_size || String(next.serving_size).trim().length === 0) {
         next.serving_size = db.serving_size
       }
