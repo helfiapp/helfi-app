@@ -619,7 +619,7 @@ export default function SplashPage() {
               {/* $10 plan */}
               <div className="border border-gray-200 rounded-2xl p-8 shadow-sm hover:shadow-md transition-shadow bg-white">
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">$10 / month</h3>
-                <p className="text-3xl font-bold text-gray-900 mb-1">Monthly wallet: 500 credits</p>
+                <p className="text-3xl font-bold text-gray-900 mb-1">Monthly wallet: 700 credits</p>
                 <p className="text-xs text-gray-500 mb-4">Credits refresh monthly. No rollover.</p>
                 <ul className="space-y-2 mb-6 text-sm text-gray-600">
                   <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> All features unlocked</li>
@@ -634,7 +634,7 @@ export default function SplashPage() {
               {/* $20 plan */}
               <div className="border border-gray-200 rounded-2xl p-8 shadow-sm hover:shadow-md transition-shadow bg-white">
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">$20 / month</h3>
-                <p className="text-3xl font-bold text-gray-900 mb-1">Monthly wallet: 1,000 credits</p>
+                <p className="text-3xl font-bold text-gray-900 mb-1">Monthly wallet: 1,400 credits</p>
                 <p className="text-xs text-gray-500 mb-4">Credits refresh monthly. No rollover.</p>
                 <ul className="space-y-2 mb-6 text-sm text-gray-600">
                   <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> All features unlocked</li>
@@ -652,7 +652,7 @@ export default function SplashPage() {
                   <span className="bg-helfi-green text-white px-3 py-1 rounded-full text-sm font-medium">Most Popular</span>
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">$30 / month</h3>
-                <p className="text-3xl font-bold text-gray-900 mb-1">Monthly wallet: 1,500 credits</p>
+                <p className="text-3xl font-bold text-gray-900 mb-1">Monthly wallet: 2,100 credits</p>
                 <p className="text-xs text-gray-500 mb-4">Credits refresh monthly. No rollover.</p>
                 <ul className="space-y-2 mb-6 text-sm text-gray-600">
                   <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> All features unlocked</li>
@@ -667,7 +667,7 @@ export default function SplashPage() {
               {/* $50 plan */}
               <div className="border border-gray-200 rounded-2xl p-8 shadow-sm hover:shadow-md transition-shadow bg-white">
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">$50 / month</h3>
-                <p className="text-3xl font-bold text-gray-900 mb-1">Monthly wallet: 2,500 credits</p>
+                <p className="text-3xl font-bold text-gray-900 mb-1">Monthly wallet: 3,500 credits</p>
                 <p className="text-xs text-gray-500 mb-4">Credits refresh monthly. No rollover.</p>
                 <ul className="space-y-2 mb-6 text-sm text-gray-600">
                   <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> All features unlocked</li>

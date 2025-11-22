@@ -72,10 +72,10 @@ export async function POST(request: Request) {
             // Determine current plan tier for better error message
             const currentTier = user.subscription.monthlyPriceCents
             let tierName = 'Premium'
-            if (currentTier === 1000) tierName = '$10/month (500 credits)'
-            else if (currentTier === 2000) tierName = '$20/month (1,000 credits)'
-            else if (currentTier === 3000) tierName = '$30/month (1,500 credits)'
-            else if (currentTier === 5000) tierName = '$50/month (2,500 credits)'
+            if (currentTier === 1000) tierName = '$10/month (700 credits)'
+            else if (currentTier === 2000) tierName = '$20/month (1,400 credits)'
+            else if (currentTier === 3000) tierName = '$30/month (2,100 credits)'
+            else if (currentTier === 5000) tierName = '$50/month (3,500 credits)'
             else if (currentTier) tierName = `$${(currentTier / 100).toFixed(0)}/month`
 
             return NextResponse.json(
@@ -116,4 +116,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Failed to create checkout session' }, { status: 500 })
   }
 }
-
