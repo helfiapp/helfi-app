@@ -14,16 +14,26 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Fetch user and subscription separately to avoid Prisma client issues
     const user = await prisma.user.findUnique({
       where: { email: session.user.email.toLowerCase() },
-      include: { subscription: true }
+      select: { id: true, email: true, name: true }
     })
 
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    const subscription = user.subscription
+    // Fetch subscription separately using raw query to avoid Prisma client schema issues
+    const subscriptionResult = await prisma.$queryRaw<any[]>`
+      SELECT id, "userId", plan, "monthlyPriceCents", "startDate", "endDate", "stripeSubscriptionId"
+      FROM "Subscription"
+      WHERE "userId" = ${user.id}
+      LIMIT 1
+    `
+
+    const subscription = subscriptionResult && subscriptionResult.length > 0 ? subscriptionResult[0] : null
+    
     if (!subscription) {
       return NextResponse.json({ 
         hasSubscription: false,
@@ -33,11 +43,12 @@ export async function GET(request: NextRequest) {
 
     // Check if subscription is active
     const now = new Date()
-    const isActive = !subscription.endDate || new Date(subscription.endDate) > now
+    const endDate = subscription.endDate ? new Date(subscription.endDate) : null
+    const isActive = !endDate || endDate > now
 
     // Get Stripe subscription details if available
     let stripeSubscription = null
-    const stripeSubscriptionId = (subscription as any).stripeSubscriptionId || null
+    const stripeSubscriptionId = subscription.stripeSubscriptionId || null
     
     if (stripeSubscriptionId) {
       try {
@@ -117,8 +128,8 @@ export async function GET(request: NextRequest) {
         tier: tierName,
         credits,
         monthlyPriceCents: subscription.monthlyPriceCents,
-        startDate: subscription.startDate,
-        endDate: subscription.endDate,
+        startDate: subscription.startDate?.toISOString() || subscription.startDate,
+        endDate: subscription.endDate?.toISOString() || subscription.endDate || null,
         stripeSubscriptionId: stripeSubscriptionId,
         stripeStatus: stripeSubscription?.status,
         stripeCancelAtPeriodEnd: stripeSubscription?.cancel_at_period_end,
@@ -153,19 +164,29 @@ export async function POST(request: NextRequest) {
 
     const user = await prisma.user.findUnique({
       where: { email: session.user.email.toLowerCase() },
-      include: { subscription: true }
+      select: { id: true }
     })
 
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    if (!user.subscription) {
+    // Fetch subscription using raw query to avoid Prisma client issues
+    const subscriptionResult = await prisma.$queryRaw<any[]>`
+      SELECT id, "userId", plan, "monthlyPriceCents", "startDate", "endDate", "stripeSubscriptionId"
+      FROM "Subscription"
+      WHERE "userId" = ${user.id}
+      LIMIT 1
+    `
+
+    if (!subscriptionResult || subscriptionResult.length === 0) {
       return NextResponse.json({ error: 'No active subscription found' }, { status: 400 })
     }
 
+    const dbSubscription = subscriptionResult[0]
+
     // Find or get Stripe subscription
-    let stripeSubscriptionId = (user.subscription as any).stripeSubscriptionId || null
+    let stripeSubscriptionId = dbSubscription.stripeSubscriptionId || null
     
     if (!stripeSubscriptionId) {
       // Try to find by customer email
@@ -215,7 +236,7 @@ export async function POST(request: NextRequest) {
         })
       } else {
         // Admin-granted subscription - set endDate to end of current period
-        const startDate = user.subscription.startDate
+        const startDate = dbSubscription.startDate ? new Date(dbSubscription.startDate) : new Date()
         const endDate = new Date(startDate)
         endDate.setMonth(endDate.getMonth() + 1) // Cancel at end of current month
         
@@ -248,8 +269,8 @@ export async function POST(request: NextRequest) {
 
       if (stripeSubscriptionId) {
         // Update Stripe subscription
-        const subscription = await stripe.subscriptions.retrieve(stripeSubscriptionId)
-        const currentPriceId = subscription.items.data[0]?.price?.id
+        const stripeSub = await stripe.subscriptions.retrieve(stripeSubscriptionId)
+        const currentPriceId = stripeSub.items.data[0]?.price?.id
 
         if (currentPriceId === newPriceId) {
           return NextResponse.json({ error: 'You are already on this plan' }, { status: 400 })
@@ -258,7 +279,7 @@ export async function POST(request: NextRequest) {
         // Update subscription to new price
         await stripe.subscriptions.update(stripeSubscriptionId, {
           items: [{
-            id: subscription.items.data[0].id,
+            id: stripeSub.items.data[0].id,
             price: newPriceId,
           }],
           proration_behavior: 'always_invoice', // Prorate the difference
