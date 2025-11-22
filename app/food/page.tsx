@@ -157,8 +157,10 @@ const enrichItemsFromCuratedUsda = (items: any[]) => {
     const findMatch = (name: string) => {
       const key = normalizeFoodName(name)
       if (map.has(key)) return map.get(key)
-      // Fallback: partial contains
-      for (const [k, v] of map.entries()) {
+      // Fallback: partial contains (avoid downlevel iteration issues)
+      const entries = Array.from(map.entries())
+      for (let i = 0; i < entries.length; i++) {
+        const [k, v] = entries[i]
         if (key.includes(k) || k.includes(key)) return v
       }
       return null
