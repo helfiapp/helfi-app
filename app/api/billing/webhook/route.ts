@@ -63,7 +63,6 @@ export async function POST(request: NextRequest) {
         })
 
         // Notify owner of subscription purchase (don't await to avoid blocking webhook)
-        const amountCents = sub.items.data[0]?.price?.unit_amount || 0
         const currency = sub.currency?.toUpperCase() || 'USD'
         const planName = `Premium (${currency === 'USD' ? '$' : ''}${(amountCents / 100).toFixed(0)}/month)`
         
