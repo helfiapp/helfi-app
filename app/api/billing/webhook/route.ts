@@ -24,6 +24,12 @@ export async function POST(request: NextRequest) {
       case 'customer.subscription.created':
       case 'customer.subscription.updated': {
         const sub = event.data.object as Stripe.Subscription
+        const currentPeriodStart = sub.current_period_start
+          ? new Date(sub.current_period_start * 1000)
+          : new Date()
+        const currentPeriodEnd = sub.current_period_end
+          ? new Date(sub.current_period_end * 1000)
+          : null
         // Get customer email via customer ID
         const customerId = typeof sub.customer === 'string' ? sub.customer : sub.customer?.id
         let email: string | undefined
@@ -53,23 +59,27 @@ export async function POST(request: NextRequest) {
         const isTierChange = existingSub && existingSub.monthlyPriceCents !== amountCents
         // Also reset if switching from admin-granted (no stripeSubscriptionId) to Stripe-managed subscription
         // This is critical: if subscription exists but doesn't have stripeSubscriptionId, and we're adding one, reset everything
-        const isSwitchingToStripe = existingSub && !existingSub.stripeSubscriptionId && sub.id
+        const isSwitchingToStripe = existingSub && !existingSub.stripeSubscriptionId
+        const hasNewStripeId = !existingSub?.stripeSubscriptionId || existingSub.stripeSubscriptionId !== sub.id
         
         // If tier is changing, new subscription, or switching to Stripe, reset startDate to start new billing cycle
-        const shouldResetCredits = isNewSubscription || isTierChange || isSwitchingToStripe
-        // Always use current date when switching to Stripe or creating new subscription
-        const newStartDate = shouldResetCredits ? new Date() : (existingSub?.startDate || new Date())
+        const shouldResetCredits = isNewSubscription || isTierChange || isSwitchingToStripe || hasNewStripeId
+        // Always align startDate/reset to Stripe period start when switching to Stripe or creating new subscription
+        const newStartDate = shouldResetCredits ? currentPeriodStart : (existingSub?.startDate || currentPeriodStart)
         
         // Log for debugging
         console.log(`[Webhook] Subscription ${sub.id} for ${email}:`, {
           isNewSubscription,
           isTierChange,
           isSwitchingToStripe,
+          hasNewStripeId,
           shouldResetCredits,
           existingStripeId: existingSub?.stripeSubscriptionId,
           newStripeId: sub.id,
           existingStartDate: existingSub?.startDate,
-          newStartDate
+          newStartDate,
+          currentPeriodStart,
+          currentPeriodEnd
         })
         
         // Set plan to PREMIUM and store Stripe subscription ID
@@ -84,7 +94,8 @@ export async function POST(request: NextRequest) {
               plan: 'PREMIUM',
               monthlyPriceCents: amountCents,
               stripeSubscriptionId: sub.id,
-              startDate: newStartDate // Always update startDate when switching to Stripe
+              startDate: newStartDate, // Always update startDate when switching to Stripe
+              endDate: currentPeriodEnd
             }
           })
           // Fetch updated user with subscription
@@ -102,7 +113,8 @@ export async function POST(request: NextRequest) {
                   plan: 'PREMIUM',
                   monthlyPriceCents: amountCents,
                   stripeSubscriptionId: sub.id,
-                  startDate: newStartDate
+                  startDate: newStartDate,
+                  endDate: currentPeriodEnd
                 }
               },
             },
@@ -117,7 +129,9 @@ export async function POST(request: NextRequest) {
         
         // Reset monthly counters and wallet when starting new subscription cycle or changing tier
         if (shouldResetCredits) {
-          console.log(`[Webhook] Resetting credits for user ${user.id} - switching to Stripe or new subscription`)
+          console.log(`[Webhook] Resetting credits for user ${user.id} - switching to Stripe or new subscription`, {
+            walletResetAt: newStartDate
+          })
           await prisma.user.update({
             where: { id: user.id },
             data: {
@@ -238,4 +252,3 @@ export async function POST(request: NextRequest) {
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
-
