@@ -245,6 +245,10 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
   const [feet, setFeet] = useState(initial?.feet || '');
   const [inches, setInches] = useState(initial?.inches || '');
   const [bodyType, setBodyType] = useState(initial?.bodyType || '');
+  const [goalChoice, setGoalChoice] = useState(initial?.goalChoice || '');
+  const [goalIntensity, setGoalIntensity] = useState<'mild' | 'standard' | 'aggressive'>(
+    (initial?.goalIntensity as any) || 'standard',
+  );
   const [unit, setUnit] = useState<'metric' | 'imperial'>('metric');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
@@ -275,6 +279,12 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
     }
     if (!bodyType && initial.bodyType) {
       setBodyType(initial.bodyType);
+    }
+    if (!goalChoice && initial.goalChoice) {
+      setGoalChoice(initial.goalChoice);
+    }
+    if (initial.goalIntensity && !goalIntensity) {
+      setGoalIntensity(initial.goalIntensity);
     }
 
     if (!birthYear && !birthMonth && !birthDay && typeof initial.birthdate === 'string') {
@@ -346,6 +356,8 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
     const initialFeet = initial?.feet || '';
     const initialInches = initial?.inches || '';
     const initialBodyType = initial?.bodyType || '';
+    const initialGoalChoice = initial?.goalChoice || '';
+    const initialGoalIntensity = initial?.goalIntensity || 'standard';
     const initialBirthdate = initial?.birthdate || '';
 
     const changed =
@@ -354,13 +366,15 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
       (feet || '') !== (initialFeet || '') ||
       (inches || '') !== (initialInches || '') ||
       (bodyType || '') !== (initialBodyType || '') ||
+      (goalChoice || '') !== (initialGoalChoice || '') ||
+      (goalIntensity || 'standard') !== (initialGoalIntensity || 'standard') ||
       (birthdate || '') !== (initialBirthdate || '');
 
     const hasAny =
-      !!(weight || height || feet || inches || bodyType || birthdate);
+      !!(weight || height || feet || inches || bodyType || goalChoice || birthdate);
 
     setHasUnsavedChanges(changed && hasAny);
-  }, [weight, height, feet, inches, bodyType, birthdate, initial]);
+  }, [weight, height, feet, inches, bodyType, goalChoice, goalIntensity, birthdate, initial]);
 
   // Warn if the user tries to close the tab or browser with unsaved changes
   useEffect(() => {
@@ -411,6 +425,8 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
     feet,
     inches,
     bodyType,
+    goalChoice,
+    goalIntensity,
     unit,
   });
 
@@ -675,6 +691,54 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
           </div>
         )}
       </div>
+      <h2 className="text-2xl font-bold mb-2">What is your primary goal?</h2>
+      <p className="mb-4 text-gray-600">We’ll tailor your calories and macros to this goal.</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+        {[
+          { key: 'lose weight', label: 'Lose weight' },
+          { key: 'tone up', label: 'Tone up' },
+          { key: 'get shredded', label: 'Get shredded' },
+          { key: 'gain weight', label: 'Gain weight' },
+        ].map((option) => (
+          <button
+            key={option.key}
+            className={`w-full p-3 rounded border ${
+              goalChoice === option.key ? 'bg-green-600 text-white' : 'border-green-600 text-green-600 hover:bg-green-50'
+            } transition-colors`}
+            onClick={() => setGoalChoice(option.key)}
+            type="button"
+          >
+            <span className="font-semibold">{option.label}</span>
+          </button>
+        ))}
+      </div>
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-lg font-semibold text-gray-900">How intense?</h3>
+          <span className="text-sm text-gray-500">Adjusts deficit/surplus</span>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { key: 'mild', label: 'Mild' },
+            { key: 'standard', label: 'Standard' },
+            { key: 'aggressive', label: 'Aggressive' },
+          ].map((option) => (
+            <button
+              key={option.key}
+              className={`w-full py-2 rounded border ${
+                goalIntensity === option.key ? 'bg-gray-900 text-white' : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+              } transition-colors text-sm font-medium`}
+              onClick={() => setGoalIntensity(option.key as any)}
+              type="button"
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+        <p className="mt-2 text-xs text-gray-500">
+          Mild = smaller change, Standard = balanced, Aggressive = faster change (use only if safe for you).
+        </p>
+      </div>
       <h2 className="text-2xl font-bold mb-4">Choose your body type (optional)</h2>
       <p className="mb-4 text-gray-600">Helps tailor insights to your body composition.</p>
       <div className="space-y-3 mb-6">
@@ -771,19 +835,48 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
 function ExerciseStep({ onNext, onBack, initial }: { onNext: (data: any) => void, onBack: () => void, initial?: any }) {
   const [exerciseFrequency, setExerciseFrequency] = useState(initial?.exerciseFrequency || '');
   const [exerciseTypes, setExerciseTypes] = useState<string[]>(initial?.exerciseTypes || []);
+  const [exerciseDurations, setExerciseDurations] = useState<Record<string, string>>(
+    initial?.exerciseDurations || {},
+  );
   const [customExercise, setCustomExercise] = useState('');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
 
+  const handleDurationChange = (type: string, value: string) => {
+    setExerciseDurations((prev) => {
+      const next = { ...prev }
+      next[type] = value
+      return next
+    })
+  }
+
+  const toggleExercise = (type: string, enabled: boolean) => {
+    setExerciseTypes((prev) => {
+      if (enabled) {
+        if (prev.includes(type)) return prev
+        return [...prev, type]
+      }
+      setExerciseDurations((prevDurations) => {
+        const next = { ...prevDurations }
+        delete next[type]
+        return next
+      })
+      return prev.filter((t) => t !== type)
+    })
+  }
+
   // Track changes from initial values
   useEffect(() => {
     const initialFrequency = initial?.exerciseFrequency || '';
     const initialTypes = initial?.exerciseTypes || [];
-    const hasChanged = exerciseFrequency !== initialFrequency || 
-                       JSON.stringify(exerciseTypes.sort()) !== JSON.stringify(initialTypes.sort());
+    const initialDurations = initial?.exerciseDurations || {};
+    const hasChanged =
+      exerciseFrequency !== initialFrequency ||
+      JSON.stringify(exerciseTypes.sort()) !== JSON.stringify(initialTypes.sort()) ||
+      JSON.stringify(exerciseDurations) !== JSON.stringify(initialDurations);
     setHasUnsavedChanges(hasChanged && (exerciseFrequency || exerciseTypes.length > 0));
-  }, [exerciseFrequency, exerciseTypes, initial]);
+  }, [exerciseFrequency, exerciseTypes, exerciseDurations, initial]);
 
   // Prevent browser navigation when there are unsaved changes
   useEffect(() => {
@@ -808,7 +901,8 @@ function ExerciseStep({ onNext, onBack, initial }: { onNext: (data: any) => void
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           exerciseFrequency: exerciseFrequency || 'not specified',
-          exerciseTypes: exerciseTypes || []
+          exerciseTypes: exerciseTypes || [],
+          exerciseDurations,
         })
       });
       
@@ -837,7 +931,11 @@ function ExerciseStep({ onNext, onBack, initial }: { onNext: (data: any) => void
       }
       return;
     }
-    onNext({ exerciseFrequency: exerciseFrequency || 'not specified', exerciseTypes: exerciseTypes || [] });
+    onNext({
+      exerciseFrequency: exerciseFrequency || 'not specified',
+      exerciseTypes: exerciseTypes || [],
+      exerciseDurations,
+    });
   };
 
   const handleBack = () => {
@@ -882,16 +980,20 @@ function ExerciseStep({ onNext, onBack, initial }: { onNext: (data: any) => void
               type="checkbox"
               id="walking"
               checked={exerciseTypes.includes('Walking')}
-              onChange={(e) => {
-                if (e.target.checked) {
-                  setExerciseTypes([...exerciseTypes, 'Walking']);
-                } else {
-                  setExerciseTypes(exerciseTypes.filter(t => t !== 'Walking'));
-                }
-              }}
+              onChange={(e) => toggleExercise('Walking', e.target.checked)}
               className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
             />
             <label htmlFor="walking" className="text-gray-700 cursor-pointer">Walking</label>
+            {exerciseTypes.includes('Walking') && (
+              <input
+                type="number"
+                min="0"
+                className="ml-auto w-24 rounded border border-gray-200 px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                placeholder="mins"
+                value={exerciseDurations['Walking'] || ''}
+                onChange={(e) => handleDurationChange('Walking', e.target.value)}
+              />
+            )}
           </div>
           
           <div className="flex items-center space-x-3">
@@ -899,16 +1001,20 @@ function ExerciseStep({ onNext, onBack, initial }: { onNext: (data: any) => void
               type="checkbox"
               id="running"
               checked={exerciseTypes.includes('Running')}
-              onChange={(e) => {
-                if (e.target.checked) {
-                  setExerciseTypes([...exerciseTypes, 'Running']);
-                } else {
-                  setExerciseTypes(exerciseTypes.filter(t => t !== 'Running'));
-                }
-              }}
+              onChange={(e) => toggleExercise('Running', e.target.checked)}
               className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
             />
             <label htmlFor="running" className="text-gray-700 cursor-pointer">Running</label>
+            {exerciseTypes.includes('Running') && (
+              <input
+                type="number"
+                min="0"
+                className="ml-auto w-24 rounded border border-gray-200 px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                placeholder="mins"
+                value={exerciseDurations['Running'] || ''}
+                onChange={(e) => handleDurationChange('Running', e.target.value)}
+              />
+            )}
           </div>
           
           <div className="flex items-center space-x-3">
@@ -916,16 +1022,20 @@ function ExerciseStep({ onNext, onBack, initial }: { onNext: (data: any) => void
               type="checkbox"
               id="swimming"
               checked={exerciseTypes.includes('Swimming')}
-              onChange={(e) => {
-                if (e.target.checked) {
-                  setExerciseTypes([...exerciseTypes, 'Swimming']);
-                } else {
-                  setExerciseTypes(exerciseTypes.filter(t => t !== 'Swimming'));
-                }
-              }}
+              onChange={(e) => toggleExercise('Swimming', e.target.checked)}
               className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
             />
             <label htmlFor="swimming" className="text-gray-700 cursor-pointer">Swimming</label>
+            {exerciseTypes.includes('Swimming') && (
+              <input
+                type="number"
+                min="0"
+                className="ml-auto w-24 rounded border border-gray-200 px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                placeholder="mins"
+                value={exerciseDurations['Swimming'] || ''}
+                onChange={(e) => handleDurationChange('Swimming', e.target.value)}
+              />
+            )}
           </div>
           
           <div className="flex items-center space-x-3">
@@ -933,16 +1043,20 @@ function ExerciseStep({ onNext, onBack, initial }: { onNext: (data: any) => void
               type="checkbox"
               id="biking"
               checked={exerciseTypes.includes('Bike riding')}
-              onChange={(e) => {
-                if (e.target.checked) {
-                  setExerciseTypes([...exerciseTypes, 'Bike riding']);
-                } else {
-                  setExerciseTypes(exerciseTypes.filter(t => t !== 'Bike riding'));
-                }
-              }}
+              onChange={(e) => toggleExercise('Bike riding', e.target.checked)}
               className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
             />
             <label htmlFor="biking" className="text-gray-700 cursor-pointer">Bike riding</label>
+            {exerciseTypes.includes('Bike riding') && (
+              <input
+                type="number"
+                min="0"
+                className="ml-auto w-24 rounded border border-gray-200 px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                placeholder="mins"
+                value={exerciseDurations['Bike riding'] || ''}
+                onChange={(e) => handleDurationChange('Bike riding', e.target.value)}
+              />
+            )}
           </div>
 
           <div className="flex items-center space-x-3">
@@ -950,16 +1064,20 @@ function ExerciseStep({ onNext, onBack, initial }: { onNext: (data: any) => void
               type="checkbox"
               id="mma"
               checked={exerciseTypes.includes('MMA')}
-              onChange={(e) => {
-                if (e.target.checked) {
-                  setExerciseTypes([...exerciseTypes, 'MMA']);
-                } else {
-                  setExerciseTypes(exerciseTypes.filter(t => t !== 'MMA'));
-                }
-              }}
+              onChange={(e) => toggleExercise('MMA', e.target.checked)}
               className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
             />
             <label htmlFor="mma" className="text-gray-700 cursor-pointer">MMA</label>
+            {exerciseTypes.includes('MMA') && (
+              <input
+                type="number"
+                min="0"
+                className="ml-auto w-24 rounded border border-gray-200 px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                placeholder="mins"
+                value={exerciseDurations['MMA'] || ''}
+                onChange={(e) => handleDurationChange('MMA', e.target.value)}
+              />
+            )}
           </div>
 
           <div className="flex items-center space-x-3">
@@ -967,16 +1085,20 @@ function ExerciseStep({ onNext, onBack, initial }: { onNext: (data: any) => void
               type="checkbox"
               id="boxing"
               checked={exerciseTypes.includes('Boxing')}
-              onChange={(e) => {
-                if (e.target.checked) {
-                  setExerciseTypes([...exerciseTypes, 'Boxing']);
-                } else {
-                  setExerciseTypes(exerciseTypes.filter(t => t !== 'Boxing'));
-                }
-              }}
+              onChange={(e) => toggleExercise('Boxing', e.target.checked)}
               className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
             />
             <label htmlFor="boxing" className="text-gray-700 cursor-pointer">Boxing</label>
+            {exerciseTypes.includes('Boxing') && (
+              <input
+                type="number"
+                min="0"
+                className="ml-auto w-24 rounded border border-gray-200 px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                placeholder="mins"
+                value={exerciseDurations['Boxing'] || ''}
+                onChange={(e) => handleDurationChange('Boxing', e.target.value)}
+              />
+            )}
           </div>
 
           <div className="flex items-center space-x-3">
@@ -984,16 +1106,20 @@ function ExerciseStep({ onNext, onBack, initial }: { onNext: (data: any) => void
               type="checkbox"
               id="jujitsu"
               checked={exerciseTypes.includes('Jujitsu')}
-              onChange={(e) => {
-                if (e.target.checked) {
-                  setExerciseTypes([...exerciseTypes, 'Jujitsu']);
-                } else {
-                  setExerciseTypes(exerciseTypes.filter(t => t !== 'Jujitsu'));
-                }
-              }}
+              onChange={(e) => toggleExercise('Jujitsu', e.target.checked)}
               className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
             />
             <label htmlFor="jujitsu" className="text-gray-700 cursor-pointer">Jujitsu</label>
+            {exerciseTypes.includes('Jujitsu') && (
+              <input
+                type="number"
+                min="0"
+                className="ml-auto w-24 rounded border border-gray-200 px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                placeholder="mins"
+                value={exerciseDurations['Jujitsu'] || ''}
+                onChange={(e) => handleDurationChange('Jujitsu', e.target.value)}
+              />
+            )}
           </div>
 
           <div className="flex items-center space-x-3">
@@ -1001,16 +1127,20 @@ function ExerciseStep({ onNext, onBack, initial }: { onNext: (data: any) => void
               type="checkbox"
               id="karate"
               checked={exerciseTypes.includes('Karate')}
-              onChange={(e) => {
-                if (e.target.checked) {
-                  setExerciseTypes([...exerciseTypes, 'Karate']);
-                } else {
-                  setExerciseTypes(exerciseTypes.filter(t => t !== 'Karate'));
-                }
-              }}
+              onChange={(e) => toggleExercise('Karate', e.target.checked)}
               className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
             />
             <label htmlFor="karate" className="text-gray-700 cursor-pointer">Karate</label>
+            {exerciseTypes.includes('Karate') && (
+              <input
+                type="number"
+                min="0"
+                className="ml-auto w-24 rounded border border-gray-200 px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                placeholder="mins"
+                value={exerciseDurations['Karate'] || ''}
+                onChange={(e) => handleDurationChange('Karate', e.target.value)}
+              />
+            )}
           </div>
 
           <div className="flex items-center space-x-3">
@@ -1018,16 +1148,20 @@ function ExerciseStep({ onNext, onBack, initial }: { onNext: (data: any) => void
               type="checkbox"
               id="bodybuilding"
               checked={exerciseTypes.includes('Body Building')}
-              onChange={(e) => {
-                if (e.target.checked) {
-                  setExerciseTypes([...exerciseTypes, 'Body Building']);
-                } else {
-                  setExerciseTypes(exerciseTypes.filter(t => t !== 'Body Building'));
-                }
-              }}
+              onChange={(e) => toggleExercise('Body Building', e.target.checked)}
               className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
             />
             <label htmlFor="bodybuilding" className="text-gray-700 cursor-pointer">Body Building</label>
+            {exerciseTypes.includes('Body Building') && (
+              <input
+                type="number"
+                min="0"
+                className="ml-auto w-24 rounded border border-gray-200 px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                placeholder="mins"
+                value={exerciseDurations['Body Building'] || ''}
+                onChange={(e) => handleDurationChange('Body Building', e.target.value)}
+              />
+            )}
           </div>
 
           <div className="flex items-center space-x-3">
@@ -1035,16 +1169,20 @@ function ExerciseStep({ onNext, onBack, initial }: { onNext: (data: any) => void
               type="checkbox"
               id="yoga"
               checked={exerciseTypes.includes('Yoga')}
-              onChange={(e) => {
-                if (e.target.checked) {
-                  setExerciseTypes([...exerciseTypes, 'Yoga']);
-                } else {
-                  setExerciseTypes(exerciseTypes.filter(t => t !== 'Yoga'));
-                }
-              }}
+              onChange={(e) => toggleExercise('Yoga', e.target.checked)}
               className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
             />
             <label htmlFor="yoga" className="text-gray-700 cursor-pointer">Yoga</label>
+            {exerciseTypes.includes('Yoga') && (
+              <input
+                type="number"
+                min="0"
+                className="ml-auto w-24 rounded border border-gray-200 px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                placeholder="mins"
+                value={exerciseDurations['Yoga'] || ''}
+                onChange={(e) => handleDurationChange('Yoga', e.target.value)}
+              />
+            )}
           </div>
 
           <div className="flex items-center space-x-3">
@@ -1052,16 +1190,20 @@ function ExerciseStep({ onNext, onBack, initial }: { onNext: (data: any) => void
               type="checkbox"
               id="pilates"
               checked={exerciseTypes.includes('Pilates')}
-              onChange={(e) => {
-                if (e.target.checked) {
-                  setExerciseTypes([...exerciseTypes, 'Pilates']);
-                } else {
-                  setExerciseTypes(exerciseTypes.filter(t => t !== 'Pilates'));
-                }
-              }}
+              onChange={(e) => toggleExercise('Pilates', e.target.checked)}
               className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
             />
             <label htmlFor="pilates" className="text-gray-700 cursor-pointer">Pilates</label>
+            {exerciseTypes.includes('Pilates') && (
+              <input
+                type="number"
+                min="0"
+                className="ml-auto w-24 rounded border border-gray-200 px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                placeholder="mins"
+                value={exerciseDurations['Pilates'] || ''}
+                onChange={(e) => handleDurationChange('Pilates', e.target.value)}
+              />
+            )}
           </div>
         </div>
 
@@ -1138,7 +1280,11 @@ function ExerciseStep({ onNext, onBack, initial }: { onNext: (data: any) => void
                   setShowUpdatePopup(true);
                   return;
                 }
-                onNext({ exerciseFrequency: exerciseFrequency || 'not specified', exerciseTypes: exerciseTypes || [] });
+                onNext({
+                  exerciseFrequency: exerciseFrequency || 'not specified',
+                  exerciseTypes: exerciseTypes || [],
+                  exerciseDurations,
+                });
               }}
             >
               Skip

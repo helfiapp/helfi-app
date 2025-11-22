@@ -1013,6 +1013,10 @@ export default function FoodDiary() {
       heightCm: Number.isFinite(heightCm || NaN) ? (heightCm as number) : null,
       exerciseFrequency: (userData as any).exerciseFrequency,
       goals: goalsArray,
+      goalChoice: (userData as any).goalChoice,
+      goalIntensity: (userData as any).goalIntensity,
+      exerciseDurations: (userData as any).exerciseDurations,
+      healthSituations: (userData as any).healthSituations,
     })
   }, [userData])
 
@@ -4796,6 +4800,14 @@ Please add nutritional information manually if needed.`);
                   { key: 'fat', label: 'Fat', grams: totals.fat || 0, color: '#6366f1' }, // purple
                 ]
 
+                const macroTargets = {
+                  protein: dailyTargets.protein ?? null,
+                  carbs: dailyTargets.carbs ?? null,
+                  fat: dailyTargets.fat ?? null,
+                  fiber: (dailyTargets as any).fiber ?? null,
+                  sugar: (dailyTargets as any).sugarMax ?? null,
+                }
+
                 return (
                   <div className="space-y-4">
                     {/* Daily rings header */}
@@ -4834,75 +4846,111 @@ Please add nutritional information manually if needed.`);
                           Add a meal to see how today compares to your daily targets.
                         </p>
                       ) : (
-                        <div className="grid grid-cols-2 gap-4">
-                          {/* Consumed macro ring */}
-                          <button
-                            type="button"
-                            className="flex flex-col items-center focus:outline-none"
-                            onClick={() =>
-                              setMacroPopup({
-                                title: "Today's macro breakdown",
-                                energyLabel:
-                                  consumedInUnit !== null
-                                    ? `${Math.round(consumedInUnit)} ${energyUnit}`
-                                    : undefined,
-                                macros: macroSegments,
-                              })
-                            }
-                          >
-                            <div className="relative inline-block">
-                              <MacroRing macros={macroSegments} showLegend={false} size="large" />
-                              <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                                <div className="text-xl font-bold text-gray-900">
-                                  {consumedInUnit !== null
-                                    ? Math.round(consumedInUnit)
-                                    : '—'}
-                                </div>
-                                <div className="text-xs text-gray-500 mt-0.5">
-                                  {energyUnit}
-                                </div>
-                              </div>
-                            </div>
-                            <div className="mt-2 text-xs font-semibold text-gray-700 uppercase tracking-wide">
-                              Consumed
-                            </div>
-                          </button>
-
-                          {/* Remaining allowance ring */}
-                          <div className="flex flex-col items-center">
-                            <TargetRing
-                              label="Remaining"
-                              valueLabel={
-                                targetInUnit !== null && consumedInUnit !== null
-                                  ? `${Math.max(
-                                      0,
-                                      Math.round(targetInUnit - consumedInUnit),
-                                    )} ${energyUnit}`
-                                  : '—'
+                        <>
+                          <div className="grid grid-cols-2 gap-4">
+                            {/* Consumed macro ring */}
+                            <button
+                              type="button"
+                              className="flex flex-col items-center focus:outline-none"
+                              onClick={() =>
+                                setMacroPopup({
+                                  title: "Today's macro breakdown",
+                                  energyLabel:
+                                    consumedInUnit !== null
+                                      ? `${Math.round(consumedInUnit)} ${energyUnit}`
+                                      : undefined,
+                                  macros: macroSegments,
+                                })
                               }
-                              percent={percentUsed || 0}
-                              tone="target"
-                            />
-                            {targetInUnit !== null && (
-                              <div className="mt-1 text-[11px] text-gray-500">
-                                Daily allowance:{' '}
-                                <span className="font-semibold">
-                                  {Math.round(targetInUnit)} {energyUnit}
-                                </span>
+                            >
+                              <div className="relative inline-block">
+                                <MacroRing macros={macroSegments} showLegend={false} size="large" />
+                                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                                  <div className="text-xl font-bold text-gray-900">
+                                    {consumedInUnit !== null
+                                      ? Math.round(consumedInUnit)
+                                      : '—'}
+                                  </div>
+                                  <div className="text-xs text-gray-500 mt-0.5">
+                                    {energyUnit}
+                                  </div>
+                                </div>
                               </div>
-                            )}
-                            <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-gray-600">
-                              <div className="flex items-center gap-1">
-                                <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500 shrink-0" />
-                                <span>Used</span>
+                              <div className="mt-2 text-xs font-semibold text-gray-700 uppercase tracking-wide">
+                                Consumed
                               </div>
-                              <div className="flex items-center gap-1">
-                                <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
-                                <span>Remaining</span>
+                            </button>
+
+                            {/* Remaining allowance ring */}
+                            <div className="flex flex-col items-center">
+                              <TargetRing
+                                label="Remaining"
+                                valueLabel={
+                                  targetInUnit !== null && consumedInUnit !== null
+                                    ? `${Math.max(
+                                        0,
+                                        Math.round(targetInUnit - consumedInUnit),
+                                      )} ${energyUnit}`
+                                    : '—'
+                                }
+                                percent={percentUsed || 0}
+                                tone="target"
+                              />
+                              {targetInUnit !== null && (
+                                <div className="mt-1 text-[11px] text-gray-500">
+                                  Daily allowance:{' '}
+                                  <span className="font-semibold">
+                                    {Math.round(targetInUnit)} {energyUnit}
+                                  </span>
+                                </div>
+                              )}
+                              <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-gray-600">
+                                <div className="flex items-center gap-1">
+                                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500 shrink-0" />
+                                  <span>Used</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
+                                  <span>Remaining</span>
+                                </div>
                               </div>
                             </div>
                           </div>
-                        </div>
+
+                          {/* Macro progress strip */}
+                          {(macroTargets.protein || macroTargets.carbs || macroTargets.fat || macroTargets.fiber || macroTargets.sugar) && (
+                            <div className="mt-4 space-y-2">
+                              {[
+                                { key: 'protein', label: 'Protein', consumed: totals.protein || 0, target: macroTargets.protein },
+                                { key: 'carbs', label: 'Carbs', consumed: totals.carbs || 0, target: macroTargets.carbs },
+                                { key: 'fat', label: 'Fat', consumed: totals.fat || 0, target: macroTargets.fat },
+                                { key: 'fiber', label: 'Fibre', consumed: totals.fiber || 0, target: macroTargets.fiber },
+                                { key: 'sugar', label: 'Sugar (max)', consumed: totals.sugar || 0, target: macroTargets.sugar },
+                              ].map(({ key, label, consumed, target }) => {
+                                if (!target || target <= 0) return null
+                                const pct = Math.min(1, consumed / target)
+                                const remaining = Math.max(0, target - consumed)
+                                return (
+                                  <div key={key} className="flex items-center gap-3">
+                                    <div className="w-20 text-xs font-semibold text-gray-700">{label}</div>
+                                    <div className="flex-1">
+                                      <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+                                        <div
+                                          className="h-2 bg-helfi-green rounded-full transition-all"
+                                          style={{ width: `${pct * 100}%` }}
+                                        />
+                                      </div>
+                                      <div className="mt-1 text-[11px] text-gray-500">
+                                        {Math.round(consumed)} g / {Math.round(target)} g{' '}
+                                        {key === 'sugar' ? 'cap' : 'target'} · {Math.round(remaining)} g left
+                                      </div>
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>
