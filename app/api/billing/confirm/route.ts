@@ -57,12 +57,12 @@ export async function GET(request: NextRequest) {
     const expiresAt = new Date(purchasedAt)
     expiresAt.setUTCMonth(expiresAt.getUTCMonth() + 12)
 
-    // Map paid amount to wallet credits (not 1:1 dollars). New schedule:
-    // $5 -> 200 credits, $10 -> 400 credits, $20 -> 800 credits. Fallback: use payment amount.
+    // Map paid amount to wallet credits (not 1:1 dollars). New schedule (75% profit target):
+    // $5 -> 250 credits, $10 -> 500 credits, $20 -> 1,000 credits. Fallback: use payment amount.
     let creditAmount = 0
-    if (paymentCents >= 2000) creditAmount = 800
-    else if (paymentCents >= 1000) creditAmount = 400
-    else if (paymentCents >= 500) creditAmount = 200
+    if (paymentCents >= 2000) creditAmount = 1000
+    else if (paymentCents >= 1000) creditAmount = 500
+    else if (paymentCents >= 500) creditAmount = 250
     const walletCredits = creditAmount > 0 ? creditAmount : paymentCents
 
     await prisma.creditTopUp.create({
@@ -94,4 +94,3 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'server_error' }, { status: 500 })
   }
 }
-

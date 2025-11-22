@@ -686,21 +686,21 @@ export default function SplashPage() {
             <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">Buy Extra Credits</h2>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
               <div className="border border-gray-200 rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Try with $5 (200 credits)</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Try with $5 (250 credits)</h3>
                 <p className="text-sm text-gray-600 mb-6">One‑time top‑up. Credits valid for 12 months.</p>
                 <button onClick={handleCreditPurchase} className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors" type="button">
                   Buy $5 Credits
                 </button>
               </div>
               <div className="border border-gray-200 rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">$10 (400 credits)</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">$10 (500 credits)</h3>
                 <p className="text-sm text-gray-600 mb-6">One‑time top‑up. Credits valid for 12 months.</p>
                 <button onClick={handleCreditPurchase} className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors" type="button">
                   Buy $10 Credits
                 </button>
               </div>
               <div className="border border-gray-200 rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">$20 (800 credits)</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">$20 (1,000 credits)</h3>
                 <p className="text-sm text-gray-600 mb-6">One‑time top‑up. Credits valid for 12 months.</p>
                 <button onClick={handleCreditPurchase} className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors" type="button">
                   Buy $20 Credits

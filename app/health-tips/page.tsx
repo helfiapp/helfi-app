@@ -345,6 +345,9 @@ export default function HealthTipsPage() {
             receive them. Each tip uses your Helfi credits (we always charge more credits than the
             raw AI cost so things stay in line with your subscription and top-ups).
           </p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+            Typical cost: 2–4 credits per tip (billed at 2× OpenAI cost).
+          </p>
 
           {/* Credits usage for Health Tips */}
           <div className="mb-4">
@@ -545,5 +548,4 @@ export default function HealthTipsPage() {
     </div>
   )
 }
-
 
