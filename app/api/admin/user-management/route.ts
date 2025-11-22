@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { extractAdminFromHeaders } from '@/lib/admin-auth'
 import { CreditManager } from '@/lib/credit-system'
+import Stripe from 'stripe'
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', { apiVersion: '2024-06-20' })
 
 export async function GET(request: NextRequest) {
   try {
@@ -140,6 +143,81 @@ export async function POST(request: NextRequest) {
     const { action, userId, data } = body
 
     switch (action) {
+      case 'sync_stripe_subscription': {
+        const targetEmail = data?.email?.toLowerCase()
+        if (!targetEmail) {
+          return NextResponse.json({ error: 'Email required' }, { status: 400 })
+        }
+
+        // Find user
+        const user = await prisma.user.findUnique({ where: { email: targetEmail } })
+        if (!user) {
+          return NextResponse.json({ error: 'User not found' }, { status: 404 })
+        }
+
+        // Lookup Stripe customer and active subscription
+        if (!process.env.STRIPE_SECRET_KEY) {
+          return NextResponse.json({ error: 'Stripe not configured' }, { status: 500 })
+        }
+
+        const customers = await stripe.customers.list({ email: targetEmail, limit: 1 })
+        if (!customers.data.length) {
+          return NextResponse.json({ error: 'Stripe customer not found' }, { status: 404 })
+        }
+        const customer = customers.data[0]
+        const subs = await stripe.subscriptions.list({ customer: customer.id, status: 'all', limit: 1 })
+        if (!subs.data.length) {
+          return NextResponse.json({ error: 'Stripe subscription not found' }, { status: 404 })
+        }
+        const sub = subs.data[0]
+        const amountCents = sub.items.data[0]?.price?.unit_amount || 0
+        const currentPeriodStart = sub.current_period_start ? new Date(sub.current_period_start * 1000) : new Date()
+        const currentPeriodEnd = sub.current_period_end ? new Date(sub.current_period_end * 1000) : null
+
+        // Update subscription to Stripe details
+        await prisma.subscription.upsert({
+          where: { userId: user.id },
+          update: {
+            plan: 'PREMIUM',
+            monthlyPriceCents: amountCents,
+            stripeSubscriptionId: sub.id,
+            startDate: currentPeriodStart,
+            endDate: currentPeriodEnd
+          },
+          create: {
+            userId: user.id,
+            plan: 'PREMIUM',
+            monthlyPriceCents: amountCents,
+            stripeSubscriptionId: sub.id,
+            startDate: currentPeriodStart,
+            endDate: currentPeriodEnd
+          }
+        })
+
+        // Reset wallet/monthly counters to align with Stripe period start
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            walletMonthlyUsedCents: 0,
+            walletMonthlyResetAt: currentPeriodStart,
+            monthlySymptomAnalysisUsed: 0,
+            monthlyFoodAnalysisUsed: 0,
+            monthlyMedicalImageAnalysisUsed: 0,
+            monthlyInteractionAnalysisUsed: 0,
+            monthlyInsightsGenerationUsed: 0,
+          } as any
+        })
+
+        return NextResponse.json({
+          success: true,
+          userId: user.id,
+          stripeSubscriptionId: sub.id,
+          startDate: currentPeriodStart,
+          endDate: currentPeriodEnd,
+          amountCents
+        })
+      }
+
       case 'activate':
         // Create or update subscription to PREMIUM (defaults to $20 tier)
         await prisma.subscription.upsert({
