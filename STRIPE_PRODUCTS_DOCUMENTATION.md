@@ -34,7 +34,7 @@ All products are configured in **USD** currency and use the tax code: **Software
 
 ### 2. Helfi Premium Plus - 1,700 Credits (Most Popular)
 - **Product Name**: `Helfi Premium Plus - 1,700 Credits`
-- **Description**: `Monthly wallet: 1,700 credits. Credits refresh monthly. No rollover.`
+- **Description**: `Monthly wallet: 1,500 credits. Credits refresh monthly. No rollover.`
 - **Price**: $30.00 USD
 - **Billing**: Monthly (recurring)
 - **Type**: Subscription
@@ -47,7 +47,7 @@ All products are configured in **USD** currency and use the tax code: **Software
 
 ### 3. Helfi Premium Max - 3,000 Credits
 - **Product Name**: `Helfi Premium Max - 3,000 Credits`
-- **Description**: `Monthly wallet: 3,000 credits. Credits refresh monthly. No rollover.`
+- **Description**: `Monthly wallet: 2,500 credits. Credits refresh monthly. No rollover.`
 - **Price**: $50.00 USD
 - **Billing**: Monthly (recurring)
 - **Type**: Subscription

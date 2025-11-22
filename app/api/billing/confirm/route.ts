@@ -48,8 +48,8 @@ export async function GET(request: NextRequest) {
     }
 
     // For credit purchases we used Checkout in 'payment' mode.
-    const amountCents = typeof checkout.amount_total === 'number' ? checkout.amount_total : 0
-    if (amountCents <= 0 || checkout.mode !== 'payment') {
+    const paymentCents = typeof checkout.amount_total === 'number' ? checkout.amount_total : 0
+    if (paymentCents <= 0 || checkout.mode !== 'payment') {
       return NextResponse.json({ error: 'not_a_credit_purchase' }, { status: 400 })
     }
 
@@ -57,10 +57,18 @@ export async function GET(request: NextRequest) {
     const expiresAt = new Date(purchasedAt)
     expiresAt.setUTCMonth(expiresAt.getUTCMonth() + 12)
 
+    // Map paid amount to wallet credits (not 1:1 dollars). New schedule:
+    // $5 -> 200 credits, $10 -> 400 credits, $20 -> 800 credits. Fallback: use payment amount.
+    let creditAmount = 0
+    if (paymentCents >= 2000) creditAmount = 800
+    else if (paymentCents >= 1000) creditAmount = 400
+    else if (paymentCents >= 500) creditAmount = 200
+    const walletCredits = creditAmount > 0 ? creditAmount : paymentCents
+
     await prisma.creditTopUp.create({
       data: {
         userId: user.id,
-        amountCents,
+        amountCents: walletCredits,
         usedCents: 0,
         purchasedAt,
         expiresAt,
@@ -68,19 +76,12 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    // Calculate credit amount based on purchase amount
-    // Common packages: $5 = 500 credits, $10 = 1000 credits, etc.
-    let creditAmount = 0
-    if (amountCents >= 1000) creditAmount = 1000
-    else if (amountCents >= 500) creditAmount = 500
-    else if (amountCents >= 250) creditAmount = 250
-
     // Notify owner of credit purchase (don't await to avoid blocking response)
     notifyOwner({
       event: 'credit_purchase',
       userEmail: user.email,
       userName: user.name || undefined,
-      amount: amountCents,
+      amount: paymentCents,
       currency: (checkout.currency || 'usd').toUpperCase(),
       creditAmount: creditAmount || undefined,
     }).catch(error => {
@@ -93,5 +94,4 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'server_error' }, { status: 500 })
   }
 }
-
 

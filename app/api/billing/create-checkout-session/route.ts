@@ -25,6 +25,7 @@ export async function POST(request: Request) {
 
     const PLAN_TO_PRICE: Record<string, string | undefined> = {
       // Monthly subscription plans
+      plan_10_monthly: process.env.STRIPE_PRICE_10_MONTHLY,
       plan_20_monthly: process.env.STRIPE_PRICE_20_MONTHLY,
       plan_30_monthly: process.env.STRIPE_PRICE_30_MONTHLY,
       plan_50_monthly: process.env.STRIPE_PRICE_50_MONTHLY,
@@ -75,5 +76,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Failed to create checkout session' }, { status: 500 })
   }
 }
-
 

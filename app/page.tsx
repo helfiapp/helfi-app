@@ -615,7 +615,22 @@ export default function SplashPage() {
           {/* Plans Section */}
           <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
             <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">Plans</h2>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+              {/* $10 plan */}
+              <div className="border border-gray-200 rounded-2xl p-8 shadow-sm hover:shadow-md transition-shadow bg-white">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">$10 / month</h3>
+                <p className="text-3xl font-bold text-gray-900 mb-1">Monthly wallet: 500 credits</p>
+                <p className="text-xs text-gray-500 mb-4">Credits refresh monthly. No rollover.</p>
+                <ul className="space-y-2 mb-6 text-sm text-gray-600">
+                  <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> All features unlocked</li>
+                  <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Percentage‑based usage meter</li>
+                  <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Top‑ups valid 12 months</li>
+                </ul>
+                <button onClick={handleWaitlistCta} className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors" type="button">
+                  Choose $10 Plan
+                </button>
+              </div>
+
               {/* $20 plan */}
               <div className="border border-gray-200 rounded-2xl p-8 shadow-sm hover:shadow-md transition-shadow bg-white">
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">$20 / month</h3>
@@ -637,7 +652,7 @@ export default function SplashPage() {
                   <span className="bg-helfi-green text-white px-3 py-1 rounded-full text-sm font-medium">Most Popular</span>
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">$30 / month</h3>
-                <p className="text-3xl font-bold text-gray-900 mb-1">Monthly wallet: 1,700 credits</p>
+                <p className="text-3xl font-bold text-gray-900 mb-1">Monthly wallet: 1,500 credits</p>
                 <p className="text-xs text-gray-500 mb-4">Credits refresh monthly. No rollover.</p>
                 <ul className="space-y-2 mb-6 text-sm text-gray-600">
                   <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> All features unlocked</li>
@@ -652,7 +667,7 @@ export default function SplashPage() {
               {/* $50 plan */}
               <div className="border border-gray-200 rounded-2xl p-8 shadow-sm hover:shadow-md transition-shadow bg-white">
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">$50 / month</h3>
-                <p className="text-3xl font-bold text-gray-900 mb-1">Monthly wallet: 3,000 credits</p>
+                <p className="text-3xl font-bold text-gray-900 mb-1">Monthly wallet: 2,500 credits</p>
                 <p className="text-xs text-gray-500 mb-4">Credits refresh monthly. No rollover.</p>
                 <ul className="space-y-2 mb-6 text-sm text-gray-600">
                   <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> All features unlocked</li>
@@ -671,21 +686,21 @@ export default function SplashPage() {
             <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">Buy Extra Credits</h2>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
               <div className="border border-gray-200 rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Try with $5 (250 credits)</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Try with $5 (200 credits)</h3>
                 <p className="text-sm text-gray-600 mb-6">One‑time top‑up. Credits valid for 12 months.</p>
                 <button onClick={handleCreditPurchase} className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors" type="button">
                   Buy $5 Credits
                 </button>
               </div>
               <div className="border border-gray-200 rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">$10 (500 credits)</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">$10 (400 credits)</h3>
                 <p className="text-sm text-gray-600 mb-6">One‑time top‑up. Credits valid for 12 months.</p>
                 <button onClick={handleCreditPurchase} className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors" type="button">
                   Buy $10 Credits
                 </button>
               </div>
               <div className="border border-gray-200 rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">$20 (1,000 credits)</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">$20 (800 credits)</h3>
                 <p className="text-sm text-gray-600 mb-6">One‑time top‑up. Credits valid for 12 months.</p>
                 <button onClick={handleCreditPurchase} className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors" type="button">
                   Buy $20 Credits

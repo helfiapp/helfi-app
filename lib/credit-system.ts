@@ -47,9 +47,10 @@ export class CreditManager {
 
   // Map subscription price directly to advertised credit amounts
   private static SUBSCRIPTION_CREDITS_MAP: Record<number, number> = {
+    1000: 500,   // $10/month → 500 credits
     2000: 1000,  // $20/month → 1,000 credits
-    3000: 1700,  // $30/month → 1,700 credits
-    5000: 3000,  // $50/month → 3,000 credits
+    3000: 1500,  // $30/month → 1,500 credits
+    5000: 2500,  // $50/month → 2,500 credits
   };
 
   private static PLAN_PRICE_CENTS: Record<string, number> = {
