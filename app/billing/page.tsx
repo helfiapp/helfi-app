@@ -30,7 +30,10 @@ export default function BillingPage() {
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        throw new Error(data?.error || 'Checkout error')
+        // Show user-friendly error message
+        const errorMessage = data?.message || data?.error || 'Checkout error'
+        alert(errorMessage)
+        return
       }
       const { url } = await res.json()
       if (url) {

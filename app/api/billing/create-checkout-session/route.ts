@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
 
 // POST /api/billing/create-checkout-session
@@ -53,6 +54,45 @@ export async function POST(request: Request) {
     // Get user email from session if available
     const session = await getServerSession(authOptions)
     const customerEmail = session?.user?.email || undefined
+
+    // Check if user already has an active subscription (only for subscription plans, not credit top-ups)
+    if (!isCredits && customerEmail) {
+      try {
+        const user = await prisma.user.findUnique({
+          where: { email: customerEmail.toLowerCase() },
+          include: { subscription: true }
+        })
+
+        if (user?.subscription) {
+          // Check if subscription is active (no endDate or endDate is in the future)
+          const now = new Date()
+          const isActive = !user.subscription.endDate || new Date(user.subscription.endDate) > now
+
+          if (isActive) {
+            // Determine current plan tier for better error message
+            const currentTier = user.subscription.monthlyPriceCents
+            let tierName = 'Premium'
+            if (currentTier === 1000) tierName = '$10/month (500 credits)'
+            else if (currentTier === 2000) tierName = '$20/month (1,000 credits)'
+            else if (currentTier === 3000) tierName = '$30/month (1,700 credits)'
+            else if (currentTier === 5000) tierName = '$50/month (3,000 credits)'
+            else if (currentTier) tierName = `$${(currentTier / 100).toFixed(0)}/month`
+
+            return NextResponse.json(
+              { 
+                error: 'You already have an active subscription',
+                message: `You are currently subscribed to ${tierName}. Please cancel your existing subscription before subscribing to a new plan.`,
+                currentPlan: tierName
+              },
+              { status: 400 }
+            )
+          }
+        }
+      } catch (error) {
+        console.error('Error checking existing subscription:', error)
+        // Continue with checkout if we can't check (don't block user)
+      }
+    }
 
     const checkoutSession = await stripe.checkout.sessions.create({
       mode: isCredits ? 'payment' : 'subscription',
