@@ -227,7 +227,10 @@ export default function BillingPage() {
     try {
       const res = await fetch('/api/billing/portal', { method: 'POST' })
       if (!res.ok) {
-        alert('Could not open subscription management. Please try again.')
+        const data = await res.json().catch(() => ({}))
+        // Show the actual error message from the API
+        const errorMessage = data?.message || data?.error || 'Could not open subscription management. Please try again.'
+        alert(errorMessage)
         return
       }
       const data = await res.json()
@@ -236,9 +239,9 @@ export default function BillingPage() {
       } else {
         alert('Could not open subscription management. Please try again.')
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Portal error:', err)
-      alert('Could not open subscription management. Please try again.')
+      alert(err?.message || 'Could not open subscription management. Please try again.')
     } finally {
       setIsCreatingPortalSession(false)
     }
