@@ -13,6 +13,9 @@ import { prisma } from '@/lib/prisma';
 import { CreditManager, CREDIT_COSTS } from '@/lib/credit-system';
 import crypto from 'crypto';
 
+// Bump this when changing curated nutrition to invalidate old cached images.
+const CACHE_VERSION = 'v2';
+
 // Guard rail: this route powers the main Food Analyzer. Billing enforcement
 // (BILLING_ENFORCED) must remain true for production unless the user explicitly
 // asks to pause billing. Do not toggle it off as a "quick fix" for other bugs.
@@ -391,9 +394,10 @@ CRITICAL REQUIREMENTS:
       });
 
       // Cache check: if we've already analyzed this exact image, return the cached result
-      const cached = imageAnalysisCache.get(imageHash);
+      const cacheKey = `${CACHE_VERSION}:${imageHash}`;
+      const cached = imageAnalysisCache.get(cacheKey);
       if (cached) {
-        console.log('♻️ Returning cached analysis for image hash', imageHash);
+        console.log('♻️ Returning cached analysis for image hash', cacheKey);
         return NextResponse.json({
           success: true,
           analysis: cached.analysis,
@@ -1118,7 +1122,8 @@ Your recommendations:`;
     // Cache successful image analyses to keep repeat results stable
     if (imageHash) {
       try {
-        imageAnalysisCache.set(imageHash, {
+        const cacheKey = `${CACHE_VERSION}:${imageHash}`;
+        imageAnalysisCache.set(cacheKey, {
           analysis: resp.analysis,
           items: Array.isArray(resp.items) ? resp.items : null,
           total: resp.total ?? null,
