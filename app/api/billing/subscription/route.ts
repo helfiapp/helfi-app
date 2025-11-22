@@ -37,9 +37,11 @@ export async function GET(request: NextRequest) {
 
     // Get Stripe subscription details if available
     let stripeSubscription = null
-    if (subscription.stripeSubscriptionId) {
+    const stripeSubscriptionId = (subscription as any).stripeSubscriptionId || null
+    
+    if (stripeSubscriptionId) {
       try {
-        stripeSubscription = await stripe.subscriptions.retrieve(subscription.stripeSubscriptionId)
+        stripeSubscription = await stripe.subscriptions.retrieve(stripeSubscriptionId)
       } catch (error) {
         console.error('Error fetching Stripe subscription:', error)
         // Continue without Stripe data
@@ -62,15 +64,21 @@ export async function GET(request: NextRequest) {
           
           if (subscriptions.data.length > 0) {
             stripeSubscription = subscriptions.data[0]
-            // Update database with Stripe subscription ID
-            await prisma.subscription.update({
-              where: { userId: user.id },
-              data: { stripeSubscriptionId: stripeSubscription.id }
-            })
+            // Update database with Stripe subscription ID (only if column exists)
+            try {
+              await prisma.subscription.update({
+                where: { userId: user.id },
+                data: { stripeSubscriptionId: stripeSubscription.id } as any
+              })
+            } catch (updateError) {
+              console.error('Error updating stripeSubscriptionId (column may not exist yet):', updateError)
+              // Continue without updating - column might not exist yet
+            }
           }
         }
       } catch (error) {
         console.error('Error finding Stripe subscription by email:', error)
+        // Continue without Stripe data
       }
     }
 
@@ -111,16 +119,24 @@ export async function GET(request: NextRequest) {
         monthlyPriceCents: subscription.monthlyPriceCents,
         startDate: subscription.startDate,
         endDate: subscription.endDate,
-        stripeSubscriptionId: subscription.stripeSubscriptionId,
+        stripeSubscriptionId: stripeSubscriptionId,
         stripeStatus: stripeSubscription?.status,
         stripeCancelAtPeriodEnd: stripeSubscription?.cancel_at_period_end,
         stripeCurrentPeriodEnd: stripeSubscription?.current_period_end ? new Date(stripeSubscription.current_period_end * 1000).toISOString() : null,
-        isStripeManaged: !!subscription.stripeSubscriptionId || !!stripeSubscription
+        isStripeManaged: !!stripeSubscriptionId || !!stripeSubscription
       }
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching subscription:', error)
-    return NextResponse.json({ error: 'Failed to fetch subscription' }, { status: 500 })
+    console.error('Error details:', {
+      message: error?.message,
+      stack: error?.stack,
+      name: error?.name
+    })
+    return NextResponse.json({ 
+      error: 'Failed to fetch subscription',
+      details: process.env.NODE_ENV === 'development' ? error?.message : undefined
+    }, { status: 500 })
   }
 }
 
@@ -149,7 +165,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Find or get Stripe subscription
-    let stripeSubscriptionId = user.subscription.stripeSubscriptionId
+    let stripeSubscriptionId = (user.subscription as any).stripeSubscriptionId || null
     
     if (!stripeSubscriptionId) {
       // Try to find by customer email
@@ -169,11 +185,16 @@ export async function POST(request: NextRequest) {
           
           if (subscriptions.data.length > 0) {
             stripeSubscriptionId = subscriptions.data[0].id
-            // Update database
-            await prisma.subscription.update({
-              where: { userId: user.id },
-              data: { stripeSubscriptionId }
-            })
+            // Update database (only if column exists)
+            try {
+              await prisma.subscription.update({
+                where: { userId: user.id },
+                data: { stripeSubscriptionId } as any
+              })
+            } catch (updateError) {
+              console.error('Error updating stripeSubscriptionId (column may not exist yet):', updateError)
+              // Continue without updating
+            }
           }
         }
       } catch (error) {
