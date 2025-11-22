@@ -600,8 +600,10 @@ export async function POST(req: NextRequest) {
     const fullBody =
       safetyNote && safetyNote.length > 0 ? `${safeTip} ${safetyNote}` : safeTip
 
+    // costCents already includes the global markup (default 2x OpenAI cost).
+    // Charge the user exactly that amount—do not double again.
     const costCents = wrapped.costCents
-    const chargeCents = costCents * 2
+    const chargeCents = costCents
 
     const suggestedQuestions =
       Array.isArray(parsed.suggestedQuestions) && parsed.suggestedQuestions.length > 0
@@ -676,5 +678,4 @@ export async function POST(req: NextRequest) {
     )
   }
 }
-
 
