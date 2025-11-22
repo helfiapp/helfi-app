@@ -25,12 +25,13 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch subscription separately using raw query to avoid Prisma client schema issues
-    const subscriptionResult = await prisma.$queryRaw<any[]>`
-      SELECT id, "userId", plan, "monthlyPriceCents", "startDate", "endDate", "stripeSubscriptionId"
-      FROM "Subscription"
-      WHERE "userId" = ${user.id}
-      LIMIT 1
-    `
+    const subscriptionResult: any[] = await prisma.$queryRawUnsafe(
+      `SELECT id, "userId", plan, "monthlyPriceCents", "startDate", "endDate", "stripeSubscriptionId"
+       FROM "Subscription"
+       WHERE "userId" = $1
+       LIMIT 1`,
+      user.id
+    )
 
     const subscription = subscriptionResult && subscriptionResult.length > 0 ? subscriptionResult[0] : null
     
@@ -172,12 +173,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch subscription using raw query to avoid Prisma client issues
-    const subscriptionResult = await prisma.$queryRaw<any[]>`
-      SELECT id, "userId", plan, "monthlyPriceCents", "startDate", "endDate", "stripeSubscriptionId"
-      FROM "Subscription"
-      WHERE "userId" = ${user.id}
-      LIMIT 1
-    `
+    const subscriptionResult: any[] = await prisma.$queryRawUnsafe(
+      `SELECT id, "userId", plan, "monthlyPriceCents", "startDate", "endDate", "stripeSubscriptionId"
+       FROM "Subscription"
+       WHERE "userId" = $1
+       LIMIT 1`,
+      user.id
+    )
 
     if (!subscriptionResult || subscriptionResult.length === 0) {
       return NextResponse.json({ error: 'No active subscription found' }, { status: 400 })
