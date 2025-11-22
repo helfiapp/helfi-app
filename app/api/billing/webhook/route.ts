@@ -51,9 +51,11 @@ export async function POST(request: NextRequest) {
         const existingSub = existingUser?.subscription
         const isNewSubscription = !existingSub
         const isTierChange = existingSub && existingSub.monthlyPriceCents !== amountCents
+        // Also reset if switching from admin-granted (no stripeSubscriptionId) to Stripe-managed subscription
+        const isSwitchingToStripe = existingSub && !existingSub.stripeSubscriptionId && sub.id
         
-        // If tier is changing or new subscription, reset startDate to start new billing cycle
-        const shouldResetCredits = isNewSubscription || isTierChange
+        // If tier is changing, new subscription, or switching to Stripe, reset startDate to start new billing cycle
+        const shouldResetCredits = isNewSubscription || isTierChange || isSwitchingToStripe
         const newStartDate = shouldResetCredits ? new Date() : (existingSub?.startDate || new Date())
         
         // Set plan to PREMIUM and store Stripe subscription ID
