@@ -1139,10 +1139,19 @@ const applyStructuredItems = (
   const enrichedItems = curatedEnriched.length > 0 ? enrichItemsFromStarter(curatedEnriched) : []
   const normalizedItems =
     enrichedItems.length > 0 ? normalizeDiscreteServingsWithLabel(enrichedItems) : []
-  setAnalyzedItems(normalizedItems)
+
+  // Guard rail: never wipe existing cards if a new analysis yields nothing.
+  const itemsToUse =
+    normalizedItems.length > 0
+      ? normalizedItems
+      : Array.isArray(analyzedItems) && analyzedItems.length > 0
+      ? analyzedItems
+      : []
+
+  setAnalyzedItems(itemsToUse)
 
   console.log('📊 Processing totals:', {
-    enrichedItemsCount: normalizedItems.length,
+    enrichedItemsCount: itemsToUse.length,
     hasFinalTotal: !!finalTotal,
     finalTotalValue: finalTotal ? JSON.stringify(finalTotal) : 'null',
   })
@@ -1153,8 +1162,8 @@ const applyStructuredItems = (
   // 3. Extracted from analysis text (fallback)
   let totalsToUse: NutritionTotals | null = null
 
-  if (normalizedItems.length > 0) {
-    const fromItems = recalculateNutritionFromItems(normalizedItems)
+  if (itemsToUse.length > 0) {
+    const fromItems = recalculateNutritionFromItems(itemsToUse)
     console.log(
       '📊 Recalculated totals from enriched items:',
       fromItems ? JSON.stringify(fromItems) : 'null',
@@ -1182,9 +1191,9 @@ const applyStructuredItems = (
     setAnalyzedNutrition(totalsToUse)
     setAnalyzedTotal(convertTotalsForStorage(totalsToUse))
     console.log('✅ Set nutrition totals:', JSON.stringify(totalsToUse))
-  } else if (normalizedItems.length > 0) {
+  } else if (itemsToUse.length > 0) {
     // If we have items but no totals, recalculate one more time as a last resort
-    const lastResortTotals = recalculateNutritionFromItems(normalizedItems)
+    const lastResortTotals = recalculateNutritionFromItems(itemsToUse)
     if (lastResortTotals) {
       setAnalyzedNutrition(lastResortTotals)
       setAnalyzedTotal(convertTotalsForStorage(lastResortTotals))
