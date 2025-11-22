@@ -19,6 +19,17 @@ All products are configured in **USD** currency and use the tax code: **Software
 
 ## Monthly Subscription Plans
 
+### NEW: Helfi Starter - 500 Credits
+- **Product Name**: `Helfi Starter - 500 Credits`
+- **Description**: `Monthly wallet: 500 credits. Credits refresh monthly. No rollover.`
+- **Price**: $10.00 USD
+- **Billing**: Monthly (recurring)
+- **Type**: Subscription
+- **Plan ID** (for API): `plan_10_monthly`
+- **Environment Variable**: `STRIPE_PRICE_10_MONTHLY`
+- **Test Mode**: create a new price and set `STRIPE_PRICE_10_MONTHLY`
+- **Live Mode**: create a new price and set `STRIPE_PRICE_10_MONTHLY`
+
 ### 1. Helfi Premium - 1,000 Credits
 - **Product Name**: `Helfi Premium - 1,000 Credits`
 - **Description**: `Monthly wallet: 1,000 credits. Credits refresh monthly. No rollover.`
