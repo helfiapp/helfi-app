@@ -288,12 +288,13 @@ export async function POST(request: NextRequest) {
           
           if (subscriptions.data.length > 0) {
             stripeSubscriptionId = subscriptions.data[0].id
-            // Update database (only if column exists)
+            // Update database (only if column exists) - use raw SQL
             try {
-              await prisma.subscription.update({
-                where: { userId: user.id },
-                data: { stripeSubscriptionId } as any
-              })
+              await prisma.$executeRawUnsafe(
+                `UPDATE "Subscription" SET "stripeSubscriptionId" = $1 WHERE "userId" = $2`,
+                stripeSubscriptionId,
+                user.id
+              )
             } catch (updateError) {
               console.error('Error updating stripeSubscriptionId (column may not exist yet):', updateError)
               // Continue without updating
@@ -322,10 +323,12 @@ export async function POST(request: NextRequest) {
         const endDate = new Date(startDate)
         endDate.setMonth(endDate.getMonth() + 1) // Cancel at end of current month
         
-        await prisma.subscription.update({
-          where: { userId: user.id },
-          data: { endDate }
-        })
+        // Use raw SQL to update endDate
+        await prisma.$executeRawUnsafe(
+          `UPDATE "Subscription" SET "endDate" = $1 WHERE "userId" = $2`,
+          endDate,
+          user.id
+        )
         
         return NextResponse.json({ 
           success: true,
@@ -374,11 +377,12 @@ export async function POST(request: NextRequest) {
         else if (newPlan === 'plan_30_monthly') newPriceCents = 3000
         else if (newPlan === 'plan_50_monthly') newPriceCents = 5000
 
-        // Update database
-        await prisma.subscription.update({
-          where: { userId: user.id },
-          data: { monthlyPriceCents: newPriceCents }
-        })
+        // Update database using raw SQL
+        await prisma.$executeRawUnsafe(
+          `UPDATE "Subscription" SET "monthlyPriceCents" = $1 WHERE "userId" = $2`,
+          newPriceCents,
+          user.id
+        )
 
         return NextResponse.json({ 
           success: true,
@@ -392,10 +396,12 @@ export async function POST(request: NextRequest) {
         else if (newPlan === 'plan_30_monthly') newPriceCents = 3000
         else if (newPlan === 'plan_50_monthly') newPriceCents = 5000
 
-        await prisma.subscription.update({
-          where: { userId: user.id },
-          data: { monthlyPriceCents: newPriceCents }
-        })
+        // Update database using raw SQL
+        await prisma.$executeRawUnsafe(
+          `UPDATE "Subscription" SET "monthlyPriceCents" = $1 WHERE "userId" = $2`,
+          newPriceCents,
+          user.id
+        )
 
         return NextResponse.json({ 
           success: true,
