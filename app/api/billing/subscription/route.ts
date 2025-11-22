@@ -92,6 +92,12 @@ export async function GET(request: NextRequest) {
       credits = 3000
     } else if (currentTier) {
       tierName = `$${(currentTier / 100).toFixed(0)}/month`
+      // Estimate credits based on price (rough approximation)
+      credits = Math.round(currentTier / 2) // $1 = ~50 credits
+    } else {
+      // Default for admin-granted subscriptions without price set
+      tierName = 'Premium'
+      credits = 1000 // Default estimate
     }
 
     return NextResponse.json({

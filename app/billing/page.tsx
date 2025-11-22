@@ -100,6 +100,7 @@ export default function BillingPage() {
         const res = await fetch('/api/billing/subscription')
         if (res.ok) {
           const data = await res.json()
+          console.log('Subscription data:', data) // Debug log
           if (data.hasSubscription && data.isActive) {
             setSubscription(data.subscription)
             setHasActiveSubscription(true)
@@ -108,6 +109,8 @@ export default function BillingPage() {
             setHasActiveSubscription(false)
             setSubscription(null)
           }
+        } else {
+          console.error('Failed to load subscription:', res.status)
         }
       } catch (error) {
         console.error('Error loading subscription:', error)
@@ -244,7 +247,10 @@ export default function BillingPage() {
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h2 className="text-2xl font-bold text-gray-900">Current Subscription</h2>
-                <p className="text-gray-600 mt-1">{subscription.tier} - {subscription.credits.toLocaleString()} credits/month</p>
+                <p className="text-gray-600 mt-1">
+                  {subscription.tier} 
+                  {subscription.credits > 0 && ` - ${subscription.credits.toLocaleString()} credits/month`}
+                </p>
               </div>
               <div className="text-right">
                 <div className="text-sm text-gray-500">Status</div>
@@ -276,43 +282,43 @@ export default function BillingPage() {
               )}
               
               {/* Upgrade/Downgrade options */}
-              {subscription.monthlyPriceCents !== 1000 && (
+              {(!subscription.monthlyPriceCents || subscription.monthlyPriceCents !== 1000) && (
                 <button
-                  onClick={() => handleChangePlan('plan_10_monthly', subscription.monthlyPriceCents! > 1000 ? 'downgrade' : 'upgrade')}
+                  onClick={() => handleChangePlan('plan_10_monthly', (subscription.monthlyPriceCents || 0) > 1000 ? 'downgrade' : 'upgrade')}
                   disabled={isManagingSubscription}
                   className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {subscription.monthlyPriceCents! > 1000 ? 'Downgrade to $10/month' : 'Upgrade to $10/month'}
+                  {(subscription.monthlyPriceCents || 0) > 1000 ? 'Downgrade to $10/month' : 'Switch to $10/month'}
                 </button>
               )}
               
-              {subscription.monthlyPriceCents !== 2000 && (
+              {(!subscription.monthlyPriceCents || subscription.monthlyPriceCents !== 2000) && (
                 <button
-                  onClick={() => handleChangePlan('plan_20_monthly', subscription.monthlyPriceCents! > 2000 ? 'downgrade' : 'upgrade')}
+                  onClick={() => handleChangePlan('plan_20_monthly', (subscription.monthlyPriceCents || 0) > 2000 ? 'downgrade' : 'upgrade')}
                   disabled={isManagingSubscription}
                   className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {subscription.monthlyPriceCents! > 2000 ? 'Downgrade to $20/month' : 'Upgrade to $20/month'}
+                  {(subscription.monthlyPriceCents || 0) > 2000 ? 'Downgrade to $20/month' : 'Switch to $20/month'}
                 </button>
               )}
               
-              {subscription.monthlyPriceCents !== 3000 && (
+              {(!subscription.monthlyPriceCents || subscription.monthlyPriceCents !== 3000) && (
                 <button
-                  onClick={() => handleChangePlan('plan_30_monthly', subscription.monthlyPriceCents! > 3000 ? 'downgrade' : 'upgrade')}
+                  onClick={() => handleChangePlan('plan_30_monthly', (subscription.monthlyPriceCents || 0) > 3000 ? 'downgrade' : 'upgrade')}
                   disabled={isManagingSubscription}
                   className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {subscription.monthlyPriceCents! > 3000 ? 'Downgrade to $30/month' : 'Upgrade to $30/month'}
+                  {(subscription.monthlyPriceCents || 0) > 3000 ? 'Downgrade to $30/month' : 'Switch to $30/month'}
                 </button>
               )}
               
-              {subscription.monthlyPriceCents !== 5000 && (
+              {(!subscription.monthlyPriceCents || subscription.monthlyPriceCents !== 5000) && (
                 <button
-                  onClick={() => handleChangePlan('plan_50_monthly', subscription.monthlyPriceCents! > 5000 ? 'downgrade' : 'upgrade')}
+                  onClick={() => handleChangePlan('plan_50_monthly', (subscription.monthlyPriceCents || 0) > 5000 ? 'downgrade' : 'upgrade')}
                   disabled={isManagingSubscription}
                   className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {subscription.monthlyPriceCents! > 5000 ? 'Downgrade to $50/month' : 'Upgrade to $50/month'}
+                  {(subscription.monthlyPriceCents || 0) > 5000 ? 'Downgrade to $50/month' : 'Switch to $50/month'}
                 </button>
               )}
             </div>
