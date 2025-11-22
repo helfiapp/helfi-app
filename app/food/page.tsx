@@ -3474,11 +3474,6 @@ Please add nutritional information manually if needed.`);
                       <div className="block text-lg font-medium text-gray-900">
                         Food Description
                       </div>
-                      {foodTitle && (
-                        <div className="px-4 py-3 bg-emerald-50 border border-emerald-100 rounded-xl text-sm sm:text-base text-emerald-900 leading-relaxed">
-                          {foodTitle}
-                        </div>
-                      )}
                       {foodDescriptionText && (
                         <p className="text-sm sm:text-base text-gray-700 leading-relaxed whitespace-pre-wrap">
                           {foodDescriptionText}
