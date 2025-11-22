@@ -122,12 +122,13 @@ export async function GET(request: NextRequest) {
           
           if (subscriptions.data.length > 0) {
             stripeSubscription = subscriptions.data[0]
-            // Update database with Stripe subscription ID (only if column exists)
+            // Update database with Stripe subscription ID (only if column exists) - use raw SQL
             try {
-              await prisma.subscription.update({
-                where: { userId: user.id },
-                data: { stripeSubscriptionId: stripeSubscription.id } as any
-              })
+              await prisma.$executeRawUnsafe(
+                `UPDATE "Subscription" SET "stripeSubscriptionId" = $1 WHERE "userId" = $2`,
+                stripeSubscription.id,
+                user.id
+              )
             } catch (updateError: any) {
               console.error('Error updating stripeSubscriptionId:', updateError?.message || updateError)
               // Continue without updating - column might not exist yet
