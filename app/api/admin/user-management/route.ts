@@ -162,9 +162,10 @@ export async function POST(request: NextRequest) {
         break
 
       case 'grant_subscription':
-        // Grant subscription with specific tier ($20, $30, or $50)
-        const tier = data?.tier // '20', '30', or '50'
+        // Grant subscription with specific tier ($10, $20, $30, or $50)
+        const tier = data?.tier // '10', '20', '30', or '50'
         const priceCentsMap: Record<string, number> = {
+          '10': 1000,
           '20': 2000,
           '30': 3000,
           '50': 5000

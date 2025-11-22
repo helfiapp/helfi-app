@@ -2767,9 +2767,10 @@ The Helfi Team`,
                                })()
                              ) : (
                                // Permanent subscription - show monthly tier
-                               selectedUser.subscription.monthlyPriceCents === 2000 ? '$20/month (1,000 credits)' :
-                               selectedUser.subscription.monthlyPriceCents === 3000 ? '$30/month (1,700 credits)' :
-                               selectedUser.subscription.monthlyPriceCents === 5000 ? '$50/month (3,000 credits)' :
+                              selectedUser.subscription.monthlyPriceCents === 1000 ? '$10/month (500 credits)' :
+                              selectedUser.subscription.monthlyPriceCents === 2000 ? '$20/month (1,000 credits)' :
+                              selectedUser.subscription.monthlyPriceCents === 3000 ? '$30/month (1,500 credits)' :
+                              selectedUser.subscription.monthlyPriceCents === 5000 ? '$50/month (2,500 credits)' :
                                `$${(selectedUser.subscription.monthlyPriceCents / 100).toFixed(0)}/month`
                              )}
                            </span>
@@ -2951,7 +2952,13 @@ The Helfi Team`,
                      <h4 className="font-medium text-gray-900">Grant Subscription</h4>
                      
                      {/* Subscription Tiers - matching billing page */}
-                     <div className="grid grid-cols-3 gap-2 mb-3">
+                     <div className="grid grid-cols-4 gap-2 mb-3">
+                       <button
+                         onClick={() => handleUserAction('grant_subscription', selectedUser.id, { tier: '10' })}
+                         className="bg-emerald-400 text-white px-3 py-2 rounded hover:bg-emerald-500 transition-colors text-xs"
+                       >
+                         $10/month<br/>(500 credits)
+                       </button>
                        <button
                          onClick={() => handleUserAction('grant_subscription', selectedUser.id, { tier: '20' })}
                          className="bg-emerald-500 text-white px-3 py-2 rounded hover:bg-emerald-600 transition-colors text-xs"
@@ -2962,13 +2969,13 @@ The Helfi Team`,
                          onClick={() => handleUserAction('grant_subscription', selectedUser.id, { tier: '30' })}
                          className="bg-emerald-600 text-white px-3 py-2 rounded hover:bg-emerald-700 transition-colors text-xs font-semibold"
                        >
-                         $30/month<br/>(1,700 credits)
+                         $30/month<br/>(1,500 credits)
                        </button>
                        <button
                          onClick={() => handleUserAction('grant_subscription', selectedUser.id, { tier: '50' })}
                          className="bg-gray-900 text-white px-3 py-2 rounded hover:bg-gray-800 transition-colors text-xs"
                        >
-                         $50/month<br/>(3,000 credits)
+                         $50/month<br/>(2,500 credits)
                        </button>
                      </div>
                      

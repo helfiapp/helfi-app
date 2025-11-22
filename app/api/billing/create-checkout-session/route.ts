@@ -74,8 +74,8 @@ export async function POST(request: Request) {
             let tierName = 'Premium'
             if (currentTier === 1000) tierName = '$10/month (500 credits)'
             else if (currentTier === 2000) tierName = '$20/month (1,000 credits)'
-            else if (currentTier === 3000) tierName = '$30/month (1,700 credits)'
-            else if (currentTier === 5000) tierName = '$50/month (3,000 credits)'
+            else if (currentTier === 3000) tierName = '$30/month (1,500 credits)'
+            else if (currentTier === 5000) tierName = '$50/month (2,500 credits)'
             else if (currentTier) tierName = `$${(currentTier / 100).toFixed(0)}/month`
 
             return NextResponse.json(

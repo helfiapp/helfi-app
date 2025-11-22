@@ -42,6 +42,20 @@ export async function POST(request: NextRequest) {
         // Determine monthly price from subscription
         const amountCents = sub.items.data[0]?.price?.unit_amount || 0
         
+        // Check if subscription already exists and if tier is changing
+        const existingUser = await prisma.user.findUnique({
+          where: { email: email.toLowerCase() },
+          include: { subscription: true }
+        })
+        
+        const existingSub = existingUser?.subscription
+        const isNewSubscription = !existingSub
+        const isTierChange = existingSub && existingSub.monthlyPriceCents !== amountCents
+        
+        // If tier is changing or new subscription, reset startDate to start new billing cycle
+        const shouldResetCredits = isNewSubscription || isTierChange
+        const newStartDate = shouldResetCredits ? new Date() : (existingSub?.startDate || new Date())
+        
         // Set plan to PREMIUM and store Stripe subscription ID
         const user = await prisma.user.update({
           where: { email: email.toLowerCase() },
@@ -50,17 +64,36 @@ export async function POST(request: NextRequest) {
               create: { 
                 plan: 'PREMIUM',
                 monthlyPriceCents: amountCents,
-                stripeSubscriptionId: sub.id
+                stripeSubscriptionId: sub.id,
+                startDate: newStartDate
               },
               update: { 
                 plan: 'PREMIUM',
                 monthlyPriceCents: amountCents,
-                stripeSubscriptionId: sub.id
+                stripeSubscriptionId: sub.id,
+                startDate: newStartDate
               }
             }},
           },
           include: { subscription: true }
         })
+        
+        // Reset monthly counters and wallet when starting new subscription cycle or changing tier
+        if (shouldResetCredits) {
+          await prisma.user.update({
+            where: { id: user.id },
+            data: {
+              dailyAnalysisCredits: 30,
+              walletMonthlyUsedCents: 0,
+              walletMonthlyResetAt: newStartDate,
+              monthlySymptomAnalysisUsed: 0,
+              monthlyFoodAnalysisUsed: 0,
+              monthlyMedicalImageAnalysisUsed: 0,
+              monthlyInteractionAnalysisUsed: 0,
+              monthlyInsightsGenerationUsed: 0,
+            } as any
+          })
+        }
 
         // Notify owner of subscription purchase (don't await to avoid blocking webhook)
         const currency = sub.currency?.toUpperCase() || 'USD'
