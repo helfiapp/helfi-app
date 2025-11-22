@@ -17,6 +17,9 @@ export default function BillingPage() {
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const router = useRouter()
   const [profileImage, setProfileImage] = useState<string>('')
+  const [subscription, setSubscription] = useState<any>(null)
+  const [hasActiveSubscription, setHasActiveSubscription] = useState(false)
+  const [isManagingSubscription, setIsManagingSubscription] = useState(false)
 
   // Stripe checkout
   const [isCreatingCheckout, setIsCreatingCheckout] = useState<string | null>(null)
@@ -90,6 +93,31 @@ export default function BillingPage() {
     }
   }, [session])
 
+  // Load subscription status
+  useEffect(() => {
+    const loadSubscription = async () => {
+      try {
+        const res = await fetch('/api/billing/subscription')
+        if (res.ok) {
+          const data = await res.json()
+          if (data.hasSubscription && data.isActive) {
+            setSubscription(data.subscription)
+            setHasActiveSubscription(true)
+            setCurrentPlan(data.subscription?.tier || 'free')
+          } else {
+            setHasActiveSubscription(false)
+            setSubscription(null)
+          }
+        }
+      } catch (error) {
+        console.error('Error loading subscription:', error)
+      }
+    }
+    if (session) {
+      loadSubscription()
+    }
+  }, [session])
+
   // If returning from Stripe, confirm top-up (no useSearchParams to keep static safe)
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -98,9 +126,97 @@ export default function BillingPage() {
     const sid = params.get('session_id')
     if (checkout === 'success' && sid) {
       fetch(`/api/billing/confirm?session_id=${encodeURIComponent(sid)}`)
+        .then(() => {
+          // Reload subscription after successful checkout
+          fetch('/api/billing/subscription')
+            .then(res => res.json())
+            .then(data => {
+              if (data.hasSubscription && data.isActive) {
+                setSubscription(data.subscription)
+                setCurrentPlan(data.subscription.tier)
+              }
+            })
+            .catch(() => {})
+        })
         .catch(() => {})
     }
   }, [])
+
+  // Handle subscription management
+  const handleCancelSubscription = async () => {
+    if (!confirm('Are you sure you want to cancel your subscription? It will remain active until the end of the current billing period.')) {
+      return
+    }
+    
+    setIsManagingSubscription(true)
+    try {
+      const res = await fetch('/api/billing/subscription', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'cancel' }),
+      })
+      
+      if (res.ok) {
+        const data = await res.json()
+        alert(data.message || 'Subscription canceled successfully')
+        // Reload subscription status
+        const subRes = await fetch('/api/billing/subscription')
+        if (subRes.ok) {
+          const subData = await subRes.json()
+          if (subData.hasSubscription && subData.isActive) {
+            setSubscription(subData.subscription)
+            setHasActiveSubscription(true)
+          } else {
+            setHasActiveSubscription(false)
+            setSubscription(null)
+          }
+        }
+      } else {
+        const error = await res.json()
+        alert(error.error || 'Failed to cancel subscription')
+      }
+    } catch (error) {
+      alert('Failed to cancel subscription')
+    } finally {
+      setIsManagingSubscription(false)
+    }
+  }
+
+  const handleChangePlan = async (newPlan: string, action: 'upgrade' | 'downgrade') => {
+    setIsManagingSubscription(true)
+    try {
+      const res = await fetch('/api/billing/subscription', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, newPlan }),
+      })
+      
+      if (res.ok) {
+        const data = await res.json()
+        alert(data.message || `Subscription ${action === 'upgrade' ? 'upgraded' : 'downgraded'} successfully`)
+        // Reload subscription status
+        const subRes = await fetch('/api/billing/subscription')
+        if (subRes.ok) {
+          const subData = await subRes.json()
+          if (subData.hasSubscription && subData.isActive) {
+            setSubscription(subData.subscription)
+            setHasActiveSubscription(true)
+            setCurrentPlan(subData.subscription.tier)
+          } else {
+            setHasActiveSubscription(false)
+            setSubscription(null)
+          }
+        }
+      } else {
+        const error = await res.json()
+        alert(error.error || `Failed to ${action} subscription`)
+      }
+    } catch (error) {
+      alert(`Failed to ${action} subscription`)
+    } finally {
+      setIsManagingSubscription(false)
+    }
+  }
 
   const handleSignOut = async () => {
     // Clear user-specific localStorage before signing out
@@ -121,6 +237,88 @@ export default function BillingPage() {
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 text-sm text-blue-900">
           Stripe Sandbox is enabled for testing. Use test card 4242 4242 4242 4242, any future expiry, any CVC and ZIP.
         </div>
+
+        {/* Current Subscription */}
+        {hasActiveSubscription && subscription && (
+          <div className="bg-white rounded-lg shadow-sm p-6 mb-8 border-2 border-green-500">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">Current Subscription</h2>
+                <p className="text-gray-600 mt-1">{subscription.tier} - {subscription.credits.toLocaleString()} credits/month</p>
+              </div>
+              <div className="text-right">
+                <div className="text-sm text-gray-500">Status</div>
+                <div className="text-lg font-semibold text-green-600">Active</div>
+              </div>
+            </div>
+            
+            {subscription.stripeCurrentPeriodEnd && (
+              <div className="mb-4 text-sm text-gray-600">
+                Next billing date: {new Date(subscription.stripeCurrentPeriodEnd).toLocaleDateString()}
+              </div>
+            )}
+
+            {subscription.stripeCancelAtPeriodEnd && (
+              <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
+                ⚠️ Your subscription will be canceled at the end of the current billing period.
+              </div>
+            )}
+
+            <div className="flex flex-wrap gap-3">
+              {!subscription.stripeCancelAtPeriodEnd && (
+                <button
+                  onClick={handleCancelSubscription}
+                  disabled={isManagingSubscription}
+                  className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isManagingSubscription ? 'Processing...' : 'Cancel Subscription'}
+                </button>
+              )}
+              
+              {/* Upgrade/Downgrade options */}
+              {subscription.monthlyPriceCents !== 1000 && (
+                <button
+                  onClick={() => handleChangePlan('plan_10_monthly', subscription.monthlyPriceCents! > 1000 ? 'downgrade' : 'upgrade')}
+                  disabled={isManagingSubscription}
+                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {subscription.monthlyPriceCents! > 1000 ? 'Downgrade to $10/month' : 'Upgrade to $10/month'}
+                </button>
+              )}
+              
+              {subscription.monthlyPriceCents !== 2000 && (
+                <button
+                  onClick={() => handleChangePlan('plan_20_monthly', subscription.monthlyPriceCents! > 2000 ? 'downgrade' : 'upgrade')}
+                  disabled={isManagingSubscription}
+                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {subscription.monthlyPriceCents! > 2000 ? 'Downgrade to $20/month' : 'Upgrade to $20/month'}
+                </button>
+              )}
+              
+              {subscription.monthlyPriceCents !== 3000 && (
+                <button
+                  onClick={() => handleChangePlan('plan_30_monthly', subscription.monthlyPriceCents! > 3000 ? 'downgrade' : 'upgrade')}
+                  disabled={isManagingSubscription}
+                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {subscription.monthlyPriceCents! > 3000 ? 'Downgrade to $30/month' : 'Upgrade to $30/month'}
+                </button>
+              )}
+              
+              {subscription.monthlyPriceCents !== 5000 && (
+                <button
+                  onClick={() => handleChangePlan('plan_50_monthly', subscription.monthlyPriceCents! > 5000 ? 'downgrade' : 'upgrade')}
+                  disabled={isManagingSubscription}
+                  className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {subscription.monthlyPriceCents! > 5000 ? 'Downgrade to $50/month' : 'Upgrade to $50/month'}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Available Plans */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
           <div className="flex items-center justify-between mb-6">

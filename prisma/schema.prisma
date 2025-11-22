@@ -208,13 +208,14 @@ model FitbitData {
 }
 
 model Subscription {
-  id                String    @id @default(cuid())
-  userId            String    @unique
-  plan              Plan      @default(PREMIUM)
-  monthlyPriceCents Int? // Track subscription tier: 2000 ($20), 3000 ($30), 5000 ($50)
-  startDate         DateTime  @default(now())
-  endDate           DateTime?
-  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                  String    @id @default(cuid())
+  userId              String    @unique
+  plan                Plan      @default(PREMIUM)
+  monthlyPriceCents   Int? // Track subscription tier: 2000 ($20), 3000 ($30), 5000 ($50)
+  stripeSubscriptionId String? // Stripe subscription ID for managing Stripe subscriptions
+  startDate           DateTime  @default(now())
+  endDate             DateTime?
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 // Monetary credit top-ups valid for up to 12 months, consumed FIFO

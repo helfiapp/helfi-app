@@ -1,0 +1,283 @@
+import { NextRequest, NextResponse } from 'next/server'
+import Stripe from 'stripe'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', { apiVersion: '2024-06-20' })
+
+// GET /api/billing/subscription - Get current subscription status
+export async function GET(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email.toLowerCase() },
+      include: { subscription: true }
+    })
+
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    const subscription = user.subscription
+    if (!subscription) {
+      return NextResponse.json({ 
+        hasSubscription: false,
+        subscription: null
+      })
+    }
+
+    // Check if subscription is active
+    const now = new Date()
+    const isActive = !subscription.endDate || new Date(subscription.endDate) > now
+
+    // Get Stripe subscription details if available
+    let stripeSubscription = null
+    if (subscription.stripeSubscriptionId) {
+      try {
+        stripeSubscription = await stripe.subscriptions.retrieve(subscription.stripeSubscriptionId)
+      } catch (error) {
+        console.error('Error fetching Stripe subscription:', error)
+        // Continue without Stripe data
+      }
+    } else {
+      // Try to find Stripe subscription by customer email
+      try {
+        const customers = await stripe.customers.list({
+          email: session.user.email.toLowerCase(),
+          limit: 1
+        })
+        
+        if (customers.data.length > 0) {
+          const customer = customers.data[0]
+          const subscriptions = await stripe.subscriptions.list({
+            customer: customer.id,
+            status: 'all',
+            limit: 1
+          })
+          
+          if (subscriptions.data.length > 0) {
+            stripeSubscription = subscriptions.data[0]
+            // Update database with Stripe subscription ID
+            await prisma.subscription.update({
+              where: { userId: user.id },
+              data: { stripeSubscriptionId: stripeSubscription.id }
+            })
+          }
+        }
+      } catch (error) {
+        console.error('Error finding Stripe subscription by email:', error)
+      }
+    }
+
+    // Determine plan tier name
+    const currentTier = subscription.monthlyPriceCents
+    let tierName = 'Premium'
+    let credits = 0
+    if (currentTier === 1000) {
+      tierName = '$10/month'
+      credits = 500
+    } else if (currentTier === 2000) {
+      tierName = '$20/month'
+      credits = 1000
+    } else if (currentTier === 3000) {
+      tierName = '$30/month'
+      credits = 1700
+    } else if (currentTier === 5000) {
+      tierName = '$50/month'
+      credits = 3000
+    } else if (currentTier) {
+      tierName = `$${(currentTier / 100).toFixed(0)}/month`
+    }
+
+    return NextResponse.json({
+      hasSubscription: true,
+      isActive,
+      subscription: {
+        id: subscription.id,
+        plan: subscription.plan,
+        tier: tierName,
+        credits,
+        monthlyPriceCents: subscription.monthlyPriceCents,
+        startDate: subscription.startDate,
+        endDate: subscription.endDate,
+        stripeSubscriptionId: subscription.stripeSubscriptionId,
+        stripeStatus: stripeSubscription?.status,
+        stripeCancelAtPeriodEnd: stripeSubscription?.cancel_at_period_end,
+        stripeCurrentPeriodEnd: stripeSubscription?.current_period_end ? new Date(stripeSubscription.current_period_end * 1000).toISOString() : null,
+        isStripeManaged: !!subscription.stripeSubscriptionId || !!stripeSubscription
+      }
+    })
+  } catch (error) {
+    console.error('Error fetching subscription:', error)
+    return NextResponse.json({ error: 'Failed to fetch subscription' }, { status: 500 })
+  }
+}
+
+// POST /api/billing/subscription - Cancel, upgrade, or downgrade subscription
+export async function POST(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const body = await request.json()
+    const { action, newPlan } = body // action: 'cancel' | 'upgrade' | 'downgrade', newPlan: 'plan_20_monthly' | etc.
+
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email.toLowerCase() },
+      include: { subscription: true }
+    })
+
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    if (!user.subscription) {
+      return NextResponse.json({ error: 'No active subscription found' }, { status: 400 })
+    }
+
+    // Find or get Stripe subscription
+    let stripeSubscriptionId = user.subscription.stripeSubscriptionId
+    
+    if (!stripeSubscriptionId) {
+      // Try to find by customer email
+      try {
+        const customers = await stripe.customers.list({
+          email: session.user.email.toLowerCase(),
+          limit: 1
+        })
+        
+        if (customers.data.length > 0) {
+          const customer = customers.data[0]
+          const subscriptions = await stripe.subscriptions.list({
+            customer: customer.id,
+            status: 'active',
+            limit: 1
+          })
+          
+          if (subscriptions.data.length > 0) {
+            stripeSubscriptionId = subscriptions.data[0].id
+            // Update database
+            await prisma.subscription.update({
+              where: { userId: user.id },
+              data: { stripeSubscriptionId }
+            })
+          }
+        }
+      } catch (error) {
+        console.error('Error finding Stripe subscription:', error)
+      }
+    }
+
+    if (action === 'cancel') {
+      if (stripeSubscriptionId) {
+        // Cancel Stripe subscription at period end
+        await stripe.subscriptions.update(stripeSubscriptionId, {
+          cancel_at_period_end: true
+        })
+        
+        return NextResponse.json({ 
+          success: true,
+          message: 'Subscription will be canceled at the end of the current billing period'
+        })
+      } else {
+        // Admin-granted subscription - set endDate to end of current period
+        const startDate = user.subscription.startDate
+        const endDate = new Date(startDate)
+        endDate.setMonth(endDate.getMonth() + 1) // Cancel at end of current month
+        
+        await prisma.subscription.update({
+          where: { userId: user.id },
+          data: { endDate }
+        })
+        
+        return NextResponse.json({ 
+          success: true,
+          message: 'Subscription will be canceled at the end of the current billing period'
+        })
+      }
+    } else if (action === 'upgrade' || action === 'downgrade') {
+      if (!newPlan) {
+        return NextResponse.json({ error: 'New plan required for upgrade/downgrade' }, { status: 400 })
+      }
+
+      const PLAN_TO_PRICE: Record<string, string | undefined> = {
+        plan_10_monthly: process.env.STRIPE_PRICE_10_MONTHLY,
+        plan_20_monthly: process.env.STRIPE_PRICE_20_MONTHLY,
+        plan_30_monthly: process.env.STRIPE_PRICE_30_MONTHLY,
+        plan_50_monthly: process.env.STRIPE_PRICE_50_MONTHLY,
+      }
+
+      const newPriceId = PLAN_TO_PRICE[newPlan]
+      if (!newPriceId) {
+        return NextResponse.json({ error: 'Invalid plan' }, { status: 400 })
+      }
+
+      if (stripeSubscriptionId) {
+        // Update Stripe subscription
+        const subscription = await stripe.subscriptions.retrieve(stripeSubscriptionId)
+        const currentPriceId = subscription.items.data[0]?.price?.id
+
+        if (currentPriceId === newPriceId) {
+          return NextResponse.json({ error: 'You are already on this plan' }, { status: 400 })
+        }
+
+        // Update subscription to new price
+        await stripe.subscriptions.update(stripeSubscriptionId, {
+          items: [{
+            id: subscription.items.data[0].id,
+            price: newPriceId,
+          }],
+          proration_behavior: 'always_invoice', // Prorate the difference
+        })
+
+        // Determine new tier
+        let newPriceCents = 2000
+        if (newPlan === 'plan_10_monthly') newPriceCents = 1000
+        else if (newPlan === 'plan_20_monthly') newPriceCents = 2000
+        else if (newPlan === 'plan_30_monthly') newPriceCents = 3000
+        else if (newPlan === 'plan_50_monthly') newPriceCents = 5000
+
+        // Update database
+        await prisma.subscription.update({
+          where: { userId: user.id },
+          data: { monthlyPriceCents: newPriceCents }
+        })
+
+        return NextResponse.json({ 
+          success: true,
+          message: `Subscription ${action === 'upgrade' ? 'upgraded' : 'downgraded'} successfully`
+        })
+      } else {
+        // Admin-granted subscription - update database only
+        let newPriceCents = 2000
+        if (newPlan === 'plan_10_monthly') newPriceCents = 1000
+        else if (newPlan === 'plan_20_monthly') newPriceCents = 2000
+        else if (newPlan === 'plan_30_monthly') newPriceCents = 3000
+        else if (newPlan === 'plan_50_monthly') newPriceCents = 5000
+
+        await prisma.subscription.update({
+          where: { userId: user.id },
+          data: { monthlyPriceCents: newPriceCents }
+        })
+
+        return NextResponse.json({ 
+          success: true,
+          message: `Subscription ${action === 'upgrade' ? 'upgraded' : 'downgraded'} successfully`
+        })
+      }
+    } else {
+      return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
+    }
+  } catch (error) {
+    console.error('Error managing subscription:', error)
+    return NextResponse.json({ error: 'Failed to manage subscription' }, { status: 500 })
+  }
+}
+

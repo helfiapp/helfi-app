@@ -39,13 +39,24 @@ export async function POST(request: NextRequest) {
         }
         if (!email) break
 
-        // Set plan to PREMIUM (no trial periods)
+        // Determine monthly price from subscription
+        const amountCents = sub.items.data[0]?.price?.unit_amount || 0
+        
+        // Set plan to PREMIUM and store Stripe subscription ID
         const user = await prisma.user.update({
           where: { email: email.toLowerCase() },
           data: {
             subscription: { upsert: {
-              create: { plan: 'PREMIUM' },
-              update: { plan: 'PREMIUM' }
+              create: { 
+                plan: 'PREMIUM',
+                monthlyPriceCents: amountCents,
+                stripeSubscriptionId: sub.id
+              },
+              update: { 
+                plan: 'PREMIUM',
+                monthlyPriceCents: amountCents,
+                stripeSubscriptionId: sub.id
+              }
             }},
           },
           include: { subscription: true }
