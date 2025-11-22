@@ -310,13 +310,19 @@ export async function POST(request: NextRequest) {
     if (action === 'cancel') {
       if (stripeSubscriptionId) {
         // Cancel Stripe subscription at period end
-        await stripe.subscriptions.update(stripeSubscriptionId, {
+        const updatedSubscription = await stripe.subscriptions.update(stripeSubscriptionId, {
           cancel_at_period_end: true
         })
         
+        // Get the actual cancellation date (current_period_end)
+        const cancellationDate = updatedSubscription.current_period_end 
+          ? new Date(updatedSubscription.current_period_end * 1000)
+          : null
+        
         return NextResponse.json({ 
           success: true,
-          message: 'Subscription will be canceled at the end of the current billing period'
+          message: 'Subscription will be canceled at the end of the current billing period',
+          cancellationDate: cancellationDate?.toISOString() || null
         })
       } else {
         // Admin-granted subscription - set endDate to end of current period
@@ -333,7 +339,8 @@ export async function POST(request: NextRequest) {
         
         return NextResponse.json({ 
           success: true,
-          message: 'Subscription will be canceled at the end of the current billing period'
+          message: 'Subscription will be canceled at the end of the current billing period',
+          cancellationDate: endDate.toISOString()
         })
       }
     } else if (action === 'upgrade' || action === 'downgrade') {

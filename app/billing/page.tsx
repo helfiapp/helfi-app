@@ -9,6 +9,8 @@ import Link from 'next/link'
 import MobileMoreMenu from '@/components/MobileMoreMenu'
 import UsageMeter from '@/components/UsageMeter'
 import PageHeader from '@/components/PageHeader'
+import ConfirmationModal from '@/components/ConfirmationModal'
+import MessageModal from '@/components/MessageModal'
 
 export default function BillingPage() {
   const { data: session } = useSession()
@@ -21,6 +23,11 @@ export default function BillingPage() {
   const [hasActiveSubscription, setHasActiveSubscription] = useState(false)
   const [isManagingSubscription, setIsManagingSubscription] = useState(false)
   const [isCreatingPortalSession, setIsCreatingPortalSession] = useState(false)
+  
+  // Modal states
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false)
+  const [showMessageModal, setShowMessageModal] = useState(false)
+  const [messageModalContent, setMessageModalContent] = useState<{ title: string; message: string; type?: 'success' | 'error' | 'info' }>({ title: '', message: '' })
 
   // Stripe checkout
   const [isCreatingCheckout, setIsCreatingCheckout] = useState<string | null>(null)
@@ -36,7 +43,12 @@ export default function BillingPage() {
         const data = await res.json().catch(() => ({}))
         // Show user-friendly error message
         const errorMessage = data?.message || data?.error || 'Checkout error'
-        alert(errorMessage)
+        setMessageModalContent({
+          title: 'Checkout Error',
+          message: errorMessage,
+          type: 'error'
+        })
+        setShowMessageModal(true)
         return
       }
       const { url } = await res.json()
@@ -46,7 +58,12 @@ export default function BillingPage() {
         throw new Error('No checkout URL returned')
       }
     } catch (e: any) {
-      alert(e?.message || 'Failed to start checkout')
+      setMessageModalContent({
+        title: 'Error',
+        message: e?.message || 'Failed to start checkout',
+        type: 'error'
+      })
+      setShowMessageModal(true)
     } finally {
       setIsCreatingCheckout(null)
     }
@@ -148,10 +165,11 @@ export default function BillingPage() {
 
   // Handle subscription management
   const handleCancelSubscription = async () => {
-    if (!confirm('Are you sure you want to cancel your subscription? It will remain active until the end of the current billing period.')) {
-      return
-    }
-    
+    setShowCancelConfirm(true)
+  }
+
+  const confirmCancelSubscription = async () => {
+    setShowCancelConfirm(false)
     setIsManagingSubscription(true)
     try {
       const res = await fetch('/api/billing/subscription', {
@@ -162,7 +180,27 @@ export default function BillingPage() {
       
       if (res.ok) {
         const data = await res.json()
-        alert(data.message || 'Subscription canceled successfully')
+        
+        // Format the cancellation date message
+        let message = data.message || 'Subscription canceled successfully'
+        if (data.cancellationDate) {
+          const cancelDate = new Date(data.cancellationDate)
+          const formattedDate = cancelDate.toLocaleDateString('en-US', { 
+            weekday: 'long', 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+          })
+          message = `Your subscription will remain active until ${formattedDate}. After that date, your subscription will be canceled and you'll lose access to premium features.`
+        }
+        
+        setMessageModalContent({
+          title: 'Subscription Canceled',
+          message,
+          type: 'success'
+        })
+        setShowMessageModal(true)
+        
         // Reload subscription status
         const subRes = await fetch('/api/billing/subscription')
         if (subRes.ok) {
@@ -177,11 +215,21 @@ export default function BillingPage() {
         }
       } else {
         const error = await res.json().catch(() => ({}))
-        alert(error.message || error.error || error.details?.message || 'Failed to cancel subscription')
+        setMessageModalContent({
+          title: 'Error',
+          message: error.message || error.error || error.details?.message || 'Failed to cancel subscription',
+          type: 'error'
+        })
+        setShowMessageModal(true)
       }
     } catch (error: any) {
       console.error('Cancel subscription error:', error)
-      alert(error?.message || 'Failed to cancel subscription')
+      setMessageModalContent({
+        title: 'Error',
+        message: error?.message || 'Failed to cancel subscription',
+        type: 'error'
+      })
+      setShowMessageModal(true)
     } finally {
       setIsManagingSubscription(false)
     }
@@ -198,7 +246,12 @@ export default function BillingPage() {
       
       if (res.ok) {
         const data = await res.json()
-        alert(data.message || `Subscription ${action === 'upgrade' ? 'upgraded' : 'downgraded'} successfully`)
+        setMessageModalContent({
+          title: 'Success',
+          message: data.message || `Subscription ${action === 'upgrade' ? 'upgraded' : 'downgraded'} successfully`,
+          type: 'success'
+        })
+        setShowMessageModal(true)
         // Reload subscription status
         const subRes = await fetch('/api/billing/subscription')
         if (subRes.ok) {
@@ -214,11 +267,21 @@ export default function BillingPage() {
         }
       } else {
         const error = await res.json().catch(() => ({}))
-        alert(error.message || error.error || error.details?.message || `Failed to ${action} subscription`)
+        setMessageModalContent({
+          title: 'Error',
+          message: error.message || error.error || error.details?.message || `Failed to ${action} subscription`,
+          type: 'error'
+        })
+        setShowMessageModal(true)
       }
     } catch (error: any) {
       console.error(`${action} subscription error:`, error)
-      alert(error?.message || `Failed to ${action} subscription`)
+      setMessageModalContent({
+        title: 'Error',
+        message: error?.message || `Failed to ${action} subscription`,
+        type: 'error'
+      })
+      setShowMessageModal(true)
     } finally {
       setIsManagingSubscription(false)
     }
@@ -232,18 +295,33 @@ export default function BillingPage() {
         const data = await res.json().catch(() => ({}))
         // Show the actual error message from the API
         const errorMessage = data?.message || data?.error || 'Could not open subscription management. Please try again.'
-        alert(errorMessage)
+        setMessageModalContent({
+          title: 'Error',
+          message: errorMessage,
+          type: 'error'
+        })
+        setShowMessageModal(true)
         return
       }
       const data = await res.json()
       if (data?.url) {
         window.location.href = data.url
       } else {
-        alert('Could not open subscription management. Please try again.')
+        setMessageModalContent({
+          title: 'Error',
+          message: 'Could not open subscription management. Please try again.',
+          type: 'error'
+        })
+        setShowMessageModal(true)
       }
     } catch (err: any) {
       console.error('Portal error:', err)
-      alert(err?.message || 'Could not open subscription management. Please try again.')
+      setMessageModalContent({
+        title: 'Error',
+        message: err?.message || 'Could not open subscription management. Please try again.',
+        type: 'error'
+      })
+      setShowMessageModal(true)
     } finally {
       setIsCreatingPortalSession(false)
     }
@@ -545,6 +623,28 @@ export default function BillingPage() {
 
         </div>
       </nav>
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showCancelConfirm}
+        onClose={() => setShowCancelConfirm(false)}
+        onConfirm={confirmCancelSubscription}
+        title="Cancel Subscription"
+        message="Are you sure you want to cancel your subscription? It will remain active until the end of the current billing period."
+        confirmText="Yes, Cancel Subscription"
+        cancelText="Keep Subscription"
+        confirmButtonClass="bg-red-500 hover:bg-red-600"
+        isLoading={isManagingSubscription}
+      />
+
+      {/* Message Modal */}
+      <MessageModal
+        isOpen={showMessageModal}
+        onClose={() => setShowMessageModal(false)}
+        title={messageModalContent.title}
+        message={messageModalContent.message}
+        type={messageModalContent.type}
+      />
     </div>
   )
 } 
