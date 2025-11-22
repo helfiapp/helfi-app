@@ -19,8 +19,8 @@ export const revalidate = 0
 // avoid depending on wallet internals (display‑only endpoint).
 const SUBSCRIPTION_CREDITS_MAP: Record<number, number> = {
   2000: 1000, // $20/month → 1,000 credits
-  3000: 1700, // $30/month → 1,700 credits
-  5000: 3000, // $50/month → 3,000 credits
+  3000: 1500, // $30/month → 1,500 credits
+  5000: 2500, // $50/month → 2,500 credits
 }
 
 function creditsForSubscriptionPrice(monthlyPriceCents: number | null | undefined): number {
@@ -228,4 +228,3 @@ export async function GET(_req: NextRequest) {
     })
   }
 }
-
