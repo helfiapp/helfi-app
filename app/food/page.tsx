@@ -142,25 +142,45 @@ const enrichItemsFromStarter = (items: any[]) => {
   }
 }
 
-// Enrich items using curated USDA-backed entries (common foods). Only fills missing/zero macros.
+// Enrich items using curated USDA-backed entries (common foods). Only fills missing/zero macros
+// or replaces clearly-low estimates to keep accuracy high.
 const enrichItemsFromCuratedUsda = (items: any[]) => {
   try {
     const map = new Map<string, any>()
-    COMMON_USDA_FOODS.forEach((f) => map.set(normalizeFoodName(f.name), f))
+    COMMON_USDA_FOODS.forEach((f) => {
+      const key = normalizeFoodName(f.name)
+      map.set(key, f)
+      if (Array.isArray(f.aliases)) {
+        f.aliases.forEach((a) => map.set(normalizeFoodName(a), f))
+      }
+    })
+    const findMatch = (name: string) => {
+      const key = normalizeFoodName(name)
+      if (map.has(key)) return map.get(key)
+      // Fallback: partial contains
+      for (const [k, v] of map.entries()) {
+        if (key.includes(k) || k.includes(key)) return v
+      }
+      return null
+    }
     const maybeUse = (v: any, dbv: any) =>
       v === null || v === undefined || (Number(v) === 0 && Number(dbv) > 0) ? dbv : v
     return items.map((it) => {
-      const key = normalizeFoodName(it?.name)
-      const db = map.get(key)
+      const db = findMatch(it?.name || '')
       if (!db) return it
       const next = { ...it }
       if (!next.serving_size || String(next.serving_size).trim().length === 0) {
         next.serving_size = db.serving_size
       }
-      next.calories = maybeUse(next.calories, db.calories)
-      next.protein_g = maybeUse(next.protein_g, db.protein_g)
-      next.carbs_g = maybeUse(next.carbs_g, db.carbs_g)
-      next.fat_g = maybeUse(next.fat_g, db.fat_g)
+      const enforceFloor = (value: any, floor: number) => {
+        const num = Number(value)
+        if (!Number.isFinite(num) || num <= 0) return floor
+        return num < floor * 0.9 ? floor : num
+      }
+      next.calories = enforceFloor(maybeUse(next.calories, db.calories), db.calories)
+      next.protein_g = enforceFloor(maybeUse(next.protein_g, db.protein_g), db.protein_g)
+      next.carbs_g = enforceFloor(maybeUse(next.carbs_g, db.carbs_g), db.carbs_g)
+      next.fat_g = enforceFloor(maybeUse(next.fat_g, db.fat_g), db.fat_g)
       next.fiber_g = maybeUse(next.fiber_g, db.fiber_g ?? 0)
       next.sugar_g = maybeUse(next.sugar_g, db.sugar_g ?? 0)
       return next
