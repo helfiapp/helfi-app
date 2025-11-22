@@ -43,17 +43,40 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // Fetch subscription using Prisma (safer than raw in this case)
+    // Fetch subscription using raw SQL to avoid Prisma schema issues with stripeSubscriptionId column
     let subscription
     try {
-      subscription = await prisma.subscription.findFirst({
-        where: { userId: user.id },
-      })
-    } catch (error) {
+      const subscriptionResult: any[] = await prisma.$queryRawUnsafe(
+        `SELECT id, "userId", plan, "monthlyPriceCents", "startDate", "endDate"
+         FROM "Subscription"
+         WHERE "userId" = $1
+         LIMIT 1`,
+        user.id
+      )
+      subscription = subscriptionResult && subscriptionResult.length > 0 ? subscriptionResult[0] : null
+      
+      // Try to get stripeSubscriptionId separately if column exists
+      if (subscription) {
+        try {
+          const stripeIdResult: any[] = await prisma.$queryRawUnsafe(
+            `SELECT "stripeSubscriptionId" FROM "Subscription" WHERE "userId" = $1 LIMIT 1`,
+            user.id
+          )
+          if (stripeIdResult && stripeIdResult.length > 0) {
+            subscription.stripeSubscriptionId = stripeIdResult[0].stripeSubscriptionId || null
+          } else {
+            subscription.stripeSubscriptionId = null
+          }
+        } catch {
+          // Column doesn't exist, set to null
+          subscription.stripeSubscriptionId = null
+        }
+      }
+    } catch (error: any) {
       console.error('Error fetching subscription:', error)
       return NextResponse.json({ 
         error: 'Database error',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        details: error?.message || 'Unknown error'
       }, { status: 500 })
     }
     
