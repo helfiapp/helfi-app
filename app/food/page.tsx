@@ -4919,25 +4919,30 @@ Please add nutritional information manually if needed.`);
 
                           {/* Macro progress strip */}
                           {(macroTargets.protein || macroTargets.carbs || macroTargets.fat || macroTargets.fiber || macroTargets.sugar) && (
-                            <div className="mt-4 space-y-2">
+                            <div className="mt-4 space-y-3">
                               {[
-                                { key: 'protein', label: 'Protein', consumed: totals.protein || 0, target: macroTargets.protein },
-                                { key: 'carbs', label: 'Carbs', consumed: totals.carbs || 0, target: macroTargets.carbs },
-                                { key: 'fat', label: 'Fat', consumed: totals.fat || 0, target: macroTargets.fat },
-                                { key: 'fiber', label: 'Fibre', consumed: totals.fiber || 0, target: macroTargets.fiber },
-                                { key: 'sugar', label: 'Sugar (max)', consumed: totals.sugar || 0, target: macroTargets.sugar },
-                              ].map(({ key, label, consumed, target }) => {
+                                { key: 'protein', label: 'Protein', consumed: totals.protein || 0, target: macroTargets.protein, color: '#ef4444' },
+                                { key: 'carbs', label: 'Carbs', consumed: totals.carbs || 0, target: macroTargets.carbs, color: '#22c55e' },
+                                { key: 'fat', label: 'Fat', consumed: totals.fat || 0, target: macroTargets.fat, color: '#6366f1' },
+                                { key: 'fiber', label: 'Fibre', consumed: totals.fiber || 0, target: macroTargets.fiber, color: '#93c5fd' },
+                                { key: 'sugar', label: 'Sugar (max)', consumed: totals.sugar || 0, target: macroTargets.sugar, color: '#f97316' },
+                              ].map(({ key, label, consumed, target, color }) => {
                                 if (!target || target <= 0) return null
                                 const pct = Math.min(1, consumed / target)
                                 const remaining = Math.max(0, target - consumed)
                                 return (
                                   <div key={key} className="flex items-center gap-3">
-                                    <div className="w-20 text-xs font-semibold text-gray-700">{label}</div>
+                                    <div
+                                      className="w-24 text-xs font-semibold"
+                                      style={{ color }}
+                                    >
+                                      {label}
+                                    </div>
                                     <div className="flex-1">
-                                      <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+                                      <div className="h-2.5 w-full bg-gray-100 rounded-full overflow-hidden flex items-center">
                                         <div
-                                          className="h-2 bg-helfi-green rounded-full transition-all"
-                                          style={{ width: `${pct * 100}%` }}
+                                          className="h-2.5 rounded-full transition-all"
+                                          style={{ width: `${pct * 100}%`, backgroundColor: color }}
                                         />
                                       </div>
                                       <div className="mt-1 text-[11px] text-gray-500">
