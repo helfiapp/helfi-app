@@ -52,36 +52,72 @@ export async function POST(request: NextRequest) {
         const isNewSubscription = !existingSub
         const isTierChange = existingSub && existingSub.monthlyPriceCents !== amountCents
         // Also reset if switching from admin-granted (no stripeSubscriptionId) to Stripe-managed subscription
+        // This is critical: if subscription exists but doesn't have stripeSubscriptionId, and we're adding one, reset everything
         const isSwitchingToStripe = existingSub && !existingSub.stripeSubscriptionId && sub.id
         
         // If tier is changing, new subscription, or switching to Stripe, reset startDate to start new billing cycle
         const shouldResetCredits = isNewSubscription || isTierChange || isSwitchingToStripe
+        // Always use current date when switching to Stripe or creating new subscription
         const newStartDate = shouldResetCredits ? new Date() : (existingSub?.startDate || new Date())
         
-        // Set plan to PREMIUM and store Stripe subscription ID
-        const user = await prisma.user.update({
-          where: { email: email.toLowerCase() },
-          data: {
-            subscription: { upsert: {
-              create: { 
-                plan: 'PREMIUM',
-                monthlyPriceCents: amountCents,
-                stripeSubscriptionId: sub.id,
-                startDate: newStartDate
-              },
-              update: { 
-                plan: 'PREMIUM',
-                monthlyPriceCents: amountCents,
-                stripeSubscriptionId: sub.id,
-                startDate: newStartDate
-              }
-            }},
-          },
-          include: { subscription: true }
+        // Log for debugging
+        console.log(`[Webhook] Subscription ${sub.id} for ${email}:`, {
+          isNewSubscription,
+          isTierChange,
+          isSwitchingToStripe,
+          shouldResetCredits,
+          existingStripeId: existingSub?.stripeSubscriptionId,
+          newStripeId: sub.id,
+          existingStartDate: existingSub?.startDate,
+          newStartDate
         })
+        
+        // Set plan to PREMIUM and store Stripe subscription ID
+        // IMPORTANT: Always update startDate when switching to Stripe, even if using upsert
+        // Use direct update if subscription exists to ensure startDate is always updated when switching to Stripe
+        let user
+        if (existingSub) {
+          // Subscription exists - update it directly to ensure startDate is always set correctly
+          await prisma.subscription.update({
+            where: { userId: existingUser.id },
+            data: {
+              plan: 'PREMIUM',
+              monthlyPriceCents: amountCents,
+              stripeSubscriptionId: sub.id,
+              startDate: newStartDate // Always update startDate when switching to Stripe
+            }
+          })
+          // Fetch updated user with subscription
+          user = await prisma.user.findUnique({
+            where: { email: email.toLowerCase() },
+            include: { subscription: true }
+          })
+        } else {
+          // New subscription - use upsert create
+          user = await prisma.user.update({
+            where: { email: email.toLowerCase() },
+            data: {
+              subscription: { 
+                create: { 
+                  plan: 'PREMIUM',
+                  monthlyPriceCents: amountCents,
+                  stripeSubscriptionId: sub.id,
+                  startDate: newStartDate
+                }
+              },
+            },
+            include: { subscription: true }
+          })
+        }
+        
+        if (!user) {
+          console.error(`[Webhook] Failed to update user ${email} after subscription update`)
+          break
+        }
         
         // Reset monthly counters and wallet when starting new subscription cycle or changing tier
         if (shouldResetCredits) {
+          console.log(`[Webhook] Resetting credits for user ${user.id} - switching to Stripe or new subscription`)
           await prisma.user.update({
             where: { id: user.id },
             data: {
