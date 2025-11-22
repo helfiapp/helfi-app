@@ -373,8 +373,12 @@ export async function POST(request: NextRequest) {
     } else {
       return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error managing subscription:', error)
-    return NextResponse.json({ error: 'Failed to manage subscription' }, { status: 500 })
+    return NextResponse.json({ 
+      error: 'Failed to manage subscription',
+      message: error?.message || 'Unknown error occurred',
+      details: error?.code || 'NO_CODE'
+    }, { status: 500 })
   }
 }

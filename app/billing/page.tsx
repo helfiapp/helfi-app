@@ -176,11 +176,12 @@ export default function BillingPage() {
           }
         }
       } else {
-        const error = await res.json()
-        alert(error.error || 'Failed to cancel subscription')
+        const error = await res.json().catch(() => ({}))
+        alert(error.message || error.error || error.details?.message || 'Failed to cancel subscription')
       }
-    } catch (error) {
-      alert('Failed to cancel subscription')
+    } catch (error: any) {
+      console.error('Cancel subscription error:', error)
+      alert(error?.message || 'Failed to cancel subscription')
     } finally {
       setIsManagingSubscription(false)
     }
@@ -212,11 +213,12 @@ export default function BillingPage() {
           }
         }
       } else {
-        const error = await res.json()
-        alert(error.error || `Failed to ${action} subscription`)
+        const error = await res.json().catch(() => ({}))
+        alert(error.message || error.error || error.details?.message || `Failed to ${action} subscription`)
       }
-    } catch (error) {
-      alert(`Failed to ${action} subscription`)
+    } catch (error: any) {
+      console.error(`${action} subscription error:`, error)
+      alert(error?.message || `Failed to ${action} subscription`)
     } finally {
       setIsManagingSubscription(false)
     }
