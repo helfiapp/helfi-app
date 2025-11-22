@@ -174,25 +174,42 @@ export async function POST(request: NextRequest) {
         const currentPeriodStart = sub.current_period_start ? new Date(sub.current_period_start * 1000) : new Date()
         const currentPeriodEnd = sub.current_period_end ? new Date(sub.current_period_end * 1000) : null
 
-        // Update subscription to Stripe details
-        await prisma.subscription.upsert({
-          where: { userId: user.id },
-          update: {
-            plan: 'PREMIUM',
-            monthlyPriceCents: amountCents,
-            stripeSubscriptionId: sub.id,
-            startDate: currentPeriodStart,
-            endDate: currentPeriodEnd
-          },
-          create: {
-            userId: user.id,
-            plan: 'PREMIUM',
-            monthlyPriceCents: amountCents,
-            stripeSubscriptionId: sub.id,
-            startDate: currentPeriodStart,
-            endDate: currentPeriodEnd
+        // Update subscription to Stripe details (auto-add column if missing)
+        const upsertSubscription = async () => {
+          await prisma.subscription.upsert({
+            where: { userId: user.id },
+            update: {
+              plan: 'PREMIUM',
+              monthlyPriceCents: amountCents,
+              stripeSubscriptionId: sub.id,
+              startDate: currentPeriodStart,
+              endDate: currentPeriodEnd
+            } as any,
+            create: {
+              userId: user.id,
+              plan: 'PREMIUM',
+              monthlyPriceCents: amountCents,
+              stripeSubscriptionId: sub.id,
+              startDate: currentPeriodStart,
+              endDate: currentPeriodEnd
+            } as any
+          })
+        }
+
+        try {
+          await upsertSubscription()
+        } catch (err: any) {
+          const msg = err?.message || ''
+          if (msg.includes('stripeSubscriptionId')) {
+            // Add column if missing (defensive for older DBs)
+            await prisma.$executeRawUnsafe(
+              'ALTER TABLE \"Subscription\" ADD COLUMN IF NOT EXISTS \"stripeSubscriptionId\" TEXT'
+            )
+            await upsertSubscription()
+          } else {
+            throw err
           }
-        })
+        }
 
         // Reset wallet/monthly counters to align with Stripe period start
         await prisma.user.update({
