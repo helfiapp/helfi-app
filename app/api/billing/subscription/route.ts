@@ -14,20 +14,48 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Check Stripe configuration
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY
+    if (!stripeSecretKey) {
+      console.error('STRIPE_SECRET_KEY is not set')
+      return NextResponse.json({ 
+        error: 'Stripe not configured',
+        details: 'STRIPE_SECRET_KEY environment variable is missing'
+      }, { status: 500 })
+    }
+
     // Fetch user and subscription separately to avoid Prisma client issues
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email.toLowerCase() },
-      select: { id: true, email: true, name: true }
-    })
+    let user
+    try {
+      user = await prisma.user.findUnique({
+        where: { email: session.user.email.toLowerCase() },
+        select: { id: true, email: true, name: true }
+      })
+    } catch (error) {
+      console.error('Error fetching user:', error)
+      return NextResponse.json({ 
+        error: 'Database error',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      }, { status: 500 })
+    }
 
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
     // Fetch subscription using Prisma (safer than raw in this case)
-    const subscription = await prisma.subscription.findFirst({
-      where: { userId: user.id },
-    })
+    let subscription
+    try {
+      subscription = await prisma.subscription.findFirst({
+        where: { userId: user.id },
+      })
+    } catch (error) {
+      console.error('Error fetching subscription:', error)
+      return NextResponse.json({ 
+        error: 'Database error',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      }, { status: 500 })
+    }
     
     if (!subscription) {
       return NextResponse.json({ 
@@ -43,14 +71,15 @@ export async function GET(request: NextRequest) {
 
     // Get Stripe subscription details if available
     let stripeSubscription = null
-    const stripeSubscriptionId = subscription.stripeSubscriptionId || null
+    // Safely access stripeSubscriptionId field (may not exist in Prisma types yet)
+    const stripeSubscriptionId = (subscription as any).stripeSubscriptionId || null
     
     if (stripeSubscriptionId) {
       try {
         stripeSubscription = await stripe.subscriptions.retrieve(stripeSubscriptionId)
-      } catch (error) {
-        console.error('Error fetching Stripe subscription:', error)
-        // Continue without Stripe data
+      } catch (error: any) {
+        console.error('Error fetching Stripe subscription:', error?.message || error)
+        // Continue without Stripe data - subscription might have been deleted in Stripe
       }
     } else {
       // Try to find Stripe subscription by customer email
@@ -76,15 +105,15 @@ export async function GET(request: NextRequest) {
                 where: { userId: user.id },
                 data: { stripeSubscriptionId: stripeSubscription.id } as any
               })
-            } catch (updateError) {
-              console.error('Error updating stripeSubscriptionId (column may not exist yet):', updateError)
+            } catch (updateError: any) {
+              console.error('Error updating stripeSubscriptionId:', updateError?.message || updateError)
               // Continue without updating - column might not exist yet
             }
           }
         }
-      } catch (error) {
-        console.error('Error finding Stripe subscription by email:', error)
-        // Continue without Stripe data
+      } catch (error: any) {
+        console.error('Error finding Stripe subscription by email:', error?.message || error)
+        // Continue without Stripe data - user might not have Stripe customer yet
       }
     }
 
@@ -137,11 +166,20 @@ export async function GET(request: NextRequest) {
     console.error('Error details:', {
       message: error?.message,
       stack: error?.stack,
-      name: error?.name
+      name: error?.name,
+      code: error?.code
     })
+    
+    // Return detailed error in development, generic in production
+    const isDevelopment = process.env.NODE_ENV === 'development' || process.env.VERCEL_ENV === 'development'
+    
     return NextResponse.json({ 
       error: 'Failed to fetch subscription',
-      details: process.env.NODE_ENV === 'development' ? error?.message : undefined
+      details: isDevelopment ? {
+        message: error?.message,
+        name: error?.name,
+        code: error?.code
+      } : undefined
     }, { status: 500 })
   }
 }
