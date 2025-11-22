@@ -29,6 +29,7 @@ import UsageMeter from '@/components/UsageMeter'
 import FeatureUsageDisplay from '@/components/FeatureUsageDisplay'
 import CreditPurchaseModal from '@/components/CreditPurchaseModal'
 import { STARTER_FOODS } from '@/data/foods-starter'
+import { COMMON_USDA_FOODS } from '@/data/usda-common'
 import { calculateDailyTargets } from '@/lib/daily-targets'
 import { SolidMacroRing } from '@/components/SolidMacroRing'
 
@@ -128,6 +129,34 @@ const enrichItemsFromStarter = (items: any[]) => {
       }
       const maybeUse = (v: any, dbv: any) =>
         (v === null || v === undefined || (Number(v) === 0 && Number(dbv) > 0)) ? dbv : v
+      next.calories = maybeUse(next.calories, db.calories)
+      next.protein_g = maybeUse(next.protein_g, db.protein_g)
+      next.carbs_g = maybeUse(next.carbs_g, db.carbs_g)
+      next.fat_g = maybeUse(next.fat_g, db.fat_g)
+      next.fiber_g = maybeUse(next.fiber_g, db.fiber_g ?? 0)
+      next.sugar_g = maybeUse(next.sugar_g, db.sugar_g ?? 0)
+      return next
+    })
+  } catch {
+    return items
+  }
+}
+
+// Enrich items using curated USDA-backed entries (common foods). Only fills missing/zero macros.
+const enrichItemsFromCuratedUsda = (items: any[]) => {
+  try {
+    const map = new Map<string, any>()
+    COMMON_USDA_FOODS.forEach((f) => map.set(normalizeFoodName(f.name), f))
+    const maybeUse = (v: any, dbv: any) =>
+      v === null || v === undefined || (Number(v) === 0 && Number(dbv) > 0) ? dbv : v
+    return items.map((it) => {
+      const key = normalizeFoodName(it?.name)
+      const db = map.get(key)
+      if (!db) return it
+      const next = { ...it }
+      if (!next.serving_size || String(next.serving_size).trim().length === 0) {
+        next.serving_size = db.serving_size
+      }
       next.calories = maybeUse(next.calories, db.calories)
       next.protein_g = maybeUse(next.protein_g, db.protein_g)
       next.carbs_g = maybeUse(next.carbs_g, db.carbs_g)
@@ -895,6 +924,7 @@ export default function FoodDiary() {
   const [originalEditingEntry, setOriginalEditingEntry] = useState<any>(null)
   const [showEditActionsMenu, setShowEditActionsMenu] = useState(false)
   const usdaFallbackAttemptedRef = useRef(false)
+  const usdaCacheRef = useRef<Map<string, any>>(new Map())
   
   // New loading state
   const [foodDiaryLoaded, setFoodDiaryLoaded] = useState(false)
@@ -1104,7 +1134,9 @@ const applyStructuredItems = (
     }
   }
 
-  const enrichedItems = finalItems.length > 0 ? enrichItemsFromStarter(finalItems) : []
+  const curatedEnriched =
+    finalItems.length > 0 ? enrichItemsFromCuratedUsda(finalItems) : []
+  const enrichedItems = curatedEnriched.length > 0 ? enrichItemsFromStarter(curatedEnriched) : []
   const normalizedItems =
     enrichedItems.length > 0 ? normalizeDiscreteServingsWithLabel(enrichedItems) : []
   setAnalyzedItems(normalizedItems)
@@ -1660,6 +1692,25 @@ const applyStructuredItems = (
         for (const idx of indexesNeeding) {
           const name = (updated[idx]?.name || '').trim()
           if (!name) continue
+          const cacheKey = normalizeFoodName(name)
+          if (usdaCacheRef.current.has(cacheKey)) {
+            const cached = usdaCacheRef.current.get(cacheKey)
+            if (cached) {
+              const next = { ...updated[idx] }
+              const macros = ['calories', 'protein_g', 'carbs_g', 'fat_g', 'fiber_g', 'sugar_g'] as const
+              macros.forEach((m) => {
+                if (Number.isFinite(Number(cached[m]))) {
+                  next[m] = Number(cached[m])
+                }
+              })
+              if (!next.serving_size && cached.serving_size) {
+                next.serving_size = cached.serving_size
+              }
+              updated[idx] = next
+              changed = true
+              continue
+            }
+          }
           const params = new URLSearchParams({
             source: 'usda',
             q: name,
@@ -1682,6 +1733,7 @@ const applyStructuredItems = (
           if (!next.serving_size && hit.serving_size) {
             next.serving_size = hit.serving_size
           }
+          usdaCacheRef.current.set(cacheKey, hit)
           updated[idx] = next
           changed = true
         }
