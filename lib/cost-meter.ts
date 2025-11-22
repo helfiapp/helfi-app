@@ -8,6 +8,15 @@ type ModelPrices = {
   outputCentsPer1k: number;
 };
 
+// Global markup multiplier to apply to all computed costs (e.g., 2 = 2x OpenAI cost).
+// Default is 2x per user request.
+const BILLING_MARKUP_MULTIPLIER = (() => {
+  const v = process.env.HELFI_BILLING_MARKUP_MULTIPLIER;
+  const n = Number(v);
+  if (Number.isFinite(n) && n > 0) return n;
+  return 2; // default: double the OpenAI cost to cover service margin
+})();
+
 const envNumber = (key: string, fallback: number): number => {
   const v = process.env[key];
   if (!v) return fallback;
@@ -53,8 +62,9 @@ export function costCentsForTokens(model: string, usage: TokenUsage): number {
   const { inputCentsPer1k, outputCentsPer1k } = getModelPrices(model);
   const inCost = (usage.promptTokens / 1000) * inputCentsPer1k;
   const outCost = (usage.completionTokens / 1000) * outputCentsPer1k;
-  // Round up to the nearest cent to avoid undercharging
-  return Math.ceil(inCost + outCost);
+  const base = inCost + outCost;
+  // Apply global markup and round up to avoid undercharging
+  return Math.ceil(base * BILLING_MARKUP_MULTIPLIER);
 }
 
 // Rough estimation for streaming or when usage is unavailable.
@@ -74,7 +84,6 @@ export function costCentsEstimateFromText(
   const completionTokens = Math.ceil(expectedOutputChars / 4);
   return costCentsForTokens(model, { promptTokens, completionTokens });
 }
-
 
 
 
