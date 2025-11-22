@@ -701,9 +701,9 @@ const extractItemsFromTextEstimates = (analysis: string) => {
   // "- **Scrambled Eggs**: Calories: 210, Protein: 18g, Carbs: 2g, Fat: 15g, Fiber: 0g, Sugar: 1g"
   // or "**Scrambled Eggs**: 210 calories, 18g protein, 2g carbs, 15g fat"
   const inlineMacroRegex1 =
-    /(?:^|[*\-\u2022]\s*)\**([A-Za-z0-9 ,()\/\-]+?)\**\s*:\s*Calories:\s*([\d\.]+)[^,\n]*,\s*Protein:\s*([\d\.]+)\s*g[^,\n]*,\s*Carbs:\s*([\d\.]+)\s*g[^,\n]*,\s*Fat:\s*([\d\.]+)\s*g(?:[^,\n]*,\s*Fiber:\s*([\d\.]+)\s*g)?(?:[^,\n]*,\s*Sugar:\s*([\d\.]+)\s*g)?/i
+    /(?:^|[*\-\u2022]\s*)\**([A-Za-z0-9 ,()\/\-]+?)\**\s*:\s*Calories:\s*[~≈]?\s*([\d\.]+)[^,\n]*,\s*Protein:\s*[~≈]?\s*([\d\.]+)\s*g[^,\n]*,\s*Carbs:\s*[~≈]?\s*([\d\.]+)\s*g[^,\n]*,\s*Fat:\s*[~≈]?\s*([\d\.]+)\s*g(?:[^,\n]*,\s*Fiber:\s*[~≈]?\s*([\d\.]+)\s*g)?(?:[^,\n]*,\s*Sugar:\s*[~≈]?\s*([\d\.]+)\s*g)?/i
   const inlineMacroRegex2 =
-    /(?:^|[*\-\u2022]\s*)\**([A-Za-z0-9 ,()\/\-]+?)\**\s*:\s*([\d\.]+)\s*calories?\s*,\s*([\d\.]+)\s*g\s*protein\s*,\s*([\d\.]+)\s*g\s*carbs?\s*,\s*([\d\.]+)\s*g\s*fat\s*(?:,\s*([\d\.]+)\s*g\s*fiber\s*)?(?:,\s*([\d\.]+)\s*g\s*sugar\s*)?/i
+    /(?:^|[*\-\u2022]\s*)\**([A-Za-z0-9 ,()\/\-]+?)\**\s*:\s*[~≈]?\s*([\d\.]+)\s*calories?\s*,\s*[~≈]?\s*([\d\.]+)\s*g\s*protein\s*,\s*[~≈]?\s*([\d\.]+)\s*g\s*carbs?\s*,\s*[~≈]?\s*([\d\.]+)\s*g\s*fat\s*(?:,\s*[~≈]?\s*([\d\.]+)\s*g\s*fiber\s*)?(?:,\s*[~≈]?\s*([\d\.]+)\s*g\s*sugar\s*)?/i
 
   for (let i = 0; i < lines.length; i++) {
     const l = lines[i]
