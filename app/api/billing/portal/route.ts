@@ -21,7 +21,12 @@ export async function POST(req: NextRequest) {
     // Find Stripe customer by email
     const customers = await stripe.customers.list({ email, limit: 1 })
     if (!customers.data.length) {
-      return NextResponse.json({ error: 'No Stripe customer found for this account' }, { status: 404 })
+      // User might have admin-granted subscription without Stripe customer
+      // Return a helpful error message
+      return NextResponse.json({ 
+        error: 'No Stripe customer found',
+        message: 'Your subscription was granted by an administrator. Please contact support to manage your subscription, or subscribe through Stripe to enable self-service management.'
+      }, { status: 404 })
     }
 
     const customerId = customers.data[0].id
@@ -33,8 +38,12 @@ export async function POST(req: NextRequest) {
     })
 
     return NextResponse.json({ url: portalSession.url })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error creating portal session:', error)
-    return NextResponse.json({ error: 'Failed to create portal session' }, { status: 500 })
+    return NextResponse.json({ 
+      error: 'Failed to create portal session',
+      details: error?.message || 'Unknown error',
+      code: error?.code || 'NO_CODE'
+    }, { status: 500 })
   }
 }
