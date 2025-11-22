@@ -461,6 +461,9 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
         </button>
       </div>
       {/* Messages Area - ChatGPT style */}
+      <div className="px-4 pb-2 text-sm text-gray-500">
+        AI replies use credits (billed at 2× OpenAI cost). Typical: 2–4 credits per reply, depending on length.
+      </div>
       <div ref={containerRef} className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-6 space-y-6 min-w-0" aria-live="polite" style={{ maxWidth: '100%', wordWrap: 'break-word' }}>
         {messages.length === 0 && !loading && (
           <div className="max-w-3xl mx-auto">

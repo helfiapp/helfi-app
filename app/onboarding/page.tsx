@@ -3880,6 +3880,9 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
           >
             Analyze for Interactions & Contradictions
           </button>
+          <p className="text-center text-sm text-gray-500">
+            Uses AI credits (2× OpenAI cost). Typical total: 6–10 credits depending on your supplements/meds and recommendations.
+          </p>
           <button 
             className="w-full border border-green-600 text-green-600 px-6 py-3 rounded-lg hover:bg-green-600 hover:text-white transition-colors" 
             onClick={handleBack}
@@ -4470,6 +4473,9 @@ function ReviewStep({ onBack, data }: { onBack: () => void, data: any }) {
           )}
         </button>
       </div>
+      <p className="mt-3 text-sm text-gray-500">
+        AI setup uses credits (billed at 2× OpenAI cost). Typical total: 10–15 credits depending on your answers and data.
+      </p>
     </div>
   );
 }
