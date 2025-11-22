@@ -24,16 +24,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // Fetch subscription separately using raw query to avoid Prisma client schema issues
-    const subscriptionResult: any[] = await prisma.$queryRawUnsafe(
-      `SELECT id, "userId", plan, "monthlyPriceCents", "startDate", "endDate", "stripeSubscriptionId"
-       FROM "Subscription"
-       WHERE "userId" = $1
-       LIMIT 1`,
-      user.id
-    )
-
-    const subscription = subscriptionResult && subscriptionResult.length > 0 ? subscriptionResult[0] : null
+    // Fetch subscription using Prisma (safer than raw in this case)
+    const subscription = await prisma.subscription.findFirst({
+      where: { userId: user.id },
+    })
     
     if (!subscription) {
       return NextResponse.json({ 
@@ -106,10 +100,10 @@ export async function GET(request: NextRequest) {
       credits = 1000
     } else if (currentTier === 3000) {
       tierName = '$30/month'
-      credits = 1700
+      credits = 1500
     } else if (currentTier === 5000) {
       tierName = '$50/month'
-      credits = 3000
+      credits = 2500
     } else if (currentTier) {
       tierName = `$${(currentTier / 100).toFixed(0)}/month`
       // Estimate credits based on price (rough approximation)
@@ -172,20 +166,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // Fetch subscription using raw query to avoid Prisma client issues
-    const subscriptionResult: any[] = await prisma.$queryRawUnsafe(
-      `SELECT id, "userId", plan, "monthlyPriceCents", "startDate", "endDate", "stripeSubscriptionId"
-       FROM "Subscription"
-       WHERE "userId" = $1
-       LIMIT 1`,
-      user.id
-    )
+    // Fetch subscription using Prisma
+    const dbSubscription = await prisma.subscription.findFirst({
+      where: { userId: user.id },
+    })
 
-    if (!subscriptionResult || subscriptionResult.length === 0) {
+    if (!dbSubscription) {
       return NextResponse.json({ error: 'No active subscription found' }, { status: 400 })
     }
-
-    const dbSubscription = subscriptionResult[0]
 
     // Find or get Stripe subscription
     let stripeSubscriptionId = dbSubscription.stripeSubscriptionId || null
@@ -330,4 +318,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to manage subscription' }, { status: 500 })
   }
 }
-

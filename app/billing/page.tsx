@@ -20,6 +20,7 @@ export default function BillingPage() {
   const [subscription, setSubscription] = useState<any>(null)
   const [hasActiveSubscription, setHasActiveSubscription] = useState(false)
   const [isManagingSubscription, setIsManagingSubscription] = useState(false)
+  const [isCreatingPortalSession, setIsCreatingPortalSession] = useState(false)
 
   // Stripe checkout
   const [isCreatingCheckout, setIsCreatingCheckout] = useState<string | null>(null)
@@ -221,6 +222,28 @@ export default function BillingPage() {
     }
   }
 
+  const handleManagePortal = async () => {
+    setIsCreatingPortalSession(true)
+    try {
+      const res = await fetch('/api/billing/portal', { method: 'POST' })
+      if (!res.ok) {
+        alert('Could not open subscription management. Please try again.')
+        return
+      }
+      const data = await res.json()
+      if (data?.url) {
+        window.location.href = data.url
+      } else {
+        alert('Could not open subscription management. Please try again.')
+      }
+    } catch (err) {
+      console.error('Portal error:', err)
+      alert('Could not open subscription management. Please try again.')
+    } finally {
+      setIsCreatingPortalSession(false)
+    }
+  }
+
   const handleSignOut = async () => {
     // Clear user-specific localStorage before signing out
     if (session?.user?.id) {
@@ -271,6 +294,14 @@ export default function BillingPage() {
             )}
 
             <div className="flex flex-wrap gap-3">
+              <button
+                onClick={handleManagePortal}
+                disabled={isCreatingPortalSession}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isCreatingPortalSession ? 'Opening portal…' : 'Manage subscription'}
+              </button>
+
               {!subscription.stripeCancelAtPeriodEnd && (
                 <button
                   onClick={handleCancelSubscription}
