@@ -11,6 +11,7 @@ import { getToken } from 'next-auth/jwt';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { CreditManager, CREDIT_COSTS } from '@/lib/credit-system';
+import crypto from 'crypto';
 
 // Guard rail: this route powers the main Food Analyzer. Billing enforcement
 // (BILLING_ENFORCED) must remain true for production unless the user explicitly
@@ -155,6 +156,13 @@ const harmonizeDiscretePortionItems = (items: any[]): { items: any[]; total: any
   return { items: cloned, total };
 };
 
+// In-memory cache for repeated photo analyses (keyed by image hash).
+// Avoids re-calling the model and keeps macros consistent for the same photo.
+const imageAnalysisCache = new Map<
+  string,
+  { analysis: string; items: any[] | null; total: any | null }
+>();
+
 // Initialize OpenAI client only when API key is available
 // Updated: 2025-06-26 - Ensure environment variable is properly loaded
 const getOpenAIClient = () => {
@@ -169,6 +177,7 @@ const getOpenAIClient = () => {
 export async function POST(req: NextRequest) {
   try {
     console.log('=== FOOD ANALYZER DEBUG START ===');
+    let imageHash: string | null = null;
     
     // Check authentication - pass request headers for proper session resolution
     const session = await getServerSession(authOptions);
@@ -372,12 +381,27 @@ CRITICAL REQUIREMENTS:
       const imageBuffer = await imageFile.arrayBuffer();
       const imageBase64 = Buffer.from(imageBuffer).toString('base64');
       const imageDataUrl = `data:${imageFile.type};base64,${imageBase64}`;
+      imageHash = crypto.createHash('sha256').update(Buffer.from(imageBuffer)).digest('hex');
       
       console.log('✅ Image conversion complete:', {
         bufferSize: imageBuffer.byteLength,
         base64Length: imageBase64.length,
-        dataUrlPrefix: imageDataUrl.substring(0, 50) + '...'
+        dataUrlPrefix: imageDataUrl.substring(0, 50) + '...',
+        imageHash
       });
+
+      // Cache check: if we've already analyzed this exact image, return the cached result
+      const cached = imageAnalysisCache.get(imageHash);
+      if (cached) {
+        console.log('♻️ Returning cached analysis for image hash', imageHash);
+        return NextResponse.json({
+          success: true,
+          analysis: cached.analysis,
+          items: cached.items,
+          total: cached.total,
+          cached: true,
+        });
+      }
 
       // For image analysis, request structured items and multi-detect by default
       wantStructured = true;
@@ -1090,6 +1114,20 @@ Your recommendations:`;
     try {
       fetch('/api/insights/generate?preview=1', { method: 'POST' }).catch(() => {})
     } catch {}
+
+    // Cache successful image analyses to keep repeat results stable
+    if (imageHash) {
+      try {
+        imageAnalysisCache.set(imageHash, {
+          analysis: resp.analysis,
+          items: Array.isArray(resp.items) ? resp.items : null,
+          total: resp.total ?? null,
+        });
+      } catch (err) {
+        console.warn('Failed to cache image analysis (non-fatal):', err);
+      }
+    }
+
     return NextResponse.json(resp);
 
   } catch (error) {
