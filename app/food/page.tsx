@@ -3412,6 +3412,27 @@ Please add nutritional information manually if needed.`);
                   </div>
                 </div>
                 <div className="space-y-3">
+                  <button
+                    onClick={analyzePhoto}
+                    disabled={isAnalyzing}
+                    className="w-full px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 font-semibold"
+                  >
+                    {isAnalyzing ? (
+                      <div className="flex items-center justify-center">
+                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        {analysisPhase === 'preparing'
+                          ? 'Step 1 of 3: Preparing your photo...'
+                          : analysisPhase === 'analyzing'
+                            ? 'Step 2 of 3: AI is analyzing your food...'
+                            : 'Step 3 of 3: Building ingredient cards...'}
+                      </div>
+                    ) : (
+                      '🤖 Analyze with AI'
+                    )}
+                  </button>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     {[
                       { key: 'auto', label: 'Auto detect', helper: 'Use visual cues' },
@@ -3439,27 +3460,6 @@ Please add nutritional information manually if needed.`);
                   <div className="text-xs text-gray-600">
                     Packaged label mode reads the per-serving column exactly (ignores per-100g). Barcode mode will try barcode APIs first, then fall back to the label.
                   </div>
-                  <button
-                    onClick={analyzePhoto}
-                    disabled={isAnalyzing}
-                    className="w-full px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 font-semibold"
-                  >
-                    {isAnalyzing ? (
-                      <div className="flex items-center justify-center">
-                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        {analysisPhase === 'preparing'
-                          ? 'Step 1 of 3: Preparing your photo...'
-                          : analysisPhase === 'analyzing'
-                            ? 'Step 2 of 3: AI is analyzing your food...'
-                            : 'Step 3 of 3: Building ingredient cards...'}
-                      </div>
-                    ) : (
-                      '🤖 Analyze with AI'
-                    )}
-                  </button>
                   <div className="mt-2">
                     <p className="text-xs text-gray-500 text-center mb-2">Typical cost: 6–8 credits (varies by photo + health checks)</p>
                     {!hasPaidAccess && (
