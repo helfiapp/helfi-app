@@ -989,7 +989,6 @@ export default function FoodDiary() {
     energyLabel?: string
     macros: MacroSegment[]
   } | null>(null)
-  const [macroView, setMacroView] = useState<'targets' | 'consumed'>('targets')
 
   const dailyTargets = useMemo(() => {
     if (!userData) return { calories: null, protein: null, carbs: null, fat: null }
@@ -4818,14 +4817,6 @@ Please add nutritional information manually if needed.`);
                 const macroViewOptions: Array<'targets' | 'consumed'> = ['targets', 'consumed']
 
                 const macroRows = [
-                  {
-                    key: 'energy',
-                    label: 'Energy',
-                    consumed: consumedKcal,
-                    target: targetCalories || 0,
-                    unit: energyUnit,
-                    color: '#e5e7eb', // neutral bar for energy
-                  },
                   { key: 'protein', label: 'Protein', consumed: totals.protein || 0, target: macroTargets.protein || 0, unit: 'g', color: '#ef4444' },
                   { key: 'carbs', label: 'Carbs', consumed: carbGrams, target: macroTargets.carbs || 0, unit: 'g', color: '#22c55e' },
                   { key: 'fat', label: 'Fat', consumed: totals.fat || 0, target: macroTargets.fat || 0, unit: 'g', color: '#6366f1' },
@@ -4871,59 +4862,39 @@ Please add nutritional information manually if needed.`);
                           Add a meal to see how today compares to your daily targets.
                         </p>
                       ) : (
-                        <div className="flex flex-col gap-6 md:grid md:grid-cols-[minmax(0,1fr)_260px] md:items-start">
+                        <div className="flex flex-col gap-4 md:grid md:grid-cols-[minmax(0,1fr)_260px] md:items-start">
                           {/* Macro progress list - left on desktop, below on mobile */}
                           {macroRows.length > 0 && (
-                            <div className="order-2 md:order-1">
-                              <div className="flex items-center justify-between mb-2 text-xs font-semibold text-gray-700 uppercase tracking-wide">
-                                <span>Targets</span>
-                                <div className="flex gap-1 rounded-full bg-gray-100 p-1">
-                                  {macroViewOptions.map((opt) => (
-                                    <button
-                                      key={opt}
-                                      type="button"
-                                      onClick={() => setMacroView(opt)}
-                                      className={`px-3 py-1 rounded-full text-[11px] font-semibold ${
-                                        macroView === opt ? 'bg-white shadow text-gray-900' : 'text-gray-500'
-                                      }`}
-                                    >
-                                      {opt === 'targets' ? 'Targets' : 'Consumed'}
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-                              <div className="space-y-2.5">
-                                {macroRows.map((row) => {
-                                  const pctRaw = row.target > 0 ? row.consumed / row.target : 0
-                                  const pct = Math.max(0, pctRaw)
-                                  const percentDisplay = row.target > 0 ? Math.round(pctRaw * 100) : 0
-                                  const over = percentDisplay > 100
-                                  const labelColor = over ? 'text-red-600' : 'text-gray-900'
-                                  const remaining = Math.max(0, row.target - row.consumed)
-                                  const displayConsumed = macroView === 'consumed'
-                                    ? `${Math.round(row.consumed)} ${row.unit}`
-                                    : `${Math.round(row.consumed)} / ${Math.round(row.target)} ${row.unit}${row.key === 'sugar' ? ' cap' : ''}`
-
-                                  return (
-                                    <div key={row.key} className="space-y-1">
-                                      <div className="flex items-center justify-between text-sm">
-                                        <div className="text-gray-900 font-semibold">{row.label}</div>
-                                        <div className={`text-xs font-semibold ${labelColor}`}>
-                                          {percentDisplay > 0 ? `${percentDisplay}%` : '0%'}
-                                        </div>
+                            <div className="order-2 md:order-1 space-y-2">
+                              {macroRows.map((row) => {
+                                const pctRaw = row.target > 0 ? row.consumed / row.target : 0
+                                const pct = Math.max(0, pctRaw)
+                                const percentDisplay = row.target > 0 ? Math.round(pctRaw * 100) : 0
+                                const over = percentDisplay > 100
+                                const percentColor = over ? 'text-red-600' : 'text-gray-900'
+                                const remaining = Math.max(0, row.target - row.consumed)
+                                return (
+                                  <div key={row.key} className="space-y-1">
+                                    <div className="flex items-center justify-between text-sm">
+                                      <div className="text-gray-900 font-semibold">
+                                        {row.label} – {Math.round(row.consumed)} / {Math.round(row.target)} {row.unit}{row.key === 'sugar' ? ' cap' : ''}
                                       </div>
-                                      <div className="text-[11px] text-gray-600">{displayConsumed}</div>
-                                      <div className="h-2.5 w-full bg-gray-200 rounded-full overflow-hidden">
-                                        <div
-                                          className="h-2.5 rounded-full transition-all"
-                                          style={{ width: `${Math.min(100, pct * 100)}%`, backgroundColor: over ? '#ef4444' : row.color }}
-                                        />
+                                      <div className={`text-xs font-semibold ${percentColor}`}>
+                                        {percentDisplay > 0 ? `${percentDisplay}%` : '0%'}
                                       </div>
-                                      <div className="text-[11px] text-gray-500">{Math.round(remaining)} {row.unit} left</div>
                                     </div>
-                                  )
-                                })}
-                              </div>
+                                    <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
+                                      <div
+                                        className="h-2 rounded-full transition-all"
+                                        style={{ width: `${Math.min(100, pct * 100)}%`, backgroundColor: over ? '#ef4444' : row.color }}
+                                      />
+                                    </div>
+                                    <div className="text-[11px] font-semibold" style={{ color: over ? '#ef4444' : row.color }}>
+                                      {Math.round(remaining)} {row.unit} left
+                                    </div>
+                                  </div>
+                                )
+                              })}
                             </div>
                           )}
 
