@@ -4876,8 +4876,14 @@ Please add nutritional information manually if needed.`);
                                 return (
                                   <div key={row.key} className="space-y-1">
                                     <div className="flex items-center justify-between text-sm">
-                                      <div className="text-gray-900 font-semibold">
-                                        {row.label} – {Math.round(row.consumed)} / {Math.round(row.target)} {row.unit}{row.key === 'sugar' ? ' cap' : ''}
+                                      <div className="text-gray-900 font-semibold flex items-center gap-2">
+                                        <span>{row.label}</span>
+                                        <span className="text-gray-700 font-normal">
+                                          {Math.round(row.consumed)} / {Math.round(row.target)} {row.unit}{row.key === 'sugar' ? ' cap' : ''}
+                                        </span>
+                                        <span className="font-semibold" style={{ color: over ? '#ef4444' : row.color }}>
+                                          {Math.round(remaining)} {row.unit} left
+                                        </span>
                                       </div>
                                       <div className={`text-xs font-semibold ${percentColor}`}>
                                         {percentDisplay > 0 ? `${percentDisplay}%` : '0%'}
@@ -4888,9 +4894,6 @@ Please add nutritional information manually if needed.`);
                                         className="h-2 rounded-full transition-all"
                                         style={{ width: `${Math.min(100, pct * 100)}%`, backgroundColor: over ? '#ef4444' : row.color }}
                                       />
-                                    </div>
-                                    <div className="text-[11px] font-semibold" style={{ color: over ? '#ef4444' : row.color }}>
-                                      {Math.round(remaining)} {row.unit} left
                                     </div>
                                   </div>
                                 )
