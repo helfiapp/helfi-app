@@ -151,7 +151,7 @@ const extractPerServingFromLabel = async (
 > => {
   try {
     const completion = await chatCompletionWithCost(openai, {
-      model: 'gpt-4o-mini',
+      model: 'gpt-4o',
       messages: [
         {
           role: 'user',

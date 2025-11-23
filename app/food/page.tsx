@@ -4055,10 +4055,13 @@ Please add nutritional information manually if needed.`);
                                       onClick={() => {
                                         const current = analyzedItems[index]?.servings || 1
                                         const step =
-                                          servingUnitMeta && isDiscreteUnitLabel(servingUnitMeta.unitLabel)
-                                            ? Math.max(1 / servingUnitMeta.quantity, 0.05)
+                                          servingUnitMeta && isDiscreteUnitLabel(servingUnitMeta.unitLabel) && servingUnitMeta.quantity > 0
+                                            ? 1 / servingUnitMeta.quantity
                                             : 0.25
-                                        const next = Math.max(0, current - step)
+                                        const next = Math.max(
+                                          0,
+                                          Math.round((current - step) * (servingUnitMeta?.quantity || 1)) / (servingUnitMeta?.quantity || 1)
+                                        )
                                         updateItemField(index, 'servings', next)
                                       }}
                                       className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-medium transition-colors"
@@ -4070,7 +4073,7 @@ Please add nutritional information manually if needed.`);
                                       min={0}
                                       step={
                                         servingUnitMeta && isDiscreteUnitLabel(servingUnitMeta.unitLabel)
-                                          ? Math.max(1 / servingUnitMeta.quantity, 0.05)
+                                          ? Math.max(1 / servingUnitMeta.quantity, 0.01)
                                           : 0.25
                                       }
                                       value={formatNumberInputValue(item.servings ?? 1)}
@@ -4082,9 +4085,11 @@ Please add nutritional information manually if needed.`);
                                         const current = analyzedItems[index]?.servings || 1
                                         const step =
                                           servingUnitMeta && isDiscreteUnitLabel(servingUnitMeta.unitLabel)
-                                            ? Math.max(1 / servingUnitMeta.quantity, 0.05)
+                                            ? 1 / servingUnitMeta.quantity
                                             : 0.25
-                                        const next = current + step
+                                        const next =
+                                          Math.round((current + step) * (servingUnitMeta?.quantity || 1)) /
+                                          (servingUnitMeta?.quantity || 1)
                                         updateItemField(index, 'servings', next)
                                       }}
                                       className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-medium transition-colors"
