@@ -183,31 +183,6 @@ const extractPerServingFromLabel = async (
 };
 
 // Optional: decode barcode from label image (OpenAI vision quick pass).
-const extractBarcodeFromImage = async (openai: OpenAI, imageDataUrl: string): Promise<string | null> => {
-  try {
-    const completion = await chatCompletionWithCost(openai, {
-      model: 'gpt-4o-mini',
-      messages: [
-        {
-          role: 'user',
-          content: [
-            { type: 'text', text: `Read a barcode number from this image if visible. Return only the number as plain text (digits only). If none, return "none".` },
-            { type: 'image_url', image_url: { url: imageDataUrl } },
-          ],
-        },
-      ],
-      max_tokens: 32,
-      temperature: 0,
-    } as any);
-    const raw = completion.completion.choices?.[0]?.message?.content?.trim() || '';
-    const cleaned = raw.replace(/[^0-9]/g, '');
-    if (cleaned.length >= 6) return cleaned; // basic sanity
-  } catch (err) {
-    console.warn('Barcode extractor failed (non-fatal)', err);
-  }
-  return null;
-};
-
 const fetchOpenFoodFactsByBarcode = async (barcode: string): Promise<any | null> => {
   try {
     if (!barcode || barcode.trim().length < 6) return null;
@@ -439,20 +414,18 @@ export async function POST(req: NextRequest) {
     // Default ON for best accuracy
     let wantStructured = true; // when true, we also return items[] and totals
     let preferMultiDetect = true; // default ON: detect multiple foods without changing output line
-    let analysisMode: 'auto' | 'packaged' | 'meal' | 'barcode' = 'auto';
+    let analysisMode: 'auto' | 'packaged' | 'meal' = 'auto';
     let packagedMode = false;
-    let barcodeMode = false;
     let packagedEmphasisBlock = '';
 
     const setAnalysisMode = (modeRaw: any) => {
       const normalized = String(modeRaw || 'auto').toLowerCase();
-      if (normalized === 'packaged' || normalized === 'meal' || normalized === 'barcode') {
-        analysisMode = normalized as 'packaged' | 'meal' | 'barcode';
+      if (normalized === 'packaged' || normalized === 'meal') {
+        analysisMode = normalized as 'packaged' | 'meal';
       } else {
         analysisMode = 'auto';
       }
-      barcodeMode = analysisMode === 'barcode';
-      packagedMode = analysisMode === 'packaged' || barcodeMode;
+      packagedMode = analysisMode === 'packaged';
       packagedEmphasisBlock = packagedMode
         ? `
 PACKAGED MODE SELECTED:
@@ -1119,52 +1092,7 @@ CRITICAL REQUIREMENTS:
     }
 
     // Packaged mode: force-read per-serving column and REPLACE macros with the per-serving read
-    let barcodeApplied = false;
-    if (packagedMode && imageDataUrl && barcodeMode) {
-      try {
-        const barcode = await extractBarcodeFromImage(openai, imageDataUrl);
-        if (barcode) {
-          let barcodeItem: any | null = await fetchOpenFoodFactsByBarcode(barcode);
-          let source = 'openfoodfacts';
-          if (!barcodeItem) {
-            const fsResults = await searchFatSecretFoods(barcode, { pageSize: 1 });
-            const candidate = fsResults?.[0];
-            if (candidate) {
-              barcodeItem = candidate;
-              source = 'fatsecret';
-            }
-          }
-          if (barcodeItem) {
-            const fallbackItem = resp.items && resp.items[0] ? resp.items[0] : {};
-            resp.items = [
-              {
-                name: barcodeItem.name || fallbackItem.name || 'Packaged item',
-                brand: barcodeItem.brand || fallbackItem.brand || null,
-                serving_size: barcodeItem.serving_size || fallbackItem.serving_size || null,
-                calories: barcodeItem.calories ?? fallbackItem.calories ?? null,
-                protein_g: barcodeItem.protein_g ?? fallbackItem.protein_g ?? null,
-                carbs_g: barcodeItem.carbs_g ?? fallbackItem.carbs_g ?? null,
-                fat_g: barcodeItem.fat_g ?? fallbackItem.fat_g ?? null,
-                fiber_g: barcodeItem.fiber_g ?? fallbackItem.fiber_g ?? null,
-                sugar_g: barcodeItem.sugar_g ?? fallbackItem.sugar_g ?? null,
-                servings: 1,
-              },
-            ];
-            resp.total = computeTotalsFromItems(resp.items);
-            resp.analysis = `Barcode match (${source}) detected.`;
-            barcodeApplied = true;
-          } else {
-            resp.analysis = `Barcode not found in databases; using label read.`;
-          }
-        } else {
-          resp.analysis = `Could not read barcode; using label read.`;
-        }
-      } catch (err) {
-        console.warn('Barcode mode failed (non-fatal)', err);
-      }
-    }
-
-    if (packagedMode && !barcodeApplied && resp.items && Array.isArray(resp.items) && resp.items.length > 0 && imageDataUrl) {
+    if (packagedMode && resp.items && Array.isArray(resp.items) && resp.items.length > 0 && imageDataUrl) {
       // 1) Force per-serving extraction first and replace macros for all items.
       const forced = await extractPerServingFromLabel(openai, imageDataUrl);
       if (forced) {
@@ -1189,6 +1117,15 @@ CRITICAL REQUIREMENTS:
             const remaining = forcedValues.calories - (proteinCals + carbCals);
             const adjustedFat = Math.max(0, remaining / 9);
             forcedValues.fat_g = Math.round(adjustedFat * 10) / 10;
+          }
+          // If carbs look too low relative to label calories, adjust carbs from remaining calories (after protein/fat).
+          if ((forcedValues.carbs_g ?? 0) > 0) {
+            const remainingAfterProteinFat =
+              forcedValues.calories - (proteinCals + (forcedValues.fat_g ?? 0) * 9);
+            const impliedCarbs = remainingAfterProteinFat / 4;
+            if (impliedCarbs > 0 && impliedCarbs > (forcedValues.carbs_g ?? 0) * 1.25) {
+              forcedValues.carbs_g = Math.round(impliedCarbs * 10) / 10;
+            }
           }
         }
 

@@ -918,7 +918,7 @@ export default function FoodDiary() {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analysisPhase, setAnalysisPhase] = useState<'idle' | 'preparing' | 'analyzing' | 'building'>('idle')
   const [isSavingEntry, setIsSavingEntry] = useState(false)
-  const [analysisMode, setAnalysisMode] = useState<'auto' | 'packaged' | 'meal' | 'barcode'>('auto')
+  const [analysisMode, setAnalysisMode] = useState<'auto' | 'packaged' | 'meal'>('auto')
   const [showAnalysisModeModal, setShowAnalysisModeModal] = useState(false)
   const [pendingPhotoPicker, setPendingPhotoPicker] = useState(false)
   const [photoFile, setPhotoFile] = useState<File | null>(null)
@@ -3228,46 +3228,56 @@ Please add nutritional information manually if needed.`);
 
           {/* Simplified Dropdown Options */}
           {showPhotoOptions && (
-            <div className="food-options-dropdown absolute top-full left-0 right-0 mt-2 bg-white rounded-lg shadow-xl border border-gray-200 overflow-hidden z-50">
-              {/* Take Photo Option - Native Mobile Experience */}
-              <button
-                className="flex items-center p-4 hover:bg-gray-50 cursor-pointer transition-colors border-b border-gray-100 w-full text-left"
-                onClick={() => {
-                  setPendingPhotoPicker(true);
-                  setShowPhotoOptions(false);
-                  setShowAnalysisModeModal(true);
-                }}
-              >
-                <div className="flex-shrink-0 w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mr-4">
-                  <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-lg font-medium text-gray-900">📱 Select Photo</h3>
-                  <p className="text-sm text-gray-500">Camera, Photo Library, or Choose File</p>
-                </div>
-              </button>
+            <div className="food-options-dropdown absolute top-full left-0 right-0 mt-2 z-50">
+              <div className="rounded-2xl shadow-2xl border border-gray-200 bg-white/90 backdrop-blur-xl overflow-hidden">
+                <div className="divide-y divide-gray-100">
+                  {/* Take Photo Option - Modern card */}
+                  <button
+                    className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
+                    onClick={() => {
+                      setPendingPhotoPicker(true);
+                      setShowPhotoOptions(false);
+                      setShowAnalysisModeModal(true);
+                    }}
+                  >
+                    <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center mr-3 text-blue-600">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <div className="text-base font-semibold text-gray-900">Photo Library / Camera</div>
+                      <div className="text-xs text-gray-500">Capture or pick a photo of your food</div>
+                    </div>
+                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
 
-              {/* Manual Entry Option */}
-              <button
-                onClick={() => {
-                  setShowPhotoOptions(false);
-                  setShowAddFood(true);
-                }}
-                className="flex items-center p-4 hover:bg-gray-50 cursor-pointer transition-colors w-full text-left"
-              >
-                <div className="flex-shrink-0 w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mr-4">
-                  <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                  </svg>
+                  {/* Manual Entry Option */}
+                  <button
+                    onClick={() => {
+                      setShowPhotoOptions(false);
+                      setShowAddFood(true);
+                    }}
+                    className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center mr-3 text-green-600">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <div className="text-base font-semibold text-gray-900">Manual Entry</div>
+                      <div className="text-xs text-gray-500">Type your food description</div>
+                    </div>
+                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
                 </div>
-                <div className="flex-1">
-                  <h3 className="text-lg font-medium text-gray-900">✍️ Manual Entry</h3>
-                  <p className="text-sm text-gray-500">Type your food description</p>
-                </div>
-              </button>
+              </div>
             </div>
           )}
         </div>
@@ -3305,16 +3315,15 @@ Please add nutritional information manually if needed.`);
               <div className="grid grid-cols-1 gap-2">
                 {[
                   { key: 'auto', label: 'Auto detect', helper: 'Best guess for meals and snacks' },
-                  { key: 'packaged', label: 'Packaged label', helper: 'Read the per-serving panel exactly' },
+                  { key: 'packaged', label: 'Product nutrition image', helper: 'Photo of the nutrition facts panel' },
                   { key: 'meal', label: 'Homemade/restaurant', helper: 'Plated/restaurant foods' },
-                  { key: 'barcode', label: 'Barcode', helper: 'Scan barcode for packaged foods' },
                 ].map((mode) => {
                   const active = analysisMode === mode.key
                   return (
                     <button
                       key={mode.key}
                       type="button"
-                      onClick={() => setAnalysisMode(mode.key as 'auto' | 'packaged' | 'meal' | 'barcode')}
+                      onClick={() => setAnalysisMode(mode.key as 'auto' | 'packaged' | 'meal')}
                       className={`flex flex-col items-start px-3 py-2 rounded-lg border text-left ${
                         active
                           ? 'border-emerald-500 bg-emerald-50 text-emerald-800'
@@ -3328,7 +3337,7 @@ Please add nutritional information manually if needed.`);
                 })}
               </div>
               <div className="text-xs text-gray-600">
-                Packaged label mode ignores per-100g numbers and copies the per-serving panel. Barcode mode will try barcode APIs first, then fall back to the label.
+                Product nutrition image: take a clear photo of the nutrition facts panel. We’ll read the per-serving numbers.
               </div>
               {pendingPhotoPicker && (
                 <button
@@ -3403,19 +3412,18 @@ Please add nutritional information manually if needed.`);
                   </div>
                 </div>
                 <div className="space-y-3">
-                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     {[
                       { key: 'auto', label: 'Auto detect', helper: 'Use visual cues' },
-                      { key: 'packaged', label: 'Packaged label', helper: 'Read per-serving panel' },
+                      { key: 'packaged', label: 'Product nutrition image', helper: 'Photo of nutrition facts panel' },
                       { key: 'meal', label: 'Homemade/restaurant', helper: 'Plate/meal focus' },
-                      { key: 'barcode', label: 'Barcode', helper: 'Scan code for packaged item' },
                     ].map((mode) => {
                       const active = analysisMode === mode.key
                       return (
                         <button
                           key={mode.key}
                           type="button"
-                          onClick={() => setAnalysisMode(mode.key as 'auto' | 'packaged' | 'meal' | 'barcode')}
+                          onClick={() => setAnalysisMode(mode.key as 'auto' | 'packaged' | 'meal')}
                           className={`flex flex-col items-start px-3 py-2 rounded-lg border text-left ${
                             active
                               ? 'border-emerald-500 bg-emerald-50 text-emerald-800'
@@ -4031,7 +4039,7 @@ Please add nutritional information manually if needed.`);
                                         const current = analyzedItems[index]?.servings || 1
                                         const step =
                                           servingUnitMeta && isDiscreteUnitLabel(servingUnitMeta.unitLabel)
-                                            ? 1
+                                            ? Math.max(1 / servingUnitMeta.quantity, 0.25)
                                             : 0.25
                                         const next = Math.max(0, current - step)
                                         updateItemField(index, 'servings', next)
@@ -4045,7 +4053,7 @@ Please add nutritional information manually if needed.`);
                                       min={0}
                                       step={
                                         servingUnitMeta && isDiscreteUnitLabel(servingUnitMeta.unitLabel)
-                                          ? 1
+                                          ? Math.max(1 / servingUnitMeta.quantity, 0.25)
                                           : 0.25
                                       }
                                       value={formatNumberInputValue(item.servings ?? 1)}
@@ -4057,7 +4065,7 @@ Please add nutritional information manually if needed.`);
                                         const current = analyzedItems[index]?.servings || 1
                                         const step =
                                           servingUnitMeta && isDiscreteUnitLabel(servingUnitMeta.unitLabel)
-                                            ? 1
+                                            ? Math.max(1 / servingUnitMeta.quantity, 0.25)
                                             : 0.25
                                         const next = current + step
                                         updateItemField(index, 'servings', next)
