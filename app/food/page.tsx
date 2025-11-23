@@ -4865,7 +4865,7 @@ Please add nutritional information manually if needed.`);
                         <div className="flex flex-col gap-4 md:grid md:grid-cols-[minmax(0,1fr)_300px] md:items-start">
                           {/* Macro progress list - left on desktop, below on mobile */}
                           {macroRows.length > 0 && (
-                            <div className="order-2 md:order-1 space-y-2">
+                            <div className="order-2 md:order-1 space-y-2 mt-6 md:mt-0">
                               {macroRows.map((row) => {
                                 const pctRaw = row.target > 0 ? row.consumed / row.target : 0
                                 const pct = Math.max(0, pctRaw)
