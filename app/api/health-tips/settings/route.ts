@@ -107,6 +107,7 @@ export async function GET() {
   //   `ALTER TABLE HealthTipSettings ADD COLUMN IF NOT EXISTS focusLifestyle BOOLEAN NOT NULL DEFAULT true`
   // ).catch(() => {})
 
+  // Explicit column aliases to preserve camelCase keys in the JSON result (Postgres lowercases names by default).
   const rows: Array<{
     enabled: boolean
     time1: string
@@ -118,7 +119,16 @@ export async function GET() {
     focusSupplements: boolean
     focusLifestyle: boolean
   }> = await prisma.$queryRawUnsafe(
-    `SELECT enabled, time1, time2, time3, timezone, frequency, focusFood, focusSupplements, focusLifestyle
+    `SELECT
+        enabled AS "enabled",
+        time1 AS "time1",
+        time2 AS "time2",
+        time3 AS "time3",
+        timezone AS "timezone",
+        frequency AS "frequency",
+        focusFood AS "focusFood",
+        focusSupplements AS "focusSupplements",
+        focusLifestyle AS "focusLifestyle"
      FROM HealthTipSettings
      WHERE userId = $1`,
     user.id
@@ -309,4 +319,3 @@ export async function POST(req: NextRequest) {
     )
   }
 }
-
