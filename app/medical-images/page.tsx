@@ -1,7 +1,7 @@
 'use client'
 import { Cog6ToothIcon } from '@heroicons/react/24/outline'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import CreditPurchaseModal from '@/components/CreditPurchaseModal'
@@ -48,6 +48,7 @@ export default function MedicalImagesPage() {
   const [hasPaidAccess, setHasPaidAccess] = useState<boolean>(false)
   const [hasAnalyzedCurrentImage, setHasAnalyzedCurrentImage] = useState<boolean>(false)
   const [analysisSessionId, setAnalysisSessionId] = useState<number>(0)
+  const resultRef = useRef<HTMLDivElement | null>(null)
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -169,13 +170,22 @@ export default function MedicalImagesPage() {
     setHasAnalyzedCurrentImage(false)
   }
 
+  useEffect(() => {
+    if (!analysisResult) return
+    const el = resultRef.current
+    if (!el) return
+    requestAnimationFrame(() => {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+  }, [analysisResult])
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <PageHeader title="Medical Image Analyzer" />
 
       {/* Content */}
       <main className="flex-1">
-        <div className="max-w-3xl mx-auto px-4 py-6">
+        <div className="mx-auto w-full px-0 sm:px-4 md:max-w-3xl md:px-4 py-6">
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 md:p-6">
             <h1 className="text-xl font-semibold text-gray-900 mb-1">Medical Image Analyzer</h1>
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
@@ -287,7 +297,10 @@ export default function MedicalImagesPage() {
 
             {/* Analysis Results */}
             {(analysisResult || analysis) && (
-              <div className="mt-6 bg-gray-50 border border-gray-200 rounded-lg p-4 md:p-6 space-y-4">
+              <div
+                ref={resultRef}
+                className="mt-6 bg-gray-50 border border-gray-200 rounded-lg p-4 md:p-6 space-y-4"
+              >
                 <h2 className="text-lg font-semibold text-gray-900">Analysis Results</h2>
 
                 {/* Summary */}

@@ -185,7 +185,7 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
   }
 
   return (
-    <section className="bg-white overflow-hidden">
+    <section className="bg-white overflow-hidden -mx-4 sm:mx-0 md:rounded-2xl md:border md:shadow-sm">
       <header className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
         <div>
           <h3 className="text-sm font-semibold text-gray-900">Chat about your medical image</h3>
@@ -401,4 +401,3 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
     </section>
   )
 }
-

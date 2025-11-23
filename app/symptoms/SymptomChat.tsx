@@ -236,7 +236,7 @@ export default function SymptomChat({ analysisResult, symptoms, duration, notes 
   }
 
   return (
-    <section className="bg-white mt-6 overflow-hidden">
+    <section className="bg-white mt-6 overflow-hidden -mx-4 sm:mx-0 md:rounded-2xl md:border md:shadow-sm">
       <header className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
         <div>
           <h3 className="text-sm font-semibold text-gray-900">Chat about your symptom analysis</h3>
@@ -422,4 +422,3 @@ export default function SymptomChat({ analysisResult, symptoms, duration, notes 
     </section>
   )
 }
-

@@ -395,7 +395,7 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
 
   if (!enabled) return null
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-white -mx-4 sm:mx-0 md:rounded-2xl md:border md:shadow-sm">
       {/* Thread Selector Header */}
       <div className="border-b border-gray-200 bg-white px-4 py-2 flex items-center justify-between relative">
         <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -466,7 +466,7 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
       </div>
       <div ref={containerRef} className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-6 space-y-6 min-w-0" aria-live="polite" style={{ maxWidth: '100%', wordWrap: 'break-word' }}>
         {messages.length === 0 && !loading && (
-          <div className="max-w-3xl mx-auto">
+          <div className="w-full md:max-w-3xl mx-auto">
             <div className="text-center mb-8">
               <h2 className="text-2xl font-semibold text-gray-900 mb-2">How can I help you today?</h2>
             </div>
@@ -490,7 +490,7 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
           </div>
         )}
         {messages.map((m, idx) => (
-          <div key={idx} className={`flex gap-4 max-w-3xl mx-auto ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
+          <div key={idx} className={`flex gap-4 w-full md:max-w-3xl mx-auto ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
             <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
               {m.role === 'user' ? (
                 <svg className="w-5 h-5 text-gray-600" fill="currentColor" viewBox="0 0 24 24">
@@ -591,7 +591,7 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
           </div>
         ))}
         {loading && (
-          <div className="flex gap-4 max-w-3xl mx-auto">
+          <div className="flex gap-4 w-full md:max-w-3xl mx-auto">
             <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
               <svg className="w-5 h-5 text-gray-600" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
@@ -617,7 +617,7 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
           <div className="px-4 py-2 text-sm text-red-600 bg-red-50">{error}</div>
         )}
         <form className="px-4 py-3" onSubmit={handleSubmit}>
-          <div className="max-w-3xl mx-auto flex items-center gap-2">
+          <div className="w-full md:max-w-3xl mx-auto flex items-center gap-2">
             {messages.length > 0 && (
               <button
                 type="button"
@@ -665,7 +665,6 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
                 placeholder="Ask anything"
                 rows={1}
                 className="w-full rounded-2xl border-0 bg-gray-100 px-4 py-3 pr-12 text-base leading-6 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-0 resize-none transition-all duration-200 min-h-[52px] max-h-[200px]"
-                style={{ height: '52px' }}
               />
             </div>
             <button

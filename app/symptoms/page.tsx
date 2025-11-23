@@ -1,7 +1,7 @@
 'use client'
 import { Cog6ToothIcon } from '@heroicons/react/24/outline'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import CreditPurchaseModal from '@/components/CreditPurchaseModal'
@@ -38,6 +38,7 @@ export default function SymptomAnalysisPage() {
   const [creditInfo, setCreditInfo] = useState<any>({ dailyUsed: 0, dailyLimit: 0, additionalCredits: 0, plan: 'FREE', creditCost: 1 })
   const [tagsExpanded, setTagsExpanded] = useState<boolean>(false)
   const [usageMeterRefresh, setUsageMeterRefresh] = useState<number>(0) // Trigger for UsageMeter refresh
+  const resultRef = useRef<HTMLDivElement | null>(null)
   const [hasPaidAccess, setHasPaidAccess] = useState<boolean>(false)
 
   // Progress phases shown while analyzing
@@ -158,13 +159,22 @@ export default function SymptomAnalysisPage() {
     }
   }
 
+  useEffect(() => {
+    if (!result) return
+    const el = resultRef.current
+    if (!el) return
+    requestAnimationFrame(() => {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+  }, [result])
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <PageHeader title="Symptom Analysis" />
 
       {/* Content */}
       <main className="flex-1">
-        <div className="max-w-3xl mx-auto px-4 py-6">
+        <div className="mx-auto w-full px-0 sm:px-4 md:max-w-3xl md:px-4 py-6">
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 md:p-6">
             <h1 className="text-xl font-semibold text-gray-900 mb-1">Describe your symptoms</h1>
             <p className="text-sm text-gray-600 mb-4">List symptoms separated by commas (e.g., Headache, Fever). Add duration and any notes.</p>
@@ -283,7 +293,10 @@ export default function SymptomAnalysisPage() {
 
           {/* Results */}
           {result && (
-            <div className="mt-6 bg-white rounded-lg shadow-sm border border-gray-200 p-4 md:p-6">
+            <div
+              ref={resultRef}
+              className="mt-6 bg-white rounded-lg shadow-sm border border-gray-200 p-4 md:p-6"
+            >
               <h2 className="text-lg font-semibold text-gray-900 mb-2">Your analysis</h2>
 
               {result.summary && (
@@ -393,4 +406,3 @@ export default function SymptomAnalysisPage() {
     </div>
   )
 }
-
