@@ -469,6 +469,13 @@ for a change.
 - **Do not undo the discrete-portion fix (Nov 22, 2025):**
   - `app/food/page.tsx` now *scales macros instead of servings* for discrete items when the label states multiple pieces (e.g., “3 large eggs”, “4 slices bacon”). Servings stays at `1` to avoid “3 servings of 3 eggs”, while calories/macros are multiplied by the labeled count. **Leave this logic intact** unless the user explicitly requests a different design.
 - **Keep bagel starter data intact:** `data/foods-starter.ts` includes `Sesame Bagel` with standard macros so photo analyses have a reliable fallback. Do not remove or rename this entry without approval.
+- **Packaged per-serving OCR (Nov 24, 2025 – locked):**
+  - Packaged (“Product nutrition image”) uses **gpt-4o** for per-serving extraction; do not downgrade the model without user approval.
+  - Use the per-serving column exactly; ignore per-100g and do not sum saturated/trans into total fat. If macros overshoot label calories, only clamp fat (and carbs if clearly under-read) to fit label kcal; otherwise keep the per-serving numbers from the label.
+  - Barcode mode is **removed**; do not reintroduce barcode lookups or hallucinated products. If nothing is found, stick to label OCR.
+- **Serving step snapping (Nov 24, 2025 – locked):**
+  - If the serving label includes a discrete count in parentheses (e.g., “10g (6 crackers)”, “1 serving (3 eggs)”), the serving step is exactly `1 / count`, and values snap to that fraction so whole numbers stay exact (no 2.002 drift).
+  - For non-discrete or unspecified counts, keep the 0.25 step. Do not loosen this snapping logic without user approval.
 
 ### 4.2 Absolute Rules for Agents
 
