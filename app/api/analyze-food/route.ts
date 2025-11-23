@@ -1114,7 +1114,7 @@ CRITICAL REQUIREMENTS:
           if (candidate) {
             const maybe = (v: any, fallback: any) =>
               v !== null && v !== undefined ? v : fallback;
-            resp.items = resp.items.map((item) => ({
+            resp.items = resp.items.map((item: any) => ({
               ...item,
               serving_size: maybe(candidate.serving_size, item.serving_size),
               calories: maybe(candidate.calories, item.calories),
