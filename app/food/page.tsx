@@ -4820,7 +4820,7 @@ Please add nutritional information manually if needed.`);
                   { key: 'protein', label: 'Protein', consumed: totals.protein || 0, target: macroTargets.protein || 0, unit: 'g', color: '#ef4444' },
                   { key: 'carbs', label: 'Carbs', consumed: carbGrams, target: macroTargets.carbs || 0, unit: 'g', color: '#22c55e' },
                   { key: 'fat', label: 'Fat', consumed: totals.fat || 0, target: macroTargets.fat || 0, unit: 'g', color: '#6366f1' },
-                  { key: 'fibre', label: 'Fibre', consumed: fibreGrams, target: macroTargets.fiber || 0, unit: 'g', color: '#93c5fd' },
+                  { key: 'fibre', label: 'Fibre', consumed: fibreGrams, target: macroTargets.fiber || 0, unit: 'g', color: '#12adc9' },
                   { key: 'sugar', label: 'Sugar (max)', consumed: sugarGrams, target: macroTargets.sugar || 0, unit: 'g', color: '#f97316' },
                 ].filter((row) => row.target > 0)
 
