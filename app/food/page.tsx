@@ -4801,10 +4801,27 @@ Please add nutritional information manually if needed.`);
                     ? Math.min(1, consumedKcal / targetCalories)
                     : 0
 
-                const macroSegments: MacroSegment[] = [
-                  { key: 'protein', label: 'Protein', grams: totals.protein || 0, color: '#ef4444' }, // red
-                  { key: 'carbs', label: 'Carbs', grams: totals.carbs || 0, color: '#22c55e' }, // green
-                  { key: 'fat', label: 'Fat', grams: totals.fat || 0, color: '#6366f1' }, // purple
+                const sugarGrams = totals.sugar || 0
+                const carbGrams = totals.carbs || 0
+                const carbNonSugar = Math.max(0, carbGrams - sugarGrams)
+                const fibreGrams = totals.fiber || 0
+
+                // Ring: use energy-weighted slices so proportions line up with kcal
+                const ringSegments: MacroSegment[] = [
+                  { key: 'protein', label: 'Protein', grams: (totals.protein || 0) * 4, color: '#ef4444' }, // red
+                  { key: 'carbs', label: 'Carbs', grams: carbNonSugar * 4, color: '#22c55e' }, // green
+                  { key: 'sugar', label: 'Sugar', grams: sugarGrams * 4, color: '#f97316' }, // orange
+                  { key: 'fat', label: 'Fat', grams: (totals.fat || 0) * 9, color: '#6366f1' }, // purple
+                  { key: 'fibre', label: 'Fibre', grams: fibreGrams * 2, color: '#93c5fd' }, // light blue (approx 2 kcal/g)
+                ].filter((s) => (s.grams || 0) > 0)
+
+                // Popup legend: show real grams so users see exact amounts.
+                const displayMacroSegments: MacroSegment[] = [
+                  { key: 'protein', label: 'Protein', grams: totals.protein || 0, color: '#ef4444' },
+                  { key: 'carbs', label: 'Carbs', grams: carbNonSugar, color: '#22c55e' },
+                  { key: 'sugar', label: 'Sugar', grams: sugarGrams, color: '#f97316' },
+                  { key: 'fat', label: 'Fat', grams: totals.fat || 0, color: '#6366f1' },
+                  { key: 'fibre', label: 'Fibre', grams: fibreGrams, color: '#93c5fd' },
                 ]
 
                 const macroTargets = {
@@ -4866,12 +4883,12 @@ Please add nutritional information manually if needed.`);
                                     consumedInUnit !== null
                                       ? `${Math.round(consumedInUnit)} ${energyUnit}`
                                       : undefined,
-                                  macros: macroSegments,
+                                  macros: displayMacroSegments,
                                 })
                               }
                             >
                               <div className="relative inline-block">
-                                <MacroRing macros={macroSegments} showLegend={false} size="large" />
+                                <MacroRing macros={ringSegments} showLegend={false} size="large" />
                                 <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
                                   <div className="text-xl font-bold text-gray-900">
                                     {consumedInUnit !== null
