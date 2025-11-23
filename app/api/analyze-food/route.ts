@@ -1043,28 +1043,41 @@ CRITICAL REQUIREMENTS:
       }
     }
 
-    // Packaged mode: force-read per-serving column and correct macros if model picked per-100g values
+    // Packaged mode: force-read per-serving column and REPLACE macros with the per-serving read
     if (packagedMode && resp.items && Array.isArray(resp.items) && resp.items.length > 0 && imageDataUrl) {
       const forced = await extractPerServingFromLabel(openai, imageDataUrl);
       if (forced) {
         const item = { ...resp.items[0] };
-        const overrideIfHigher = (current: any, nextVal: any) => {
-          const n = Number(nextVal);
-          if (!Number.isFinite(n)) return current;
-          const c = Number(current);
-          if (!Number.isFinite(c)) return n;
-          // If current is clearly larger than per-serving (suggesting per-100g), override.
-          return c > n * 1.3 ? n : c;
+        const toNum = (v: any) => (Number.isFinite(Number(v)) ? Number(v) : null);
+        const forcedItem = {
+          ...item,
+          serving_size: forced.serving_size || item.serving_size,
+          calories: toNum(forced.calories) ?? item.calories,
+          protein_g: toNum(forced.protein_g) ?? item.protein_g,
+          carbs_g: toNum(forced.carbs_g) ?? item.carbs_g,
+          fat_g: toNum(forced.fat_g) ?? item.fat_g,
+          fiber_g: toNum(forced.fiber_g) ?? item.fiber_g,
+          sugar_g: toNum(forced.sugar_g) ?? item.sugar_g,
         };
-        item.serving_size = forced.serving_size || item.serving_size;
-        item.calories = overrideIfHigher(item.calories, forced.calories);
-        item.protein_g = overrideIfHigher(item.protein_g, forced.protein_g);
-        item.carbs_g = overrideIfHigher(item.carbs_g, forced.carbs_g);
-        item.fat_g = overrideIfHigher(item.fat_g, forced.fat_g);
-        item.fiber_g = overrideIfHigher(item.fiber_g, forced.fiber_g);
-        item.sugar_g = overrideIfHigher(item.sugar_g, forced.sugar_g);
-        resp.items[0] = item;
+
+        // Calorie sanity: if the macros imply a calorie total within ~20% of the label calories, trust them; otherwise keep forced values anyway
+        const impliedKcal =
+          (Number(forcedItem.protein_g) || 0) * 4 +
+          (Number(forcedItem.carbs_g) || 0) * 4 +
+          (Number(forcedItem.fat_g) || 0) * 9;
+        const labelKcal = Number(forcedItem.calories) || 0;
+        const withinTolerance =
+          labelKcal > 0 ? Math.abs(impliedKcal - labelKcal) / labelKcal <= 0.2 : true;
+        // Replace first item with forced per-serving values
+        resp.items[0] = forcedItem;
+        // Recompute total; if calories sanity fails but label calories exist, still keep the forced macros (safer per-serving)
         resp.total = computeTotalsFromItems(resp.items);
+        if (!withinTolerance && labelKcal > 0) {
+          resp.total = {
+            ...(resp.total || {}),
+            calories: Math.round(labelKcal),
+          };
+        }
       }
     }
 
