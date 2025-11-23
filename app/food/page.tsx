@@ -3458,7 +3458,7 @@ Please add nutritional information manually if needed.`);
                     })}
                   </div>
                   <div className="text-xs text-gray-600">
-                    Packaged label mode reads the per-serving column exactly (ignores per-100g). Barcode mode will try barcode APIs first, then fall back to the label.
+                    Product nutrition image reads the per-serving column exactly (ignores per-100g).
                   </div>
                   <div className="mt-2">
                     <p className="text-xs text-gray-500 text-center mb-2">Typical cost: 6–8 credits (varies by photo + health checks)</p>
@@ -4039,7 +4039,7 @@ Please add nutritional information manually if needed.`);
                                         const current = analyzedItems[index]?.servings || 1
                                         const step =
                                           servingUnitMeta && isDiscreteUnitLabel(servingUnitMeta.unitLabel)
-                                            ? Math.max(1 / servingUnitMeta.quantity, 0.25)
+                                            ? Math.max(1 / servingUnitMeta.quantity, 0.05)
                                             : 0.25
                                         const next = Math.max(0, current - step)
                                         updateItemField(index, 'servings', next)
@@ -4053,7 +4053,7 @@ Please add nutritional information manually if needed.`);
                                       min={0}
                                       step={
                                         servingUnitMeta && isDiscreteUnitLabel(servingUnitMeta.unitLabel)
-                                          ? Math.max(1 / servingUnitMeta.quantity, 0.25)
+                                          ? Math.max(1 / servingUnitMeta.quantity, 0.05)
                                           : 0.25
                                       }
                                       value={formatNumberInputValue(item.servings ?? 1)}
@@ -4065,7 +4065,7 @@ Please add nutritional information manually if needed.`);
                                         const current = analyzedItems[index]?.servings || 1
                                         const step =
                                           servingUnitMeta && isDiscreteUnitLabel(servingUnitMeta.unitLabel)
-                                            ? Math.max(1 / servingUnitMeta.quantity, 0.25)
+                                            ? Math.max(1 / servingUnitMeta.quantity, 0.05)
                                             : 0.25
                                         const next = current + step
                                         updateItemField(index, 'servings', next)
