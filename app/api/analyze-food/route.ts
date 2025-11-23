@@ -306,6 +306,7 @@ export async function POST(req: NextRequest) {
   try {
     console.log('=== FOOD ANALYZER DEBUG START ===');
     let imageHash: string | null = null;
+    let imageDataUrl: string | null = null;
     
     // Check authentication - pass request headers for proper session resolution
     const session = await getServerSession(authOptions);
