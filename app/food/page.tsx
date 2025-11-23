@@ -4803,9 +4803,7 @@ Please add nutritional information manually if needed.`);
 
                 const macroSegments: MacroSegment[] = [
                   { key: 'protein', label: 'Protein', grams: totals.protein || 0, color: '#ef4444' }, // red
-                  { key: 'fibre', label: 'Fibre', grams: totals.fiber || 0, color: '#93c5fd' }, // light blue
                   { key: 'carbs', label: 'Carbs', grams: totals.carbs || 0, color: '#22c55e' }, // green
-                  { key: 'sugar', label: 'Sugar', grams: totals.sugar || 0, color: '#f97316' }, // orange
                   { key: 'fat', label: 'Fat', grams: totals.fat || 0, color: '#6366f1' }, // purple
                 ]
 
