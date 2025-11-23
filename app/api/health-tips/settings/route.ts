@@ -4,6 +4,46 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { scheduleHealthTipWithQStash } from '@/lib/qstash'
 
+async function ensureHealthTipSettingsTable() {
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS HealthTipSettings (
+      userId TEXT PRIMARY KEY,
+      enabled BOOLEAN NOT NULL DEFAULT true,
+      time1 TEXT NOT NULL,
+      time2 TEXT NOT NULL,
+      time3 TEXT NOT NULL,
+      timezone TEXT NOT NULL,
+      frequency INTEGER NOT NULL DEFAULT 1,
+      focusFood BOOLEAN NOT NULL DEFAULT true,
+      focusSupplements BOOLEAN NOT NULL DEFAULT true,
+      focusLifestyle BOOLEAN NOT NULL DEFAULT true
+    )
+  `)
+
+  // Defensive migrations in case the table was created before new columns were added
+  await prisma.$executeRawUnsafe(
+    `ALTER TABLE HealthTipSettings ADD COLUMN IF NOT EXISTS enabled BOOLEAN NOT NULL DEFAULT true`
+  ).catch(() => {})
+  await prisma.$executeRawUnsafe(
+    `ALTER TABLE HealthTipSettings ADD COLUMN IF NOT EXISTS time2 TEXT NOT NULL DEFAULT '15:30'`
+  ).catch(() => {})
+  await prisma.$executeRawUnsafe(
+    `ALTER TABLE HealthTipSettings ADD COLUMN IF NOT EXISTS time3 TEXT NOT NULL DEFAULT '20:30'`
+  ).catch(() => {})
+  await prisma.$executeRawUnsafe(
+    `ALTER TABLE HealthTipSettings ADD COLUMN IF NOT EXISTS frequency INTEGER NOT NULL DEFAULT 1`
+  ).catch(() => {})
+  await prisma.$executeRawUnsafe(
+    `ALTER TABLE HealthTipSettings ADD COLUMN IF NOT EXISTS focusFood BOOLEAN NOT NULL DEFAULT true`
+  ).catch(() => {})
+  await prisma.$executeRawUnsafe(
+    `ALTER TABLE HealthTipSettings ADD COLUMN IF NOT EXISTS focusSupplements BOOLEAN NOT NULL DEFAULT true`
+  ).catch(() => {})
+  await prisma.$executeRawUnsafe(
+    `ALTER TABLE HealthTipSettings ADD COLUMN IF NOT EXISTS focusLifestyle BOOLEAN NOT NULL DEFAULT true`
+  ).catch(() => {})
+}
+
 /**
  * Health Tip Settings
  *
@@ -25,6 +65,8 @@ export async function GET() {
   if (!user) {
     return NextResponse.json({ error: 'User not found' }, { status: 404 })
   }
+
+  await ensureHealthTipSettingsTable()
 
   // Ensure table exists with full schema
   // await prisma.$executeRawUnsafe(`
@@ -166,11 +208,14 @@ export async function POST(req: NextRequest) {
     Intl.DateTimeFormat().resolvedOptions().timeZone ||
     'Australia/Melbourne'
   frequency = Math.max(1, Math.min(3, parseInt(String(frequency || 1), 10)))
-  focusFood = focusFood !== false
-  focusSupplements = focusSupplements !== false
-  focusLifestyle = focusLifestyle !== false
+  // Convert to boolean explicitly, handling both string and boolean inputs
+  focusFood = focusFood === false || focusFood === 'false' ? false : Boolean(focusFood ?? true)
+  focusSupplements = focusSupplements === false || focusSupplements === 'false' ? false : Boolean(focusSupplements ?? true)
+  focusLifestyle = focusLifestyle === false || focusLifestyle === 'false' ? false : Boolean(focusLifestyle ?? true)
 
   try {
+    await ensureHealthTipSettingsTable()
+
     // await prisma.$executeRawUnsafe(`
     //   CREATE TABLE IF NOT EXISTS HealthTipSettings (
     //     userId TEXT PRIMARY KEY,
@@ -264,5 +309,4 @@ export async function POST(req: NextRequest) {
     )
   }
 }
-
 
