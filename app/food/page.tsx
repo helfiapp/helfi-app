@@ -4806,24 +4806,6 @@ Please add nutritional information manually if needed.`);
                 const carbNonSugar = Math.max(0, carbGrams - sugarGrams)
                 const fibreGrams = totals.fiber || 0
 
-                // Ring: use energy-weighted slices so proportions line up with kcal
-                const ringSegments: MacroSegment[] = [
-                  { key: 'protein', label: 'Protein', grams: (totals.protein || 0) * 4, color: '#ef4444' }, // red
-                  { key: 'carbs', label: 'Carbs', grams: carbNonSugar * 4, color: '#22c55e' }, // green
-                  { key: 'sugar', label: 'Sugar', grams: sugarGrams * 4, color: '#f97316' }, // orange
-                  { key: 'fat', label: 'Fat', grams: (totals.fat || 0) * 9, color: '#6366f1' }, // purple
-                  { key: 'fibre', label: 'Fibre', grams: fibreGrams * 2, color: '#93c5fd' }, // light blue (approx 2 kcal/g)
-                ].filter((s) => (s.grams || 0) > 0)
-
-                // Popup legend: show real grams so users see exact amounts.
-                const displayMacroSegments: MacroSegment[] = [
-                  { key: 'protein', label: 'Protein', grams: totals.protein || 0, color: '#ef4444' },
-                  { key: 'carbs', label: 'Carbs', grams: carbNonSugar, color: '#22c55e' },
-                  { key: 'sugar', label: 'Sugar', grams: sugarGrams, color: '#f97316' },
-                  { key: 'fat', label: 'Fat', grams: totals.fat || 0, color: '#6366f1' },
-                  { key: 'fibre', label: 'Fibre', grams: fibreGrams, color: '#93c5fd' },
-                ]
-
                 const macroTargets = {
                   protein: dailyTargets.protein ?? null,
                   carbs: dailyTargets.carbs ?? null,
@@ -4870,80 +4852,10 @@ Please add nutritional information manually if needed.`);
                           Add a meal to see how today compares to your daily targets.
                         </p>
                       ) : (
-                        <>
-                          <div className="grid grid-cols-2 gap-4">
-                            {/* Consumed macro ring */}
-                            <button
-                              type="button"
-                              className="flex flex-col items-center focus:outline-none"
-                              onClick={() =>
-                                setMacroPopup({
-                                  title: "Today's macro breakdown",
-                                  energyLabel:
-                                    consumedInUnit !== null
-                                      ? `${Math.round(consumedInUnit)} ${energyUnit}`
-                                      : undefined,
-                                  macros: displayMacroSegments,
-                                })
-                              }
-                            >
-                              <div className="relative inline-block">
-                                <MacroRing macros={ringSegments} showLegend={false} size="large" />
-                                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                                  <div className="text-xl font-bold text-gray-900">
-                                    {consumedInUnit !== null
-                                      ? Math.round(consumedInUnit)
-                                      : '—'}
-                                  </div>
-                                  <div className="text-xs text-gray-500 mt-0.5">
-                                    {energyUnit}
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="mt-2 text-xs font-semibold text-gray-700 uppercase tracking-wide">
-                                Consumed
-                              </div>
-                            </button>
-
-                            {/* Remaining allowance ring */}
-                            <div className="flex flex-col items-center">
-                              <TargetRing
-                                label="Remaining"
-                                valueLabel={
-                                  targetInUnit !== null && consumedInUnit !== null
-                                    ? `${Math.max(
-                                        0,
-                                        Math.round(targetInUnit - consumedInUnit),
-                                      )} ${energyUnit}`
-                                    : '—'
-                                }
-                                percent={percentUsed || 0}
-                                tone="target"
-                              />
-                              {targetInUnit !== null && (
-                                <div className="mt-1 text-[11px] text-gray-500">
-                                  Daily allowance:{' '}
-                                  <span className="font-semibold">
-                                    {Math.round(targetInUnit)} {energyUnit}
-                                  </span>
-                                </div>
-                              )}
-                              <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-gray-600">
-                                <div className="flex items-center gap-1">
-                                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500 shrink-0" />
-                                  <span>Used</span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
-                                  <span>Remaining</span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Macro progress strip */}
+                        <div className="flex flex-col gap-6 md:grid md:grid-cols-[minmax(0,1fr)_260px] md:items-start">
+                          {/* Macro progress strip - left on desktop, below on mobile */}
                           {(macroTargets.protein || macroTargets.carbs || macroTargets.fat || macroTargets.fiber || macroTargets.sugar) && (
-                            <div className="mt-4 space-y-3">
+                            <div className="space-y-3 order-2 md:order-1">
                               {[
                                 { key: 'protein', label: 'Protein', consumed: totals.protein || 0, target: macroTargets.protein, color: '#ef4444' },
                                 { key: 'carbs', label: 'Carbs', consumed: totals.carbs || 0, target: macroTargets.carbs, color: '#22c55e' },
@@ -4956,10 +4868,7 @@ Please add nutritional information manually if needed.`);
                                 const remaining = Math.max(0, target - consumed)
                                 return (
                                   <div key={key} className="flex items-center gap-3">
-                                    <div
-                                      className="w-24 text-xs font-semibold"
-                                      style={{ color }}
-                                    >
+                                    <div className="w-24 text-xs font-semibold text-gray-800">
                                       {label}
                                     </div>
                                     <div className="flex-1">
@@ -4979,7 +4888,42 @@ Please add nutritional information manually if needed.`);
                               })}
                             </div>
                           )}
-                        </>
+
+                          {/* Remaining allowance ring - right on desktop, top on mobile */}
+                          <div className="flex flex-col items-center order-1 md:order-2">
+                            <TargetRing
+                              label="Remaining"
+                              valueLabel={
+                                targetInUnit !== null && consumedInUnit !== null
+                                  ? `${Math.max(
+                                      0,
+                                      Math.round(targetInUnit - consumedInUnit),
+                                    )} ${energyUnit}`
+                                  : '—'
+                              }
+                              percent={percentUsed || 0}
+                              tone="target"
+                            />
+                            {targetInUnit !== null && (
+                              <div className="mt-1 text-[11px] text-gray-500">
+                                Daily allowance:{' '}
+                                <span className="font-semibold">
+                                  {Math.round(targetInUnit)} {energyUnit}
+                                </span>
+                              </div>
+                            )}
+                            <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-gray-600">
+                              <div className="flex items-center gap-1">
+                                <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500 shrink-0" />
+                                <span>Used</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
+                                <span>Remaining</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
                       )}
                     </div>
                   </div>
