@@ -1086,7 +1086,7 @@ CRITICAL REQUIREMENTS:
           sugar_g: toNum(forced.sugar_g),
         };
 
-        resp.items = resp.items.map((item) => ({
+        resp.items = resp.items.map((item: any) => ({
           ...item,
           serving_size: forcedValues.serving_size || item.serving_size,
           calories: forcedValues.calories ?? item.calories,
