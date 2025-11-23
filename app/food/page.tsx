@@ -4779,7 +4779,16 @@ Please add nutritional information manually if needed.`);
                   return acc
                 }, { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0 })
 
-                const consumedKcal = totals.calories || 0
+                // Keep rings and macro bars in sync: prefer macros → kcal conversion when available.
+                const macroCalories =
+                  (totals.protein || 0) * 4 +
+                  (totals.carbs || 0) * 4 +
+                  (totals.fat || 0) * 9
+
+                const consumedKcal =
+                  (macroCalories && Number.isFinite(macroCalories) ? macroCalories : 0) ||
+                  totals.calories ||
+                  0
                 const targetCalories = dailyTargets.calories
                 const remainingKcal =
                   targetCalories && targetCalories > 0
