@@ -483,10 +483,27 @@ const parseServingUnitMetadata = (servingSize: string | number | null | undefine
   if (servingSize === null || servingSize === undefined) return null
   const normalized = typeof servingSize === 'string' ? servingSize : String(servingSize)
   if (!normalized.trim()) return null
-  const quantity = parseServingQuantity(normalized)
-  if (!quantity || quantity <= 0) return null
+  // Base parse (may pick up grams first)
+  let quantity = parseServingQuantity(normalized)
+  let unitLabel = ''
   const numberToken = normalized.match(/(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?)/)
-  const unitLabel = numberToken ? normalized.replace(numberToken[0], '').trim().replace(/^of\s+/i, '').trim() : normalized.trim()
+  unitLabel = numberToken ? normalized.replace(numberToken[0], '').trim().replace(/^of\s+/i, '').trim() : normalized.trim()
+
+  // If parentheses contain a discrete count (e.g., "(6 crackers)"), prefer that for step sizing.
+  const parenSegments = normalized.match(/\(([^)]*)\)/g) || []
+  for (const seg of parenSegments) {
+    const cleaned = seg.replace(/[()]/g, '').trim()
+    const altQty = parseServingQuantity(cleaned)
+    const altNumberToken = cleaned.match(/(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?)/)
+    const altUnit = altNumberToken ? cleaned.replace(altNumberToken[0], '').trim().replace(/^of\s+/i, '').trim() : cleaned
+    if (altQty && altQty > 0 && isDiscreteUnitLabel(altUnit)) {
+      quantity = altQty
+      unitLabel = altUnit
+      break
+    }
+  }
+
+  if (!quantity || quantity <= 0) return null
   return {
     quantity,
     unitLabel: unitLabel || 'unit',
