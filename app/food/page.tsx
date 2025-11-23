@@ -989,6 +989,7 @@ export default function FoodDiary() {
     energyLabel?: string
     macros: MacroSegment[]
   } | null>(null)
+  const [macroView, setMacroView] = useState<'targets' | 'consumed'>('targets')
 
   const dailyTargets = useMemo(() => {
     if (!userData) return { calories: null, protein: null, carbs: null, fat: null }
@@ -4876,14 +4877,14 @@ Please add nutritional information manually if needed.`);
                             <div className="order-2 md:order-1">
                               <div className="flex items-center justify-between mb-2 text-xs font-semibold text-gray-700 uppercase tracking-wide">
                                 <span>Targets</span>
-                                <div className="flex gap-2">
+                                <div className="flex gap-1 rounded-full bg-gray-100 p-1">
                                   {macroViewOptions.map((opt) => (
                                     <button
                                       key={opt}
                                       type="button"
-                                      onClick={() => setMacroPopup(null)} // keep popup closed when toggling
-                                      className={`px-2 py-1 rounded ${
-                                        opt === 'targets' ? 'bg-gray-200 text-gray-800' : 'text-gray-500 hover:text-gray-800'
+                                      onClick={() => setMacroView(opt)}
+                                      className={`px-3 py-1 rounded-full text-[11px] font-semibold ${
+                                        macroView === opt ? 'bg-white shadow text-gray-900' : 'text-gray-500'
                                       }`}
                                     >
                                       {opt === 'targets' ? 'Targets' : 'Consumed'}
@@ -4891,37 +4892,34 @@ Please add nutritional information manually if needed.`);
                                   ))}
                                 </div>
                               </div>
-                              <div className="space-y-3">
+                              <div className="space-y-2.5">
                                 {macroRows.map((row) => {
-                                  const pct = row.target > 0 ? Math.min(1, row.consumed / row.target) : 0
-                                  const percentDisplay = row.target > 0 ? Math.round((row.consumed / row.target) * 100) : 0
+                                  const pctRaw = row.target > 0 ? row.consumed / row.target : 0
+                                  const pct = Math.max(0, pctRaw)
+                                  const percentDisplay = row.target > 0 ? Math.round(pctRaw * 100) : 0
                                   const over = percentDisplay > 100
-                                  const labelColor = over ? 'text-red-600' : 'text-gray-800'
+                                  const labelColor = over ? 'text-red-600' : 'text-gray-900'
                                   const remaining = Math.max(0, row.target - row.consumed)
-                                  const displayConsumed = row.unit === energyUnit ? Math.round(row.consumed) : Math.round(row.consumed)
-                                  const displayTarget = row.unit === energyUnit ? Math.round(row.target) : Math.round(row.target)
+                                  const displayConsumed = macroView === 'consumed'
+                                    ? `${Math.round(row.consumed)} ${row.unit}`
+                                    : `${Math.round(row.consumed)} / ${Math.round(row.target)} ${row.unit}${row.key === 'sugar' ? ' cap' : ''}`
 
                                   return (
-                                    <div key={row.key}>
+                                    <div key={row.key} className="space-y-1">
                                       <div className="flex items-center justify-between text-sm">
-                                        <div className="text-gray-800 font-semibold">{row.label}</div>
+                                        <div className="text-gray-900 font-semibold">{row.label}</div>
                                         <div className={`text-xs font-semibold ${labelColor}`}>
                                           {percentDisplay > 0 ? `${percentDisplay}%` : '0%'}
                                         </div>
                                       </div>
-                                      <div className="text-[11px] text-gray-600 mb-1">
-                                        {displayConsumed} / {displayTarget} {row.unit}
-                                        {row.key === 'sugar' ? ' cap' : ''}
-                                      </div>
-                                      <div className="h-2.5 w-full bg-gray-100 rounded-full overflow-hidden flex items-center">
+                                      <div className="text-[11px] text-gray-600">{displayConsumed}</div>
+                                      <div className="h-2.5 w-full bg-gray-200 rounded-full overflow-hidden">
                                         <div
                                           className="h-2.5 rounded-full transition-all"
                                           style={{ width: `${Math.min(100, pct * 100)}%`, backgroundColor: over ? '#ef4444' : row.color }}
                                         />
                                       </div>
-                                      <div className="mt-1 text-[11px] text-gray-500">
-                                        {Math.round(remaining)} {row.unit} left
-                                      </div>
+                                      <div className="text-[11px] text-gray-500">{Math.round(remaining)} {row.unit} left</div>
                                     </div>
                                   )
                                 })}
