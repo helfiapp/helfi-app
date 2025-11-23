@@ -27,22 +27,23 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const enabled = (process.env.NEXT_PUBLIC_INSIGHTS_CHAT || 'true').toLowerCase() === 'true' || (process.env.NEXT_PUBLIC_INSIGHTS_CHAT || '') === '1'
   const recognitionRef = useRef<any>(null)
-  const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const resizeRafRef = useRef<number | null>(null)
 
-  // Debounced resize function to prevent pulsating
+  // Smooth single-frame resize to prevent jitter when text grows/shrinks quickly
   const resizeTextarea = useCallback(() => {
-    if (resizeTimeoutRef.current) {
-      clearTimeout(resizeTimeoutRef.current)
-    }
-    resizeTimeoutRef.current = setTimeout(() => {
+    if (resizeRafRef.current) cancelAnimationFrame(resizeRafRef.current)
+    resizeRafRef.current = requestAnimationFrame(() => {
       const textarea = textareaRef.current
       if (!textarea) return
-      textarea.style.height = 'auto'
+      const minHeight = 52
       const maxHeight = 200
-      const newHeight = Math.min(textarea.scrollHeight, maxHeight)
-      textarea.style.height = `${newHeight}px`
+      textarea.style.height = 'auto'
+      const desired = Math.min(Math.max(textarea.scrollHeight, minHeight), maxHeight)
+      if (textarea.style.height !== `${desired}px`) {
+        textarea.style.height = `${desired}px`
+      }
       textarea.style.overflowY = textarea.scrollHeight > maxHeight ? 'auto' : 'hidden'
-    }, 50)
+    })
   }, [])
 
   // Initialize speech recognition
@@ -263,6 +264,12 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
       }, 100)
     }
   }, [messages, loading, hasUserInteracted])
+
+  useEffect(() => {
+    return () => {
+      if (resizeRafRef.current) cancelAnimationFrame(resizeRafRef.current)
+    }
+  }, [])
 
   function onComposerKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
     if (event.key === 'Enter' && !event.shiftKey) {

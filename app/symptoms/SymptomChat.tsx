@@ -28,22 +28,23 @@ export default function SymptomChat({ analysisResult, symptoms, duration, notes 
   const containerRef = useRef<HTMLDivElement | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const recognitionRef = useRef<any>(null)
-  const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const resizeRafRef = useRef<number | null>(null)
 
-  // Debounced resize function to prevent pulsating
+  // Smooth, single-frame resize to avoid jumpiness when text grows/shrinks rapidly (typing or voice)
   const resizeTextarea = useCallback(() => {
-    if (resizeTimeoutRef.current) {
-      clearTimeout(resizeTimeoutRef.current)
-    }
-    resizeTimeoutRef.current = setTimeout(() => {
+    if (resizeRafRef.current) cancelAnimationFrame(resizeRafRef.current)
+    resizeRafRef.current = requestAnimationFrame(() => {
       const textarea = textareaRef.current
       if (!textarea) return
-      textarea.style.height = 'auto'
+      const minHeight = 52
       const maxHeight = 200
-      const newHeight = Math.min(textarea.scrollHeight, maxHeight)
-      textarea.style.height = `${newHeight}px`
+      textarea.style.height = 'auto'
+      const desired = Math.min(Math.max(textarea.scrollHeight, minHeight), maxHeight)
+      if (textarea.style.height !== `${desired}px`) {
+        textarea.style.height = `${desired}px`
+      }
       textarea.style.overflowY = textarea.scrollHeight > maxHeight ? 'auto' : 'hidden'
-    }, 50)
+    })
   }, [])
 
   // Initialize speech recognition
@@ -140,7 +141,17 @@ export default function SymptomChat({ analysisResult, symptoms, duration, notes 
     if (!container) return
     // Scroll inside the chat container only, avoid scrolling the whole page
     container.scrollTop = container.scrollHeight
+
+    return () => {
+      if (resizeRafRef.current) cancelAnimationFrame(resizeRafRef.current)
+    }
   }, [messages, loading])
+
+  useEffect(() => {
+    return () => {
+      if (resizeRafRef.current) cancelAnimationFrame(resizeRafRef.current)
+    }
+  }, [])
 
   // Auto-resize textarea with debounce
   useEffect(() => {

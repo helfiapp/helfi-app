@@ -67,22 +67,23 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
   const endRef = useRef<HTMLDivElement | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
-  const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const resizeRafRef = useRef<number | null>(null)
 
-  // Debounced resize to keep composer smooth (match SymptomChat)
+  // Smooth, single-frame resize to keep composer steady during rapid updates (typing/voice)
   const resizeTextarea = useCallback(() => {
-    if (resizeTimeoutRef.current) {
-      clearTimeout(resizeTimeoutRef.current)
-    }
-    resizeTimeoutRef.current = setTimeout(() => {
+    if (resizeRafRef.current) cancelAnimationFrame(resizeRafRef.current)
+    resizeRafRef.current = requestAnimationFrame(() => {
       const textarea = textareaRef.current
       if (!textarea) return
-      textarea.style.height = 'auto'
+      const minHeight = 52
       const maxHeight = 200
-      const newHeight = Math.min(textarea.scrollHeight, maxHeight)
-      textarea.style.height = `${newHeight}px`
+      textarea.style.height = 'auto'
+      const desired = Math.min(Math.max(textarea.scrollHeight, minHeight), maxHeight)
+      if (textarea.style.height !== `${desired}px`) {
+        textarea.style.height = `${desired}px`
+      }
       textarea.style.overflowY = textarea.scrollHeight > maxHeight ? 'auto' : 'hidden'
-    }, 50)
+    })
   }, [])
 
   // Scroll to bottom inside chat container
@@ -90,7 +91,17 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
     const container = containerRef.current
     if (!container) return
     container.scrollTop = container.scrollHeight
+
+    return () => {
+      if (resizeRafRef.current) cancelAnimationFrame(resizeRafRef.current)
+    }
   }, [messages, loading])
+
+  useEffect(() => {
+    return () => {
+      if (resizeRafRef.current) cancelAnimationFrame(resizeRafRef.current)
+    }
+  }, [])
 
   // Auto-resize textarea with debounce
   useEffect(() => {
