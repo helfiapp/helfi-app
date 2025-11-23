@@ -3654,7 +3654,7 @@ Please add nutritional information manually if needed.`);
                                 {/* Horizontal macro chips under the photo+circle row */}
                                 <div className="mt-4 flex flex-wrap gap-3">
                                   {macroSegments.map((macro) => {
-                                    const displayValue = macro.grams > 0 ? Math.round(macro.grams) : 0
+                                    const displayValue = formatMacroValue(macro.grams, 'g')
                                     return (
                                       <div
                                         key={macro.key}
@@ -3665,7 +3665,7 @@ Please add nutritional information manually if needed.`);
                                           style={{ backgroundColor: macro.color }}
                                         />
                                         <span>
-                                          {macro.label} {displayValue} g
+                                          {macro.label} {displayValue}
                                         </span>
                                       </div>
                                     )
@@ -3755,7 +3755,7 @@ Please add nutritional information manually if needed.`);
                           <div className="flex-1 flex flex-col justify-center py-2">
                             <div className="space-y-1 text-sm text-gray-700">
                               {macroSegments.map((macro) => {
-                                const displayValue = macro.grams > 0 ? Math.round(macro.grams) : 0
+                                const displayValue = formatMacroValue(macro.grams, 'g')
                                 return (
                                   <div key={macro.key} className="flex items-center gap-2">
                                     <span
@@ -3763,7 +3763,7 @@ Please add nutritional information manually if needed.`);
                                       style={{ backgroundColor: macro.color }}
                                     />
                                     <span>
-                                      {macro.label} {displayValue} g
+                                      {macro.label} {displayValue}
                                     </span>
                                   </div>
                                 )
