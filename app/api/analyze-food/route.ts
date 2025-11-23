@@ -133,6 +133,54 @@ const enrichPackagedItemsWithFatSecret = async (items: any[]): Promise<{ items: 
   };
 };
 
+// Secondary per-serving extractor for packaged labels: forces the model to read ONLY the per-serving column.
+const extractPerServingFromLabel = async (
+  openai: OpenAI,
+  imageDataUrl: string,
+): Promise<
+  | {
+      serving_size?: string | null;
+      calories?: number | null;
+      protein_g?: number | null;
+      carbs_g?: number | null;
+      fat_g?: number | null;
+      fiber_g?: number | null;
+      sugar_g?: number | null;
+    }
+  | null
+> => {
+  try {
+    const completion = await chatCompletionWithCost(openai, {
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: `Read ONLY the PER-SERVING column from this nutrition label. Ignore per 100g/ml values. Return JSON only in this shape:
+{"serving_size":"string","calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"sugar_g":0}
+- Copy the per-serving numbers verbatim.
+- If you see multiple columns, choose the one labelled per serve/per serving.
+- Do NOT estimate or scale from per 100g.
+- No prose, just JSON.` },
+            { type: 'image_url', image_url: { url: imageDataUrl } },
+          ],
+        },
+      ],
+      max_tokens: 180,
+      temperature: 0,
+    } as any);
+    const raw = completion.completion.choices?.[0]?.message?.content?.trim() || '';
+    const cleaned = raw.replace(/```json/gi, '').replace(/```/g, '').trim();
+    const parsed = cleaned ? parseItemsJsonRelaxed(cleaned) : null;
+    if (parsed && typeof parsed === 'object') {
+      return parsed as any;
+    }
+  } catch (err) {
+    console.warn('Per-serving extractor failed (non-fatal)', err);
+  }
+  return null;
+};
+
 // Heuristic correction for discrete foods where the serving label clearly
 // describes multiple units (e.g. "3 large eggs", "4 slices bacon") but the
 // calories/macros look like a single unit. This runs **after** we have parsed
@@ -992,6 +1040,31 @@ CRITICAL REQUIREMENTS:
       if (enriched.total) {
         resp.items = enriched.items;
         resp.total = enriched.total;
+      }
+    }
+
+    // Packaged mode: force-read per-serving column and correct macros if model picked per-100g values
+    if (packagedMode && resp.items && Array.isArray(resp.items) && resp.items.length > 0 && imageDataUrl) {
+      const forced = await extractPerServingFromLabel(openai, imageDataUrl);
+      if (forced) {
+        const item = { ...resp.items[0] };
+        const overrideIfHigher = (current: any, nextVal: any) => {
+          const n = Number(nextVal);
+          if (!Number.isFinite(n)) return current;
+          const c = Number(current);
+          if (!Number.isFinite(c)) return n;
+          // If current is clearly larger than per-serving (suggesting per-100g), override.
+          return c > n * 1.3 ? n : c;
+        };
+        item.serving_size = forced.serving_size || item.serving_size;
+        item.calories = overrideIfHigher(item.calories, forced.calories);
+        item.protein_g = overrideIfHigher(item.protein_g, forced.protein_g);
+        item.carbs_g = overrideIfHigher(item.carbs_g, forced.carbs_g);
+        item.fat_g = overrideIfHigher(item.fat_g, forced.fat_g);
+        item.fiber_g = overrideIfHigher(item.fiber_g, forced.fiber_g);
+        item.sugar_g = overrideIfHigher(item.sugar_g, forced.sugar_g);
+        resp.items[0] = item;
+        resp.total = computeTotalsFromItems(resp.items);
       }
     }
 
