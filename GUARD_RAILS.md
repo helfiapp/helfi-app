@@ -334,7 +334,120 @@ Before modifying food diary loading logic, agents must test:
 
 ---
 
-## 4. AI Food Analyzer & Credit/Billing System (Critical Lock)
+## 4. Macros Progress Bars & Remaining Calories Ring (Locked)
+
+The macros progress bars and remaining calories ring in the Food Diary are now working perfectly and must **not be changed** unless the user explicitly requests modifications.
+
+### 4.1 Protected Components
+
+**Protected files:**
+- `app/food/page.tsx` (lines ~265-353 – `TargetRing` component for remaining calories)
+- `app/food/page.tsx` (lines ~4867-4901 – macros progress bars rendering)
+- `components/SolidMacroRing.tsx` (solid macro ring component, if used elsewhere)
+
+### 4.2 Macros Progress Bars
+
+**Location:** `app/food/page.tsx` lines ~4867-4901, within the "Energy summary" section
+
+**Current Behaviour (Must Stay):**
+
+Each macro (Protein, Carbs, Fat, Fibre, Sugar) displays:
+1. **Label and values:**
+   - Macro name (e.g., "Protein")
+   - Consumed / Target format (e.g., "50 / 100 g")
+   - Remaining amount in colored text (e.g., "50 g left")
+   - Percentage display (e.g., "50%")
+2. **Progress bar:**
+   - Horizontal bar showing consumed percentage
+   - Bar color matches macro color (Protein: red, Carbs: green, Fat: purple, Fibre: cyan, Sugar: orange)
+   - Bar turns red (`#ef4444`) when over target (100%+)
+   - Bar width is clamped to maximum 100% visually
+3. **Calculation logic:**
+   - `pctRaw = consumed / target` (can exceed 1.0 when over target)
+   - `pct = Math.max(0, pctRaw)` (ensures non-negative)
+   - `percentDisplay = Math.round(pctRaw * 100)` (for percentage text)
+   - `remaining = Math.max(0, target - consumed)` (never negative)
+   - Bar width uses `Math.min(100, pct * 100)` to cap visual display at 100%
+
+**What Agents MUST NOT Do:**
+- Change the progress bar color scheme or remove the "over target" red color
+- Modify the calculation logic for percentage or remaining amounts
+- Remove or change the format of the "consumed / target" display
+- Change the order of macros (Protein, Carbs, Fat, Fibre, Sugar)
+- Remove the "left" text showing remaining amounts
+- Change the bar height (`h-2`) or styling
+- Remove the percentage display or change its format
+
+### 4.3 Remaining Calories Ring
+
+**Location:** `app/food/page.tsx` lines ~265-353 (`TargetRing` component), rendered at lines ~4904-4937
+
+**Current Behaviour (Must Stay):**
+
+The remaining calories ring displays:
+1. **Two-tone ring visualization:**
+   - Green circle (`#22c55e`) representing remaining allowance (full circle)
+   - Red overlay (`#ef4444`) representing consumed amount (overlays from top, grows clockwise)
+   - Ring rotates -90 degrees so it starts from top
+   - Stroke width: 8px
+   - Responsive sizing: 144px on mobile, 132px on desktop
+2. **Center display:**
+   - Main value: remaining calories/kJ (e.g., "1,200 kcal" or "5,000 kJ")
+   - Unit displayed below value
+   - Label "Remaining" below the ring
+3. **Supporting information:**
+   - "Daily allowance: X kcal/kJ" text below ring
+   - Legend showing:
+     - Red dot + "Used" (what's been consumed)
+     - Green dot + "Remaining" (what's left)
+4. **Calculation logic:**
+   - `percent` parameter is the *used* fraction (0–1), where 1.0 = 100% consumed
+   - `usedFraction = Math.max(0, Math.min(percent, 1))` (clamped to 0–1)
+   - `usedLength = usedFraction * circumference` (for red overlay)
+   - Remaining value: `Math.max(0, target - consumed)` in selected unit (kcal/kJ)
+   - Unit toggle (kcal/kJ) switches between energy units
+
+**What Agents MUST NOT Do:**
+- Change the two-tone ring design (green base + red overlay)
+- Modify the ring colors (`#22c55e` green, `#ef4444` red)
+- Change the ring rotation or starting position
+- Remove or modify the center value display format
+- Change the stroke width (8px) or ring dimensions
+- Remove the "Daily allowance" text or legend
+- Modify the calculation logic for remaining calories
+- Remove the kcal/kJ unit toggle functionality
+- Change the responsive sizing behavior
+
+### 4.4 Energy Summary Section Layout
+
+**Location:** `app/food/page.tsx` lines ~4830-4940
+
+**Current Layout (Must Stay):**
+- Desktop: Grid layout with macros progress bars on left, remaining calories ring on right
+- Mobile: Stacked layout with remaining calories ring on top, macros progress bars below
+- Header shows "Today's energy summary" or "Energy summary" with kcal/kJ toggle
+- Empty state message when no meals added
+
+**What Agents MUST NOT Do:**
+- Change the responsive layout behavior (grid on desktop, stacked on mobile)
+- Remove the energy unit toggle (kcal/kJ)
+- Modify the section header text or styling
+- Change the order of elements (ring vs progress bars)
+- Remove the empty state message
+
+### 4.5 Testing Requirements
+
+Before modifying macros progress bars or remaining calories ring, agents must test:
+1. **Normal consumption:** Values below target show correct percentages and green bars
+2. **Over target:** Values exceeding target show red bars and correct "over 100%" display
+3. **Zero consumption:** Empty diary shows 0% bars and full green ring
+4. **Unit switching:** kcal/kJ toggle updates both ring value and daily allowance text
+5. **Responsive design:** Layout switches correctly between mobile and desktop views
+6. **Multiple macros:** All five macros (Protein, Carbs, Fat, Fibre, Sugar) display correctly
+
+---
+
+## 5. AI Food Analyzer & Credit/Billing System (Critical Lock)
 
 These flows have been broken repeatedly by past agents. The current behaviour
 is working and must be treated as **locked** unless the user explicitly asks
@@ -389,7 +502,7 @@ may an agent change any of the protected files in this section.
 
 ---
 
-## 5. Medical Image Analyzer & Chat (Locked)
+## 6. Medical Image Analyzer & Chat (Locked)
 
 The Medical Image Analyzer has now been stabilised and tuned end‑to‑end:
 
@@ -433,7 +546,7 @@ Any functional change to the Medical Image Analyzer or its chat must be:
 
 ---
 
-## 6. Rules for Future Modifications
+## 7. Rules for Future Modifications
 
 Before changing anything in the protected areas above, an agent **must**:
 
