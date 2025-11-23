@@ -263,7 +263,7 @@ type RingProps = {
 }
 
 function TargetRing({ label, valueLabel, percent, tone }: RingProps) {
-  const radius = 44
+  const radius = typeof window !== 'undefined' && window.innerWidth < 640 ? 56 : 50
   const circumference = 2 * Math.PI * radius
   const clamped = Math.max(0, Math.min(percent, 1))
 
@@ -274,7 +274,7 @@ function TargetRing({ label, valueLabel, percent, tone }: RingProps) {
   // for a simple single-colour ring.
   const isTarget = tone === 'target'
   const strokeWidth = 8
-  const svgSize = 120
+  const svgSize = typeof window !== 'undefined' && window.innerWidth < 640 ? 144 : 132
 
   const parts = (valueLabel || '').split(' ')
   const mainValue = parts[0] || valueLabel
@@ -4862,7 +4862,7 @@ Please add nutritional information manually if needed.`);
                           Add a meal to see how today compares to your daily targets.
                         </p>
                       ) : (
-                        <div className="flex flex-col gap-4 md:grid md:grid-cols-[minmax(0,1fr)_260px] md:items-start">
+                        <div className="flex flex-col gap-4 md:grid md:grid-cols-[minmax(0,1fr)_300px] md:items-start">
                           {/* Macro progress list - left on desktop, below on mobile */}
                           {macroRows.length > 0 && (
                             <div className="order-2 md:order-1 space-y-2">
