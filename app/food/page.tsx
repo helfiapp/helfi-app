@@ -919,6 +919,7 @@ export default function FoodDiary() {
   const [analysisPhase, setAnalysisPhase] = useState<'idle' | 'preparing' | 'analyzing' | 'building'>('idle')
   const [isSavingEntry, setIsSavingEntry] = useState(false)
   const [analysisMode, setAnalysisMode] = useState<'auto' | 'packaged' | 'meal'>('auto')
+  const [showAnalysisModeModal, setShowAnalysisModeModal] = useState(false)
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [aiDescription, setAiDescription] = useState('')
@@ -2055,6 +2056,9 @@ const applyStructuredItems = (
         reader.onload = (e) => setPhotoPreview(e.target?.result as string);
         reader.readAsDataURL(file);
       }
+      setShowAddFood(true);
+      setShowAiResult(false);
+      setShowAnalysisModeModal(true);
     }
   };
 
@@ -2233,6 +2237,7 @@ function sanitizeNutritionTotals(raw: any): NutritionTotals | null {
   const analyzePhoto = async () => {
     if (!photoFile) return;
     
+    setShowAnalysisModeModal(false);
     setIsAnalyzing(true);
     setAnalysisPhase('preparing');
     
@@ -3268,6 +3273,60 @@ Please add nutritional information manually if needed.`);
             </div>
           )}
         </div>
+        )}
+
+        {/* Mode chooser modal immediately after photo selection */}
+        {showAnalysisModeModal && photoPreview && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+            <div className="absolute inset-0 bg-black/50" onClick={() => setShowAnalysisModeModal(false)} />
+            <div className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl border border-gray-200 p-5 space-y-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="text-lg font-semibold text-gray-900">Choose analysis mode</div>
+                  <div className="text-sm text-gray-600">We’ll tailor the AI for this photo before analyzing.</div>
+                </div>
+                <button
+                  onClick={() => setShowAnalysisModeModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <span aria-hidden>✕</span>
+                </button>
+              </div>
+              <div className="grid grid-cols-1 gap-2">
+                {[
+                  { key: 'auto', label: 'Auto detect', helper: 'Best guess for meals and snacks' },
+                  { key: 'packaged', label: 'Packaged label', helper: 'Read the per-serving panel exactly' },
+                  { key: 'meal', label: 'Homemade/restaurant', helper: 'Plated/restaurant foods' },
+                ].map((mode) => {
+                  const active = analysisMode === mode.key
+                  return (
+                    <button
+                      key={mode.key}
+                      type="button"
+                      onClick={() => setAnalysisMode(mode.key as 'auto' | 'packaged' | 'meal')}
+                      className={`flex flex-col items-start px-3 py-2 rounded-lg border text-left ${
+                        active
+                          ? 'border-emerald-500 bg-emerald-50 text-emerald-800'
+                          : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                      }`}
+                    >
+                      <span className="text-sm font-semibold">{mode.label}</span>
+                      <span className="text-[11px] text-gray-500">{mode.helper}</span>
+                    </button>
+                  )
+                })}
+              </div>
+              <div className="text-xs text-gray-600">
+                Packaged label mode ignores per-100g numbers and copies the per-serving panel; uses FatSecret as a packaged fallback when needed.
+              </div>
+              <button
+                onClick={analyzePhoto}
+                className="w-full bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 font-semibold"
+              >
+                🤖 Analyze with AI
+              </button>
+            </div>
+          </div>
         )}
 
                 {/* Food Processing Area */}
