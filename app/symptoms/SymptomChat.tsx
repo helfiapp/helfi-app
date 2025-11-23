@@ -1,6 +1,6 @@
 'use client'
 
-import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState, useCallback } from 'react'
+import { FormEvent, KeyboardEvent, useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from 'react'
 
 interface SymptomChatProps {
   analysisResult: {
@@ -153,8 +153,8 @@ export default function SymptomChat({ analysisResult, symptoms, duration, notes 
     }
   }, [])
 
-  // Auto-resize textarea with debounce
-  useEffect(() => {
+  // Auto-resize textarea pre-paint to reduce visible flicker
+  useLayoutEffect(() => {
     resizeTextarea()
   }, [input, resizeTextarea])
 
@@ -247,8 +247,8 @@ export default function SymptomChat({ analysisResult, symptoms, duration, notes 
   }
 
   return (
-    <section className="bg-white mt-6 overflow-hidden -mx-4 sm:mx-0 md:rounded-2xl md:border md:shadow-sm">
-      <header className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+    <section className="bg-white mt-6 overflow-hidden md:rounded-2xl md:border md:shadow-sm">
+      <header className="flex items-center justify-between px-4 py-3 border-b border-gray-200 w-full max-w-3xl mx-auto">
         <div>
           <h3 className="text-sm font-semibold text-gray-900">Chat about your symptom analysis</h3>
           <p className="text-xs text-gray-500">Ask follow-up questions – history saved locally</p>
@@ -264,7 +264,7 @@ export default function SymptomChat({ analysisResult, symptoms, duration, notes 
         </div>
       </header>
 
-      <div ref={containerRef} className="px-4 py-6 h-[420px] overflow-y-auto overflow-x-hidden space-y-6 min-w-0" aria-live="polite" style={{ maxWidth: '100%', wordWrap: 'break-word' }}>
+      <div ref={containerRef} className="px-4 py-6 h-[420px] overflow-y-auto overflow-x-hidden space-y-6 min-w-0 w-full max-w-3xl mx-auto" aria-live="polite" style={{ maxWidth: '100%', wordWrap: 'break-word' }}>
         {messages.length === 0 && !loading && (
           <div className="text-sm text-gray-400">
             Ask follow‑ups like:
@@ -377,8 +377,8 @@ export default function SymptomChat({ analysisResult, symptoms, duration, notes 
         <div ref={endRef} />
       </div>
 
-      <form className="border-t border-gray-200 px-4 py-3 bg-white" onSubmit={handleSubmit}>
-        <div className="flex items-center gap-2">
+      <form className="border-t border-gray-200 px-4 py-3 bg-white">
+        <div className="flex items-center gap-2 w-full max-w-3xl mx-auto" onSubmitCapture={handleSubmit as any}>
           {recognitionRef.current && (
             <button
               type="button"

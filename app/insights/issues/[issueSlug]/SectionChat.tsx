@@ -1,6 +1,6 @@
 'use client'
 
-import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState, useCallback } from 'react'
+import { FormEvent, KeyboardEvent, useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from 'react'
 
 interface SectionChatProps {
   issueSlug: string
@@ -402,7 +402,7 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
 
   if (!enabled) return null
   return (
-    <div className="flex flex-col h-full bg-white -mx-4 sm:mx-0 md:rounded-2xl md:border md:shadow-sm">
+    <div className="flex flex-col h-full bg-white md:rounded-2xl md:border md:shadow-sm">
       {/* Thread Selector Header */}
       <div className="border-b border-gray-200 bg-white px-4 py-2 flex items-center justify-between relative">
         <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -471,7 +471,7 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
       <div className="px-4 pb-2 text-sm text-gray-500">
         AI replies use credits (billed at 2× OpenAI cost). Typical: 2–4 credits per reply, depending on length.
       </div>
-      <div ref={containerRef} className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-6 space-y-6 min-w-0" aria-live="polite" style={{ maxWidth: '100%', wordWrap: 'break-word' }}>
+      <div ref={containerRef} className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-6 space-y-6 min-w-0 w-full max-w-3xl mx-auto" aria-live="polite" style={{ maxWidth: '100%', wordWrap: 'break-word' }}>
         {messages.length === 0 && !loading && (
           <div className="w-full md:max-w-3xl mx-auto">
             <div className="text-center mb-8">

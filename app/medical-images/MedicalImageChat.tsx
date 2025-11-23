@@ -1,6 +1,6 @@
 'use client'
 
-import { FormEvent, KeyboardEvent, useCallback, useEffect, useRef, useState } from 'react'
+import { FormEvent, KeyboardEvent, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 type ChatMessage = { role: 'user' | 'assistant'; content: string }
 
@@ -103,8 +103,8 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
     }
   }, [])
 
-  // Auto-resize textarea with debounce
-  useEffect(() => {
+  // Auto-resize textarea pre-paint to reduce flicker
+  useLayoutEffect(() => {
     resizeTextarea()
   }, [input, resizeTextarea])
 
@@ -196,8 +196,8 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
   }
 
   return (
-    <section className="bg-white overflow-hidden -mx-4 sm:mx-0 md:rounded-2xl md:border md:shadow-sm">
-      <header className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+    <section className="bg-white overflow-hidden md:rounded-2xl md:border md:shadow-sm">
+      <header className="flex items-center justify-between px-4 py-3 border-b border-gray-200 w-full max-w-3xl mx-auto">
         <div>
           <h3 className="text-sm font-semibold text-gray-900">Chat about your medical image</h3>
           <p className="text-xs text-gray-500">
@@ -217,7 +217,7 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
 
       <div
         ref={containerRef}
-        className="px-4 py-6 h-[420px] overflow-y-auto overflow-x-hidden space-y-6 min-w-0"
+        className="px-4 py-6 h-[420px] overflow-y-auto overflow-x-hidden space-y-6 min-w-0 w-full max-w-3xl mx-auto"
         aria-live="polite"
         style={{ maxWidth: '100%', wordWrap: 'break-word' }}
       >
@@ -381,7 +381,7 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
       </div>
 
       <form className="border-t border-gray-200 px-4 py-3 bg-white" onSubmit={handleSubmit}>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 w-full max-w-3xl mx-auto">
           <div className="flex-1 relative flex items-center">
             <textarea
               ref={textareaRef}
