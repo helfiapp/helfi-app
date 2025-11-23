@@ -25,6 +25,13 @@ environment.
   4. **NEVER** tell the user "changes are live" or "deployment complete" without verifying the deployment succeeded.
   5. If deployment fails, fix the issue and redeploy before reporting success.
 
+### If you are a GPT-5 Codex agent (required quick path)
+- **Always** use the Git push flow above (`git add -A && git commit ... && git push origin master`). This is the only supported production trigger.
+- Do **not** attempt to deploy with `npx vercel` unless the Git pipeline is broken and you have explicit approval.
+- Do **not** request or regenerate Vercel tokens; they are not needed for the Git-based deploy.
+- The Vercel dashboard should show the new deployment immediately after the push; wait for `READY` before reporting success.
+- If CLI auth prompts appear, stop and fall back to Git push (no CLI deploy).
+
 ### ⚠️ CRITICAL: Deployment Status Verification
 
 **ALL AGENTS MUST VERIFY DEPLOYMENT STATUS BEFORE CLAIMING SUCCESS**
