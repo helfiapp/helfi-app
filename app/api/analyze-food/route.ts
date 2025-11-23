@@ -208,6 +208,51 @@ const extractBarcodeFromImage = async (openai: OpenAI, imageDataUrl: string): Pr
   return null;
 };
 
+const fetchOpenFoodFactsByBarcode = async (barcode: string): Promise<any | null> => {
+  try {
+    if (!barcode || barcode.trim().length < 6) return null;
+    const url = `https://world.openfoodfacts.org/api/v0/product/${encodeURIComponent(barcode)}.json`;
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'helfi-app/1.0 (support@helfi.ai)' },
+      cache: 'no-store',
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.status !== 1 || !data.product) return null;
+    const p = data.product;
+    const nutr = p.nutriments || {};
+    const servingSize =
+      (p.serving_size && String(p.serving_size).trim()) ||
+      (nutr['serving_size'] && String(nutr['serving_size']).trim()) ||
+      null;
+    const get = (k: string) => {
+      const v = nutr[k];
+      const n = Number(v);
+      return Number.isFinite(n) ? n : null;
+    };
+    const calories = get('energy-kcal_serving') ?? get('energy_serving') ?? get('energy-kcal_100g') ?? get('energy_100g');
+    const protein_g = get('proteins_serving') ?? get('proteins_100g');
+    const carbs_g = get('carbohydrates_serving') ?? get('carbohydrates_100g');
+    const fat_g = get('fat_serving') ?? get('fat_100g');
+    const fiber_g = get('fiber_serving') ?? get('fiber_100g');
+    const sugar_g = get('sugars_serving') ?? get('sugars_100g');
+    return {
+      name: p.product_name || p.brands || 'Packaged item',
+      brand: p.brands || null,
+      serving_size: servingSize,
+      calories,
+      protein_g,
+      carbs_g,
+      fat_g,
+      fiber_g,
+      sugar_g,
+    };
+  } catch (err) {
+    console.warn('OpenFoodFacts barcode lookup failed', err);
+    return null;
+  }
+};
+
 // Heuristic correction for discrete foods where the serving label clearly
 // describes multiple units (e.g. "3 large eggs", "4 slices bacon") but the
 // calories/macros look like a single unit. This runs **after** we have parsed
@@ -394,18 +439,20 @@ export async function POST(req: NextRequest) {
     // Default ON for best accuracy
     let wantStructured = true; // when true, we also return items[] and totals
     let preferMultiDetect = true; // default ON: detect multiple foods without changing output line
-    let analysisMode: 'auto' | 'packaged' | 'meal' = 'auto';
+    let analysisMode: 'auto' | 'packaged' | 'meal' | 'barcode' = 'auto';
     let packagedMode = false;
+    let barcodeMode = false;
     let packagedEmphasisBlock = '';
 
     const setAnalysisMode = (modeRaw: any) => {
       const normalized = String(modeRaw || 'auto').toLowerCase();
-      if (normalized === 'packaged' || normalized === 'meal') {
-        analysisMode = normalized as 'packaged' | 'meal';
+      if (normalized === 'packaged' || normalized === 'meal' || normalized === 'barcode') {
+        analysisMode = normalized as 'packaged' | 'meal' | 'barcode';
       } else {
         analysisMode = 'auto';
       }
-      packagedMode = analysisMode === 'packaged';
+      barcodeMode = analysisMode === 'barcode';
+      packagedMode = analysisMode === 'packaged' || barcodeMode;
       packagedEmphasisBlock = packagedMode
         ? `
 PACKAGED MODE SELECTED:
@@ -1072,7 +1119,52 @@ CRITICAL REQUIREMENTS:
     }
 
     // Packaged mode: force-read per-serving column and REPLACE macros with the per-serving read
-    if (packagedMode && resp.items && Array.isArray(resp.items) && resp.items.length > 0 && imageDataUrl) {
+    let barcodeApplied = false;
+    if (packagedMode && imageDataUrl && barcodeMode) {
+      try {
+        const barcode = await extractBarcodeFromImage(openai, imageDataUrl);
+        if (barcode) {
+          let barcodeItem: any | null = await fetchOpenFoodFactsByBarcode(barcode);
+          let source = 'openfoodfacts';
+          if (!barcodeItem) {
+            const fsResults = await searchFatSecretFoods(barcode, { pageSize: 1 });
+            const candidate = fsResults?.[0];
+            if (candidate) {
+              barcodeItem = candidate;
+              source = 'fatsecret';
+            }
+          }
+          if (barcodeItem) {
+            const fallbackItem = resp.items && resp.items[0] ? resp.items[0] : {};
+            resp.items = [
+              {
+                name: barcodeItem.name || fallbackItem.name || 'Packaged item',
+                brand: barcodeItem.brand || fallbackItem.brand || null,
+                serving_size: barcodeItem.serving_size || fallbackItem.serving_size || null,
+                calories: barcodeItem.calories ?? fallbackItem.calories ?? null,
+                protein_g: barcodeItem.protein_g ?? fallbackItem.protein_g ?? null,
+                carbs_g: barcodeItem.carbs_g ?? fallbackItem.carbs_g ?? null,
+                fat_g: barcodeItem.fat_g ?? fallbackItem.fat_g ?? null,
+                fiber_g: barcodeItem.fiber_g ?? fallbackItem.fiber_g ?? null,
+                sugar_g: barcodeItem.sugar_g ?? fallbackItem.sugar_g ?? null,
+                servings: 1,
+              },
+            ];
+            resp.total = computeTotalsFromItems(resp.items);
+            resp.analysis = `Barcode match (${source}) detected.`;
+            barcodeApplied = true;
+          } else {
+            resp.analysis = `Barcode not found in databases; using label read.`;
+          }
+        } else {
+          resp.analysis = `Could not read barcode; using label read.`;
+        }
+      } catch (err) {
+        console.warn('Barcode mode failed (non-fatal)', err);
+      }
+    }
+
+    if (packagedMode && !barcodeApplied && resp.items && Array.isArray(resp.items) && resp.items.length > 0 && imageDataUrl) {
       // 1) Force per-serving extraction first and replace macros for all items.
       const forced = await extractPerServingFromLabel(openai, imageDataUrl);
       if (forced) {
