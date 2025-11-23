@@ -918,6 +918,7 @@ export default function FoodDiary() {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analysisPhase, setAnalysisPhase] = useState<'idle' | 'preparing' | 'analyzing' | 'building'>('idle')
   const [isSavingEntry, setIsSavingEntry] = useState(false)
+  const [analysisMode, setAnalysisMode] = useState<'auto' | 'packaged' | 'meal'>('auto')
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [aiDescription, setAiDescription] = useState('')
@@ -2261,6 +2262,7 @@ function sanitizeNutritionTotals(raw: any): NutritionTotals | null {
       console.log('📤 Creating FormData for upload...');
       const formData = new FormData();
       formData.append('image', compressedFile);
+      formData.append('analysisMode', analysisMode);
       console.log('✅ FormData created successfully');
 
       // Step 3: API call with detailed logging
@@ -2407,6 +2409,7 @@ Meanwhile, you can describe your food manually:
         body: JSON.stringify({
           textDescription: foodDescription,
           foodType: manualFoodType,
+          analysisMode,
           // Strongly request structured items and multi-detect for best accuracy
           returnItems: true,
           multi: true,
@@ -3316,6 +3319,33 @@ Please add nutritional information manually if needed.`);
                   </div>
                 </div>
                 <div className="space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {[
+                      { key: 'auto', label: 'Auto detect', helper: 'Use visual cues' },
+                      { key: 'packaged', label: 'Packaged label', helper: 'Read per-serving panel' },
+                      { key: 'meal', label: 'Homemade/restaurant', helper: 'Plate/meal focus' },
+                    ].map((mode) => {
+                      const active = analysisMode === mode.key
+                      return (
+                        <button
+                          key={mode.key}
+                          type="button"
+                          onClick={() => setAnalysisMode(mode.key as 'auto' | 'packaged' | 'meal')}
+                          className={`flex flex-col items-start px-3 py-2 rounded-lg border text-left ${
+                            active
+                              ? 'border-emerald-500 bg-emerald-50 text-emerald-800'
+                              : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                          }`}
+                        >
+                          <span className="text-sm font-semibold">{mode.label}</span>
+                          <span className="text-[11px] text-gray-500">{mode.helper}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                  <div className="text-xs text-gray-600">
+                    Packaged label mode reads the per-serving column exactly (ignores per-100g) and can fall back to FatSecret for packaged products.
+                  </div>
                   <button
                     onClick={analyzePhoto}
                     disabled={isAnalyzing}

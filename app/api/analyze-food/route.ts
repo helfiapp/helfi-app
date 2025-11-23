@@ -10,6 +10,7 @@ import { getServerSession } from 'next-auth';
 import { getToken } from 'next-auth/jwt';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { searchFatSecretFoods } from '@/lib/food-data';
 import { CreditManager, CREDIT_COSTS } from '@/lib/credit-system';
 import crypto from 'crypto';
 
@@ -79,6 +80,56 @@ const computeTotalsFromItems = (items: any[]): any | null => {
     fat_g: round(totals.fat_g),
     fiber_g: totals.fiber_g > 0 ? round(totals.fiber_g) : null,
     sugar_g: totals.sugar_g > 0 ? round(totals.sugar_g) : null,
+  };
+};
+
+// When in packaged mode, try to fill missing/zero macros from FatSecret without overwriting existing values.
+const enrichPackagedItemsWithFatSecret = async (items: any[]): Promise<{ items: any[]; total: any | null }> => {
+  const enriched: any[] = [];
+  let changed = false;
+
+  for (const item of items) {
+    const next = { ...item };
+    const query = [item.brand, item.name].filter(Boolean).join(' ').trim();
+    const hasMissingMacros =
+      next.calories == null ||
+      next.protein_g == null ||
+      next.carbs_g == null ||
+      next.fat_g == null ||
+      next.fiber_g == null ||
+      next.sugar_g == null ||
+      next.calories === 0;
+
+    if (query && hasMissingMacros) {
+      try {
+        const fsResults = await searchFatSecretFoods(query, { pageSize: 1 });
+        const candidate = fsResults?.[0];
+        if (candidate) {
+          const maybe = (key: keyof typeof candidate, fallback: any) =>
+            candidate[key] !== null && candidate[key] !== undefined ? candidate[key] : fallback;
+
+          if (candidate.serving_size && !next.serving_size) {
+            next.serving_size = candidate.serving_size;
+          }
+          if (next.calories == null || next.calories === 0) next.calories = maybe('calories', next.calories);
+          if (next.protein_g == null) next.protein_g = maybe('protein_g', next.protein_g);
+          if (next.carbs_g == null) next.carbs_g = maybe('carbs_g', next.carbs_g);
+          if (next.fat_g == null) next.fat_g = maybe('fat_g', next.fat_g);
+          if (next.fiber_g == null) next.fiber_g = maybe('fiber_g', next.fiber_g);
+          if (next.sugar_g == null) next.sugar_g = maybe('sugar_g', next.sugar_g);
+          changed = true;
+        }
+      } catch (err) {
+        console.warn('FatSecret enrichment failed (non-fatal)', err);
+      }
+    }
+
+    enriched.push(next);
+  }
+
+  return {
+    items: enriched,
+    total: changed ? computeTotalsFromItems(enriched) : null,
   };
 };
 
@@ -267,16 +318,38 @@ export async function POST(req: NextRequest) {
     // Default ON for best accuracy
     let wantStructured = true; // when true, we also return items[] and totals
     let preferMultiDetect = true; // default ON: detect multiple foods without changing output line
+    let analysisMode: 'auto' | 'packaged' | 'meal' = 'auto';
+    let packagedMode = false;
+    let packagedEmphasisBlock = '';
+
+    const setAnalysisMode = (modeRaw: any) => {
+      const normalized = String(modeRaw || 'auto').toLowerCase();
+      if (normalized === 'packaged' || normalized === 'meal') {
+        analysisMode = normalized as 'packaged' | 'meal';
+      } else {
+        analysisMode = 'auto';
+      }
+      packagedMode = analysisMode === 'packaged';
+      packagedEmphasisBlock = packagedMode
+        ? `
+PACKAGED MODE SELECTED:
+- Use ONLY the per-serving column from the nutrition label (ignore per-100g values).
+- Copy the per-serving numbers verbatim (calories, protein, carbs, fat, fiber, sugar) and the printed serving size.
+- Do NOT scale from per-100g to per-serving; do NOT "correct" the label.
+- Keep serving_size as written on the label and set servings to 1 by default (user will adjust).`
+        : '';
+    };
 
     let isReanalysis = false;
     if (contentType?.includes('application/json')) {
       // Handle text-based food analysis
       const body = await req.json();
-      const { textDescription, foodType, isReanalysis: reFlag, returnItems, multi } = body as any;
+      const { textDescription, foodType, isReanalysis: reFlag, returnItems, multi, analysisMode: bodyMode } = body as any;
       isReanalysis = !!reFlag;
       // Default to true unless explicitly disabled
       wantStructured = returnItems !== undefined ? !!returnItems : true;
       preferMultiDetect = multi !== undefined ? !!multi : true;
+      setAnalysisMode(bodyMode);
       console.log('📝 Text analysis mode:', { textDescription, foodType });
 
       if (!textDescription) {
@@ -312,6 +385,7 @@ PACKAGED / BRANDED FOODS (VERY IMPORTANT):
 - For branded items, put the product brand in the "brand" field (e.g. "Tip Top", "Heinz") and the generic food name in "name" (e.g. "Hot dog roll").
 - For packets with multiple identical units (e.g. 6 hot dog rolls), nutrition in ITEMS_JSON for EACH ITEM should be PER ONE ROLL by default with "servings": 1 (the app will multiply when the user eats more than one).
 - If the text clearly says the person ate multiple units (e.g. "2 hot dog rolls"), keep the serving_size as on the label (per 1 roll) and set "servings" accordingly (e.g. 2).
+${packagedEmphasisBlock}
 
 Keep your explanation concise (2-3 sentences) and ALWAYS include a single nutrition line at the end in this exact format:
 
@@ -363,6 +437,7 @@ CRITICAL REQUIREMENTS:
       
       const formData = await req.formData();
       const imageFile = formData.get('image') as File;
+      setAnalysisMode(formData.get('analysisMode'));
       
       console.log('📊 Image file info:', {
         hasImageFile: !!imageFile,
@@ -453,6 +528,7 @@ PACKAGED / BRANDED FOODS (VERY IMPORTANT):
 - Do NOT invent or "correct" the label; if the label looks surprising, still trust it over your own visual estimate.
 - Put the brand name from the packaging (e.g. "Tip Top", "Heinz") into the "brand" field and a generic food name into "name" (e.g. "Hot dog roll", "Wholemeal bread slice").
 - For packets with multiple identical units (e.g. 6 hot dog rolls), nutrition in ITEMS_JSON for EACH ITEM should be PER ONE UNIT by default with "servings": 1. If the person clearly ate multiple units, keep serving_size as the label’s per-unit portion and adjust "servings" (e.g. 2 rolls eaten -> servings: 2).
+${packagedEmphasisBlock}
 
 CRITICAL STRUCTURED OUTPUT RULES:
 - ALWAYS return the ITEMS_JSON block and include fiber_g and sugar_g for each item (do not leave as 0 unless truly 0).
@@ -907,6 +983,15 @@ CRITICAL REQUIREMENTS:
         resp.total = harmonized.total;
       } else if (!resp.total) {
         resp.total = computeTotalsFromItems(resp.items);
+      }
+    }
+
+    // Packaged mode: fill missing macros from FatSecret without overriding existing values.
+    if (packagedMode && resp.items && Array.isArray(resp.items) && resp.items.length > 0) {
+      const enriched = await enrichPackagedItemsWithFatSecret(resp.items);
+      if (enriched.total) {
+        resp.items = enriched.items;
+        resp.total = enriched.total;
       }
     }
 

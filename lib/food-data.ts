@@ -21,8 +21,11 @@ const OPENFOODFACTS_USER_AGENT =
   process.env.OPENFOODFACTS_USER_AGENT || 'helfi-app/1.0 (support@helfi.ai)'
 
 const USDA_API_KEY = process.env.USDA_API_KEY
-const FATSECRET_CLIENT_ID = process.env.FATSECRET_CLIENT_ID
-const FATSECRET_CLIENT_SECRET = process.env.FATSECRET_CLIENT_SECRET
+// Default to provided credentials if env vars are not set (per user request for FatSecret packaged lookups)
+const FATSECRET_CLIENT_ID =
+  process.env.FATSECRET_CLIENT_ID || '5b035e5de0b041ffb0b8522abd75dd0b'
+const FATSECRET_CLIENT_SECRET =
+  process.env.FATSECRET_CLIENT_SECRET || 'd544f96d19494c9ca8a3dec1bcaf1da3'
 
 function parseNumber(value: any): number | null {
   const n = typeof value === 'number' ? value : Number(value)
@@ -479,5 +482,4 @@ export async function lookupFoodNutrition(
   console.warn(`⚠️ No results found from any source for query: ${query}`)
   return []
 }
-
 
