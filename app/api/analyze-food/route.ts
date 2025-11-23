@@ -181,6 +181,32 @@ const extractPerServingFromLabel = async (
   return null;
 };
 
+// Optional: decode barcode from label image (OpenAI vision quick pass).
+const extractBarcodeFromImage = async (openai: OpenAI, imageDataUrl: string): Promise<string | null> => {
+  try {
+    const completion = await chatCompletionWithCost(openai, {
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: `Read a barcode number from this image if visible. Return only the number as plain text (digits only). If none, return "none".` },
+            { type: 'image_url', image_url: { url: imageDataUrl } },
+          ],
+        },
+      ],
+      max_tokens: 32,
+      temperature: 0,
+    } as any);
+    const raw = completion.completion.choices?.[0]?.message?.content?.trim() || '';
+    const cleaned = raw.replace(/[^0-9]/g, '');
+    if (cleaned.length >= 6) return cleaned; // basic sanity
+  } catch (err) {
+    console.warn('Barcode extractor failed (non-fatal)', err);
+  }
+  return null;
+};
+
 // Heuristic correction for discrete foods where the serving label clearly
 // describes multiple units (e.g. "3 large eggs", "4 slices bacon") but the
 // calories/macros look like a single unit. This runs **after** we have parsed
@@ -1045,39 +1071,63 @@ CRITICAL REQUIREMENTS:
 
     // Packaged mode: force-read per-serving column and REPLACE macros with the per-serving read
     if (packagedMode && resp.items && Array.isArray(resp.items) && resp.items.length > 0 && imageDataUrl) {
+      // 1) Force per-serving extraction first and replace macros for all items.
       const forced = await extractPerServingFromLabel(openai, imageDataUrl);
       if (forced) {
-        const item = { ...resp.items[0] };
         const toNum = (v: any) => (Number.isFinite(Number(v)) ? Number(v) : null);
-        const forcedItem = {
-          ...item,
-          serving_size: forced.serving_size || item.serving_size,
-          calories: toNum(forced.calories) ?? item.calories,
-          protein_g: toNum(forced.protein_g) ?? item.protein_g,
-          carbs_g: toNum(forced.carbs_g) ?? item.carbs_g,
-          fat_g: toNum(forced.fat_g) ?? item.fat_g,
-          fiber_g: toNum(forced.fiber_g) ?? item.fiber_g,
-          sugar_g: toNum(forced.sugar_g) ?? item.sugar_g,
+        const forcedValues = {
+          serving_size: forced.serving_size ?? null,
+          calories: toNum(forced.calories),
+          protein_g: toNum(forced.protein_g),
+          carbs_g: toNum(forced.carbs_g),
+          fat_g: toNum(forced.fat_g),
+          fiber_g: toNum(forced.fiber_g),
+          sugar_g: toNum(forced.sugar_g),
         };
 
-        // Calorie sanity: if the macros imply a calorie total within ~20% of the label calories, trust them; otherwise keep forced values anyway
-        const impliedKcal =
-          (Number(forcedItem.protein_g) || 0) * 4 +
-          (Number(forcedItem.carbs_g) || 0) * 4 +
-          (Number(forcedItem.fat_g) || 0) * 9;
-        const labelKcal = Number(forcedItem.calories) || 0;
-        const withinTolerance =
-          labelKcal > 0 ? Math.abs(impliedKcal - labelKcal) / labelKcal <= 0.2 : true;
-        // Replace first item with forced per-serving values
-        resp.items[0] = forcedItem;
-        // Recompute total; if calories sanity fails but label calories exist, still keep the forced macros (safer per-serving)
+        resp.items = resp.items.map((item) => ({
+          ...item,
+          serving_size: forcedValues.serving_size || item.serving_size,
+          calories: forcedValues.calories ?? item.calories,
+          protein_g: forcedValues.protein_g ?? item.protein_g,
+          carbs_g: forcedValues.carbs_g ?? item.carbs_g,
+          fat_g: forcedValues.fat_g ?? item.fat_g,
+          fiber_g: forcedValues.fiber_g ?? item.fiber_g,
+          sugar_g: forcedValues.sugar_g ?? item.sugar_g,
+        }));
+
         resp.total = computeTotalsFromItems(resp.items);
-        if (!withinTolerance && labelKcal > 0) {
-          resp.total = {
-            ...(resp.total || {}),
-            calories: Math.round(labelKcal),
-          };
+
+        // If calories present on label, keep them authoritative even if macro-implied differs.
+        if (forcedValues.calories != null && resp.total) {
+          resp.total.calories = Math.round(forcedValues.calories);
         }
+      }
+
+      // 2) Try barcode extraction; if we get a code, do a FatSecret lookup by code as a secondary guard.
+      try {
+        const barcode = await extractBarcodeFromImage(openai, imageDataUrl);
+        if (barcode) {
+          const fsResults = await searchFatSecretFoods(barcode, { pageSize: 1 });
+          const candidate = fsResults?.[0];
+          if (candidate) {
+            const maybe = (v: any, fallback: any) =>
+              v !== null && v !== undefined ? v : fallback;
+            resp.items = resp.items.map((item) => ({
+              ...item,
+              serving_size: maybe(candidate.serving_size, item.serving_size),
+              calories: maybe(candidate.calories, item.calories),
+              protein_g: maybe(candidate.protein_g, item.protein_g),
+              carbs_g: maybe(candidate.carbs_g, item.carbs_g),
+              fat_g: maybe(candidate.fat_g, item.fat_g),
+              fiber_g: maybe(candidate.fiber_g, item.fiber_g),
+              sugar_g: maybe(candidate.sugar_g, item.sugar_g),
+            }));
+            resp.total = computeTotalsFromItems(resp.items);
+          }
+        }
+      } catch (err) {
+        console.warn('Barcode/FatSecret packaged fallback failed (non-fatal)', err);
       }
     }
 
