@@ -160,6 +160,7 @@ const extractPerServingFromLabel = async (
 {"serving_size":"string","calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"sugar_g":0}
 - Copy the per-serving numbers verbatim.
 - If you see multiple columns, choose the one labelled per serve/per serving.
+- For fat: read the TOTAL FAT row from the per-serving column. Do NOT add saturated or trans fat; just use the total fat per serving.
 - Do NOT estimate or scale from per 100g.
 - No prose, just JSON.` },
             { type: 'image_url', image_url: { url: imageDataUrl } },
@@ -1086,6 +1087,19 @@ CRITICAL REQUIREMENTS:
           sugar_g: toNum(forced.sugar_g),
         };
 
+        // If implied calories from macros exceed label calories by >15%, clamp fat to fit label calories (total fat row only).
+        if (forcedValues.calories && forcedValues.calories > 0) {
+          const proteinCals = (forcedValues.protein_g ?? 0) * 4;
+          const carbCals = (forcedValues.carbs_g ?? 0) * 4;
+          const fatCals = (forcedValues.fat_g ?? 0) * 9;
+          const implied = proteinCals + carbCals + fatCals;
+          if (implied > forcedValues.calories * 1.15) {
+            const remaining = forcedValues.calories - (proteinCals + carbCals);
+            const adjustedFat = Math.max(0, remaining / 9);
+            forcedValues.fat_g = Math.round(adjustedFat * 10) / 10;
+          }
+        }
+
         resp.items = resp.items.map((item: any) => ({
           ...item,
           serving_size: forcedValues.serving_size || item.serving_size,
@@ -1105,31 +1119,7 @@ CRITICAL REQUIREMENTS:
         }
       }
 
-      // 2) Try barcode extraction; if we get a code, do a FatSecret lookup by code as a secondary guard.
-      try {
-        const barcode = await extractBarcodeFromImage(openai, imageDataUrl);
-        if (barcode) {
-          const fsResults = await searchFatSecretFoods(barcode, { pageSize: 1 });
-          const candidate = fsResults?.[0];
-          if (candidate) {
-            const maybe = (v: any, fallback: any) =>
-              v !== null && v !== undefined ? v : fallback;
-            resp.items = resp.items.map((item: any) => ({
-              ...item,
-              serving_size: maybe(candidate.serving_size, item.serving_size),
-              calories: maybe(candidate.calories, item.calories),
-              protein_g: maybe(candidate.protein_g, item.protein_g),
-              carbs_g: maybe(candidate.carbs_g, item.carbs_g),
-              fat_g: maybe(candidate.fat_g, item.fat_g),
-              fiber_g: maybe(candidate.fiber_g, item.fiber_g),
-              sugar_g: maybe(candidate.sugar_g, item.sugar_g),
-            }));
-            resp.total = computeTotalsFromItems(resp.items);
-          }
-        }
-      } catch (err) {
-        console.warn('Barcode/FatSecret packaged fallback failed (non-fatal)', err);
-      }
+      // 2) Barcode fallback disabled for now to avoid wrong matches (burger mixups). Keep label per-serving as source of truth.
     }
 
     // NOTE: USDA/FatSecret database enhancement removed from AI photo analysis flow
