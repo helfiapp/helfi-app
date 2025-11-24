@@ -1,6 +1,7 @@
 'use client'
 
 import { FormEvent, KeyboardEvent, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { ArrowsPointingOutIcon, ArrowsPointingInIcon } from '@heroicons/react/24/outline'
 
 type ChatMessage = { role: 'user' | 'assistant'; content: string }
 
@@ -125,15 +126,15 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
       document.body.style.overflow = 'hidden'
       // Scroll chat to bottom
       requestAnimationFrame(() => {
-        containerRef.current?.scrollTo({ top: containerRef.current.scrollHeight, behavior: 'auto' })
+        if (containerRef.current) {
+          containerRef.current.scrollTop = containerRef.current.scrollHeight
+        }
       })
     } else {
       // Restore scroll position when collapsing
       document.body.style.overflow = ''
-      // Restore scroll position after a brief delay to ensure layout is stable
-      requestAnimationFrame(() => {
-        window.scrollTo({ top: scrollPositionRef.current, behavior: 'auto' })
-      })
+      // Restore scroll position immediately to prevent jump
+      window.scrollTo({ top: scrollPositionRef.current, behavior: 'instant' })
     }
   }, [expanded])
 
@@ -225,7 +226,7 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
   }
 
   const sectionClass = expanded
-    ? 'fixed inset-0 z-50 bg-white flex flex-col'
+    ? 'fixed inset-0 z-[9999] bg-white flex flex-col h-[100dvh]'
     : 'bg-white overflow-hidden md:rounded-2xl md:border md:shadow-sm relative flex flex-col h-[calc(100vh-140px)] md:h-auto'
 
   return (
@@ -458,13 +459,9 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
                 aria-label={expanded ? 'Exit expanded chat view' : 'Expand chat area'}
               >
                 {expanded ? (
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 9l6 6m0-6l-6 6" />
-                  </svg>
+                  <ArrowsPointingInIcon className="w-4 h-4" />
                 ) : (
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 16 16">
-                    <path d="M2 2l2 2-2 2V2zm10-2v4l-2-2 2-2zm0 10l-2-2 2-2v4zm-10 0v-4l2 2-2 2z" />
-                  </svg>
+                  <ArrowsPointingOutIcon className="w-4 h-4" />
                 )}
               </button>
             )}
