@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import type { IssueSummary, IssueSectionKey } from '@/lib/insights/issue-engine'
 import { ISSUE_SECTION_ORDER } from '@/lib/insights/issue-engine'
+import UsageMeter from '@/components/UsageMeter'
+import FeatureUsageDisplay from '@/components/FeatureUsageDisplay'
 
 interface IssueOverviewClientProps {
   issue: IssueSummary
@@ -144,6 +146,7 @@ export default function IssueOverviewClient({ issue, issueSlug }: IssueOverviewC
   const [isRegenerating, setIsRegenerating] = useState(false)
   const [needsRegeneration, setNeedsRegeneration] = useState<boolean | null>(null)
   const [isCheckingStatus, setIsCheckingStatus] = useState(true)
+  const [usageMeterRefresh, setUsageMeterRefresh] = useState(0)
   
   // Check if insights need regeneration on component mount
   useEffect(() => {
@@ -194,6 +197,10 @@ export default function IssueOverviewClient({ issue, issueSlug }: IssueOverviewC
       if (!response.ok) {
         throw new Error('Unable to start regeneration right now.')
       }
+
+      // Refresh credit + usage meters (regeneration uses credits)
+      setUsageMeterRefresh((v) => v + 1)
+      try { window.dispatchEvent(new Event('credits:refresh')) } catch {}
       
       // Progress bar will poll and call handleRegenerationComplete when done
     } catch (err) {
@@ -205,6 +212,8 @@ export default function IssueOverviewClient({ issue, issueSlug }: IssueOverviewC
   function handleRegenerationComplete() {
     setIsRegenerating(false)
     setNeedsRegeneration(false)
+    setUsageMeterRefresh((v) => v + 1)
+    try { window.dispatchEvent(new Event('credits:refresh')) } catch {}
     window.location.reload()
   }
 
@@ -221,6 +230,15 @@ export default function IssueOverviewClient({ issue, issueSlug }: IssueOverviewC
             <p className="text-sm text-gray-600">
               Your health data has changed. Refresh all sections for {issue.name} with your latest data. This may take 1-2 minutes.
             </p>
+            <p className="text-sm text-gray-600 mt-2">
+              Regenerating uses your AI credits (typical cost: 2 credits per run). Track your remaining credits and monthly regeneration usage below.
+            </p>
+            <UsageMeter inline={true} refreshTrigger={usageMeterRefresh} className="max-w-md" />
+            <FeatureUsageDisplay
+              featureName="insightsGeneration"
+              featureLabel="Insights Regeneration"
+              refreshTrigger={usageMeterRefresh}
+            />
           </div>
           <div className="flex-shrink-0">
             {isRegenerating ? (
@@ -295,4 +313,3 @@ export default function IssueOverviewClient({ issue, issueSlug }: IssueOverviewC
     </div>
   )
 }
-
