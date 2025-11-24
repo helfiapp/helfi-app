@@ -264,7 +264,12 @@ export default function SymptomChat({ analysisResult, symptoms, duration, notes 
         </div>
       </header>
 
-      <div ref={containerRef} className="px-4 py-6 h-[420px] overflow-y-auto overflow-x-hidden space-y-6 min-w-0 w-full max-w-3xl mx-auto" aria-live="polite" style={{ maxWidth: '100%', wordWrap: 'break-word' }}>
+      <div
+        ref={containerRef}
+        className="px-4 py-6 overflow-y-auto overflow-x-hidden space-y-6 min-w-0 w-full max-w-3xl mx-auto max-h-[55vh] min-h-[220px]"
+        aria-live="polite"
+        style={{ maxWidth: '100%', wordWrap: 'break-word' }}
+      >
         {messages.length === 0 && !loading && (
           <div className="text-sm text-gray-400">
             Ask follow‑ups like:
