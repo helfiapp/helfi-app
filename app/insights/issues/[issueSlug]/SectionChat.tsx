@@ -676,7 +676,7 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
                 onKeyDown={onComposerKeyDown}
                 placeholder="Ask anything"
                 rows={1}
-                className="w-full rounded-2xl border-0 bg-gray-100 px-4 py-3 pr-12 text-base leading-6 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-0 resize-none transition-all duration-200 min-h-[52px] max-h-[200px]"
+                className="w-full rounded-2xl border-0 bg-gray-100 px-4 py-3 pr-12 text-[16px] leading-6 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-0 resize-none transition-all duration-200 min-h-[52px] max-h-[200px]"
               />
             </div>
             <button
