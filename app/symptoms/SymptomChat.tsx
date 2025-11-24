@@ -159,6 +159,25 @@ export default function SymptomChat({ analysisResult, symptoms, duration, notes 
     resizeTextarea()
   }, [input, resizeTextarea])
 
+  // Lock body scroll when expanded
+  useEffect(() => {
+    if (expanded) {
+      const prev = document.body.style.overflow
+      document.body.style.overflow = 'hidden'
+      return () => {
+        document.body.style.overflow = prev
+      }
+    }
+  }, [expanded])
+
+  // Scroll chat to bottom when expanding
+  useEffect(() => {
+    if (!expanded) return
+    requestAnimationFrame(() => {
+      containerRef.current?.scrollTo({ top: containerRef.current.scrollHeight, behavior: 'auto' })
+    })
+  }, [expanded])
+
   function onComposerKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault()

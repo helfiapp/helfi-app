@@ -266,6 +266,25 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
     }
   }, [messages, loading, hasUserInteracted])
 
+  // Lock body scroll when expanded
+  useEffect(() => {
+    if (expanded) {
+      const prev = document.body.style.overflow
+      document.body.style.overflow = 'hidden'
+      return () => {
+        document.body.style.overflow = prev
+      }
+    }
+  }, [expanded])
+
+  // Scroll to bottom when expanding
+  useEffect(() => {
+    if (!expanded) return
+    requestAnimationFrame(() => {
+      containerRef.current?.scrollTo({ top: containerRef.current.scrollHeight, behavior: 'auto' })
+    })
+  }, [expanded])
+
   useEffect(() => {
     return () => {
       if (resizeRafRef.current) cancelAnimationFrame(resizeRafRef.current)
