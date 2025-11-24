@@ -4048,22 +4048,27 @@ Please add nutritional information manually if needed.`);
                                   "1 serving" without explicit written approval from the user. */}
                             {isExpanded && (
                               <div className="flex flex-col gap-2 mb-3 pb-3 border-b border-gray-100">
-                                <div className="flex items-center gap-3">
-                                  <span className="text-sm text-gray-600">Servings:</span>
-                                  <div className="flex items-center gap-2">
-                                    <button
-                                      onClick={() => {
-                                        const current = analyzedItems[index]?.servings || 1
-                                        const step =
-                                          servingUnitMeta && isDiscreteUnitLabel(servingUnitMeta.unitLabel) && servingUnitMeta.quantity > 0
-                                            ? 1 / servingUnitMeta.quantity
-                                            : 0.25
-                                        const next = Math.max(0, Math.round((current - step) * 100) / 100)
-                                        updateItemField(index, 'servings', next)
-                                      }}
-                                      className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-medium transition-colors"
-                                    >
-                                      -
+                              <div className="flex items-center gap-3">
+                                <span className="text-sm text-gray-600">Servings:</span>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => {
+                                      const current = analyzedItems[index]?.servings || 1
+                                      const step =
+                                        servingUnitMeta && isDiscreteUnitLabel(servingUnitMeta.unitLabel) && servingUnitMeta.quantity > 0
+                                          ? 1 / servingUnitMeta.quantity
+                                          : 0.25
+                                      const snapToStep = (val: number) => {
+                                        if (!step || step <= 0) return val
+                                        const snapped = Math.round(val / step)
+                                        return Math.max(0, Math.round(snapped * step * 10000) / 10000)
+                                      }
+                                      const next = snapToStep(current - step)
+                                      updateItemField(index, 'servings', next)
+                                    }}
+                                    className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-medium transition-colors"
+                                  >
+                                    -
                                     </button>
                                     <input
                                       type="number"
@@ -4081,10 +4086,15 @@ Please add nutritional information manually if needed.`);
                                       onClick={() => {
                                         const current = analyzedItems[index]?.servings || 1
                                         const step =
-                                          servingUnitMeta && isDiscreteUnitLabel(servingUnitMeta.unitLabel)
+                                          servingUnitMeta && isDiscreteUnitLabel(servingUnitMeta.unitLabel) && servingUnitMeta.quantity > 0
                                             ? 1 / servingUnitMeta.quantity
                                             : 0.25
-                                        const next = Math.round((current + step) * 100) / 100
+                                        const snapToStep = (val: number) => {
+                                          if (!step || step <= 0) return val
+                                          const snapped = Math.round(val / step)
+                                          return Math.max(0, Math.round(snapped * step * 10000) / 10000)
+                                        }
+                                        const next = snapToStep(current + step)
                                         updateItemField(index, 'servings', next)
                                       }}
                                       className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-medium transition-colors"
