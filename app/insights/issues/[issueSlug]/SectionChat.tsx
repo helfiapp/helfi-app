@@ -684,18 +684,34 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
                 onKeyDown={onComposerKeyDown}
                 placeholder="Ask anything"
                 rows={1}
-                className="w-full rounded-2xl border-0 bg-gray-100 px-4 py-3 pr-12 text-[16px] leading-6 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-0 resize-none transition-all duration-200 min-h-[52px] max-h-[200px]"
+                className="w-full rounded-2xl border-0 bg-gray-100 px-4 py-3 pr-14 text-[16px] leading-6 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-0 resize-none transition-all duration-200 min-h-[52px] max-h-[200px]"
               />
+              <button
+                type="submit"
+                disabled={loading || !input.trim() || isListening}
+                className="absolute right-2 bottom-2 w-9 h-9 rounded-full bg-gray-900 text-white flex items-center justify-center hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                aria-label="Send message"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                </svg>
+              </button>
             </div>
             <button
-              type="submit"
-              disabled={loading || !input.trim() || isListening}
-              className="flex-shrink-0 w-10 h-10 rounded-full bg-gray-900 text-white flex items-center justify-center hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              aria-label="Send message"
+              type="button"
+              onClick={() => setExpanded((v) => !v)}
+              className="flex-shrink-0 w-10 h-10 rounded-full bg-gray-100 text-gray-700 flex items-center justify-center hover:bg-gray-200 transition-colors"
+              aria-label={expanded ? 'Exit expanded chat view' : 'Expand chat area'}
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-              </svg>
+              {expanded ? (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 14h4v4M4 10h4V6M20 14h-4v4M20 10h-4V6" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 14h4v4H4zM4 6h4v4H4zM16 14h4v4h-4zM16 6h4v4h-4z" />
+                </svg>
+              )}
             </button>
           </div>
         </form>
