@@ -478,7 +478,7 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
         style={{
           maxWidth: '100%',
           wordWrap: 'break-word',
-          paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 180px)',
+          paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 96px)',
         }}
       >
         {messages.length === 0 && !loading && (
@@ -632,10 +632,8 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
         {error && (
           <div className="px-4 py-2 text-sm text-red-600 bg-red-50">{error}</div>
         )}
-        <div aria-hidden className="h-[140px]" />
-
         <form
-          className="px-4 py-3 fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40 shadow-[0_-6px_24px_rgba(0,0,0,0.12)]"
+          className="px-4 py-3 sticky bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40 shadow-[0_-6px_18px_rgba(0,0,0,0.08)]"
           onSubmit={handleSubmit}
           style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}
         >

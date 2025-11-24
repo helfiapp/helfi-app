@@ -222,7 +222,7 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
         style={{
           maxWidth: '100%',
           wordWrap: 'break-word',
-          paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 180px)',
+          paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 96px)',
         }}
       >
         {messages.length === 0 && !loading && (
@@ -384,10 +384,8 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
         <div ref={endRef} />
       </div>
 
-      <div aria-hidden className="h-[140px]" />
-
       <form
-        className="fixed bottom-0 left-0 right-0 border-t border-gray-200 px-4 py-3 bg-white z-40 shadow-[0_-6px_24px_rgba(0,0,0,0.12)]"
+        className="sticky bottom-0 left-0 right-0 border-t border-gray-200 px-4 py-3 bg-white z-40 shadow-[0_-6px_18px_rgba(0,0,0,0.08)]"
         onSubmit={handleSubmit}
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}
       >
