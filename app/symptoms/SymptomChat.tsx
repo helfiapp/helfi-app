@@ -266,12 +266,12 @@ export default function SymptomChat({ analysisResult, symptoms, duration, notes 
 
       <div
         ref={containerRef}
-        className="px-4 py-6 overflow-y-auto overflow-x-hidden space-y-6 min-w-0 w-full max-w-3xl mx-auto max-h-[55vh] min-h-[220px]"
+        className="px-4 py-6 overflow-y-auto overflow-x-hidden space-y-6 min-w-0 w-full max-w-3xl mx-auto min-h-[220px]"
         aria-live="polite"
         style={{
           maxWidth: '100%',
           wordWrap: 'break-word',
-          paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 96px)',
+          paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 180px)',
         }}
       >
         {messages.length === 0 && !loading && (
@@ -386,8 +386,10 @@ export default function SymptomChat({ analysisResult, symptoms, duration, notes 
         <div ref={endRef} />
       </div>
 
+      <div aria-hidden className="h-[140px]" />
+
       <form
-        className="border-t border-gray-200 px-4 py-3 bg-white sticky bottom-0 left-0 right-0 z-10"
+        className="fixed bottom-0 left-0 right-0 border-t border-gray-200 px-4 py-3 bg-white z-40 shadow-[0_-6px_24px_rgba(0,0,0,0.12)]"
         onSubmit={handleSubmit}
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}
       >
