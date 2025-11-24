@@ -247,7 +247,7 @@ export default function SymptomChat({ analysisResult, symptoms, duration, notes 
   }
 
   return (
-    <section className="bg-white mt-6 overflow-hidden md:rounded-2xl md:border md:shadow-sm">
+    <section className="bg-white mt-6 overflow-hidden md:rounded-2xl md:border md:shadow-sm relative">
       <header className="flex items-center justify-between px-4 py-3 border-b border-gray-200 w-full max-w-3xl mx-auto">
         <div>
           <h3 className="text-sm font-semibold text-gray-900">Chat about your symptom analysis</h3>
@@ -268,7 +268,11 @@ export default function SymptomChat({ analysisResult, symptoms, duration, notes 
         ref={containerRef}
         className="px-4 py-6 overflow-y-auto overflow-x-hidden space-y-6 min-w-0 w-full max-w-3xl mx-auto max-h-[55vh] min-h-[220px]"
         aria-live="polite"
-        style={{ maxWidth: '100%', wordWrap: 'break-word' }}
+        style={{
+          maxWidth: '100%',
+          wordWrap: 'break-word',
+          paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 96px)',
+        }}
       >
         {messages.length === 0 && !loading && (
           <div className="text-sm text-gray-400">
@@ -382,8 +386,12 @@ export default function SymptomChat({ analysisResult, symptoms, duration, notes 
         <div ref={endRef} />
       </div>
 
-      <form className="border-t border-gray-200 px-4 py-3 bg-white">
-        <div className="flex items-center gap-2 w-full max-w-3xl mx-auto" onSubmitCapture={handleSubmit as any}>
+      <form
+        className="border-t border-gray-200 px-4 py-3 bg-white sticky bottom-0 left-0 right-0 z-10"
+        onSubmit={handleSubmit}
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}
+      >
+        <div className="flex items-center gap-2 w-full max-w-3xl mx-auto">
           {recognitionRef.current && (
             <button
               type="button"

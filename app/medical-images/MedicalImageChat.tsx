@@ -196,7 +196,7 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
   }
 
   return (
-    <section className="bg-white overflow-hidden md:rounded-2xl md:border md:shadow-sm">
+    <section className="bg-white overflow-hidden md:rounded-2xl md:border md:shadow-sm relative">
       <header className="flex items-center justify-between px-4 py-3 border-b border-gray-200 w-full max-w-3xl mx-auto">
         <div>
           <h3 className="text-sm font-semibold text-gray-900">Chat about your medical image</h3>
@@ -219,7 +219,11 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
         ref={containerRef}
         className="px-4 py-6 overflow-y-auto overflow-x-hidden space-y-6 min-w-0 w-full max-w-3xl mx-auto max-h-[55vh] min-h-[220px]"
         aria-live="polite"
-        style={{ maxWidth: '100%', wordWrap: 'break-word' }}
+        style={{
+          maxWidth: '100%',
+          wordWrap: 'break-word',
+          paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 96px)',
+        }}
       >
         {messages.length === 0 && !loading && (
           <div className="text-sm text-gray-400">
@@ -380,7 +384,11 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
         <div ref={endRef} />
       </div>
 
-      <form className="border-t border-gray-200 px-4 py-3 bg-white" onSubmit={handleSubmit}>
+      <form
+        className="border-t border-gray-200 px-4 py-3 bg-white sticky bottom-0 left-0 right-0 z-10"
+        onSubmit={handleSubmit}
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}
+      >
         <div className="flex items-center gap-2 w-full max-w-3xl mx-auto">
           <div className="flex-1 relative flex items-center">
             <textarea

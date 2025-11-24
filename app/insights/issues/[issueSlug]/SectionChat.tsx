@@ -402,7 +402,7 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
 
   if (!enabled) return null
   return (
-    <div className="flex flex-col h-full bg-white md:rounded-2xl md:border md:shadow-sm">
+    <div className="flex flex-col h-full bg-white md:rounded-2xl md:border md:shadow-sm relative">
       {/* Thread Selector Header */}
       <div className="border-b border-gray-200 bg-white px-4 py-2 flex items-center justify-between relative">
         <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -475,7 +475,11 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
         ref={containerRef}
         className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-6 space-y-6 min-w-0 w-full max-w-3xl mx-auto max-h-[55vh] min-h-[220px]"
         aria-live="polite"
-        style={{ maxWidth: '100%', wordWrap: 'break-word' }}
+        style={{
+          maxWidth: '100%',
+          wordWrap: 'break-word',
+          paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 96px)',
+        }}
       >
         {messages.length === 0 && !loading && (
           <div className="w-full md:max-w-3xl mx-auto">
@@ -628,7 +632,11 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
         {error && (
           <div className="px-4 py-2 text-sm text-red-600 bg-red-50">{error}</div>
         )}
-        <form className="px-4 py-3" onSubmit={handleSubmit}>
+        <form
+          className="px-4 py-3 sticky bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-10"
+          onSubmit={handleSubmit}
+          style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}
+        >
           <div className="w-full md:max-w-3xl mx-auto flex items-center gap-2">
             {messages.length > 0 && (
               <button
