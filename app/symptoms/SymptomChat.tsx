@@ -1,6 +1,7 @@
 'use client'
 
 import { FormEvent, KeyboardEvent, useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { ArrowsPointingOutIcon, ArrowsPointingInIcon } from '@heroicons/react/24/outline'
 
 interface SymptomChatProps {
@@ -33,6 +34,7 @@ export default function SymptomChat({ analysisResult, symptoms, duration, notes 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const recognitionRef = useRef<any>(null)
   const resizeRafRef = useRef<number | null>(null)
+  const [isClient, setIsClient] = useState(false)
 
   // Smooth, single-frame resize to avoid jumpiness when text grows/shrinks rapidly (typing or voice)
   const resizeTextarea = useCallback(() => {
@@ -109,6 +111,11 @@ export default function SymptomChat({ analysisResult, symptoms, duration, notes 
     }
   }, [])
 
+  // Track client-side mount so we can safely use portals
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
+
   function startListening() {
     if (!recognitionRef.current || isListening) return
     try {
@@ -167,26 +174,10 @@ export default function SymptomChat({ analysisResult, symptoms, duration, notes 
     resizeTextarea()
   }, [input, resizeTextarea])
 
-  // Handle expand/collapse with scroll position preservation
-  useEffect(() => {
-    if (expanded) {
-      // Store current scroll position before expanding
-      scrollPositionRef.current = window.scrollY
-      // Lock body scroll
-      document.body.style.overflow = 'hidden'
-      // Scroll chat to bottom
-      requestAnimationFrame(() => {
-        if (containerRef.current) {
-          containerRef.current.scrollTop = containerRef.current.scrollHeight
-        }
-      })
-    } else {
-      // Restore scroll position when collapsing
-      document.body.style.overflow = ''
-      // Restore scroll position immediately to prevent jump
-      window.scrollTo({ top: scrollPositionRef.current, behavior: 'instant' })
-    }
-  }, [expanded])
+  // NOTE: We intentionally do NOT manipulate page scroll here.
+  // The expanded chat is rendered in a fullscreen portal overlay,
+  // so closing it just removes the overlay and leaves the page
+  // exactly where it was.
 
   function onComposerKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
     if (event.key === 'Enter' && !event.shiftKey) {
@@ -280,7 +271,7 @@ export default function SymptomChat({ analysisResult, symptoms, duration, notes 
     ? 'fixed inset-0 z-[9999] bg-white flex flex-col h-[100dvh]'
     : 'bg-white mt-6 overflow-hidden md:rounded-2xl md:border md:shadow-sm relative flex flex-col h-[calc(100vh-140px)] md:h-auto'
 
-  return (
+  const chatUI = (
     <section
       className={sectionClass}
       style={
@@ -507,4 +498,12 @@ export default function SymptomChat({ analysisResult, symptoms, duration, notes 
       </form>
     </section>
   )
+
+  // When expanded, render the chat as a true fullscreen overlay
+  // using a portal so it is independent of the page layout.
+  if (expanded && isClient && typeof document !== 'undefined') {
+    return createPortal(chatUI, document.body)
+  }
+
+  return chatUI
 }

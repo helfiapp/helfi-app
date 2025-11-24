@@ -1,6 +1,7 @@
 'use client'
 
 import { FormEvent, KeyboardEvent, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { ArrowsPointingOutIcon, ArrowsPointingInIcon } from '@heroicons/react/24/outline'
 
 type ChatMessage = { role: 'user' | 'assistant'; content: string }
@@ -72,6 +73,7 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
   const containerRef = useRef<HTMLDivElement | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
   const resizeRafRef = useRef<number | null>(null)
+  const [isClient, setIsClient] = useState(false)
 
   // Smooth, single-frame resize to keep composer steady during rapid updates (typing/voice)
   const resizeTextarea = useCallback(() => {
@@ -117,26 +119,10 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
     resizeTextarea()
   }, [input, resizeTextarea])
 
-  // Handle expand/collapse with scroll position preservation
+  // Track client-side mount so we can safely use portals
   useEffect(() => {
-    if (expanded) {
-      // Store current scroll position before expanding
-      scrollPositionRef.current = window.scrollY
-      // Lock body scroll
-      document.body.style.overflow = 'hidden'
-      // Scroll chat to bottom
-      requestAnimationFrame(() => {
-        if (containerRef.current) {
-          containerRef.current.scrollTop = containerRef.current.scrollHeight
-        }
-      })
-    } else {
-      // Restore scroll position when collapsing
-      document.body.style.overflow = ''
-      // Restore scroll position immediately to prevent jump
-      window.scrollTo({ top: scrollPositionRef.current, behavior: 'instant' })
-    }
-  }, [expanded])
+    setIsClient(true)
+  }, [])
 
   function onComposerKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
     if (event.key === 'Enter' && !event.shiftKey) {
@@ -229,7 +215,7 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
     ? 'fixed inset-0 z-[9999] bg-white flex flex-col h-[100dvh]'
     : 'bg-white overflow-hidden md:rounded-2xl md:border md:shadow-sm relative flex flex-col h-[calc(100vh-140px)] md:h-auto'
 
-  return (
+  const chatUI = (
     <section
       className={sectionClass}
       style={
@@ -481,4 +467,10 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
       </form>
     </section>
   )
+
+  if (expanded && isClient && typeof document !== 'undefined') {
+    return createPortal(chatUI, document.body)
+  }
+
+  return chatUI
 }

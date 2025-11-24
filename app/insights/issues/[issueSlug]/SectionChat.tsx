@@ -1,6 +1,7 @@
 'use client'
 
 import { FormEvent, KeyboardEvent, useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { ArrowsPointingOutIcon, ArrowsPointingInIcon } from '@heroicons/react/24/outline'
 
 interface SectionChatProps {
@@ -32,6 +33,7 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
   const enabled = (process.env.NEXT_PUBLIC_INSIGHTS_CHAT || 'true').toLowerCase() === 'true' || (process.env.NEXT_PUBLIC_INSIGHTS_CHAT || '') === '1'
   const recognitionRef = useRef<any>(null)
   const resizeRafRef = useRef<number | null>(null)
+  const [isClient, setIsClient] = useState(false)
 
   // Smooth single-frame resize to prevent jitter when text grows/shrinks quickly
   const resizeTextarea = useCallback(() => {
@@ -113,6 +115,11 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
       if (recognitionRef.current) recognitionRef.current.stop()
     }
   }, [enabled])
+
+  // Track client-side mount so we can safely use portals
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
 
   function startListening() {
     if (!recognitionRef.current || isListening) return
@@ -274,26 +281,10 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
     }
   }, [messages, loading, hasUserInteracted])
 
-  // Handle expand/collapse with scroll position preservation
-  useEffect(() => {
-    if (expanded) {
-      // Store current scroll position before expanding
-      scrollPositionRef.current = window.scrollY
-      // Lock body scroll
-      document.body.style.overflow = 'hidden'
-      // Scroll chat to bottom
-      requestAnimationFrame(() => {
-        if (containerRef.current) {
-          containerRef.current.scrollTop = containerRef.current.scrollHeight
-        }
-      })
-    } else {
-      // Restore scroll position when collapsing
-      document.body.style.overflow = ''
-      // Restore scroll position immediately to prevent jump
-      window.scrollTo({ top: scrollPositionRef.current, behavior: 'instant' })
-    }
-  }, [expanded])
+  // NOTE: We intentionally do NOT manipulate page scroll when expanding.
+  // The expanded chat is rendered in a fullscreen portal overlay,
+  // so closing it simply removes the overlay and leaves page scroll
+  // exactly where it was.
 
   useEffect(() => {
     return () => {
@@ -435,7 +426,7 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
     ? 'fixed inset-0 z-[9999] bg-white flex flex-col h-[100dvh]'
     : 'flex flex-col h-[calc(100vh-140px)] md:h-full bg-white md:rounded-2xl md:border md:shadow-sm relative'
 
-  return (
+  const chatUI = (
     <div
       className={sectionClass}
       style={
@@ -764,4 +755,10 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
       </div>
     </div>
   )
+
+  if (expanded && isClient && typeof document !== 'undefined') {
+    return createPortal(chatUI, document.body)
+  }
+
+  return chatUI
 }
