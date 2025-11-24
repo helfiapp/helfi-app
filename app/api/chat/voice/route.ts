@@ -4,8 +4,9 @@ import { authOptions } from '@/lib/auth'
 import OpenAI from 'openai'
 import { prisma } from '@/lib/prisma'
 import { CreditManager } from '@/lib/credit-system'
-import { costCentsEstimateFromText } from '@/lib/cost-meter'
+import { costCentsEstimateFromText, estimateTokensFromText } from '@/lib/cost-meter'
 import { chatCompletionWithCost } from '@/lib/metered-openai'
+import { logAIUsage } from '@/lib/ai-usage-logger'
 import { ensureTalkToAITables, listMessages, appendMessage, createThread, updateThreadTitle, listThreads } from '@/lib/talk-to-ai-chat-store'
 
 function getOpenAIClient(): OpenAI | null {
@@ -398,6 +399,16 @@ export async function POST(req: NextRequest) {
               const actualCents = costCentsEstimateFromText(model, `${systemPrompt}\n${question}`, full.length * 4)
               const actualUserCostCents = actualCents * 2
               await cm.chargeCents(actualUserCostCents)
+              // Log estimated usage for visibility
+              const promptTokens = estimateTokensFromText(`${systemPrompt}\n${question}`)
+              const completionTokens = Math.ceil(full.length / 4)
+              await logAIUsage({
+                context: { feature: 'voice:chat', userId: user.id },
+                model,
+                promptTokens,
+                completionTokens,
+                costCents: actualUserCostCents,
+              })
             } catch (err) {
               console.error('[voice-chat] Failed to charge wallet:', err)
             }
@@ -449,4 +460,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 })
   }
 }
-

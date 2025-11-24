@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { runChatCompletionWithLogging } from '../ai-usage-logger'
 
 const CACHE_TTL_MS = 1000 * 60 * 30
 
@@ -21,6 +22,12 @@ function getOpenAIClient() {
   const OpenAI = require('openai').default
   _openai = new OpenAI({ apiKey })
   return _openai
+}
+
+async function createCompletion(params: any, context: { feature: string; userId?: string | null; issueSlug?: string | null } = { feature: 'insights:unknown' }) {
+  const openai = getOpenAIClient()
+  if (!openai) return null
+  return runChatCompletionWithLogging(openai, params, context)
 }
 
 const DEFAULT_INSIGHTS_MODEL = process.env.OPENAI_INSIGHTS_MODEL ?? 'gpt-4o-mini'
@@ -138,14 +145,14 @@ export async function generateSectionCandidates(params: {
     ? `\n\nCRITICAL FOR EXERCISE MODE: The user has selected these exercise types in their health intake: ${JSON.stringify(params.profile.exerciseTypes)}. Evaluate each exercise against "${params.issueName}" - if supportive, consider including them in suggested (they will be promoted to working if they match intake selections).`
     : ''
   
-  const user = `Write SECTION: ${params.mode} for issue "${params.issueName}".
+    const user = `Write SECTION: ${params.mode} for issue "${params.issueName}".
 Generate only two arrays: suggested and avoid. Each item must include: name, candidateType guess ∈ {food,supplement,exercise,medication,other}, reason (two sentences: mechanism + direct relevance), and optional protocol.
 Counts: suggested≥${suggested}, avoid≥${avoid}.
 Profile: ${JSON.stringify(params.profile ?? {}, null, 2)}${exerciseGuidance}
 Return strict JSON {"suggested": [...], "avoid": [...]}`
   try {
     console.time(`[insights.genCandidates:${params.mode}]`)
-    const response = await openai.chat.completions.create({
+    const response: any = await createCompletion({
       model: DEFAULT_INSIGHTS_MODEL,
       temperature: 0.2,
       max_tokens: 700,
@@ -154,7 +161,7 @@ Return strict JSON {"suggested": [...], "avoid": [...]}`
         { role: 'system', content: 'You propose domain-appropriate items with concise clinical reasons. Output JSON only.' },
         { role: 'user', content: user },
       ],
-    })
+    }, { feature: `insights:generate-section-candidates:${params.mode}` })
     console.timeEnd(`[insights.genCandidates:${params.mode}]`)
     const content = response.choices?.[0]?.message?.content
     if (!content) return null
@@ -223,7 +230,6 @@ function scoreCandidate(data: SectionLLMResult) {
 }
 
 interface RepairArgs {
-  openai: any
   mode: SectionMode
   issueName: string
   issueSummary?: string | null
@@ -237,7 +243,6 @@ interface RepairArgs {
 }
 
 async function repairLLMOutput({
-  openai,
   mode,
   issueName,
   issueSummary,
@@ -274,7 +279,7 @@ Requirements:
 - If data is sparse, rely on best-practice clinician guidance for ${issueName}; do not fabricate patient-specific logs.
 `
 
-    const response = await openai.chat.completions.create({
+    const response: any = await createCompletion({
       model: DEFAULT_INSIGHTS_MODEL,
       temperature: 0.05,
       max_tokens: 600,
@@ -290,7 +295,7 @@ Requirements:
           content: repairPrompt,
         },
       ],
-    })
+    }, { feature: `insights:repair:${mode}` })
     const content = response.choices?.[0]?.message?.content
     if (!content) return null
 
@@ -473,13 +478,12 @@ function uniqueByName<T extends { name: string }>(items: T[]): T[] {
 }
 
 async function classifyCandidatesForSection(params: {
-  openai: any
   issueName: string
   mode: SectionMode
   items: ClassificationEntry[]
   trace: string
 }): Promise<ClassifiedItem[] | null> {
-  const { openai, issueName, mode, items, trace } = params
+  const { issueName, mode, items, trace } = params
   if (!items.length) return []
   try {
     const system = 'You are a precise classifier. For each item, assign a canonicalType and whether it is in-domain for the requested section. Output strict JSON.'
@@ -490,7 +494,7 @@ Return JSON with an array under key "items"; each element: {"name": string, "can
 Items:\n${JSON.stringify(items, null, 2)}`
 
     console.time(`${trace}:classify`)
-    const response = await openai.chat.completions.create({
+    const response: any = await createCompletion({
       model: DEFAULT_INSIGHTS_MODEL,
       temperature: 0,
       max_tokens: 500,
@@ -499,7 +503,7 @@ Items:\n${JSON.stringify(items, null, 2)}`
         { role: 'system', content: system },
         { role: 'user', content: user },
       ],
-    })
+    }, { feature: `insights:classify:${mode}` })
     console.timeEnd(`${trace}:classify`)
 
     const content = response.choices?.[0]?.message?.content
@@ -546,7 +550,7 @@ async function rewriteCandidatesToDomain(params: {
     tries += 1
     try {
       console.time(`${trace}:rewrite-${bucket}#${tries}`)
-      const response = await openai.chat.completions.create({
+      const response: any = await runChatCompletionWithLogging(openai, {
         model: DEFAULT_INSIGHTS_MODEL,
         temperature: 0.2,
         max_tokens: 600,
@@ -561,7 +565,7 @@ async function rewriteCandidatesToDomain(params: {
 Items to rewrite:\n${JSON.stringify(items, null, 2)}`,
           },
         ],
-      })
+      }, { feature: `insights:rewrite:${mode}` })
       console.timeEnd(`${trace}:rewrite-${bucket}#${tries}`)
       const content = response.choices?.[0]?.message?.content
       if (!content) continue
@@ -620,7 +624,7 @@ ${diversityHint}`
 
   try {
     console.time(`${trace}:fill-${bucket}`)
-    const response = await openai.chat.completions.create({
+    const response: any = await runChatCompletionWithLogging(openai, {
       model: DEFAULT_INSIGHTS_MODEL,
       temperature: 0.2,
       max_tokens: 500,
@@ -629,7 +633,7 @@ ${diversityHint}`
         { role: 'system', content: 'You generate concise, clinically-relevant items. Output strict JSON only.' },
         { role: 'user', content: prompt },
       ],
-    })
+    }, { feature: `insights:fill-missing:${mode}` })
     console.timeEnd(`${trace}:fill-${bucket}`)
     const content = response.choices?.[0]?.message?.content
     if (!content) return null
@@ -693,18 +697,18 @@ CRITICAL INSTRUCTIONS:
 6. Return ONLY items that are plausibly supportive for this issue
 
 Return JSON:
-{
-  "supportive": Array<{
-    "index": number (0-based index into the provided items),
-    "name"?: string (optional, should be EXACT logged name),
-    "reason": string (two sentences: mechanism + direct relevance),
-    "dosage": string | null,
-    "timing": string | null
-  }>
-}`
+  {
+    "supportive": Array<{
+      "index": number (0-based index into the provided items),
+      "name"?: string (optional, should be EXACT logged name),
+      "reason": string (two sentences: mechanism + direct relevance),
+      "dosage": string | null,
+      "timing": string | null
+    }>
+  }`
 
   try {
-    const response = await openai.chat.completions.create({
+    const response: any = await runChatCompletionWithLogging(openai, {
       model: DEFAULT_INSIGHTS_MODEL,
       temperature: 0.1,
       max_tokens: 600,
@@ -716,7 +720,7 @@ Return JSON:
         },
         { role: 'user', content: prompt },
       ],
-    })
+    }, { feature: `insights:evaluate-focus:${mode}` })
 
     const content = response.choices?.[0]?.message?.content
     if (!content) return null
@@ -787,7 +791,7 @@ Generate minimally valid guidance with ONLY in-domain items. Output JSON with ke
 Counts: suggested≥${minSuggested}, avoid≥${minAvoid}.`
     const g0 = Date.now()
     console.time(`${trace}:generate`)
-    const resp = await openai.chat.completions.create({
+    const resp: any = await runChatCompletionWithLogging(openai, {
       model: DEFAULT_INSIGHTS_MODEL,
       temperature: 0.2,
       max_tokens: 700,
@@ -796,7 +800,7 @@ Counts: suggested≥${minSuggested}, avoid≥${minAvoid}.`
         { role: 'system', content: 'Produce domain-correct, concise items. Output JSON only.' },
         { role: 'user', content: user },
       ],
-    })
+    }, { feature: `insights:degraded:${input.mode}` })
     console.timeEnd(`${trace}:generate`)
     generateMs += Date.now() - g0
     const content = resp.choices?.[0]?.message?.content
@@ -1101,7 +1105,7 @@ export async function generateSectionInsightsFromLLM(
     try {
       const g0 = Date.now()
       console.time(`[insights.gen:${input.mode}]`)
-      const response = await openai.chat.completions.create({
+      const response: any = await runChatCompletionWithLogging(openai, {
         model: DEFAULT_INSIGHTS_MODEL,
         temperature: 0.05,
         max_tokens: 650,
@@ -1114,7 +1118,7 @@ export async function generateSectionInsightsFromLLM(
           },
           { role: 'user', content: prompt },
         ],
-      })
+      }, { feature: `insights:generate:${input.mode}` })
       console.timeEnd(`[insights.gen:${input.mode}]`)
       const elapsed = Date.now() - g0
       generateMs += elapsed

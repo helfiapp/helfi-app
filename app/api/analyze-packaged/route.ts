@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import OpenAI from 'openai'
+import { runChatCompletionWithLogging } from '@/lib/ai-usage-logger'
 
 const getOpenAIClient = () => {
   if (!process.env.OPENAI_API_KEY) return null
@@ -54,12 +55,12 @@ export async function POST(req: NextRequest) {
         },
   ]
 
-  const result = await openai.chat.completions.create({
+  const result: any = await runChatCompletionWithLogging(openai, {
     model: 'gpt-4o-mini',
     messages,
     max_tokens: 400,
     temperature: 0,
-  })
+  }, { feature: 'food:analyze-packaged', userId: (session.user as any)?.id ?? null })
   const content = result.choices?.[0]?.message?.content || ''
   const m = content.match(/<NUTR_JSON>([\s\S]*?)<\/NUTR_JSON>/i)
   let parsed: any = null
@@ -71,5 +72,4 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ success: true, raw: content.trim(), parsed })
 }
-
 

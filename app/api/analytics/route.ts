@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import { runChatCompletionWithLogging } from '@/lib/ai-usage-logger'
 
 // Initialize OpenAI only when needed to avoid build-time errors
 function getOpenAI() {
@@ -150,12 +151,12 @@ Keep response concise but actionable for app developers.
       return "OpenAI API key not configured. Cannot generate AI insights."
     }
     
-    const response = await openai.chat.completions.create({
+    const response: any = await runChatCompletionWithLogging(openai, {
       model: "gpt-4o-mini",
       messages: [{ role: "user", content: prompt }],
       max_tokens: 800,
       temperature: 0.3
-    })
+    }, { feature: 'admin:analytics-insights' })
     
     return response.choices[0]?.message?.content || "Unable to generate insights"
     

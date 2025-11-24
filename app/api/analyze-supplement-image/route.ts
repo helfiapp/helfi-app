@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import { runChatCompletionWithLogging } from '@/lib/ai-usage-logger';
 
 function getOpenAIClient() {
   if (!process.env.OPENAI_API_KEY) {
@@ -32,7 +33,7 @@ export async function POST(req: NextRequest) {
     if (!openai) {
       return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 });
     }
-    const response = await openai.chat.completions.create({
+    const response: any = await runChatCompletionWithLogging(openai, {
       model: "gpt-4o",
       messages: [
         {
@@ -72,7 +73,7 @@ Return only the product name, no explanations or additional text.`
       ],
       max_tokens: 50,
       temperature: 0.1
-    });
+    }, { feature: 'supplements:image-name' });
 
     const supplementName = response.choices[0]?.message?.content?.trim() || 'Unknown Supplement';
     

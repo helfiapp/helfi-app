@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { runChatCompletionWithLogging } from '@/lib/ai-usage-logger'
 
 // Lazy OpenAI import to avoid build-time env requirements
 let _openai: any = null
@@ -222,12 +223,12 @@ Nutrition guidance rules:
 Keep each insight skimmable but substantive. Do not return prose outside of the JSON array.
 
 Profile: ${profileText}`
-        const resp = await openai.chat.completions.create({
+        const resp: any = await runChatCompletionWithLogging(openai, {
           model: 'gpt-4o-mini',
           messages: [{ role: 'user', content: prompt }],
           temperature: 0.2,
           max_tokens: 1000,
-        })
+        }, { feature: 'insights:landing-generate', userId: profile.id })
         const text = resp.choices?.[0]?.message?.content || ''
         // Try to extract JSON array
         const jsonMatch = text.match(/\[([\s\S]*?)\]/)
@@ -252,5 +253,4 @@ Profile: ${profileText}`
 
   return NextResponse.json({ enabled: true, items: fallback(), preview: true }, { status: 200 })
 }
-
 

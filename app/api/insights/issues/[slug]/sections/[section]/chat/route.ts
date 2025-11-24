@@ -15,7 +15,8 @@ import {
 import type { IssueSectionKey } from '@/lib/insights/issue-engine'
 import { prisma } from '@/lib/prisma'
 import { CreditManager } from '@/lib/credit-system'
-import { costCentsEstimateFromText } from '@/lib/cost-meter'
+import { costCentsEstimateFromText, estimateTokensFromText } from '@/lib/cost-meter'
+import { logAIUsage } from '@/lib/ai-usage-logger'
 import { chatCompletionWithCost } from '@/lib/metered-openai'
 
 const rateMap = new Map<string, number>()
@@ -194,6 +195,15 @@ export async function POST(
               full.length
             )
             await cm.chargeCents(cents)
+            const promptTokens = estimateTokensFromText(promptText)
+            const completionTokens = Math.ceil(full.length / 4)
+            await logAIUsage({
+              context: { feature: `insights:section-chat:${sec}`, userId: session.user.id, issueSlug: slug },
+              model: process.env.OPENAI_INSIGHTS_MODEL || 'gpt-4o-mini',
+              promptTokens,
+              completionTokens,
+              costCents: cents,
+            })
           } catch {}
             controller.enqueue(enc.encode('event: end\n\n'))
             controller.close()
@@ -232,5 +242,3 @@ export async function POST(
     return NextResponse.json({ error: 'server_error' }, { status: 500 })
   }
 }
-
-

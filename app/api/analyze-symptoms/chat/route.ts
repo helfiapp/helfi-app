@@ -4,7 +4,8 @@ import { authOptions } from '@/lib/auth'
 import OpenAI from 'openai'
 import { prisma } from '@/lib/prisma'
 import { CreditManager } from '@/lib/credit-system'
-import { costCentsEstimateFromText } from '@/lib/cost-meter'
+import { costCentsEstimateFromText, estimateTokensFromText } from '@/lib/cost-meter'
+import { logAIUsage } from '@/lib/ai-usage-logger'
 import { chatCompletionWithCost } from '@/lib/metered-openai'
 
 function getOpenAIClient(): OpenAI | null {
@@ -131,6 +132,16 @@ export async function POST(req: NextRequest) {
                 full.length
               )
               await cm.chargeCents(actualCents)
+              // Log estimated usage for cost visibility
+              const promptTokens = estimateTokensFromText(`${systemPrompt}\n${question}`)
+              const completionTokens = Math.ceil(full.length / 4)
+              await logAIUsage({
+                context: { feature: 'symptoms:chat', userId: user.id },
+                model,
+                promptTokens,
+                completionTokens,
+                costCents: actualCents,
+              })
             } catch {
               // Do not interrupt the finished stream; just swallow errors
             }
@@ -175,5 +186,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'server_error' }, { status: 500 })
   }
 }
-
-

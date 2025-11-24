@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { runChatCompletionWithLogging } from '@/lib/ai-usage-logger'
 
 // Lazy OpenAI import to avoid build-time env requirements
 let _openai: any = null
@@ -96,17 +97,16 @@ export async function POST(request: NextRequest) {
       ? clientMessages.map((m: any) => ({ role: String(m.role || 'user'), content: String(m.content || '') })).slice(-12)
       : (question ? [{ role: 'user', content: String(question) }] : [])
 
-    const resp = await openai.chat.completions.create({
+    const resp: any = await runChatCompletionWithLogging(openai, {
       model: 'gpt-4o-mini',
       messages: [baseSystem, ...history],
       temperature: 0.2,
       max_tokens: 400,
-    })
+    }, { feature: 'insights:ask', userId })
     const text = resp.choices?.[0]?.message?.content || ''
     return NextResponse.json({ messages: [...history, { role: 'assistant', content: text }], preview: false }, { status: 200 })
   } catch (e) {
     return NextResponse.json({ error: 'server_error' }, { status: 500 })
   }
 }
-
 
