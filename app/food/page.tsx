@@ -1298,11 +1298,9 @@ const applyStructuredItems = (
     } else if (field === 'serving_size') {
       itemsCopy[index].serving_size = String(value || '').trim()
     } else if (field === 'servings') {
-      // Keep servings as a smooth fractional value under the hood:
-      // - Units controls (oz / ml / pieces) handle the "nice" whole-number steps
-      // - Servings simply tracks the precise underlying quantity
+      // Keep servings stable to 2 decimals to avoid 1.24 vs 1.25 drift when stepping.
       const clamped = clampNumber(value, 0, 20)
-      const rounded = Math.round(clamped * 1000) / 1000
+      const rounded = Math.round(clamped * 100) / 100
       itemsCopy[index].servings = rounded
     } else if (field === 'calories') {
       // Calories as integer, reasonable upper bound per serving
@@ -4060,10 +4058,7 @@ Please add nutritional information manually if needed.`);
                                           servingUnitMeta && isDiscreteUnitLabel(servingUnitMeta.unitLabel) && servingUnitMeta.quantity > 0
                                             ? 1 / servingUnitMeta.quantity
                                             : 0.25
-                                        const next = Math.max(
-                                          0,
-                                          Math.round((current - step) * (servingUnitMeta?.quantity || 1)) / (servingUnitMeta?.quantity || 1)
-                                        )
+                                        const next = Math.max(0, Math.round((current - step) * 100) / 100)
                                         updateItemField(index, 'servings', next)
                                       }}
                                       className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-medium transition-colors"
@@ -4089,9 +4084,7 @@ Please add nutritional information manually if needed.`);
                                           servingUnitMeta && isDiscreteUnitLabel(servingUnitMeta.unitLabel)
                                             ? 1 / servingUnitMeta.quantity
                                             : 0.25
-                                        const next =
-                                          Math.round((current + step) * (servingUnitMeta?.quantity || 1)) /
-                                          (servingUnitMeta?.quantity || 1)
+                                        const next = Math.round((current + step) * 100) / 100
                                         updateItemField(index, 'servings', next)
                                       }}
                                       className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-medium transition-colors"
