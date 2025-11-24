@@ -22,6 +22,7 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
   const [threadId, setThreadId] = useState<string | null>(null)
   const [showThreadMenu, setShowThreadMenu] = useState(false)
   const [hasSpeechRecognition, setHasSpeechRecognition] = useState(false)
+  const [expanded, setExpanded] = useState(false)
   const endRef = useRef<HTMLDivElement | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
