@@ -65,7 +65,9 @@ type NutritionTotals = {
 const formatServingsDisplay = (value: number | null | undefined) => {
   const numeric = Number(value)
   if (!Number.isFinite(numeric) || numeric <= 0) return '1'
-  const rounded = Math.round(numeric * 100) / 100
+  // Normalize to 2dp but guard against floating drift (e.g. 1.249999 → 1.25)
+  const normalized = Math.round(numeric * 1000) / 1000 // 3dp safety
+  const rounded = Math.round(normalized * 100) / 100
   if (Number.isInteger(rounded)) return String(rounded)
   return rounded.toFixed(2).replace(/\.0+$/, '').replace(/(\.[1-9])0$/, '$1')
 }
