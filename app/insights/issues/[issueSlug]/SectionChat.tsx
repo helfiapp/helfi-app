@@ -24,6 +24,7 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
   const [hasSpeechRecognition, setHasSpeechRecognition] = useState(false)
   const [expanded, setExpanded] = useState(false)
   const [showExpandControl, setShowExpandControl] = useState(false)
+  const scrollPositionRef = useRef<number>(0)
   const endRef = useRef<HTMLDivElement | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
@@ -271,23 +272,25 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
     }
   }, [messages, loading, hasUserInteracted])
 
-  // Lock body scroll when expanded
+  // Handle expand/collapse with scroll position preservation
   useEffect(() => {
     if (expanded) {
-      const prev = document.body.style.overflow
+      // Store current scroll position before expanding
+      scrollPositionRef.current = window.scrollY
+      // Lock body scroll
       document.body.style.overflow = 'hidden'
-      return () => {
-        document.body.style.overflow = prev
-      }
+      // Scroll chat to bottom
+      requestAnimationFrame(() => {
+        containerRef.current?.scrollTo({ top: containerRef.current.scrollHeight, behavior: 'auto' })
+      })
+    } else {
+      // Restore scroll position when collapsing
+      document.body.style.overflow = ''
+      // Restore scroll position after a brief delay to ensure layout is stable
+      requestAnimationFrame(() => {
+        window.scrollTo({ top: scrollPositionRef.current, behavior: 'auto' })
+      })
     }
-  }, [expanded])
-
-  // Scroll to bottom when expanding
-  useEffect(() => {
-    if (!expanded) return
-    requestAnimationFrame(() => {
-      containerRef.current?.scrollTo({ top: containerRef.current.scrollHeight, behavior: 'auto' })
-    })
   }, [expanded])
 
   useEffect(() => {
@@ -427,7 +430,7 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
 
   if (!enabled) return null
   const sectionClass = expanded
-    ? 'fixed inset-0 z-50 bg-white flex flex-col overflow-hidden'
+    ? 'fixed inset-0 z-50 bg-white flex flex-col'
     : 'flex flex-col h-[calc(100vh-140px)] md:h-full bg-white md:rounded-2xl md:border md:shadow-sm relative'
 
   return (
@@ -512,7 +515,7 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
       </div>
       <div
         ref={containerRef}
-        className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-4 py-6 space-y-6 min-w-0 w-full max-w-3xl mx-auto min-h-[220px]"
+        className={`overflow-y-auto overflow-x-hidden px-4 py-6 space-y-6 min-w-0 w-full max-w-3xl mx-auto ${expanded ? 'flex-1 min-h-0' : 'min-h-[220px]'}`}
         aria-live="polite"
         style={{
           maxWidth: '100%',
@@ -725,6 +728,28 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
                 rows={1}
                 className="w-full rounded-2xl border-0 bg-gray-100 px-4 py-3 pr-14 text-[16px] leading-6 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-0 resize-none transition-all duration-200 min-h-[52px] max-h-[200px]"
               />
+              {(showExpandControl || expanded) && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    setExpanded((v) => !v)
+                  }}
+                  className="absolute right-12 top-2 w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors"
+                  aria-label={expanded ? 'Exit expanded chat view' : 'Expand chat area'}
+                >
+                  {expanded ? (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 9l6 6m0-6l-6 6" />
+                    </svg>
+                ) : (
+                  <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M2 2l2 2-2 2V2zm10-2v4l-2-2 2-2zm0 10l-2-2 2-2v4zm-10 0v-4l2 2-2 2z" />
+                  </svg>
+                )}
+                </button>
+              )}
               <button
                 type="submit"
                 disabled={loading || !input.trim() || isListening}
@@ -736,24 +761,6 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
                 </svg>
               </button>
             </div>
-            {(showExpandControl || expanded) && (
-              <button
-                type="button"
-                onClick={() => setExpanded((v) => !v)}
-                className="flex-shrink-0 w-10 h-10 rounded-full bg-gray-100 text-gray-700 flex items-center justify-center hover:bg-gray-200 transition-colors"
-                aria-label={expanded ? 'Exit expanded chat view' : 'Expand chat area'}
-              >
-                {expanded ? (
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 14h4v4M4 10h4V6M20 14h-4v4M20 10h-4V6" />
-                  </svg>
-                ) : (
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 14h4v4H4zM4 6h4v4H4zM16 14h4v4h-4zM16 6h4v4h-4z" />
-                  </svg>
-                )}
-              </button>
-            )}
           </div>
         </form>
       </div>
