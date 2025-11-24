@@ -196,8 +196,12 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
     }
   }
 
+  const sectionClass = expanded
+    ? 'fixed inset-0 z-50 bg-white flex flex-col overflow-hidden'
+    : 'bg-white overflow-hidden md:rounded-2xl md:border md:shadow-sm relative flex flex-col h-[calc(100vh-140px)] md:h-auto'
+
   return (
-    <section className="bg-white overflow-hidden md:rounded-2xl md:border md:shadow-sm relative flex flex-col h-[calc(100vh-140px)] md:h-auto">
+    <section className={sectionClass} style={expanded ? { paddingTop: 'calc(env(safe-area-inset-top, 16px))' } : undefined}>
       <header className="flex items-center justify-between px-4 py-3 border-b border-gray-200 w-full max-w-3xl mx-auto">
         <div>
           <h3 className="text-sm font-semibold text-gray-900">Chat about your medical image</h3>

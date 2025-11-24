@@ -402,8 +402,12 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
   }
 
   if (!enabled) return null
+  const sectionClass = expanded
+    ? 'fixed inset-0 z-50 bg-white flex flex-col overflow-hidden'
+    : 'flex flex-col h-[calc(100vh-140px)] md:h-full bg-white md:rounded-2xl md:border md:shadow-sm relative'
+
   return (
-    <div className="flex flex-col h-[calc(100vh-140px)] md:h-full bg-white md:rounded-2xl md:border md:shadow-sm relative">
+    <div className={sectionClass} style={expanded ? { paddingTop: 'calc(env(safe-area-inset-top, 16px))' } : undefined}>
       {/* Thread Selector Header */}
       <div className="border-b border-gray-200 bg-white px-4 py-2 flex items-center justify-between relative">
         <div className="flex items-center gap-2 flex-1 min-w-0">

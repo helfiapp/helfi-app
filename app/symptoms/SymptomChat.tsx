@@ -247,8 +247,12 @@ export default function SymptomChat({ analysisResult, symptoms, duration, notes 
     }
   }
 
+  const sectionClass = expanded
+    ? 'fixed inset-0 z-50 bg-white flex flex-col overflow-hidden'
+    : 'bg-white mt-6 overflow-hidden md:rounded-2xl md:border md:shadow-sm relative flex flex-col h-[calc(100vh-140px)] md:h-auto'
+
   return (
-    <section className="bg-white mt-6 overflow-hidden md:rounded-2xl md:border md:shadow-sm relative flex flex-col h-[calc(100vh-140px)] md:h-auto">
+    <section className={sectionClass} style={expanded ? { paddingTop: 'calc(env(safe-area-inset-top, 16px))' } : undefined}>
       <header className="flex items-center justify-between px-4 py-3 border-b border-gray-200 w-full max-w-3xl mx-auto">
         <div>
           <h3 className="text-sm font-semibold text-gray-900">Chat about your symptom analysis</h3>
@@ -428,8 +432,8 @@ export default function SymptomChat({ analysisResult, symptoms, duration, notes 
               onKeyDown={onComposerKeyDown}
               placeholder={recognitionRef.current ? "Type or use voice input..." : "Message AI about your symptom analysis"}
               rows={1}
-              className="w-full rounded-2xl border-0 bg-gray-100 px-4 py-3 pr-14 text-[16px] leading-6 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-0 resize-none transition-all duration-200 min-h-[52px] max-h-[200px]"
-            />
+            className="w-full rounded-2xl border-0 bg-gray-100 px-4 py-3 pr-14 text-[16px] leading-6 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-0 resize-none transition-all duration-200 min-h-[52px] max-h-[200px]"
+          />
             <button
               type="submit"
               disabled={loading || !input.trim() || isListening}
