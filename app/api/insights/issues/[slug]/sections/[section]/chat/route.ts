@@ -198,7 +198,7 @@ export async function POST(
             const promptTokens = estimateTokensFromText(promptText)
             const completionTokens = Math.ceil(full.length / 4)
             await logAIUsage({
-              context: { feature: `insights:section-chat:${sec}`, userId: session.user.id, issueSlug: slug },
+              context: { feature: `insights:section-chat:${section}`, userId: session.user.id, issueSlug: slug },
               model: process.env.OPENAI_INSIGHTS_MODEL || 'gpt-4o-mini',
               promptTokens,
               completionTokens,
