@@ -196,7 +196,7 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
   }
 
   return (
-    <section className="bg-white overflow-hidden md:rounded-2xl md:border md:shadow-sm relative">
+    <section className="bg-white overflow-hidden md:rounded-2xl md:border md:shadow-sm relative flex flex-col h-[calc(100vh-140px)] md:h-auto">
       <header className="flex items-center justify-between px-4 py-3 border-b border-gray-200 w-full max-w-3xl mx-auto">
         <div>
           <h3 className="text-sm font-semibold text-gray-900">Chat about your medical image</h3>
@@ -217,7 +217,7 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
 
       <div
         ref={containerRef}
-        className="px-4 py-6 overflow-y-auto overflow-x-hidden space-y-6 min-w-0 w-full max-w-3xl mx-auto min-h-[220px]"
+        className="px-4 py-6 overflow-y-auto overflow-x-hidden space-y-6 min-w-0 w-full max-w-3xl mx-auto min-h-[220px] flex-1"
         aria-live="polite"
         style={{
           maxWidth: '100%',
@@ -385,7 +385,7 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
       </div>
 
       <form
-        className="sticky bottom-0 left-0 right-0 border-t border-gray-200 px-4 py-3 bg-white z-40 shadow-[0_-6px_18px_rgba(0,0,0,0.08)]"
+        className="sticky bottom-0 left-0 right-0 border-t border-gray-200 px-4 py-3 bg-white z-40 shadow-[0_-6px_18px_rgba(0,0,0,0.08)] flex-shrink-0"
         onSubmit={handleSubmit}
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}
       >

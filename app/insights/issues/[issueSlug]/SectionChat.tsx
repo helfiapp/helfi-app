@@ -402,7 +402,7 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
 
   if (!enabled) return null
   return (
-    <div className="flex flex-col h-full bg-white md:rounded-2xl md:border md:shadow-sm relative">
+    <div className="flex flex-col h-[calc(100vh-140px)] md:h-full bg-white md:rounded-2xl md:border md:shadow-sm relative">
       {/* Thread Selector Header */}
       <div className="border-b border-gray-200 bg-white px-4 py-2 flex items-center justify-between relative">
         <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -633,7 +633,7 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
           <div className="px-4 py-2 text-sm text-red-600 bg-red-50">{error}</div>
         )}
         <form
-          className="px-4 py-3 sticky bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40 shadow-[0_-6px_18px_rgba(0,0,0,0.08)]"
+          className="px-4 py-3 sticky bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40 shadow-[0_-6px_18px_rgba(0,0,0,0.08)] flex-shrink-0"
           onSubmit={handleSubmit}
           style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}
         >
