@@ -48,9 +48,10 @@ export default function SymptomChat({ analysisResult, symptoms, duration, notes 
       }
       textarea.style.overflowY = textarea.scrollHeight > maxHeight ? 'auto' : 'hidden'
 
-      const lineBreaks = (textarea.value.match(/\n/g) || []).length
-      const approxLines = Math.max(1 + lineBreaks, textarea.scrollHeight / minHeight)
-      setShowExpandControl(approxLines >= 2.5)
+      // Show expand control when textarea height exceeds ~3-4 lines (around 156px for 3 lines)
+      // Using scrollHeight which reflects actual content height
+      const shouldShow = textarea.scrollHeight > 140 || (textarea.value.match(/\n/g) || []).length >= 2
+      setShowExpandControl(shouldShow)
     })
   }, [])
 
@@ -479,7 +480,7 @@ export default function SymptomChat({ analysisResult, symptoms, duration, notes 
                   e.stopPropagation()
                   setExpanded((v) => !v)
                 }}
-                className="absolute right-12 top-2 w-6 h-6 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors"
+                className="absolute right-14 top-2.5 w-5 h-5 flex items-center justify-center text-gray-500 hover:text-gray-700 transition-colors z-10"
                 aria-label={expanded ? 'Exit expanded chat view' : 'Expand chat area'}
               >
                 {expanded ? (
@@ -487,7 +488,7 @@ export default function SymptomChat({ analysisResult, symptoms, duration, notes 
                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 9l6 6m0-6l-6 6" />
                   </svg>
                 ) : (
-                  <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 16 16">
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 16 16">
                     <path d="M2 2l2 2-2 2V2zm10-2v4l-2-2 2-2zm0 10l-2-2 2-2v4zm-10 0v-4l2 2-2 2z" />
                   </svg>
                 )}
