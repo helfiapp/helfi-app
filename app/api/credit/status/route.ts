@@ -18,6 +18,7 @@ export const revalidate = 0
 // Mirrors CreditManager.SUBSCRIPTION_CREDITS_MAP but kept local here to
 // avoid depending on wallet internals (display‑only endpoint).
 const SUBSCRIPTION_CREDITS_MAP: Record<number, number> = {
+  1000: 700,  // $10/month → 700 credits
   2000: 1400, // $20/month → 1,400 credits
   3000: 2100, // $30/month → 2,100 credits
   5000: 3500, // $50/month → 3,500 credits

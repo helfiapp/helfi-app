@@ -145,18 +145,17 @@ export async function GET(request: NextRequest) {
     const currentTier = subscription.monthlyPriceCents
     let tierName = 'Premium'
     let credits = 0
-    if (currentTier === 1000) {
-      tierName = '$10/month'
-      credits = 500
-    } else if (currentTier === 2000) {
-      tierName = '$20/month'
-      credits = 1000
-    } else if (currentTier === 3000) {
-      tierName = '$30/month'
-      credits = 1500
-    } else if (currentTier === 5000) {
-      tierName = '$50/month'
-      credits = 2500
+
+    const subscriptionCreditsMap: Record<number, number> = {
+      1000: 700,  // $10/month → 700 credits
+      2000: 1400, // $20/month → 1,400 credits
+      3000: 2100, // $30/month → 2,100 credits
+      5000: 3500, // $50/month → 3,500 credits
+    }
+
+    if (currentTier && subscriptionCreditsMap[currentTier]) {
+      tierName = `$${(currentTier / 100).toFixed(0)}/month`
+      credits = subscriptionCreditsMap[currentTier]
     } else if (currentTier) {
       tierName = `$${(currentTier / 100).toFixed(0)}/month`
       // Estimate credits based on price (rough approximation)
