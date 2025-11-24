@@ -23,6 +23,7 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
   const [showThreadMenu, setShowThreadMenu] = useState(false)
   const [hasSpeechRecognition, setHasSpeechRecognition] = useState(false)
   const [expanded, setExpanded] = useState(false)
+  const [showExpandControl, setShowExpandControl] = useState(false)
   const endRef = useRef<HTMLDivElement | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
@@ -44,6 +45,10 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
         textarea.style.height = `${desired}px`
       }
       textarea.style.overflowY = textarea.scrollHeight > maxHeight ? 'auto' : 'hidden'
+
+      const lineBreaks = (textarea.value.match(/\n/g) || []).length
+      const approxLines = Math.max(1 + lineBreaks, textarea.scrollHeight / minHeight)
+      setShowExpandControl(approxLines >= 2.5)
     })
   }, [])
 
@@ -426,7 +431,17 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
     : 'flex flex-col h-[calc(100vh-140px)] md:h-full bg-white md:rounded-2xl md:border md:shadow-sm relative'
 
   return (
-    <div className={sectionClass} style={expanded ? { paddingTop: 'calc(env(safe-area-inset-top, 16px))' } : undefined}>
+    <div
+      className={sectionClass}
+      style={
+        expanded
+          ? {
+              paddingTop: 'calc(env(safe-area-inset-top, 16px))',
+              paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+            }
+          : undefined
+      }
+    >
       {/* Thread Selector Header */}
       <div className="border-b border-gray-200 bg-white px-4 py-2 flex items-center justify-between relative">
         <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -497,7 +512,7 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
       </div>
       <div
         ref={containerRef}
-        className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-6 space-y-6 min-w-0 w-full max-w-3xl mx-auto min-h-[220px]"
+        className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-4 py-6 space-y-6 min-w-0 w-full max-w-3xl mx-auto min-h-[220px]"
         aria-live="polite"
         style={{
           maxWidth: '100%',
@@ -721,22 +736,24 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
                 </svg>
               </button>
             </div>
-            <button
-              type="button"
-              onClick={() => setExpanded((v) => !v)}
-              className="flex-shrink-0 w-10 h-10 rounded-full bg-gray-100 text-gray-700 flex items-center justify-center hover:bg-gray-200 transition-colors"
-              aria-label={expanded ? 'Exit expanded chat view' : 'Expand chat area'}
-            >
-              {expanded ? (
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 14h4v4M4 10h4V6M20 14h-4v4M20 10h-4V6" />
-                </svg>
-              ) : (
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 14h4v4H4zM4 6h4v4H4zM16 14h4v4h-4zM16 6h4v4h-4z" />
-                </svg>
-              )}
-            </button>
+            {(showExpandControl || expanded) && (
+              <button
+                type="button"
+                onClick={() => setExpanded((v) => !v)}
+                className="flex-shrink-0 w-10 h-10 rounded-full bg-gray-100 text-gray-700 flex items-center justify-center hover:bg-gray-200 transition-colors"
+                aria-label={expanded ? 'Exit expanded chat view' : 'Expand chat area'}
+              >
+                {expanded ? (
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 14h4v4M4 10h4V6M20 14h-4v4M20 10h-4V6" />
+                  </svg>
+                ) : (
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 14h4v4H4zM4 6h4v4H4zM16 14h4v4h-4zM16 6h4v4h-4z" />
+                  </svg>
+                )}
+              </button>
+            )}
           </div>
         </form>
       </div>
