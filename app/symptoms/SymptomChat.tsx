@@ -473,7 +473,7 @@ export default function SymptomChat({ analysisResult, symptoms, duration, notes 
               rows={1}
               className="w-full rounded-2xl border-0 bg-gray-100 px-4 py-3 pr-14 text-[16px] leading-6 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-0 resize-none transition-all duration-200 min-h-[52px] max-h-[200px]"
             />
-            {(showExpandControl || expanded) && (
+            {true && (
               <button
                 type="button"
                 onClick={(e) => {
