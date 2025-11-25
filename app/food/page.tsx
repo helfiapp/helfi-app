@@ -1326,7 +1326,8 @@ const applyStructuredItems = (
       const rounded = Math.round(clamped * 100) / 100
       itemsCopy[index].weightAmount = rounded
     } else if (field === 'weightUnit') {
-      itemsCopy[index].weightUnit = value === 'ml' ? 'ml' : 'g'
+      const normalized = value === 'ml' ? 'ml' : value === 'oz' ? 'oz' : 'g'
+      itemsCopy[index].weightUnit = normalized
     } else if (field === 'customGramsPerServing') {
       const clamped = clampNumber(value, 0, 5000)
       const rounded = Math.round(clamped * 100) / 100
@@ -2205,12 +2206,21 @@ const applyStructuredItems = (
     const raw = (item?.serving_size && String(item.serving_size)) || ''
     const gramsMatch = raw.match(/(\d+(?:\.\d+)?)\s*g\b/i)
     const mlMatch = raw.match(/(\d+(?:\.\d+)?)\s*ml\b/i)
+    const ozMatch = raw.match(/(\d+(?:\.\d+)?)\s*(oz|ounce|ounces)\b/i)
     const gramsPerServing = gramsMatch ? parseFloat(gramsMatch[1]) : null
     const mlPerServing = mlMatch ? parseFloat(mlMatch[1]) : null
+    const ozPerServing = ozMatch ? parseFloat(ozMatch[1]) : null
+    const gramsFromOz = ozPerServing ? ozPerServing * 28.3495 : null
     return {
       label: raw,
-      gramsPerServing: gramsPerServing && gramsPerServing > 0 ? gramsPerServing : null,
+      gramsPerServing:
+        gramsPerServing && gramsPerServing > 0
+          ? gramsPerServing
+          : gramsFromOz && gramsFromOz > 0
+          ? gramsFromOz
+          : null,
       mlPerServing: mlPerServing && mlPerServing > 0 ? mlPerServing : null,
+      ozPerServing: ozPerServing && ozPerServing > 0 ? ozPerServing : null,
     }
   }
 
@@ -2224,16 +2234,27 @@ const applyStructuredItems = (
     const customGrams = Number.isFinite(item?.customGramsPerServing) ? Number(item.customGramsPerServing) : null
     const customMl = Number.isFinite(item?.customMlPerServing) ? Number(item.customMlPerServing) : null
     const weight = Number.isFinite(item?.weightAmount) ? Number(item.weightAmount) : null
-    const unit = item?.weightUnit === 'ml' ? 'ml' : 'g'
+    const unit = item?.weightUnit === 'ml' ? 'ml' : item?.weightUnit === 'oz' ? 'oz' : 'g'
 
     if (!weight || weight <= 0) return baseServings
 
     if (unit === 'g') {
       const denominator = customGrams && customGrams > 0 ? customGrams : gramsPerServing
       if (denominator && denominator > 0) return Math.max(0, weight / denominator)
-    } else {
+    } else if (unit === 'ml') {
       const denominator = customMl && customMl > 0 ? customMl : mlPerServing
       if (denominator && denominator > 0) return Math.max(0, weight / denominator)
+    } else if (unit === 'oz') {
+      const denominator =
+        customGrams && customGrams > 0
+          ? customGrams
+          : gramsPerServing
+          ? gramsPerServing
+          : null
+      if (denominator && denominator > 0) {
+        const gramsWeight = weight * 28.3495
+        return Math.max(0, gramsWeight / denominator)
+      }
     }
 
     // Fallback to base servings if we lack conversion data
@@ -4044,7 +4065,7 @@ Please add nutritional information manually if needed.`);
                         const gramsPerServing = servingInfo.gramsPerServing
                         const mlPerServing = servingInfo.mlPerServing
                         const portionMode = item?.portionMode === 'weight' ? 'weight' : 'servings'
-                        const weightUnit = item?.weightUnit === 'ml' ? 'ml' : 'g'
+                        const weightUnit = item?.weightUnit === 'ml' ? 'ml' : item?.weightUnit === 'oz' ? 'oz' : 'g'
                         const weightAmount =
                           portionMode === 'weight' && Number.isFinite(item?.weightAmount)
                             ? Number(item.weightAmount)
@@ -4251,6 +4272,7 @@ Please add nutritional information manually if needed.`);
                                       >
                                         <option value="g">g</option>
                                         <option value="ml">mL</option>
+                                        <option value="oz">oz</option>
                                       </select>
                                     </div>
                                     <div className="text-xs text-gray-500">
@@ -4283,6 +4305,33 @@ Please add nutritional information manually if needed.`);
                                           onChange={(e) => updateItemField(index, 'customMlPerServing', e.target.value)}
                                           className="col-span-3 px-2 py-1 border border-gray-300 rounded-lg text-sm text-gray-900 text-center focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                                           placeholder={mlPerServing ? `${mlPerServing} mL` : 'e.g. 15'}
+                                        />
+                                      </div>
+                                    )}
+                                    {weightUnit === 'oz' && (
+                                      <div className="grid grid-cols-6 gap-2 items-center">
+                                        <span className="text-[11px] text-gray-600 col-span-3">Ounces per serving (if missing):</span>
+                                        <input
+                                          type="number"
+                                          min={0}
+                                          step={0.1}
+                                          value={formatNumberInputValue(
+                                            item.customGramsPerServing ? item.customGramsPerServing / 28.3495 : '',
+                                          )}
+                                          onChange={(e) => {
+                                            const val = Number(e.target.value)
+                                            if (Number.isFinite(val)) {
+                                              updateItemField(index, 'customGramsPerServing', val * 28.3495)
+                                            } else {
+                                              updateItemField(index, 'customGramsPerServing', '')
+                                            }
+                                          }}
+                                          className="col-span-3 px-2 py-1 border border-gray-300 rounded-lg text-sm text-gray-900 text-center focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                          placeholder={
+                                            gramsPerServing
+                                              ? `${Math.round((gramsPerServing / 28.3495) * 100) / 100} oz`
+                                              : 'e.g. 1.5'
+                                          }
                                         />
                                       </div>
                                     )}
