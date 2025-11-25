@@ -3,6 +3,7 @@
 import { FormEvent, KeyboardEvent, useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { ArrowsPointingOutIcon, ArrowsPointingInIcon } from '@heroicons/react/24/outline'
+import { formatChatContent } from '@/lib/chatFormatting'
 
 interface SectionChatProps {
   issueSlug: string
@@ -561,8 +562,9 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
               }`} style={{ wordWrap: 'break-word', overflowWrap: 'break-word' }}>
                 <div className="text-lg leading-relaxed break-words">
                   {(() => {
+                    const formatted = formatChatContent(m.content)
                     // Split by double newlines first to get paragraphs
-                    const paragraphs = m.content.split(/\n\n+/)
+                    const paragraphs = formatted.split(/\n\n+/)
                     return paragraphs.map((para, paraIdx) => {
                       const trimmed = para.trim()
                       if (!trimmed) return null

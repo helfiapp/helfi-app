@@ -553,7 +553,27 @@ Any functional change to the Medical Image Analyzer or its chat must be:
 
 ---
 
-## 7. Rules for Future Modifications
+## 7. Chat Formatting Across AI Conversations (Locked)
+
+The chat UI across the app has been standardised to render ChatGPT‑style, well‑spaced messages with headings, bullets, and numbered lists even when the model streams content as one long paragraph. Do **not** loosen or remove these formatting helpers.
+
+**Protected files:**
+- `lib/chatFormatting.ts` (shared formatter that inserts line breaks around headings, bullets, and numbered lists)
+- `app/symptoms/SymptomChat.tsx` (symptom analysis chat UI)
+- `components/VoiceChat.tsx` (general AI chat UI)
+- `app/medical-images/MedicalImageChat.tsx` (medical image follow‑up chat UI)
+- `app/insights/issues/[issueSlug]/SectionChat.tsx` (insights section chats for issues like libido/medications)
+
+Agents must not:
+- Remove or bypass `formatChatContent` or equivalent line‑break/spacing logic that prevents single‑block outputs.  
+- Change heading/list detection or spacing without explicit written approval from the user.  
+- Make per‑feature formatting inconsistent (all chat surfaces must stay aligned on the same formatting rules).
+
+If changes are requested, explain them to the user first, get explicit approval, and ensure all chat experiences remain consistent and readable.
+
+---
+
+## 8. Rules for Future Modifications
 
 Before changing anything in the protected areas above, an agent **must**:
 
