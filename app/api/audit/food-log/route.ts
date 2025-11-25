@@ -63,7 +63,9 @@ export async function GET(req: NextRequest) {
         byDate.get(date)?.push(f)
       }
 
-      for (const [date, entries] of byDate.entries()) {
+      const entriesArray = Array.from(byDate.entries())
+      for (let i = 0; i < entriesArray.length; i++) {
+        const [date, entries] = entriesArray[i]
         // Check if FoodLog has at least as many rows for that date
         const count = await prisma.foodLog.count({
           where: { userId: snap.userId, localDate: date },
