@@ -533,7 +533,6 @@ Items:\n${JSON.stringify(items, null, 2)}`
 }
 
 async function rewriteCandidatesToDomain(params: {
-  openai: any
   issueName: string
   mode: SectionMode
   bucket: 'suggested' | 'avoid'
@@ -542,8 +541,10 @@ async function rewriteCandidatesToDomain(params: {
   attempts?: number
   trace: string
 }): Promise<Array<{ name: string; reason: string }> | null> {
-  const { openai, issueName, mode, bucket, expectedType, items, attempts = 2, trace } = params
+  const { issueName, mode, bucket, expectedType, items, attempts = 2, trace } = params
   if (!items.length) return []
+  const openai = getOpenAIClient()
+  if (!openai) return null
   const typeText = expectedType ? `${expectedType}` : 'the section domain'
   let tries = 0
   while (tries < attempts) {
@@ -591,7 +592,6 @@ Items to rewrite:\n${JSON.stringify(items, null, 2)}`,
 }
 
 async function fillMissingItemsForSection(params: {
-  openai: any
   issueName: string
   mode: SectionMode
   bucket: 'suggested' | 'avoid'
@@ -600,8 +600,10 @@ async function fillMissingItemsForSection(params: {
   disallowNames: string[]
   trace: string
 }): Promise<Array<{ name: string; reason: string; protocol?: string | null }> | null> {
-  const { openai, issueName, mode, bucket, expectedType, needed, disallowNames, trace } = params
+  const { issueName, mode, bucket, expectedType, needed, disallowNames, trace } = params
   if (needed <= 0) return []
+  const openai = getOpenAIClient()
+  if (!openai) return null
   const typeText = expectedType ? `that are strictly of type ${expectedType}` : 'that fit the section domain'
   const diversityHint = (() => {
     switch (mode) {
