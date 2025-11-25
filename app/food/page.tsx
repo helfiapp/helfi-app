@@ -953,6 +953,7 @@ export default function FoodDiary() {
   const [showItemEditModal, setShowItemEditModal] = useState<boolean>(false) // Show edit modal for item
   const [healthWarning, setHealthWarning] = useState<string | null>(null)
   const [healthAlternatives, setHealthAlternatives] = useState<string | null>(null)
+  const [historySaveError, setHistorySaveError] = useState<string | null>(null)
   const [showAddIngredientModal, setShowAddIngredientModal] = useState<boolean>(false)
   const [officialSearchQuery, setOfficialSearchQuery] = useState<string>('')
   const [officialResults, setOfficialResults] = useState<any[]>([])
@@ -2103,6 +2104,7 @@ const applyStructuredItems = (
       //    for history view (and "yesterday" after midnight).
       if (appendHistory && latest) {
         try {
+          setHistorySaveError(null)
           const payload = {
             description: (latest?.description || '').toString(),
             nutrition: latest?.nutrition || null,
@@ -2130,6 +2132,7 @@ const applyStructuredItems = (
 
           if (!res.ok) {
             const errorText = await res.text()
+            setHistorySaveError('Saving your meal to history failed. Keep this tab open; trying fallback now.')
             console.error('❌ Failed to save entry to FoodLog:', {
               status: res.status,
               statusText: res.statusText,
@@ -2139,6 +2142,28 @@ const applyStructuredItems = (
                 descriptionPreview: payload.description.substring(0, 50),
               },
             })
+            // Fallback: attempt legacy append via /api/user-data with appendHistory: true
+            try {
+              const fallbackRes = await fetch('/api/user-data', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ todaysFoods: dedupedFoods, appendHistory: true }),
+              })
+              if (!fallbackRes.ok) {
+                console.error('❌ Fallback user-data append failed:', {
+                  status: fallbackRes.status,
+                  statusText: fallbackRes.statusText,
+                  error: await fallbackRes.text(),
+                })
+              } else {
+                console.log('✅ Fallback user-data append succeeded (history)', {
+                  localDate: payload.localDate,
+                })
+                setHistorySaveError(null)
+              }
+            } catch (fallbackError) {
+              console.error('❌ Fallback user-data append threw:', fallbackError)
+            }
           } else {
             const result = await res.json().catch(() => ({}))
             console.log('✅ Successfully saved entry to FoodLog:', {
@@ -2146,6 +2171,7 @@ const applyStructuredItems = (
               foodLogId: result.id,
               descriptionPreview: payload.description.substring(0, 50),
             })
+            setHistorySaveError(null)
           }
         } catch (historyError) {
           console.error('❌ Exception while saving to FoodLog:', {
@@ -2154,6 +2180,7 @@ const applyStructuredItems = (
             stack: historyError instanceof Error ? historyError.stack : undefined,
             targetLocalDate,
           })
+          setHistorySaveError('Saving your meal to history failed. Please stay on this page and retry saving.')
         }
       } else {
         console.log('ℹ️ Skipping FoodLog save (appendHistory=false or no latest entry)')
@@ -3406,6 +3433,12 @@ Please add nutritional information manually if needed.`);
             📸 Take a photo of your meal or snack and let AI analyze it!
           </p>
         </div>
+        )}
+
+        {historySaveError && (
+          <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 text-amber-800 px-4 py-3 text-sm">
+            {historySaveError}
+          </div>
         )}
 
         {/* Add Food Button - Hidden during edit mode */}
