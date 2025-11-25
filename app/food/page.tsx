@@ -973,6 +973,8 @@ export default function FoodDiary() {
     dinner: true,
     snacks: true,
   })
+  const [selectedAddCategory, setSelectedAddCategory] = useState<'uncategorized' | 'breakfast' | 'lunch' | 'dinner' | 'snacks'>('uncategorized')
+  const [showCategoryPicker, setShowCategoryPicker] = useState(false)
   const [showAddIngredientModal, setShowAddIngredientModal] = useState<boolean>(false)
   const [officialSearchQuery, setOfficialSearchQuery] = useState<string>('')
   const [officialResults, setOfficialResults] = useState<any[]>([])
@@ -3573,14 +3575,24 @@ Please add nutritional information manually if needed.`);
         {!isEditingDescription && (
         <div className="mb-6 relative add-food-entry-container">
           <button
-            onClick={() => setShowPhotoOptions(!showPhotoOptions)}
-            className="w-full bg-helfi-green text-white px-6 py-3 rounded-lg hover:bg-helfi-green/90 transition-colors font-medium flex items-center justify-center shadow-lg"
+            onClick={() => {
+              setShowCategoryPicker((prev) => !prev)
+              setShowPhotoOptions(false)
+            }}
+            className="w-full bg-helfi-green text-white px-4 py-3 rounded-lg hover:bg-helfi-green/90 transition-colors font-medium flex items-center justify-between shadow-lg"
           >
-            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-            </svg>
-            Add Food Entry
-            <svg className={`w-4 h-4 ml-2 transition-transform ${showPhotoOptions ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="flex items-center gap-3">
+              <span className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+              </span>
+              <div className="text-left">
+                <div className="text-sm font-semibold">Add to</div>
+                <div className="text-xs text-emerald-50 capitalize">{selectedAddCategory}</div>
+              </div>
+            </div>
+            <svg className={`w-4 h-4 transition-transform ${showCategoryPicker || showPhotoOptions ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
           </button>
@@ -3591,8 +3603,43 @@ Please add nutritional information manually if needed.`);
             <FeatureUsageDisplay featureName="foodAnalysis" featureLabel="Food Analysis" refreshTrigger={usageMeterRefresh} />
           </div>
 
+          {/* Category picker first */}
+          {showCategoryPicker && (
+            <div className="food-options-dropdown absolute top-full left-0 right-0 mt-2 z-50">
+              <div className="rounded-2xl shadow-2xl border border-gray-200 bg-white/95 backdrop-blur-xl overflow-hidden divide-y divide-gray-100">
+                {[
+                  { key: 'uncategorized', label: 'Uncategorized' },
+                  { key: 'breakfast', label: 'Breakfast' },
+                  { key: 'lunch', label: 'Lunch' },
+                  { key: 'dinner', label: 'Dinner' },
+                  { key: 'snacks', label: 'Snacks' },
+                ].map((cat) => (
+                  <button
+                    key={cat.key}
+                    className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
+                    onClick={() => {
+                      setSelectedAddCategory(cat.key as any)
+                      setShowCategoryPicker(false)
+                      setShowPhotoOptions(true)
+                      setShowAddFood(true)
+                    }}
+                  >
+                    <div className="flex-1">
+                      <div className="text-base font-semibold text-gray-900">{cat.label}</div>
+                    </div>
+                    {selectedAddCategory === cat.key && (
+                      <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Simplified Dropdown Options */}
-          {showPhotoOptions && (
+          {showPhotoOptions && !showCategoryPicker && (
             <div className="food-options-dropdown absolute top-full left-0 right-0 mt-2 z-50">
               <div className="rounded-2xl shadow-2xl border border-gray-200 bg-white/90 backdrop-blur-xl overflow-hidden">
                 <div className="divide-y divide-gray-100">
