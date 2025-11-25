@@ -1322,9 +1322,13 @@ const applyStructuredItems = (
         }
       }
     } else if (field === 'weightAmount') {
-      const clamped = clampNumber(value, 0, 5000)
-      const rounded = Math.round(clamped * 100) / 100
-      itemsCopy[index].weightAmount = rounded
+      if (value === '' || value === null) {
+        itemsCopy[index].weightAmount = null
+      } else {
+        const clamped = clampNumber(value, 0, 5000)
+        const rounded = Math.round(clamped * 100) / 100
+        itemsCopy[index].weightAmount = rounded
+      }
     } else if (field === 'weightUnit') {
       const previousUnit = itemsCopy[index].weightUnit === 'ml' ? 'ml' : itemsCopy[index].weightUnit === 'oz' ? 'oz' : 'g'
       const normalized = value === 'ml' ? 'ml' : value === 'oz' ? 'oz' : 'g'
@@ -4285,7 +4289,16 @@ Please add nutritional information manually if needed.`);
                                         min={0}
                                         step={1}
                                         value={formatNumberInputValue(weightAmount ?? (weightUnit === 'ml' ? mlPerServing || '' : gramsPerServing || ''))}
-                                        onFocus={(e) => e.target.select()}
+                                        onFocus={(e) => {
+                                          e.target.select()
+                                          e.currentTarget.dataset.cleared = ''
+                                        }}
+                                        onBeforeInput={(e) => {
+                                          if (!e.currentTarget.dataset.cleared) {
+                                            e.currentTarget.value = ''
+                                            e.currentTarget.dataset.cleared = 'true'
+                                          }
+                                        }}
                                         onChange={(e) => updateItemField(index, 'weightAmount', e.target.value)}
                                         className="col-span-2 px-2 py-1 border border-gray-300 rounded-lg text-base font-semibold text-gray-900 text-center focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                                       />
@@ -4326,7 +4339,16 @@ Please add nutritional information manually if needed.`);
                                                 : ''
                                               : item.customGramsPerServing ?? '',
                                           )}
-                                          onFocus={(e) => e.target.select()}
+                                          onFocus={(e) => {
+                                            e.target.select()
+                                            e.currentTarget.dataset.cleared = ''
+                                          }}
+                                          onBeforeInput={(e) => {
+                                            if (!e.currentTarget.dataset.cleared) {
+                                              e.currentTarget.value = ''
+                                              e.currentTarget.dataset.cleared = 'true'
+                                            }
+                                          }}
                                           onChange={(e) => {
                                             const val = Number(e.target.value)
                                             if (!Number.isFinite(val) || val <= 0) {
