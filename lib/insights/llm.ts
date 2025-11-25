@@ -1257,7 +1257,6 @@ export async function generateSectionInsightsFromLLM(
     if (droppedSuggested.length) {
       const rw0 = Date.now()
       const rewritten = await rewriteCandidatesToDomain({
-        openai,
         issueName: input.issueName,
         mode: input.mode,
         bucket: 'suggested',
@@ -1270,13 +1269,12 @@ export async function generateSectionInsightsFromLLM(
       if (rewritten?.length) {
         const cc0 = Date.now()
         const reClassified = await classifyCandidatesForSection({
-          openai,
           issueName: input.issueName,
           mode: input.mode,
           items: rewritten.map((m) => ({ name: m.name, reason: m.reason })),
           trace,
         })
-        classifyMs += Date.now() - cc0
+      classifyMs += Date.now() - cc0
         const filtered = (reClassified ?? [])
           .filter((it) => allowed.has(it.canonicalType))
           .map((it) => {
@@ -1289,7 +1287,6 @@ export async function generateSectionInsightsFromLLM(
     if (droppedAvoid.length) {
       const rw1 = Date.now()
       const rewritten = await rewriteCandidatesToDomain({
-        openai,
         issueName: input.issueName,
         mode: input.mode,
         bucket: 'avoid',
