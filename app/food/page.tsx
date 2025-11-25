@@ -1397,6 +1397,61 @@ const applyStructuredItems = (
     }
   }
 
+  // Ensure numeric inputs behave like "type to replace" and surface the numeric keypad on mobile.
+  const primeNumericOverwrite = (input: HTMLInputElement | null) => {
+    if (!input) return
+    input.dataset.replaceOnInput = 'true'
+    requestAnimationFrame(() => {
+      try {
+        input.select()
+      } catch {
+        // Mobile Safari can throw if selection isn't ready yet.
+      }
+    })
+    // Fallback to ensure selection after any delayed focus.
+    setTimeout(() => {
+      if (document.activeElement === input) {
+        try {
+          input.select()
+        } catch {
+          // no-op
+        }
+      }
+    }, 0)
+  }
+
+  const handleNumericFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+    primeNumericOverwrite(e.currentTarget)
+  }
+
+  const handleNumericBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    e.currentTarget.dataset.replaceOnInput = ''
+  }
+
+  const handleNumericKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const target = e.currentTarget
+    if (target.dataset.replaceOnInput === 'true') {
+      const metaPressed = e.metaKey || e.ctrlKey || e.altKey
+      const navigationKeys = ['Tab', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Enter', 'Escape', 'Shift']
+      if (!metaPressed && !navigationKeys.includes(e.key) && !e.repeat) {
+        target.value = ''
+      }
+    }
+  }
+
+  const normalizeNumericInput = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const target = event.currentTarget
+    if (target.dataset.replaceOnInput === 'true') {
+      const native = event.nativeEvent as InputEvent
+      const data = native?.data
+      const nextValue = data !== null && data !== undefined ? data : target.value
+      target.dataset.replaceOnInput = 'false'
+      target.value = nextValue
+      return nextValue
+    }
+    return target.value
+  }
+
   // Profile data - prefer real photos; fall back to professional icon
   const hasProfileImage = !!(profileImage || session?.user?.image)
   const userImage = (profileImage || session?.user?.image || '') as string
@@ -4286,20 +4341,14 @@ Please add nutritional information manually if needed.`);
                                       <span className="text-sm text-gray-600 col-span-2">Weight:</span>
                                       <input
                                         type="number"
+                                        inputMode="decimal"
                                         min={0}
                                         step={1}
                                         value={formatNumberInputValue(weightAmount ?? (weightUnit === 'ml' ? mlPerServing || '' : gramsPerServing || ''))}
-                                        onFocus={(e) => {
-                                          e.target.select()
-                                          e.currentTarget.dataset.cleared = ''
-                                        }}
-                                        onBeforeInput={(e) => {
-                                          if (!e.currentTarget.dataset.cleared) {
-                                            e.currentTarget.value = ''
-                                            e.currentTarget.dataset.cleared = 'true'
-                                          }
-                                        }}
-                                        onChange={(e) => updateItemField(index, 'weightAmount', e.target.value)}
+                                        onFocus={handleNumericFocus}
+                                        onBlur={handleNumericBlur}
+                                        onKeyDown={handleNumericKeyDown}
+                                        onChange={(e) => updateItemField(index, 'weightAmount', normalizeNumericInput(e))}
                                         className="col-span-2 px-2 py-1 border border-gray-300 rounded-lg text-base font-semibold text-gray-900 text-center focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                                       />
                                       <select
@@ -4328,6 +4377,7 @@ Please add nutritional information manually if needed.`);
                                         <span className="text-[11px] text-gray-600 col-span-3">Per-serving weight (for scaling):</span>
                                         <input
                                           type="number"
+                                          inputMode="decimal"
                                           min={0}
                                           step={weightUnit === 'oz' ? 0.1 : 1}
                                           value={formatNumberInputValue(
@@ -4339,18 +4389,11 @@ Please add nutritional information manually if needed.`);
                                                 : ''
                                               : item.customGramsPerServing ?? '',
                                           )}
-                                          onFocus={(e) => {
-                                            e.target.select()
-                                            e.currentTarget.dataset.cleared = ''
-                                          }}
-                                          onBeforeInput={(e) => {
-                                            if (!e.currentTarget.dataset.cleared) {
-                                              e.currentTarget.value = ''
-                                              e.currentTarget.dataset.cleared = 'true'
-                                            }
-                                          }}
+                                          onFocus={handleNumericFocus}
+                                          onBlur={handleNumericBlur}
+                                          onKeyDown={handleNumericKeyDown}
                                           onChange={(e) => {
-                                            const val = Number(e.target.value)
+                                            const val = Number(normalizeNumericInput(e))
                                             if (!Number.isFinite(val) || val <= 0) {
                                               updateItemField(index, 'customGramsPerServing', '')
                                               updateItemField(index, 'customMlPerServing', '')
