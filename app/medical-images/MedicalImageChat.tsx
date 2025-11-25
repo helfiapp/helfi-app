@@ -3,6 +3,7 @@
 import { FormEvent, KeyboardEvent, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ArrowsPointingOutIcon, ArrowsPointingInIcon } from '@heroicons/react/24/outline'
+import { formatChatContent } from '@/lib/chatFormatting'
 
 type ChatMessage = { role: 'user' | 'assistant'; content: string }
 
@@ -32,33 +33,8 @@ const SECTION_HEADINGS = [
   '**What you can do next**',
 ]
 
-function escapeForRegExp(text: string): string {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-}
-
 function normaliseMedicalChatContent(raw: string): string {
-  let text = raw || ''
-
-  // Ensure each major section heading appears on its own line so the UI
-  // can render it as a separate, nicely spaced block (even if the model
-  // streams everything in one long paragraph).
-  for (const heading of SECTION_HEADINGS) {
-    const pattern = new RegExp(escapeForRegExp(heading), 'g')
-    text = text.replace(pattern, `\n${heading}\n`)
-  }
-
-  // As a safety net, push any remaining **bold heading** patterns onto their own line.
-  // This helps when the model forgets to add line breaks (e.g. "...sentence.**Why this matters** More text")
-  // by turning them into:
-  //   ...sentence.
-  //   **Why this matters**
-  //   More text
-  text = text.replace(/(\*\*[A-Za-z][^*\n]{2,80}\*\*)/g, '\n$1\n')
-
-  // Collapse any excessive blank lines so spacing stays neat.
-  text = text.replace(/\n{3,}/g, '\n\n')
-
-  return text.trim()
+  return formatChatContent(raw, { headings: SECTION_HEADINGS })
 }
 
 export default function MedicalImageChat({ analysisResult }: MedicalImageChatProps) {

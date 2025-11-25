@@ -3,6 +3,7 @@
 import { FormEvent, KeyboardEvent, useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { ArrowsPointingOutIcon, ArrowsPointingInIcon } from '@heroicons/react/24/outline'
+import { formatChatContent } from '@/lib/chatFormatting'
 
 interface SymptomChatProps {
   analysisResult: {
@@ -351,7 +352,7 @@ export default function SymptomChat({ analysisResult, symptoms, duration, notes 
                   : 'bg-gray-100 text-gray-900'
               }`} style={{ wordWrap: 'break-word', overflowWrap: 'break-word' }}>
                 <div className="text-lg leading-relaxed break-words" style={{ whiteSpace: 'pre-wrap' }}>
-                  {m.content.split('\n').map((line, idx) => {
+                  {formatChatContent(m.content).split('\n').map((line, idx) => {
                     const trimmed = line.trim()
                     if (!trimmed) {
                       return <div key={idx} className="h-3" />

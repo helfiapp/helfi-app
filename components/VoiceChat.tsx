@@ -1,6 +1,7 @@
 'use client'
 
 import { FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState, useCallback } from 'react'
+import { formatChatContent } from '@/lib/chatFormatting'
 
 interface VoiceChatContext {
   symptoms?: string[]
@@ -592,8 +593,9 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
               }`} style={{ wordWrap: 'break-word', overflowWrap: 'break-word' }}>
                 <div className="text-lg leading-relaxed break-words">
                   {(() => {
+                    const formatted = formatChatContent(m.content)
                     // Split by double newlines first to get paragraphs
-                    const paragraphs = m.content.split(/\n\n+/)
+                    const paragraphs = formatted.split(/\n\n+/)
                     return paragraphs.map((para, paraIdx) => {
                       const trimmed = para.trim()
                       if (!trimmed) return null
@@ -766,4 +768,3 @@ export default function VoiceChat({ context, onCostEstimate, className = '' }: V
     </div>
   )
 }
-
