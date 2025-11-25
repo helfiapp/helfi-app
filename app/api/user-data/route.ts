@@ -184,6 +184,21 @@ export async function GET(request: NextRequest) {
       console.log('No profile info data found in storage');
     }
 
+    // Get primary goal choice + intensity (Step 2) stored as hidden health goal
+    let primaryGoalData: { goalChoice?: string; goalIntensity?: string } = {};
+    try {
+      const storedPrimaryGoal = user.healthGoals.find((goal: any) => goal.name === '__PRIMARY_GOAL__');
+      if (storedPrimaryGoal?.category) {
+        const parsed = JSON.parse(storedPrimaryGoal.category);
+        primaryGoalData = {
+          goalChoice: typeof parsed.goalChoice === 'string' ? parsed.goalChoice : '',
+          goalIntensity: typeof parsed.goalIntensity === 'string' ? parsed.goalIntensity : '',
+        };
+      }
+    } catch (e) {
+      console.log('No primary goal data found in storage');
+    }
+
     // Transform to onboarding format
     let selectedGoals: string[] = []
     try {
@@ -235,7 +250,9 @@ export async function GET(request: NextRequest) {
       todaysFoods: todaysFoods,
       profileInfo: profileInfoData,
       deviceInterest: deviceInterestData,
-      termsAccepted: (user as any).termsAccepted === true
+      termsAccepted: (user as any).termsAccepted === true,
+      goalChoice: primaryGoalData.goalChoice || '',
+      goalIntensity: primaryGoalData.goalIntensity || 'standard',
     }
 
     console.log('GET /api/user-data - Returning onboarding data for user')
@@ -442,7 +459,7 @@ export async function POST(request: NextRequest) {
         const deleteResult = await prisma.healthGoal.deleteMany({
           where: { 
             userId: user.id,
-            name: { notIn: ['__EXERCISE_DATA__', '__HEALTH_SITUATIONS_DATA__', '__SELECTED_ISSUES__'] }
+            name: { notIn: ['__EXERCISE_DATA__', '__HEALTH_SITUATIONS_DATA__', '__SELECTED_ISSUES__', '__PRIMARY_GOAL__'] }
           }
         })
         console.log('🗑️ Deleted', deleteResult.count, 'existing health goals')
@@ -512,6 +529,34 @@ export async function POST(request: NextRequest) {
       }
     } catch (error) {
       console.error('Error storing health situations data:', error)
+      // Continue with other updates
+    }
+
+    // 3.25. Handle primary goal + intensity (Step 2) - store as special health goal
+    try {
+      if (data.goalChoice || data.goalIntensity) {
+        await prisma.healthGoal.deleteMany({
+          where: {
+            userId: user.id,
+            name: '__PRIMARY_GOAL__'
+          }
+        })
+
+        await prisma.healthGoal.create({
+          data: {
+            userId: user.id,
+            name: '__PRIMARY_GOAL__',
+            category: JSON.stringify({
+              goalChoice: data.goalChoice || '',
+              goalIntensity: data.goalIntensity || 'standard',
+            }),
+            currentRating: 0,
+          }
+        })
+        console.log('Stored primary goal data successfully')
+      }
+    } catch (error) {
+      console.error('Error storing primary goal data:', error)
       // Continue with other updates
     }
 
