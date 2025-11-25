@@ -967,11 +967,11 @@ export default function FoodDiary() {
   const [lastHistoryPayload, setLastHistoryPayload] = useState<any>(null)
   const [historyRetrying, setHistoryRetrying] = useState(false)
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({
-    uncategorized: true,
-    breakfast: true,
-    lunch: true,
-    dinner: true,
-    snacks: true,
+    uncategorized: false,
+    breakfast: false,
+    lunch: false,
+    dinner: false,
+    snacks: false,
   })
   const [selectedAddCategory, setSelectedAddCategory] = useState<'uncategorized' | 'breakfast' | 'lunch' | 'dinner' | 'snacks'>('uncategorized')
   const [showCategoryPicker, setShowCategoryPicker] = useState(false)
@@ -1034,6 +1034,7 @@ export default function FoodDiary() {
     energyLabel?: string
     macros: MacroSegment[]
   } | null>(null)
+  const isAddMenuOpen = showCategoryPicker || showPhotoOptions
 
   const dailyTargets = useMemo(() => {
     if (!userData) return { calories: null, protein: null, carbs: null, fat: null }
@@ -3355,6 +3356,7 @@ Please add nutritional information manually if needed.`);
     if (editingEntry?.description) return editingEntry.description;
     return '';
   }, [aiDescription, editingEntry]);
+  const shouldShowAddPanel = showAddFood && !isAddMenuOpen
 
   // Debug logging to track state changes
   useEffect(() => {
@@ -3605,7 +3607,7 @@ Please add nutritional information manually if needed.`);
 
           {/* Category picker first */}
           {showCategoryPicker && (
-            <div className="food-options-dropdown absolute top-full left-0 right-0 mt-2 z-50">
+            <div className="food-options-dropdown absolute top-full left-0 w-full sm:w-80 sm:left-auto sm:right-0 mt-2 z-50">
               <div className="rounded-2xl shadow-2xl border border-gray-200 bg-white/95 backdrop-blur-xl overflow-hidden divide-y divide-gray-100">
                 {[
                   { key: 'uncategorized', label: 'Uncategorized' },
@@ -3621,7 +3623,6 @@ Please add nutritional information manually if needed.`);
                       setSelectedAddCategory(cat.key as any)
                       setShowCategoryPicker(false)
                       setShowPhotoOptions(true)
-                      setShowAddFood(true)
                     }}
                   >
                     <div className="flex-1">
@@ -3640,7 +3641,7 @@ Please add nutritional information manually if needed.`);
 
           {/* Simplified Dropdown Options */}
           {showPhotoOptions && !showCategoryPicker && (
-            <div className="food-options-dropdown absolute top-full left-0 right-0 mt-2 z-50">
+            <div className="food-options-dropdown absolute top-full left-0 w-full sm:w-80 sm:left-auto sm:right-0 mt-2 z-50">
               <div className="rounded-2xl shadow-2xl border border-gray-200 bg-white/90 backdrop-blur-xl overflow-hidden">
                 <div className="divide-y divide-gray-100">
                   {/* Take Photo Option - Modern card */}
@@ -3755,7 +3756,6 @@ Please add nutritional information manually if needed.`);
                 <button
                   onClick={() => {
                     setShowAnalysisModeModal(false);
-                    setShowAddFood(true);
                     try { selectPhotoInputRef.current?.click(); } catch {}
                   }}
                   className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 font-semibold"
@@ -3776,7 +3776,7 @@ Please add nutritional information manually if needed.`);
         )}
 
                 {/* Food Processing Area */}
-        {showAddFood && (
+        {shouldShowAddPanel && (
           // Outer wrapper now has no extra background so the inner Food Analysis
           // card can stretch closer to the screen edges on mobile.
           <div className="mb-6">
@@ -5881,51 +5881,51 @@ Please add nutritional information manually if needed.`);
                         },
                         { calories: 0, protein: 0, carbs: 0, fat: 0 },
                       )
+                      const summaryParts: string[] = []
+                      if (totals.calories > 0) summaryParts.push(`${Math.round(totals.calories)} kcal`)
+                      if (totals.protein > 0) summaryParts.push(`${Math.round(totals.protein)}g Protein`)
+                      if (totals.carbs > 0) summaryParts.push(`${Math.round(totals.carbs)}g Carbs`)
+                      if (totals.fat > 0) summaryParts.push(`${Math.round(totals.fat)}g Fat`)
+                      const summaryText = summaryParts.length > 0 ? summaryParts.join(', ') : 'No entries yet'
 
                       return (
                         <div key={cat.key} className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-                          <div className="flex items-center justify-between px-4 py-3">
-                            <div>
-                              <div className="font-semibold text-gray-900">{cat.label}</div>
-                              <div className="text-xs text-gray-500">
-                                {totals.calories > 0 ? `${Math.round(totals.calories)} kcal` : 'No entries yet'}
-                                {totals.protein > 0 && ` • ${Math.round(totals.protein)}g P`}
-                                {totals.carbs > 0 && ` • ${Math.round(totals.carbs)}g C`}
-                                {totals.fat > 0 && ` • ${Math.round(totals.fat)}g F`}
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setShowPhotoOptions(true)
-                                  setShowAddFood(true)
-                                }}
-                                className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-100"
-                              >
-                                + Add
-                              </button>
-                              <button
-                                onClick={() =>
-                                  setExpandedCategories((prev) => ({
-                                    ...prev,
-                                    [cat.key]: !prev[cat.key],
-                                  }))
-                                }
-                                className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-                                aria-label={expandedCategories[cat.key] ? 'Collapse category' : 'Expand category'}
-                              >
-                                <svg
-                                  className={`w-4 h-4 text-gray-500 transition-transform ${expandedCategories[cat.key] ? 'rotate-180' : ''}`}
-                                  fill="none"
-                                  stroke="currentColor"
-                                  viewBox="0 0 24 24"
-                                >
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          <button
+                            type="button"
+                            aria-expanded={expandedCategories[cat.key]}
+                            onClick={() =>
+                              setExpandedCategories((prev) => ({
+                                ...prev,
+                                [cat.key]: !prev[cat.key],
+                              }))
+                            }
+                            className="w-full text-left px-4 py-3"
+                          >
+                            <div
+                              className={`flex items-center gap-3 rounded-xl border ${
+                                expandedCategories[cat.key] ? 'bg-gray-50 border-gray-200' : 'bg-white border-gray-100'
+                              } shadow-sm px-3 py-2`}
+                            >
+                              <div className="flex-shrink-0 h-9 w-9 rounded-full border border-emerald-200 bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v12m6-6H6" />
                                 </svg>
-                              </button>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="font-semibold text-gray-900">{cat.label}</div>
+                                <div className="text-xs text-gray-500 truncate">{summaryText}</div>
+                              </div>
+                              <svg
+                                className={`w-4 h-4 text-gray-500 transition-transform ${expandedCategories[cat.key] ? 'rotate-180' : ''}`}
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                                aria-hidden
+                              >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
                             </div>
-                          </div>
+                          </button>
                           {expandedCategories[cat.key] && (
                             <div className="border-t border-gray-100 space-y-3 p-3">
                               {entries.length === 0 ? (
