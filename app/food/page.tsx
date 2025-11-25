@@ -5804,7 +5804,13 @@ Please add nutritional information manually if needed.`);
                                 Edit
                               </button>
                               <button
-                                onClick={() => handleDeleteEntry(food.id)}
+                                onClick={() => {
+                                  if (isViewingToday) {
+                                    deleteFood(food.id)
+                                  } else {
+                                    deleteHistoryFood((food as any).dbId)
+                                  }
+                                }}
                                 className="px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-sm font-medium hover:bg-red-100 transition-colors"
                               >
                                 Delete
