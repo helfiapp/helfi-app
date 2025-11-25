@@ -4275,63 +4275,50 @@ Please add nutritional information manually if needed.`);
                                         <option value="oz">oz</option>
                                       </select>
                                     </div>
-                                    <div className="text-xs text-gray-500">
-                                      {gramsPerServing || mlPerServing
-                                        ? `1 serving = ${servingSizeLabel || 'not specified'}`
-                                        : 'No per-serving weight/volume detected; enter one below to enable precise scaling.'}
-                                    </div>
-                                    {weightUnit === 'g' && (
-                                      <div className="grid grid-cols-6 gap-2 items-center">
-                                        <span className="text-[11px] text-gray-600 col-span-3">Grams per serving (if missing):</span>
-                                        <input
-                                          type="number"
-                                          min={0}
-                                          step={1}
-                                          value={formatNumberInputValue(item.customGramsPerServing ?? '')}
-                                          onChange={(e) => updateItemField(index, 'customGramsPerServing', e.target.value)}
-                                          className="col-span-3 px-2 py-1 border border-gray-300 rounded-lg text-sm text-gray-900 text-center focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                          placeholder={gramsPerServing ? `${gramsPerServing} g` : 'e.g. 20'}
-                                        />
+                                    {(gramsPerServing || mlPerServing || item.customGramsPerServing || item.customMlPerServing) && (
+                                      <div className="text-xs text-gray-500">
+                                        {servingSizeLabel
+                                          ? `1 serving = ${servingSizeLabel}`
+                                          : gramsPerServing
+                                          ? `1 serving ≈ ${Math.round(gramsPerServing * 100) / 100} g`
+                                          : mlPerServing
+                                          ? `1 serving ≈ ${Math.round(mlPerServing * 100) / 100} mL`
+                                          : null}
                                       </div>
                                     )}
-                                    {weightUnit === 'ml' && (
+                                    {!gramsPerServing && !mlPerServing && !item.customGramsPerServing && !item.customMlPerServing && (
                                       <div className="grid grid-cols-6 gap-2 items-center">
-                                        <span className="text-[11px] text-gray-600 col-span-3">mL per serving (if missing):</span>
+                                        <span className="text-[11px] text-gray-600 col-span-3">Per-serving weight (for scaling):</span>
                                         <input
                                           type="number"
                                           min={0}
-                                          step={1}
-                                          value={formatNumberInputValue(item.customMlPerServing ?? '')}
-                                          onChange={(e) => updateItemField(index, 'customMlPerServing', e.target.value)}
-                                          className="col-span-3 px-2 py-1 border border-gray-300 rounded-lg text-sm text-gray-900 text-center focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                          placeholder={mlPerServing ? `${mlPerServing} mL` : 'e.g. 15'}
-                                        />
-                                      </div>
-                                    )}
-                                    {weightUnit === 'oz' && (
-                                      <div className="grid grid-cols-6 gap-2 items-center">
-                                        <span className="text-[11px] text-gray-600 col-span-3">Ounces per serving (if missing):</span>
-                                        <input
-                                          type="number"
-                                          min={0}
-                                          step={0.1}
+                                          step={weightUnit === 'oz' ? 0.1 : 1}
                                           value={formatNumberInputValue(
-                                            item.customGramsPerServing ? item.customGramsPerServing / 28.3495 : '',
+                                            weightUnit === 'ml'
+                                              ? item.customMlPerServing ?? ''
+                                              : weightUnit === 'oz'
+                                              ? item.customGramsPerServing
+                                                ? item.customGramsPerServing / 28.3495
+                                                : ''
+                                              : item.customGramsPerServing ?? '',
                                           )}
                                           onChange={(e) => {
                                             const val = Number(e.target.value)
-                                            if (Number.isFinite(val)) {
+                                            if (!Number.isFinite(val) || val <= 0) {
+                                              updateItemField(index, 'customGramsPerServing', '')
+                                              updateItemField(index, 'customMlPerServing', '')
+                                              return
+                                            }
+                                            if (weightUnit === 'ml') {
+                                              updateItemField(index, 'customMlPerServing', val)
+                                            } else if (weightUnit === 'oz') {
                                               updateItemField(index, 'customGramsPerServing', val * 28.3495)
                                             } else {
-                                              updateItemField(index, 'customGramsPerServing', '')
+                                              updateItemField(index, 'customGramsPerServing', val)
                                             }
                                           }}
                                           className="col-span-3 px-2 py-1 border border-gray-300 rounded-lg text-sm text-gray-900 text-center focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                          placeholder={
-                                            gramsPerServing
-                                              ? `${Math.round((gramsPerServing / 28.3495) * 100) / 100} oz`
-                                              : 'e.g. 1.5'
-                                          }
+                                          placeholder={weightUnit === 'ml' ? 'mL per serving' : weightUnit === 'oz' ? 'oz per serving' : 'g per serving'}
                                         />
                                       </div>
                                     )}
