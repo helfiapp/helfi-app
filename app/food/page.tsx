@@ -1063,11 +1063,6 @@ export default function FoodDiary() {
       healthSituations: (userData as any).healthSituations,
     })
   }, [userData])
-  const sourceEntries = useMemo(
-    () => dedupeEntries(isViewingToday ? todaysFoods : (historyFoods || [])),
-    [todaysFoods, historyFoods, isViewingToday],
-  )
-
   const applyRecalculatedNutrition = (items: any[]) => {
     const recalculated = recalculateNutritionFromItems(items)
     // Guard rail: only overwrite the original AI totals when we have a
@@ -1557,6 +1552,11 @@ const applyStructuredItems = (
       day: 'numeric',
     });
   })();
+
+  const sourceEntries = useMemo(
+    () => dedupeEntries(isViewingToday ? todaysFoods : (historyFoods || [])),
+    [todaysFoods, historyFoods, isViewingToday],
+  )
 
   // Close dropdowns on outside click
   useEffect(() => {
