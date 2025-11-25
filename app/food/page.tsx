@@ -4057,16 +4057,6 @@ Please add nutritional information manually if needed.`);
                           portionMode === 'weight' && weightAmount
                             ? `${formatNumberInputValue(weightAmount)} ${weightUnit}`
                             : formattedServings
-                        const portionMode = item?.portionMode === 'weight' ? 'weight' : 'servings'
-                        const weightUnit = item?.weightUnit === 'ml' ? 'ml' : 'g'
-                        const weightAmount =
-                          portionMode === 'weight' && Number.isFinite(item?.weightAmount)
-                            ? Number(item.weightAmount)
-                            : null
-                        const weightLabel =
-                          portionMode === 'weight' && weightAmount
-                            ? `${weightAmount}${weightUnit}`
-                            : null
 
                         const isMultiIngredient = analyzedItems.length > 1
                         const isExpanded = !isMultiIngredient || expandedItemIndex === index
