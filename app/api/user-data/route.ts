@@ -255,6 +255,11 @@ export async function GET(request: NextRequest) {
       goalIntensity: primaryGoalData.goalIntensity || 'standard',
     }
 
+    // Fallback: if primary goal still missing, use the first non-hidden health goal as a soft default
+    if (!onboardingData.goalChoice && onboardingData.goals.length > 0) {
+      onboardingData.goalChoice = onboardingData.goals[0]
+    }
+
     console.log('GET /api/user-data - Returning onboarding data for user')
 
     // Debug: Log transformed data being returned
@@ -383,6 +388,23 @@ export async function POST(request: NextRequest) {
       }
     } catch (error) {
       console.warn('⚠️ Failed to load existing profile info data:', error)
+    }
+
+    // Load existing primary goal (goal choice + intensity) for safe merging
+    let existingPrimaryGoalData: { goalChoice?: string; goalIntensity?: string } = {}
+    try {
+      const storedPrimaryGoal = await prisma.healthGoal.findFirst({
+        where: { userId: user.id, name: '__PRIMARY_GOAL__' },
+      })
+      if (storedPrimaryGoal?.category) {
+        const parsed = JSON.parse(storedPrimaryGoal.category)
+        existingPrimaryGoalData = {
+          goalChoice: typeof parsed.goalChoice === 'string' ? parsed.goalChoice : '',
+          goalIntensity: typeof parsed.goalIntensity === 'string' ? parsed.goalIntensity : '',
+        }
+      }
+    } catch (error) {
+      console.warn('⚠️ Failed to load existing primary goal data:', error)
     }
 
     const normalizedBirthdate =
@@ -534,7 +556,12 @@ export async function POST(request: NextRequest) {
 
     // 3.25. Handle primary goal + intensity (Step 2) - store as special health goal
     try {
-      if (data.goalChoice || data.goalIntensity) {
+      const incomingGoalChoice =
+        typeof data.goalChoice === 'string' ? data.goalChoice : existingPrimaryGoalData.goalChoice || ''
+      const incomingGoalIntensity =
+        typeof data.goalIntensity === 'string' ? data.goalIntensity : existingPrimaryGoalData.goalIntensity || 'standard'
+
+      if (incomingGoalChoice || incomingGoalIntensity) {
         await prisma.healthGoal.deleteMany({
           where: {
             userId: user.id,
@@ -547,8 +574,8 @@ export async function POST(request: NextRequest) {
             userId: user.id,
             name: '__PRIMARY_GOAL__',
             category: JSON.stringify({
-              goalChoice: data.goalChoice || '',
-              goalIntensity: data.goalIntensity || 'standard',
+              goalChoice: incomingGoalChoice,
+              goalIntensity: incomingGoalIntensity || 'standard',
             }),
             currentRating: 0,
           }
