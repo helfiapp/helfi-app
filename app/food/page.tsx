@@ -1326,7 +1326,30 @@ const applyStructuredItems = (
       const rounded = Math.round(clamped * 100) / 100
       itemsCopy[index].weightAmount = rounded
     } else if (field === 'weightUnit') {
+      const previousUnit = itemsCopy[index].weightUnit === 'ml' ? 'ml' : itemsCopy[index].weightUnit === 'oz' ? 'oz' : 'g'
       const normalized = value === 'ml' ? 'ml' : value === 'oz' ? 'oz' : 'g'
+      // Convert weightAmount to preserve the same actual quantity when switching units
+      const currentWeight = Number.isFinite(itemsCopy[index].weightAmount) ? Number(itemsCopy[index].weightAmount) : null
+      if (currentWeight && currentWeight > 0 && normalized !== previousUnit) {
+        let gramsValue: number | null = null
+        if (previousUnit === 'g') gramsValue = currentWeight
+        else if (previousUnit === 'ml') gramsValue = currentWeight // assume density ~1g/mL when unknown
+        else if (previousUnit === 'oz') gramsValue = currentWeight * 28.3495
+
+        if (gramsValue !== null) {
+          let converted = gramsValue
+          if (normalized === 'g') converted = gramsValue
+          else if (normalized === 'ml') converted = gramsValue // assume ~1g per mL
+          else if (normalized === 'oz') converted = gramsValue / 28.3495
+
+          // Round sensibly
+          if (normalized === 'oz') {
+            itemsCopy[index].weightAmount = Math.round(converted * 100) / 100
+          } else {
+            itemsCopy[index].weightAmount = Math.round(converted * 1000) / 1000
+          }
+        }
+      }
       itemsCopy[index].weightUnit = normalized
     } else if (field === 'customGramsPerServing') {
       const clamped = clampNumber(value, 0, 5000)
@@ -4262,6 +4285,7 @@ Please add nutritional information manually if needed.`);
                                         min={0}
                                         step={1}
                                         value={formatNumberInputValue(weightAmount ?? (weightUnit === 'ml' ? mlPerServing || '' : gramsPerServing || ''))}
+                                        onFocus={(e) => e.target.select()}
                                         onChange={(e) => updateItemField(index, 'weightAmount', e.target.value)}
                                         className="col-span-2 px-2 py-1 border border-gray-300 rounded-lg text-base font-semibold text-gray-900 text-center focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                                       />
@@ -4302,6 +4326,7 @@ Please add nutritional information manually if needed.`);
                                                 : ''
                                               : item.customGramsPerServing ?? '',
                                           )}
+                                          onFocus={(e) => e.target.select()}
                                           onChange={(e) => {
                                             const val = Number(e.target.value)
                                             if (!Number.isFinite(val) || val <= 0) {
