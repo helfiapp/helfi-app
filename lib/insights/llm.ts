@@ -855,7 +855,6 @@ Counts: suggested≥${minSuggested}, avoid≥${minAvoid}.`
     if (needSuggested > 0) {
       const f0 = Date.now()
       const more = await fillMissingItemsForSection({
-        openai,
         issueName: input.issueName,
         mode: input.mode,
         bucket: 'suggested',
@@ -871,7 +870,6 @@ Counts: suggested≥${minSuggested}, avoid≥${minAvoid}.`
     if (needAvoid > 0) {
       const f1 = Date.now()
       const more = await fillMissingItemsForSection({
-        openai,
         issueName: input.issueName,
         mode: input.mode,
         bucket: 'avoid',
@@ -1301,7 +1299,6 @@ export async function generateSectionInsightsFromLLM(
       if (rewritten?.length) {
         const cc1 = Date.now()
         const reClassified = await classifyCandidatesForSection({
-          openai,
           issueName: input.issueName,
           mode: input.mode,
           items: rewritten.map((m) => ({ name: m.name, reason: m.reason })),
@@ -1333,7 +1330,6 @@ export async function generateSectionInsightsFromLLM(
         const expected: CanonicalType | null = Array.from(allowed)[0] ?? null
         const f0 = Date.now()
         const more = await fillMissingItemsForSection({
-          openai,
           issueName: input.issueName,
           mode: input.mode,
           bucket,
@@ -1348,7 +1344,6 @@ export async function generateSectionInsightsFromLLM(
         // classify the new items
         const c1 = Date.now()
         const moreClassified = await classifyCandidatesForSection({
-          openai,
           issueName: input.issueName,
           mode: input.mode,
           items: more.map((m) => ({ name: m.name, reason: m.reason })),
