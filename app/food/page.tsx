@@ -2066,18 +2066,30 @@ const applyStructuredItems = (
         const compressedFile = await compressImage(file, 1024, 0.85);
         setPhotoFile(compressedFile);
         const reader = new FileReader();
-        reader.onload = (e) => setPhotoPreview(e.target?.result as string);
+        reader.onload = (e) => {
+          setPhotoPreview(e.target?.result as string);
+          setShowAddFood(true);
+          setShowAiResult(false);
+          setIsEditingDescription(false);
+          // Keep the analysis mode modal visible so the 🤖 Analyze button stays in view after picking
+          setShowAnalysisModeModal(true);
+        };
         reader.readAsDataURL(compressedFile);
       } catch (error) {
         console.error('Error compressing image:', error);
         // Fallback to original file if compression fails
         setPhotoFile(file);
         const reader = new FileReader();
-        reader.onload = (e) => setPhotoPreview(e.target?.result as string);
+        reader.onload = (e) => {
+          setPhotoPreview(e.target?.result as string);
+          setShowAddFood(true);
+          setShowAiResult(false);
+          setIsEditingDescription(false);
+          setShowAnalysisModeModal(true);
+        };
         reader.readAsDataURL(file);
       }
-      setShowAddFood(true);
-      setShowAiResult(false);
+      setPendingPhotoPicker(false);
     }
   };
 
