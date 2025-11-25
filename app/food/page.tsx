@@ -4021,10 +4021,6 @@ Please add nutritional information manually if needed.`);
                         const totalFiber = Math.round(((item.fiber_g ?? 0) * servingsCount) * 10) / 10;
                         const totalSugar = Math.round(((item.sugar_g ?? 0) * servingsCount) * 10) / 10;
                         const formattedServings = `${formatServingsDisplay(servingsCount)} serving${Math.abs(servingsCount - 1) < 0.001 ? '' : 's'}`;
-                        const totalsLabel =
-                          portionMode === 'weight' && weightAmount
-                            ? `${formatNumberInputValue(weightAmount)} ${weightUnit}`
-                            : formattedServings
 
                         const totalsByField: Record<string, number | null> = {
                           calories: totalCalories,
@@ -4047,6 +4043,20 @@ Please add nutritional information manually if needed.`);
                         const servingInfo = parseServingSizeInfo({ serving_size: servingSizeLabel })
                         const gramsPerServing = servingInfo.gramsPerServing
                         const mlPerServing = servingInfo.mlPerServing
+                        const portionMode = item?.portionMode === 'weight' ? 'weight' : 'servings'
+                        const weightUnit = item?.weightUnit === 'ml' ? 'ml' : 'g'
+                        const weightAmount =
+                          portionMode === 'weight' && Number.isFinite(item?.weightAmount)
+                            ? Number(item.weightAmount)
+                            : null
+                        const weightLabel =
+                          portionMode === 'weight' && weightAmount
+                            ? `${weightAmount}${weightUnit}`
+                            : null
+                        const totalsLabel =
+                          portionMode === 'weight' && weightAmount
+                            ? `${formatNumberInputValue(weightAmount)} ${weightUnit}`
+                            : formattedServings
                         const portionMode = item?.portionMode === 'weight' ? 'weight' : 'servings'
                         const weightUnit = item?.weightUnit === 'ml' ? 'ml' : 'g'
                         const weightAmount =
