@@ -1184,7 +1184,6 @@ export async function generateSectionInsightsFromLLM(
   if (base && !bestCandidate?.metMinimums) {
     const r0 = Date.now()
     const repaired = await repairLLMOutput({
-      openai,
       mode: input.mode,
       issueName: input.issueName,
       issueSummary: input.issueSummary,
