@@ -1221,7 +1221,6 @@ export async function generateSectionInsightsFromLLM(
     ]
     const c0 = Date.now()
     const classified = await classifyCandidatesForSection({
-      openai,
       issueName: input.issueName,
       mode: input.mode,
       items: itemsForClassification,
