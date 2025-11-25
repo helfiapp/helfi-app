@@ -1279,6 +1279,11 @@ const applyStructuredItems = (
       | 'brand'
       | 'serving_size'
       | 'servings'
+      | 'portionMode'
+      | 'weightAmount'
+      | 'weightUnit'
+      | 'customGramsPerServing'
+      | 'customMlPerServing'
       | 'calories'
       | 'protein_g'
       | 'carbs_g'
@@ -1303,6 +1308,33 @@ const applyStructuredItems = (
       const clamped = clampNumber(value, 0, 20)
       const rounded = Math.round(clamped * 100) / 100
       itemsCopy[index].servings = rounded
+    } else if (field === 'portionMode') {
+      itemsCopy[index].portionMode = value === 'weight' ? 'weight' : 'servings'
+      if (itemsCopy[index].portionMode === 'weight') {
+        const info = parseServingSizeInfo(itemsCopy[index])
+        const seed =
+          (itemsCopy[index].weightUnit === 'ml' ? info.mlPerServing : info.gramsPerServing) ||
+          info.gramsPerServing ||
+          info.mlPerServing ||
+          null
+        if (seed) {
+          itemsCopy[index].weightAmount = Math.round(seed * 100) / 100
+        }
+      }
+    } else if (field === 'weightAmount') {
+      const clamped = clampNumber(value, 0, 5000)
+      const rounded = Math.round(clamped * 100) / 100
+      itemsCopy[index].weightAmount = rounded
+    } else if (field === 'weightUnit') {
+      itemsCopy[index].weightUnit = value === 'ml' ? 'ml' : 'g'
+    } else if (field === 'customGramsPerServing') {
+      const clamped = clampNumber(value, 0, 5000)
+      const rounded = Math.round(clamped * 100) / 100
+      itemsCopy[index].customGramsPerServing = rounded
+    } else if (field === 'customMlPerServing') {
+      const clamped = clampNumber(value, 0, 5000)
+      const rounded = Math.round(clamped * 100) / 100
+      itemsCopy[index].customMlPerServing = rounded
     } else if (field === 'calories') {
       // Calories as integer, reasonable upper bound per serving
       const clamped = clampNumber(value, 0, 3000)
@@ -2169,6 +2201,45 @@ const applyStructuredItems = (
     }
   }
 
+  const parseServingSizeInfo = (item: any) => {
+    const raw = (item?.serving_size && String(item.serving_size)) || ''
+    const gramsMatch = raw.match(/(\d+(?:\.\d+)?)\s*g\b/i)
+    const mlMatch = raw.match(/(\d+(?:\.\d+)?)\s*ml\b/i)
+    const gramsPerServing = gramsMatch ? parseFloat(gramsMatch[1]) : null
+    const mlPerServing = mlMatch ? parseFloat(mlMatch[1]) : null
+    return {
+      label: raw,
+      gramsPerServing: gramsPerServing && gramsPerServing > 0 ? gramsPerServing : null,
+      mlPerServing: mlPerServing && mlPerServing > 0 ? mlPerServing : null,
+    }
+  }
+
+  const effectiveServings = (item: any) => {
+    const mode = item?.portionMode === 'weight' ? 'weight' : 'servings'
+    const baseServings = item?.servings && Number.isFinite(item.servings) && item.servings > 0 ? item.servings : 1
+
+    if (mode !== 'weight') return baseServings
+
+    const { gramsPerServing, mlPerServing } = parseServingSizeInfo(item)
+    const customGrams = Number.isFinite(item?.customGramsPerServing) ? Number(item.customGramsPerServing) : null
+    const customMl = Number.isFinite(item?.customMlPerServing) ? Number(item.customMlPerServing) : null
+    const weight = Number.isFinite(item?.weightAmount) ? Number(item.weightAmount) : null
+    const unit = item?.weightUnit === 'ml' ? 'ml' : 'g'
+
+    if (!weight || weight <= 0) return baseServings
+
+    if (unit === 'g') {
+      const denominator = customGrams && customGrams > 0 ? customGrams : gramsPerServing
+      if (denominator && denominator > 0) return Math.max(0, weight / denominator)
+    } else {
+      const denominator = customMl && customMl > 0 ? customMl : mlPerServing
+      if (denominator && denominator > 0) return Math.max(0, weight / denominator)
+    }
+
+    // Fallback to base servings if we lack conversion data
+    return baseServings
+  }
+
   // Recalculate nutrition totals from items array (multiplying by servings)
   const recalculateNutritionFromItems = (items: any[]): NutritionTotals | null => {
     if (!items || items.length === 0) return null
@@ -2183,7 +2254,7 @@ const applyStructuredItems = (
     }
 
     items.forEach((item: any) => {
-      const servings = item?.servings && Number.isFinite(item.servings) ? item.servings : 1
+      const servings = effectiveServings(item)
       totals.calories += (item.calories || 0) * servings
       totals.protein += (item.protein_g || 0) * servings
       totals.carbs += (item.carbs_g || 0) * servings
@@ -3942,7 +4013,7 @@ Please add nutritional information manually if needed.`);
                         </button>
                       </div>
                       {analyzedItems.map((item: any, index: number) => {
-                        const servingsCount = item?.servings && item.servings > 0 ? item.servings : 1;
+                        const servingsCount = effectiveServings(item);
                         const totalCalories = Math.round((item.calories || 0) * servingsCount);
                         const totalProtein = Math.round(((item.protein_g || 0) * servingsCount) * 10) / 10;
                         const totalCarbs = Math.round(((item.carbs_g || 0) * servingsCount) * 10) / 10;
@@ -3950,6 +4021,10 @@ Please add nutritional information manually if needed.`);
                         const totalFiber = Math.round(((item.fiber_g ?? 0) * servingsCount) * 10) / 10;
                         const totalSugar = Math.round(((item.sugar_g ?? 0) * servingsCount) * 10) / 10;
                         const formattedServings = `${formatServingsDisplay(servingsCount)} serving${Math.abs(servingsCount - 1) < 0.001 ? '' : 's'}`;
+                        const totalsLabel =
+                          portionMode === 'weight' && weightAmount
+                            ? `${formatNumberInputValue(weightAmount)} ${weightUnit}`
+                            : formattedServings
 
                         const totalsByField: Record<string, number | null> = {
                           calories: totalCalories,
@@ -3969,13 +4044,19 @@ Please add nutritional information manually if needed.`);
                           return m && m[1] ? m[1].trim() : ''
                         })()
                         const servingUnitMeta = parseServingUnitMetadata(servingSizeLabel || '')
-                        const gramsPerServing = (() => {
-                          if (!servingSizeLabel) return null
-                          const m = servingSizeLabel.match(/(\d+(?:\.\d+)?)\s*g\b/i)
-                          if (!m) return null
-                          const v = parseFloat(m[1])
-                          return Number.isFinite(v) && v > 0 ? v : null
-                        })()
+                        const servingInfo = parseServingSizeInfo({ serving_size: servingSizeLabel })
+                        const gramsPerServing = servingInfo.gramsPerServing
+                        const mlPerServing = servingInfo.mlPerServing
+                        const portionMode = item?.portionMode === 'weight' ? 'weight' : 'servings'
+                        const weightUnit = item?.weightUnit === 'ml' ? 'ml' : 'g'
+                        const weightAmount =
+                          portionMode === 'weight' && Number.isFinite(item?.weightAmount)
+                            ? Number(item.weightAmount)
+                            : null
+                        const weightLabel =
+                          portionMode === 'weight' && weightAmount
+                            ? `${weightAmount}${weightUnit}`
+                            : null
 
                         const isMultiIngredient = analyzedItems.length > 1
                         const isExpanded = !isMultiIngredient || expandedItemIndex === index
@@ -4052,79 +4133,163 @@ Please add nutritional information manually if needed.`);
                               </div>
                             </div>
                             
-                            {/* Serving Controls
-                                GUARD RAIL SUMMARY:
-                                - This UI intentionally exposes ONE editable number: Servings.
-                                - 1 serving is defined by `servingSizeLabel` (e.g. "1/2 cup (45 g)").
-                                - When gramsPerServing is known, we also show a read-only "Total ≈ X g" line.
-                                - Do NOT re-introduce a second editable "Units" field or change the meaning of
-                                  "1 serving" without explicit written approval from the user. */}
+                            {/* Portion controls: toggle between servings and weight modes */}
                             {isExpanded && (
                               <div className="flex flex-col gap-2 mb-3 pb-3 border-b border-gray-100">
-                              <div className="flex items-center gap-3">
-                                <span className="text-sm text-gray-600">Servings:</span>
                                 <div className="flex items-center gap-2">
-                                  <button
-                                    onClick={() => {
-                                      const current = analyzedItems[index]?.servings || 1
-                                      const step =
-                                        servingUnitMeta && isDiscreteUnitLabel(servingUnitMeta.unitLabel) && servingUnitMeta.quantity > 0
-                                          ? 1 / servingUnitMeta.quantity
-                                          : 0.25
-                                      const snapToStep = (val: number) => {
-                                        if (!step || step <= 0) return val
-                                        const snapped = Math.round(val / step)
-                                        return Math.max(0, Math.round(snapped * step * 10000) / 10000)
-                                      }
-                                      const next = snapToStep(current - step)
-                                      updateItemField(index, 'servings', next)
-                                    }}
-                                    className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-medium transition-colors"
-                                  >
-                                    -
-                                    </button>
-                                    <input
-                                      type="number"
-                                      min={0}
-                                      step={
-                                        servingUnitMeta && isDiscreteUnitLabel(servingUnitMeta.unitLabel)
-                                          ? Math.max(1 / servingUnitMeta.quantity, 0.01)
-                                          : 0.25
-                                      }
-                                      value={formatNumberInputValue(item.servings ?? 1)}
-                                      onChange={(e) => updateItemField(index, 'servings', e.target.value)}
-                                      className="w-20 px-2 py-1 border border-gray-300 rounded-lg text-base font-semibold text-gray-900 text-center focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                    />
+                                  <span className="text-sm text-gray-600">Portion mode:</span>
+                                  <div className="flex gap-1">
                                     <button
-                                      onClick={() => {
-                                        const current = analyzedItems[index]?.servings || 1
-                                        const step =
-                                          servingUnitMeta && isDiscreteUnitLabel(servingUnitMeta.unitLabel) && servingUnitMeta.quantity > 0
-                                            ? 1 / servingUnitMeta.quantity
-                                            : 0.25
-                                        const snapToStep = (val: number) => {
-                                          if (!step || step <= 0) return val
-                                          const snapped = Math.round(val / step)
-                                          return Math.max(0, Math.round(snapped * step * 10000) / 10000)
-                                        }
-                                        const next = snapToStep(current + step)
-                                        updateItemField(index, 'servings', next)
-                                      }}
-                                      className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-medium transition-colors"
+                                      type="button"
+                                      onClick={() => updateItemField(index, 'portionMode', 'servings')}
+                                      className={`px-3 py-1.5 text-xs rounded-lg border ${
+                                        portionMode === 'servings'
+                                          ? 'bg-emerald-600 text-white border-emerald-600'
+                                          : 'bg-white text-gray-700 border-gray-300'
+                                      }`}
                                     >
-                                      +
+                                      Servings
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => updateItemField(index, 'portionMode', 'weight')}
+                                      className={`px-3 py-1.5 text-xs rounded-lg border ${
+                                        portionMode === 'weight'
+                                          ? 'bg-slate-800 text-white border-slate-800'
+                                          : 'bg-white text-gray-700 border-gray-300'
+                                      }`}
+                                    >
+                                      Weight (g / mL)
                                     </button>
                                   </div>
                                 </div>
-                                <div className="text-xs text-gray-500">
-                                  {servingSizeLabel
-                                    ? `1 serving = ${servingSizeLabel}`
-                                    : 'Serving size not specified'}
-                                </div>
-                                {gramsPerServing && (
-                                  <div className="text-xs text-gray-500">
-                                    Total amount ≈ {Math.round(gramsPerServing * servingsCount)} g
-                                  </div>
+
+                                {portionMode === 'servings' ? (
+                                  <>
+                                    <div className="flex items-center gap-3">
+                                      <span className="text-sm text-gray-600">Servings:</span>
+                                      <div className="flex items-center gap-2">
+                                        <button
+                                          onClick={() => {
+                                            const current = analyzedItems[index]?.servings || 1
+                                            const step =
+                                              servingUnitMeta && isDiscreteUnitLabel(servingUnitMeta.unitLabel) && servingUnitMeta.quantity > 0
+                                                ? 1 / servingUnitMeta.quantity
+                                                : 0.25
+                                            const snapToStep = (val: number) => {
+                                              if (!step || step <= 0) return val
+                                              const snapped = Math.round(val / step)
+                                              return Math.max(0, Math.round(snapped * step * 10000) / 10000)
+                                            }
+                                            const next = snapToStep(current - step)
+                                            updateItemField(index, 'servings', next)
+                                          }}
+                                          className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-medium transition-colors"
+                                        >
+                                          -
+                                        </button>
+                                        <input
+                                          type="number"
+                                          min={0}
+                                          step={
+                                            servingUnitMeta && isDiscreteUnitLabel(servingUnitMeta.unitLabel)
+                                              ? Math.max(1 / servingUnitMeta.quantity, 0.01)
+                                              : 0.25
+                                          }
+                                          value={formatNumberInputValue(item.servings ?? 1)}
+                                          onChange={(e) => updateItemField(index, 'servings', e.target.value)}
+                                          className="w-20 px-2 py-1 border border-gray-300 rounded-lg text-base font-semibold text-gray-900 text-center focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                        />
+                                        <button
+                                          onClick={() => {
+                                            const current = analyzedItems[index]?.servings || 1
+                                            const step =
+                                              servingUnitMeta && isDiscreteUnitLabel(servingUnitMeta.unitLabel) && servingUnitMeta.quantity > 0
+                                                ? 1 / servingUnitMeta.quantity
+                                                : 0.25
+                                            const snapToStep = (val: number) => {
+                                              if (!step || step <= 0) return val
+                                              const snapped = Math.round(val / step)
+                                              return Math.max(0, Math.round(snapped * step * 10000) / 10000)
+                                            }
+                                            const next = snapToStep(current + step)
+                                            updateItemField(index, 'servings', next)
+                                          }}
+                                          className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-medium transition-colors"
+                                        >
+                                          +
+                                        </button>
+                                      </div>
+                                    </div>
+                                    <div className="text-xs text-gray-500">
+                                      {servingSizeLabel
+                                        ? `1 serving = ${servingSizeLabel}`
+                                        : 'Serving size not specified'}
+                                    </div>
+                                    {gramsPerServing && (
+                                      <div className="text-xs text-gray-500">
+                                        Total amount ≈ {Math.round(gramsPerServing * servingsCount)} g
+                                      </div>
+                                    )}
+                                  </>
+                                ) : (
+                                  <>
+                                    <div className="grid grid-cols-6 gap-2 items-center">
+                                      <span className="text-sm text-gray-600 col-span-2">Weight:</span>
+                                      <input
+                                        type="number"
+                                        min={0}
+                                        step={1}
+                                        value={formatNumberInputValue(weightAmount ?? (weightUnit === 'ml' ? mlPerServing || '' : gramsPerServing || ''))}
+                                        onChange={(e) => updateItemField(index, 'weightAmount', e.target.value)}
+                                        className="col-span-2 px-2 py-1 border border-gray-300 rounded-lg text-base font-semibold text-gray-900 text-center focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                      />
+                                      <select
+                                        value={weightUnit}
+                                        onChange={(e) => updateItemField(index, 'weightUnit', e.target.value)}
+                                        className="col-span-2 px-2 py-1 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                      >
+                                        <option value="g">g</option>
+                                        <option value="ml">mL</option>
+                                      </select>
+                                    </div>
+                                    <div className="text-xs text-gray-500">
+                                      {gramsPerServing || mlPerServing
+                                        ? `1 serving = ${servingSizeLabel || 'not specified'}`
+                                        : 'No per-serving weight/volume detected; enter one below to enable precise scaling.'}
+                                    </div>
+                                    {weightUnit === 'g' && (
+                                      <div className="grid grid-cols-6 gap-2 items-center">
+                                        <span className="text-[11px] text-gray-600 col-span-3">Grams per serving (if missing):</span>
+                                        <input
+                                          type="number"
+                                          min={0}
+                                          step={1}
+                                          value={formatNumberInputValue(item.customGramsPerServing ?? '')}
+                                          onChange={(e) => updateItemField(index, 'customGramsPerServing', e.target.value)}
+                                          className="col-span-3 px-2 py-1 border border-gray-300 rounded-lg text-sm text-gray-900 text-center focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                          placeholder={gramsPerServing ? `${gramsPerServing} g` : 'e.g. 20'}
+                                        />
+                                      </div>
+                                    )}
+                                    {weightUnit === 'ml' && (
+                                      <div className="grid grid-cols-6 gap-2 items-center">
+                                        <span className="text-[11px] text-gray-600 col-span-3">mL per serving (if missing):</span>
+                                        <input
+                                          type="number"
+                                          min={0}
+                                          step={1}
+                                          value={formatNumberInputValue(item.customMlPerServing ?? '')}
+                                          onChange={(e) => updateItemField(index, 'customMlPerServing', e.target.value)}
+                                          className="col-span-3 px-2 py-1 border border-gray-300 rounded-lg text-sm text-gray-900 text-center focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                          placeholder={mlPerServing ? `${mlPerServing} mL` : 'e.g. 15'}
+                                        />
+                                      </div>
+                                    )}
+                                    <div className="text-xs text-gray-500">
+                                      Macros scale linearly to the weight you enter. Servings controls are hidden in weight mode to avoid conflicts.
+                                    </div>
+                                  </>
                                 )}
                               </div>
                             )}
@@ -4133,7 +4298,7 @@ Please add nutritional information manually if needed.`);
                             {isExpanded && (
                             <div className="space-y-2">
                               <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                                Totals for {formattedServings}
+                                Totals for {totalsLabel}
                               </div>
                               <div className="flex flex-wrap gap-2">
                                 {ITEM_NUTRIENT_META.map((meta) => {
