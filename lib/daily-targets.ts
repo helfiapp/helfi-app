@@ -17,6 +17,7 @@ export type DailyTargetInput = {
   goalChoice?: string | null
   goalIntensity?: 'mild' | 'standard' | 'aggressive' | null
   exerciseDurations?: Record<string, number | string | null> | null
+  bodyType?: string | null
   healthSituations?: {
     healthIssues?: string
     healthProblems?: string
@@ -138,6 +139,38 @@ function macroSplitForGoal(goalChoice?: string | null): { proteinPct: number; fa
   return { proteinPct: 0.3, fatPct: 0.3, carbPct: 0.4 }
 }
 
+function normalizeSplit(proteinPct: number, fatPct: number, carbPct: number) {
+  const totalPct = proteinPct + fatPct + carbPct
+  if (totalPct > 1e-6) {
+    return {
+      proteinPct: proteinPct / totalPct,
+      fatPct: fatPct / totalPct,
+      carbPct: carbPct / totalPct,
+    }
+  }
+  return { proteinPct: 0.3, fatPct: 0.3, carbPct: 0.4 }
+}
+
+function parseConditionsFromGoals(goals?: string[] | null): string[] {
+  if (!Array.isArray(goals) || goals.length === 0) return []
+  const blob = goals.join(' ').toLowerCase()
+  const conditions: string[] = []
+  const add = (tag: string) => {
+    if (!conditions.includes(tag)) conditions.push(tag)
+  }
+  if (blob.includes('diab')) add('diabetes')
+  if (blob.includes('pcos')) add('pcos')
+  if (blob.includes('cholesterol') || blob.includes('lipid')) add('cholesterol')
+  if (blob.includes('hypertension') || blob.includes('blood pressure')) add('hypertension')
+  if (blob.includes('heart') || blob.includes('cardio')) add('cardio')
+  if (blob.includes('ibs')) add('ibs')
+  if (blob.includes('constipation')) add('constipation')
+  if (blob.includes('ulcer')) add('ulcer')
+  if (blob.includes('gerd') || blob.includes('reflux')) add('reflux')
+  if (blob.includes('acid') && blob.includes('reflux')) add('reflux')
+  return conditions
+}
+
 function applyConditionAdjustments(
   split: { proteinPct: number; fatPct: number; carbPct: number },
   conditions: string[],
@@ -160,14 +193,49 @@ function applyConditionAdjustments(
     carbPct = Math.min(0.45, carbPct + 0.02)
   }
 
-  const totalPct = proteinPct + fatPct + carbPct
-  if (totalPct > 1e-6) {
-    proteinPct = proteinPct / totalPct
-    fatPct = fatPct / totalPct
-    carbPct = carbPct / totalPct
+  if (conditions.includes('constipation')) {
+    fiberTarget = Math.max(fiberTarget, 32)
   }
 
-  return { proteinPct, fatPct, carbPct, fiberTarget, sugarCap }
+  if (conditions.includes('ulcer') || conditions.includes('reflux')) {
+    // Gentle tweak: avoid very high fat splits; keep carbs moderate
+    fatPct = Math.min(fatPct, 0.32)
+    carbPct = Math.min(Math.max(carbPct, 0.35), 0.45)
+  }
+
+  const normalized = normalizeSplit(proteinPct, fatPct, carbPct)
+
+  return { ...normalized, fiberTarget, sugarCap }
+}
+
+function applyBodyTypeAdjustments(
+  split: { proteinPct: number; fatPct: number; carbPct: number },
+  bodyType?: string | null,
+) {
+  const type = (bodyType || '').toLowerCase()
+  let proteinPct = split.proteinPct
+  let fatPct = split.fatPct
+  let carbPct = split.carbPct
+  let calorieFactor = 1
+  let fiberBonus = 0
+
+  if (type.startsWith('ecto')) {
+    // Slightly higher carbs and calories to support weight gain/maintenance
+    carbPct += 0.02
+    fatPct -= 0.01
+    calorieFactor = 1.05
+  } else if (type.startsWith('endo')) {
+    // Slightly higher protein, moderate carbs, gentle calorie reduction
+    proteinPct += 0.02
+    carbPct -= 0.03
+    fatPct += 0.01
+    calorieFactor = 0.95
+  } else if (type.startsWith('meso')) {
+    fiberBonus = 1 // subtle nudge
+  }
+
+  const normalized = normalizeSplit(proteinPct, fatPct, carbPct)
+  return { ...normalized, calorieFactor, fiberBonus }
 }
 
 /**
@@ -200,6 +268,7 @@ export function calculateDailyTargets(input: DailyTargetInput): DailyTargets {
 
   const activity = activityMultiplier(input.exerciseFrequency)
   const goalFactor = goalAdjustmentFactor(input.goalChoice, input.goalIntensity)
+  const bodyTypeFactor = applyBodyTypeAdjustments({ proteinPct: 0, fatPct: 0, carbPct: 1 }, input.bodyType).calorieFactor
 
   // Include user-reported exercise durations to estimate extra daily burn
   const metMinutes = parseExerciseDurations(input.exerciseDurations, input.exerciseFrequency)
@@ -207,11 +276,26 @@ export function calculateDailyTargets(input: DailyTargetInput): DailyTargets {
     weightKg && metMinutes > 0 ? (metMinutes * weightKg) / 200 : 0 // kcal/day
 
   const tdee = bmr * activity
-  const targetCalories = clamp(Math.round((tdee + extraActivityKcal) * goalFactor), 1200, 4000)
+  const targetCalories = clamp(
+    Math.round((tdee + extraActivityKcal) * goalFactor * bodyTypeFactor),
+    1200,
+    4000,
+  )
 
   const baseSplit = macroSplitForGoal(input.goalChoice)
-  const conditions = parseConditionsText(input.healthSituations)
-  const { proteinPct, fatPct, carbPct, fiberTarget, sugarCap } = applyConditionAdjustments(baseSplit, conditions)
+  const conditions = Array.from(
+    new Set([
+      ...parseConditionsText(input.healthSituations),
+      ...parseConditionsFromGoals(input.goals),
+    ]),
+  )
+  const { proteinPct: conditionedProtein, fatPct: conditionedFat, carbPct: conditionedCarb, fiberTarget, sugarCap } =
+    applyConditionAdjustments(baseSplit, conditions)
+
+  const { proteinPct, fatPct, carbPct, fiberBonus } = applyBodyTypeAdjustments(
+    { proteinPct: conditionedProtein, fatPct: conditionedFat, carbPct: conditionedCarb },
+    input.bodyType,
+  )
 
   const proteinCalories = targetCalories * proteinPct
   const carbCalories = targetCalories * carbPct
@@ -220,7 +304,7 @@ export function calculateDailyTargets(input: DailyTargetInput): DailyTargets {
   const protein = Math.round(proteinCalories / 4)
   const carbs = Math.round(carbCalories / 4)
   const fat = Math.round(fatCalories / 9)
-  const fiber = Math.round(fiberTarget)
+  const fiber = Math.round(fiberTarget + fiberBonus)
   const sugarMax = Math.round(
     Math.min(
       sugarCap,

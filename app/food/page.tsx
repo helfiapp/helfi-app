@@ -1039,6 +1039,7 @@ export default function FoodDiary() {
       goalChoice: (userData as any).goalChoice,
       goalIntensity: (userData as any).goalIntensity,
       exerciseDurations: (userData as any).exerciseDurations,
+      bodyType: (userData as any).bodyType,
       healthSituations: (userData as any).healthSituations,
     })
   }, [userData])
