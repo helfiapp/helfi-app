@@ -7,6 +7,7 @@ import { CreditManager } from '@/lib/credit-system'
 import { chatCompletionWithCost } from '@/lib/metered-openai'
 import { costCentsEstimateFromText } from '@/lib/cost-meter'
 import { scheduleHealthTipWithQStash } from '@/lib/qstash'
+import { logAIUsage } from '@/lib/ai-usage-logger'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -612,7 +613,7 @@ export async function POST(req: NextRequest) {
             .slice(0, 4)
         : []
 
-    // Charge the user twice the underlying AI cost in credits
+    // Charge the user in credits for this tip
     const chargedOk = await creditManager.chargeCents(chargeCents)
     if (!chargedOk) {
       return NextResponse.json({ error: 'billing_failed' }, { status: 402 })
@@ -663,6 +664,19 @@ export async function POST(req: NextRequest) {
         console.error('[HEALTH_TIPS] Failed to schedule next tip via QStash', error)
       }
     )
+
+    // Log AI usage for health tip generation (fire-and-forget)
+    try {
+      await logAIUsage({
+        context: { feature: 'health-tips:dispatch', userId },
+        model,
+        promptTokens: wrapped.promptTokens,
+        completionTokens: wrapped.completionTokens,
+        costCents,
+      })
+    } catch {
+      // Logging issues should not affect tip delivery
+    }
 
     return NextResponse.json({
       ok: true,

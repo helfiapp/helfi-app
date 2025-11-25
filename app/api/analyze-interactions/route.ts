@@ -6,6 +6,7 @@ import { CreditManager, CREDIT_COSTS } from '@/lib/credit-system';
 import OpenAI from 'openai';
 import { chatCompletionWithCost } from '@/lib/metered-openai';
 import { costCentsEstimateFromText } from '@/lib/cost-meter';
+import { logAIUsage } from '@/lib/ai-usage-logger';
 
 // Lazily initialize OpenAI to avoid build-time env requirements
 function getOpenAIClient() {
@@ -305,6 +306,19 @@ Be thorough but not alarmist. Provide actionable recommendations.`;
         totalAnalysisCount: { increment: 1 },
       } as any )
     });
+
+    // Log AI usage for interaction analysis (fire-and-forget)
+    try {
+      await logAIUsage({
+        context: { feature: 'interactions:analysis', userId: user.id },
+        model,
+        promptTokens: wrapped.promptTokens,
+        completionTokens: wrapped.completionTokens,
+        costCents: wrapped.costCents,
+      });
+    } catch {
+      // Logging should never break the main flow
+    }
 
     // Fire-and-forget: update insights preview based on new interaction results
     try { fetch('/api/insights/generate?preview=1', { method: 'POST' }).catch(()=>{}) } catch {}

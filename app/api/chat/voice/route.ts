@@ -444,6 +444,19 @@ export async function POST(req: NextRequest) {
       const userCostCents = wrapped.costCents * 2
       await cm.chargeCents(userCostCents)
 
+      // Log AI usage for cost tracking (voice chat, non-streaming)
+      try {
+        await logAIUsage({
+          context: { feature: 'voice:chat', userId: user.id },
+          model,
+          promptTokens: wrapped.promptTokens,
+          completionTokens: wrapped.completionTokens,
+          costCents: userCostCents,
+        })
+      } catch {
+        // Ignore logging failures
+      }
+
       const assistantMessage = wrapped.completion.choices[0]?.message?.content || 'I apologize, but I could not generate a response.'
 
       // Save assistant message

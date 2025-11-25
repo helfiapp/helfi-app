@@ -233,6 +233,24 @@ export async function POST(
       messages: chatMessages as any,
     } as any)
     await cm.chargeCents(wrapped.costCents).catch(() => {})
+
+    // Log AI usage for non-streaming section chat
+    try {
+      await logAIUsage({
+        context: {
+          feature: `insights:section-chat:${section}`,
+          userId: session.user.id,
+          issueSlug: context.params.slug,
+        },
+        model,
+        promptTokens: wrapped.promptTokens,
+        completionTokens: wrapped.completionTokens,
+        costCents: wrapped.costCents,
+      })
+    } catch {
+      // Ignore logging failures
+    }
+
     const text = wrapped.completion.choices?.[0]?.message?.content || ''
     await appendMessage(thread.id, 'assistant', text)
     return NextResponse.json({ assistant: text })

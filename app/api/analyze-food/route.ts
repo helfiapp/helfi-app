@@ -23,6 +23,7 @@ const CACHE_VERSION = 'v2';
 import OpenAI from 'openai';
 import { chatCompletionWithCost } from '@/lib/metered-openai';
 import { costCentsEstimateFromText } from '@/lib/cost-meter';
+import { logAIUsage } from '@/lib/ai-usage-logger';
 // NOTE: USDA/FatSecret lookup removed from AI analysis - kept only for manual ingredient lookup via /api/food-data
 
 // Best-effort relaxed JSON parsing to handle minor LLM formatting issues
@@ -1353,6 +1354,20 @@ Your recommendations:`;
         console.warn('Wallet charge failed:', e);
         return NextResponse.json({ error: 'Billing error' }, { status: 402 });
       }
+    }
+
+    // Log AI usage for the main Food Analyzer (fire-and-forget).
+    // Use the primary analysis tokens and the total combined cost (analysis + follow-ups).
+    try {
+      await logAIUsage({
+        context: { feature: 'food:analysis', userId: currentUser.id },
+        model,
+        promptTokens: primary.promptTokens,
+        completionTokens: primary.completionTokens,
+        costCents: totalCostCents,
+      });
+    } catch {
+      // Logging must never affect the Food Analyzer behaviour
     }
 
     // Fire-and-forget: generate updated insights in preview mode

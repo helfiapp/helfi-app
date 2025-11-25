@@ -7,6 +7,7 @@ import { CreditManager, CREDIT_COSTS } from '@/lib/credit-system'
 import OpenAI from 'openai'
 import { chatCompletionWithCost } from '@/lib/metered-openai'
 import { costCentsEstimateFromText } from '@/lib/cost-meter'
+import { logAIUsage } from '@/lib/ai-usage-logger'
 
 // Initialize OpenAI client only when API key is available (same pattern as analyze-food)
 const getOpenAIClient = () => {
@@ -220,6 +221,19 @@ Return two parts:
           console.warn('Failed to update hasUsedFreeSymptomAnalysis:', e)
         }
       }
+    }
+
+    // Log AI usage for cost tracking (fire-and-forget; does not affect user flow)
+    try {
+      await logAIUsage({
+        context: { feature: 'symptoms:analysis', userId: refreshedUser.id },
+        model,
+        promptTokens: wrapped.promptTokens,
+        completionTokens: wrapped.completionTokens,
+        costCents: wrapped.costCents,
+      })
+    } catch {
+      // Logging failures must never break the main feature
     }
 
     // Build response

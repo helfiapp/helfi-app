@@ -178,6 +178,20 @@ export async function POST(req: NextRequest) {
         const cm = new CreditManager(user.id)
         await cm.chargeCents(wrapped.costCents)
       } catch {}
+
+      // Log AI usage for non-streaming symptom chat
+      try {
+        await logAIUsage({
+          context: { feature: 'symptoms:chat', userId: user.id },
+          model,
+          promptTokens: wrapped.promptTokens,
+          completionTokens: wrapped.completionTokens,
+          costCents: wrapped.costCents,
+        })
+      } catch {
+        // Ignore logging failures
+      }
+
       const text = wrapped.completion.choices?.[0]?.message?.content || ''
       return NextResponse.json({ assistant: text })
     }

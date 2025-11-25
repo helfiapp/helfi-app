@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { CreditManager } from '@/lib/credit-system';
 import { chatCompletionWithCost } from '@/lib/metered-openai';
+import { logAIUsage } from '@/lib/ai-usage-logger';
 
 function getOpenAIClient() {
   if (!process.env.OPENAI_API_KEY) {
@@ -205,6 +206,19 @@ export async function POST(req: NextRequest) {
       }
     }
     
+    // Log AI usage for medical image analysis (fire-and-forget)
+    try {
+      await logAIUsage({
+        context: { feature: 'medical-image:analysis', userId: user.id },
+        model: "gpt-4o",
+        promptTokens: wrapped.promptTokens,
+        completionTokens: wrapped.completionTokens,
+        costCents: wrapped.costCents,
+      });
+    } catch {
+      // Logging errors should not impact the user
+    }
+
     // Update monthly counter (for all users, not just premium)
     await prisma.user.update({
       where: { id: user.id },
