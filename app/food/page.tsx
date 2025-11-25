@@ -954,6 +954,8 @@ export default function FoodDiary() {
   const [healthWarning, setHealthWarning] = useState<string | null>(null)
   const [healthAlternatives, setHealthAlternatives] = useState<string | null>(null)
   const [historySaveError, setHistorySaveError] = useState<string | null>(null)
+  const [lastHistoryPayload, setLastHistoryPayload] = useState<any>(null)
+  const [historyRetrying, setHistoryRetrying] = useState(false)
   const [showAddIngredientModal, setShowAddIngredientModal] = useState<boolean>(false)
   const [officialSearchQuery, setOfficialSearchQuery] = useState<string>('')
   const [officialResults, setOfficialResults] = useState<any[]>([])
@@ -1056,6 +1058,26 @@ export default function FoodDiary() {
     }
     setAnalyzedNutrition(recalculated)
     setAnalyzedTotal(convertTotalsForStorage(recalculated))
+  }
+
+  // Prevent duplicate rows from ever rendering (e.g., double writes or cached copies).
+  const dedupeEntries = (list: any[]) => {
+    if (!Array.isArray(list)) return []
+    const seen = new Set<string>()
+    const result: any[] = []
+    for (const entry of list) {
+      const key = [
+        entry?.localDate || '',
+        (entry?.description || '').toString().trim().toLowerCase(),
+        entry?.time || '',
+        entry?.photo || '',
+      ].join('|')
+      if (!seen.has(key)) {
+        seen.add(key)
+        result.push(entry)
+      }
+    }
+    return result
   }
 
   const handleDeleteItem = (index: number) => {
@@ -1573,9 +1595,9 @@ const applyStructuredItems = (
       });
       console.log(`📊 Found ${onlySelectedDate.length} entries in cache for date ${selectedDate}`);
       
-      // Deduplicate entries by ID to prevent duplicates from context updates
+      // Deduplicate entries by ID + content to prevent duplicates from context updates
       const seenIds = new Set<number>();
-      const deduped = onlySelectedDate.filter((item: any) => {
+      const deduped = dedupeEntries(onlySelectedDate).filter((item: any) => {
         const id = typeof item.id === 'number' ? item.id : Number(item.id);
         if (seenIds.has(id)) {
           return false;
@@ -2113,6 +2135,7 @@ const applyStructuredItems = (
             // Always pin to the calendar date the user was viewing when they saved
             localDate: targetLocalDate,
           }
+          setLastHistoryPayload(payload)
 
           console.log('📤 Sending FoodLog POST request:', {
             localDate: payload.localDate,
@@ -2164,6 +2187,7 @@ const applyStructuredItems = (
             } catch (fallbackError) {
               console.error('❌ Fallback user-data append threw:', fallbackError)
             }
+            throw new Error('History save failed')
           } else {
             const result = await res.json().catch(() => ({}))
             console.log('✅ Successfully saved entry to FoodLog:', {
@@ -2172,6 +2196,7 @@ const applyStructuredItems = (
               descriptionPreview: payload.description.substring(0, 50),
             })
             setHistorySaveError(null)
+            setLastHistoryPayload(null)
           }
         } catch (historyError) {
           console.error('❌ Exception while saving to FoodLog:', {
@@ -2197,6 +2222,33 @@ const applyStructuredItems = (
         message: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined,
       })
+      setHistorySaveError('Saving your meal to history failed. Please stay on this page and retry saving.')
+    }
+  }
+
+  const retryHistorySave = async () => {
+    if (!lastHistoryPayload || historyRetrying) return
+    try {
+      setHistoryRetrying(true)
+      const res = await fetch('/api/food-log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(lastHistoryPayload),
+      })
+      if (!res.ok) {
+        const errorText = await res.text()
+        console.error('❌ Retry history save failed:', { status: res.status, statusText: res.statusText, error: errorText })
+        setHistorySaveError('Retry failed. Keep this tab open and try again.')
+        return
+      }
+      setHistorySaveError(null)
+      setLastHistoryPayload(null)
+      console.log('✅ Retry history save succeeded')
+    } catch (e) {
+      console.error('❌ Retry history save exception:', e)
+      setHistorySaveError('Retry failed. Keep this tab open and try again.')
+    } finally {
+      setHistoryRetrying(false)
     }
   }
 
@@ -3436,8 +3488,17 @@ Please add nutritional information manually if needed.`);
         )}
 
         {historySaveError && (
-          <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 text-amber-800 px-4 py-3 text-sm">
-            {historySaveError}
+          <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 text-amber-800 px-4 py-3 text-sm flex items-center justify-between gap-3">
+            <span>{historySaveError}</span>
+            {lastHistoryPayload && (
+              <button
+                onClick={retryHistorySave}
+                disabled={historyRetrying}
+                className="px-3 py-1 rounded-md bg-amber-600 text-white text-xs font-semibold disabled:opacity-60"
+              >
+                {historyRetrying ? 'Retrying…' : 'Retry save'}
+              </button>
+            )}
           </div>
         )}
 
@@ -5192,10 +5253,10 @@ Please add nutritional information manually if needed.`);
         ) : (
         <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 overflow-visible">
           {/* Daily Totals Row - only show on main diary view, not while editing an entry */}
-          {!editingEntry && (isViewingToday ? todaysFoods : (historyFoods || [])).length > 0 && (
+          {!editingEntry && dedupeEntries(isViewingToday ? todaysFoods : (historyFoods || [])).length > 0 && (
             <div className="mb-4">
               {(() => {
-                const source = isViewingToday ? todaysFoods : (historyFoods || [])
+                const source = dedupeEntries(isViewingToday ? todaysFoods : (historyFoods || []))
 
                 const safeNumber = (value: any) => {
                   const num = Number(value)
@@ -5436,7 +5497,7 @@ Please add nutritional information manually if needed.`);
             <>
           <h3 className="text-lg font-semibold mb-4">{isViewingToday ? "Today's Meals" : 'Meals'}</h3>
           
-          {(isViewingToday ? todaysFoods : (historyFoods || [])).length === 0 ? (
+          {dedupeEntries(isViewingToday ? todaysFoods : (historyFoods || [])).length === 0 ? (
             <div className="text-center py-8">
               <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
@@ -5446,7 +5507,7 @@ Please add nutritional information manually if needed.`);
             </div>
           ) : (
             <div className="space-y-3">
-              {(isViewingToday ? todaysFoods : (historyFoods || []))
+              {dedupeEntries(isViewingToday ? todaysFoods : (historyFoods || []))
                 .slice()
                 .sort((a: any, b: any) => (b?.id || 0) - (a?.id || 0))
                 .map((food) => (
