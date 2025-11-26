@@ -1109,12 +1109,14 @@ export default function FoodDiary() {
         .toLowerCase()
         .replace(/\s+/g, ' ')
         .trim()
-    // First pass: drop obvious duplicates (same date+description+time+photo)
+    // First pass: drop obvious duplicates within the same category (same date+category+description+time+photo)
     const seen = new Set<string>()
     const firstPass: any[] = []
     for (const entry of list) {
+      const cat = normalizeCategory(entry?.meal || entry?.category || entry?.mealType)
       const key = [
         entry?.localDate || '',
+        cat,
         (entry?.description || '').toString().trim().toLowerCase(),
         entry?.time || '',
         entry?.photo || '',
@@ -1124,12 +1126,13 @@ export default function FoodDiary() {
         firstPass.push(entry)
       }
     }
-    // Second pass: if we have both categorized and uncategorized versions of the
-    // same meal (same date + description + photo), keep the categorized one.
+    // Second pass: within the same date+category+description+photo, prefer the categorized copy over uncategorized.
     const preferred = new Map<string, any>()
     for (const entry of firstPass) {
+      const cat = normalizeCategory(entry?.meal || entry?.category || entry?.mealType)
       const key = [
         entry?.localDate || '',
+        cat,
         descKey(entry?.description),
         entry?.photo || '',
       ].join('|')
