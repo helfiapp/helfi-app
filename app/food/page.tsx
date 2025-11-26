@@ -260,11 +260,21 @@ const formatNumberInputValue = (value: any) => {
   return value
 }
 
+// Normalize meal descriptions to drop boilerplate like "This image shows..."
+const sanitizeMealDescription = (text: string | null | undefined) => {
+  if (!text) return ''
+  const stripped = text
+    .replace(/^(the\s+image\s+shows|this\s+image\s+shows|i\s+can\s+see|based\s+on\s+the\s+image|the\s+food\s+appears\s+to\s+be|this\s+appears\s+to\s+be)\s*/i, '')
+    .trim()
+  if (!stripped) return ''
+  return stripped.replace(/^./, (c) => c.toUpperCase())
+}
+
 const extractBaseMealDescription = (value: string | null | undefined) => {
   if (!value) return ''
   const withoutNutrition = value.replace(/Calories:[\s\S]*/i, '').trim()
   const firstLine = withoutNutrition.split('\n').map((line) => line.trim()).find(Boolean)
-  return firstLine || value.trim()
+  return sanitizeMealDescription(firstLine || value.trim())
 }
 
 type RingProps = {
@@ -4954,10 +4964,10 @@ Please add nutritional information manually if needed.`);
                             const cleaned = filteredLines.join('\n\n').trim();
                             const fallback = aiDescription.replace(/calories\s*:[^\n]+/gi, '').trim();
                             const merged = (cleaned || fallback || aiDescription || '').trim();
-                            const normalized = merged.replace(/^(This image shows|I can see|The food appears to be|This appears to be|I'm unable to see|Based on the image)/i, '').trim();
+                            const normalized = sanitizeMealDescription(merged);
                             const finalText = normalized || 'Description not available yet.';
 
-                            return finalText.replace(/^./, (match: string) => match.toUpperCase());
+                            return finalText;
                           })()}
                         </div>
                       </div>
@@ -5892,10 +5902,7 @@ Please add nutritional information manually if needed.`);
                         <div className="p-4 hover:bg-gray-50 transition-colors">
                           <div className="flex items-center gap-3">
                             <p className="flex-1 text-sm sm:text-base text-gray-900 truncate">
-                              {food.description.split('\n')[0].split('Calories:')[0]
-                                .replace(/^(I'm unable to see.*?but I can provide a general estimate for|Based on.*?,|This image shows|I can see|The food appears to be|This appears to be)/i, '')
-                                .trim()
-                                .replace(/^./, (match: string) => match.toUpperCase())}
+                              {sanitizeMealDescription(food.description.split('\n')[0].split('Calories:')[0])}
                             </p>
                             <div className="flex items-center gap-2 flex-shrink-0">
                               <p className="text-xs sm:text-sm text-gray-500">
@@ -5976,7 +5983,7 @@ Please add nutritional information manually if needed.`);
                           <div className="border-t border-gray-100 p-4 bg-gray-50">
                             {/* Full description when expanded */}
                             <p className="mb-3 text-sm text-gray-800 whitespace-pre-line">
-                              {food.description.split('Calories:')[0].trim()}
+                              {sanitizeMealDescription(food.description.split('Calories:')[0])}
                             </p>
                             <div className="flex flex-col sm:flex-row gap-4">
                               {/* Food Image */}
