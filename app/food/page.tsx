@@ -5641,16 +5641,12 @@ Please add nutritional information manually if needed.`);
             <>
               <h3 className="text-lg font-semibold mb-4">{isViewingToday ? "Today's Meals" : 'Meals'}</h3>
 
-              {sourceEntries.length === 0 ? (
-                <div className="text-center py-8">
-                  <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                  </svg>
-                  <p className="text-gray-500">No food entries yet {isViewingToday ? 'today' : 'for this date'}</p>
-                  <p className="text-gray-400 text-sm">{isViewingToday ? 'Add your first meal to start tracking!' : 'Pick another day or return to Today.'}</p>
-                </div>
-              ) : (
-                <div className="space-y-3 -mx-4 sm:-mx-6">
+              <div className="space-y-3 -mx-4 sm:-mx-6">
+                {sourceEntries.length === 0 && (
+                  <div className="text-sm text-gray-500 px-4 sm:px-6 pb-2">
+                    No food entries yet {isViewingToday ? 'today' : 'for this date'}. Add a meal to get started.
+                  </div>
+                )}
                   {(() => {
                     const mealCategories = MEAL_CATEGORY_ORDER.map((key) => ({
                       key,
@@ -5681,7 +5677,7 @@ Please add nutritional information manually if needed.`);
                                 {formatTimeWithAMPM(food.time)}
                               </p>
                               {/* 3-Dot Options Menu */}
-                              <div className="relative entry-options-dropdown">
+                              <div className="relative entry-options-dropdown overflow-visible">
                                 <button
                                   onMouseDown={(e) => {
                                     e.preventDefault();
@@ -5695,7 +5691,7 @@ Please add nutritional information manually if needed.`);
                                   </svg>
                                 </button>
                                 {showEntryOptions === food.id.toString() && (
-                                  <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-200 z-[9999]" style={{boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'}}>
+                                  <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-200 z-[9999]" style={{boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)', overflow: 'visible', paddingBottom: '6px'}}>
                                     <button
                                       onClick={() => editFood(food)}
                                       className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center transition-colors"
@@ -5931,6 +5927,11 @@ Please add nutritional information manually if needed.`);
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation()
+                                  if (showPhotoOptions && photoOptionsAnchor === cat.key) {
+                                    setShowPhotoOptions(false)
+                                    setPhotoOptionsAnchor(null)
+                                    return
+                                  }
                                   setSelectedAddCategory(cat.key as any)
                                   setShowCategoryPicker(false)
                                   setPhotoOptionsAnchor(cat.key)
@@ -6043,8 +6044,7 @@ Please add nutritional information manually if needed.`);
                       )
                     })
                   })()}
-                </div>
-              )}
+              </div>
             </>
           )}
         </div>
