@@ -5383,7 +5383,7 @@ Please add nutritional information manually if needed.`);
             <div className="text-gray-500 font-medium">Loading your food diary...</div>
           </div>
         ) : (
-        <div className="bg-white rounded-lg shadow-sm p-4 sm:p-6 overflow-visible">
+        <div className="overflow-visible space-y-6">
           {/* Daily Totals Row - only show on main diary view, not while editing an entry */}
           {!editingEntry && dedupeEntries(isViewingToday ? todaysFoods : (historyFoods || [])).length > 0 && (
             <div className="mb-4">
@@ -5913,12 +5913,10 @@ Please add nutritional information manually if needed.`);
                         }))
 
                       return (
-                        <div key={cat.key} className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-visible px-4 sm:px-6 pt-2">
+                        <div key={cat.key} className="overflow-visible">
                           <div className="relative">
                             <div
-                              className={`flex items-center gap-3 rounded-xl border ${
-                                expandedCategories[cat.key] ? 'bg-gray-50 border-gray-200' : 'bg-white border-gray-100'
-                              } shadow-sm px-3 py-2`}
+                              className={`flex items-center gap-3 px-4 sm:px-6 py-3 ${expandedCategories[cat.key] ? 'bg-white' : 'bg-white'}`}
                             >
                               <button
                                 type="button"
@@ -5967,7 +5965,7 @@ Please add nutritional information manually if needed.`);
                             </div>
 
                             {showPhotoOptions && photoOptionsAnchor === cat.key && !showCategoryPicker && (
-                              <div className="food-options-dropdown absolute left-0 right-0 top-full mt-2 z-50">
+                              <div className="food-options-dropdown absolute left-0 right-0 top-full mt-2 z-50 px-4 sm:px-6">
                                 <div className="rounded-2xl shadow-2xl border border-gray-200 bg-white/95 backdrop-blur-xl overflow-hidden">
                                   <div className="divide-y divide-gray-100">
                                     <button
@@ -6021,7 +6019,7 @@ Please add nutritional information manually if needed.`);
                             )}
                           </div>
                           {expandedCategories[cat.key] && (
-                            <div className="border-t border-gray-100 space-y-3 p-3">
+                            <div className="border-t border-gray-100 bg-white space-y-3 px-4 sm:px-6 pb-3">
                               {entries.length === 0 ? (
                                 <div className="text-sm text-gray-500 px-1 py-2">No entries in this category yet.</div>
                               ) : (
