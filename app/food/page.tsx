@@ -968,6 +968,34 @@ export default function FoodDiary() {
   const [historyRetrying, setHistoryRetrying] = useState(false)
   const [pendingQueue, setPendingQueue] = useState<any[]>([])
   const [isFlushingQueue, setIsFlushingQueue] = useState(false)
+  // Persist pending queue across reloads to avoid losing unsaved items
+  useEffect(() => {
+    try {
+      const stored = typeof window !== 'undefined' ? localStorage.getItem('foodlog:pendingQueue') : null
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setPendingQueue(parsed)
+          setHistorySaveError('Unsaved meals detected. We\'re retrying now.')
+        }
+      }
+    } catch (e) {
+      console.warn('Could not load pending queue', e)
+    }
+  }, [])
+  useEffect(() => {
+    try {
+      if (typeof window === 'undefined') return
+      if (pendingQueue.length > 0) {
+        localStorage.setItem('foodlog:pendingQueue', JSON.stringify(pendingQueue))
+        setHistorySaveError((msg) => msg || 'Saving your meal to history failed. We\'re retrying now.')
+      } else {
+        localStorage.removeItem('foodlog:pendingQueue')
+      }
+    } catch (e) {
+      console.warn('Could not persist pending queue', e)
+    }
+  }, [pendingQueue])
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({
     uncategorized: false,
     breakfast: false,
@@ -2322,6 +2350,7 @@ const applyStructuredItems = (
             setHistorySaveError(null)
             setLastHistoryPayload(null)
             setPendingQueue([])
+            setHistorySaveError(null)
           }
         } catch (historyError) {
           console.error('❌ Exception while saving to FoodLog:', {
@@ -2330,7 +2359,7 @@ const applyStructuredItems = (
             stack: historyError instanceof Error ? historyError.stack : undefined,
             targetLocalDate,
           })
-          setHistorySaveError('Saving your meal to history failed. Please stay on this page and retry saving.')
+          setHistorySaveError('Saving your meal to history failed. We\'ll keep retrying until it sticks.')
           // Queue the payload for retry if it exists
           if (lastHistoryPayload) {
             setPendingQueue((q) => [...q, lastHistoryPayload])
@@ -2356,13 +2385,14 @@ const applyStructuredItems = (
   }
 
   const retryHistorySave = async () => {
-    if (!lastHistoryPayload || historyRetrying) return
+    const payload = lastHistoryPayload || pendingQueue[0]
+    if (!payload || historyRetrying) return
     try {
       setHistoryRetrying(true)
       const res = await fetch('/api/food-log', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(lastHistoryPayload),
+        body: JSON.stringify(payload),
       })
       if (!res.ok) {
         const errorText = await res.text()
@@ -2372,6 +2402,7 @@ const applyStructuredItems = (
       }
       setHistorySaveError(null)
       setLastHistoryPayload(null)
+       setPendingQueue((q) => q.filter((p) => p !== payload))
       console.log('✅ Retry history save succeeded')
     } catch (e) {
       console.error('❌ Retry history save exception:', e)
@@ -2404,9 +2435,11 @@ const applyStructuredItems = (
             } else {
               const text = await res.text()
               console.warn('⚠️ Flush failed, keeping in queue', { status: res.status, text })
+              setHistorySaveError('Saving your meal to history failed. We\'ll keep retrying until it sticks.')
             }
           } catch (e) {
             console.warn('⚠️ Flush threw, keeping in queue', e)
+            setHistorySaveError('Saving your meal to history failed. We\'ll keep retrying until it sticks.')
           }
           if (isCancelled) break
         }
