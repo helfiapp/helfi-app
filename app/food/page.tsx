@@ -1280,12 +1280,20 @@ const applyStructuredItems = (
     enrichedItems.length > 0 ? normalizeDiscreteServingsWithLabel(enrichedItems) : []
 
   // Guard rail: never wipe existing cards if a new analysis yields nothing.
-  const itemsToUse =
-    normalizedItems.length > 0
-      ? normalizedItems
-      : Array.isArray(analyzedItems) && analyzedItems.length > 0
-      ? analyzedItems
+  // Prefer, in order:
+  // 1) Fresh normalized items from the latest analysis
+  // 2) Existing in-memory analyzedItems
+  // 3) Items stored on the current editingEntry (if any)
+  const existingItemsFromState =
+    Array.isArray(analyzedItems) && analyzedItems.length > 0 ? analyzedItems : []
+  const existingItemsFromEditingEntry =
+    editingEntry && Array.isArray((editingEntry as any).items) && (editingEntry as any).items.length > 0
+      ? (editingEntry as any).items
       : []
+  const fallbackExistingItems =
+    existingItemsFromState.length > 0 ? existingItemsFromState : existingItemsFromEditingEntry
+
+  const itemsToUse = normalizedItems.length > 0 ? normalizedItems : fallbackExistingItems
 
   setAnalyzedItems(itemsToUse)
 
