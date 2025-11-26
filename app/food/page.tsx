@@ -5996,7 +5996,7 @@ Please add nutritional information manually if needed.`);
                       return (
                       <div
                         key={food.id}
-                        className="relative bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden"
+                        className={`relative bg-white border border-gray-200 rounded-xl shadow-sm ${isMobile ? 'overflow-hidden' : 'overflow-visible'}`}
                         onTouchStart={handleTouchStart}
                         onTouchMove={handleTouchMove}
                         onTouchEnd={handleTouchEnd}
