@@ -2272,6 +2272,47 @@ const applyStructuredItems = (
     loadHistory();
   }, [selectedDate, isViewingToday]);
 
+  const mapLogsToEntries = (logs: any[], fallbackDate: string) =>
+    logs.map((l: any) => ({
+      id: new Date(l.createdAt).getTime(), // UI key and sorting by timestamp
+      dbId: l.id, // actual database id for delete operations
+      description: l.description || l.name,
+      time: new Date(l.createdAt).toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
+      method: l.imageUrl ? 'photo' : 'text',
+      photo: l.imageUrl || null,
+      nutrition: l.nutrients || null,
+      items: (l as any).items || (l.nutrients as any)?.items || null,
+      meal: normalizeCategory((l as any)?.meal || (l as any)?.category || (l as any)?.mealType),
+      category: normalizeCategory((l as any)?.meal || (l as any)?.category || (l as any)?.mealType),
+      localDate: (l as any).localDate || fallbackDate,
+    }))
+
+  // Best-effort reload to keep UI in sync with the authoritative DB rows right after saving.
+  const refreshEntriesFromServer = async () => {
+    try {
+      const tz = new Date().getTimezoneOffset();
+      const res = await fetch(`/api/food-log?date=${selectedDate}&tz=${tz}`);
+      if (!res.ok) return;
+
+      const json = await res.json();
+      const logs = Array.isArray(json.logs) ? json.logs : [];
+      const mapped = mapLogsToEntries(logs, selectedDate);
+      const deduped = dedupeEntries(mapped);
+
+      if (isViewingToday) {
+        setTodaysFoods(deduped);
+        updateUserData({ todaysFoods: deduped });
+      } else {
+        setHistoryFoods(deduped);
+      }
+    } catch (error) {
+      console.error('Error refreshing food diary after save:', error);
+    }
+  };
+
   // Save food entries to database and update context (OPTIMIZED + RELIABLE HISTORY)
   const saveFoodEntries = async (updatedFoods: any[], options?: { appendHistory?: boolean }) => {
     try {
@@ -3082,6 +3123,7 @@ Please add nutritional information manually if needed.`);
     setIsSavingEntry(true)
     try {
       await saveFoodEntries(updatedFoods)
+      await refreshEntriesFromServer()
       
       // Show subtle notification that insights are updating
       setInsightsNotification({
@@ -3138,6 +3180,7 @@ Please add nutritional information manually if needed.`);
     try {
       setTodaysFoods(updatedFoods);
       await saveFoodEntries(updatedFoods, { appendHistory: false });
+      await refreshEntriesFromServer();
       
       // Reset all form states
       resetAnalyzerPanel()
