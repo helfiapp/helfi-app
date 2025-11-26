@@ -30,20 +30,16 @@ function AllSectionsProgressBar({ issueSlug, sections, onComplete }: {
     
     const pollStatus = async () => {
       try {
-        // Poll each section's status
-        const statusPromises = sections.map(async (section) => {
-          try {
-            const response = await fetch(`/api/insights/issues/${issueSlug}/sections/${section}`)
-            if (!response.ok) return { section, status: 'unknown' }
-            const data = await response.json()
-            const meta = data._meta || {}
-            return { section, status: meta.status || 'missing' }
-          } catch {
-            return { section, status: 'unknown' }
-          }
+        // Lightweight poll against the consolidated status endpoint to avoid
+        // triggering expensive per-section generation while the job is running.
+        const response = await fetch(`/api/insights/issues/${issueSlug}/status`)
+        if (!response.ok) throw new Error('Failed to load regeneration status')
+        const data = await response.json()
+        const statusMap: Record<string, { status?: string; needsUpdate?: boolean }> = data.statuses || {}
+        const statuses = sections.map((section) => {
+          const entry = statusMap[section] || {}
+          return { section, status: entry.status || 'unknown', needsUpdate: entry.needsUpdate ?? true }
         })
-        
-        const statuses = await Promise.all(statusPromises)
         const freshCount = statuses.filter(s => s.status === 'fresh').length
         const generatingCount = statuses.filter(s => s.status === 'generating' || s.status === 'stale').length
         
