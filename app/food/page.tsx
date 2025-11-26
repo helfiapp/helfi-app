@@ -966,6 +966,8 @@ export default function FoodDiary() {
   const [historySaveError, setHistorySaveError] = useState<string | null>(null)
   const [lastHistoryPayload, setLastHistoryPayload] = useState<any>(null)
   const [historyRetrying, setHistoryRetrying] = useState(false)
+  const [pendingQueue, setPendingQueue] = useState<any[]>([])
+  const [isFlushingQueue, setIsFlushingQueue] = useState(false)
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({
     uncategorized: false,
     breakfast: false,
@@ -2233,10 +2235,7 @@ const applyStructuredItems = (
       })
 
       // 2) Persist today's foods snapshot (fast "today" view) via /api/user-data.
-      //    We send appendHistory: false here so this endpoint does NOT try to create
-      //    FoodLog rows itself. History writes are handled exclusively by the
-      //    dedicated /api/food-log endpoint below to avoid conflicts.
-      // Fire-and-forget snapshot so UI isn't blocked by this extra write.
+      //    Fire-and-forget so UI isn't blocked; failures are logged.
       try {
         fetch('/api/user-data', {
           method: 'POST',
@@ -2265,9 +2264,8 @@ const applyStructuredItems = (
         console.error('❌ Error launching todaysFoods snapshot:', userDataError)
       }
 
-      // 3) For brand new entries, write directly into the permanent FoodLog
-      //    history table via /api/food-log. This is the SINGLE SOURCE OF TRUTH
-      //    for history view (and "yesterday" after midnight).
+      // 3) For brand new entries, write directly into the permanent FoodLog history table.
+      //    If the write fails, enqueue the payload locally and surface a retry button.
       if (appendHistory && latest) {
         try {
           setHistorySaveError(null)
@@ -2311,28 +2309,8 @@ const applyStructuredItems = (
                 descriptionPreview: payload.description.substring(0, 50),
               },
             })
-            // Fallback: attempt legacy append via /api/user-data with appendHistory: true
-            try {
-              const fallbackRes = await fetch('/api/user-data', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ todaysFoods: dedupedFoods, appendHistory: true }),
-              })
-              if (!fallbackRes.ok) {
-                console.error('❌ Fallback user-data append failed:', {
-                  status: fallbackRes.status,
-                  statusText: fallbackRes.statusText,
-                  error: await fallbackRes.text(),
-                })
-              } else {
-                console.log('✅ Fallback user-data append succeeded (history)', {
-                  localDate: payload.localDate,
-                })
-                setHistorySaveError(null)
-              }
-            } catch (fallbackError) {
-              console.error('❌ Fallback user-data append threw:', fallbackError)
-            }
+            // Queue the payload for retry
+            setPendingQueue((q) => [...q, payload])
             throw new Error('History save failed')
           } else {
             const result = await res.json().catch(() => ({}))
@@ -2343,6 +2321,7 @@ const applyStructuredItems = (
             })
             setHistorySaveError(null)
             setLastHistoryPayload(null)
+            setPendingQueue([])
           }
         } catch (historyError) {
           console.error('❌ Exception while saving to FoodLog:', {
@@ -2352,6 +2331,10 @@ const applyStructuredItems = (
             targetLocalDate,
           })
           setHistorySaveError('Saving your meal to history failed. Please stay on this page and retry saving.')
+          // Queue the payload for retry if it exists
+          if (lastHistoryPayload) {
+            setPendingQueue((q) => [...q, lastHistoryPayload])
+          }
         }
       } else {
         console.log('ℹ️ Skipping FoodLog save (appendHistory=false or no latest entry)')
@@ -2397,6 +2380,45 @@ const applyStructuredItems = (
       setHistoryRetrying(false)
     }
   }
+
+  // Background flush for any queued payloads (best-effort)
+  useEffect(() => {
+    if (pendingQueue.length === 0 || isFlushingQueue) return
+    let isCancelled = false
+    const flush = async () => {
+      try {
+        setIsFlushingQueue(true)
+        const next = [...pendingQueue]
+        for (const payload of next) {
+          try {
+            const res = await fetch('/api/food-log', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+            })
+            if (res.ok) {
+              console.log('✅ Flushed pending FoodLog payload', { localDate: payload.localDate })
+              setPendingQueue((q) => q.filter((p) => p !== payload))
+              setHistorySaveError(null)
+              setLastHistoryPayload(null)
+            } else {
+              const text = await res.text()
+              console.warn('⚠️ Flush failed, keeping in queue', { status: res.status, text })
+            }
+          } catch (e) {
+            console.warn('⚠️ Flush threw, keeping in queue', e)
+          }
+          if (isCancelled) break
+        }
+      } finally {
+        setIsFlushingQueue(false)
+      }
+    }
+    flush()
+    return () => {
+      isCancelled = true
+    }
+  }, [pendingQueue, isFlushingQueue])
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -3706,8 +3728,8 @@ Please add nutritional information manually if needed.`);
 
         {historySaveError && (
           <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 text-amber-800 px-4 py-3 text-sm flex items-center justify-between gap-3">
-            <span>{historySaveError}</span>
-            {lastHistoryPayload && (
+            <span className="flex-1">{historySaveError}</span>
+            {(lastHistoryPayload || pendingQueue.length > 0) && (
               <button
                 onClick={retryHistorySave}
                 disabled={historyRetrying}
