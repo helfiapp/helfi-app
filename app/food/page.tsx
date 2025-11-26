@@ -5994,14 +5994,7 @@ Please add nutritional information manually if needed.`);
                       }
 
                       return (
-                      <div
-                        key={food.id}
-                        className="relative bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden"
-                        onTouchStart={handleTouchStart}
-                        onTouchMove={handleTouchMove}
-                        onTouchEnd={handleTouchEnd}
-                        style={isMobile ? { touchAction: 'pan-y' } : undefined}
-                      >
+                      <div key={food.id} className="relative bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
                         {isMobile && (
                           <div className="absolute inset-0 flex">
                             <button
@@ -6026,6 +6019,9 @@ Please add nutritional information manually if needed.`);
                         {/* Collapsed header row */}
                         <div
                           className="p-4 hover:bg-gray-50 transition-colors relative"
+                          onTouchStart={handleTouchStart}
+                          onTouchMove={handleTouchMove}
+                          onTouchEnd={handleTouchEnd}
                         >
                           <div
                             className="relative"
