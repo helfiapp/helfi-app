@@ -1036,6 +1036,8 @@ export default function FoodDiary() {
   const [officialSource, setOfficialSource] = useState<'packaged' | 'single'>('packaged')
   const [officialLoading, setOfficialLoading] = useState<boolean>(false)
   const [officialError, setOfficialError] = useState<string | null>(null)
+  const [isMobile, setIsMobile] = useState(false)
+  const [summarySlideIndex, setSummarySlideIndex] = useState(0)
   
   // Manual food entry states
   const [manualFoodName, setManualFoodName] = useState('')
@@ -1057,6 +1059,7 @@ export default function FoodDiary() {
   const descriptionTextareaRef = useRef<HTMLTextAreaElement | null>(null)
   const editPhotoInputRef = useRef<HTMLInputElement | null>(null)
   const selectPhotoInputRef = useRef<HTMLInputElement | null>(null)
+  const summaryCarouselRef = useRef<HTMLDivElement | null>(null)
 
   const [foodImagesLoading, setFoodImagesLoading] = useState<{[key: string]: boolean}>({})
   const [expandedEntries, setExpandedEntries] = useState<{[key: string]: boolean}>({})
@@ -1091,6 +1094,16 @@ export default function FoodDiary() {
     macros: MacroSegment[]
   } | null>(null)
   const isAddMenuOpen = showCategoryPicker || showPhotoOptions
+
+  useEffect(() => {
+    const updateIsMobile = () => {
+      if (typeof window === 'undefined') return
+      setIsMobile(window.innerWidth < 768)
+    }
+    updateIsMobile()
+    window.addEventListener('resize', updateIsMobile)
+    return () => window.removeEventListener('resize', updateIsMobile)
+  }, [])
 
   const dailyTargets = useMemo(() => {
     if (!userData) return { calories: null, protein: null, carbs: null, fat: null }
@@ -5789,80 +5802,122 @@ Please add nutritional information manually if needed.`);
                           Add a meal to see how today compares to your daily targets.
                         </p>
                       ) : (
-                        <div className="flex flex-col gap-4 md:grid md:grid-cols-[minmax(0,1fr)_300px] md:items-start">
-                          {/* Macro progress list - left on desktop, below on mobile */}
-                          {macroRows.length > 0 && (
-                            <div className="order-2 md:order-1 space-y-2 mt-6 md:mt-0">
-                              {macroRows.map((row) => {
-                                const pctRaw = row.target > 0 ? row.consumed / row.target : 0
-                                const pct = Math.max(0, pctRaw)
-                                const percentDisplay = row.target > 0 ? Math.round(pctRaw * 100) : 0
-                                const over = percentDisplay > 100
-                                const percentColor = over ? 'text-red-600' : 'text-gray-900'
-                                const remaining = Math.max(0, row.target - row.consumed)
-                                return (
-                                  <div key={row.key} className="space-y-1">
-                                    <div className="flex items-center justify-between text-sm">
-                                      <div className="text-gray-900 font-semibold flex items-center gap-2">
-                                        <span>{row.label}</span>
-                                        <span className="text-gray-700 font-normal">
-                                          {Math.round(row.consumed)} / {Math.round(row.target)} {row.unit}{row.key === 'sugar' ? ' cap' : ''}
-                                        </span>
-                                        <span className="font-semibold" style={{ color: over ? '#ef4444' : row.color }}>
-                                          {Math.round(remaining)} {row.unit} left
-                                        </span>
-                                      </div>
-                                      <div className={`text-xs font-semibold ${percentColor}`}>
-                                        {percentDisplay > 0 ? `${percentDisplay}%` : '0%'}
-                                      </div>
-                                    </div>
-                                    <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
-                                      <div
-                                        className="h-2 rounded-full transition-all"
-                                        style={{ width: `${Math.min(100, pct * 100)}%`, backgroundColor: over ? '#ef4444' : row.color }}
-                                      />
-                                    </div>
-                                  </div>
-                                )
-                              })}
-                            </div>
-                          )}
+                        {(() => {
+                          const slides: JSX.Element[] = []
 
-                          {/* Remaining allowance ring - right on desktop, top on mobile */}
-                          <div className="flex flex-col items-center order-1 md:order-2">
-                            <TargetRing
-                              label="Remaining"
-                              valueLabel={
-                                targetInUnit !== null && consumedInUnit !== null
-                                  ? `${Math.max(
-                                      0,
-                                      Math.round(targetInUnit - consumedInUnit),
-                                    )} ${energyUnit}`
-                                  : '—'
-                              }
-                              percent={percentUsed || 0}
-                              tone="target"
-                            />
-                            {targetInUnit !== null && (
-                              <div className="mt-1 text-[11px] text-gray-500">
-                                Daily allowance:{' '}
-                                <span className="font-semibold">
-                                  {Math.round(targetInUnit)} {energyUnit}
-                                </span>
+                          if (macroRows.length > 0) {
+                            slides.push(
+                              <div className="order-2 md:order-1 space-y-2 mt-6 md:mt-0">
+                                {macroRows.map((row) => {
+                                  const pctRaw = row.target > 0 ? row.consumed / row.target : 0
+                                  const pct = Math.max(0, pctRaw)
+                                  const percentDisplay = row.target > 0 ? Math.round(pctRaw * 100) : 0
+                                  const over = percentDisplay > 100
+                                  const percentColor = over ? 'text-red-600' : 'text-gray-900'
+                                  const remaining = Math.max(0, row.target - row.consumed)
+                                  return (
+                                    <div key={row.key} className="space-y-1">
+                                      <div className="flex items-center justify-between text-sm">
+                                        <div className="text-gray-900 font-semibold flex items-center gap-2">
+                                          <span>{row.label}</span>
+                                          <span className="text-gray-700 font-normal">
+                                            {Math.round(row.consumed)} / {Math.round(row.target)} {row.unit}{row.key === 'sugar' ? ' cap' : ''}
+                                          </span>
+                                          <span className="font-semibold" style={{ color: over ? '#ef4444' : row.color }}>
+                                            {Math.round(remaining)} {row.unit} left
+                                          </span>
+                                        </div>
+                                        <div className={`text-xs font-semibold ${percentColor}`}>
+                                          {percentDisplay > 0 ? `${percentDisplay}%` : '0%'}
+                                        </div>
+                                      </div>
+                                      <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">
+                                        <div
+                                          className="h-2 rounded-full transition-all"
+                                          style={{ width: `${Math.min(100, pct * 100)}%`, backgroundColor: over ? '#ef4444' : row.color }}
+                                        />
+                                      </div>
+                                    </div>
+                                  )
+                                })}
                               </div>
-                            )}
-                            <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-gray-600">
-                              <div className="flex items-center gap-1">
-                                <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500 shrink-0" />
-                                <span>Used</span>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
-                                <span>Remaining</span>
+                            )
+                          }
+
+                          slides.push(
+                            <div className="flex flex-col items-center order-1 md:order-2">
+                              <TargetRing
+                                label="Remaining"
+                                valueLabel={
+                                  targetInUnit !== null && consumedInUnit !== null
+                                    ? `${Math.max(
+                                        0,
+                                        Math.round(targetInUnit - consumedInUnit),
+                                      )} ${energyUnit}`
+                                    : '—'
+                                }
+                                percent={percentUsed || 0}
+                                tone="target"
+                              />
+                              {targetInUnit !== null && (
+                                <div className="mt-1 text-[11px] text-gray-500">
+                                  Daily allowance:{' '}
+                                  <span className="font-semibold">
+                                    {Math.round(targetInUnit)} {energyUnit}
+                                  </span>
+                                </div>
+                              )}
+                              <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-gray-600">
+                                <div className="flex items-center gap-1">
+                                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500 shrink-0" />
+                                  <span>Used</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
+                                  <span>Remaining</span>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        </div>
+                          )
+
+                          const handleSummaryScroll = () => {
+                            if (!isMobile || !summaryCarouselRef.current || slides.length <= 1) return
+                            const { scrollLeft, clientWidth } = summaryCarouselRef.current
+                            if (!clientWidth) return
+                            const idx = Math.round(scrollLeft / clientWidth)
+                            const clamped = Math.max(0, Math.min(slides.length - 1, idx))
+                            setSummarySlideIndex(clamped)
+                          }
+
+                          return (
+                            <>
+                              <div
+                                ref={summaryCarouselRef}
+                                onScroll={handleSummaryScroll}
+                                className="flex gap-4 overflow-x-auto snap-x snap-mandatory pb-3 md:grid md:grid-cols-[minmax(0,1fr)_300px] md:items-start md:gap-4 md:overflow-visible md:snap-none md:pb-0"
+                              >
+                                {slides.map((slide, idx) => (
+                                  <div
+                                    key={idx}
+                                    className="flex-shrink-0 w-[calc(100%-32px)] snap-center md:w-auto"
+                                  >
+                                    {slide}
+                                  </div>
+                                ))}
+                              </div>
+                              {isMobile && slides.length > 1 && (
+                                <div className="flex justify-center gap-2 -mt-1">
+                                  {slides.map((_, idx) => (
+                                    <span
+                                      key={idx}
+                                      className={`w-2 h-2 rounded-full ${summarySlideIndex === idx ? 'bg-emerald-500' : 'bg-gray-300'}`}
+                                    />
+                                  ))}
+                                </div>
+                              )}
+                            </>
+                          )
+                        })()}
                       )}
                     </div>
                   </div>
