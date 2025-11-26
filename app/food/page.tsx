@@ -1038,7 +1038,6 @@ export default function FoodDiary() {
   const [officialError, setOfficialError] = useState<string | null>(null)
   const [isMobile, setIsMobile] = useState(false)
   const [summarySlideIndex, setSummarySlideIndex] = useState(0)
-  const [swipeOffsets, setSwipeOffsets] = useState<Record<string, number>>({})
   
   // Manual food entry states
   const [manualFoodName, setManualFoodName] = useState('')
@@ -1061,8 +1060,6 @@ export default function FoodDiary() {
   const editPhotoInputRef = useRef<HTMLInputElement | null>(null)
   const selectPhotoInputRef = useRef<HTMLInputElement | null>(null)
   const summaryCarouselRef = useRef<HTMLDivElement | null>(null)
-  const swipeStartXRef = useRef(0)
-  const swipeActiveIdRef = useRef<string | null>(null)
 
   const [foodImagesLoading, setFoodImagesLoading] = useState<{[key: string]: boolean}>({})
   const [expandedEntries, setExpandedEntries] = useState<{[key: string]: boolean}>({})
@@ -5956,80 +5953,10 @@ Please add nutritional information manually if needed.`);
                       grouped[target].push(entry)
                     })
 
-                    const renderEntryCard = (food: any) => {
-                      const swipeOffset = isMobile ? (swipeOffsets[food.id] || 0) : 0
-                      const handleTouchStart = (e: React.TouchEvent) => {
-                        if (!isMobile) return
-                        swipeStartXRef.current = e.touches[0].clientX
-                        swipeActiveIdRef.current = food.id.toString()
-                      }
-                      const handleTouchMove = (e: React.TouchEvent) => {
-                        if (!isMobile || swipeActiveIdRef.current !== food.id.toString()) return
-                        const delta = e.touches[0].clientX - swipeStartXRef.current
-                        const clamped = Math.max(-80, Math.min(80, delta))
-                        setSwipeOffsets((prev) => ({ ...prev, [food.id]: clamped }))
-                      }
-                      const handleTouchEnd = () => {
-                        if (!isMobile) return
-                        const offset = swipeOffsets[food.id] || 0
-                        let final = 0
-                        if (offset < -40) final = -80
-                        else if (offset > 40) final = 80
-                        setSwipeOffsets((prev) => ({ ...prev, [food.id]: final }))
-                        swipeActiveIdRef.current = null
-                      }
-                      const resetSwipe = () => setSwipeOffsets((prev) => ({ ...prev, [food.id]: 0 }))
-
-                      const openMenu = () => {
-                        setShowEntryOptions(food.id.toString())
-                        resetSwipe()
-                      }
-                      const quickDelete = () => {
-                        if (isViewingToday) {
-                          deleteFood(food.id)
-                        } else {
-                          deleteHistoryFood((food as any).dbId)
-                        }
-                        resetSwipe()
-                      }
-
-                      return (
-                      <div key={food.id} className="relative bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-                        {isMobile && (
-                          <div className="absolute inset-0 flex">
-                            <button
-                              onClick={openMenu}
-                              className="w-20 flex items-center justify-start pl-4 bg-emerald-600 text-white"
-                            >
-                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6h.01M12 12h.01M12 18h.01" />
-                              </svg>
-                            </button>
-                            <div className="flex-1" />
-                            <button
-                              onClick={quickDelete}
-                              className="w-20 flex items-center justify-end pr-4 bg-red-500 text-white"
-                            >
-                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                              </svg>
-                            </button>
-                          </div>
-                        )}
+                    const renderEntryCard = (food: any) => (
+                      <div key={food.id} className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-visible">
                         {/* Collapsed header row */}
-                        <div
-                          className="p-4 hover:bg-gray-50 transition-colors relative"
-                          onTouchStart={handleTouchStart}
-                          onTouchMove={handleTouchMove}
-                          onTouchEnd={handleTouchEnd}
-                        >
-                          <div
-                            className="relative"
-                            style={{
-                              transform: `translateX(${swipeOffset}px)`,
-                              transition: swipeActiveIdRef.current === food.id.toString() ? 'none' : 'transform 150ms ease-out',
-                            }}
-                          >
+                        <div className="p-4 hover:bg-gray-50 transition-colors">
                           <div className="flex items-center gap-3">
                             <p className="flex-1 text-sm sm:text-base text-gray-900 truncate">
                               {sanitizeMealDescription(food.description.split('\n')[0].split('Calories:')[0])}
@@ -6044,10 +5971,6 @@ Please add nutritional information manually if needed.`);
                                   onMouseDown={(e) => {
                                     e.preventDefault();
                                     e.stopPropagation();
-                                    setShowEntryOptions(showEntryOptions === food.id.toString() ? null : food.id.toString());
-                                  }}
-                                  onClick={(e) => {
-                                    e.stopPropagation()
                                     setShowEntryOptions(showEntryOptions === food.id.toString() ? null : food.id.toString());
                                   }}
                                   className="p-1.5 sm:p-2 rounded-lg hover:bg-gray-200 transition-colors"
@@ -6104,14 +6027,13 @@ Please add nutritional information manually if needed.`);
                                   fill="none" 
                                   stroke="currentColor" 
                                   viewBox="0 0 24 24"
-                              >
+                                >
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                                 </svg>
                               </button>
                             </div>
-                          </div>
+                            </div>
                         </div>
-                      </div>
 
                         {/* Expandable Content */}
                         {expandedEntries[food.id.toString()] && (
@@ -6257,7 +6179,6 @@ Please add nutritional information manually if needed.`);
                         )}
                       </div>
                     )
-                  }
 
                     return mealCategories.map((cat) => {
                       const entries = grouped[cat.key] || []
