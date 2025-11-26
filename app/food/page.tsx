@@ -3042,6 +3042,13 @@ Please add nutritional information manually if needed.`);
     setPhotoOptionsAnchor(null)
   }
 
+  const closeAddMenus = () => {
+    setShowPhotoOptions(false)
+    setShowCategoryPicker(false)
+    setPhotoOptionsAnchor(null)
+    setPendingPhotoPicker(false)
+  }
+
   const handleDeletePhoto = () => {
     // For new AI analyses, deleting the photo should behave like cancelling:
     // clear the analyzer state and return to the main Food Diary view.
@@ -3605,10 +3612,14 @@ Please add nutritional information manually if needed.`);
         <div className="mb-6 relative add-food-entry-container">
           <button
             onClick={() => {
-              const next = !showCategoryPicker
-              setShowCategoryPicker(next)
+              // Toggle the global picker; if open, close everything
+              if (showCategoryPicker || (showPhotoOptions && photoOptionsAnchor === 'global')) {
+                closeAddMenus()
+                return
+              }
+              setShowCategoryPicker(true)
               setShowPhotoOptions(false)
-              setPhotoOptionsAnchor(next ? 'global' : null)
+              setPhotoOptionsAnchor('global')
             }}
             className="w-full bg-helfi-green text-white px-4 py-3 rounded-lg hover:bg-helfi-green/90 transition-colors font-medium flex items-center justify-between shadow-lg"
           >
@@ -5927,8 +5938,7 @@ Please add nutritional information manually if needed.`);
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   if (showPhotoOptions && photoOptionsAnchor === cat.key) {
-                                    setShowPhotoOptions(false)
-                                    setPhotoOptionsAnchor(null)
+                                    closeAddMenus()
                                     return
                                   }
                                   setSelectedAddCategory(cat.key as any)
