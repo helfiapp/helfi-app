@@ -3442,6 +3442,7 @@ Please add nutritional information manually if needed.`);
   const deleteFood = async (foodId: number) => {
     // Find the entry being deleted to check if it has a database ID
     const entryToDelete = todaysFoods.find(food => food.id === foodId);
+    const entryCategory = normalizeCategory(entryToDelete?.meal || entryToDelete?.category || entryToDelete?.mealType)
     const dbId = (entryToDelete as any)?.dbId;
     
     // If entry has a database ID, delete it from the database first
@@ -3466,13 +3467,28 @@ Please add nutritional information manually if needed.`);
     const updatedFoods = todaysFoods.filter(food => food.id !== foodId);
     setTodaysFoods(updatedFoods);
     await saveFoodEntries(updatedFoods, { appendHistory: false });
+    // If this was the last entry in the category, collapse that panel
+    const stillHasCategory = updatedFoods.some((f) => normalizeCategory(f.meal || f.category || f.mealType) === entryCategory)
+    if (!stillHasCategory) {
+      setExpandedCategories((prev) => ({ ...prev, [entryCategory]: false }))
+    }
     setShowEntryOptions(null);
   };
 
   const deleteHistoryFood = async (dbId: string) => {
     try {
       // Optimistic UI update
-      setHistoryFoods((prev) => (prev || []).filter((f: any) => f.dbId !== dbId));
+      setHistoryFoods((prev) => {
+        const base = (prev || [])
+        const entry = base.find((f: any) => f.dbId === dbId)
+        const entryCategory = normalizeCategory(entry?.meal || entry?.category || entry?.mealType)
+        const next = base.filter((f: any) => f.dbId !== dbId)
+        const stillHasCategory = next.some((f: any) => normalizeCategory(f.meal || f.category || f.mealType) === entryCategory)
+        if (!stillHasCategory) {
+          setExpandedCategories((prevExp) => ({ ...prevExp, [entryCategory]: false }))
+        }
+        return next
+      });
       // Call API to delete from DB
       await fetch('/api/food-log/delete', {
         method: 'POST',
