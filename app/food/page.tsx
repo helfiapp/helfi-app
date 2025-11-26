@@ -1098,8 +1098,20 @@ export default function FoodDiary() {
   // Prevent duplicate rows from ever rendering (e.g., double writes or cached copies).
   const dedupeEntries = (list: any[]) => {
     if (!Array.isArray(list)) return []
+    // Prefer entries that have a real meal/category over uncategorized copies.
+    const hasRealCategory = (entry: any) => {
+      const cat = normalizeCategory(entry?.meal || entry?.category || entry?.mealType)
+      return cat !== 'uncategorized'
+    }
+    const descKey = (desc: any) =>
+      (desc || '')
+        .toString()
+        .toLowerCase()
+        .replace(/\s+/g, ' ')
+        .trim()
+    // First pass: drop obvious duplicates (same date+description+time+photo)
     const seen = new Set<string>()
-    const result: any[] = []
+    const firstPass: any[] = []
     for (const entry of list) {
       const key = [
         entry?.localDate || '',
@@ -1109,10 +1121,33 @@ export default function FoodDiary() {
       ].join('|')
       if (!seen.has(key)) {
         seen.add(key)
-        result.push(entry)
+        firstPass.push(entry)
       }
     }
-    return result
+    // Second pass: if we have both categorized and uncategorized versions of the
+    // same meal (same date + description + photo), keep the categorized one.
+    const preferred = new Map<string, any>()
+    for (const entry of firstPass) {
+      const key = [
+        entry?.localDate || '',
+        descKey(entry?.description),
+        entry?.photo || '',
+      ].join('|')
+      const existing = preferred.get(key)
+      const entryHasCat = hasRealCategory(entry)
+      const existingHasCat = hasRealCategory(existing || {})
+      if (!existing) {
+        preferred.set(key, entry)
+      } else if (!existingHasCat && entryHasCat) {
+        preferred.set(key, entry)
+      } else if (existingHasCat === entryHasCat) {
+        // If both have same category quality, keep the most recent by createdAt/id
+        const existingTs = typeof existing.id === 'number' ? existing.id : new Date(existing.createdAt || existing.time || 0).getTime()
+        const entryTs = typeof entry.id === 'number' ? entry.id : new Date(entry.createdAt || entry.time || 0).getTime()
+        if (entryTs > existingTs) preferred.set(key, entry)
+      }
+    }
+    return Array.from(preferred.values())
   }
 
   const getEntryTotals = (entry: any) => {
