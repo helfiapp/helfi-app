@@ -1586,7 +1586,11 @@ const applyStructuredItems = (
       if (!target.closest('.dropdown-container')) {
         setDropdownOpen(false);
       }
-      if (!target.closest('.food-options-dropdown') && !target.closest('.add-food-entry-container')) {
+      if (
+        !target.closest('.food-options-dropdown') &&
+        !target.closest('.add-food-entry-container') &&
+        !target.closest('.category-add-button')
+      ) {
         setShowPhotoOptions(false);
         setPhotoOptionsAnchor(null);
       }
@@ -5966,11 +5970,11 @@ Please add nutritional information manually if needed.`);
                             >
                               <button
                                 type="button"
+                                className="category-add-button flex-shrink-0 h-9 w-9 rounded-full border border-emerald-200 bg-emerald-50 text-emerald-600 flex items-center justify-center hover:bg-emerald-100 transition-colors"
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   handleCategoryPlusClick(cat.key as any)
                                 }}
-                                className="flex-shrink-0 h-9 w-9 rounded-full border border-emerald-200 bg-emerald-50 text-emerald-600 flex items-center justify-center hover:bg-emerald-100 transition-colors"
                                 aria-label={`Add to ${cat.label}`}
                               >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
