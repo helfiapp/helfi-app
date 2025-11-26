@@ -3050,6 +3050,20 @@ Please add nutritional information manually if needed.`);
     setShowAddFood(false)
   }
 
+  const handleCategoryPlusClick = (key: typeof MEAL_CATEGORY_ORDER[number]) => {
+    if (showPhotoOptions && photoOptionsAnchor === key) {
+      closeAddMenus()
+      return
+    }
+    setSelectedAddCategory(key)
+    setShowCategoryPicker(false)
+    setPhotoOptionsAnchor(key)
+    setShowPhotoOptions(true)
+    setShowAddFood(false)
+    setIsEditingDescription(false)
+    setShowAiResult(false)
+  }
+
   const toggleCategoryAddMenu = (key: typeof MEAL_CATEGORY_ORDER[number]) => {
     // If this category's add menu is open, close everything
     if (showPhotoOptions && photoOptionsAnchor === key) {
@@ -5954,7 +5968,7 @@ Please add nutritional information manually if needed.`);
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  toggleCategoryAddMenu(cat.key as any)
+                                  handleCategoryPlusClick(cat.key as any)
                                 }}
                                 className="flex-shrink-0 h-9 w-9 rounded-full border border-emerald-200 bg-emerald-50 text-emerald-600 flex items-center justify-center hover:bg-emerald-100 transition-colors"
                                 aria-label={`Add to ${cat.label}`}
