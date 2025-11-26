@@ -1818,34 +1818,13 @@ const applyStructuredItems = (
                 localDate: (l as any).localDate || selectedDate,
               }))
 
-              // If DB differs from cached (missing entries OR different category/meal), replace cache with DB
-              const cachedIds = new Set(deduped.map((f: any) => (typeof f.id === 'number' ? f.id : Number(f.id))));
-              const dbIds = new Set(mappedFromDb.map((f: any) => (typeof f.id === 'number' ? f.id : Number(f.id))));
-              const lengthDiffers = mappedFromDb.length !== deduped.length
-              const categoryDiffers = deduped.some((cached) => {
-                const match = mappedFromDb.find((m: any) => {
-                  const cid = typeof cached.id === 'number' ? cached.id : Number(cached.id)
-                  const mid = typeof m.id === 'number' ? m.id : Number(m.id)
-                  return cid === mid
-                })
-                if (!match) return false
-                return normalizeCategory(cached.meal || cached.category || cached.mealType) !== normalizeCategory(match.meal || match.category || match.mealType)
-              })
-              const hasMissing = mappedFromDb.some((m: any) => !cachedIds.has(typeof m.id === 'number' ? m.id : Number(m.id)))
-              const shouldReplace = lengthDiffers || categoryDiffers || hasMissing
-
-              if (shouldReplace) {
-                console.log('♻️ Replacing cached food entries with DB results for date', selectedDate, {
-                  lengthDiffers,
-                  categoryDiffers,
-                  hasMissing,
-                  dbCount: mappedFromDb.length,
-                  cachedCount: deduped.length,
-                })
+              // Always prefer authoritative DB rows for this date to avoid stale categories
+              if (mappedFromDb.length > 0) {
+                console.log('♻️ Replacing cache with DB rows for date', selectedDate, { dbCount: mappedFromDb.length })
                 if (isViewingToday) {
-                  setTodaysFoods(mappedFromDb);
+                  setTodaysFoods(mappedFromDb)
                 } else {
-                  setHistoryFoods(mappedFromDb);
+                  setHistoryFoods(mappedFromDb)
                 }
                 try {
                   fetch('/api/user-data', {
