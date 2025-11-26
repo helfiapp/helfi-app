@@ -3047,6 +3047,23 @@ Please add nutritional information manually if needed.`);
     setShowCategoryPicker(false)
     setPhotoOptionsAnchor(null)
     setPendingPhotoPicker(false)
+    setShowAddFood(false)
+  }
+
+  const toggleCategoryAddMenu = (key: typeof MEAL_CATEGORY_ORDER[number]) => {
+    // If this category's add menu is open, close everything
+    if (showPhotoOptions && photoOptionsAnchor === key) {
+      closeAddMenus()
+      return
+    }
+    // Otherwise open this category's add menu
+    setSelectedAddCategory(key)
+    setShowCategoryPicker(false)
+    setPhotoOptionsAnchor(key)
+    setShowPhotoOptions(true)
+    setShowAddFood(false)
+    setIsEditingDescription(false)
+    setShowAiResult(false)
   }
 
   const handleDeletePhoto = () => {
@@ -5937,17 +5954,7 @@ Please add nutritional information manually if needed.`);
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  if (showPhotoOptions && photoOptionsAnchor === cat.key) {
-                                    closeAddMenus()
-                                    return
-                                  }
-                                  setSelectedAddCategory(cat.key as any)
-                                  setShowCategoryPicker(false)
-                                  setPhotoOptionsAnchor(cat.key)
-                                  setShowPhotoOptions(true)
-                                  setShowAddFood(false)
-                                  setIsEditingDescription(false)
-                                  setShowAiResult(false)
+                                  toggleCategoryAddMenu(cat.key as any)
                                 }}
                                 className="flex-shrink-0 h-9 w-9 rounded-full border border-emerald-200 bg-emerald-50 text-emerald-600 flex items-center justify-center hover:bg-emerald-100 transition-colors"
                                 aria-label={`Add to ${cat.label}`}
