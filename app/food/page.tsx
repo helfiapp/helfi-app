@@ -1803,13 +1803,66 @@ const applyStructuredItems = (
             if (res.ok) {
               const json = await res.json();
               const logs = Array.isArray(json.logs) ? json.logs : [];
-              
+
+              const mappedFromDb = logs.map((l: any) => ({
+                id: new Date(l.createdAt).getTime(),
+                dbId: l.id,
+                description: l.description || l.name,
+                time: new Date(l.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                method: l.imageUrl ? 'photo' : 'text',
+                photo: l.imageUrl || null,
+                nutrition: l.nutrients || null,
+                items: (l as any).items || (l.nutrients as any)?.items || null,
+                meal: normalizeCategory((l as any)?.meal || (l as any)?.category || (l as any)?.mealType),
+                category: normalizeCategory((l as any)?.meal || (l as any)?.category || (l as any)?.mealType),
+                localDate: (l as any).localDate || selectedDate,
+              }))
+
+              // If DB differs from cached (missing entries OR different category/meal), replace cache with DB
+              const cachedIds = new Set(deduped.map((f: any) => (typeof f.id === 'number' ? f.id : Number(f.id))));
+              const dbIds = new Set(mappedFromDb.map((f: any) => (typeof f.id === 'number' ? f.id : Number(f.id))));
+              const lengthDiffers = mappedFromDb.length !== deduped.length
+              const categoryDiffers = deduped.some((cached) => {
+                const match = mappedFromDb.find((m: any) => {
+                  const cid = typeof cached.id === 'number' ? cached.id : Number(cached.id)
+                  const mid = typeof m.id === 'number' ? m.id : Number(m.id)
+                  return cid === mid
+                })
+                if (!match) return false
+                return normalizeCategory(cached.meal || cached.category || cached.mealType) !== normalizeCategory(match.meal || match.category || match.mealType)
+              })
+              const hasMissing = mappedFromDb.some((m: any) => !cachedIds.has(typeof m.id === 'number' ? m.id : Number(m.id)))
+              const shouldReplace = lengthDiffers || categoryDiffers || hasMissing
+
+              if (shouldReplace) {
+                console.log('♻️ Replacing cached food entries with DB results for date', selectedDate, {
+                  lengthDiffers,
+                  categoryDiffers,
+                  hasMissing,
+                  dbCount: mappedFromDb.length,
+                  cachedCount: deduped.length,
+                })
+                if (isViewingToday) {
+                  setTodaysFoods(mappedFromDb);
+                } else {
+                  setHistoryFoods(mappedFromDb);
+                }
+                try {
+                  fetch('/api/user-data', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ todaysFoods: mappedFromDb, appendHistory: false })
+                  }).catch(() => {})
+                } catch {}
+                return
+              }
+
               // Check if database has entries that aren't in our cached list
-              const cachedIds = new Set(deduped.map((f: any) => {
+              const cachedIdsForMissing = new Set(deduped.map((f: any) => {
                 const id = typeof f.id === 'number' ? f.id : Number(f.id);
                 return id;
               }));
-              
+
               // Also enrich existing cached entries with dbId from database
               // This ensures delete functionality works even for cached entries
               const enrichedCached = deduped.map((cachedEntry: any) => {
@@ -1825,12 +1878,12 @@ const applyStructuredItems = (
                 }
                 return cachedEntry;
               });
-              
+
               const missingEntries = logs.filter((l: any) => {
                 const logId = new Date(l.createdAt).getTime();
-                return !cachedIds.has(logId);
+                return !cachedIdsForMissing.has(logId);
               });
-              
+
               if (missingEntries.length > 0 || enrichedCached.some((e: any, i: number) => e.dbId !== deduped[i]?.dbId)) {
                 console.log('⚠️ Found entries in database that were missing from cache:', missingEntries.length);
                 const mappedMissing = missingEntries.map((l: any) => ({
