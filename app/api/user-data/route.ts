@@ -802,6 +802,17 @@ export async function POST(request: NextRequest) {
                   .split('.')[0]
                   .trim() || 'Food item'
 
+              const normalizedMeal = (() => {
+                const raw = (last as any)?.meal ?? (last as any)?.category ?? (last as any)?.mealType
+                const value = typeof raw === 'string' ? raw.toLowerCase() : ''
+                if (/breakfast/.test(value)) return 'breakfast'
+                if (/lunch/.test(value)) return 'lunch'
+                if (/dinner/.test(value)) return 'dinner'
+                if (/snack/.test(value)) return 'snacks'
+                if (/uncat/.test(value) || /other/.test(value)) return 'uncategorized'
+                return typeof raw === 'string' && raw.trim().length > 0 ? raw.trim() : null
+              })()
+
               await prisma.foodLog.create({
                 data: {
                   userId: user.id,
@@ -811,6 +822,8 @@ export async function POST(request: NextRequest) {
                   nutrients: last.nutrition || null,
                   items: Array.isArray(last.items) && last.items.length > 0 ? last.items : null,
                   localDate: (last.localDate as string | null) || null,
+                  meal: normalizedMeal,
+                  category: normalizedMeal,
                 },
               })
               console.log('Appended latest food entry to FoodLog for history view')

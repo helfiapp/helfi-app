@@ -1774,6 +1774,8 @@ const applyStructuredItems = (
                   photo: l.imageUrl || null,
                   nutrition: l.nutrients || null,
                   items: (l as any).items || (l.nutrients as any)?.items || null,
+                  meal: normalizeCategory((l as any)?.meal || (l as any)?.category || (l as any)?.mealType),
+                  category: normalizeCategory((l as any)?.meal || (l as any)?.category || (l as any)?.mealType),
                   localDate: (l as any).localDate || selectedDate,
                 }));
                 
@@ -1825,6 +1827,8 @@ const applyStructuredItems = (
                 photo: l.imageUrl || null,
                 nutrition: l.nutrients || null,
                 items: (l as any).items || (l.nutrients as any)?.items || null,
+                meal: normalizeCategory((l as any)?.meal || (l as any)?.category || (l as any)?.mealType),
+                category: normalizeCategory((l as any)?.meal || (l as any)?.category || (l as any)?.mealType),
                 // Prefer explicit localDate from the server when present
                 localDate: (l as any).localDate || selectedDate,
               }));
@@ -3390,11 +3394,35 @@ Please add nutritional information manually if needed.`);
 
   // Format time with AM/PM
   const formatTimeWithAMPM = (timeString: string) => {
-    const [hours, minutes] = timeString.split(':');
-    const hour24 = parseInt(hours);
-    const hour12 = hour24 === 0 ? 12 : hour24 > 12 ? hour24 - 12 : hour24;
-    const ampm = hour24 >= 12 ? 'PM' : 'AM';
-    return `${hour12}:${minutes} ${ampm}`;
+    if (!timeString) return ''
+    const trimmed = timeString.trim()
+    const match = trimmed.match(/(\d{1,2})(?::(\d{2}))?\s*([ap]m)?/i)
+    if (match) {
+      const hourRaw = parseInt(match[1], 10)
+      const minutes = (match[2] || '00').padStart(2, '0')
+      const suffix = match[3] ? match[3].toUpperCase() : ''
+
+      if (suffix) {
+        const hour12 = Number.isFinite(hourRaw) ? (hourRaw % 12 || 12) : 12
+        return `${hour12}:${minutes} ${suffix}`
+      }
+
+      const safeHour = Number.isFinite(hourRaw) ? hourRaw : 0
+      const ampm = safeHour >= 12 ? 'PM' : 'AM'
+      const hour12 = safeHour % 12 || 12
+      return `${hour12}:${minutes} ${ampm}`
+    }
+
+    const parsed = new Date(`1970-01-01T${trimmed}`)
+    if (!Number.isNaN(parsed.getTime())) {
+      const hours = parsed.getHours()
+      const minutes = parsed.getMinutes()
+      const ampm = hours >= 12 ? 'PM' : 'AM'
+      const hour12 = hours % 12 || 12
+      return `${hour12}:${String(minutes).padStart(2, '0')} ${ampm}`
+    }
+
+    return trimmed
   };
 
   const mealSummary = useMemo(() => buildMealSummaryFromItems(analyzedItems), [analyzedItems])

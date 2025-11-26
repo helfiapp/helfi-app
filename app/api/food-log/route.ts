@@ -5,6 +5,17 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { triggerBackgroundRegeneration } from '@/lib/insights/regeneration-service'
 
+const normalizeMealCategory = (raw: any): string | null => {
+  const value = typeof raw === 'string' ? raw.toLowerCase() : ''
+  if (/breakfast/.test(value)) return 'breakfast'
+  if (/lunch/.test(value)) return 'lunch'
+  if (/dinner/.test(value)) return 'dinner'
+  if (/snack/.test(value)) return 'snacks'
+  if (/uncat/.test(value) || /other/.test(value)) return 'uncategorized'
+  if (typeof raw === 'string' && raw.trim()) return raw.trim()
+  return null
+}
+
 // Fetch logs for a specific date (YYYY-MM-DD)
 export async function GET(request: NextRequest) {
   let dateStr: string | null = null;
@@ -340,7 +351,10 @@ export async function POST(request: NextRequest) {
     console.log('✅ POST /api/food-log - Found user:', { userId, email: userEmail })
 
     const body = await request.json()
-    const { description, nutrition, imageUrl, items, localDate } = body || {}
+    const { description, nutrition, imageUrl, items, localDate, meal, category } = body || {}
+
+    const normalizedMeal = normalizeMealCategory(meal ?? category)
+    const storedCategory = normalizedMeal ?? (typeof category === 'string' ? category.trim() : null)
     
     // Validate and normalize localDate - must be YYYY-MM-DD format
     let normalizedLocalDate: string | null = null
@@ -385,6 +399,7 @@ export async function POST(request: NextRequest) {
       providedLocalDate: localDate || 'MISSING',
       normalizedLocalDate: normalizedLocalDate || 'NULL',
       localDateType: typeof localDate,
+      normalizedMeal,
     })
     
     const name = (description || '')
@@ -403,6 +418,7 @@ export async function POST(request: NextRequest) {
       hasNutrition: !!nutrition,
       hasImageUrl: !!imageUrl,
       hasItems: Array.isArray(items) && items.length > 0,
+      normalizedMeal,
     })
 
     const created = await prisma.foodLog.create({
@@ -414,6 +430,8 @@ export async function POST(request: NextRequest) {
         nutrients: nutrition || null,
         items: items || null,
         localDate: normalizedLocalDate,
+        meal: normalizedMeal,
+        category: storedCategory,
       },
     })
 
@@ -498,4 +516,3 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to delete log' }, { status: 500 })
   }
 }
-

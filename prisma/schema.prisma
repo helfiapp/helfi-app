@@ -172,6 +172,8 @@ model FoodLog {
   nutrients   Json?
   items       Json?      // Structured ingredient list for robust card editing
   localDate   String?    // Local calendar date (YYYY-MM-DD) to avoid timezone drift in history
+  meal        String?    // Normalized meal category (breakfast, lunch, dinner, snacks, uncategorized)
+  category    String?    // Optional original category label for compatibility
   createdAt   DateTime @default(now())
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
