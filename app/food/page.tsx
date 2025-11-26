@@ -988,6 +988,7 @@ export default function FoodDiary() {
   const [manualIngredients, setManualIngredients] = useState([{ name: '', weight: '', unit: 'g' }])
   const [showEntryOptions, setShowEntryOptions] = useState<string | null>(null)
   const [showIngredientOptions, setShowIngredientOptions] = useState<string | null>(null)
+  const [photoOptionsAnchor, setPhotoOptionsAnchor] = useState<'global' | string | null>(null)
   const [editingEntry, setEditingEntry] = useState<any>(null)
   const [originalEditingEntry, setOriginalEditingEntry] = useState<any>(null)
   const [showEditActionsMenu, setShowEditActionsMenu] = useState(false)
@@ -1572,6 +1573,7 @@ const applyStructuredItems = (
       }
       if (!target.closest('.food-options-dropdown') && !target.closest('.add-food-entry-container')) {
         setShowPhotoOptions(false);
+        setPhotoOptionsAnchor(null);
       }
       if (!target.closest('.entry-options-dropdown')) {
         setShowEntryOptions(null);
@@ -2202,6 +2204,8 @@ const applyStructuredItems = (
             nutrition: latest?.nutrition || null,
             imageUrl: latest?.photo || null,
             items: Array.isArray(latest?.items) && latest.items.length > 0 ? latest.items : null,
+            meal: normalizeCategory(latest?.meal || latest?.category || latest?.mealType),
+            category: normalizeCategory(latest?.meal || latest?.category || latest?.mealType),
             // Always pin to the calendar date the user was viewing when they saved
             localDate: targetLocalDate,
           }
@@ -2335,6 +2339,7 @@ const applyStructuredItems = (
           setShowAddFood(true);
           setShowAiResult(false);
           setIsEditingDescription(false);
+          setPhotoOptionsAnchor(null);
           // Keep the analysis mode modal visible so the 🤖 Analyze button stays in view after picking
           setShowAnalysisModeModal(true);
         };
@@ -2349,6 +2354,7 @@ const applyStructuredItems = (
           setShowAddFood(true);
           setShowAiResult(false);
           setIsEditingDescription(false);
+          setPhotoOptionsAnchor(null);
           setShowAnalysisModeModal(true);
         };
         reader.readAsDataURL(file);
@@ -2851,7 +2857,9 @@ Please add nutritional information manually if needed.`);
       photo: method === 'photo' ? photoPreview : null,
       nutrition: nutrition || analyzedNutrition,
       items: analyzedItems && analyzedItems.length > 0 ? analyzedItems : null, // Store structured items
-      total: analyzedTotal || null // Store total nutrition
+      total: analyzedTotal || null, // Store total nutrition
+      meal: selectedAddCategory,
+      category: selectedAddCategory,
     };
     
     // Prevent duplicates: check if entry with same ID already exists
@@ -2881,6 +2889,8 @@ Please add nutritional information manually if needed.`);
           items: newEntry.items,
           localDate: newEntry.localDate,
           total: newEntry.total || null,
+          meal: newEntry.meal,
+          category: newEntry.category,
         }
         return [mapped, ...base]
       })
@@ -3014,6 +3024,7 @@ Please add nutritional information manually if needed.`);
     setShowAiResult(false)
     setShowAddFood(false)
     setShowPhotoOptions(false)
+    setPhotoOptionsAnchor(null)
   }
 
   const handleDeletePhoto = () => {
@@ -3138,6 +3149,7 @@ Please add nutritional information manually if needed.`);
 
   const editFood = (food: any) => {
     setEditingEntry(food);
+    setSelectedAddCategory(normalizeCategory(food?.meal || food?.category || food?.mealType) as any);
     try {
       // Keep an immutable copy to enable "Cancel changes"
       setOriginalEditingEntry(JSON.parse(JSON.stringify(food)))
@@ -3578,8 +3590,10 @@ Please add nutritional information manually if needed.`);
         <div className="mb-6 relative add-food-entry-container">
           <button
             onClick={() => {
-              setShowCategoryPicker((prev) => !prev)
+              const next = !showCategoryPicker
+              setShowCategoryPicker(next)
               setShowPhotoOptions(false)
+              setPhotoOptionsAnchor(next ? 'global' : null)
             }}
             className="w-full bg-helfi-green text-white px-4 py-3 rounded-lg hover:bg-helfi-green/90 transition-colors font-medium flex items-center justify-between shadow-lg"
           >
@@ -3594,7 +3608,7 @@ Please add nutritional information manually if needed.`);
                 <div className="text-xs text-emerald-50 capitalize">{selectedAddCategory}</div>
               </div>
             </div>
-            <svg className={`w-4 h-4 transition-transform ${showCategoryPicker || showPhotoOptions ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className={`w-4 h-4 transition-transform ${showCategoryPicker || (showPhotoOptions && photoOptionsAnchor === 'global') ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
           </button>
@@ -3622,7 +3636,9 @@ Please add nutritional information manually if needed.`);
                     onClick={() => {
                       setSelectedAddCategory(cat.key as any)
                       setShowCategoryPicker(false)
+                      setPhotoOptionsAnchor('global')
                       setShowPhotoOptions(true)
+                      setShowAddFood(false)
                     }}
                   >
                     <div className="flex-1">
@@ -3640,7 +3656,7 @@ Please add nutritional information manually if needed.`);
           )}
 
           {/* Simplified Dropdown Options */}
-          {showPhotoOptions && !showCategoryPicker && (
+          {showPhotoOptions && photoOptionsAnchor === 'global' && !showCategoryPicker && (
             <div className="food-options-dropdown absolute top-full left-0 w-full sm:w-80 sm:left-auto sm:right-0 mt-2 z-50">
               <div className="rounded-2xl shadow-2xl border border-gray-200 bg-white/90 backdrop-blur-xl overflow-hidden">
                 <div className="divide-y divide-gray-100">
@@ -3650,6 +3666,7 @@ Please add nutritional information manually if needed.`);
                     onClick={() => {
                       setPendingPhotoPicker(true);
                       setShowPhotoOptions(false);
+                      setPhotoOptionsAnchor(null);
                       setShowAnalysisModeModal(true);
                     }}
                   >
@@ -3672,6 +3689,7 @@ Please add nutritional information manually if needed.`);
                   <button
                     onClick={() => {
                       setShowPhotoOptions(false);
+                      setPhotoOptionsAnchor(null);
                       setShowAddFood(true);
                     }}
                     className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
@@ -5620,7 +5638,7 @@ Please add nutritional information manually if needed.`);
                   <p className="text-gray-400 text-sm">{isViewingToday ? 'Add your first meal to start tracking!' : 'Pick another day or return to Today.'}</p>
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-3 -mx-4 sm:-mx-6">
                   {(() => {
                     const mealCategories = [
                       { key: 'uncategorized', label: 'Uncategorized' },
@@ -5668,7 +5686,7 @@ Please add nutritional information manually if needed.`);
                                   </svg>
                                 </button>
                                 {showEntryOptions === food.id.toString() && (
-                                  <div className="absolute right-0 bottom-full mb-2 w-48 bg-white rounded-lg shadow-xl border border-gray-200 z-[9999]" style={{boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'}}>
+                                  <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-200 z-[9999]" style={{boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'}}>
                                     <button
                                       onClick={() => editFood(food)}
                                       className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center transition-colors"
@@ -5888,44 +5906,120 @@ Please add nutritional information manually if needed.`);
                       if (totals.fat > 0) summaryParts.push(`${Math.round(totals.fat)}g Fat`)
                       const summaryText = summaryParts.length > 0 ? summaryParts.join(', ') : 'No entries yet'
 
+                      const toggleCategory = () =>
+                        setExpandedCategories((prev) => ({
+                          ...prev,
+                          [cat.key]: !prev[cat.key],
+                        }))
+
                       return (
-                        <div key={cat.key} className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-                          <button
-                            type="button"
-                            aria-expanded={expandedCategories[cat.key]}
-                            onClick={() =>
-                              setExpandedCategories((prev) => ({
-                                ...prev,
-                                [cat.key]: !prev[cat.key],
-                              }))
-                            }
-                            className="w-full text-left px-4 py-3"
-                          >
+                        <div key={cat.key} className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-visible px-4 sm:px-6 pt-2">
+                          <div className="relative">
                             <div
                               className={`flex items-center gap-3 rounded-xl border ${
                                 expandedCategories[cat.key] ? 'bg-gray-50 border-gray-200' : 'bg-white border-gray-100'
                               } shadow-sm px-3 py-2`}
                             >
-                              <div className="flex-shrink-0 h-9 w-9 rounded-full border border-emerald-200 bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setSelectedAddCategory(cat.key as any)
+                                  setShowCategoryPicker(false)
+                                  setPhotoOptionsAnchor(cat.key)
+                                  setShowPhotoOptions(true)
+                                  setShowAddFood(false)
+                                  setIsEditingDescription(false)
+                                  setShowAiResult(false)
+                                }}
+                                className="flex-shrink-0 h-9 w-9 rounded-full border border-emerald-200 bg-emerald-50 text-emerald-600 flex items-center justify-center hover:bg-emerald-100 transition-colors"
+                                aria-label={`Add to ${cat.label}`}
+                              >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v12m6-6H6" />
                                 </svg>
-                              </div>
-                              <div className="flex-1 min-w-0">
+                              </button>
+                              <button
+                                type="button"
+                                onClick={toggleCategory}
+                                className="flex-1 min-w-0 text-left"
+                                aria-expanded={expandedCategories[cat.key]}
+                              >
                                 <div className="font-semibold text-gray-900">{cat.label}</div>
                                 <div className="text-xs text-gray-500 truncate">{summaryText}</div>
-                              </div>
-                              <svg
-                                className={`w-4 h-4 text-gray-500 transition-transform ${expandedCategories[cat.key] ? 'rotate-180' : ''}`}
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                                aria-hidden
+                              </button>
+                              <button
+                                type="button"
+                                onClick={toggleCategory}
+                                className="flex-shrink-0 p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                                aria-label={expandedCategories[cat.key] ? 'Collapse category' : 'Expand category'}
                               >
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                              </svg>
+                                <svg
+                                  className={`w-4 h-4 text-gray-500 transition-transform ${expandedCategories[cat.key] ? 'rotate-180' : ''}`}
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                  aria-hidden
+                                >
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
+                              </button>
                             </div>
-                          </button>
+
+                            {showPhotoOptions && photoOptionsAnchor === cat.key && !showCategoryPicker && (
+                              <div className="food-options-dropdown absolute left-0 right-0 top-full mt-2 z-50">
+                                <div className="rounded-2xl shadow-2xl border border-gray-200 bg-white/95 backdrop-blur-xl overflow-hidden">
+                                  <div className="divide-y divide-gray-100">
+                                    <button
+                                      className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
+                                      onClick={() => {
+                                        setPendingPhotoPicker(true);
+                                        setShowPhotoOptions(false);
+                                        setPhotoOptionsAnchor(null);
+                                        setShowAnalysisModeModal(true);
+                                      }}
+                                    >
+                                      <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center mr-3 text-blue-600">
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        </svg>
+                                      </div>
+                                      <div className="flex-1">
+                                        <div className="text-base font-semibold text-gray-900">Photo Library / Camera</div>
+                                        <div className="text-xs text-gray-500">Capture or pick a photo of your food</div>
+                                      </div>
+                                      <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                      </svg>
+                                    </button>
+
+                                    <button
+                                      onClick={() => {
+                                        setShowPhotoOptions(false);
+                                        setPhotoOptionsAnchor(null);
+                                        setShowAddFood(true);
+                                      }}
+                                      className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
+                                    >
+                                      <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center mr-3 text-green-600">
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                        </svg>
+                                      </div>
+                                      <div className="flex-1">
+                                        <div className="text-base font-semibold text-gray-900">Manual Entry</div>
+                                        <div className="text-xs text-gray-500">Type your food description</div>
+                                      </div>
+                                      <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                      </svg>
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
                           {expandedCategories[cat.key] && (
                             <div className="border-t border-gray-100 space-y-3 p-3">
                               {entries.length === 0 ? (
