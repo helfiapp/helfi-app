@@ -5805,6 +5805,44 @@ Please add nutritional information manually if needed.`);
                         (() => {
                           const slides: JSX.Element[] = []
 
+                          // Slide 1: Remaining ring
+                          slides.push(
+                            <div className="flex flex-col items-center order-1 md:order-2">
+                              <TargetRing
+                                label="Remaining"
+                                valueLabel={
+                                  targetInUnit !== null && consumedInUnit !== null
+                                    ? `${Math.max(
+                                        0,
+                                        Math.round(targetInUnit - consumedInUnit),
+                                      )} ${energyUnit}`
+                                    : '—'
+                                }
+                                percent={percentUsed || 0}
+                                tone="target"
+                              />
+                              {targetInUnit !== null && (
+                                <div className="mt-1 text-[11px] text-gray-500">
+                                  Daily allowance:{' '}
+                                  <span className="font-semibold">
+                                    {Math.round(targetInUnit)} {energyUnit}
+                                  </span>
+                                </div>
+                              )}
+                              <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-gray-600">
+                                <div className="flex items-center gap-1">
+                                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500 shrink-0" />
+                                  <span>Used</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
+                                  <span>Remaining</span>
+                                </div>
+                              </div>
+                            </div>
+                          )
+
+                          // Slide 2: macro bars
                           if (macroRows.length > 0) {
                             slides.push(
                               <div className="order-2 md:order-1 space-y-2 mt-6 md:mt-0">
@@ -5844,42 +5882,6 @@ Please add nutritional information manually if needed.`);
                             )
                           }
 
-                          slides.push(
-                            <div className="flex flex-col items-center order-1 md:order-2">
-                              <TargetRing
-                                label="Remaining"
-                                valueLabel={
-                                  targetInUnit !== null && consumedInUnit !== null
-                                    ? `${Math.max(
-                                        0,
-                                        Math.round(targetInUnit - consumedInUnit),
-                                      )} ${energyUnit}`
-                                    : '—'
-                                }
-                                percent={percentUsed || 0}
-                                tone="target"
-                              />
-                              {targetInUnit !== null && (
-                                <div className="mt-1 text-[11px] text-gray-500">
-                                  Daily allowance:{' '}
-                                  <span className="font-semibold">
-                                    {Math.round(targetInUnit)} {energyUnit}
-                                  </span>
-                                </div>
-                              )}
-                              <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-gray-600">
-                                <div className="flex items-center gap-1">
-                                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500 shrink-0" />
-                                  <span>Used</span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
-                                  <span>Remaining</span>
-                                </div>
-                              </div>
-                            </div>
-                          )
-
                           const handleSummaryScroll = () => {
                             if (!isMobile || !summaryCarouselRef.current || slides.length <= 1) return
                             const { scrollLeft, clientWidth } = summaryCarouselRef.current
@@ -5899,7 +5901,7 @@ Please add nutritional information manually if needed.`);
                                 {slides.map((slide, idx) => (
                                   <div
                                     key={idx}
-                                    className="flex-shrink-0 w-[calc(100%-32px)] snap-center md:w-auto"
+                                    className="flex-shrink-0 w-full snap-center md:w-auto"
                                   >
                                     {slide}
                                   </div>
