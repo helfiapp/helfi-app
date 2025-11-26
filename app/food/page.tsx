@@ -5802,7 +5802,7 @@ Please add nutritional information manually if needed.`);
                           Add a meal to see how today compares to your daily targets.
                         </p>
                       ) : (
-                        {(() => {
+                        (() => {
                           const slides: JSX.Element[] = []
 
                           if (macroRows.length > 0) {
@@ -5917,7 +5917,7 @@ Please add nutritional information manually if needed.`);
                               )}
                             </>
                           )
-                        })()}
+                        })()
                       )}
                     </div>
                   </div>
