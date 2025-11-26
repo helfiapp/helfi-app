@@ -3619,8 +3619,7 @@ Please add nutritional information manually if needed.`);
                 </svg>
               </span>
               <div className="text-left">
-                <div className="text-sm font-semibold">Add to</div>
-                <div className="text-xs text-emerald-50">{categoryLabel(selectedAddCategory)}</div>
+                <div className="text-base sm:text-lg font-semibold">Add Food Entry</div>
               </div>
             </div>
             <svg className={`w-4 h-4 transition-transform ${showCategoryPicker || (showPhotoOptions && photoOptionsAnchor === 'global') ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
