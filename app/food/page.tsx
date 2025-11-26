@@ -973,7 +973,22 @@ export default function FoodDiary() {
     dinner: false,
     snacks: false,
   })
-  const [selectedAddCategory, setSelectedAddCategory] = useState<'uncategorized' | 'breakfast' | 'lunch' | 'dinner' | 'snacks'>('uncategorized')
+  const MEAL_CATEGORY_ORDER: Array<'breakfast' | 'lunch' | 'dinner' | 'snacks' | 'uncategorized'> = [
+    'breakfast',
+    'lunch',
+    'dinner',
+    'snacks',
+    'uncategorized',
+  ]
+  const CATEGORY_LABELS: Record<typeof MEAL_CATEGORY_ORDER[number], string> = {
+    breakfast: 'Breakfast',
+    lunch: 'Lunch',
+    dinner: 'Dinner',
+    snacks: 'Snacks',
+    uncategorized: 'Other',
+  }
+  const categoryLabel = (key: typeof MEAL_CATEGORY_ORDER[number]) => CATEGORY_LABELS[key] || 'Other'
+  const [selectedAddCategory, setSelectedAddCategory] = useState<typeof MEAL_CATEGORY_ORDER[number]>('uncategorized')
   const [showCategoryPicker, setShowCategoryPicker] = useState(false)
   const [showAddIngredientModal, setShowAddIngredientModal] = useState<boolean>(false)
   const [officialSearchQuery, setOfficialSearchQuery] = useState<string>('')
@@ -3605,7 +3620,7 @@ Please add nutritional information manually if needed.`);
               </span>
               <div className="text-left">
                 <div className="text-sm font-semibold">Add to</div>
-                <div className="text-xs text-emerald-50 capitalize">{selectedAddCategory}</div>
+                <div className="text-xs text-emerald-50">{categoryLabel(selectedAddCategory)}</div>
               </div>
             </div>
             <svg className={`w-4 h-4 transition-transform ${showCategoryPicker || (showPhotoOptions && photoOptionsAnchor === 'global') ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -3623,18 +3638,14 @@ Please add nutritional information manually if needed.`);
           {showCategoryPicker && (
             <div className="food-options-dropdown absolute top-full left-0 w-full sm:w-80 sm:left-auto sm:right-0 mt-2 z-50">
               <div className="rounded-2xl shadow-2xl border border-gray-200 bg-white/95 backdrop-blur-xl overflow-hidden divide-y divide-gray-100">
-                {[
-                  { key: 'uncategorized', label: 'Uncategorized' },
-                  { key: 'breakfast', label: 'Breakfast' },
-                  { key: 'lunch', label: 'Lunch' },
-                  { key: 'dinner', label: 'Dinner' },
-                  { key: 'snacks', label: 'Snacks' },
-                ].map((cat) => (
+                {MEAL_CATEGORY_ORDER.map((key) => {
+                  const label = categoryLabel(key)
+                  return (
                   <button
-                    key={cat.key}
+                    key={key}
                     className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
                     onClick={() => {
-                      setSelectedAddCategory(cat.key as any)
+                      setSelectedAddCategory(key)
                       setShowCategoryPicker(false)
                       setPhotoOptionsAnchor('global')
                       setShowPhotoOptions(true)
@@ -3642,15 +3653,16 @@ Please add nutritional information manually if needed.`);
                     }}
                   >
                     <div className="flex-1">
-                      <div className="text-base font-semibold text-gray-900">{cat.label}</div>
+                      <div className="text-base font-semibold text-gray-900">{label}</div>
                     </div>
-                    {selectedAddCategory === cat.key && (
+                    {selectedAddCategory === key && (
                       <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
                     )}
                   </button>
-                ))}
+                  )
+                })}
               </div>
             </div>
           )}
@@ -5640,13 +5652,10 @@ Please add nutritional information manually if needed.`);
               ) : (
                 <div className="space-y-3 -mx-4 sm:-mx-6">
                   {(() => {
-                    const mealCategories = [
-                      { key: 'uncategorized', label: 'Uncategorized' },
-                      { key: 'breakfast', label: 'Breakfast' },
-                      { key: 'lunch', label: 'Lunch' },
-                      { key: 'dinner', label: 'Dinner' },
-                      { key: 'snacks', label: 'Snacks' },
-                    ]
+                    const mealCategories = MEAL_CATEGORY_ORDER.map((key) => ({
+                      key,
+                      label: categoryLabel(key),
+                    }))
 
                     const grouped: Record<string, any[]> = {}
                     sourceEntries.forEach((entry) => {
