@@ -2236,8 +2236,9 @@ const applyStructuredItems = (
       //    We send appendHistory: false here so this endpoint does NOT try to create
       //    FoodLog rows itself. History writes are handled exclusively by the
       //    dedicated /api/food-log endpoint below to avoid conflicts.
+      // Fire-and-forget snapshot so UI isn't blocked by this extra write.
       try {
-        const userDataResponse = await fetch('/api/user-data', {
+        fetch('/api/user-data', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -2246,20 +2247,22 @@ const applyStructuredItems = (
             todaysFoods: dedupedFoods, // Use deduplicated array
             appendHistory: false, // Always false - we handle FoodLog separately
           }),
+        }).then(async (userDataResponse) => {
+          if (!userDataResponse.ok) {
+            const errorText = await userDataResponse.text()
+            console.error('❌ Failed to save todaysFoods snapshot:', {
+              status: userDataResponse.status,
+              statusText: userDataResponse.statusText,
+              error: errorText,
+            })
+          } else {
+            console.log('✅ Saved todaysFoods snapshot successfully')
+          }
+        }).catch((userDataError) => {
+          console.error('❌ Error saving todaysFoods snapshot:', userDataError)
         })
-
-        if (!userDataResponse.ok) {
-          const errorText = await userDataResponse.text()
-          console.error('❌ Failed to save todaysFoods snapshot:', {
-            status: userDataResponse.status,
-            statusText: userDataResponse.statusText,
-            error: errorText,
-          })
-        } else {
-          console.log('✅ Saved todaysFoods snapshot successfully')
-        }
       } catch (userDataError) {
-        console.error('❌ Error saving todaysFoods snapshot:', userDataError)
+        console.error('❌ Error launching todaysFoods snapshot:', userDataError)
       }
 
       // 3) For brand new entries, write directly into the permanent FoodLog
