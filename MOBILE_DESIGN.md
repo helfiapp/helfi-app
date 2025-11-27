@@ -1,11 +1,11 @@
 # Mobile To-Do (food entries)
 
 ## Reference images (always check these)
-- Swipe right UI example: `public/mobile-design-screenshots/IMG_3281ECC90E09-1-11-27-2025_06_49_PM.jpg`
-- 3-dot menu showing “Show Nutrition Summary”: `public/mobile-design-screenshots/IMG_F7C3BC1E4504-1-11-27-2025_06_47_PM.jpg`
-- Current layout baseline: `public/mobile-design-screenshots/IMG_1565713203E0-1-11-27-2025_06_48_PM.jpg`
-- Food row tap → full detail screen: `public/mobile-design-screenshots/Screenshot-2025-11-27-at-4-30-01-pm-11-27-2025_06_49_PM.jpg`
-- Detail screen with Edit/Delete and kcal note: `public/mobile-design-screenshots/IMG_E6DA5BDDF750-1-11-27-2025_06_48_PM.jpg`
+- Swipe/delete styling reference (delete icon): `public/mobile-design-screenshots/DELETE BUTTON ICON.jpg`
+- Current spacing/gap issue reference: `public/mobile-design-screenshots/SPACE ON LEFT AND RIGHT REMOVAL.jpg`
+- Favorites option location reference: `public/mobile-design-screenshots/FAVORITES MENU.jpg`
+
+Only the three images above remain relevant in `public/mobile-design-screenshots/`; older images were removed.
 
 ## Status
 - ✅ Edit button on the food detail screen opens the real edit flow.
@@ -20,6 +20,7 @@
 - ☐ Add Favorites entry point in add flow: when tapping the global “Add Food Entry” button or the meal “+”, after category selection, the option sheet should include “Favorites” (alongside Photo Library/Camera and Manual Entry) to insert a saved favorite. Currently Favorites are only stubbed in-memory; no UI entry point.
 - ☐ Duplicate Meal: pressing “Duplicate Meal” should open a category picker with helper text (“Which category would you like to place your duplicated meal?”) listing all categories; on selection, duplicate the meal into that category. Current handler is stubbed; no effect.
 - ☐ Edit Entry scroll: opening “Edit Entry” should land at the top of the edit page (not mid-page). Current behavior still lands mid-page.
+- ☐ Delete button visual: when swiping left, show an icon-only delete button like the Cronometer example (see `DELETE BUTTON ICON.jpg`), not the word “Delete”.
 
 ## Guidance for the next agent
 - Only do the to-do items above. Everything else stays as-is.
