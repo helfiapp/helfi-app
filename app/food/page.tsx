@@ -1066,6 +1066,7 @@ export default function FoodDiary() {
   const [expandedEntries, setExpandedEntries] = useState<{[key: string]: boolean}>({})
   const [entrySwipeOffsets, setEntrySwipeOffsets] = useState<{ [key: string]: number }>({})
   const [swipeMenuEntry, setSwipeMenuEntry] = useState<string | null>(null)
+  const [duplicateModalEntry, setDuplicateModalEntry] = useState<any | null>(null)
   const swipeMetaRef = useRef<Record<string, { startX: number; startY: number; swiping: boolean; hasMoved: boolean }>>({})
   const swipeClickBlockRef = useRef<Record<string, boolean>>({})
   const [insightsNotification, setInsightsNotification] = useState<{show: boolean, message: string, type: 'updating' | 'updated'} | null>(null)
@@ -1099,6 +1100,7 @@ export default function FoodDiary() {
     macros: MacroSegment[]
   } | null>(null)
   const [quickToast, setQuickToast] = useState<string | null>(null)
+  const [favorites, setFavorites] = useState<any[]>([])
   const isAddMenuOpen = showCategoryPicker || showPhotoOptions
 
   useEffect(() => {
@@ -3322,7 +3324,13 @@ Please add nutritional information manually if needed.`);
     }
   }
 
-  const handleAddToFavorites = () => {
+  const handleAddToFavorites = (entry: any) => {
+    const id = (entry as any)?.id || entry
+    if (!id) {
+      showQuickToast('Could not add to favorites')
+      return
+    }
+    setFavorites((prev) => (prev.includes(id) ? prev : [...prev, id]))
     showQuickToast('Added to favorites')
   }
 
@@ -6060,8 +6068,8 @@ Please add nutritional information manually if needed.`);
                       const entryTotals = getEntryTotals(food)
                       const entryCalories = Number.isFinite(Number(entryTotals?.calories)) ? Math.round(Number(entryTotals?.calories)) : null
                       const actions = [
-                        { label: 'Add to Favorites', onClick: () => handleAddToFavorites() },
-                        { label: 'Duplicate Meal', onClick: () => showQuickToast('Duplicate coming soon') },
+                        { label: 'Add to Favorites', onClick: () => handleAddToFavorites(food) },
+                        { label: 'Duplicate Meal', onClick: () => setDuplicateModalEntry(food) },
                         { label: 'Copy to Today', onClick: () => showQuickToast('Copy to Today coming soon') },
                         { label: 'Edit Entry', onClick: () => editFood(food) },
                         { label: 'Delete', onClick: () => {
@@ -6141,13 +6149,13 @@ Please add nutritional information manually if needed.`);
                         setEntrySwipeOffsets((prev) => ({ ...prev, [entryKey]: 0 }))
                       }
 
-                      const handleRowPress = () => {
-                        if (isMobile && swipeClickBlockRef.current[entryKey]) return
-                        closeSwipeMenus()
-                        setShowEntryOptions(null)
-                        setEnergyUnit('kcal')
-                        editFood(food)
-                      }
+  const handleRowPress = () => {
+    if (isMobile && swipeClickBlockRef.current[entryKey]) return
+    closeSwipeMenus()
+    setShowEntryOptions(null)
+    setEnergyUnit('kcal')
+    editFood(food)
+  }
 
                       const openSwipeMenu = (e?: React.SyntheticEvent) => {
                         if (e) {
@@ -6173,7 +6181,7 @@ Please add nutritional information manually if needed.`);
                                   </svg>
                                 </button>
                               </div>
-                              <div className="flex-1 bg-transparent" />
+                              <div className="flex-1 bg-[#4DAF50]" />
                               <div className="flex items-center">
                                 <button
                                   type="button"
@@ -6191,7 +6199,7 @@ Please add nutritional information manually if needed.`);
                             </div>
                           )}
                           <div
-                            className="relative bg-white border border-gray-200 rounded-none sm:rounded-xl shadow-sm transition-transform duration-150 ease-out z-10"
+                            className="relative bg-white border border-gray-200 rounded-none sm:rounded-xl shadow-sm transition-transform duration-150 ease-out z-10 w-full"
                             style={isMobile ? { transform: `translateX(${swipeOffset}px)`, touchAction: 'pan-y' } : undefined}
                             onTouchStart={handleTouchStart}
                             onTouchMove={handleTouchMove}
@@ -6200,22 +6208,22 @@ Please add nutritional information manually if needed.`);
                           >
                             <div
                               className="p-4 hover:bg-gray-50 transition-colors"
-                              onClick={handleRowPress}
+                              onClick={isMobile ? handleRowPress : undefined}
                             >
                               <div className="flex items-center gap-3">
                                 <p className="flex-1 text-sm sm:text-base text-gray-900 truncate">
                                   {sanitizeMealDescription(food.description.split('\n')[0].split('Calories:')[0])}
                                 </p>
-                                <div className="flex flex-col items-end gap-1 flex-shrink-0 text-xs sm:text-sm text-gray-600">
+                              <div className="flex flex-col items-end gap-1 flex-shrink-0 text-xs sm:text-sm text-gray-600">
                                   {entryCalories !== null && <span className="font-semibold text-gray-900">{entryCalories} kcal</span>}
                                   <span className="text-gray-500">{formatTimeWithAMPM(food.time)}</span>
                                 </div>
                                 {!isMobile && (
-                                  <div className="relative entry-options-dropdown overflow-visible">
-                                    <button
+                              <div className="relative entry-options-dropdown overflow-visible">
+                                <button
                                       onMouseDown={handleOptionsToggle}
                                       className="p-1.5 sm:p-2 rounded-lg hover:bg-gray-200 transition-colors"
-                                    >
+                                >
                                       <svg className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
                                         <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
                                       </svg>
@@ -6248,12 +6256,12 @@ Please add nutritional information manually if needed.`);
                           </div>
                           {isMobile && isMenuOpen && (
                             <div className="absolute left-0 right-0 top-full mt-2 px-4 z-20">
-                              <div className="rounded-2xl bg-white border border-gray-200 shadow-xl overflow-hidden">
-                                {actions.map((item, idx) => (
-                                  <button
-                                    key={item.label}
-                                    className={`w-full text-left px-4 py-3 text-sm flex items-center justify-between ${item.destructive ? 'text-red-600 hover:bg-red-50' : 'text-gray-800 hover:bg-gray-50'} ${idx > 0 ? 'border-t border-gray-100' : ''}`}
-                                    onClick={() => {
+                            <div className="rounded-2xl bg-white border border-gray-200 shadow-xl overflow-hidden w-full">
+                              {actions.map((item, idx) => (
+                                <button
+                                  key={item.label}
+                                  className={`w-full text-left px-4 py-3 text-sm flex items-center justify-between ${item.destructive ? 'text-red-600 hover:bg-red-50' : 'text-gray-800 hover:bg-gray-50'} ${idx > 0 ? 'border-t border-gray-100' : ''}`}
+                                  onClick={() => {
                                       item.onClick()
                                       closeSwipeMenus()
                                     }}
