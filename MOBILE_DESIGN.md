@@ -1,5 +1,8 @@
 # Mobile UI To-Do (Cronometer-inspired)
 
+## Completed
+- ✅ Food entry detail screen: Edit button opens the real edit flow (no blank screen).
+
 ## 1) Overall layout overhaul
 - Rework Food Diary mobile layout to mirror Cronometer’s stacked sections and clear top summary (rings + date nav + triple-dot menu).
 - Tighten spacing, rounded cards, and sticky bottom nav with a bold central “add” action.
