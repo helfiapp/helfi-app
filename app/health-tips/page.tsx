@@ -346,7 +346,7 @@ export default function HealthTipsPage() {
             raw AI cost so things stay in line with your subscription and top-ups).
           </p>
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-            Typical cost: 2–4 credits per tip (billed at 2× OpenAI cost).
+            Cost: 2 credits per tip dispatch.
           </p>
 
           {/* Credits usage for Health Tips */}
@@ -548,4 +548,3 @@ export default function HealthTipsPage() {
     </div>
   )
 }
-

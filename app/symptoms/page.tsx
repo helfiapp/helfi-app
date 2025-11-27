@@ -267,7 +267,7 @@ export default function SymptomAnalysisPage() {
               {isAnalyzing ? 'Analyzing…' : 'Analyze symptoms'}
             </button>
             <div className="mt-2">
-              <p className="text-xs text-gray-500 mb-2">Typical cost: 4-6 credits per analysis</p>
+              <p className="text-xs text-gray-500 mb-2">Cost: 6 credits per analysis</p>
               {!hasPaidAccess && (
                 <div className="text-[11px] text-blue-800 bg-blue-50 border border-blue-200 rounded px-2 py-1 mb-2">
                   Free accounts can try this AI feature once. After your free analysis, upgrade or buy credits to continue.
@@ -275,6 +275,7 @@ export default function SymptomAnalysisPage() {
               )}
               <UsageMeter inline={true} refreshTrigger={usageMeterRefresh} />
               <FeatureUsageDisplay featureName="symptomAnalysis" featureLabel="Symptom Analysis" refreshTrigger={usageMeterRefresh} />
+              <p className="text-xs text-gray-600 mt-1">Cost: 6 credits per symptom analysis.</p>
             </div>
 
             {/* Progress Bar */}

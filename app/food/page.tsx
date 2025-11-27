@@ -3923,6 +3923,7 @@ Please add nutritional information manually if needed.`);
           <div className="mt-2">
             <UsageMeter inline={true} refreshTrigger={usageMeterRefresh} />
             <FeatureUsageDisplay featureName="foodAnalysis" featureLabel="Food Analysis" refreshTrigger={usageMeterRefresh} />
+            <p className="text-xs text-gray-600 mt-1">Cost: 15 credits per food analysis.</p>
           </div>
 
           {/* Category picker first */}
@@ -4194,7 +4195,7 @@ Please add nutritional information manually if needed.`);
                     Product nutrition image reads the per-serving column exactly (ignores per-100g).
                   </div>
                   <div className="mt-2">
-                    <p className="text-xs text-gray-500 text-center mb-2">Typical cost: 6–8 credits (varies by photo + health checks)</p>
+                    <p className="text-xs text-gray-500 text-center mb-2">Cost: 15 credits per food analysis</p>
                     {!hasPaidAccess && (
                       <div className="text-[11px] text-blue-800 bg-blue-50 border border-blue-200 rounded px-2 py-1 mb-2 text-center">
                         Free accounts can try this AI feature once. After your free analysis, upgrade or buy credits to continue.

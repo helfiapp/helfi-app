@@ -11,6 +11,7 @@ import UsageMeter from '@/components/UsageMeter'
 import PageHeader from '@/components/PageHeader'
 import ConfirmationModal from '@/components/ConfirmationModal'
 import MessageModal from '@/components/MessageModal'
+import { creditDisplayList } from '@/data/creditCosts'
 
 export default function BillingPage() {
   const { data: session } = useSession()
@@ -623,6 +624,20 @@ export default function BillingPage() {
 
         </div>
       </nav>
+
+      {/* AI feature credit costs reference */}
+      <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
+        <h2 className="text-2xl font-bold text-gray-900 mb-3">AI feature credit costs</h2>
+        <p className="text-sm text-gray-600 mb-4">Each AI action deducts credits from your wallet. Here’s the current cost per feature:</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {creditDisplayList.map((item) => (
+            <div key={item.key} className="border border-gray-200 rounded-xl px-4 py-3 flex items-center justify-between">
+              <span className="text-sm font-medium text-gray-900">{item.label}</span>
+              <span className="text-sm font-semibold text-gray-800">{item.credits} credits</span>
+            </div>
+          ))}
+        </div>
+      </div>
 
       {/* Confirmation Modal */}
       <ConfirmationModal
