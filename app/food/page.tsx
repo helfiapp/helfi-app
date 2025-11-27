@@ -1063,6 +1063,9 @@ export default function FoodDiary() {
 
   const [foodImagesLoading, setFoodImagesLoading] = useState<{[key: string]: boolean}>({})
   const [expandedEntries, setExpandedEntries] = useState<{[key: string]: boolean}>({})
+  const [entrySwipeOffsets, setEntrySwipeOffsets] = useState<{ [key: string]: number }>({})
+  const swipeMetaRef = useRef<Record<string, { startX: number; startY: number; swiping: boolean; hasMoved: boolean }>>({})
+  const swipeClickBlockRef = useRef<Record<string, boolean>>({})
   const [insightsNotification, setInsightsNotification] = useState<{show: boolean, message: string, type: 'updating' | 'updated'} | null>(null)
   const [fullSizeImage, setFullSizeImage] = useState<string | null>(null)
   const [showSavedToast, setShowSavedToast] = useState<boolean>(false)
@@ -3296,6 +3299,21 @@ Please add nutritional information manually if needed.`);
     resetAnalyzerPanel()
   }
 
+  const handleDeleteEditingEntry = async () => {
+    if (!editingEntry) return
+    try {
+      if (isViewingToday) {
+        await deleteFood(editingEntry.id)
+      } else if ((editingEntry as any)?.dbId) {
+        await deleteHistoryFood((editingEntry as any).dbId)
+      } else {
+        await deleteFood(editingEntry.id)
+      }
+    } finally {
+      exitEditingSession()
+    }
+  }
+
   const exitEditingSession = () => {
     resetAnalyzerPanel()
     setEditingEntry(null)
@@ -3412,6 +3430,7 @@ Please add nutritional information manually if needed.`);
 
   const editFood = (food: any) => {
     setEditingEntry(food);
+    setEnergyUnit('kcal')
     setSelectedAddCategory(normalizeCategory(food?.meal || food?.category || food?.mealType) as any);
     try {
       // Keep an immutable copy to enable "Cancel changes"
@@ -4242,6 +4261,24 @@ Please add nutritional information manually if needed.`);
             {/* AI Analysis Result - Premium Cronometer-style UI */}
             {showAiResult && (
               <div className="bg-white rounded-2xl shadow-lg border border-gray-100">
+                {editingEntry && (
+                  <div className="flex items-center justify-end gap-3 px-4 pt-4">
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingDescription(true)}
+                      className="px-3 py-1.5 rounded-full border border-gray-200 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDeleteEditingEntry}
+                      className="px-3 py-1.5 rounded-full bg-red-50 text-sm font-semibold text-red-600 hover:bg-red-100"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                )}
                 {/* Photo Section - full width image for mobile / non-editing.
                     When editing an entry, clicking the image lets you change the photo. */}
                 {photoPreview && (
@@ -5997,221 +6034,344 @@ Please add nutritional information manually if needed.`);
                       grouped[target].push(entry)
                     })
 
-                    const renderEntryCard = (food: any) => (
-                      <div key={food.id} className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-visible">
-                        {/* Collapsed header row */}
-                        <div className="p-4 hover:bg-gray-50 transition-colors">
-                          <div className="flex items-center gap-3">
-                            <p className="flex-1 text-sm sm:text-base text-gray-900 truncate">
-                              {sanitizeMealDescription(food.description.split('\n')[0].split('Calories:')[0])}
-                            </p>
-                            <div className="flex items-center gap-2 flex-shrink-0">
-                              <p className="text-xs sm:text-sm text-gray-500">
-                                {formatTimeWithAMPM(food.time)}
-                              </p>
-                              {/* 3-Dot Options Menu */}
-                              <div className="relative entry-options-dropdown overflow-visible">
+                    const renderEntryCard = (food: any) => {
+                      const entryKey = food.id.toString()
+                      const swipeOffset = entrySwipeOffsets[entryKey] || 0
+
+                      const handleOptionsToggle = (e?: React.SyntheticEvent) => {
+                        if (e) {
+                          e.preventDefault()
+                          e.stopPropagation()
+                        }
+                        setShowEntryOptions(showEntryOptions === entryKey ? null : entryKey)
+                        setEntrySwipeOffsets((prev) => ({ ...prev, [entryKey]: 0 }))
+                      }
+
+                      const handleSwipeDelete = () => {
+                        if (isViewingToday) {
+                          deleteFood(food.id)
+                        } else {
+                          deleteHistoryFood((food as any).dbId)
+                        }
+                      }
+
+                      const handleTouchStart = (e: React.TouchEvent) => {
+                        if (!isMobile || e.touches.length === 0) return
+                        const touch = e.touches[0]
+                        swipeMetaRef.current[entryKey] = {
+                          startX: touch.clientX,
+                          startY: touch.clientY,
+                          swiping: false,
+                          hasMoved: false,
+                        }
+                        swipeClickBlockRef.current[entryKey] = false
+                      }
+
+                      const handleTouchMove = (e: React.TouchEvent) => {
+                        if (!isMobile || e.touches.length === 0) return
+                        const meta = swipeMetaRef.current[entryKey]
+                        if (!meta) return
+                        const touch = e.touches[0]
+                        const dx = touch.clientX - meta.startX
+                        const dy = touch.clientY - meta.startY
+                        if (!meta.swiping) {
+                          if (Math.abs(dx) < 6 || Math.abs(dx) < Math.abs(dy)) return
+                          meta.swiping = true
+                        }
+                        meta.hasMoved = true
+                        const clamped = Math.max(-120, Math.min(120, dx))
+                        setEntrySwipeOffsets((prev) => ({ ...prev, [entryKey]: clamped }))
+                      }
+
+                      const handleTouchEnd = () => {
+                        if (!isMobile) return
+                        const meta = swipeMetaRef.current[entryKey]
+                        const offset = entrySwipeOffsets[entryKey] || 0
+                        if (meta?.hasMoved) {
+                          swipeClickBlockRef.current[entryKey] = true
+                          setTimeout(() => {
+                            swipeClickBlockRef.current[entryKey] = false
+                          }, 160)
+                        }
+                        delete swipeMetaRef.current[entryKey]
+
+                        if (offset > 70) {
+                          setEntrySwipeOffsets((prev) => ({ ...prev, [entryKey]: 72 }))
+                          return
+                        }
+                        if (offset < -70) {
+                          setEntrySwipeOffsets((prev) => ({ ...prev, [entryKey]: -90 }))
+                          handleSwipeDelete()
+                          return
+                        }
+                        setEntrySwipeOffsets((prev) => ({ ...prev, [entryKey]: 0 }))
+                      }
+
+                      const handleRowPress = () => {
+                        if (!isMobile) return
+                        if (swipeClickBlockRef.current[entryKey]) return
+                        setEntrySwipeOffsets((prev) => ({ ...prev, [entryKey]: 0 }))
+                        setShowEntryOptions(null)
+                        setEnergyUnit('kcal')
+                        editFood(food)
+                      }
+
+                      return (
+                        <div key={food.id} className="relative">
+                          {isMobile && (
+                            <div className="absolute inset-0 flex items-stretch pointer-events-none">
+                              <div className="flex items-center">
                                 <button
-                                  onMouseDown={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    setShowEntryOptions(showEntryOptions === food.id.toString() ? null : food.id.toString());
-                                  }}
-                                  className="p-1.5 sm:p-2 rounded-lg hover:bg-gray-200 transition-colors"
+                                  type="button"
+                                  onClick={(e) => handleOptionsToggle(e)}
+                                  className="pointer-events-auto h-full w-16 bg-[#4DAF50] text-white flex items-center justify-center font-semibold uppercase tracking-wide"
                                 >
-                                  <svg className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
-                                    <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
+                                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                                   </svg>
                                 </button>
-                                {showEntryOptions === food.id.toString() && (
-                                  <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-200 z-[9999]" style={{boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)', overflow: 'visible', paddingBottom: '6px'}}>
-                                    <button
-                                      onClick={() => editFood(food)}
-                                      className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center transition-colors"
-                                    >
-                                      <svg className="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                      </svg>
-                                      <div>
-                                        <div className="font-medium">Edit Entry</div>
-                                        <div className="text-xs text-gray-500">Modify description & re-analyze</div>
-                                      </div>
-                                    </button>
-                                    <button
-                                      onClick={() => {
-                                        if (isViewingToday) {
-                                          deleteFood(food.id)
-                                        } else {
-                                          // For history view, use the database id
-                                          deleteHistoryFood((food as any).dbId)
-                                        }
-                                      }}
-                                      className="w-full px-4 py-3 text-left text-sm text-red-600 hover:bg-red-50 flex items-center border-t border-gray-100 transition-colors"
-                                    >
-                                      <svg className="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                      </svg>
-                                      <div>
-                                        <div className="font-medium">Delete Entry</div>
-                                        <div className="text-xs text-gray-500">Remove from food diary</div>
-                                      </div>
-                                    </button>
-                                  </div>
-                                )}
                               </div>
-                              {/* Expand/Collapse Toggle */}
-                              <button
-                                onClick={() => toggleExpanded(food.id.toString())}
-                                className="p-1.5 sm:p-2 rounded-lg hover:bg-gray-200 transition-colors"
-                              >
-                                <svg 
-                                  className={`w-4 h-4 sm:w-5 sm:h-5 text-gray-400 transition-transform duration-200 ${
-                                    expandedEntries[food.id.toString()] ? 'rotate-180' : ''
-                                  }`} 
-                                  fill="none" 
-                                  stroke="currentColor" 
-                                  viewBox="0 0 24 24"
+                              <div className="flex-1" />
+                              <div className="flex items-center">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    handleSwipeDelete()
+                                  }}
+                                  className="pointer-events-auto h-full w-16 bg-red-500 text-white flex items-center justify-center font-semibold uppercase tracking-wide"
                                 >
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                </svg>
-                              </button>
+                                  Delete
+                                </button>
+                              </div>
                             </div>
-                            </div>
-                        </div>
-
-                        {/* Expandable Content */}
-                        {expandedEntries[food.id.toString()] && (
-                          <div className="border-t border-gray-100 p-4 bg-gray-50">
-                            {/* Full description when expanded */}
-                            <p className="mb-3 text-sm text-gray-800 whitespace-pre-line">
-                              {sanitizeMealDescription(food.description.split('Calories:')[0])}
-                            </p>
-                            <div className="flex flex-col sm:flex-row gap-4">
-                              {/* Food Image */}
-                              {food.photo && (
-                                <div className="w-full sm:w-32 sm:flex-shrink-0 mb-4 sm:mb-0">
-                                  <div className="relative">
-                                    {foodImagesLoading[food.id] && (
-                                      <div className="absolute inset-0 bg-gray-100 rounded-lg animate-pulse flex items-center justify-center">
-                                        <svg className="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24">
-                                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                        </svg>
+                          )}
+                          <div
+                            className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-visible transition-transform duration-200"
+                            style={isMobile ? { transform: `translateX(${swipeOffset}px)` } : undefined}
+                            onTouchStart={handleTouchStart}
+                            onTouchMove={handleTouchMove}
+                            onTouchEnd={handleTouchEnd}
+                            onTouchCancel={handleTouchEnd}
+                          >
+                            {/* Collapsed header row */}
+                            <div
+                              className="p-4 hover:bg-gray-50 transition-colors"
+                              onClick={handleRowPress}
+                            >
+                              <div className="flex items-center gap-3">
+                                <p className="flex-1 text-sm sm:text-base text-gray-900 truncate">
+                                  {sanitizeMealDescription(food.description.split('\n')[0].split('Calories:')[0])}
+                                </p>
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  <p className="text-xs sm:text-sm text-gray-500">
+                                    {formatTimeWithAMPM(food.time)}
+                                  </p>
+                                  {/* 3-Dot Options Menu */}
+                                  <div className="relative entry-options-dropdown overflow-visible">
+                                    <button
+                                      onMouseDown={handleOptionsToggle}
+                                      className="p-1.5 sm:p-2 rounded-lg hover:bg-gray-200 transition-colors"
+                                    >
+                                      <svg className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
+                                      </svg>
+                                    </button>
+                                    {showEntryOptions === food.id.toString() && (
+                                      <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-200 z-[9999]" style={{boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)', overflow: 'visible', paddingBottom: '6px'}}>
+                                        <button
+                                          onClick={() => editFood(food)}
+                                          className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center transition-colors"
+                                        >
+                                          <svg className="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                          </svg>
+                                          <div>
+                                            <div className="font-medium">Show Nutrition Summary</div>
+                                            <div className="text-xs text-gray-500">View and edit the full entry</div>
+                                          </div>
+                                        </button>
+                                        <button
+                                          onClick={() => {
+                                            if (isViewingToday) {
+                                              deleteFood(food.id)
+                                            } else {
+                                              // For history view, use the database id
+                                              deleteHistoryFood((food as any).dbId)
+                                            }
+                                          }}
+                                          className="w-full px-4 py-3 text-left text-sm text-red-600 hover:bg-red-50 flex items-center border-t border-gray-100 transition-colors"
+                                        >
+                                          <svg className="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                          </svg>
+                                          <div>
+                                            <div className="font-medium">Delete Entry</div>
+                                            <div className="text-xs text-gray-500">Remove from food diary</div>
+                                          </div>
+                                        </button>
                                       </div>
                                     )}
-                                    <Image
-                                      src={food.photo}
-                                      alt="Food"
-                                      width={128}
-                                      height={128}
-                                      className={`w-full sm:w-32 aspect-square object-cover rounded-lg cursor-pointer hover:opacity-80 transition-opacity ${foodImagesLoading[food.id] ? 'opacity-0' : 'opacity-100'}`}
-                                      onLoadStart={() => setFoodImagesLoading(prev => ({...prev, [food.id]: true}))}
-                                      onLoad={() => setFoodImagesLoading(prev => ({...prev, [food.id]: false}))}
-                                      onError={() => setFoodImagesLoading(prev => ({...prev, [food.id]: false}))}
-                                      onClick={() => setFullSizeImage(food.photo)}
-                                      loading="lazy"
-                                    />
                                   </div>
+                                  {/* Expand/Collapse Toggle */}
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      toggleExpanded(food.id.toString())
+                                    }}
+                                    className="p-1.5 sm:p-2 rounded-lg hover:bg-gray-200 transition-colors"
+                                  >
+                                    <svg 
+                                      className={`w-4 h-4 sm:w-5 sm:h-5 text-gray-400 transition-transform duration-200 ${
+                                        expandedEntries[food.id.toString()] ? 'rotate-180' : ''
+                                      }`} 
+                                      fill="none" 
+                                      stroke="currentColor" 
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                  </button>
                                 </div>
-                              )}
-
-                              {/* Per-meal macro ring */}
-                              <div className="flex-1 sm:max-w-md lg:max-w-lg">
-                                {(() => {
-                                  const summaryTotals = getEntryTotals(food)
-
-                                  const mealMacros: MacroSegment[] = [
-                                    { key: 'protein', label: 'Protein', grams: (summaryTotals as any)?.protein ?? 0, color: '#ef4444' },
-                                    { key: 'fibre', label: 'Fibre', grams: (summaryTotals as any)?.fiber ?? 0, color: '#93c5fd' },
-                                    { key: 'carbs', label: 'Carbs', grams: (summaryTotals as any)?.carbs ?? 0, color: '#22c55e' },
-                                    { key: 'sugar', label: 'Sugar', grams: (summaryTotals as any)?.sugar ?? 0, color: '#f97316' },
-                                    { key: 'fat', label: 'Fat', grams: (summaryTotals as any)?.fat ?? 0, color: '#6366f1' },
-                                  ]
-
-                                  const mealEnergyKcal = Number((summaryTotals as any)?.calories ?? 0)
-                                  const mealEnergyInUnit = energyUnit === 'kJ' 
-                                    ? Math.round(mealEnergyKcal * 4.184) 
-                                    : Math.round(mealEnergyKcal)
-
-                                  return (
-                                    <div className="flex flex-row gap-4 items-start">
-                                      <button
-                                        type="button"
-                                        className="flex flex-col items-center flex-shrink-0 focus:outline-none"
-                                        onClick={() =>
-                                          setMacroPopup({
-                                            title: 'Meal macro breakdown',
-                                            energyLabel:
-                                              Number.isFinite(mealEnergyKcal) && mealEnergyKcal > 0
-                                                ? `${Math.round(mealEnergyKcal)} kcal`
-                                                : undefined,
-                                            macros: mealMacros,
-                                          })
-                                        }
-                                      >
-                                        <div className="relative inline-block">
-                                          <MacroRing macros={mealMacros} showLegend={false} size="large" />
-                                          <div className="absolute inset-0 flex items-center justify-center">
-                                            <span className="text-xs font-semibold text-gray-800">
-                                              {Number.isFinite(mealEnergyKcal) && mealEnergyKcal > 0
-                                                ? mealEnergyInUnit
-                                                : '—'}
-                                            </span>
-                                          </div>
-                                        </div>
-                                        <span className="mt-2 text-[11px] text-gray-500">Tap to expand</span>
-                                      </button>
-                                      
-                                      <div className="flex-1 space-y-1">
-                                        {mealMacros.map((m) => (
-                                          <div key={m.key} className="flex items-center gap-2">
-                                            <div className="w-10 text-[11px] text-gray-500 uppercase">{m.label}</div>
-                                            <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-                                              <div
-                                                className="h-2 rounded-full"
-                                                style={{
-                                                  width: `${Math.min(100, (Number(m.grams || 0) / 40) * 100)}%`,
-                                                  backgroundColor: m.color,
-                                                }}
-                                              />
-                                            </div>
-                                            <div className="w-12 text-right text-sm font-semibold text-gray-800">
-                                              {Math.round(Number(m.grams || 0))}g
-                                            </div>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  )
-                                })()}
                               </div>
                             </div>
 
-                            {/* Action buttons */}
-                            <div className="mt-4 flex flex-wrap gap-2">
-                              <button
-                                onClick={() => editFood(food)}
-                                className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors"
-                              >
-                                Edit
-                              </button>
-                              <button
-                                onClick={() => {
-                                  if (isViewingToday) {
-                                    deleteFood(food.id)
-                                  } else {
-                                    deleteHistoryFood((food as any).dbId)
-                                  }
-                                }}
-                                className="px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-sm font-medium hover:bg-red-100 transition-colors"
-                              >
-                                Delete
-                              </button>
-                            </div>
+                            {/* Expandable Content */}
+                            {expandedEntries[food.id.toString()] && (
+                              <div className="border-t border-gray-100 p-4 bg-gray-50">
+                                {/* Full description when expanded */}
+                                <p className="mb-3 text-sm text-gray-800 whitespace-pre-line">
+                                  {sanitizeMealDescription(food.description.split('Calories:')[0])}
+                                </p>
+                                <div className="flex flex-col sm:flex-row gap-4">
+                                  {/* Food Image */}
+                                  {food.photo && (
+                                    <div className="w-full sm:w-32 sm:flex-shrink-0 mb-4 sm:mb-0">
+                                      <div className="relative">
+                                        {foodImagesLoading[food.id] && (
+                                          <div className="absolute inset-0 bg-gray-100 rounded-lg animate-pulse flex items-center justify-center">
+                                            <svg className="w-6 h-6 text-gray-400" fill="none" viewBox="0 0 24 24">
+                                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                          </div>
+                                        )}
+                                        <Image
+                                          src={food.photo}
+                                          alt="Food"
+                                          width={128}
+                                          height={128}
+                                          className={`w-full sm:w-32 aspect-square object-cover rounded-lg cursor-pointer hover:opacity-80 transition-opacity ${foodImagesLoading[food.id] ? 'opacity-0' : 'opacity-100'}`}
+                                          onLoadStart={() => setFoodImagesLoading(prev => ({...prev, [food.id]: true}))}
+                                          onLoad={() => setFoodImagesLoading(prev => ({...prev, [food.id]: false}))}
+                                          onError={() => setFoodImagesLoading(prev => ({...prev, [food.id]: false}))}
+                                          onClick={() => setFullSizeImage(food.photo)}
+                                          loading="lazy"
+                                        />
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Per-meal macro ring */}
+                                  <div className="flex-1 sm:max-w-md lg:max-w-lg">
+                                    {(() => {
+                                      const summaryTotals = getEntryTotals(food)
+
+                                      const mealMacros: MacroSegment[] = [
+                                        { key: 'protein', label: 'Protein', grams: (summaryTotals as any)?.protein ?? 0, color: '#ef4444' },
+                                        { key: 'fibre', label: 'Fibre', grams: (summaryTotals as any)?.fiber ?? 0, color: '#93c5fd' },
+                                        { key: 'carbs', label: 'Carbs', grams: (summaryTotals as any)?.carbs ?? 0, color: '#22c55e' },
+                                        { key: 'sugar', label: 'Sugar', grams: (summaryTotals as any)?.sugar ?? 0, color: '#f97316' },
+                                        { key: 'fat', label: 'Fat', grams: (summaryTotals as any)?.fat ?? 0, color: '#6366f1' },
+                                      ]
+
+                                      const mealEnergyKcal = Number((summaryTotals as any)?.calories ?? 0)
+                                      const mealEnergyInUnit = energyUnit === 'kJ' 
+                                        ? Math.round(mealEnergyKcal * 4.184) 
+                                        : Math.round(mealEnergyKcal)
+
+                                      return (
+                                        <div className="flex flex-row gap-4 items-start">
+                                          <button
+                                            type="button"
+                                            className="flex flex-col items-center flex-shrink-0 focus:outline-none"
+                                            onClick={() =>
+                                              setMacroPopup({
+                                                title: 'Meal macro breakdown',
+                                                energyLabel:
+                                                  Number.isFinite(mealEnergyKcal) && mealEnergyKcal > 0
+                                                    ? `${Math.round(mealEnergyKcal)} kcal`
+                                                    : undefined,
+                                                macros: mealMacros,
+                                              })
+                                            }
+                                          >
+                                            <div className="relative inline-block">
+                                              <MacroRing macros={mealMacros} showLegend={false} size="large" />
+                                              <div className="absolute inset-0 flex items-center justify-center">
+                                                <span className="text-xs font-semibold text-gray-800">
+                                                  {Number.isFinite(mealEnergyKcal) && mealEnergyKcal > 0
+                                                    ? mealEnergyInUnit
+                                                    : '—'}
+                                                </span>
+                                              </div>
+                                            </div>
+                                            <span className="mt-2 text-[11px] text-gray-500">Tap to expand</span>
+                                          </button>
+                                          
+                                          <div className="flex-1 space-y-1">
+                                            {mealMacros.map((m) => (
+                                              <div key={m.key} className="flex items-center gap-2">
+                                                <div className="w-10 text-[11px] text-gray-500 uppercase">{m.label}</div>
+                                                <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                                  <div
+                                                    className="h-2 rounded-full"
+                                                    style={{
+                                                      width: `${Math.min(100, (Number(m.grams || 0) / 40) * 100)}%`,
+                                                      backgroundColor: m.color,
+                                                    }}
+                                                  />
+                                                </div>
+                                                <div className="w-12 text-right text-sm font-semibold text-gray-800">
+                                                  {Math.round(Number(m.grams || 0))}g
+                                                </div>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )
+                                    })()}
+                                  </div>
+                                </div>
+
+                                {/* Action buttons */}
+                                <div className="mt-4 flex flex-wrap gap-2">
+                                  <button
+                                    onClick={() => editFood(food)}
+                                    className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors"
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      if (isViewingToday) {
+                                        deleteFood(food.id)
+                                      } else {
+                                        deleteHistoryFood((food as any).dbId)
+                                      }
+                                    }}
+                                    className="px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-sm font-medium hover:bg-red-100 transition-colors"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
-                    )
+                        </div>
+                      )
+                    }
 
                     return mealCategories.map((cat) => {
                       const entries = grouped[cat.key] || []
