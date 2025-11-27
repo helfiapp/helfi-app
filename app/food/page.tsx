@@ -116,6 +116,7 @@ const buildMealSummaryFromItems = (items: any[] | null | undefined) => {
     if (/lunch/.test(value)) return 'lunch'
     if (/dinner/.test(value)) return 'dinner'
     if (/snack/.test(value)) return 'snacks'
+    if (/other/.test(value)) return 'uncategorized'
     if (/uncat/.test(value)) return 'uncategorized'
     return 'uncategorized'
   }
@@ -1064,6 +1065,7 @@ export default function FoodDiary() {
   const [foodImagesLoading, setFoodImagesLoading] = useState<{[key: string]: boolean}>({})
   const [expandedEntries, setExpandedEntries] = useState<{[key: string]: boolean}>({})
   const [entrySwipeOffsets, setEntrySwipeOffsets] = useState<{ [key: string]: number }>({})
+  const [swipeMenuEntry, setSwipeMenuEntry] = useState<string | null>(null)
   const swipeMetaRef = useRef<Record<string, { startX: number; startY: number; swiping: boolean; hasMoved: boolean }>>({})
   const swipeClickBlockRef = useRef<Record<string, boolean>>({})
   const [insightsNotification, setInsightsNotification] = useState<{show: boolean, message: string, type: 'updating' | 'updated'} | null>(null)
@@ -1096,6 +1098,7 @@ export default function FoodDiary() {
     energyLabel?: string
     macros: MacroSegment[]
   } | null>(null)
+  const [quickToast, setQuickToast] = useState<string | null>(null)
   const isAddMenuOpen = showCategoryPicker || showPhotoOptions
 
   useEffect(() => {
@@ -3299,6 +3302,11 @@ Please add nutritional information manually if needed.`);
     resetAnalyzerPanel()
   }
 
+  const showQuickToast = (message: string) => {
+    setQuickToast(message)
+    setTimeout(() => setQuickToast(null), 1400)
+  }
+
   const handleDeleteEditingEntry = async () => {
     if (!editingEntry) return
     try {
@@ -3312,6 +3320,10 @@ Please add nutritional information manually if needed.`);
     } finally {
       exitEditingSession()
     }
+  }
+
+  const handleAddToFavorites = () => {
+    showQuickToast('Added to favorites')
   }
 
   const exitEditingSession = () => {
@@ -3740,6 +3752,13 @@ Please add nutritional information manually if needed.`);
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[10000]">
           <div className="px-4 py-2 bg-emerald-600 text-white rounded-full shadow-lg text-sm">
             Saved
+          </div>
+        </div>
+      )}
+      {quickToast && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[10000]">
+          <div className="px-4 py-2 bg-gray-900 text-white rounded-full shadow-lg text-sm">
+            {quickToast}
           </div>
         </div>
       )}
@@ -4265,10 +4284,10 @@ Please add nutritional information manually if needed.`);
                   <div className="flex items-center justify-end gap-3 px-4 pt-4">
                     <button
                       type="button"
-                      onClick={() => setIsEditingDescription(true)}
+                      onClick={handleAddToFavorites}
                       className="px-3 py-1.5 rounded-full border border-gray-200 text-sm font-semibold text-gray-800 hover:bg-gray-50"
                     >
-                      Edit
+                      Add to Favorites
                     </button>
                     <button
                       type="button"
@@ -6037,6 +6056,12 @@ Please add nutritional information manually if needed.`);
                     const renderEntryCard = (food: any) => {
                       const entryKey = food.id.toString()
                       const swipeOffset = entrySwipeOffsets[entryKey] || 0
+                      const isMenuOpen = swipeMenuEntry === entryKey
+
+                      const closeSwipeMenus = () => {
+                        setSwipeMenuEntry(null)
+                        setEntrySwipeOffsets((prev) => ({ ...prev, [entryKey]: 0 }))
+                      }
 
                       const handleOptionsToggle = (e?: React.SyntheticEvent) => {
                         if (e) {
@@ -6044,7 +6069,7 @@ Please add nutritional information manually if needed.`);
                           e.stopPropagation()
                         }
                         setShowEntryOptions(showEntryOptions === entryKey ? null : entryKey)
-                        setEntrySwipeOffsets((prev) => ({ ...prev, [entryKey]: 0 }))
+                        closeSwipeMenus()
                       }
 
                       const handleSwipeDelete = () => {
@@ -6053,6 +6078,7 @@ Please add nutritional information manually if needed.`);
                         } else {
                           deleteHistoryFood((food as any).dbId)
                         }
+                        closeSwipeMenus()
                       }
 
                       const handleTouchStart = (e: React.TouchEvent) => {
@@ -6096,34 +6122,44 @@ Please add nutritional information manually if needed.`);
                         delete swipeMetaRef.current[entryKey]
 
                         if (offset > 70) {
-                          setEntrySwipeOffsets((prev) => ({ ...prev, [entryKey]: 72 }))
+                          setEntrySwipeOffsets((prev) => ({ ...prev, [entryKey]: 80 }))
                           return
                         }
                         if (offset < -70) {
+                          setSwipeMenuEntry(null)
                           setEntrySwipeOffsets((prev) => ({ ...prev, [entryKey]: -90 }))
-                          handleSwipeDelete()
                           return
                         }
+                        setSwipeMenuEntry(null)
                         setEntrySwipeOffsets((prev) => ({ ...prev, [entryKey]: 0 }))
                       }
 
                       const handleRowPress = () => {
                         if (!isMobile) return
                         if (swipeClickBlockRef.current[entryKey]) return
-                        setEntrySwipeOffsets((prev) => ({ ...prev, [entryKey]: 0 }))
+                        closeSwipeMenus()
                         setShowEntryOptions(null)
                         setEnergyUnit('kcal')
                         editFood(food)
                       }
 
+                      const openSwipeMenu = (e?: React.SyntheticEvent) => {
+                        if (e) {
+                          e.preventDefault()
+                          e.stopPropagation()
+                        }
+                        setSwipeMenuEntry(entryKey)
+                        setEntrySwipeOffsets((prev) => ({ ...prev, [entryKey]: 80 }))
+                      }
+
                       return (
-                        <div key={food.id} className="relative">
+                        <div key={food.id} className="relative overflow-hidden rounded-none sm:rounded-xl">
                           {isMobile && (
                             <div className="absolute inset-0 flex items-stretch pointer-events-none">
                               <div className="flex items-center">
                                 <button
                                   type="button"
-                                  onClick={(e) => handleOptionsToggle(e)}
+                                  onClick={openSwipeMenu}
                                   className="pointer-events-auto h-full w-16 bg-[#4DAF50] text-white flex items-center justify-center font-semibold uppercase tracking-wide"
                                 >
                                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -6131,7 +6167,7 @@ Please add nutritional information manually if needed.`);
                                   </svg>
                                 </button>
                               </div>
-                              <div className="flex-1" />
+                              <div className="flex-1 bg-transparent" />
                               <div className="flex items-center">
                                 <button
                                   type="button"
@@ -6148,7 +6184,7 @@ Please add nutritional information manually if needed.`);
                             </div>
                           )}
                           <div
-                            className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-visible transition-transform duration-200"
+                            className="relative bg-white border border-gray-200 rounded-none sm:rounded-xl shadow-sm transition-transform duration-200 z-10"
                             style={isMobile ? { transform: `translateX(${swipeOffset}px)` } : undefined}
                             onTouchStart={handleTouchStart}
                             onTouchMove={handleTouchMove}
@@ -6168,52 +6204,53 @@ Please add nutritional information manually if needed.`);
                                   <p className="text-xs sm:text-sm text-gray-500">
                                     {formatTimeWithAMPM(food.time)}
                                   </p>
-                                  {/* 3-Dot Options Menu */}
-                                  <div className="relative entry-options-dropdown overflow-visible">
-                                    <button
-                                      onMouseDown={handleOptionsToggle}
-                                      className="p-1.5 sm:p-2 rounded-lg hover:bg-gray-200 transition-colors"
-                                    >
-                                      <svg className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
-                                        <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
-                                      </svg>
-                                    </button>
-                                    {showEntryOptions === food.id.toString() && (
-                                      <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-200 z-[9999]" style={{boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)', overflow: 'visible', paddingBottom: '6px'}}>
-                                        <button
-                                          onClick={() => editFood(food)}
-                                          className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center transition-colors"
-                                        >
-                                          <svg className="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                          </svg>
-                                          <div>
-                                            <div className="font-medium">Show Nutrition Summary</div>
-                                            <div className="text-xs text-gray-500">View and edit the full entry</div>
-                                          </div>
-                                        </button>
-                                        <button
-                                          onClick={() => {
-                                            if (isViewingToday) {
-                                              deleteFood(food.id)
-                                            } else {
-                                              // For history view, use the database id
-                                              deleteHistoryFood((food as any).dbId)
-                                            }
-                                          }}
-                                          className="w-full px-4 py-3 text-left text-sm text-red-600 hover:bg-red-50 flex items-center border-t border-gray-100 transition-colors"
-                                        >
-                                          <svg className="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                          </svg>
-                                          <div>
-                                            <div className="font-medium">Delete Entry</div>
-                                            <div className="text-xs text-gray-500">Remove from food diary</div>
-                                          </div>
-                                        </button>
-                                      </div>
-                                    )}
-                                  </div>
+                                  {!isMobile && (
+                                    <div className="relative entry-options-dropdown overflow-visible">
+                                      <button
+                                        onMouseDown={handleOptionsToggle}
+                                        className="p-1.5 sm:p-2 rounded-lg hover:bg-gray-200 transition-colors"
+                                      >
+                                        <svg className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
+                                          <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
+                                        </svg>
+                                      </button>
+                                      {showEntryOptions === food.id.toString() && (
+                                        <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-200 z-[9999]" style={{boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)', overflow: 'visible', paddingBottom: '6px'}}>
+                                          <button
+                                            onClick={() => editFood(food)}
+                                            className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center transition-colors"
+                                          >
+                                            <svg className="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                            </svg>
+                                            <div>
+                                              <div className="font-medium">Show Nutrition Summary</div>
+                                              <div className="text-xs text-gray-500">View and edit the full entry</div>
+                                            </div>
+                                          </button>
+                                          <button
+                                            onClick={() => {
+                                              if (isViewingToday) {
+                                                deleteFood(food.id)
+                                              } else {
+                                                // For history view, use the database id
+                                                deleteHistoryFood((food as any).dbId)
+                                              }
+                                            }}
+                                            className="w-full px-4 py-3 text-left text-sm text-red-600 hover:bg-red-50 flex items-center border-t border-gray-100 transition-colors"
+                                          >
+                                            <svg className="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                            </svg>
+                                            <div>
+                                              <div className="font-medium">Delete Entry</div>
+                                              <div className="text-xs text-gray-500">Remove from food diary</div>
+                                            </div>
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
                                   {/* Expand/Collapse Toggle */}
                                   <button
                                     onClick={(e) => {
@@ -6369,6 +6406,35 @@ Please add nutritional information manually if needed.`);
                               </div>
                             )}
                           </div>
+                          {isMobile && isMenuOpen && (
+                            <div className="absolute left-0 right-0 top-full mt-2 px-4 z-20">
+                              <div className="rounded-2xl bg-white border border-gray-200 shadow-xl overflow-hidden">
+                                {[
+                                  { label: 'Add to Favorites', onClick: () => handleAddToFavorites() },
+                                  { label: 'Duplicate Meal', onClick: () => showQuickToast('Duplicate coming soon') },
+                                  { label: 'Copy to Today', onClick: () => showQuickToast('Copy to Today coming soon') },
+                                  { label: 'Edit Entry', onClick: () => editFood(food) },
+                                  { label: 'Delete', onClick: handleSwipeDelete, destructive: true },
+                                ].map((item, idx) => (
+                                  <button
+                                    key={item.label}
+                                    className={`w-full text-left px-4 py-3 text-sm flex items-center justify-between ${item.destructive ? 'text-red-600 hover:bg-red-50' : 'text-gray-800 hover:bg-gray-50'} ${idx > 0 ? 'border-t border-gray-100' : ''}`}
+                                    onClick={() => {
+                                      item.onClick()
+                                      closeSwipeMenus()
+                                    }}
+                                  >
+                                    <span>{item.label}</span>
+                                    {item.destructive && (
+                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                      </svg>
+                                    )}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )
                     }
