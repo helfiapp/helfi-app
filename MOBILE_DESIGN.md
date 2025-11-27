@@ -1,5 +1,15 @@
 # Mobile To-Do (food entries)
 
+# Handover Notes (read before working)
+- Remaining gaps: mobile rows/swipe backgrounds still show left/right space; need truly edge-to-edge cards and swipe backgrounds (green/red) on mobile. Prior tweaks to transforms/padding/borders didn’t eliminate the gaps.
+- Swipe-right menu: currently auto-opens when swiping past threshold. Requirement: swipe should only reveal the green button; tapping the green button toggles the menu open/closed. Do not auto-open on swipe.
+- Delete styling: swipe-left delete must be icon-only (see DELETE BUTTON ICON.jpg), not the word “Delete”.
+- Favorites: “Add to Favorites” is only stubbed; no UI entry point. Add “Favorites” option in the add flow (after category selection, alongside Photo/Camera and Manual Entry) to insert saved favorites.
+- Duplicate Meal: action is stubbed; needs a category picker with helper text (“Which category would you like to place your duplicated meal?”) listing all categories and duplicating into the chosen category.
+- Edit Entry scroll: opening “Edit Entry” should land at the top of the edit page; it currently lands mid-page.
+- Desktop: 3-dots menu must open the same menu items as mobile (Favorites, Duplicate Meal, Copy to Today, Edit Entry, Delete); desktop row click should not auto-open edit.
+- Relevant screenshots live in `public/mobile-design-screenshots/` (only three remain): DELETE BUTTON ICON.jpg, SPACE ON LEFT AND RIGHT REMOVAL.jpg, FAVORITES MENU.jpg.
+
 ## Reference images (always check these)
 - Swipe/delete styling reference (delete icon): `public/mobile-design-screenshots/DELETE BUTTON ICON.jpg`
 - Current spacing/gap issue reference: `public/mobile-design-screenshots/SPACE ON LEFT AND RIGHT REMOVAL.jpg`
