@@ -64,7 +64,7 @@ export default function FAQPage() {
         },
         {
           q: "Is there a free trial?",
-          a: "Yes! Free users get 3 food photo analyses per day with 1 reanalysis per item. This lets you experience the core functionality before upgrading."
+          a: "No, we no longer offer free trials. However, you can try each AI feature once for free. After that, you'll need a subscription or credits to continue using AI features. Non-AI features remain free for all users."
         }
       ]
     },

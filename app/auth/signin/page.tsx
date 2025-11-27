@@ -90,24 +90,24 @@ export default function SignIn() {
         setError('Failed to create account. Please try again.')
       }
     } else {
-      // Handle signin - Use direct API to bypass NextAuth redirect loop
+      // Handle signin - Try NextAuth credentials first (most stable), then direct API
       try {
-        const response = await fetch('/api/auth/signin-direct', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ email, password }),
-        })
-
-        const data = await response.json()
-
-        if (!response.ok) {
-          setError(data.error || 'Invalid email or password')
-        } else {
-          // Success - redirect to onboarding
-          console.log('✅ Direct signin successful:', data.user)
+        const res = await signIn('credentials', { email, password, callbackUrl: '/onboarding', redirect: false })
+        if (res?.ok) {
           window.location.href = '/onboarding'
+        } else {
+          // Fallback to direct API
+          const response = await fetch('/api/auth/signin-direct', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+          })
+          const data = await response.json().catch(()=>({}))
+          if (response.ok) {
+            window.location.href = '/onboarding'
+          } else {
+            setError((data && (data.error || data.message)) || 'Invalid email or password')
+          }
         }
       } catch (error) {
         console.error('Signin error:', error)

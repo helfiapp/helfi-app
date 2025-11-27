@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
+import { getToken } from 'next-auth/jwt'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { precomputeIssueSectionsForUser, precomputeQuickSectionsForUser } from '@/lib/insights/issue-engine'
+import { triggerBackgroundRegeneration } from '@/lib/insights/regeneration-service'
+import { CreditManager, CREDIT_COSTS } from '@/lib/credit-system'
 
 export async function GET(request: NextRequest) {
   try {
@@ -9,28 +13,44 @@ export async function GET(request: NextRequest) {
     console.log('Request URL:', request.url)
     console.log('Request headers:', Object.fromEntries(request.headers.entries()))
     
-    // Get NextAuth session - App Router automatically handles request context
-    const session = await getServerSession(authOptions)
-    
+    // Get NextAuth session - with JWT fallback (same pattern as /api/analyze-food)
+    let session = await getServerSession(authOptions)
+    let userEmail: string | null = session?.user?.email ?? null
+    let usedTokenFallback = false
+
+    if (!userEmail) {
+      try {
+        const token = await getToken({
+          req: request,
+          secret: process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET || 'helfi-secret-key-production-2024',
+        })
+        if (token?.email) {
+          userEmail = String(token.email)
+          usedTokenFallback = true
+        }
+      } catch (tokenError) {
+        console.error('GET /api/user-data - JWT fallback failed:', tokenError)
+      }
+    }
+
     console.log('NextAuth session result:', session)
     console.log('Session user:', session?.user)
-    console.log('Session user email:', session?.user?.email)
+    console.log('Resolved user email (session/JWT):', userEmail, 'usedTokenFallback:', usedTokenFallback)
     
-    if (!session?.user?.email) {
-      console.log('GET Authentication failed - no valid session found')
+    if (!userEmail) {
+      console.log('GET Authentication failed - no valid session or token found')
       console.log('Session:', session)
       console.log('Request headers:', Object.fromEntries(request.headers.entries()))
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
     
-    const userEmail = session.user.email
-    console.log('GET /api/user-data - NextAuth session found for:', userEmail)
+    console.log('GET /api/user-data - Authenticated for:', userEmail)
 
     // Get user data by email with better error handling
     let user
     try {
       user = await prisma.user.findUnique({
-        where: { email: userEmail },
+      where: { email: userEmail },
         include: {
           healthGoals: true,
           supplements: true,
@@ -123,6 +143,18 @@ export async function GET(request: NextRequest) {
       console.log('No todays foods data found in storage');
     }
 
+    // Get device interest (stored in hidden goal record)
+    let deviceInterestData: any = {}
+    try {
+      const storedDeviceInterest = user.healthGoals.find((goal: any) => goal.name === '__DEVICE_INTEREST__');
+      if (storedDeviceInterest && storedDeviceInterest.category) {
+        const parsed = JSON.parse(storedDeviceInterest.category);
+        deviceInterestData = parsed || {}
+      }
+    } catch (e) {
+      console.log('No device interest data found in storage');
+    }
+
     // Get profile info data
     let profileInfoData = { firstName: '', lastName: '', bio: '', dateOfBirth: '', email: user.email || '' };
     try {
@@ -152,15 +184,48 @@ export async function GET(request: NextRequest) {
       console.log('No profile info data found in storage');
     }
 
+    // Get primary goal choice + intensity (Step 2) stored as hidden health goal
+    let primaryGoalData: { goalChoice?: string; goalIntensity?: string } = {};
+    try {
+      const storedPrimaryGoal = user.healthGoals.find((goal: any) => goal.name === '__PRIMARY_GOAL__');
+      if (storedPrimaryGoal?.category) {
+        const parsed = JSON.parse(storedPrimaryGoal.category);
+        primaryGoalData = {
+          goalChoice: typeof parsed.goalChoice === 'string' ? parsed.goalChoice : '',
+          goalIntensity: typeof parsed.goalIntensity === 'string' ? parsed.goalIntensity : '',
+        };
+      }
+    } catch (e) {
+      console.log('No primary goal data found in storage');
+    }
+
     // Transform to onboarding format
+    let selectedGoals: string[] = []
+    try {
+      const selectedRecord = user.healthGoals.find((goal: any) => goal.name === '__SELECTED_ISSUES__')
+      if (selectedRecord?.category) {
+        const parsed = JSON.parse(selectedRecord.category)
+        if (Array.isArray(parsed)) {
+          selectedGoals = parsed.map((name) => String(name || '')).filter(Boolean)
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to parse __SELECTED_ISSUES__ health goal', error)
+      selectedGoals = []
+    }
+    console.log('GET /api/user-data - Parsed __SELECTED_ISSUES__ snapshot:', { count: selectedGoals.length, goals: selectedGoals })
+
     const onboardingData = {
       gender: user.gender?.toLowerCase() || '',
       weight: user.weight?.toString() || '',
       height: user.height?.toString() || '',
       bodyType: user.bodyType?.toLowerCase() || '',
+      birthdate: profileInfoData.dateOfBirth || '',
       exerciseFrequency: exerciseData.exerciseFrequency || '',
       exerciseTypes: exerciseData.exerciseTypes || [],
-      goals: user.healthGoals.filter((goal: any) => !goal.name.startsWith('__')).map((goal: any) => goal.name),
+      goals: selectedGoals.length
+        ? selectedGoals
+        : user.healthGoals.filter((goal: any) => !goal.name.startsWith('__')).map((goal: any) => goal.name),
       healthSituations: healthSituationsData,
       bloodResults: bloodResultsData,
       supplements: user.supplements.map((supp: any) => ({
@@ -169,7 +234,8 @@ export async function GET(request: NextRequest) {
         timing: supp.timing,
         dateAdded: supp.dateAdded || supp.createdAt || new Date().toISOString(),
         method: supp.method || 'manual',
-        scheduleInfo: supp.scheduleInfo || 'Daily'
+        scheduleInfo: supp.scheduleInfo || 'Daily',
+        imageUrl: supp.imageUrl || null
       })),
       medications: user.medications.map((med: any) => ({
         name: med.name,
@@ -177,11 +243,21 @@ export async function GET(request: NextRequest) {
         timing: med.timing,
         dateAdded: med.dateAdded || med.createdAt || new Date().toISOString(),
         method: med.method || 'manual',
-        scheduleInfo: med.scheduleInfo || 'Daily'
+        scheduleInfo: med.scheduleInfo || 'Daily',
+        imageUrl: med.imageUrl || null
       })),
       profileImage: user.image || null,
       todaysFoods: todaysFoods,
-      profileInfo: profileInfoData
+      profileInfo: profileInfoData,
+      deviceInterest: deviceInterestData,
+      termsAccepted: (user as any).termsAccepted === true,
+      goalChoice: primaryGoalData.goalChoice || '',
+      goalIntensity: primaryGoalData.goalIntensity || 'standard',
+    }
+
+    // Fallback: if primary goal still missing, use the first non-hidden health goal as a soft default
+    if (!onboardingData.goalChoice && onboardingData.goals.length > 0) {
+      onboardingData.goalChoice = onboardingData.goals[0]
     }
 
     console.log('GET /api/user-data - Returning onboarding data for user')
@@ -221,20 +297,36 @@ export async function POST(request: NextRequest) {
     console.log('POST /api/user-data - Starting SIMPLIFIED approach...')
     
     // Get NextAuth session
-    const session = await getServerSession(authOptions)
+    let session = await getServerSession(authOptions)
+    let userEmail: string | null = session?.user?.email ?? null
+    let usedTokenFallback = false
+
+    if (!userEmail) {
+      try {
+        const token = await getToken({
+          req: request,
+          secret: process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET || 'helfi-secret-key-production-2024',
+        })
+        if (token?.email) {
+          userEmail = String(token.email)
+          usedTokenFallback = true
+        }
+      } catch (tokenError) {
+        console.error('POST /api/user-data - JWT fallback failed:', tokenError)
+      }
+    }
     
     console.timeEnd('⏱️ Authentication Check')
     console.log('NextAuth session result:', session)
     console.log('Session user:', session?.user)
-    console.log('Session user email:', session?.user?.email)
+    console.log('Resolved user email (session/JWT):', userEmail, 'usedTokenFallback:', usedTokenFallback)
     
-    if (!session?.user?.email) {
+    if (!userEmail) {
       console.timeEnd('⏱️ Total API Processing Time')
-      console.log('❌ POST Authentication failed - no valid session found')
+      console.log('❌ POST Authentication failed - no valid session or token found')
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
     
-    const userEmail = session.user.email
     console.log('✅ POST /api/user-data - Authenticated user:', userEmail)
 
     console.time('⏱️ Parse Request Data')
@@ -254,6 +346,12 @@ export async function POST(request: NextRequest) {
       hasExercise: !!(data.exerciseFrequency || data.exerciseTypes),
       dataSize: JSON.stringify(data).length + ' characters'
     })
+    if (Array.isArray(data.goals)) {
+      const safeGoals = data.goals.map((g: any) => String(g || '').trim()).filter(Boolean)
+      console.log('🎯 POST /api/user-data - goals payload:', { count: safeGoals.length, goals: safeGoals })
+    } else {
+      console.log('ℹ️ POST /api/user-data - no goals array provided; will not modify __SELECTED_ISSUES__')
+    }
 
     // Find or create user
     console.time('⏱️ User Lookup/Creation')
@@ -276,6 +374,46 @@ export async function POST(request: NextRequest) {
     
     console.timeEnd('⏱️ User Lookup/Creation')
 
+    // Load existing profile info record for merging purposes (date of birth, etc.)
+    let existingProfileInfoData: Record<string, any> | null = null
+    try {
+      const storedProfileInfo = await prisma.healthGoal.findFirst({
+        where: {
+          userId: user.id,
+          name: '__PROFILE_INFO_DATA__'
+        }
+      })
+      if (storedProfileInfo?.category) {
+        existingProfileInfoData = JSON.parse(storedProfileInfo.category)
+      }
+    } catch (error) {
+      console.warn('⚠️ Failed to load existing profile info data:', error)
+    }
+
+    // Load existing primary goal (goal choice + intensity) for safe merging
+    let existingPrimaryGoalData: { goalChoice?: string; goalIntensity?: string } = {}
+    try {
+      const storedPrimaryGoal = await prisma.healthGoal.findFirst({
+        where: { userId: user.id, name: '__PRIMARY_GOAL__' },
+      })
+      if (storedPrimaryGoal?.category) {
+        const parsed = JSON.parse(storedPrimaryGoal.category)
+        existingPrimaryGoalData = {
+          goalChoice: typeof parsed.goalChoice === 'string' ? parsed.goalChoice : '',
+          goalIntensity: typeof parsed.goalIntensity === 'string' ? parsed.goalIntensity : '',
+        }
+      }
+    } catch (error) {
+      console.warn('⚠️ Failed to load existing primary goal data:', error)
+    }
+
+    const normalizedBirthdate =
+      typeof data.birthdate === 'string' ? data.birthdate.trim() : ''
+    const birthdateChanged = Boolean(
+      normalizedBirthdate &&
+        normalizedBirthdate !== (existingProfileInfoData?.dateOfBirth || '')
+    )
+
     // SIMPLIFIED APPROACH: Update each piece of data individually with proper error handling
     // This avoids complex transactions that were causing constraint violations
 
@@ -286,6 +424,9 @@ export async function POST(request: NextRequest) {
       
       if (data.gender) {
         updateData.gender = data.gender.toUpperCase() === 'MALE' ? 'MALE' : 'FEMALE'
+      }
+      if (data.termsAccepted === true) {
+        updateData.termsAccepted = true
       }
       if (data.weight !== undefined && data.weight !== null && data.weight !== '') {
         const weightNum = parseFloat(data.weight.toString())
@@ -340,7 +481,7 @@ export async function POST(request: NextRequest) {
         const deleteResult = await prisma.healthGoal.deleteMany({
           where: { 
             userId: user.id,
-            name: { notIn: ['__EXERCISE_DATA__', '__HEALTH_SITUATIONS_DATA__'] }
+            name: { notIn: ['__EXERCISE_DATA__', '__HEALTH_SITUATIONS_DATA__', '__SELECTED_ISSUES__', '__PRIMARY_GOAL__'] }
           }
         })
         console.log('🗑️ Deleted', deleteResult.count, 'existing health goals')
@@ -361,6 +502,24 @@ export async function POST(request: NextRequest) {
         console.log('✅ Updated health goals successfully')
       } else {
         console.log('ℹ️ No health goals to update')
+      }
+      // Persist the canonical selected issue list only when a goals array is provided
+      if (Array.isArray(data.goals)) {
+        const safeGoals = data.goals.map((g: any) => String(g || '').trim()).filter(Boolean)
+        await prisma.healthGoal.deleteMany({
+          where: { userId: user.id, name: '__SELECTED_ISSUES__' },
+        })
+        await prisma.healthGoal.create({
+          data: {
+            userId: user.id,
+            name: '__SELECTED_ISSUES__',
+            category: JSON.stringify(safeGoals),
+            currentRating: 0,
+          },
+        })
+        console.log('📝 Saved __SELECTED_ISSUES__ snapshot:', { count: safeGoals.length, goals: safeGoals })
+      } else {
+        console.log('🔒 Preserved existing __SELECTED_ISSUES__ (no goals array provided in this request)')
       }
     } catch (error) {
       console.error('❌ Error updating health goals:', error)
@@ -395,6 +554,39 @@ export async function POST(request: NextRequest) {
       // Continue with other updates
     }
 
+    // 3.25. Handle primary goal + intensity (Step 2) - store as special health goal
+    try {
+      const incomingGoalChoice =
+        typeof data.goalChoice === 'string' ? data.goalChoice : existingPrimaryGoalData.goalChoice || ''
+      const incomingGoalIntensity =
+        typeof data.goalIntensity === 'string' ? data.goalIntensity : existingPrimaryGoalData.goalIntensity || 'standard'
+
+      if (incomingGoalChoice || incomingGoalIntensity) {
+        await prisma.healthGoal.deleteMany({
+          where: {
+            userId: user.id,
+            name: '__PRIMARY_GOAL__'
+          }
+        })
+
+        await prisma.healthGoal.create({
+          data: {
+            userId: user.id,
+            name: '__PRIMARY_GOAL__',
+            category: JSON.stringify({
+              goalChoice: incomingGoalChoice,
+              goalIntensity: incomingGoalIntensity || 'standard',
+            }),
+            currentRating: 0,
+          }
+        })
+        console.log('Stored primary goal data successfully')
+      }
+    } catch (error) {
+      console.error('Error storing primary goal data:', error)
+      // Continue with other updates
+    }
+
     // 3.5. Handle blood results data (Step 7) - store as special health goal
     try {
       if (data.bloodResults) {
@@ -422,7 +614,7 @@ export async function POST(request: NextRequest) {
       // Continue with other updates
     }
 
-    // 4. Handle supplements - safe upsert approach with enhanced logging
+    // 4. Handle supplements - optimized bulk replace (deleteMany + createMany)
     console.time('⏱️ Supplements Update')
     try {
       console.log('🔍 SUPPLEMENT DEBUG - Raw data.supplements:', JSON.stringify(data.supplements, null, 2))
@@ -450,80 +642,20 @@ export async function POST(request: NextRequest) {
           })
         }
         
-        // Use database transaction for data safety
-        await prisma.$transaction(async (tx) => {
-          // Get existing supplements
-          const existingSupplements = await tx.supplement.findMany({
-            where: { userId: user.id }
+        // Bulk replace for performance: delete all then insert all
+        await prisma.$transaction([
+          prisma.supplement.deleteMany({ where: { userId: user.id } }),
+          prisma.supplement.createMany({
+            data: validSupplements.map((supp: any) => ({
+              userId: user.id,
+              name: supp.name,
+              dosage: supp.dosage || '',
+              timing: Array.isArray(supp.timing) ? supp.timing : [supp.timing || 'morning'],
+              imageUrl: supp.imageUrl || null
+            }))
           })
-          
-          console.log('📋 Found', existingSupplements.length, 'existing supplements in database')
-          
-          // Track which supplements to keep
-          const supplementsToKeep = new Set()
-          
-          // Process each valid supplement from the form
-          for (const supp of validSupplements) {
-            console.log('🔄 Processing supplement:', supp.name, 'with dosage:', supp.dosage, 'and timing:', supp.timing)
-            
-            // Try to find existing supplement with same name
-            const existing = existingSupplements.find(
-              (existing) => existing.name.toLowerCase() === supp.name.toLowerCase()
-            )
-            
-            if (existing) {
-              // Update existing supplement
-              const updatedSupplement = await tx.supplement.update({
-                where: { id: existing.id },
-                data: {
-                  name: supp.name,
-                  dosage: supp.dosage || '',
-                  timing: Array.isArray(supp.timing) ? supp.timing : [supp.timing || 'morning'],
-                }
-              })
-              supplementsToKeep.add(existing.id)
-              console.log('📝 Updated existing supplement:', supp.name, '- New data:', updatedSupplement)
-            } else {
-              // Create new supplement
-              const newSupplement = await tx.supplement.create({
-                data: {
-                  userId: user.id,
-                  name: supp.name,
-                  dosage: supp.dosage || '',
-                  timing: Array.isArray(supp.timing) ? supp.timing : [supp.timing || 'morning'],
-                }
-              })
-              supplementsToKeep.add(newSupplement.id)
-              console.log('➕ Created new supplement:', supp.name, '- Full data:', newSupplement)
-            }
-          }
-          
-          // Remove supplements that are no longer in the form
-          const supplementsToDelete = existingSupplements.filter(
-            (existing) => !supplementsToKeep.has(existing.id)
-          )
-          
-          if (supplementsToDelete.length > 0) {
-            console.log('🗑️ About to delete supplements:', supplementsToDelete.map(s => s.name))
-            await tx.supplement.deleteMany({
-              where: {
-                id: { in: supplementsToDelete.map(s => s.id) }
-              }
-            })
-            console.log('🗑️ Removed', supplementsToDelete.length, 'supplements no longer in form')
-          } else {
-            console.log('ℹ️ No supplements to delete')
-          }
-          
-          // Verify final state
-          const finalSupplements = await tx.supplement.findMany({
-            where: { userId: user.id }
-          })
-          console.log('🏁 Final supplement count after transaction:', finalSupplements.length)
-          console.log('🏁 Final supplements:', finalSupplements.map(s => ({ name: s.name, dosage: s.dosage, timing: s.timing })))
-        })
-        
-        console.log('✅ Updated supplements safely with transaction')
+        ])
+        console.log('✅ Replaced supplements via bulk operation:', validSupplements.length)
         
         // BACKUP: Also store supplements as JSON in health goals as failsafe
         try {
@@ -587,74 +719,42 @@ export async function POST(request: NextRequest) {
     }
     console.timeEnd('⏱️ Supplements Update')
 
-    // 5. Handle medications - safe upsert approach (same as supplements)
+    // Save device interest if present (hidden goal record)
+    try {
+      if (data && (data as any).deviceInterest && typeof (data as any).deviceInterest === 'object') {
+        const deviceInterest = (data as any).deviceInterest
+        const existing = await prisma.healthGoal.findFirst({ where: { userId: user.id, name: '__DEVICE_INTEREST__' } })
+        if (existing) {
+          await prisma.healthGoal.update({ where: { id: existing.id }, data: { category: JSON.stringify(deviceInterest) } })
+        } else {
+          await prisma.healthGoal.create({ data: { userId: user.id, name: '__DEVICE_INTEREST__', category: JSON.stringify(deviceInterest), currentRating: 0 } })
+        }
+      }
+    } catch (e) {
+      console.log('Device interest save skipped:', e)
+    }
+
+    // 5. Handle medications - optimized bulk replace (deleteMany + createMany)
     console.time('⏱️ Medications Update')
     try {
       if (data.medications && Array.isArray(data.medications)) {
         console.log('💉 Processing', data.medications.length, 'medications')
         
-        // Use database transaction for data safety
-        await prisma.$transaction(async (tx) => {
-          // Get existing medications
-          const existingMedications = await tx.medication.findMany({
-            where: { userId: user.id }
+        // Bulk replace for performance: delete all then insert all
+        const validMeds = (data.medications || []).filter((m: any) => m && typeof m.name === 'string' && m.name.trim().length > 0)
+        await prisma.$transaction([
+          prisma.medication.deleteMany({ where: { userId: user.id } }),
+          prisma.medication.createMany({
+            data: validMeds.map((med: any) => ({
+              userId: user.id,
+              name: med.name,
+              dosage: med.dosage || '',
+              timing: Array.isArray(med.timing) ? med.timing : [med.timing || 'morning'],
+              imageUrl: med.imageUrl || null
+            }))
           })
-          
-          // Track which medications to keep
-          const medicationsToKeep = new Set()
-          
-          // Process each medication from the form
-          for (const med of data.medications) {
-            if (med.name && typeof med.name === 'string') {
-              // Try to find existing medication with same name
-              const existing = existingMedications.find(
-                (existing) => existing.name.toLowerCase() === med.name.toLowerCase()
-              )
-              
-              if (existing) {
-                // Update existing medication
-                await tx.medication.update({
-                  where: { id: existing.id },
-                  data: {
-                    name: med.name,
-                    dosage: med.dosage || '',
-                    timing: Array.isArray(med.timing) ? med.timing : [med.timing || 'morning'],
-                  }
-                })
-                medicationsToKeep.add(existing.id)
-                console.log('📝 Updated existing medication:', med.name)
-              } else {
-                // Create new medication
-                const newMedication = await tx.medication.create({
-                  data: {
-                    userId: user.id,
-                    name: med.name,
-                    dosage: med.dosage || '',
-                    timing: Array.isArray(med.timing) ? med.timing : [med.timing || 'morning'],
-                  }
-                })
-                medicationsToKeep.add(newMedication.id)
-                console.log('➕ Created new medication:', med.name)
-              }
-            }
-          }
-          
-          // Remove medications that are no longer in the form
-          const medicationsToDelete = existingMedications.filter(
-            (existing) => !medicationsToKeep.has(existing.id)
-          )
-          
-          if (medicationsToDelete.length > 0) {
-            await tx.medication.deleteMany({
-              where: {
-                id: { in: medicationsToDelete.map(m => m.id) }
-              }
-            })
-            console.log('🗑️ Removed', medicationsToDelete.length, 'medications no longer in form')
-          }
-        })
-        
-        console.log('✅ Updated medications safely with transaction')
+        ])
+        console.log('✅ Replaced medications via bulk operation:', validMeds.length)
       } else {
         console.log('ℹ️ No medications to update')
       }
@@ -675,7 +775,7 @@ export async function POST(request: NextRequest) {
           }
         })
         
-        // Store new food data
+        // Store new food data for fast \"today\" view
         await prisma.healthGoal.create({
           data: {
             userId: user.id,
@@ -685,6 +785,53 @@ export async function POST(request: NextRequest) {
           }
         })
         console.log('Stored todays foods data successfully')
+
+        // Also append the latest entry into FoodLog for reliable history,
+        // but only when explicitly allowed by the caller.
+        const appendHistory = data.appendHistory !== false
+        if (appendHistory && data.todaysFoods.length > 0) {
+          const last = data.todaysFoods[0]
+          if (last && (last.description || last.nutrition || last.photo)) {
+            try {
+              const rawDescription = (last.description || '').toString()
+              const name =
+                rawDescription
+                  .split('\\n')[0]
+                  .split('Calories:')[0]
+                  .split(',')[0]
+                  .split('.')[0]
+                  .trim() || 'Food item'
+
+              const normalizedMeal = (() => {
+                const raw = (last as any)?.meal ?? (last as any)?.category ?? (last as any)?.mealType
+                const value = typeof raw === 'string' ? raw.toLowerCase() : ''
+                if (/breakfast/.test(value)) return 'breakfast'
+                if (/lunch/.test(value)) return 'lunch'
+                if (/dinner/.test(value)) return 'dinner'
+                if (/snack/.test(value)) return 'snacks'
+                if (/uncat/.test(value) || /other/.test(value)) return 'uncategorized'
+                return typeof raw === 'string' && raw.trim().length > 0 ? raw.trim() : null
+              })()
+
+              await prisma.foodLog.create({
+                data: {
+                  userId: user.id,
+                  name,
+                  description: rawDescription || null,
+                  imageUrl: last.photo || null,
+                  nutrients: last.nutrition || null,
+                  items: Array.isArray(last.items) && last.items.length > 0 ? last.items : null,
+                  localDate: (last.localDate as string | null) || null,
+                  meal: normalizedMeal,
+                  category: normalizedMeal,
+                },
+              })
+              console.log('Appended latest food entry to FoodLog for history view')
+            } catch (foodLogError) {
+              console.warn('FoodLog append failed (non-blocking):', foodLogError)
+            }
+          }
+        }
       }
     } catch (error) {
       console.error('Error storing todays foods data:', error)
@@ -693,22 +840,48 @@ export async function POST(request: NextRequest) {
 
     // 7. Handle profileInfo data from profile page - store as special health goal
     try {
-      if (data.profileInfo) {
-        console.log('POST /api/user-data - Handling profileInfo data:', data.profileInfo)
+      const incomingProfileInfo =
+        data.profileInfo && typeof data.profileInfo === 'object'
+          ? data.profileInfo
+          : null
+
+      let shouldUpdateProfileInfo = false
+      let profileInfoPayload: Record<string, any> | null = null
+
+      if (incomingProfileInfo) {
+        shouldUpdateProfileInfo = true
+        profileInfoPayload = {
+          ...(existingProfileInfoData || {}),
+          ...incomingProfileInfo,
+        }
+      }
+
+      if (normalizedBirthdate) {
+        if (!profileInfoPayload) {
+          profileInfoPayload = { ...(existingProfileInfoData || {}) }
+        }
+        if (profileInfoPayload.dateOfBirth !== normalizedBirthdate) {
+          profileInfoPayload.dateOfBirth = normalizedBirthdate
+          shouldUpdateProfileInfo = true
+        }
+      }
+
+      if (shouldUpdateProfileInfo && profileInfoPayload) {
+        console.log('POST /api/user-data - Handling profileInfo data:', profileInfoPayload)
         
         // Update basic User fields if available in profileInfo
         const profileUpdateData: any = {}
+        const firstName = profileInfoPayload.firstName || ''
+        const lastName = profileInfoPayload.lastName || ''
         
         // Handle name concatenation
-        if (data.profileInfo.firstName || data.profileInfo.lastName) {
-          const firstName = data.profileInfo.firstName || ''
-          const lastName = data.profileInfo.lastName || ''
+        if (firstName || lastName) {
           profileUpdateData.name = `${firstName} ${lastName}`.trim()
         }
         
         // Handle gender
-        if (data.profileInfo.gender) {
-          profileUpdateData.gender = data.profileInfo.gender.toUpperCase() === 'MALE' ? 'MALE' : 'FEMALE'
+        if (profileInfoPayload.gender) {
+          profileUpdateData.gender = profileInfoPayload.gender.toUpperCase() === 'MALE' ? 'MALE' : 'FEMALE'
         }
         
         // Update User model with basic profile data
@@ -732,7 +905,7 @@ export async function POST(request: NextRequest) {
           data: {
             userId: user.id,
             name: '__PROFILE_INFO_DATA__',
-            category: JSON.stringify(data.profileInfo),
+            category: JSON.stringify(profileInfoPayload),
             currentRating: 0,
           }
         })
@@ -744,7 +917,130 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('✅ POST /api/user-data - All updates completed successfully')
-    
+
+    if (user?.id) {
+      // Check if this is a full onboarding completion (all data provided at once)
+      // This indicates a new user completing onboarding, so we should charge for insights generation
+      const isFullOnboarding = !!(data.gender && data.weight && data.height && 
+        (data.goals?.length || data.supplements?.length || data.medications?.length))
+      
+      // Charge credits for insights generation if this is full onboarding
+      if (isFullOnboarding) {
+        try {
+          const cm = new CreditManager(user.id)
+          const hasCredits = await cm.checkCredits('INSIGHTS_GENERATION')
+          
+          if (hasCredits.hasCredits) {
+            // Charge credits for insights generation
+            const costCents = CREDIT_COSTS.INSIGHTS_GENERATION
+            const charged = await cm.chargeCents(costCents)
+            
+            if (charged) {
+              // Update monthly counter
+              await prisma.user.update({
+                where: { id: user.id },
+                data: {
+                  monthlyInsightsGenerationUsed: { increment: 1 },
+                } as any,
+              })
+              console.log('✅ Charged credits for insights generation:', costCents)
+            } else {
+              console.warn('⚠️ Insufficient credits for insights generation, skipping')
+            }
+          }
+        } catch (error) {
+          console.warn('⚠️ Failed to charge credits for insights generation:', error)
+          // Continue with insights generation even if charging fails (don't block onboarding)
+        }
+      }
+      
+      // Generate FULL insights when user completes onboarding
+      // This ensures all insights are ready immediately after onboarding
+      if (isFullOnboarding) {
+        try {
+          console.log('🚀 Generating FULL insights for user:', user.id)
+          // Generate full insights (not just quick cache)
+          // Wait up to 30 seconds for completion - this is acceptable during onboarding
+          const fullInsightsPromise = precomputeIssueSectionsForUser(user.id, { concurrency: 4 })
+          
+          await Promise.race([
+            fullInsightsPromise.then(() => {
+              console.log('✅ Full insights generation completed')
+              return 'done'
+            }),
+            new Promise((resolve) => setTimeout(() => {
+              console.log('⏱️ Full insights generation timed out after 30s, continuing in background')
+              resolve('timeout')
+            }, 30000)), // Wait up to 30 seconds
+          ])
+          
+          // Continue generation in background if it's still running
+          fullInsightsPromise.catch((error) => {
+            console.warn('⚠️ Full insights generation error (continuing):', error)
+          })
+        } catch (e) {
+          console.warn('⚠️ Full insights generation failed (continuing):', e)
+          // Continue even if insights generation fails
+        }
+      } else {
+        // For partial updates (not full onboarding), use quick cache + background full generation
+        try {
+          console.log('🚀 Priming insights QUICK cache for user:', user.id)
+          const quickPriming = precomputeQuickSectionsForUser(user.id, { concurrency: 4 })
+          // Wait up to ~6.5s; do not block longer
+          await Promise.race([
+            quickPriming.then(() => 'done'),
+            new Promise((resolve) => setTimeout(() => resolve('timeout'), 6500)),
+          ])
+          console.log('✅ Quick cache priming finished or timed out (<=6.5s)')
+        } catch (e) {
+          console.warn('⚠️ Quick cache priming failed (continuing):', e)
+        }
+        // Fire-and-forget heavy precompute in background (do not block response)
+        try {
+          precomputeIssueSectionsForUser(user.id, { concurrency: 4 }).catch(() => {})
+        } catch {}
+      }
+
+      // When health data is updated (not full onboarding), generate ALL insights
+      // This ensures insights are ready when user navigates to insights page
+      if (!isFullOnboarding) {
+        const changedTypes: Array<'supplements' | 'medications' | 'food' | 'exercise' | 'health_goals' | 'profile' | 'blood_results'> = []
+        
+        if (data.supplements) changedTypes.push('supplements')
+        if (data.medications) changedTypes.push('medications')
+        if (data.goals) changedTypes.push('health_goals')
+        const profileFieldsUpdated = Boolean(
+          data.gender ||
+            data.weight ||
+            data.height ||
+            data.bodyType ||
+            birthdateChanged ||
+            (data.profileInfo && typeof data.profileInfo === 'object')
+        )
+        if (profileFieldsUpdated) changedTypes.push('profile')
+        if (data.exerciseFrequency || data.exerciseTypes) changedTypes.push('exercise')
+        if (data.bloodResults) changedTypes.push('blood_results')
+        if (data.todaysFoods) changedTypes.push('food')
+
+        // If any health data changed, generate ALL insights (not just affected sections)
+        // This ensures complete insights are ready when user navigates to insights page
+        if (changedTypes.length > 0) {
+          try {
+            console.log('🚀 Generating ALL insights after health data update for user:', user.id)
+            // Generate full insights for all issues (not just affected sections)
+            // This runs in background - user sees progress bar on their page
+            precomputeIssueSectionsForUser(user.id, { concurrency: 4 }).catch((error) => {
+              console.warn('⚠️ Failed to generate insights after health data update:', error)
+            })
+            console.log(`🔄 Triggered full insights generation after health data changes: ${changedTypes.join(', ')}`)
+          } catch (error) {
+            console.warn('⚠️ Error triggering insights generation:', error)
+          }
+        }
+      }
+    }
+
     // 🔍 FINAL PERFORMANCE MEASUREMENT
     const totalApiTime = Date.now() - apiStartTime
     console.timeEnd('⏱️ Total API Processing Time')

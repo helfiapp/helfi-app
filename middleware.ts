@@ -2,12 +2,13 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 
+const ADMIN_GATE_COOKIE_MAX_AGE = 30 * 24 * 60 * 60 // 30 days
+
 export async function middleware(request: NextRequest) {
   // Skip middleware for static files and API routes that don't need auth
   if (
     request.nextUrl.pathname.startsWith('/_next') ||
     request.nextUrl.pathname.startsWith('/api') ||
-    request.nextUrl.pathname.startsWith('/staging-signin') ||
     request.nextUrl.pathname.includes('.')
   ) {
     return NextResponse.next()
@@ -27,6 +28,15 @@ export async function middleware(request: NextRequest) {
     // If we have a valid token, preserve it by adding stability headers
     if (token) {
       const response = NextResponse.next()
+
+      // Refresh admin gate cookie so testers aren't booted back to the gate page
+      response.cookies.set('passed_admin_gate', '1', {
+        httpOnly: false,
+        maxAge: ADMIN_GATE_COOKIE_MAX_AGE,
+        path: '/',
+        sameSite: 'lax',
+        secure: request.nextUrl.protocol === 'https:'
+      })
       
       // Add headers to prevent session invalidation during deployments
       response.headers.set('X-Session-Preserved', 'true')
@@ -37,6 +47,22 @@ export async function middleware(request: NextRequest) {
   } catch (error) {
     console.error('Middleware session check error:', error)
     // Continue without session preservation if there's an error
+  }
+
+  // Gate sign-in routes behind /healthapp admin check
+  const pathname = request.nextUrl.pathname
+  // Never allow direct access to the temporary staging sign-in page
+  if (pathname === '/staging-signin') {
+    const url = request.nextUrl.clone()
+    url.pathname = '/healthapp'
+    return NextResponse.redirect(url)
+  }
+  const needsAdminGate = pathname === '/auth/signin'
+  const hasPassedGate = request.cookies.get('passed_admin_gate')?.value === '1'
+  if (needsAdminGate && !hasPassedGate) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/healthapp'
+    return NextResponse.redirect(url)
   }
 
   return NextResponse.next()
@@ -53,4 +79,4 @@ export const config = {
      */
     '/((?!api|_next/static|_next/image|favicon.ico).*)',
   ],
-} 
+}

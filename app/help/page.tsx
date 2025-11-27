@@ -1,25 +1,21 @@
 'use client'
+import { Cog6ToothIcon, UserIcon } from '@heroicons/react/24/outline'
 
 import React, { useState, useEffect } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useUserData } from '@/components/providers/UserDataProvider'
+import MobileMoreMenu from '@/components/MobileMoreMenu'
 
 export default function Help() {
   const { data: session } = useSession()
-  const { profileImage } = useUserData()
+  const { profileImage: providerProfileImage } = useUserData()
   const [dropdownOpen, setDropdownOpen] = useState(false)
 
-  // Profile data - using consistent green avatar
-  const defaultAvatar = 'data:image/svg+xml;base64,' + btoa(`
-    <svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="64" cy="64" r="64" fill="#10B981"/>
-      <circle cx="64" cy="48" r="20" fill="white"/>
-      <path d="M64 76c-13.33 0-24 5.34-24 12v16c0 8.84 7.16 16 16 16h16c8.84 0 16-7.16 16-16V88c0-6.66-10.67-12-24-12z" fill="white"/>
-    </svg>
-  `);
-  const userImage = profileImage || session?.user?.image || defaultAvatar;
+  // Profile data - prefer real photos; fall back to professional icon
+  const hasProfileImage = !!(providerProfileImage || session?.user?.image)
+  const userImage = (providerProfileImage || session?.user?.image || '') as string
   const userName = session?.user?.name || 'User';
 
   // Close dropdown on outside click
@@ -63,24 +59,36 @@ export default function Help() {
               className="focus:outline-none"
               aria-label="Open profile menu"
             >
-              <Image
-                src={userImage}
-                alt="Profile"
-                width={48}
-                height={48}
-                className="w-12 h-12 rounded-full border-2 border-helfi-green shadow-sm object-cover"
-              />
+              {hasProfileImage ? (
+                <Image
+                  src={userImage}
+                  alt="Profile"
+                  width={48}
+                  height={48}
+                  className="w-12 h-12 rounded-full border-2 border-helfi-green shadow-sm object-cover"
+                />
+              ) : (
+                <div className="w-12 h-12 rounded-full bg-helfi-green shadow-sm flex items-center justify-center">
+                  <UserIcon className="w-6 h-6 text-white" aria-hidden="true" />
+                </div>
+              )}
             </button>
             {dropdownOpen && (
               <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-gray-800 rounded-xl shadow-lg py-2 z-50 border border-gray-100 dark:border-gray-700 animate-fade-in">
                 <div className="flex items-center px-4 py-3 border-b border-gray-100 dark:border-gray-700">
-                  <Image
-                    src={userImage}
-                    alt="Profile"
-                    width={40}
-                    height={40}
-                    className="w-10 h-10 rounded-full object-cover mr-3"
-                  />
+                  {hasProfileImage ? (
+                    <Image
+                      src={userImage}
+                      alt="Profile"
+                      width={40}
+                      height={40}
+                      className="w-10 h-10 rounded-full object-cover mr-3"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-helfi-green flex items-center justify-center mr-3">
+                      <UserIcon className="w-5 h-5 text-white" aria-hidden="true" />
+                    </div>
+                  )}
                   <div>
                     <div className="font-semibold text-gray-900 dark:text-white">{userName}</div>
                     <div className="text-xs text-gray-500 dark:text-gray-400">{session?.user?.email || 'user@email.com'}</div>
@@ -94,7 +102,7 @@ export default function Help() {
                 <Link href="/billing" className="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">Subscription & Billing</Link>
                 <Link href="/support" className="block px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 bg-gray-50 dark:bg-gray-700 font-medium">Help & Support</Link>
                 <button
-                  onClick={() => signOut()}
+                  onClick={() => signOut({ callbackUrl: '/auth/signin' })}
                   className="block w-full text-left px-4 py-2 text-red-600 dark:text-red-400 hover:bg-gray-50 dark:hover:bg-gray-700 font-semibold"
                 >
                   Logout
@@ -175,23 +183,12 @@ export default function Help() {
             <span className="text-xs text-gray-400 mt-1 font-medium truncate">Food</span>
           </Link>
 
-          {/* Intake (Onboarding) */}
-          <Link href="/onboarding?step=1" className="flex flex-col items-center py-2 px-1 min-w-0 flex-1">
-            <div className="text-gray-400">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
-            </div>
-            <span className="text-xs text-gray-400 mt-1 font-medium truncate">Intake</span>
-          </Link>
+          <MobileMoreMenu />
 
           {/* Settings */}
           <Link href="/settings" className="flex flex-col items-center py-2 px-1 min-w-0 flex-1">
             <div className="text-gray-400">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
+              <Cog6ToothIcon className="w-6 h-6 flex-shrink-0" style={{ minWidth: '24px', minHeight: '24px' }} />
             </div>
             <span className="text-xs text-gray-400 mt-1 font-medium truncate">Settings</span>
           </Link>

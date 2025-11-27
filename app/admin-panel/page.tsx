@@ -89,6 +89,19 @@ export default function AdminPanel() {
   const [adminList, setAdminList] = useState<any[]>([])
   const [isLoadingAdmins, setIsLoadingAdmins] = useState(false)
 
+  // QR Code and Push Notification states
+  const [qrCodeData, setQrCodeData] = useState<string | null>(null)
+  const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null)
+  const [isGeneratingQR, setIsGeneratingQR] = useState(false)
+  type PushNotificationState = { subscribed: boolean; loading: boolean; lastUpdated: string | null }
+  const [pushNotificationStatus, setPushNotificationStatus] = useState<PushNotificationState>({
+    subscribed: false,
+    loading: false,
+    lastUpdated: null
+  })
+  const [pushLogs, setPushLogs] = useState<Array<{createdAt: string; event: string; userEmail: string; status: string; info?: string}>>([])
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+
   // Check for URL hash to set active tab and load data
   useEffect(() => {
     const token = sessionStorage.getItem('adminToken')
@@ -153,7 +166,10 @@ export default function AdminPanel() {
     setError('')
 
     // Password-only authentication for admin panel
-    if (password === 'gX8#bQ3!Vr9zM2@kLf1T') {
+    const entered = password.trim()
+    const expected = (process.env.NEXT_PUBLIC_ADMIN_PANEL_PASSWORD || 'gX8#bQ3!Vr9zM2@kLf1T').trim()
+
+    if (entered === expected) {
       const mockAdmin = {
         id: 'temp-admin-id',
         email: 'admin@helfi.ai',
@@ -198,11 +214,15 @@ export default function AdminPanel() {
         setAnalyticsData(dataResult.data || [])
       }
 
-      // Load summary
-      const summaryResponse = await fetch('/api/analytics?action=summary')
-      if (summaryResponse.ok) {
-        const summaryResult = await summaryResponse.json()
-        setAnalyticsSummary(summaryResult.summary)
+      // Load summary (non-blocking)
+      try {
+        const summaryResponse = await fetch('/api/analytics?action=summary')
+        if (summaryResponse.ok) {
+          const summaryResult = await summaryResponse.json()
+          setAnalyticsSummary(summaryResult.summary)
+        }
+      } catch (e) {
+        console.warn('Summary load failed')
       }
     } catch (error) {
       console.error('Error loading analytics:', error)
@@ -221,11 +241,94 @@ export default function AdminPanel() {
       if (response.ok) {
         const result = await response.json()
         setWaitlistData(result.waitlist || [])
+        // Clear selected emails if they no longer exist
+        setSelectedEmails(prev => prev.filter(email => 
+          result.waitlist?.some((entry: any) => entry.email === email)
+        ))
       }
     } catch (error) {
       console.error('Error loading waitlist:', error)
     }
     setIsLoadingWaitlist(false)
+  }
+
+  const handleDeleteWaitlistEntry = async (entryId: string, email: string) => {
+    if (!confirm(`Are you sure you want to delete ${email} from the waitlist?`)) {
+      return
+    }
+
+    try {
+      const response = await fetch('/api/waitlist', {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${adminToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ id: entryId })
+      })
+
+      const result = await response.json()
+      
+      if (response.ok) {
+        // Remove from local state
+        setWaitlistData(prev => prev.filter(entry => entry.id !== entryId))
+        // Remove from selected emails if it was selected
+        setSelectedEmails(prev => prev.filter(e => e !== email))
+        alert('Waitlist entry deleted successfully')
+      } else {
+        alert(result.error || 'Failed to delete waitlist entry')
+      }
+    } catch (error) {
+      console.error('Error deleting waitlist entry:', error)
+      alert('Failed to delete waitlist entry. Please try again.')
+    }
+  }
+
+  const handleBulkDeleteWaitlistEntries = async () => {
+    if (selectedEmails.length === 0) {
+      alert('Please select at least one entry to delete')
+      return
+    }
+
+    const selectedEntries = waitlistData.filter(entry => selectedEmails.includes(entry.email))
+    const emailList = selectedEntries.map(e => e.email).join(', ')
+    
+    if (!confirm(`Are you sure you want to delete ${selectedEmails.length} waitlist ${selectedEmails.length === 1 ? 'entry' : 'entries'}?\n\n${emailList}`)) {
+      return
+    }
+
+    try {
+      // Delete all selected entries
+      const deletePromises = selectedEntries.map(entry =>
+        fetch('/api/waitlist', {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${adminToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ id: entry.id })
+        })
+      )
+
+      const results = await Promise.all(deletePromises)
+      const failed = results.filter(r => !r.ok)
+      
+      if (failed.length === 0) {
+        // Store count before clearing
+        const deletedCount = selectedEmails.length
+        // Remove all deleted entries from local state
+        const deletedIds = selectedEntries.map(e => e.id)
+        setWaitlistData(prev => prev.filter(entry => !deletedIds.includes(entry.id)))
+        // Clear selected emails
+        setSelectedEmails([])
+        alert(`✅ Successfully deleted ${deletedCount} waitlist ${deletedCount === 1 ? 'entry' : 'entries'}`)
+      } else {
+        alert(`Failed to delete ${failed.length} of ${selectedEmails.length} entries. Please try again.`)
+      }
+    } catch (error) {
+      console.error('Error bulk deleting waitlist entries:', error)
+      alert('Failed to delete waitlist entries. Please try again.')
+    }
   }
 
   const loadUserStats = async (token?: string) => {
@@ -241,6 +344,9 @@ export default function AdminPanel() {
       if (response.ok) {
         const result = await response.json()
         setUserStats(result)
+      } else {
+        // Fallback: try to populate the table via management endpoint even if stats failed
+        loadUserManagement(userSearch, userFilter, currentPage)
       }
     } catch (error) {
       console.error('Error loading user stats:', error)
@@ -287,18 +393,32 @@ export default function AdminPanel() {
         body: JSON.stringify({ action, userId, data })
       })
 
+      const result = await response.json()
+
       if (response.ok) {
         // Reload the user list to show updated data
-        loadUserManagement(userSearch, userFilter, currentPage)
-        setShowUserModal(false)
-        setSelectedUser(null)
+        await loadUserManagement(userSearch, userFilter, currentPage)
+        // Refresh selected user if modal is open
+        if (selectedUser && showUserModal) {
+          const refreshedUsers = await fetch(`/api/admin/user-management?search=${selectedUser.email}&plan=all&page=1&limit=1`, {
+            headers: { 'Authorization': `Bearer ${adminToken}` }
+          }).then(r => r.json())
+          if (refreshedUsers.users && refreshedUsers.users.length > 0) {
+            setSelectedUser(refreshedUsers.users[0])
+          }
+        } else {
+          setShowUserModal(false)
+          setSelectedUser(null)
+        }
         alert(`User ${action} completed successfully`)
       } else {
-        alert('Action failed. Please try again.')
+        const errorMessage = result.error || 'Action failed. Please try again.'
+        console.error('API Error:', result)
+        alert(`Action failed: ${errorMessage}`)
       }
     } catch (error) {
       console.error('Error performing user action:', error)
-      alert('Action failed. Please try again.')
+      alert(`Action failed: ${error instanceof Error ? error.message : 'Please try again.'}`)
     }
   }
 
@@ -434,7 +554,7 @@ export default function AdminPanel() {
   const handleSelectByTier = (tier: string) => {
     const filteredUsers = managedUsers.filter(user => {
       if (tier === 'premium') return user.subscription?.plan === 'PREMIUM'
-      if (tier === 'free') return !user.subscription?.plan || user.subscription.plan === 'FREE'
+      if (tier === 'non-subscribed') return !user.subscription?.plan
       return true
     })
     setSelectedUserEmails(filteredUsers.map(user => user.email))
@@ -1130,6 +1250,195 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
     }
   }
 
+  // QR Code Functions
+  const generateQRCode = async () => {
+    setIsGeneratingQR(true)
+    try {
+      const response = await fetch('/api/admin/qr-generate', {
+        headers: {
+          'Authorization': `Bearer ${adminToken}`
+        }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setQrCodeUrl(data.qrData.url)
+        
+        // Generate QR code image using qrcode library
+        const QRCode = (await import('qrcode')).default
+        const qrImageData = await QRCode.toDataURL(data.qrData.url, {
+          width: 300,
+          margin: 2
+        })
+        setQrCodeData(qrImageData)
+      } else {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        console.error('QR generation failed:', errorData)
+        alert(`Failed to generate QR code: ${errorData.error || 'Unknown error'}`)
+      }
+    } catch (error: any) {
+      console.error('Error generating QR code:', error)
+      alert(`Failed to generate QR code: ${error?.message || 'Network error'}`)
+    }
+    setIsGeneratingQR(false)
+  }
+
+  // Push Notification Functions
+  const checkPushNotificationStatus = async () => {
+    if (!adminUser?.email || !adminToken) return
+    
+    setPushNotificationStatus((prev) => ({ ...prev, loading: true }))
+    try {
+      // Check if admin user has push subscription
+      const response = await fetch('/api/admin/push-subscribe', {
+        headers: {
+          'Authorization': `Bearer ${adminToken}`
+        }
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setPushNotificationStatus({
+          subscribed: data.hasSubscription || false,
+          loading: false,
+          lastUpdated: data.lastUpdated || null
+        })
+      } else {
+        setPushNotificationStatus({ subscribed: false, loading: false, lastUpdated: null })
+      }
+    } catch (error) {
+      console.error('Error checking push status:', error)
+      setPushNotificationStatus({ subscribed: false, loading: false, lastUpdated: null })
+    }
+  }
+
+  const enablePushNotifications = async () => {
+    if (!('Notification' in window)) {
+      alert('Push notifications are not supported in this browser')
+      return
+    }
+
+    if (Notification.permission === 'denied') {
+      alert('Push notifications were denied. Please enable them in your browser settings.')
+      return
+    }
+
+    setPushNotificationStatus((prev) => ({ ...prev, loading: true }))
+
+    try {
+      const permission = await Notification.requestPermission()
+      if (permission !== 'granted') {
+        alert('Push notifications were denied')
+        setPushNotificationStatus({ subscribed: false, loading: false, lastUpdated: null })
+        return
+      }
+
+      // Register service worker
+      const registration = await navigator.serviceWorker.register('/sw.js')
+      await navigator.serviceWorker.ready
+
+      // Subscribe to push notifications
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+          ? urlBase64ToUint8Array(process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY)
+          : undefined
+      })
+
+      // Send subscription to server (using admin API endpoint)
+      const response = await fetch('/api/admin/push-subscribe', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${adminToken}`
+        },
+        body: JSON.stringify({ subscription })
+      })
+
+      if (response.ok) {
+        setPushNotificationStatus({
+          subscribed: true,
+          loading: false,
+          lastUpdated: new Date().toISOString()
+        })
+        alert('✅ Push notifications enabled! You will now receive notifications for signups, subscriptions, and credit purchases.')
+      } else {
+        throw new Error('Failed to save subscription')
+      }
+    } catch (error: any) {
+      console.error('Error enabling push notifications:', error)
+      alert(`Failed to enable push notifications: ${error.message}`)
+      setPushNotificationStatus({ subscribed: false, loading: false, lastUpdated: null })
+    }
+  }
+
+  const disablePushNotifications = async () => {
+    setPushNotificationStatus((s) => ({ ...s, loading: true }))
+    try {
+      const response = await fetch('/api/admin/push-subscribe', {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${adminToken}` }
+      })
+      if (response.ok) {
+        setPushNotificationStatus({ subscribed: false, loading: false, lastUpdated: null })
+        alert('🔕 Push notifications disabled.')
+      } else {
+        throw new Error('Failed to unsubscribe')
+      }
+    } catch (e: any) {
+      console.error('Disable push error', e)
+      alert(`Failed to disable push notifications: ${e?.message || e}`)
+      setPushNotificationStatus((s) => ({ ...s, loading: false }))
+    }
+  }
+
+  const sendTestOwnerPush = async () => {
+    try {
+      const res = await fetch('/api/admin/push-test', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${adminToken}` }
+      })
+      if (!res.ok) throw new Error('Failed to send test push')
+      alert('✅ Test notification enqueued (via Upstash).')
+    } catch (e: any) {
+      alert(`Test notification failed: ${e?.message || e}`)
+    }
+  }
+
+  const loadPushLogs = async () => {
+    try {
+      const res = await fetch('/api/admin/push-logs', {
+        headers: { 'Authorization': `Bearer ${adminToken}` }
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setPushLogs(
+          (data.logs || []).map((r: any) => ({
+            createdAt: r.createdAt || r.createdat,
+            event: r.event,
+            userEmail: r.userEmail,
+            status: r.status,
+            info: r.info || ''
+          }))
+        )
+      }
+    } catch (e) {
+      console.error('loadPushLogs error', e)
+    }
+  }
+
+  const urlBase64ToUint8Array = (base64String: string) => {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4)
+    const base64 = (base64String + padding)
+      .replace(/\-/g, '+')
+      .replace(/_/g, '/')
+    const rawData = window.atob(base64)
+    const outputArray = new Uint8Array(rawData.length)
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i)
+    }
+    return outputArray
+  }
+
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -1206,8 +1515,8 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex justify-between items-center">
+      <div className="sticky top-0 z-40 bg-white border-b border-gray-200 px-4 sm:px-6 py-3 sm:py-4">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center">
             <Image
               src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/HELFI_TRANSPARENT_rmssry.png"
@@ -1217,31 +1526,70 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
               className="mr-3"
             />
             <div>
-              <h1 className="text-xl font-bold text-gray-900">Helfi Analytics Dashboard</h1>
-              <p className="text-sm text-gray-600">Real-time user behavior insights</p>
+              <h1 className="text-lg sm:text-xl font-bold text-gray-900">Helfi Analytics Dashboard</h1>
+              <p className="text-xs sm:text-sm text-gray-600">Real-time user behavior insights</p>
             </div>
           </div>
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center gap-2 sm:gap-4">
+            {/* Mobile menu toggle */}
+            <button
+              onClick={() => setMobileMenuOpen(v => !v)}
+              className="sm:hidden mr-1 inline-flex items-center justify-center rounded-lg border border-gray-200 px-3 py-2 text-xs"
+              aria-label="Open menu"
+            >
+              ☰
+            </button>
             <button
               onClick={refreshData}
-              className="bg-emerald-500 text-white px-4 py-2 rounded-lg hover:bg-emerald-600 transition-colors text-sm"
+              className="shrink-0 bg-emerald-500 text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-emerald-600 transition-colors text-xs sm:text-sm"
             >
-              🔄 Refresh Data
+              🔄 <span className="hidden sm:inline">Refresh Data</span>
+              <span className="sm:hidden">Refresh</span>
             </button>
             <button
               onClick={handleLogout}
-              className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors text-sm"
+              className="shrink-0 bg-gray-500 text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors text-xs sm:text-sm"
             >
-              Logout
+              🚪 <span className="hidden sm:inline">Logout</span>
             </button>
           </div>
         </div>
       </div>
 
+      {/* Mobile Menu (only essential sections) */}
+      {mobileMenuOpen && (
+        <div className="sm:hidden bg-white border-b border-gray-200 px-4 py-2 z-30">
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { id: 'overview', label: 'Overview' },
+              { id: 'waitlist', label: 'Waitlist' },
+              { id: 'users', label: 'Users' },
+              { id: 'settings', label: 'Settings' },
+            ].map((item) => (
+              <button
+                key={item.id}
+                onClick={() => {
+                  setActiveTab(item.id)
+                  setMobileMenuOpen(false)
+                  if (item.id === 'settings') {
+                    checkPushNotificationStatus()
+                  }
+                }}
+                className={`w-full py-2 rounded-lg border text-sm ${
+                  activeTab === item.id ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-white border-gray-200 text-gray-700'
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Navigation Tabs */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="px-6">
-          <nav className="flex space-x-8">
+      <div className="hidden md:block bg-white border-b border-gray-200">
+        <div className="px-4 sm:px-6">
+          <nav className="flex space-x-4 md:space-x-8 overflow-x-auto whitespace-nowrap no-scrollbar -mx-4 px-4">
             {[
               { id: 'overview', label: '📊 Overview', desc: 'Key metrics' },
               { id: 'events', label: '📋 Events', desc: 'Raw data' },
@@ -1250,7 +1598,8 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
               { id: 'users', label: '👥 Users', desc: 'User stats' },
               { id: 'management', label: '🛠️ User Management', desc: 'Manage users' },
               { id: 'templates', label: '📝 Templates', desc: 'Email templates' },
-              { id: 'tickets', label: '🎫 Support', desc: 'Customer support' }
+              { id: 'tickets', label: '🎫 Support', desc: 'Customer support' },
+              { id: 'settings', label: '⚙️ Settings', desc: 'QR Login & Notifications' }
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -1269,8 +1618,11 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                   if (tab.id === 'tickets') {
                     loadSupportTickets()
                   }
+                  if (tab.id === 'settings') {
+                    checkPushNotificationStatus()
+                  }
                 }}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                className={`py-3 md:py-4 px-2 md:px-1 border-b-2 font-medium text-xs sm:text-sm min-w-fit ${
                   activeTab === tab.id
                     ? 'border-emerald-500 text-emerald-600'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -1278,7 +1630,7 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
               >
                 <div className="flex flex-col items-center">
                   <span>{tab.label}</span>
-                  <span className="text-xs text-gray-400">{tab.desc}</span>
+                  <span className="text-[10px] sm:text-xs text-gray-400">{tab.desc}</span>
                 </div>
               </button>
             ))}
@@ -1287,11 +1639,11 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
       </div>
 
       {/* Content */}
-      <div className="px-6 py-6">
+      <div className="px-4 sm:px-6 py-4 sm:py-6">
         {activeTab === 'overview' && (
           <div className="space-y-6">
             {/* Quick Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
               <div className="bg-white rounded-lg shadow p-6">
                 <div className="text-2xl font-bold text-emerald-600">
                   {analyticsSummary?.totalEvents || 0}
@@ -1617,12 +1969,25 @@ The Helfi Team`,
                     </p>
                   </div>
                   {waitlistData.length > 0 && (
-                    <button
-                      onClick={handleSelectAll}
-                      className="text-sm text-emerald-600 hover:text-emerald-700 font-medium"
-                    >
-                      {selectedEmails.length === waitlistData.length ? 'Deselect All' : 'Select All'}
-                    </button>
+                    <div className="flex items-center gap-3">
+                      {selectedEmails.length > 0 && (
+                        <button
+                          onClick={handleBulkDeleteWaitlistEntries}
+                          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium text-sm flex items-center gap-2"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                          Delete Selected ({selectedEmails.length})
+                        </button>
+                      )}
+                      <button
+                        onClick={handleSelectAll}
+                        className="text-sm text-emerald-600 hover:text-emerald-700 font-medium"
+                      >
+                        {selectedEmails.length === waitlistData.length ? 'Deselect All' : 'Select All'}
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
@@ -1654,12 +2019,15 @@ The Helfi Team`,
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Signed Up
                         </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Actions
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {waitlistData.length === 0 ? (
                         <tr>
-                          <td colSpan={4} className="px-6 py-4 text-center text-gray-500">
+                          <td colSpan={5} className="px-6 py-4 text-center text-gray-500">
                             No waitlist signups yet.
                           </td>
                         </tr>
@@ -1682,6 +2050,15 @@ The Helfi Team`,
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                               {new Date(entry.createdAt).toLocaleDateString()}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm">
+                              <button
+                                onClick={() => handleDeleteWaitlistEntry(entry.id, entry.email)}
+                                className="text-red-600 hover:text-red-800 font-medium transition-colors"
+                                title="Delete entry"
+                              >
+                                Delete
+                              </button>
                             </td>
                           </tr>
                         ))
@@ -1750,6 +2127,39 @@ The Helfi Team`,
                       {userStats.usersWithFoodLogs}
                     </div>
                     <div className="text-sm text-gray-600">Users with Food Logs</div>
+                  </div>
+                  <div className="bg-white rounded-lg shadow p-6">
+                    <div className="text-lg font-semibold text-gray-800 mb-2">Device Interest</div>
+                    <div className="grid grid-cols-2 gap-2 text-sm text-gray-700">
+                      <div className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                        <span>Apple Watch</span>
+                        <span className="font-bold text-emerald-600">{userStats.deviceInterest?.appleWatch || 0}</span>
+                      </div>
+                      <div className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                        <span>Fitbit</span>
+                        <span className="font-bold text-emerald-600">{userStats.deviceInterest?.fitbit || 0}</span>
+                      </div>
+                      <div className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                        <span>Garmin</span>
+                        <span className="font-bold text-emerald-600">{userStats.deviceInterest?.garmin || 0}</span>
+                      </div>
+                      <div className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                        <span>Samsung Health</span>
+                        <span className="font-bold text-emerald-600">{userStats.deviceInterest?.samsung || 0}</span>
+                      </div>
+                      <div className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                        <span>Google Fit</span>
+                        <span className="font-bold text-emerald-600">{userStats.deviceInterest?.googleFit || 0}</span>
+                      </div>
+                      <div className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                        <span>Oura Ring</span>
+                        <span className="font-bold text-emerald-600">{userStats.deviceInterest?.oura || 0}</span>
+                      </div>
+                      <div className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                        <span>Polar</span>
+                        <span className="font-bold text-emerald-600">{userStats.deviceInterest?.polar || 0}</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -1840,8 +2250,8 @@ The Helfi Team`,
                     className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                   >
                     <option value="all">All Users</option>
-                    <option value="free">Free Plan</option>
                     <option value="premium">Premium Plan</option>
+                    <option value="non-subscribed">Non-Subscribed</option>
                   </select>
                   <button
                     onClick={() => loadUserManagement(userSearch, userFilter, 1)}
@@ -1880,10 +2290,10 @@ The Helfi Team`,
                     💎 Premium Users ({managedUsers.filter(u => u.subscription?.plan === 'PREMIUM').length})
                   </button>
                   <button
-                    onClick={() => handleSelectByTier('free')}
+                    onClick={() => handleSelectByTier('non-subscribed')}
                     className="bg-blue-500 text-white px-3 py-2 rounded-lg hover:bg-blue-600 transition-colors text-sm"
                   >
-                    🆓 Free Users ({managedUsers.filter(u => !u.subscription?.plan || u.subscription.plan === 'FREE').length})
+                    👤 Non-Subscribed Users ({managedUsers.filter(u => !u.subscription?.plan).length})
                   </button>
                 </div>
               </div>
@@ -2186,7 +2596,7 @@ The Helfi Team`,
                                      ? 'bg-emerald-100 text-emerald-800' 
                                      : 'bg-gray-100 text-gray-800'
                                  }`}>
-                                   {user.subscription?.plan || 'FREE'}
+                                   {user.subscription?.plan || 'No Subscription'}
                                    {user.subscription?.endDate && new Date(user.subscription.endDate).getFullYear() > 2050 && (
                                      <span className="ml-1 text-xs">∞</span>
                                    )}
@@ -2222,9 +2632,9 @@ The Helfi Team`,
                                 </div>
                                 <div className="text-xs text-gray-500">
                                   📊 {user.dailyAnalysisUsed || 0}/{user.dailyAnalysisCredits || 3} daily
-                                  {user.additionalCredits > 0 && (
-                                    <span className="text-green-600"> (+{user.additionalCredits})</span>
-                                  )}
+                                 {(user.totalAvailableCredits > 0 || (user.additionalCredits && user.additionalCredits > 0)) && (
+                                   <span className="text-green-600"> (+{user.totalAvailableCredits || user.additionalCredits || 0})</span>
+                                 )}
                                 </div>
                               </div>
                             </td>
@@ -2244,9 +2654,11 @@ The Helfi Team`,
                                 </button>
                                 <button
                                   onClick={() => {
-                                    const credits = prompt('Enter number of credits to add:')
-                                    if (credits && !isNaN(parseInt(credits)) && parseInt(credits) > 0) {
-                                      handleUserAction('add_credits', user.id, { creditAmount: parseInt(credits) })
+                                    const credits = prompt('Enter credit package (250, 500, or 1000):')
+                                    if (credits && ['250', '500', '1000'].includes(credits)) {
+                                      handleUserAction('add_credits', user.id, { creditPackage: credits })
+                                    } else if (credits) {
+                                      alert('Invalid package. Use: 250, 500, or 1000')
                                     }
                                   }}
                                   className="bg-green-500 text-white px-3 py-1 rounded text-xs hover:bg-green-600 transition-colors"
@@ -2316,8 +2728,8 @@ The Helfi Team`,
 
                          {/* User Management Modal */}
              {showUserModal && selectedUser && (
-               <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
-                 <div className="bg-white p-6 rounded-lg shadow-xl max-w-lg w-full mx-4">
+               <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center py-8">
+                 <div className="bg-white p-6 rounded-lg shadow-xl max-w-lg w-full mx-4 max-h-[85vh] overflow-y-auto">
                    <h3 className="text-lg font-semibold text-gray-900 mb-4">
                      Manage User: {selectedUser.name || selectedUser.email}
                    </h3>
@@ -2333,17 +2745,47 @@ The Helfi Team`,
                              ? 'bg-emerald-100 text-emerald-800' 
                              : 'bg-gray-100 text-gray-800'
                          }`}>
-                           {selectedUser.subscription?.plan || 'FREE'}
+                           {selectedUser.subscription?.plan || 'No Subscription'}
                          </span>
                        </div>
+                       
+                       {selectedUser.subscription?.plan === 'PREMIUM' && selectedUser.subscription?.monthlyPriceCents && (
+                         <div className="flex justify-between items-center">
+                           <span className="text-sm text-gray-600">Subscription Tier:</span>
+                           <span className="text-sm font-semibold text-emerald-700">
+                             {selectedUser.subscription.endDate ? (
+                              // Temporary access - show duration and credits
+                              (() => {
+                                const endDate = new Date(selectedUser.subscription.endDate)
+                                const startDate = new Date(selectedUser.subscription.startDate)
+                                // Calculate total subscription duration in days (from start to end)
+                                const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
+                                const credits = Math.floor(selectedUser.subscription.monthlyPriceCents * 0.5) // 50% of price = credits
+                                if (totalDays > 90) {
+                                  return `Permanent (${credits} credits/month)`
+                                } else {
+                                  return `${totalDays}-Day Access (${credits} credits)`
+                                }
+                              })()
+                             ) : (
+                               // Permanent subscription - show monthly tier
+                              selectedUser.subscription.monthlyPriceCents === 1000 ? '$10/month (700 credits)' :
+                              selectedUser.subscription.monthlyPriceCents === 2000 ? '$20/month (1,400 credits)' :
+                              selectedUser.subscription.monthlyPriceCents === 3000 ? '$30/month (2,100 credits)' :
+                              selectedUser.subscription.monthlyPriceCents === 5000 ? '$50/month (3,500 credits)' :
+                               `$${(selectedUser.subscription.monthlyPriceCents / 100).toFixed(0)}/month`
+                             )}
+                           </span>
+                         </div>
+                       )}
                        
                        {selectedUser.subscription?.endDate && (
                          <div className="flex justify-between items-center">
                            <span className="text-sm text-gray-600">Access Type:</span>
                            <span className="text-sm font-medium">
                              {new Date(selectedUser.subscription.endDate).getFullYear() > 2050 
-                               ? '🎉 Permanent Free Access' 
-                               : `⏰ Trial expires ${new Date(selectedUser.subscription.endDate).toLocaleDateString()}`
+                               ? '🎉 Permanent Access' 
+                               : `⏰ Expires ${new Date(selectedUser.subscription.endDate).toLocaleDateString()}`
                              }
                            </span>
                          </div>
@@ -2356,11 +2798,51 @@ The Helfi Team`,
                          </div>
                        )}
                        
-                       {(!selectedUser.subscription || selectedUser.subscription?.plan === 'FREE') && (
+                       {!selectedUser.subscription && (
                          <div className="flex justify-between items-center">
                            <span className="text-sm text-gray-600">Access Type:</span>
-                           <span className="text-sm font-medium text-gray-600">🆓 Free Plan</span>
+                           <span className="text-sm font-medium text-gray-600">👤 No Subscription</span>
                          </div>
+                       )}
+                       
+                       {selectedUser.subscription && (
+                         <>
+                           <div className="flex justify-between items-center">
+                             <span className="text-sm text-gray-600">Subscription Started:</span>
+                             <span className="text-sm font-medium">
+                               {selectedUser.subscription.startDate 
+                                 ? new Date(selectedUser.subscription.startDate).toLocaleDateString()
+                                 : 'Unknown'}
+                             </span>
+                           </div>
+                           
+                           {selectedUser.subscription.startDate && !selectedUser.subscription.endDate && (
+                             <div className="flex justify-between items-center">
+                               <span className="text-sm text-gray-600">Next Renewal:</span>
+                               <span className="text-sm font-medium">
+                                 {(() => {
+                                   const startDate = new Date(selectedUser.subscription.startDate)
+                                   const now = new Date()
+                                   const startYear = startDate.getUTCFullYear()
+                                   const startMonth = startDate.getUTCMonth()
+                                   const startDay = startDate.getUTCDate()
+                                   
+                                   const currentYear = now.getUTCFullYear()
+                                   const currentMonth = now.getUTCMonth()
+                                   const currentDay = now.getUTCDate()
+                                   
+                                   let monthsSinceStart = (currentYear - startYear) * 12 + (currentMonth - startMonth)
+                                   if (currentDay < startDay) {
+                                     monthsSinceStart--
+                                   }
+                                   
+                                   const nextRenewal = new Date(Date.UTC(startYear, startMonth + monthsSinceStart + 1, startDay, 0, 0, 0, 0))
+                                   return nextRenewal.toLocaleDateString()
+                                 })()}
+                               </span>
+                             </div>
+                           )}
+                         </>
                        )}
                        
                        <div className="flex justify-between items-center">
@@ -2373,19 +2855,15 @@ The Helfi Team`,
                    {/* Credit Management */}
                    <div className="bg-green-50 rounded-lg p-4 mb-6 border-l-4 border-green-500">
                      <h4 className="font-medium text-gray-900 mb-3">📊 Credit Management</h4>
-                     <div className="space-y-2">
-                       <div className="flex justify-between items-center">
-                         <span className="text-sm text-gray-600">Daily Credits:</span>
-                         <span className="text-sm font-medium">
-                           {selectedUser.dailyAnalysisUsed || 0} / {selectedUser.dailyAnalysisCredits || 3} used
-                         </span>
-                       </div>
-                       <div className="flex justify-between items-center">
-                         <span className="text-sm text-gray-600">Additional Credits:</span>
-                         <span className="text-sm font-medium text-green-600">
-                           {selectedUser.additionalCredits || 0} credits
-                         </span>
-                       </div>
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-600">Additional Credits:</span>
+                        <span className="text-sm font-medium text-green-600">
+                          {selectedUser.totalAvailableCredits !== undefined 
+                            ? `${selectedUser.totalAvailableCredits} credits`
+                            : (selectedUser.additionalCredits || 0) + ' credits'}
+                        </span>
+                      </div>
                        <div className="flex justify-between items-center">
                          <span className="text-sm text-gray-600">Total Analyses:</span>
                          <span className="text-sm font-medium">
@@ -2395,15 +2873,31 @@ The Helfi Team`,
                        
                        {/* Feature-specific usage */}
                        <div className="pt-2 border-t border-gray-200">
-                         <div className="text-xs text-gray-500 mb-2">Today's Feature Usage:</div>
+                         <div className="text-xs text-gray-500 mb-2">Monthly Feature Usage:</div>
                          <div className="grid grid-cols-2 gap-2 text-xs">
                            <div className="flex justify-between">
                              <span>Food Analysis:</span>
                              <span className="font-medium">{selectedUser.dailyFoodAnalysisUsed || 0}</span>
                            </div>
                            <div className="flex justify-between">
+                             <span>Food Reanalysis:</span>
+                             <span className="font-medium">{selectedUser.dailyFoodReanalysisUsed || 0}</span>
+                           </div>
+                           <div className="flex justify-between">
+                             <span>Medical Image:</span>
+                             <span className="font-medium">{selectedUser.monthlyMedicalImageAnalysisUsed || 0}</span>
+                           </div>
+                           <div className="flex justify-between">
                              <span>Interaction Analysis:</span>
                              <span className="font-medium">{selectedUser.dailyInteractionAnalysisUsed || 0}</span>
+                           </div>
+                           <div className="flex justify-between">
+                             <span>Symptom Analysis:</span>
+                             <span className="font-medium">{selectedUser.monthlySymptomAnalysisUsed || 0}</span>
+                           </div>
+                           <div className="flex justify-between">
+                             <span>Insights Generation:</span>
+                             <span className="font-medium">{selectedUser.monthlyInsightsGenerationUsed || 0}</span>
                            </div>
                          </div>
                        </div>
@@ -2417,7 +2911,7 @@ The Helfi Team`,
                        )}
                      </div>
                      
-                     <div className="mt-4 grid grid-cols-2 gap-3">
+                     <div className="mt-4 grid grid-cols-3 gap-3">
                        <button
                          onClick={() => {
                            const credits = prompt('Enter number of credits to add:')
@@ -2428,6 +2922,19 @@ The Helfi Team`,
                          className="bg-green-500 text-white px-3 py-2 rounded text-sm hover:bg-green-600 transition-colors"
                        >
                          💳 Add Credits
+                       </button>
+                       <button
+                         onClick={() => {
+                           const credits = prompt('Enter number of credits to remove:')
+                           if (credits && !isNaN(parseInt(credits)) && parseInt(credits) > 0) {
+                             if (confirm(`Are you sure you want to remove ${credits} credits?`)) {
+                               handleUserAction('remove_credits', selectedUser.id, { creditAmount: parseInt(credits) })
+                             }
+                           }
+                         }}
+                         className="bg-red-500 text-white px-3 py-2 rounded text-sm hover:bg-red-600 transition-colors"
+                       >
+                         ➖ Remove Credits
                        </button>
                        <button
                          onClick={() => {
@@ -2444,29 +2951,79 @@ The Helfi Team`,
 
                    {/* Actions */}
                    <div className="space-y-4">
-                     <h4 className="font-medium text-gray-900">Grant Access</h4>
+                     <h4 className="font-medium text-gray-900">Grant Subscription</h4>
                      
-                     <div className="grid grid-cols-2 gap-3">
+                     {/* Subscription Tiers - matching billing page */}
+                     <div className="grid grid-cols-4 gap-2 mb-3">
                        <button
-                         onClick={() => handleUserAction('grant_trial', selectedUser.id, { trialDays: 7 })}
-                         className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors text-sm"
+                         onClick={() => handleUserAction('grant_subscription', selectedUser.id, { tier: '10' })}
+                         className="bg-emerald-400 text-white px-3 py-2 rounded hover:bg-emerald-500 transition-colors text-xs"
                        >
-                         7-Day Trial
+                         $10/month<br/>(700 credits)
                        </button>
                        <button
-                         onClick={() => handleUserAction('grant_trial', selectedUser.id, { trialDays: 30 })}
-                         className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors text-sm"
+                         onClick={() => handleUserAction('grant_subscription', selectedUser.id, { tier: '20' })}
+                         className="bg-emerald-500 text-white px-3 py-2 rounded hover:bg-emerald-600 transition-colors text-xs"
                        >
-                         30-Day Trial
+                         $20/month<br/>(1,400 credits)
+                       </button>
+                       <button
+                         onClick={() => handleUserAction('grant_subscription', selectedUser.id, { tier: '30' })}
+                         className="bg-emerald-600 text-white px-3 py-2 rounded hover:bg-emerald-700 transition-colors text-xs font-semibold"
+                       >
+                         $30/month<br/>(2,100 credits)
+                       </button>
+                       <button
+                         onClick={() => handleUserAction('grant_subscription', selectedUser.id, { tier: '50' })}
+                         className="bg-gray-900 text-white px-3 py-2 rounded hover:bg-gray-800 transition-colors text-xs"
+                       >
+                         $50/month<br/>(3,500 credits)
                        </button>
                      </div>
                      
-                     <button
-                       onClick={() => handleUserAction('grant_free_access', selectedUser.id)}
-                       className="w-full bg-emerald-500 text-white px-4 py-2 rounded hover:bg-emerald-600 transition-colors text-sm"
-                     >
-                       🎉 Grant Permanent Free Access
-                     </button>
+                     {/* Temporary Access */}
+                     <div className="border-t pt-3">
+                       <h5 className="text-sm font-medium text-gray-700 mb-2">Temporary Access</h5>
+                       <div className="grid grid-cols-2 gap-2">
+                         <button
+                           onClick={() => handleUserAction('grant_trial', selectedUser.id, { trialDays: 7 })}
+                           className="bg-blue-500 text-white px-3 py-2 rounded hover:bg-blue-600 transition-colors text-xs"
+                         >
+                           7-Day Premium<br/>(250 credits)
+                         </button>
+                         <button
+                           onClick={() => handleUserAction('grant_trial', selectedUser.id, { trialDays: 30 })}
+                           className="bg-blue-500 text-white px-3 py-2 rounded hover:bg-blue-600 transition-colors text-xs"
+                         >
+                           30-Day Premium<br/>(1,400 credits)
+                         </button>
+                       </div>
+                     </div>
+                     
+                     {/* Credit Packages */}
+                     <div className="border-t pt-4">
+                       <h4 className="font-medium text-gray-900 mb-3">Grant Credits</h4>
+                       <div className="grid grid-cols-3 gap-2">
+                         <button
+                           onClick={() => handleUserAction('add_credits', selectedUser.id, { creditPackage: '250' })}
+                           className="bg-purple-500 text-white px-3 py-2 rounded hover:bg-purple-600 transition-colors text-xs"
+                         >
+                           250 Credits ($5)
+                         </button>
+                         <button
+                           onClick={() => handleUserAction('add_credits', selectedUser.id, { creditPackage: '500' })}
+                           className="bg-purple-500 text-white px-3 py-2 rounded hover:bg-purple-600 transition-colors text-xs"
+                         >
+                           500 Credits ($10)
+                         </button>
+                         <button
+                           onClick={() => handleUserAction('add_credits', selectedUser.id, { creditPackage: '1000' })}
+                           className="bg-purple-500 text-white px-3 py-2 rounded hover:bg-purple-600 transition-colors text-xs"
+                         >
+                           1000 Credits ($20)
+                         </button>
+                       </div>
+                     </div>
                      
                      {/* Plan Controls */}
                      <div className="border-t pt-4">
@@ -2477,7 +3034,7 @@ The Helfi Team`,
                              onClick={() => handleUserAction('deactivate', selectedUser.id)}
                              className="bg-orange-500 text-white px-4 py-2 rounded hover:bg-orange-600 transition-colors text-sm"
                            >
-                             ⬇️ Downgrade to Free
+                             ⬇️ Remove Subscription
                            </button>
                          ) : (
                            <button
@@ -3170,6 +3727,147 @@ The Helfi Team`,
                     </button>
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'settings' && (
+          <div className="space-y-6">
+            {/* QR Code Login Section */}
+            <div className="bg-white rounded-lg shadow p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">📱 QR Code Login</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Generate a QR code to log into the admin panel on your phone. Scan the QR code with your phone's camera to instantly log in.
+              </p>
+              
+              {qrCodeData ? (
+                <div className="flex flex-col items-center space-y-4">
+                  <img src={qrCodeData} alt="QR Code" className="border-2 border-gray-200 rounded-lg" />
+                  <p className="text-sm text-gray-600 text-center">
+                    Scan this QR code with your phone to log into the admin panel
+                  </p>
+                  <p className="text-xs text-gray-500 text-center">
+                    Or visit: <a href={qrCodeUrl || '#'} className="text-blue-600 underline" target="_blank" rel="noopener noreferrer">{qrCodeUrl}</a>
+                  </p>
+                  <button
+                    onClick={generateQRCode}
+                    className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors"
+                  >
+                    🔄 Generate New QR Code
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={generateQRCode}
+                  disabled={isGeneratingQR}
+                  className="bg-emerald-500 text-white px-6 py-3 rounded-lg hover:bg-emerald-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isGeneratingQR ? 'Generating...' : '📱 Generate QR Code'}
+                </button>
+              )}
+            </div>
+
+            {/* Push Notifications Section */}
+            <div className="bg-white rounded-lg shadow p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">🔔 Push Notifications</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Enable push notifications to receive instant alerts on your phone when:
+              </p>
+              <ul className="list-disc list-inside text-sm text-gray-600 mb-4 space-y-1">
+                <li>Someone signs up on your website</li>
+                <li>Someone purchases a paid subscription</li>
+                <li>Someone buys credits</li>
+              </ul>
+
+              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                <div>
+                  <p className="font-medium text-gray-900">Push Notifications</p>
+                  <p className="text-sm text-gray-600">
+                    {pushNotificationStatus.loading 
+                      ? 'Checking status...' 
+                      : pushNotificationStatus.subscribed 
+                        ? '✅ Enabled - You will receive notifications' 
+                        : '❌ Not enabled - Click below to enable'}
+                  </p>
+                  {pushNotificationStatus.subscribed && pushNotificationStatus.lastUpdated && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Last enabled on {new Date(pushNotificationStatus.lastUpdated).toLocaleString()}. Enabling on a new device will move alerts to that device.
+                    </p>
+                  )}
+                  {!pushNotificationStatus.subscribed && !pushNotificationStatus.loading && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Push subscriptions are saved per device. Tap Enable on this phone (PWA) to get notifications here.
+                    </p>
+                  )}
+                </div>
+                {pushNotificationStatus.subscribed ? (
+                  <button
+                    onClick={disablePushNotifications}
+                    disabled={pushNotificationStatus.loading}
+                    className="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {pushNotificationStatus.loading ? '...' : 'Disable'}
+                  </button>
+                ) : (
+                  <button
+                    onClick={enablePushNotifications}
+                    disabled={pushNotificationStatus.loading}
+                    className="bg-emerald-500 text-white px-6 py-2 rounded-lg hover:bg-emerald-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {pushNotificationStatus.loading ? 'Loading...' : 'Enable'}
+                  </button>
+                )}
+              </div>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <button
+                  onClick={sendTestOwnerPush}
+                  className="w-full bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 px-4 py-2 rounded-lg"
+                >
+                  Send Test Notification
+                </button>
+                <button
+                  onClick={loadPushLogs}
+                  className="w-full bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-4 py-2 rounded-lg"
+                >
+                  Refresh Logs
+                </button>
+              </div>
+
+              {pushLogs.length > 0 && (
+                <div className="mt-4">
+                  <h4 className="text-sm font-medium text-gray-900 mb-2">Recent Notification Logs</h4>
+                  <div className="max-h-56 overflow-auto border rounded-lg">
+                    <table className="min-w-full text-xs">
+                      <thead className="bg-gray-50 text-gray-500">
+                        <tr>
+                          <th className="text-left px-3 py-2">Time</th>
+                          <th className="text-left px-3 py-2">Event</th>
+                          <th className="text-left px-3 py-2">Status</th>
+                          <th className="text-left px-3 py-2">Info</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pushLogs.map((l, i) => (
+                          <tr key={i} className="border-t">
+                            <td className="px-3 py-2 text-gray-600">{new Date(l.createdAt).toLocaleString()}</td>
+                            <td className="px-3 py-2">{l.event}</td>
+                            <td className="px-3 py-2">{l.status}</td>
+                            <td className="px-3 py-2 text-gray-500 truncate max-w-[200px]">{l.info}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-800">
+                  <strong>Note:</strong> On iPhone, web push only works when opened from the Home Screen app icon (PWA).
+                  Add to Home Screen and then enable notifications here.
+                </p>
               </div>
             </div>
           </div>

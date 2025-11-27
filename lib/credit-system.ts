@@ -1,12 +1,19 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 
-const prisma = new PrismaClient();
-
+// ABSOLUTE GUARD RAIL:
+// `CreditManager` is the single source of truth for wallet credits and costs.
+// Do NOT "quick-fix" bugs by changing credit prices or bypassing charges here
+// without reading `GUARD_RAILS.md` (credits section) and getting explicit user
+// approval.
+//
 // Credit costs for different features
 export const CREDIT_COSTS = {
   FOOD_ANALYSIS: 1,
   INTERACTION_ANALYSIS: 3,
-  MEDICAL_IMAGE_ANALYSIS: 2, // Future feature
+  MEDICAL_IMAGE_ANALYSIS: 2,
+  FOOD_REANALYSIS: 1,
+  SYMPTOM_ANALYSIS: 1,
+  INSIGHTS_GENERATION: 2, // Fixed cost per full insights generation (all health issues)
 } as const;
 
 export type FeatureType = keyof typeof CREDIT_COSTS;
@@ -34,6 +41,257 @@ export class CreditManager {
     this.userId = userId;
   }
 
+  //
+  // ===== Wallet Engine (Cursor‑style percentage wallet) =====
+  //
+
+  // Map subscription price directly to advertised credit amounts
+  private static SUBSCRIPTION_CREDITS_MAP: Record<number, number> = {
+    1000: 700,   // $10/month → 700 credits
+    2000: 1400,  // $20/month → 1,400 credits
+    3000: 2100,  // $30/month → 2,100 credits
+    5000: 3500,  // $50/month → 3,500 credits
+  };
+
+  private static PLAN_PRICE_CENTS: Record<string, number> = {
+    PREMIUM: 2000, // $20/month
+    // If a Premium Plus is added later in schema, we can map it here.
+    PREMIUM_PLUS: 3000, // $30/month (defensive default)
+  };
+
+  private static walletPercentOfPlan(): number {
+    // 50% of subscription price becomes monthly wallet allowance
+    const p = Number(process.env.HELFI_WALLET_PLAN_PERCENT || '0.5');
+    return p > 0 && p <= 1 ? p : 0.5;
+  }
+
+  private static monthlyCapCentsForPlan(plan: string | null | undefined): number {
+    const price = CreditManager.PLAN_PRICE_CENTS[String(plan || 'PREMIUM')] ?? 0;
+    return Math.floor(price * CreditManager.walletPercentOfPlan());
+  }
+
+  // Get credit cap from subscription price (uses direct mapping, not percentage)
+  private static creditsForSubscriptionPrice(monthlyPriceCents: number | null | undefined): number {
+    if (!monthlyPriceCents) return 0;
+    // Use direct mapping if available, otherwise fall back to percentage
+    if (CreditManager.SUBSCRIPTION_CREDITS_MAP[monthlyPriceCents]) {
+      return CreditManager.SUBSCRIPTION_CREDITS_MAP[monthlyPriceCents];
+    }
+    // Fallback to 50% for any unmapped prices
+    return Math.floor(monthlyPriceCents * CreditManager.walletPercentOfPlan());
+  }
+
+  private async ensureMonthlyReset(now = new Date()): Promise<void> {
+    const user = await prisma.user.findUnique({ 
+      where: { id: this.userId },
+      include: { subscription: true }
+    });
+    if (!user) return;
+    
+    const last = (user as any).walletMonthlyResetAt as Date | null;
+    
+    // Check if reset is needed based on subscription start date (if subscription exists)
+    // Otherwise fall back to calendar month
+    let shouldReset = false;
+    
+    if (user.subscription?.startDate) {
+      // Reset based on subscription start date (same calendar day each month)
+      const subStartDate = new Date(user.subscription.startDate);
+      const startYear = subStartDate.getUTCFullYear();
+      const startMonth = subStartDate.getUTCMonth();
+      const startDay = subStartDate.getUTCDate();
+      
+      if (!last) {
+        // Never reset before - reset now
+        shouldReset = true;
+      } else {
+        // Check if we've passed the subscription renewal date this month
+        const lastYear = last.getUTCFullYear();
+        const lastMonth = last.getUTCMonth();
+        const lastDay = last.getUTCDate();
+        
+        const currentYear = now.getUTCFullYear();
+        const currentMonth = now.getUTCMonth();
+        const currentDay = now.getUTCDate();
+        
+        // Calculate which subscription month we should be in based on last reset
+        let expectedMonthsSinceStart = (lastYear - startYear) * 12 + (lastMonth - startMonth);
+        if (lastDay < startDay) {
+          expectedMonthsSinceStart--;
+        }
+        
+        // Calculate which subscription month we're actually in now
+        let actualMonthsSinceStart = (currentYear - startYear) * 12 + (currentMonth - startMonth);
+        if (currentDay < startDay) {
+          actualMonthsSinceStart--;
+        }
+        
+        // Reset if we've moved to a new subscription month
+        shouldReset = actualMonthsSinceStart > expectedMonthsSinceStart;
+      }
+    } else {
+      // No subscription - use calendar month reset
+      const monthChanged =
+        !last ||
+        last.getUTCFullYear() !== now.getUTCFullYear() ||
+        last.getUTCMonth() !== now.getUTCMonth();
+      shouldReset = monthChanged;
+    }
+    
+    if (shouldReset) {
+      await prisma.user.update({
+        where: { id: this.userId },
+        data: {
+          walletMonthlyUsedCents: 0,
+          walletMonthlyResetAt: now,
+          // Reset monthly per-feature usage counters
+          monthlySymptomAnalysisUsed: 0,
+          monthlyFoodAnalysisUsed: 0,
+          monthlyMedicalImageAnalysisUsed: 0,
+          monthlyInteractionAnalysisUsed: 0,
+          monthlyInsightsGenerationUsed: 0,
+        } as any,
+      });
+    }
+  }
+
+  async getWalletStatus() {
+    await this.ensureMonthlyReset();
+    const user = await prisma.user.findUnique({
+      where: { id: this.userId },
+      include: { subscription: true },
+    });
+    if (!user) throw new Error('User not found');
+    const plan = user.subscription?.plan || null;
+    
+    // Use monthlyPriceCents if available, otherwise fall back to plan-based calculation
+    let monthlyCapCents = 0;
+    if (plan && user.subscription) {
+      if (user.subscription.monthlyPriceCents) {
+        // Use direct credit mapping (e.g., $30 → 1,700 credits)
+        monthlyCapCents = CreditManager.creditsForSubscriptionPrice(user.subscription.monthlyPriceCents);
+      } else {
+        // Fall back to plan-based calculation (defaults to $20)
+        monthlyCapCents = CreditManager.monthlyCapCentsForPlan(plan);
+      }
+    }
+    
+    const monthlyUsedCents = (user as any).walletMonthlyUsedCents || 0;
+
+    // Fetch available (non-expired) top-ups
+    const now = new Date();
+    const topUps = await prisma.creditTopUp.findMany({
+      where: { userId: user.id, expiresAt: { gt: now } },
+      orderBy: { expiresAt: 'asc' },
+    });
+    const topUpsTotalAvailable =
+      topUps.reduce((sum, t) => sum + Math.max(0, t.amountCents - t.usedCents), 0) || 0;
+    const topUpsTotalPurchased =
+      topUps.reduce((sum, t) => sum + t.amountCents, 0) || 0;
+    const topUpsTotalUsed =
+      topUps.reduce((sum, t) => sum + t.usedCents, 0) || 0;
+
+    const monthlyRemaining = Math.max(0, monthlyCapCents - monthlyUsedCents);
+    const totalAvailable = monthlyRemaining + topUpsTotalAvailable;
+    
+    // Calculate percentUsed: if user has subscription, use monthly wallet; otherwise use top-ups
+    let percentUsed = 0;
+    if (monthlyCapCents > 0) {
+      // User has subscription - calculate based on monthly wallet
+      percentUsed = Math.min(100, Math.floor((monthlyUsedCents / monthlyCapCents) * 100));
+    } else if (topUpsTotalPurchased > 0) {
+      // User has no subscription but has top-ups - calculate based on top-up usage
+      percentUsed = Math.min(100, Math.floor((topUpsTotalUsed / topUpsTotalPurchased) * 100));
+    }
+    // If neither subscription nor top-ups, percentUsed remains 0
+
+    return {
+      plan,
+      monthlyCapCents,
+      monthlyUsedCents,
+      monthlyRemainingCents: monthlyRemaining,
+      percentUsed,
+      topUps: topUps.map((t) => ({
+        id: t.id,
+        availableCents: Math.max(0, t.amountCents - t.usedCents),
+        expiresAt: t.expiresAt,
+      })),
+      totalAvailableCents: totalAvailable,
+    };
+  }
+
+  /**
+   * Charge the user's wallet and top-ups by a given cost in cents.
+   * Consumes monthly allowance first, then earliest-expiring top-ups (FIFO).
+   * Returns true if the charge succeeded, false if insufficient funds.
+   */
+  async chargeCents(costCents: number): Promise<boolean> {
+    if (costCents <= 0) return true;
+    await this.ensureMonthlyReset();
+
+    const user = await prisma.user.findUnique({
+      where: { id: this.userId },
+      include: { subscription: true },
+    });
+    if (!user) throw new Error('User not found');
+
+    const plan = user.subscription?.plan || null;
+    
+    // Use monthlyPriceCents if available, otherwise fall back to plan-based calculation
+    let monthlyCapCents = 0;
+    if (plan && user.subscription) {
+      if (user.subscription.monthlyPriceCents) {
+        // Use direct credit mapping (e.g., $30 → 1,700 credits)
+        monthlyCapCents = CreditManager.creditsForSubscriptionPrice(user.subscription.monthlyPriceCents);
+      } else {
+        monthlyCapCents = CreditManager.monthlyCapCentsForPlan(plan);
+      }
+    }
+    
+    const monthlyUsedCents = (user as any).walletMonthlyUsedCents || 0;
+    let remainingMonthly = Math.max(0, monthlyCapCents - monthlyUsedCents);
+
+    // Early insufficient check (monthly + all top-ups)
+    const now = new Date();
+    const topUps = await prisma.creditTopUp.findMany({
+      where: { userId: user.id, expiresAt: { gt: now } },
+      orderBy: { expiresAt: 'asc' },
+    });
+    const topUpsAvailable = topUps.reduce((sum, t) => sum + Math.max(0, t.amountCents - t.usedCents), 0);
+    if (remainingMonthly + topUpsAvailable < costCents) {
+      return false;
+    }
+
+    let toCharge = costCents;
+
+    // 1) Consume monthly allowance
+    const fromMonthly = Math.min(toCharge, remainingMonthly);
+    if (fromMonthly > 0) {
+      await prisma.user.update({
+        where: { id: this.userId },
+        data: { walletMonthlyUsedCents: (monthlyUsedCents + fromMonthly) as any },
+      });
+      toCharge -= fromMonthly;
+    }
+
+    if (toCharge <= 0) return true;
+
+    // 2) Consume FIFO from top-ups
+    for (const tu of topUps) {
+      const available = Math.max(0, tu.amountCents - tu.usedCents);
+      if (available <= 0) continue;
+      const consume = Math.min(available, toCharge);
+      await prisma.creditTopUp.update({
+        where: { id: tu.id },
+        data: { usedCents: tu.usedCents + consume },
+      });
+      toCharge -= consume;
+      if (toCharge <= 0) break;
+    }
+
+    return toCharge <= 0;
+  }
+
   // Check if user has enough credits for a feature
   async checkCredits(featureType: FeatureType): Promise<CreditStatus> {
     const user = await prisma.user.findUnique({
@@ -47,7 +305,7 @@ export class CreditManager {
       throw new Error('User not found');
     }
 
-    // Reset daily usage if needed
+    // Reset daily/monthly usage if needed
     const now = new Date();
     const lastReset = user.lastAnalysisResetDate;
     const shouldReset = !lastReset || 
@@ -57,7 +315,24 @@ export class CreditManager {
       await this.resetDailyUsage();
       user.dailyAnalysisUsed = 0;
       user.dailyFoodAnalysisUsed = 0;
+      user.dailyFoodReanalysisUsed = 0;
+      user.dailyMedicalAnalysisUsed = 0;
       user.dailyInteractionAnalysisUsed = 0;
+    }
+
+    const lastMonthlyReset = user.lastMonthlyResetDate;
+    const monthChanged = !lastMonthlyReset ||
+      (lastMonthlyReset.getUTCFullYear() !== now.getUTCFullYear() ||
+       lastMonthlyReset.getUTCMonth() !== now.getUTCMonth());
+    if (monthChanged) {
+      await prisma.user.update({
+        where: { id: this.userId },
+        data: {
+          monthlyInteractionAnalysisUsed: 0,
+          lastMonthlyResetDate: now,
+        }
+      });
+      user.monthlyInteractionAnalysisUsed = 0;
     }
 
     const creditCost = CREDIT_COSTS[featureType];
@@ -67,7 +342,10 @@ export class CreditManager {
 
     // Calculate daily limits based on plan
     const isPremium = user.subscription?.plan === 'PREMIUM';
-    const dailyLimit = isPremium ? 30 : 3;
+    const dailyFoodLimit = isPremium ? 30 : 3;
+    const dailyMedicalLimit = isPremium ? 15 : 0;
+    const monthlyInteractionLimit = isPremium ? 30 : 0;
+    const dailyFoodReanalysisLimit = isPremium ? 10 : 0;
 
     return {
       hasCredits,
@@ -79,9 +357,9 @@ export class CreditManager {
         interactionAnalysis: user.dailyInteractionAnalysisUsed || 0,
       },
       dailyLimits: {
-        total: dailyLimit,
-        foodAnalysis: dailyLimit, // Can use all credits for food analysis
-        interactionAnalysis: Math.floor(dailyLimit / CREDIT_COSTS.INTERACTION_ANALYSIS), // Limited by cost
+        total: dailyFoodLimit,
+        foodAnalysis: dailyFoodLimit,
+        interactionAnalysis: Math.floor(dailyFoodLimit / CREDIT_COSTS.INTERACTION_ANALYSIS),
       },
     };
   }
@@ -145,6 +423,8 @@ export class CreditManager {
       data: {
         dailyAnalysisUsed: 0,
         dailyFoodAnalysisUsed: 0,
+        dailyFoodReanalysisUsed: 0,
+        dailyMedicalAnalysisUsed: 0,
         dailyInteractionAnalysisUsed: 0,
         lastAnalysisResetDate: new Date(),
       },
@@ -210,7 +490,7 @@ export class CreditManager {
         },
       },
       lastReset: user.lastAnalysisResetDate,
-      plan: user.subscription?.plan || 'FREE',
+      plan: user.subscription?.plan || null,
     };
   }
 } 

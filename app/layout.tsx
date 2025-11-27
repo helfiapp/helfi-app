@@ -5,7 +5,11 @@ import { UserDataProvider } from '@/components/providers/UserDataProvider'
 import LayoutWrapper from '@/components/LayoutWrapper'
 import type { Metadata } from 'next'
 
-const inter = Inter({ subsets: ['latin'] })
+const inter = Inter({ 
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-inter',
+})
 
 export const metadata: Metadata = {
   title: 'Helfi - Your AI Health Intelligence Platform',
@@ -58,7 +62,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className={inter.className}>
+      <body className={`${inter.variable} ${inter.className}`}>
         <AuthProvider>
           <UserDataProvider>
             <LayoutWrapper>
@@ -69,6 +73,19 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html: `
+              // Register service worker for push notifications
+              (function(){
+                try {
+                  if ('serviceWorker' in navigator) {
+                    navigator.serviceWorker.register('/sw.js').catch(function(err) {
+                      console.log('Service worker registration failed:', err);
+                    });
+                  }
+                } catch (e) {
+                  console.log('Service worker not supported:', e);
+                }
+              })();
+
               // Global dark mode toggle function
               window.toggleDarkMode = function(enabled) {
                 try {

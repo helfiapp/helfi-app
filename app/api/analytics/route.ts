@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import { runChatCompletionWithLogging } from '@/lib/ai-usage-logger'
 
 // Initialize OpenAI only when needed to avoid build-time errors
 function getOpenAI() {
@@ -59,9 +60,37 @@ export async function GET(request: NextRequest) {
     const action = url.searchParams.get('action')
     
     if (action === 'insights') {
-      // Generate AI insights from collected data
-      const insights = await generateInsights()
-      return NextResponse.json({ success: true, insights })
+      // Lightweight: return recent timing and cache stats + aggregated p50/p95 for first byte
+      const recent = analyticsData.slice(-200)
+      const events = recent.filter(e => e?.type === 'insights-timing')
+      const timings = events.slice(-50).map(e => ({
+        section: e.section,
+        mode: e.mode,
+        generateMs: e.generateMs,
+        classifyMs: e.classifyMs,
+        rewriteMs: e.rewriteMs,
+        fillMs: e.fillMs,
+        totalMs: e.totalMs,
+        firstByteMs: e.firstByteMs,
+        cache: e.cache,
+        at: e.timestamp,
+      }))
+      const firstBytes = events
+        .map((e: any) => Number(e.firstByteMs))
+        .filter((n: number) => Number.isFinite(n))
+        .sort((a: number, b: number) => a - b)
+      const quantile = (arr: number[], q: number) => {
+        if (!arr.length) return null
+        const pos = (arr.length - 1) * q
+        const base = Math.floor(pos)
+        const rest = pos - base
+        return arr[base + 1] !== undefined ? arr[base] + rest * (arr[base + 1] - arr[base]) : arr[base]
+      }
+      const firstByteMsP50 = quantile(firstBytes, 0.5)
+      const firstByteMsP95 = quantile(firstBytes, 0.95)
+      const cacheHitCount = events.filter((e: any) => e.cache === 'hit').length
+      const cacheMissCount = events.filter((e: any) => e.cache === 'miss').length
+      return NextResponse.json({ success: true, timings, stats: { firstByteMsP50, firstByteMsP95, cacheHitCount, cacheMissCount, totalEvents: events.length } })
     }
     
     if (action === 'summary') {
@@ -122,12 +151,12 @@ Keep response concise but actionable for app developers.
       return "OpenAI API key not configured. Cannot generate AI insights."
     }
     
-    const response = await openai.chat.completions.create({
+    const response: any = await runChatCompletionWithLogging(openai, {
       model: "gpt-4o-mini",
       messages: [{ role: "user", content: prompt }],
       max_tokens: 800,
       temperature: 0.3
-    })
+    }, { feature: 'admin:analytics-insights' })
     
     return response.choices[0]?.message?.content || "Unable to generate insights"
     

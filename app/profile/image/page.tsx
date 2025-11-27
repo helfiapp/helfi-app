@@ -4,9 +4,12 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { useUserData } from '@/components/providers/UserDataProvider'
+import { UserIcon } from '@heroicons/react/24/outline'
 
 export default function ProfileImage() {
   const { data: session } = useSession()
+  const { updateProfileImage } = useUserData()
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
   const [selectedImage, setSelectedImage] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
@@ -17,15 +20,9 @@ export default function ProfileImage() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Profile data - using consistent green avatar
-  const defaultAvatar = 'data:image/svg+xml;base64,' + btoa(`
-    <svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="64" cy="64" r="64" fill="#10B981"/>
-      <circle cx="64" cy="48" r="20" fill="white"/>
-      <path d="M64 76c-13.33 0-24 5.34-24 12v16c0 8.84 7.16 16 16 16h16c8.84 0 16-7.16 16-16V88c0-6.66-10.67-12-24-12z" fill="white"/>
-    </svg>
-  `);
-  const userImage = currentProfileImage || session?.user?.image || defaultAvatar;
+  // Profile data - prefer real photos; fall back to professional icon
+  const hasProfileImage = !!(currentProfileImage || session?.user?.image)
+  const userImage = (currentProfileImage || session?.user?.image || '') as string
   const userName = session?.user?.name || 'User';
 
   // Close dropdown on outside click
@@ -106,10 +103,20 @@ export default function ProfileImage() {
           
           // Set the Cloudinary URL as the profile image
           setCurrentProfileImage(result.imageUrl);
+          // Broadcast to shared data provider so other pages update instantly
+          try {
+            updateProfileImage(result.imageUrl)
+          } catch (e) {
+            console.warn('Could not update shared profile image provider:', e)
+          }
           
           // Clear localStorage (no longer needed with Cloudinary)
           if (session?.user?.id) {
             localStorage.removeItem(`profileImage_${session.user.id}`);
+            // Also set the cached key used by Dashboard for instant display
+            try {
+              localStorage.setItem(`cachedProfileImage_${session.user.id}`, result.imageUrl)
+            } catch {}
           }
           
           setSaveStatus('saved');
@@ -258,6 +265,13 @@ export default function ProfileImage() {
           setCurrentProfileImage(null);
           setSelectedImage(null);
           setImagePreview(null);
+          // Broadcast removal to shared provider and clear dashboard cache
+          try {
+            updateProfileImage('')
+          } catch {}
+          if (session?.user?.id) {
+            try { localStorage.removeItem(`cachedProfileImage_${session.user.id}`) } catch {}
+          }
           setSaveStatus('saved');
           setTimeout(() => setSaveStatus('idle'), 2000);
         } else {
@@ -320,24 +334,36 @@ export default function ProfileImage() {
                   className="focus:outline-none"
                   aria-label="Open profile menu"
                 >
-                  <Image
-                    src={userImage}
-                    alt="Profile"
-                    width={36}
-                    height={36}
-                    className="w-9 h-9 rounded-full border-2 border-helfi-green shadow-sm object-cover"
-                  />
+                  {hasProfileImage ? (
+                    <Image
+                      src={userImage}
+                      alt="Profile"
+                      width={36}
+                      height={36}
+                      className="w-9 h-9 rounded-full border-2 border-helfi-green shadow-sm object-cover"
+                    />
+                  ) : (
+                    <div className="w-9 h-9 rounded-full bg-helfi-green shadow-sm flex items-center justify-center">
+                      <UserIcon className="w-5 h-5 text-white" aria-hidden="true" />
+                    </div>
+                  )}
                 </button>
                 {dropdownOpen && (
                   <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-100">
                     <div className="flex items-center px-4 py-3 border-b border-gray-100">
-                      <Image
-                        src={userImage}
-                        alt="Profile"
-                        width={40}
-                        height={40}
-                        className="w-10 h-10 rounded-full object-cover mr-3"
-                      />
+                      {hasProfileImage ? (
+                        <Image
+                          src={userImage}
+                          alt="Profile"
+                          width={40}
+                          height={40}
+                          className="w-10 h-10 rounded-full object-cover mr-3"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-helfi-green flex items-center justify-center mr-3">
+                          <UserIcon className="w-6 h-6 text-white" aria-hidden="true" />
+                        </div>
+                      )}
                       <div>
                         <div className="font-semibold text-gray-900">{userName}</div>
                         <div className="text-xs text-gray-500">{session?.user?.email || 'user@email.com'}</div>
@@ -351,7 +377,7 @@ export default function ProfileImage() {
                     <Link href="/privacy" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Privacy Settings</Link>
                     <Link href="/help" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
                     <button
-                      onClick={() => signOut()}
+                      onClick={() => signOut({ callbackUrl: '/auth/signin' })}
                       className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50 font-semibold"
                     >
                       Logout

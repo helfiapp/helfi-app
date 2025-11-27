@@ -1,8 +1,9 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import HeroCarousel from '@/components/HeroCarousel'
 // Back to Top Button Component
 function BackToTopButton() {
   const [isVisible, setIsVisible] = useState(false)
@@ -43,60 +44,109 @@ function BackToTopButton() {
 }
 
 export default function SplashPage() {
-  const [showPreviewLink, setShowPreviewLink] = React.useState(false)
-  React.useEffect(() => {
-    try {
-      const host = window.location.hostname
-      // Show helper link only on Vercel preview domains
-      if (host.includes('vercel.app')) {
-        setShowPreviewLink(true)
-      }
-    } catch {}
-  }, [])
+  const [showInfoModal, setShowInfoModal] = useState(false)
+  const [showWaitlistModal, setShowWaitlistModal] = useState(false)
+  const [showDemoModal, setShowDemoModal] = useState(false)
+  const [showSuccessModal, setShowSuccessModal] = useState(false)
+  const [showErrorModal, setShowErrorModal] = useState(false)
+  const [successMessage, setSuccessMessage] = useState('')
+  const [errorMessage, setErrorMessage] = useState('')
+  const [videoLoaded, setVideoLoaded] = useState(false)
+  const videoRef = useRef<HTMLVideoElement>(null)
 
+  const handleWaitlistCta = () => {
+    setShowInfoModal(true)
+  }
+
+  const handleCreditPurchase = () => {
+    setShowInfoModal(true)
+  }
+
+  const handleInfoModalSubscribe = () => {
+    setShowInfoModal(false)
+    setShowWaitlistModal(true)
+  }
+
+  const handleInfoModalClose = () => {
+    setShowInfoModal(false)
+  }
+
+  const handleWaitlistModalClose = () => {
+    setShowWaitlistModal(false)
+  }
+
+  const handleDemoModalClose = () => {
+    setShowDemoModal(false)
+  }
+
+  const handleSuccessModalClose = () => {
+    setShowSuccessModal(false)
+    setSuccessMessage('')
+  }
+
+  const handleErrorModalClose = () => {
+    setShowErrorModal(false)
+    setErrorMessage('')
+  }
+
+  const handleWaitlistSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    const formData = new FormData(e.currentTarget)
+    const email = String(formData.get('email') || '').trim().toLowerCase()
+    const name = String(formData.get('name') || '').trim()
+
+    try {
+      const res = await fetch('/api/waitlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, name })
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok && data?.success) {
+        setSuccessMessage(data.message || 'Thanks for joining our waitlist! We\'ll be in touch soon.')
+        setShowWaitlistModal(false)
+        setShowSuccessModal(true)
+        ;(e.target as HTMLFormElement).reset()
+      } else if (res.status === 409) {
+        setSuccessMessage('You\'re already on the waitlist. We\'ll notify you when we go live.')
+        setShowWaitlistModal(false)
+        setShowSuccessModal(true)
+      } else {
+        setErrorMessage(data?.error || 'Something went wrong. Please try again.')
+        setShowErrorModal(true)
+      }
+    } catch {
+      setErrorMessage('Something went wrong. Please try again.')
+      setShowErrorModal(true)
+    }
+  }
   return (
     <div className="min-h-screen bg-gradient-to-br from-helfi-green/5 via-white to-blue-50">
-      {showPreviewLink && (
-        <button
-          onClick={() => {
-            try { window.location.assign('/staging-signin') } catch { window.location.href = '/staging-signin' }
-          }}
-          className="fixed top-2 right-2 z-[1000] rounded-md bg-emerald-600 text-white px-3 py-1 text-xs shadow hover:bg-emerald-700"
-        >
-          Preview: Staging Sign‑in
-        </button>
-      )}
       {/* Medical Disclaimer Banner */}
-      <div className="bg-blue-50 border-l-4 border-blue-400 p-4">
-        <div className="max-w-6xl mx-auto">
-          <div className="flex items-start">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <p className="text-sm text-blue-700">
-                <strong>Medical Disclaimer:</strong> Helfi is not a medical device and does not provide medical advice, diagnosis, or treatment. Always consult with a qualified healthcare provider before making health-related decisions. <Link href="/terms" className="underline hover:text-blue-900">View full disclaimer</Link>
-              </p>
-            </div>
+      <div className="bg-helfi-green p-4">
+        <div className="max-w-6xl mx-auto text-center">
+          <div className="inline-flex items-center bg-white text-helfi-green px-3 py-1 rounded-full font-semibold text-sm mb-2">
+            Medical Disclaimer
           </div>
+          <p className="text-sm text-white">
+            Helfi is not a medical device and does not provide medical advice, diagnosis, or treatment. Always consult with a qualified healthcare provider before making health-related decisions. <Link href="/terms" className="underline text-white hover:text-white/90">View full disclaimer</Link>
+          </p>
         </div>
       </div>
 
       {/* Navigation */}
-      <nav className="relative z-10 px-6 py-6">
+      <nav className="relative z-10 px-6 py-1">
         <div className="max-w-6xl mx-auto flex justify-between items-center">
           <div className="flex items-center">
             <button 
               onClick={() => window.location.reload()}
-              className="w-24 h-24 md:w-32 md:h-32 cursor-pointer hover:opacity-80 transition-opacity"
+              className="w-28 h-28 md:w-40 md:h-40 cursor-pointer hover:opacity-80 transition-opacity"
             >
               <Image
                 src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/HELFI_TRANSPARENT_rmssry.png"
                 alt="Helfi Logo"
-                width={128}
-                height={128}
+                width={160}
+                height={160}
                 className="w-full h-full object-contain"
                 priority
               />
@@ -107,31 +157,31 @@ export default function SplashPage() {
           <div className="hidden md:flex items-center space-x-8">
             <button 
               onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}
-              className="text-gray-700 hover:text-helfi-green transition-colors font-medium"
+              className="text-gray-700 hover:text-helfi-green transition-colors font-medium text-lg"
             >
               Features
             </button>
             <button 
               onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}
-              className="text-gray-700 hover:text-helfi-green transition-colors font-medium"
+              className="text-gray-700 hover:text-helfi-green transition-colors font-medium text-lg"
             >
               Pricing
             </button>
             <button 
               onClick={() => document.getElementById('why-helfi')?.scrollIntoView({ behavior: 'smooth' })}
-              className="text-gray-700 hover:text-helfi-green transition-colors font-medium"
+              className="text-gray-700 hover:text-helfi-green transition-colors font-medium text-lg"
             >
               Why Helfi
             </button>
             <button 
               onClick={() => document.getElementById('faq')?.scrollIntoView({ behavior: 'smooth' })}
-              className="text-gray-700 hover:text-helfi-green transition-colors font-medium"
+              className="text-gray-700 hover:text-helfi-green transition-colors font-medium text-lg"
             >
               FAQ
             </button>
             <button 
-              onClick={() => document.getElementById('waitlist-signup')?.scrollIntoView({ behavior: 'smooth' })}
-              className="btn-secondary hover:bg-gray-100 transition-colors"
+              onClick={() => setShowWaitlistModal(true)}
+              className="btn-secondary hover:bg-gray-100 transition-colors text-lg"
             >
               Join Waitlist
             </button>
@@ -140,8 +190,8 @@ export default function SplashPage() {
           {/* Mobile Menu */}
           <div className="md:hidden flex items-center space-x-3">
             <button 
-              onClick={() => document.getElementById('waitlist-signup')?.scrollIntoView({ behavior: 'smooth' })}
-              className="btn-secondary hover:bg-gray-100 transition-colors text-sm px-3 py-2"
+              onClick={() => setShowWaitlistModal(true)}
+              className="btn-secondary hover:bg-gray-100 transition-colors text-base px-3 py-2"
             >
               Join Waitlist
             </button>
@@ -150,38 +200,74 @@ export default function SplashPage() {
       </nav>
 
       {/* Hero Section */}
-      <section className="px-6 py-20">
-        <div className="max-w-6xl mx-auto text-center">
-          <div className="max-w-4xl mx-auto">
-            <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold text-helfi-black mb-6 leading-tight">
-              <span className="block">Your Personal</span>
-              <span className="text-helfi-green block">Health Intelligence</span>
-              <span className="block">Platform</span>
+      <section className="relative w-full min-h-screen flex flex-col overflow-visible bg-gray-900" style={{ overflow: 'visible' }}>
+        {/* Full-Width Background Video */}
+        <div className="absolute inset-0 z-0">
+          <video
+            ref={videoRef}
+            autoPlay
+            loop
+            muted
+            playsInline
+            preload="auto"
+            poster="/screenshots/hero/hero-poster.jpg"
+            className="absolute inset-0 w-full h-full object-cover z-0"
+            onCanPlay={() => setVideoLoaded(true)}
+            onLoadedData={() => setVideoLoaded(true)}
+            onError={(e) => {
+              console.error('Video error:', e)
+              setVideoLoaded(false)
+            }}
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          >
+            <source src="/screenshots/hero/hero-background.mp4" type="video/mp4" />
+            Your browser does not support the video tag.
+          </video>
+          {/* Dark overlay on video */}
+          <div className="absolute inset-0 bg-black/60 z-[1]" />
+          {/* Dark background fallback - only shown when video doesn't load */}
+          {!videoLoaded && (
+            <div className="absolute inset-0 bg-gray-900 z-0" />
+          )}
+        </div>
+
+        {/* Content Container */}
+        <div className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 md:pt-8 pb-2 md:pb-4">
+          {/* Text Content */}
+          <div className="text-center mb-6">
+            <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-bold text-white mb-6 leading-tight">
+              Your Personal <span className="text-helfi-green">Health Intelligence Platform</span>
             </h1>
-            <p className="text-xl md:text-2xl text-gray-600 mb-8 leading-relaxed">
+            <p className="text-xl md:text-2xl text-white/90 mb-10 leading-relaxed max-w-4xl mx-auto">
               Track your health metrics, supplements, and medications. Get AI-powered insights 
-              and personalized recommendations to optimize your wellbeing.
+              and personalized recommendations to optimize your wellbeing. Analyze food photos, 
+              lab reports, and medical images—all in one intelligent platform.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 sm:space-x-4 sm:gap-0 justify-center">
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <button 
-                onClick={() => document.getElementById('waitlist-signup')?.scrollIntoView({ behavior: 'smooth' })}
-                className="btn-primary text-lg px-8 py-4"
+                onClick={() => setShowWaitlistModal(true)}
+                className="btn-primary text-lg px-8 py-4 bg-helfi-green hover:bg-green-600 text-white"
               >
                 Join the Waitlist
               </button>
               <button 
-                onClick={() => alert('Coming Soon! 🎬\n\nWe\'re working on an exciting demo video to show you all the amazing features of Helfi. Stay tuned!')}
-                className="btn-secondary text-lg px-8 py-4"
+                onClick={() => setShowDemoModal(true)}
+                className="btn-secondary text-lg px-8 py-4 bg-white/10 backdrop-blur-sm border-2 border-white/30 text-white hover:bg-white/20"
               >
                 Watch Demo
               </button>
             </div>
           </div>
         </div>
+
+        {/* Full-Screen Horizontal Scrolling Carousel */}
+        <div className="relative z-10 w-full">
+          <HeroCarousel />
+        </div>
       </section>
 
       {/* Features Section */}
-      <section id="features" className="px-6 py-20 bg-white">
+      <section id="features" className="px-4 sm:px-6 lg:px-10 xl:px-16 py-16 lg:py-20 bg-white">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-helfi-black mb-4">
@@ -192,40 +278,76 @@ export default function SplashPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="text-center p-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
+            <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:-translate-y-1">
               <div className="w-16 h-16 bg-helfi-green/10 rounded-full flex items-center justify-center mx-auto mb-6">
                 <svg className="w-8 h-8 text-helfi-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
               </div>
               <h3 className="text-2xl font-bold text-helfi-black mb-4">Smart Health Tracking</h3>
-              <p className="text-gray-600">
-                Track weight, sleep, mood, energy levels, and custom health metrics with intelligent pattern recognition.
+              <p className="text-gray-600 leading-relaxed">
+                Track weight, sleep, mood, energy levels, and custom health metrics with intelligent pattern recognition. Connect wearables for automatic data sync.
               </p>
             </div>
 
-            <div className="text-center p-8">
+            <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:-translate-y-1">
               <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
                 <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                 </svg>
               </div>
               <h3 className="text-2xl font-bold text-helfi-black mb-4">AI-Powered Insights</h3>
-              <p className="text-gray-600">
-                Get personalized recommendations based on your unique health patterns and goals using advanced AI analysis.
+              <p className="text-gray-600 leading-relaxed">
+                Get personalized recommendations based on your unique health patterns and goals. Advanced AI analyzes correlations across nutrition, supplements, sleep, and symptoms.
               </p>
             </div>
 
-            <div className="text-center p-8">
+            <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:-translate-y-1">
               <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
                 <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
                 </svg>
               </div>
-              <h3 className="text-2xl font-bold text-helfi-black mb-4">Supplement Management</h3>
-              <p className="text-gray-600">
-                Track supplements and medications with photo recognition, interaction checking, and optimal timing recommendations.
+              <h3 className="text-2xl font-bold text-helfi-black mb-4">Medication & Supplement Safety</h3>
+              <p className="text-gray-600 leading-relaxed">
+                Track supplements and medications with photo recognition. Automatic interaction checking alerts you to dangerous combinations and optimal timing recommendations.
+              </p>
+            </div>
+
+            <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:-translate-y-1">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <h3 className="text-2xl font-bold text-helfi-black mb-4">Food Photo Analysis</h3>
+              <p className="text-gray-600 leading-relaxed">
+                Simply snap a photo of your meal. AI identifies ingredients, estimates portions, and calculates complete nutritional breakdown including macros, vitamins, and minerals.
+              </p>
+            </div>
+
+            <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:-translate-y-1">
+              <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <svg className="w-8 h-8 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+              <h3 className="text-2xl font-bold text-helfi-black mb-4">Lab Report Analysis</h3>
+              <p className="text-gray-600 leading-relaxed">
+                Upload PDF lab reports or photos. AI extracts and tracks biomarkers over time, identifying trends and flagging values that need attention. Encrypted and secure.
+              </p>
+            </div>
+
+            <div className="bg-white rounded-xl p-8 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:-translate-y-1">
+              <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <svg className="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+                </svg>
+              </div>
+              <h3 className="text-2xl font-bold text-helfi-black mb-4">Symptom Tracking & Analysis</h3>
+              <p className="text-gray-600 leading-relaxed">
+                Log symptoms with photos and descriptions. AI identifies patterns, correlates with your nutrition and supplement intake, and suggests potential causes.
               </p>
             </div>
           </div>
@@ -343,7 +465,7 @@ export default function SplashPage() {
       </section>
 
       {/* Health Intelligence Benefits Section */}
-      <section className="px-4 py-20 bg-white">
+      <section className="px-4 sm:px-6 lg:px-10 xl:px-16 py-16 lg:py-20 bg-white">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-helfi-black mb-6">
@@ -354,7 +476,7 @@ export default function SplashPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
             <div className="text-center p-6 bg-gradient-to-br from-green-50 to-blue-50 rounded-2xl">
               <div className="w-16 h-16 bg-helfi-green/10 rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg className="w-8 h-8 text-helfi-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -407,7 +529,7 @@ export default function SplashPage() {
       </section>
 
       {/* Voice AI Section */}
-      <section className="px-6 py-20 bg-gradient-to-r from-purple-50 to-blue-50">
+      <section className="px-4 sm:px-6 lg:px-10 xl:px-16 py-16 lg:py-20 bg-gradient-to-r from-purple-50 to-blue-50">
         <div className="max-w-6xl mx-auto">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div>
@@ -479,7 +601,7 @@ export default function SplashPage() {
       </section>
 
       {/* Pricing Section */}
-      <section id="pricing" className="px-6 py-20 bg-gray-50">
+      <section id="pricing" className="px-4 sm:px-6 lg:px-10 xl:px-16 py-16 lg:py-20 bg-gray-50">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-helfi-black mb-4">
@@ -490,238 +612,99 @@ export default function SplashPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
-            {/* Free Plan */}
-            <div className="bg-white rounded-2xl p-8 border-2 border-gray-200">
-              <div className="text-center">
-                <h3 className="text-2xl font-bold text-helfi-black mb-2">Health Basics</h3>
-                <div className="mb-6">
-                  <span className="text-4xl font-bold text-helfi-black">Free</span>
-                  <div className="text-sm text-gray-500 mt-1">Forever</div>
-                </div>
-                <ul className="space-y-3 text-left mb-8">
-                  <li className="flex items-center">
-                    <svg className="w-5 h-5 text-helfi-green mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    Complete onboarding & profile setup
-                  </li>
-                  <li className="flex items-center">
-                    <svg className="w-5 h-5 text-helfi-green mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    3 AI food photo analyses per day
-                  </li>
-                  <li className="flex items-center">
-                    <svg className="w-5 h-5 text-helfi-green mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    1 reanalysis per food item
-                  </li>
-                  <li className="flex items-center">
-                    <svg className="w-5 h-5 text-helfi-green mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    Basic health goal tracking
-                  </li>
-                  <li className="flex items-center">
-                    <svg className="w-5 h-5 text-helfi-green mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    Weekly health summary emails
-                  </li>
-                  <li className="flex items-center text-gray-400">
-                    <svg className="w-5 h-5 text-gray-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                    No medication interaction analysis
-                  </li>
-                  <li className="flex items-center text-gray-400">
-                    <svg className="w-5 h-5 text-gray-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                    No medical image analysis
-                  </li>
+          {/* Plans Section */}
+          <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">Plans</h2>
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+              {/* $10 plan */}
+              <div className="border border-gray-200 rounded-2xl p-8 shadow-sm hover:shadow-md transition-shadow bg-white">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">$10 / month</h3>
+                <p className="text-3xl font-bold text-gray-900 mb-1">Monthly wallet: 700 credits</p>
+                <p className="text-xs text-gray-500 mb-4">Credits refresh monthly. No rollover.</p>
+                <ul className="space-y-2 mb-6 text-sm text-gray-600">
+                  <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> All features unlocked</li>
+                  <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Percentage‑based usage meter</li>
+                  <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Top‑ups valid 12 months</li>
                 </ul>
-                <button 
-                  onClick={() => document.getElementById('waitlist-signup')?.scrollIntoView({ behavior: 'smooth' })}
-                  className="btn-secondary w-full"
-                >
-                  Get Started Free
+                <button onClick={handleWaitlistCta} className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors" type="button">
+                  Choose $10 Plan
                 </button>
               </div>
-            </div>
 
-            {/* Premium Plan */}
-            <div className="bg-white rounded-2xl p-8 border-2 border-helfi-green relative">
-              <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                <span className="bg-helfi-green text-white px-4 py-1 rounded-full text-sm font-medium">
-                  Most Popular
-                </span>
+              {/* $20 plan */}
+              <div className="border border-gray-200 rounded-2xl p-8 shadow-sm hover:shadow-md transition-shadow bg-white">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">$20 / month</h3>
+                <p className="text-3xl font-bold text-gray-900 mb-1">Monthly wallet: 1,400 credits</p>
+                <p className="text-xs text-gray-500 mb-4">Credits refresh monthly. No rollover.</p>
+                <ul className="space-y-2 mb-6 text-sm text-gray-600">
+                  <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> All features unlocked</li>
+                  <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Percentage‑based usage meter</li>
+                  <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Top‑ups valid 12 months</li>
+                </ul>
+                <button onClick={handleWaitlistCta} className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors" type="button">
+                  Choose $20 Plan
+                </button>
               </div>
-              <div className="text-center">
-                <h3 className="text-2xl font-bold text-helfi-black mb-2">AI Health Coach</h3>
-                <div className="mb-6">
-                  <span className="text-4xl font-bold text-helfi-black">$20</span>
-                  <span className="text-gray-600">/month</span>
-                  <div className="text-sm text-gray-500 mt-1">$210/year (save 12.5%)</div>
+
+              {/* $30 plan */}
+              <div className="border-2 border-helfi-green rounded-2xl p-8 relative shadow-sm hover:shadow-lg transition-shadow bg-white">
+                <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+                  <span className="bg-helfi-green text-white px-3 py-1 rounded-full text-sm font-medium">Most Popular</span>
                 </div>
-                
-                {/* Feature Categories */}
-                <div className="text-left mb-8 space-y-6">
-                  <div>
-                    <h4 className="font-semibold text-helfi-green mb-3 flex items-center">
-                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                      </svg>
-                      Food Analysis (30/day)
-                    </h4>
-                    <ul className="space-y-2 ml-7">
-                      <li className="flex items-center text-sm">
-                        <svg className="w-4 h-4 text-helfi-green mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        30 AI food photo analyses per day
-                      </li>
-                      <li className="flex items-center text-sm">
-                        <svg className="w-4 h-4 text-helfi-green mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        30 reanalysis credits per day
-                      </li>
-                    </ul>
-                  </div>
-                  
-                  <div>
-                    <h4 className="font-semibold text-blue-600 mb-3 flex items-center">
-                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      Medical Analysis (30/day)
-                    </h4>
-                    <ul className="space-y-2 ml-7">
-                      <li className="flex items-center text-sm">
-                        <svg className="w-4 h-4 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        30 medical image analyses per day (rashes, moles, etc.)
-                      </li>
-                      <li className="flex items-center text-sm">
-                        <svg className="w-4 h-4 text-blue-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        AI observations & recommendations
-                      </li>
-                    </ul>
-                  </div>
-                  
-                  <div>
-                    <h4 className="font-semibold text-purple-600 mb-3 flex items-center">
-                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                      </svg>
-                      Premium Features
-                    </h4>
-                    <ul className="space-y-2 ml-7">
-                      <li className="flex items-center text-sm">
-                        <svg className="w-4 h-4 text-purple-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        Full medication interaction analysis
-                      </li>
-                      <li className="flex items-center text-sm">
-                        <svg className="w-4 h-4 text-purple-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        Advanced AI health insights
-                      </li>
-                      <li className="flex items-center text-sm">
-                        <svg className="w-4 h-4 text-purple-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        Priority customer support
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-                
-                <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-lg p-4 mb-6">
-                  <div className="text-sm text-gray-700">
-                    <strong>Need more credits?</strong><br/>
-                    $5 for 100 credits • $10 for 150 credits (Credits don't expire)
-                  </div>
-                </div>
-                
-                <button 
-                  onClick={() => document.getElementById('waitlist-signup')?.scrollIntoView({ behavior: 'smooth' })}
-                  className="btn-primary w-full"
-                >
-                  Start 14-Day Free Trial
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">$30 / month</h3>
+                <p className="text-3xl font-bold text-gray-900 mb-1">Monthly wallet: 2,100 credits</p>
+                <p className="text-xs text-gray-500 mb-4">Credits refresh monthly. No rollover.</p>
+                <ul className="space-y-2 mb-6 text-sm text-gray-600">
+                  <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> All features unlocked</li>
+                  <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Percentage‑based usage meter</li>
+                  <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Top‑ups valid 12 months</li>
+                </ul>
+                <button onClick={handleWaitlistCta} className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors" type="button">
+                  Choose $30 Plan
+                </button>
+              </div>
+
+              {/* $50 plan */}
+              <div className="border border-gray-200 rounded-2xl p-8 shadow-sm hover:shadow-md transition-shadow bg-white">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">$50 / month</h3>
+                <p className="text-3xl font-bold text-gray-900 mb-1">Monthly wallet: 3,500 credits</p>
+                <p className="text-xs text-gray-500 mb-4">Credits refresh monthly. No rollover.</p>
+                <ul className="space-y-2 mb-6 text-sm text-gray-600">
+                  <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> All features unlocked</li>
+                  <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Percentage‑based usage meter</li>
+                  <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Top‑ups valid 12 months</li>
+                </ul>
+                <button onClick={handleWaitlistCta} className="w-full bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors" type="button">
+                  Choose $50 Plan
                 </button>
               </div>
             </div>
           </div>
 
-          {/* Enhanced Trial Benefits Section */}
-          <div className="text-center mt-16">
-            <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 border border-blue-200 rounded-2xl p-8 max-w-5xl mx-auto shadow-lg">
-              <div className="mb-6">
-                <div className="inline-flex items-center bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-2 rounded-full text-sm font-semibold shadow-md">
-                  🎯 14-Day Free Trial includes everything!
-                </div>
+          {/* Buy Extra Credits Section */}
+          <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">Buy Extra Credits</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+              <div className="border border-gray-200 rounded-lg p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Try with $5 (250 credits)</h3>
+                <p className="text-sm text-gray-600 mb-6">One‑time top‑up. Credits valid for 12 months.</p>
+                <button onClick={handleCreditPurchase} className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors" type="button">
+                  Buy $5 Credits
+                </button>
               </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                <div className="bg-white rounded-xl p-6 shadow-sm border border-green-100 hover:shadow-md transition-shadow">
-                  <div className="text-3xl mb-3">🍎</div>
-                  <h5 className="font-semibold text-gray-900 mb-2">Food Analysis AI</h5>
-                  <p className="text-sm text-gray-600">30 AI food photo analyses per day with 30 reanalysis credits</p>
-                </div>
-                
-                <div className="bg-white rounded-xl p-6 shadow-sm border border-blue-100 hover:shadow-md transition-shadow">
-                  <div className="text-3xl mb-3">🩺</div>
-                  <h5 className="font-semibold text-gray-900 mb-2">Medical Image Analysis</h5>
-                  <p className="text-sm text-gray-600">30 medical photo analyses per day for rashes, moles, skin conditions</p>
-                </div>
-                
-                <div className="bg-white rounded-xl p-6 shadow-sm border border-purple-100 hover:shadow-md transition-shadow">
-                  <div className="text-3xl mb-3">💊</div>
-                  <h5 className="font-semibold text-gray-900 mb-2">Medication Interactions</h5>
-                  <p className="text-sm text-gray-600">Full medication & supplement interaction analysis</p>
-                </div>
+              <div className="border border-gray-200 rounded-lg p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">$10 (500 credits)</h3>
+                <p className="text-sm text-gray-600 mb-6">One‑time top‑up. Credits valid for 12 months.</p>
+                <button onClick={handleCreditPurchase} className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors" type="button">
+                  Buy $10 Credits
+                </button>
               </div>
-              
-              <div className="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-xl p-6 border border-yellow-200 mb-6">
-                <div className="flex items-center justify-center mb-3">
-                  <svg className="w-6 h-6 text-yellow-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.876c1.174 0 2.138-.93 2.254-2.094L21.88 9.88c.045-.445-.071-.89-.345-1.243A1.875 1.875 0 0020.125 8H3.875c-.621 0-1.188.276-1.51.637-.274.353-.39.798-.345 1.243l1.687 7.026C3.823 17.07 4.787 18 5.961 18z" />
-                  </svg>
-                  <strong className="text-yellow-800">Medical Disclaimer</strong>
-                </div>
-                <p className="text-sm text-yellow-700">
-                  Helfi provides educational information and observations only. Always consult healthcare professionals for medical advice, diagnosis, or treatment.
-                </p>
-              </div>
-              
-              <div className="flex flex-wrap justify-center items-center gap-6 text-sm text-blue-700 font-medium">
-                <div className="flex items-center">
-                  <svg className="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  No credit card required
-                </div>
-                <div className="flex items-center">
-                  <svg className="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Cancel anytime
-                </div>
-                <div className="flex items-center">
-                  <svg className="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Keep your data forever
-                </div>
+              <div className="border border-gray-200 rounded-lg p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">$20 (1,000 credits)</h3>
+                <p className="text-sm text-gray-600 mb-6">One‑time top‑up. Credits valid for 12 months.</p>
+                <button onClick={handleCreditPurchase} className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors" type="button">
+                  Buy $20 Credits
+                </button>
               </div>
             </div>
           </div>
@@ -817,7 +800,7 @@ export default function SplashPage() {
       </section>
 
       {/* Benefits for Health Optimization Section */}
-      <section className="px-4 py-20 bg-gradient-to-br from-helfi-green/5 to-blue-50">
+      <section className="px-4 sm:px-6 lg:px-10 xl:px-16 py-16 lg:py-20 bg-gradient-to-br from-helfi-green/5 to-blue-50">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-bold text-helfi-black mb-6">
@@ -829,7 +812,7 @@ export default function SplashPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
             <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
               <div className="text-4xl mb-4">📈</div>
               <h3 className="text-xl font-bold text-helfi-black mb-4">Prevent Chronic Disease</h3>
@@ -902,19 +885,30 @@ export default function SplashPage() {
             <form className="space-y-4" onSubmit={(e) => {
               e.preventDefault();
               const formData = new FormData(e.currentTarget);
-              const email = formData.get('email') as string;
-              const name = formData.get('name') as string;
-              
-              // Send to your email collection endpoint
+              const email = String(formData.get('email') || '').trim().toLowerCase();
+              const name = String(formData.get('name') || '').trim();
+
               fetch('/api/waitlist', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, name })
-              }).then(() => {
-                alert('Thanks for joining our waitlist! We\'ll be in touch soon.');
-                (e.target as HTMLFormElement).reset();
+              }).then(async (res) => {
+                const data = await res.json().catch(() => ({}));
+                if (res.ok && data?.success) {
+                  setSuccessMessage(data.message || 'Thanks for joining our waitlist! We\'ll be in touch soon.');
+                  setShowSuccessModal(true);
+                  (e.target as HTMLFormElement).reset();
+                } else if (res.status === 409) {
+                  // Fallback in case older deployments still return 409
+                  setSuccessMessage('You\'re already on the waitlist. We\'ll notify you when we go live.');
+                  setShowSuccessModal(true);
+                } else {
+                  setErrorMessage(data?.error || 'Something went wrong. Please try again.');
+                  setShowErrorModal(true);
+                }
               }).catch(() => {
-                alert('Something went wrong. Please try again.');
+                setErrorMessage('Something went wrong. Please try again.');
+                setShowErrorModal(true);
               });
             }}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1019,6 +1013,249 @@ export default function SplashPage() {
 
       {/* Back to Top Button */}
       <BackToTopButton />
+
+      {/* Info Modal */}
+      {showInfoModal && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          onClick={handleInfoModalClose}
+        >
+          <div 
+            className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-xl font-bold text-gray-900 mb-4">Coming Soon</h3>
+            <p className="text-gray-600 mb-6">
+              We are currently in the process of building this amazing application. If you would like to be notified the moment we go live, please sign up.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={handleInfoModalClose}
+                className="bg-gray-100 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Maybe Later
+              </button>
+              <button
+                onClick={handleInfoModalSubscribe}
+                className="bg-helfi-green text-white px-6 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors"
+              >
+                Subscribe Now
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Waitlist Form Modal */}
+      {showWaitlistModal && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          onClick={handleWaitlistModalClose}
+        >
+          <div 
+            className="bg-white rounded-2xl max-w-lg w-full p-8 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-start mb-4">
+              <h3 className="text-2xl font-bold text-gray-900">Join the Waitlist</h3>
+              <button
+                onClick={handleWaitlistModalClose}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+                aria-label="Close"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <p className="text-gray-600 mb-6">
+              Be the first to know when we launch! Join our exclusive waitlist and get early access to Helfi when we're ready.
+            </p>
+            <form onSubmit={handleWaitlistSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <input
+                  type="text"
+                  name="name"
+                  placeholder="Your name"
+                  required
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:border-helfi-green focus:ring-2 focus:ring-helfi-green/20 outline-none"
+                />
+                <input
+                  type="email"
+                  name="email"
+                  placeholder="your@email.com"
+                  required
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:border-helfi-green focus:ring-2 focus:ring-helfi-green/20 outline-none"
+                />
+              </div>
+              <button
+                type="submit"
+                className="w-full bg-helfi-green text-white px-8 py-4 rounded-lg text-lg font-semibold hover:bg-helfi-green/90 transition-colors"
+              >
+                Join the Waitlist
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Demo Modal */}
+      {showDemoModal && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          onClick={handleDemoModalClose}
+        >
+          <div 
+            className="bg-white rounded-2xl max-w-md w-full p-8 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-start mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-gradient-to-br from-helfi-green/20 to-blue-100 rounded-full flex items-center justify-center">
+                  <svg className="w-6 h-6 text-helfi-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900">Coming Soon!</h3>
+              </div>
+              <button
+                onClick={handleDemoModalClose}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+                aria-label="Close"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="mb-6">
+              <p className="text-gray-600 text-lg leading-relaxed mb-4">
+                We're working on an exciting demo video to show you all the amazing features of Helfi.
+              </p>
+              <p className="text-gray-600 leading-relaxed">
+                Stay tuned for a comprehensive walkthrough of how our AI-powered health intelligence platform can transform your wellness journey!
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={handleDemoModalClose}
+                className="flex-1 bg-gray-100 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-200 transition-colors font-medium"
+              >
+                Got it
+              </button>
+              <button
+                onClick={() => {
+                  setShowDemoModal(false)
+                  setShowWaitlistModal(true)
+                }}
+                className="flex-1 bg-helfi-green text-white px-6 py-3 rounded-lg hover:bg-helfi-green/90 transition-colors font-medium"
+              >
+                Join Waitlist
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Success Modal */}
+      {showSuccessModal && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          onClick={handleSuccessModalClose}
+        >
+          <div 
+            className="bg-white rounded-2xl max-w-md w-full p-8 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-start mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-gradient-to-br from-helfi-green/20 to-green-100 rounded-full flex items-center justify-center">
+                  <svg className="w-6 h-6 text-helfi-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900">Success!</h3>
+              </div>
+              <button
+                onClick={handleSuccessModalClose}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+                aria-label="Close"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="mb-6">
+              <p className="text-gray-600 text-lg leading-relaxed">
+                {successMessage}
+              </p>
+            </div>
+            <button
+              onClick={handleSuccessModalClose}
+              className="w-full bg-helfi-green text-white px-6 py-3 rounded-lg hover:bg-helfi-green/90 transition-colors font-medium"
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Error Modal */}
+      {showErrorModal && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+          onClick={handleErrorModalClose}
+        >
+          <div 
+            className="bg-white rounded-2xl max-w-md w-full p-8 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-start mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-gradient-to-br from-red-100 to-orange-100 rounded-full flex items-center justify-center">
+                  <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900">Oops!</h3>
+              </div>
+              <button
+                onClick={handleErrorModalClose}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+                aria-label="Close"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="mb-6">
+              <p className="text-gray-600 text-lg leading-relaxed">
+                {errorMessage}
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={handleErrorModalClose}
+                className="flex-1 bg-gray-100 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-200 transition-colors font-medium"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  setShowErrorModal(false)
+                  setShowWaitlistModal(true)
+                }}
+                className="flex-1 bg-helfi-green text-white px-6 py-3 rounded-lg hover:bg-helfi-green/90 transition-colors font-medium"
+              >
+                Try Again
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   )

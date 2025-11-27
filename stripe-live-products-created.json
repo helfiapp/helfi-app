@@ -1,0 +1,59 @@
+{
+  "products": [
+    {
+      "name": "Helfi Premium - 1,000 Credits",
+      "productId": "prod_TNUsJSTXq6oWo9",
+      "priceId": "price_1SQjscFFFsf6Yn8zZivYYd8P",
+      "planId": "plan_20_monthly",
+      "envVar": "STRIPE_PRICE_20_MONTHLY",
+      "amount": "$20.00",
+      "type": "recurring"
+    },
+    {
+      "name": "Helfi Premium Plus - 1,700 Credits",
+      "productId": "prod_TNUsDJ8hmSNpGI",
+      "priceId": "price_1SQjsdFFFsf6Yn8zM9H2lWS2",
+      "planId": "plan_30_monthly",
+      "envVar": "STRIPE_PRICE_30_MONTHLY",
+      "amount": "$30.00",
+      "type": "recurring"
+    },
+    {
+      "name": "Helfi Premium Max - 3,000 Credits",
+      "productId": "prod_TNUsj5AdNPmP17",
+      "priceId": "price_1SQjsdFFFsf6Yn8z9yhDZn9O",
+      "planId": "plan_50_monthly",
+      "envVar": "STRIPE_PRICE_50_MONTHLY",
+      "amount": "$50.00",
+      "type": "recurring"
+    },
+    {
+      "name": "Helfi Credit Top-Up - 250 Credits",
+      "productId": "prod_TNUswpRoTXGu0p",
+      "priceId": "price_1SQjseFFFsf6Yn8zwQQTNAkA",
+      "planId": "credits_250",
+      "envVar": "STRIPE_PRICE_CREDITS_250",
+      "amount": "$5.00",
+      "type": "one_time"
+    },
+    {
+      "name": "Helfi Credit Top-Up - 500 Credits",
+      "productId": "prod_TNUsgRw1HrAoZq",
+      "priceId": "price_1SQjsfFFFsf6Yn8zJ4acdev9",
+      "planId": "credits_500",
+      "envVar": "STRIPE_PRICE_CREDITS_500",
+      "amount": "$10.00",
+      "type": "one_time"
+    },
+    {
+      "name": "Helfi Credit Top-Up - 1,000 Credits",
+      "productId": "prod_TNUszhkUKrrZpt",
+      "priceId": "price_1SQjsgFFFsf6Yn8zjS5ouTq6",
+      "planId": "credits_1000",
+      "envVar": "STRIPE_PRICE_CREDITS_1000",
+      "amount": "$20.00",
+      "type": "one_time"
+    }
+  ],
+  "errors": []
+}

@@ -52,6 +52,17 @@ const CreditPurchaseModal: React.FC<CreditPurchaseModalProps> = ({
         </div>
 
         <div className="mb-6">
+          {/* Free account notice */}
+          {creditInfo.plan !== 'PREMIUM' && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+              <p className="text-sm text-blue-800">
+                With a free account, you can try each AI feature once. If you've already
+                used the free analysis for this feature, please upgrade to Premium or buy
+                credits to continue.
+              </p>
+            </div>
+          )}
+
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
             <div className="flex items-center">
               <div className="flex-shrink-0">
@@ -96,19 +107,20 @@ const CreditPurchaseModal: React.FC<CreditPurchaseModalProps> = ({
             </div>
           )}
 
-          {creditInfo.plan === 'FREE' && (
+          {/* Show upgrade option for non-subscribed users */}
+          {creditInfo.plan !== 'PREMIUM' && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
               <h4 className="font-medium text-blue-900 mb-2">
                 Upgrade to Premium
               </h4>
               <p className="text-sm text-blue-800 mb-3">
-                Get 30 daily credits plus unlimited additional credits. Perfect for both food analysis (1 credit) and interaction analysis (3 credits).
+                Get monthly credits plus unlimited additional credits. Perfect for both food analysis and interaction analysis.
               </p>
               <button
                 onClick={() => handlePurchase('premium')}
                 className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
               >
-                Upgrade to Premium - $20/month
+                View Premium Plans
               </button>
             </div>
           )}

@@ -1,0 +1,100 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
+import crypto from 'crypto'
+
+export async function GET() {
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const user = await prisma.user.findUnique({ where: { email: session.user.email } })
+  if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+
+  try {
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS CheckinIssues (
+        id TEXT PRIMARY KEY,
+        userId TEXT NOT NULL,
+        name TEXT NOT NULL,
+        polarity TEXT NOT NULL,
+        UNIQUE (userId, name)
+      )
+    `)
+    // Remove historical duplicates before creating unique index
+    await prisma.$executeRawUnsafe(`
+      DELETE FROM CheckinIssues a
+      USING CheckinIssues b
+      WHERE a.id > b.id AND a.userId = b.userId AND a.name = b.name
+    `)
+    // Ensure composite unique index exists even if table was created earlier without it
+    await prisma.$executeRawUnsafe(`
+      CREATE UNIQUE INDEX IF NOT EXISTS checkinissues_user_name_idx ON CheckinIssues (userId, name)
+    `)
+    const rows: any[] = await prisma.$queryRawUnsafe(`SELECT id, name, polarity FROM CheckinIssues WHERE userId = $1`, user.id)
+    return NextResponse.json({ issues: rows })
+  } catch {
+    return NextResponse.json({ issues: [] })
+  }
+}
+
+export async function POST(req: NextRequest) {
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const user = await prisma.user.findUnique({ where: { email: session.user.email } })
+  if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+
+  const { issues } = await req.json() as { issues: Array<{ name: string, polarity?: 'positive'|'negative' }> }
+
+  try {
+    await prisma.$executeRawUnsafe(`
+      CREATE TABLE IF NOT EXISTS CheckinIssues (
+        id TEXT PRIMARY KEY,
+        userId TEXT NOT NULL,
+        name TEXT NOT NULL,
+        polarity TEXT NOT NULL,
+        UNIQUE (userId, name)
+      )
+    `)
+    // Remove duplicates across all users to allow unique index
+    await prisma.$executeRawUnsafe(`
+      DELETE FROM CheckinIssues a
+      USING CheckinIssues b
+      WHERE a.id > b.id AND a.userId = b.userId AND a.name = b.name
+    `)
+    // Backfill unique composite index for existing tables
+    await prisma.$executeRawUnsafe(`
+      CREATE UNIQUE INDEX IF NOT EXISTS checkinissues_user_name_idx ON CheckinIssues (userId, name)
+    `)
+
+    // Replace saved list with exactly what client sent
+    const names = issues.map(i => String(i.name || '').trim()).filter(Boolean)
+    if (names.length === 0) {
+      await prisma.$executeRawUnsafe(`DELETE FROM CheckinIssues WHERE userId = $1`, user.id)
+    } else {
+      const placeholders = names.map((_, idx) => `$${idx + 2}`).join(',')
+      await prisma.$executeRawUnsafe(
+        `DELETE FROM CheckinIssues WHERE userId = $1 AND name NOT IN (${placeholders})`,
+        user.id, ...names
+      )
+    }
+
+    for (const item of issues) {
+      const name = String(item.name || '').trim()
+      if (!name) continue
+      const polarity = (item.polarity === 'negative' || /pain|ache|anxiety|depress|fatigue|nausea|bloat|insomnia|brain fog|headache|migraine|cramp|stress|itch|rash|acne|diarrh|constipat|gas|heartburn/i.test(name)) ? 'negative' : 'positive'
+      const id = crypto.randomUUID()
+      // Use queryRawUnsafe for broad compatibility; ON CONFLICT upserts by (userId,name)
+      await prisma.$queryRawUnsafe(
+        `INSERT INTO CheckinIssues (id, userId, name, polarity) VALUES ($1,$2,$3,$4)
+         ON CONFLICT (userId, name) DO UPDATE SET polarity=EXCLUDED.polarity`,
+        id, user.id, name, polarity
+      )
+    }
+    return NextResponse.json({ success: true })
+  } catch (e) {
+    console.error('checkins issues save error', e)
+    return NextResponse.json({ error: (e as any)?.message || 'Failed to save issues' }, { status: 500 })
+  }
+}
+
+

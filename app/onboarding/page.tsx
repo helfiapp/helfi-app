@@ -7,11 +7,26 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { flushSync } from 'react-dom';
 import CreditPurchaseModal from '@/components/CreditPurchaseModal';
+import { useUserData } from '@/components/providers/UserDataProvider';
+import MobileMoreMenu from '@/components/MobileMoreMenu';
+import UsageMeter from '@/components/UsageMeter';
+import InsightsProgressBar from '@/components/InsightsProgressBar';
+import { UserIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 
 // Auth-enabled onboarding flow
 
-// Interaction Analysis Update Popup Component
-function InteractionAnalysisUpdatePopup({ isOpen, onClose, onUpdate, onNavigateToAnalysis }: { isOpen: boolean, onClose: () => void, onUpdate: () => void, onNavigateToAnalysis?: () => void }) {
+// Update Insights Popup Component
+function UpdateInsightsPopup({ 
+  isOpen, 
+  onClose, 
+  onUpdateInsights, 
+  isGenerating 
+}: { 
+  isOpen: boolean
+  onClose: () => void
+  onUpdateInsights: () => void
+  isGenerating: boolean
+}) {
   if (!isOpen) return null;
 
   return (
@@ -19,40 +34,49 @@ function InteractionAnalysisUpdatePopup({ isOpen, onClose, onUpdate, onNavigateT
       <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
         <div className="flex items-center mb-4">
           <div className="flex-shrink-0">
-            <svg className="h-6 w-6 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            <svg className="h-6 w-6 text-helfi-green" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
             </svg>
           </div>
           <h3 className="ml-3 text-lg font-medium text-gray-900">
-            Update Interaction Analysis?
+            Update Insights?
           </h3>
         </div>
         
         <div className="mb-6">
-          <p className="text-sm text-gray-600">
-            You've made changes to your supplements or medications. Would you like to run a fresh analysis that includes all your current entries?
+          <p className="text-sm text-gray-600 mb-4">
+            You've changed your health information. Would you like to update your insights now? This will regenerate AI insights, update Talk to AI, and refresh all AI-powered sections with your latest data.
           </p>
-          <p className="text-sm text-gray-500 mt-2">
-            This will take you to the analysis page and generate a new comprehensive report.
-          </p>
+          {isGenerating && (
+            <div className="mb-4">
+              <InsightsProgressBar isGenerating={true} message="Generating insights..." />
+            </div>
+          )}
         </div>
         
         <div className="flex flex-col space-y-3">
           <button
-            onClick={onClose}
-            className="w-full px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+            onClick={onUpdateInsights}
+            disabled={isGenerating}
+            className="w-full px-4 py-3 bg-helfi-green text-white rounded-lg hover:bg-helfi-green/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed font-medium"
             type="button"
           >
-            Not Now
+            {isGenerating ? (
+              <>
+                <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2"></span>
+                Updating Insights...
+              </>
+            ) : (
+              'Update Insights'
+            )}
           </button>
           <button
-            onClick={() => {
-              onUpdate();
-            }}
-            className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            onClick={onClose}
+            disabled={isGenerating}
+            className="w-full px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
             type="button"
           >
-            Run Fresh Analysis
+            Add More
           </button>
         </div>
       </div>
@@ -96,7 +120,7 @@ function LogoutButton() {
   const { data: session } = useSession();
   
   const handleLogout = () => {
-    signOut({ callbackUrl: '/' });
+    signOut({ callbackUrl: '/auth/signin' });
   };
 
   if (!session) return null;
@@ -123,7 +147,7 @@ function OnboardingNav() {
   );
 }
 
-function GenderStep({ onNext, initial }: { onNext: (data: any) => void, initial?: string }) {
+function GenderStep({ onNext, initial, initialAgreed }: { onNext: (data: any) => void, initial?: string, initialAgreed?: boolean }) {
   const [gender, setGender] = useState('');
   const [agreed, setAgreed] = useState(false);
   
@@ -134,13 +158,20 @@ function GenderStep({ onNext, initial }: { onNext: (data: any) => void, initial?
     }
   }, [initial]);
   
-  // Load Terms & Conditions agreement from localStorage
+  // Initialize Terms & Conditions from DB (with localStorage fallback for legacy users)
   useEffect(() => {
-    const savedAgreement = localStorage.getItem('helfi-terms-agreed');
-    if (savedAgreement === 'true') {
+    if (initialAgreed === true) {
       setAgreed(true);
+      try { localStorage.setItem('helfi-terms-agreed', 'true'); } catch {}
+      return;
     }
-  }, []);
+    try {
+      const savedAgreement = localStorage.getItem('helfi-terms-agreed');
+      if (savedAgreement === 'true') {
+        setAgreed(true);
+      }
+    } catch {}
+  }, [initialAgreed]);
   
   // Save Terms & Conditions agreement to localStorage when changed
   const handleAgreedChange = (checked: boolean) => {
@@ -206,27 +237,291 @@ function GenderStep({ onNext, initial }: { onNext: (data: any) => void, initial?
 
 const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { onNext: (data: any) => void, onBack: () => void, initial?: any }) {
   const [weight, setWeight] = useState(initial?.weight || '');
+  const [birthdate, setBirthdate] = useState(initial?.birthdate || '');
+  const [birthYear, setBirthYear] = useState('');
+  const [birthMonth, setBirthMonth] = useState('');
+  const [birthDay, setBirthDay] = useState('');
   const [height, setHeight] = useState(initial?.height || '');
   const [feet, setFeet] = useState(initial?.feet || '');
   const [inches, setInches] = useState(initial?.inches || '');
   const [bodyType, setBodyType] = useState(initial?.bodyType || '');
+  const [goalChoice, setGoalChoice] = useState(initial?.goalChoice || '');
+  const [goalIntensity, setGoalIntensity] = useState<'mild' | 'standard' | 'aggressive'>(
+    (initial?.goalIntensity as any) || 'standard',
+  );
   const [unit, setUnit] = useState<'metric' | 'imperial'>('metric');
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showUpdatePopup, setShowUpdatePopup] = useState(false);
+  const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
+
+  const parseNumber = (value: string): number | null => {
+    if (!value) return null;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  // Keep local state in sync when initial data loads or changes,
+  // but avoid overwriting any values the user has already edited on this step.
+  useEffect(() => {
+    if (!initial) return;
+
+    if (!weight && initial.weight) {
+      setWeight(initial.weight);
+    }
+    if (!height && initial.height) {
+      setHeight(initial.height);
+    }
+    if (!feet && initial.feet) {
+      setFeet(initial.feet);
+    }
+    if (!inches && initial.inches) {
+      setInches(initial.inches);
+    }
+    if (!bodyType && initial.bodyType) {
+      setBodyType(initial.bodyType);
+    }
+    if (!goalChoice && initial.goalChoice) {
+      setGoalChoice(initial.goalChoice);
+    }
+    if (initial.goalIntensity && !goalIntensity) {
+      setGoalIntensity(initial.goalIntensity);
+    }
+
+    if (!birthYear && !birthMonth && !birthDay && typeof initial.birthdate === 'string') {
+      const [y, m, d] = initial.birthdate.split('-');
+      if (y && m && d) {
+        setBirthYear(y);
+        setBirthMonth(m);
+        setBirthDay(d);
+      }
+    }
+  }, [initial, weight, height, feet, inches, bodyType, birthYear, birthMonth, birthDay]);
+
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const minYear = currentYear - 110; // sensible lower bound for age
+
+  const daysInMonth = React.useMemo(() => {
+    if (!birthYear || !birthMonth) {
+      return 31;
+    }
+    const y = parseInt(birthYear, 10);
+    const m = parseInt(birthMonth, 10);
+    if (!Number.isFinite(y) || !Number.isFinite(m)) return 31;
+    return new Date(y, m, 0).getDate();
+  }, [birthYear, birthMonth]);
+
+  // Clamp day if month/year change to a month with fewer days
+  useEffect(() => {
+    if (!birthDay) return;
+    const max = daysInMonth;
+    const d = parseInt(birthDay, 10);
+    if (Number.isFinite(d) && d > max) {
+      setBirthDay(String(max).padStart(2, '0'));
+    }
+  }, [daysInMonth, birthDay]);
+
+  // Keep canonical birthdate string in sync with dropdowns and block future dates
+  useEffect(() => {
+    if (birthYear && birthMonth && birthDay) {
+      const y = parseInt(birthYear, 10);
+      const m = parseInt(birthMonth, 10);
+      const d = parseInt(birthDay, 10);
+
+      if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) {
+        return;
+      }
+
+      const candidate = new Date(y, m - 1, d);
+      const now = new Date();
+
+      if (candidate > now) {
+        // Don’t allow future birthdates – keep current value until user picks a valid date
+        return;
+      }
+
+      const yyyy = String(y).padStart(4, '0');
+      const mm = String(m).padStart(2, '0');
+      const dd = String(d).padStart(2, '0');
+      setBirthdate(`${yyyy}-${mm}-${dd}`);
+    } else {
+      setBirthdate('');
+    }
+  }, [birthYear, birthMonth, birthDay]);
+
+  // Track when basic profile values differ from what we initially loaded
+  useEffect(() => {
+    const initialWeight = initial?.weight || '';
+    const initialHeight = initial?.height || '';
+    const initialFeet = initial?.feet || '';
+    const initialInches = initial?.inches || '';
+    const initialBodyType = initial?.bodyType || '';
+    const initialGoalChoice = initial?.goalChoice || '';
+    const initialGoalIntensity = initial?.goalIntensity || 'standard';
+    const initialBirthdate = initial?.birthdate || '';
+
+    const changed =
+      (weight || '') !== (initialWeight || '') ||
+      (height || '') !== (initialHeight || '') ||
+      (feet || '') !== (initialFeet || '') ||
+      (inches || '') !== (initialInches || '') ||
+      (bodyType || '') !== (initialBodyType || '') ||
+      (goalChoice || '') !== (initialGoalChoice || '') ||
+      (goalIntensity || 'standard') !== (initialGoalIntensity || 'standard') ||
+      (birthdate || '') !== (initialBirthdate || '');
+
+    const hasAny =
+      !!(weight || height || feet || inches || bodyType || goalChoice || birthdate);
+
+    setHasUnsavedChanges(changed && hasAny);
+  }, [weight, height, feet, inches, bodyType, goalChoice, goalIntensity, birthdate, initial]);
+
+  // Warn if the user tries to close the tab or browser with unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue =
+          'You have unsaved changes. Please update your insights before leaving.';
+        return e.returnValue;
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  // Expose unsaved state globally so the header "Go To Dashboard" link can respect it
+  useEffect(() => {
+    try {
+      (window as any).__helfiOnboardingPhysicalHasUnsavedChanges = hasUnsavedChanges;
+    } catch {
+      // ignore
+    }
+    return () => {
+      try {
+        (window as any).__helfiOnboardingPhysicalHasUnsavedChanges = false;
+      } catch {
+        // ignore
+      }
+    };
+  }, [hasUnsavedChanges]);
+
+  // Listen for global requests to open the Update Insights popup (e.g. from the header)
+  useEffect(() => {
+    const handler = (event: MessageEvent) => {
+      if (event?.data?.type === 'OPEN_PHYSICAL_UPDATE_POPUP') {
+        setShowUpdatePopup(true);
+      }
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, []);
+
+  const buildPayload = () => ({
+    weight,
+    birthdate,
+    height: unit === 'metric' ? height : `${feet}'${inches}"`,
+    feet,
+    inches,
+    bodyType,
+    goalChoice,
+    goalIntensity,
+    unit,
+  });
 
   const handleNext = useCallback(() => {
-    const data = { 
-      weight, 
-      height: unit === 'metric' ? height : `${feet}'${inches}"`, 
-      feet, 
-      inches, 
-      bodyType, 
-      unit 
-    };
-    onNext(data);
-  }, [weight, height, feet, inches, bodyType, unit, onNext]);
+    onNext(buildPayload());
+  }, [weight, birthdate, height, feet, inches, bodyType, unit, onNext]);
 
-  const handleUnitChange = useCallback((newUnit: 'metric' | 'imperial') => {
-    setUnit(newUnit);
-  }, []);
+  const handleUpdateInsights = async () => {
+    setIsGeneratingInsights(true);
+    try {
+      const response = await fetch('/api/user-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(buildPayload()),
+      });
+
+      if (response.ok) {
+        setHasUnsavedChanges(false);
+        setTimeout(() => {
+          setShowUpdatePopup(false);
+          setIsGeneratingInsights(false);
+        }, 2000);
+      } else {
+        alert('Failed to update insights. Please try again.');
+        setIsGeneratingInsights(false);
+      }
+    } catch (error) {
+      console.error('Error updating insights:', error);
+      alert('Failed to update insights. Please try again.');
+      setIsGeneratingInsights(false);
+    }
+  };
+
+  const handleNextWithGuard = () => {
+    if (hasUnsavedChanges) {
+      if (!showUpdatePopup) {
+        setShowUpdatePopup(true);
+      }
+      return;
+    }
+    handleNext();
+  };
+
+  const handleBackWithGuard = () => {
+    if (hasUnsavedChanges) {
+      if (!showUpdatePopup) {
+        setShowUpdatePopup(true);
+      }
+      return;
+    }
+    onBack();
+  };
+
+  const handleUnitChange = useCallback(
+    (newUnit: 'metric' | 'imperial') => {
+      if (newUnit === unit) return;
+
+      if (newUnit === 'imperial') {
+        // Metric → imperial (kg → lbs, cm → ft/in)
+        const kg = parseNumber(weight);
+        if (kg != null) {
+          const lbs = kg * 2.20462;
+          setWeight(String(Math.round(lbs)));
+        }
+
+        const cmVal = parseNumber(height);
+        if (cmVal != null && cmVal > 0) {
+          const totalInches = cmVal / 2.54;
+          const wholeFeet = Math.floor(totalInches / 12);
+          const remainingInches = Math.round(totalInches - wholeFeet * 12);
+          setFeet(wholeFeet > 0 ? String(wholeFeet) : '');
+          setInches(remainingInches > 0 ? String(remainingInches) : '');
+        }
+      } else {
+        // Imperial → metric (lbs → kg, ft/in → cm)
+        const lbs = parseNumber(weight);
+        if (lbs != null) {
+          const kg = lbs / 2.20462;
+          setWeight(String(Math.round(kg)));
+        }
+
+        const ftVal = parseNumber(feet);
+        const inchVal = parseNumber(inches);
+        const totalInches =
+          (ftVal != null ? ftVal * 12 : 0) + (inchVal != null ? inchVal : 0);
+        if (totalInches > 0) {
+          const cmVal = totalInches * 2.54;
+          setHeight(String(Math.round(cmVal)));
+        }
+      }
+
+      setUnit(newUnit);
+    },
+    [unit, weight, height, feet, inches],
+  );
 
   const handleBodyTypeChange = useCallback((type: string) => {
     setBodyType(type);
@@ -247,13 +542,13 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
           className={`px-3 py-1 rounded-l ${unit === 'metric' ? 'bg-helfi-green text-white' : 'bg-gray-100'}`} 
           onClick={() => handleUnitChange('metric')}
         >
-          kg/cm
+          kg
         </button>
         <button 
           className={`px-3 py-1 rounded-r ${unit === 'imperial' ? 'bg-helfi-green text-white' : 'bg-gray-100'}`} 
           onClick={() => handleUnitChange('imperial')}
         >
-          lbs/in
+          lbs
         </button>
       </div>
       <input
@@ -264,8 +559,103 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
         value={weight}
         onChange={e => setWeight(e.target.value)}
       />
+      <h2 className="text-2xl font-bold mb-2">What is your date of birth?</h2>
+      <p className="mb-4 text-gray-600">
+        We’ll calculate your age from your birthdate to set safe calorie and nutrition targets.
+      </p>
+      <div className="grid grid-cols-3 gap-3 mb-2">
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Day</label>
+          <select
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-green-500 focus:ring-1 focus:ring-green-500 bg-white"
+            value={birthDay}
+            onChange={(e) => setBirthDay(e.target.value)}
+          >
+            <option value="">Day</option>
+            {Array.from({ length: daysInMonth }, (_, idx) => {
+              const dayNumber = idx + 1;
+              const value = String(dayNumber).padStart(2, '0');
+              const isFutureDay =
+                birthYear === String(currentYear) &&
+                birthMonth === String(today.getMonth() + 1).padStart(2, '0') &&
+                dayNumber > today.getDate();
+              return (
+                <option key={value} value={value} disabled={isFutureDay}>
+                  {dayNumber}
+                </option>
+              );
+            })}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Month</label>
+          <select
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-green-500 focus:ring-1 focus:ring-green-500 bg-white"
+            value={birthMonth}
+            onChange={(e) => setBirthMonth(e.target.value)}
+          >
+            <option value="">Month</option>
+            {[
+              { value: '01', label: 'Jan' },
+              { value: '02', label: 'Feb' },
+              { value: '03', label: 'Mar' },
+              { value: '04', label: 'Apr' },
+              { value: '05', label: 'May' },
+              { value: '06', label: 'Jun' },
+              { value: '07', label: 'Jul' },
+              { value: '08', label: 'Aug' },
+              { value: '09', label: 'Sep' },
+              { value: '10', label: 'Oct' },
+              { value: '11', label: 'Nov' },
+              { value: '12', label: 'Dec' },
+            ].map((month) => {
+              const monthNumber = parseInt(month.value, 10);
+              const isFutureMonth =
+                birthYear === String(currentYear) &&
+                monthNumber > today.getMonth() + 1;
+              return (
+                <option key={month.value} value={month.value} disabled={isFutureMonth}>
+                  {month.label}
+                </option>
+              );
+            })}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-500 mb-1">Year</label>
+          <select
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-green-500 focus:ring-1 focus:ring-green-500 bg-white"
+            value={birthYear}
+            onChange={(e) => setBirthYear(e.target.value)}
+          >
+            <option value="">Year</option>
+            {Array.from({ length: currentYear - minYear + 1 }, (_, idx) => {
+              const year = currentYear - idx;
+              return (
+                <option key={year} value={String(year)}>
+                  {year}
+                </option>
+              );
+            })}
+          </select>
+        </div>
+      </div>
       <h2 className="text-2xl font-bold mb-4">How tall are you?</h2>
       <p className="mb-4 text-gray-600">Height helps us calculate key health metrics.</p>
+      <div className="flex justify-end mb-2">
+        <button
+          className={`px-3 py-1 rounded-l ${unit === 'metric' ? 'bg-helfi-green text-white' : 'bg-gray-100'}`}
+          onClick={() => handleUnitChange('metric')}
+        >
+          cm
+        </button>
+        <button
+          className={`px-3 py-1 rounded-r ${unit === 'imperial' ? 'bg-helfi-green text-white' : 'bg-gray-100'}`}
+          onClick={() => handleUnitChange('imperial')}
+        >
+          ft/in
+        </button>
+      </div>
       <div className="mb-4">
         {unit === 'metric' ? (
           <input
@@ -301,6 +691,54 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
           </div>
         )}
       </div>
+      <h2 className="text-2xl font-bold mb-2">What is your primary goal?</h2>
+      <p className="mb-4 text-gray-600">We’ll tailor your calories and macros to this goal.</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+        {[
+          { key: 'lose weight', label: 'Lose weight' },
+          { key: 'tone up', label: 'Tone up' },
+          { key: 'get shredded', label: 'Get shredded' },
+          { key: 'gain weight', label: 'Gain weight' },
+        ].map((option) => (
+          <button
+            key={option.key}
+            className={`w-full p-3 rounded border ${
+              goalChoice === option.key ? 'bg-green-600 text-white' : 'border-green-600 text-green-600 hover:bg-green-50'
+            } transition-colors`}
+            onClick={() => setGoalChoice(option.key)}
+            type="button"
+          >
+            <span className="font-semibold">{option.label}</span>
+          </button>
+        ))}
+      </div>
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-lg font-semibold text-gray-900">How intense?</h3>
+          <span className="text-sm text-gray-500">Adjusts deficit/surplus</span>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { key: 'mild', label: 'Mild' },
+            { key: 'standard', label: 'Standard' },
+            { key: 'aggressive', label: 'Aggressive' },
+          ].map((option) => (
+            <button
+              key={option.key}
+              className={`w-full py-2 rounded border ${
+                goalIntensity === option.key ? 'bg-gray-900 text-white' : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+              } transition-colors text-sm font-medium`}
+              onClick={() => setGoalIntensity(option.key as any)}
+              type="button"
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+        <p className="mt-2 text-xs text-gray-500">
+          Mild = smaller change, Standard = balanced, Aggressive = faster change (use only if safe for you).
+        </p>
+      </div>
       <h2 className="text-2xl font-bold mb-4">Choose your body type (optional)</h2>
       <p className="mb-4 text-gray-600">Helps tailor insights to your body composition.</p>
       <div className="space-y-3 mb-6">
@@ -312,8 +750,17 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
               onClick={() => handleBodyTypeChange(type)}
             >
               <div className="flex items-center justify-center gap-2">
-                <span className="text-sm font-medium">{type.charAt(0).toUpperCase() + type.slice(1)}</span>
-                <span className="text-xs bg-gray-200 text-gray-600 rounded-full w-5 h-5 flex items-center justify-center cursor-help hover:bg-gray-300 transition-colors border border-gray-300">?</span>
+                <span className="text-sm font-medium">
+                  {type.charAt(0).toUpperCase() + type.slice(1)}
+                </span>
+                <span className="inline-flex items-center justify-center">
+                  <InformationCircleIcon
+                    className={`w-5 h-5 ${
+                      bodyType === type ? 'text-white' : 'text-helfi-green'
+                    }`}
+                    aria-hidden="true"
+                  />
+                </span>
               </div>
               <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-800 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none w-48 z-10">
                 {bodyTypeDescriptions[type as keyof typeof bodyTypeDescriptions]}
@@ -331,23 +778,56 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
           </button>
         </div>
       </div>
+      {/* Unsaved changes banner - purely informational, real action happens in the popup when you try to leave */}
+      {hasUnsavedChanges && (
+        <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <div className="flex items-start gap-2">
+            <div className="mt-1 h-2 w-2 rounded-full bg-yellow-500" />
+            <div>
+              <div className="font-medium text-yellow-900 mb-1">Changes not in insights yet</div>
+              <div className="text-sm text-yellow-700">
+                We&apos;ve noticed you updated your basic health details. When you leave this step, we&apos;ll ask if you&apos;d like to
+                update your insights so everything stays in sync.
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="flex justify-between">
-        <button className="border border-green-600 text-green-600 px-6 py-3 rounded-lg hover:bg-green-600 hover:text-white transition-colors" onClick={onBack}>Back</button>
+        <button className="border border-green-600 text-green-600 px-6 py-3 rounded-lg hover:bg-green-600 hover:text-white transition-colors" onClick={handleBackWithGuard}>Back</button>
         <div className="flex space-x-3">
           <button 
             className="text-gray-600 hover:text-gray-900 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors"
-            onClick={() => onNext({ weight: weight || '0', height: height || '0', feet: feet || '0', inches: inches || '0', bodyType: bodyType || 'not specified', unit })}
+            onClick={() =>
+              onNext({
+                weight: weight || '0',
+                height: height || '0',
+                feet: feet || '0',
+                inches: inches || '0',
+                bodyType: bodyType || 'not specified',
+                unit,
+                birthdate: birthdate || '',
+              })
+            }
           >
             Skip
           </button>
           <button 
             className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors" 
-            onClick={handleNext}
+            onClick={handleNextWithGuard}
           >
             Next
           </button>
         </div>
       </div>
+      <UpdateInsightsPopup
+        isOpen={showUpdatePopup}
+        onClose={() => {
+          setShowUpdatePopup(false);
+        }}
+        onUpdateInsights={handleUpdateInsights}
+        isGenerating={isGeneratingInsights}
+      />
     </div>
   );
 });
@@ -355,7 +835,118 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
 function ExerciseStep({ onNext, onBack, initial }: { onNext: (data: any) => void, onBack: () => void, initial?: any }) {
   const [exerciseFrequency, setExerciseFrequency] = useState(initial?.exerciseFrequency || '');
   const [exerciseTypes, setExerciseTypes] = useState<string[]>(initial?.exerciseTypes || []);
+  const [exerciseDurations, setExerciseDurations] = useState<Record<string, string>>(
+    initial?.exerciseDurations || {},
+  );
   const [customExercise, setCustomExercise] = useState('');
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showUpdatePopup, setShowUpdatePopup] = useState(false);
+  const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
+
+  const handleDurationChange = (type: string, value: string) => {
+    setExerciseDurations((prev) => {
+      const next = { ...prev }
+      next[type] = value
+      return next
+    })
+  }
+
+  const toggleExercise = (type: string, enabled: boolean) => {
+    setExerciseTypes((prev) => {
+      if (enabled) {
+        if (prev.includes(type)) return prev
+        return [...prev, type]
+      }
+      setExerciseDurations((prevDurations) => {
+        const next = { ...prevDurations }
+        delete next[type]
+        return next
+      })
+      return prev.filter((t) => t !== type)
+    })
+  }
+
+  // Track changes from initial values
+  useEffect(() => {
+    const initialFrequency = initial?.exerciseFrequency || '';
+    const initialTypes = initial?.exerciseTypes || [];
+    const initialDurations = initial?.exerciseDurations || {};
+    const hasChanged =
+      exerciseFrequency !== initialFrequency ||
+      JSON.stringify(exerciseTypes.sort()) !== JSON.stringify(initialTypes.sort()) ||
+      JSON.stringify(exerciseDurations) !== JSON.stringify(initialDurations);
+    setHasUnsavedChanges(hasChanged && (exerciseFrequency || exerciseTypes.length > 0));
+  }, [exerciseFrequency, exerciseTypes, exerciseDurations, initial]);
+
+  // Prevent browser navigation when there are unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = 'You have unsaved changes. Please update your insights before leaving.';
+        return e.returnValue;
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  // Handle Update Insights button click
+  const handleUpdateInsights = async () => {
+    setIsGeneratingInsights(true);
+    try {
+      const response = await fetch('/api/user-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          exerciseFrequency: exerciseFrequency || 'not specified',
+          exerciseTypes: exerciseTypes || [],
+          exerciseDurations,
+        })
+      });
+      
+      if (response.ok) {
+        setHasUnsavedChanges(false);
+        setTimeout(() => {
+          setShowUpdatePopup(false);
+          setIsGeneratingInsights(false);
+        }, 2000);
+      } else {
+        alert('Failed to update insights. Please try again.');
+        setIsGeneratingInsights(false);
+      }
+    } catch (error) {
+      console.error('Error updating insights:', error);
+      alert('Failed to update insights. Please try again.');
+      setIsGeneratingInsights(false);
+    }
+  };
+
+  // Handle navigation with unsaved changes check
+  const handleNext = () => {
+    if (hasUnsavedChanges) {
+      if (!showUpdatePopup) {
+        setShowUpdatePopup(true);
+      }
+      return;
+    }
+    onNext({
+      exerciseFrequency: exerciseFrequency || 'not specified',
+      exerciseTypes: exerciseTypes || [],
+      exerciseDurations,
+    });
+  };
+
+  const handleBack = () => {
+    if (hasUnsavedChanges) {
+      if (!showUpdatePopup) {
+        setShowUpdatePopup(true);
+      }
+      return;
+    }
+    onBack();
+  };
 
   return (
     <div className="max-w-md mx-auto">
@@ -389,16 +980,20 @@ function ExerciseStep({ onNext, onBack, initial }: { onNext: (data: any) => void
               type="checkbox"
               id="walking"
               checked={exerciseTypes.includes('Walking')}
-              onChange={(e) => {
-                if (e.target.checked) {
-                  setExerciseTypes([...exerciseTypes, 'Walking']);
-                } else {
-                  setExerciseTypes(exerciseTypes.filter(t => t !== 'Walking'));
-                }
-              }}
+              onChange={(e) => toggleExercise('Walking', e.target.checked)}
               className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
             />
             <label htmlFor="walking" className="text-gray-700 cursor-pointer">Walking</label>
+            {exerciseTypes.includes('Walking') && (
+              <input
+                type="number"
+                min="0"
+                className="ml-auto w-24 rounded border border-gray-200 px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                placeholder="mins"
+                value={exerciseDurations['Walking'] || ''}
+                onChange={(e) => handleDurationChange('Walking', e.target.value)}
+              />
+            )}
           </div>
           
           <div className="flex items-center space-x-3">
@@ -406,16 +1001,20 @@ function ExerciseStep({ onNext, onBack, initial }: { onNext: (data: any) => void
               type="checkbox"
               id="running"
               checked={exerciseTypes.includes('Running')}
-              onChange={(e) => {
-                if (e.target.checked) {
-                  setExerciseTypes([...exerciseTypes, 'Running']);
-                } else {
-                  setExerciseTypes(exerciseTypes.filter(t => t !== 'Running'));
-                }
-              }}
+              onChange={(e) => toggleExercise('Running', e.target.checked)}
               className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
             />
             <label htmlFor="running" className="text-gray-700 cursor-pointer">Running</label>
+            {exerciseTypes.includes('Running') && (
+              <input
+                type="number"
+                min="0"
+                className="ml-auto w-24 rounded border border-gray-200 px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                placeholder="mins"
+                value={exerciseDurations['Running'] || ''}
+                onChange={(e) => handleDurationChange('Running', e.target.value)}
+              />
+            )}
           </div>
           
           <div className="flex items-center space-x-3">
@@ -423,16 +1022,20 @@ function ExerciseStep({ onNext, onBack, initial }: { onNext: (data: any) => void
               type="checkbox"
               id="swimming"
               checked={exerciseTypes.includes('Swimming')}
-              onChange={(e) => {
-                if (e.target.checked) {
-                  setExerciseTypes([...exerciseTypes, 'Swimming']);
-                } else {
-                  setExerciseTypes(exerciseTypes.filter(t => t !== 'Swimming'));
-                }
-              }}
+              onChange={(e) => toggleExercise('Swimming', e.target.checked)}
               className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
             />
             <label htmlFor="swimming" className="text-gray-700 cursor-pointer">Swimming</label>
+            {exerciseTypes.includes('Swimming') && (
+              <input
+                type="number"
+                min="0"
+                className="ml-auto w-24 rounded border border-gray-200 px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                placeholder="mins"
+                value={exerciseDurations['Swimming'] || ''}
+                onChange={(e) => handleDurationChange('Swimming', e.target.value)}
+              />
+            )}
           </div>
           
           <div className="flex items-center space-x-3">
@@ -440,16 +1043,20 @@ function ExerciseStep({ onNext, onBack, initial }: { onNext: (data: any) => void
               type="checkbox"
               id="biking"
               checked={exerciseTypes.includes('Bike riding')}
-              onChange={(e) => {
-                if (e.target.checked) {
-                  setExerciseTypes([...exerciseTypes, 'Bike riding']);
-                } else {
-                  setExerciseTypes(exerciseTypes.filter(t => t !== 'Bike riding'));
-                }
-              }}
+              onChange={(e) => toggleExercise('Bike riding', e.target.checked)}
               className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
             />
             <label htmlFor="biking" className="text-gray-700 cursor-pointer">Bike riding</label>
+            {exerciseTypes.includes('Bike riding') && (
+              <input
+                type="number"
+                min="0"
+                className="ml-auto w-24 rounded border border-gray-200 px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                placeholder="mins"
+                value={exerciseDurations['Bike riding'] || ''}
+                onChange={(e) => handleDurationChange('Bike riding', e.target.value)}
+              />
+            )}
           </div>
 
           <div className="flex items-center space-x-3">
@@ -457,16 +1064,20 @@ function ExerciseStep({ onNext, onBack, initial }: { onNext: (data: any) => void
               type="checkbox"
               id="mma"
               checked={exerciseTypes.includes('MMA')}
-              onChange={(e) => {
-                if (e.target.checked) {
-                  setExerciseTypes([...exerciseTypes, 'MMA']);
-                } else {
-                  setExerciseTypes(exerciseTypes.filter(t => t !== 'MMA'));
-                }
-              }}
+              onChange={(e) => toggleExercise('MMA', e.target.checked)}
               className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
             />
             <label htmlFor="mma" className="text-gray-700 cursor-pointer">MMA</label>
+            {exerciseTypes.includes('MMA') && (
+              <input
+                type="number"
+                min="0"
+                className="ml-auto w-24 rounded border border-gray-200 px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                placeholder="mins"
+                value={exerciseDurations['MMA'] || ''}
+                onChange={(e) => handleDurationChange('MMA', e.target.value)}
+              />
+            )}
           </div>
 
           <div className="flex items-center space-x-3">
@@ -474,16 +1085,20 @@ function ExerciseStep({ onNext, onBack, initial }: { onNext: (data: any) => void
               type="checkbox"
               id="boxing"
               checked={exerciseTypes.includes('Boxing')}
-              onChange={(e) => {
-                if (e.target.checked) {
-                  setExerciseTypes([...exerciseTypes, 'Boxing']);
-                } else {
-                  setExerciseTypes(exerciseTypes.filter(t => t !== 'Boxing'));
-                }
-              }}
+              onChange={(e) => toggleExercise('Boxing', e.target.checked)}
               className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
             />
             <label htmlFor="boxing" className="text-gray-700 cursor-pointer">Boxing</label>
+            {exerciseTypes.includes('Boxing') && (
+              <input
+                type="number"
+                min="0"
+                className="ml-auto w-24 rounded border border-gray-200 px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                placeholder="mins"
+                value={exerciseDurations['Boxing'] || ''}
+                onChange={(e) => handleDurationChange('Boxing', e.target.value)}
+              />
+            )}
           </div>
 
           <div className="flex items-center space-x-3">
@@ -491,16 +1106,20 @@ function ExerciseStep({ onNext, onBack, initial }: { onNext: (data: any) => void
               type="checkbox"
               id="jujitsu"
               checked={exerciseTypes.includes('Jujitsu')}
-              onChange={(e) => {
-                if (e.target.checked) {
-                  setExerciseTypes([...exerciseTypes, 'Jujitsu']);
-                } else {
-                  setExerciseTypes(exerciseTypes.filter(t => t !== 'Jujitsu'));
-                }
-              }}
+              onChange={(e) => toggleExercise('Jujitsu', e.target.checked)}
               className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
             />
             <label htmlFor="jujitsu" className="text-gray-700 cursor-pointer">Jujitsu</label>
+            {exerciseTypes.includes('Jujitsu') && (
+              <input
+                type="number"
+                min="0"
+                className="ml-auto w-24 rounded border border-gray-200 px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                placeholder="mins"
+                value={exerciseDurations['Jujitsu'] || ''}
+                onChange={(e) => handleDurationChange('Jujitsu', e.target.value)}
+              />
+            )}
           </div>
 
           <div className="flex items-center space-x-3">
@@ -508,16 +1127,20 @@ function ExerciseStep({ onNext, onBack, initial }: { onNext: (data: any) => void
               type="checkbox"
               id="karate"
               checked={exerciseTypes.includes('Karate')}
-              onChange={(e) => {
-                if (e.target.checked) {
-                  setExerciseTypes([...exerciseTypes, 'Karate']);
-                } else {
-                  setExerciseTypes(exerciseTypes.filter(t => t !== 'Karate'));
-                }
-              }}
+              onChange={(e) => toggleExercise('Karate', e.target.checked)}
               className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
             />
             <label htmlFor="karate" className="text-gray-700 cursor-pointer">Karate</label>
+            {exerciseTypes.includes('Karate') && (
+              <input
+                type="number"
+                min="0"
+                className="ml-auto w-24 rounded border border-gray-200 px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                placeholder="mins"
+                value={exerciseDurations['Karate'] || ''}
+                onChange={(e) => handleDurationChange('Karate', e.target.value)}
+              />
+            )}
           </div>
 
           <div className="flex items-center space-x-3">
@@ -525,16 +1148,20 @@ function ExerciseStep({ onNext, onBack, initial }: { onNext: (data: any) => void
               type="checkbox"
               id="bodybuilding"
               checked={exerciseTypes.includes('Body Building')}
-              onChange={(e) => {
-                if (e.target.checked) {
-                  setExerciseTypes([...exerciseTypes, 'Body Building']);
-                } else {
-                  setExerciseTypes(exerciseTypes.filter(t => t !== 'Body Building'));
-                }
-              }}
+              onChange={(e) => toggleExercise('Body Building', e.target.checked)}
               className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
             />
             <label htmlFor="bodybuilding" className="text-gray-700 cursor-pointer">Body Building</label>
+            {exerciseTypes.includes('Body Building') && (
+              <input
+                type="number"
+                min="0"
+                className="ml-auto w-24 rounded border border-gray-200 px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                placeholder="mins"
+                value={exerciseDurations['Body Building'] || ''}
+                onChange={(e) => handleDurationChange('Body Building', e.target.value)}
+              />
+            )}
           </div>
 
           <div className="flex items-center space-x-3">
@@ -542,16 +1169,20 @@ function ExerciseStep({ onNext, onBack, initial }: { onNext: (data: any) => void
               type="checkbox"
               id="yoga"
               checked={exerciseTypes.includes('Yoga')}
-              onChange={(e) => {
-                if (e.target.checked) {
-                  setExerciseTypes([...exerciseTypes, 'Yoga']);
-                } else {
-                  setExerciseTypes(exerciseTypes.filter(t => t !== 'Yoga'));
-                }
-              }}
+              onChange={(e) => toggleExercise('Yoga', e.target.checked)}
               className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
             />
             <label htmlFor="yoga" className="text-gray-700 cursor-pointer">Yoga</label>
+            {exerciseTypes.includes('Yoga') && (
+              <input
+                type="number"
+                min="0"
+                className="ml-auto w-24 rounded border border-gray-200 px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                placeholder="mins"
+                value={exerciseDurations['Yoga'] || ''}
+                onChange={(e) => handleDurationChange('Yoga', e.target.value)}
+              />
+            )}
           </div>
 
           <div className="flex items-center space-x-3">
@@ -559,16 +1190,20 @@ function ExerciseStep({ onNext, onBack, initial }: { onNext: (data: any) => void
               type="checkbox"
               id="pilates"
               checked={exerciseTypes.includes('Pilates')}
-              onChange={(e) => {
-                if (e.target.checked) {
-                  setExerciseTypes([...exerciseTypes, 'Pilates']);
-                } else {
-                  setExerciseTypes(exerciseTypes.filter(t => t !== 'Pilates'));
-                }
-              }}
+              onChange={(e) => toggleExercise('Pilates', e.target.checked)}
               className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
             />
             <label htmlFor="pilates" className="text-gray-700 cursor-pointer">Pilates</label>
+            {exerciseTypes.includes('Pilates') && (
+              <input
+                type="number"
+                min="0"
+                className="ml-auto w-24 rounded border border-gray-200 px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                placeholder="mins"
+                value={exerciseDurations['Pilates'] || ''}
+                onChange={(e) => handleDurationChange('Pilates', e.target.value)}
+              />
+            )}
           </div>
         </div>
 
@@ -633,26 +1268,46 @@ function ExerciseStep({ onNext, onBack, initial }: { onNext: (data: any) => void
         <div className="flex justify-between pt-4">
           <button 
             className="border border-green-600 text-green-600 px-6 py-3 rounded-lg hover:bg-green-600 hover:text-white transition-colors" 
-            onClick={onBack}
+            onClick={handleBack}
           >
             Back
           </button>
           <div className="flex space-x-3">
             <button 
               className="text-gray-600 hover:text-gray-900 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors"
-              onClick={() => onNext({ exerciseFrequency: exerciseFrequency || 'not specified', exerciseTypes: exerciseTypes || [] })}
+              onClick={() => {
+                if (hasUnsavedChanges) {
+                  setShowUpdatePopup(true);
+                  return;
+                }
+                onNext({
+                  exerciseFrequency: exerciseFrequency || 'not specified',
+                  exerciseTypes: exerciseTypes || [],
+                  exerciseDurations,
+                });
+              }}
             >
               Skip
             </button>
             <button 
               className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors" 
-              onClick={() => onNext({ exerciseFrequency, exerciseTypes })}
+              onClick={handleNext}
             >
               Continue
             </button>
           </div>
         </div>
       </div>
+
+      {/* Update Insights Popup */}
+      <UpdateInsightsPopup
+        isOpen={showUpdatePopup}
+        onClose={() => {
+          setShowUpdatePopup(false);
+        }}
+        onUpdateInsights={handleUpdateInsights}
+        isGenerating={isGeneratingInsights}
+      />
     </div>
   );
 }
@@ -678,9 +1333,81 @@ function HealthGoalsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showUpdatePopup, setShowUpdatePopup] = useState(false);
+  const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
+
+  // Track changes from initial values
+  useEffect(() => {
+    const initialGoals = initial?.goals || [];
+    const initialCustomGoals = initial?.customGoals || [];
+    const goalsChanged = JSON.stringify(goals.sort()) !== JSON.stringify(initialGoals.sort());
+    const customGoalsChanged = JSON.stringify(customGoals.sort()) !== JSON.stringify(initialCustomGoals.sort());
+    setHasUnsavedChanges((goalsChanged || customGoalsChanged) && (goals.length > 0 || customGoals.length > 0));
+  }, [goals, customGoals, initial]);
+
+  // Prevent browser navigation when there are unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = 'You have unsaved changes. Please update your insights before leaving.';
+        return e.returnValue;
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  // Handle Update Insights button click
+  const handleUpdateInsights = async () => {
+    setIsGeneratingInsights(true);
+    try {
+      const allIssues = [...goals, ...customGoals].map((name: string) => ({ name }));
+      const currentNames = allIssues.map(i => i.name.trim()).filter(Boolean);
+      
+      // Save goals to both endpoints
+      await Promise.all([
+        fetch('/api/user-data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ goals: currentNames })
+        }),
+        fetch('/api/checkins/issues', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ issues: allIssues })
+        })
+      ]);
+      
+      setHasUnsavedChanges(false);
+      setTimeout(() => {
+        setShowUpdatePopup(false);
+        setIsGeneratingInsights(false);
+      }, 2000);
+    } catch (error) {
+      console.error('Error updating insights:', error);
+      alert('Failed to update insights. Please try again.');
+      setIsGeneratingInsights(false);
+    }
+  };
 
   // Get all available goals (custom + default)
   const allAvailableGoals = [...customGoals, ...defaultGoals];
+
+  // If user has previously saved issues, prefill selections from server
+  React.useEffect(() => {
+    try {
+      fetch('/api/checkins/issues', { cache: 'no-store' as any, credentials: 'same-origin' as any })
+        .then((r) => r.ok ? r.json() : null)
+        .then((data) => {
+          const names: string[] = Array.isArray(data?.issues) ? data.issues.map((i: any) => String(i.name || '')) : []
+          const unique = Array.from(new Set(names.filter(Boolean)))
+          if (unique.length) setGoals(unique)
+        }).catch(() => {})
+    } catch {}
+  }, [])
 
   // Filter suggestions based on search term
   const getSuggestions = () => {
@@ -711,6 +1438,16 @@ function HealthGoalsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
     setShowSuggestions(true);
     setSelectedSuggestionIndex(-1);
   };
+
+  const loadSaved = () => {
+    fetch('/api/checkins/issues', { cache: 'no-store' as any, credentials: 'same-origin' as any })
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        const names: string[] = Array.isArray(data?.issues) ? data.issues.map((i: any) => String(i.name || '')) : []
+        const unique = Array.from(new Set(names.filter(Boolean)))
+        if (unique.length) setGoals(unique)
+      }).catch(() => {})
+  }
 
   const handleSearchFocus = () => {
     setShowSuggestions(true);
@@ -770,8 +1507,118 @@ function HealthGoalsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
     }
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
+    // Check for unsaved changes first
+    if (hasUnsavedChanges) {
+      if (!showUpdatePopup) {
+        setShowUpdatePopup(true);
+      }
+      return;
+    }
+
+    // If check-ins feature is enabled, handle check-ins first to avoid step-5 flash
+    try {
+      if (process.env.NEXT_PUBLIC_CHECKINS_ENABLED === 'true') {
+        const allIssues = [...goals, ...customGoals].map((name: string) => ({ name }));
+        // Fire-and-forget: snapshot selected issues for Insights fallback
+        try {
+          const currentNames = allIssues.map(i => i.name.trim()).filter(Boolean)
+          if (currentNames.length) {
+            fetch('/api/user-data', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ goals: currentNames })
+            }).catch(() => {})
+          }
+        } catch {}
+        // Kick off previous list load in parallel to minimize latency
+        const previousPromise = (async () => {
+          try {
+            const prevRes = await fetch('/api/checkins/issues', { cache: 'no-store' as any })
+            if (prevRes.ok) {
+              const prevJson = await prevRes.json()
+              return Array.isArray(prevJson?.issues)
+                ? prevJson.issues.map((i: any) => String(i.name || '').trim()).filter(Boolean)
+                : []
+            }
+          } catch {}
+          return [] as string[]
+        })()
+
+        if (allIssues.length) {
+          // Save current issues; only await this (single request) then navigate
+          await fetch('/api/checkins/issues', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ issues: allIssues })
+          }).catch(() => {});
+        }
+        // If settings already exist, skip prompts entirely
+        let hasSettings = false
+        try {
+          const s = await fetch('/api/checkins/settings', { cache: 'no-store' as any })
+          if (s.ok) {
+            const j = await s.json()
+            if (j && (j.time1 || j.frequency)) hasSettings = true
+          }
+        } catch {}
+
+        if (!hasSettings) {
+          // First-time onboarding: progress the local step state too
+          onNext({ goals, customGoals });
+          // Only ask once when not configured
+          const enable = window.confirm(
+            'Daily Check‑ins\n\nTrack how you are going 1–3 times a day. This helps AI understand your progress and improves future reports.\n\nEnable now? (You can change this later in Settings)'
+          );
+          if (enable) {
+            const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            const t1 = window.prompt('Lunch reminder time (HH:MM)', '12:30') || '12:30';
+            const t2 = window.prompt('Evening reminder time (HH:MM)', '18:30') || '18:30';
+            const t3 = window.prompt('Bedtime reminder time (HH:MM)', '21:30') || '21:30';
+            await fetch('/api/checkins/settings', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ time1: t1, time2: t2, time3: t3, timezone: tz, frequency: 3 })
+            }).catch(() => {});
+          }
+        } // else: returning user, do not advance step here
+        // Compute newly added names compared to previous selection
+        const currentNames = allIssues.map(i => i.name.trim())
+        const previousNames = await previousPromise
+        const prevSet = new Set(previousNames.map((n: string) => n.toLowerCase()))
+        const newlyAdded = currentNames.filter(n => !prevSet.has(n.toLowerCase()))
+        const query = newlyAdded.length ? ('?new=' + encodeURIComponent(newlyAdded.join('|'))) : ''
+        // Navigate instantly; avoid intermediate step-5 flash by replacing instead of normal navigation
+        window.location.replace('/check-in' + query);
+        return
+      }
+    } catch (e) {
+      // Silently ignore; onboarding should not break
+      console.warn('check-ins prompt error', e);
+    }
+    // Fallback if feature is disabled or an error occurred
+    // Fire-and-forget: snapshot selected issues for Insights fallback when check-ins are disabled
+    try {
+      const currentNames = [...goals, ...customGoals].map((n: string) => n.trim()).filter(Boolean)
+      if (currentNames.length) {
+        fetch('/api/user-data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ goals: currentNames })
+        }).catch(() => {})
+      }
+    } catch {}
     onNext({ goals, customGoals });
+  };
+
+  const handleBack = () => {
+    if (hasUnsavedChanges) {
+      if (!showUpdatePopup) {
+        setShowUpdatePopup(true);
+      }
+      return;
+    }
+    onBack();
   };
 
   return (
@@ -793,6 +1640,9 @@ function HealthGoalsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
         <p className="mb-6 text-gray-600">
           Search and select the areas you'd like to focus on. You can add custom concerns too! 🎯
         </p>
+        <div className="mb-4">
+          <button onClick={loadSaved} className="text-sm text-helfi-green underline">Load saved choices</button>
+        </div>
         
         {/* Selected Goals as Chips */}
         {goals.length > 0 && (
@@ -961,14 +1811,20 @@ function HealthGoalsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
         <div className="flex justify-between pt-4">
           <button 
             className="border border-green-600 text-green-600 px-6 py-3 rounded-lg hover:bg-green-600 hover:text-white transition-colors" 
-            onClick={onBack}
+            onClick={handleBack}
           >
             Back
           </button>
           <div className="flex space-x-3">
             <button 
               className="text-gray-600 hover:text-gray-900 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors"
-              onClick={() => onNext({ goals: [], customGoals: [] })}
+              onClick={() => {
+                if (hasUnsavedChanges) {
+                  setShowUpdatePopup(true);
+                  return;
+                }
+                onNext({ goals: [], customGoals: [] });
+              }}
             >
               Skip
             </button>
@@ -981,6 +1837,16 @@ function HealthGoalsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
           </div>
         </div>
       </div>
+
+      {/* Update Insights Popup */}
+      <UpdateInsightsPopup
+        isOpen={showUpdatePopup}
+        onClose={() => {
+          setShowUpdatePopup(false);
+        }}
+        onUpdateInsights={handleUpdateInsights}
+        isGenerating={isGeneratingInsights}
+      />
     </div>
   );
 }
@@ -990,8 +1856,76 @@ function HealthSituationsStep({ onNext, onBack, initial }: { onNext: (data: any)
   const [healthProblems, setHealthProblems] = useState(initial?.healthSituations?.healthProblems || initial?.healthProblems || '');
   const [additionalInfo, setAdditionalInfo] = useState(initial?.healthSituations?.additionalInfo || initial?.additionalInfo || '');
   const [skipped, setSkipped] = useState(initial?.healthSituations?.skipped || initial?.skipped || false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showUpdatePopup, setShowUpdatePopup] = useState(false);
+  const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
+
+  // Track changes from initial values
+  useEffect(() => {
+    const initialIssues = initial?.healthSituations?.healthIssues || initial?.healthIssues || '';
+    const initialProblems = initial?.healthSituations?.healthProblems || initial?.healthProblems || '';
+    const initialInfo = initial?.healthSituations?.additionalInfo || initial?.additionalInfo || '';
+    const hasChanged = healthIssues.trim() !== initialIssues.trim() || 
+                       healthProblems.trim() !== initialProblems.trim() || 
+                       additionalInfo.trim() !== initialInfo.trim();
+    setHasUnsavedChanges(hasChanged && !skipped && (healthIssues.trim() || healthProblems.trim() || additionalInfo.trim()));
+  }, [healthIssues, healthProblems, additionalInfo, skipped, initial]);
+
+  // Prevent browser navigation when there are unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = 'You have unsaved changes. Please update your insights before leaving.';
+        return e.returnValue;
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  // Handle Update Insights button click
+  const handleUpdateInsights = async () => {
+    setIsGeneratingInsights(true);
+    try {
+      const response = await fetch('/api/user-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          healthSituations: {
+            healthIssues: healthIssues.trim(),
+            healthProblems: healthProblems.trim(),
+            additionalInfo: additionalInfo.trim(),
+            skipped: false
+          }
+        })
+      });
+      
+      if (response.ok) {
+        setHasUnsavedChanges(false);
+        setTimeout(() => {
+          setShowUpdatePopup(false);
+          setIsGeneratingInsights(false);
+        }, 2000);
+      } else {
+        alert('Failed to update insights. Please try again.');
+        setIsGeneratingInsights(false);
+      }
+    } catch (error) {
+      console.error('Error updating insights:', error);
+      alert('Failed to update insights. Please try again.');
+      setIsGeneratingInsights(false);
+    }
+  };
 
   const handleNext = () => {
+    if (hasUnsavedChanges) {
+      if (!showUpdatePopup) {
+        setShowUpdatePopup(true);
+      }
+      return;
+    }
     const healthSituationsData = { 
       healthIssues: healthIssues.trim(), 
       healthProblems: healthProblems.trim(),
@@ -1002,7 +1936,23 @@ function HealthSituationsStep({ onNext, onBack, initial }: { onNext: (data: any)
     onNext({ healthSituations: healthSituationsData });
   };
 
+  const handleBack = () => {
+    if (hasUnsavedChanges) {
+      if (!showUpdatePopup) {
+        setShowUpdatePopup(true);
+      }
+      return;
+    }
+    onBack();
+  };
+
   const handleSkip = () => {
+    if (hasUnsavedChanges) {
+      if (!showUpdatePopup) {
+        setShowUpdatePopup(true);
+      }
+      return;
+    }
     setSkipped(true);
     onNext({ healthSituations: { skipped: true, healthIssues: '', healthProblems: '', additionalInfo: '' } });
   };
@@ -1013,7 +1963,7 @@ function HealthSituationsStep({ onNext, onBack, initial }: { onNext: (data: any)
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold">Tell us about your current health situation</h2>
           <button 
-            onClick={onBack}
+            onClick={handleBack}
             className="text-gray-600 hover:text-gray-900 flex items-center"
           >
             <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1096,6 +2046,16 @@ function HealthSituationsStep({ onNext, onBack, initial }: { onNext: (data: any)
           </button>
         </div>
       </div>
+
+      {/* Update Insights Popup */}
+      <UpdateInsightsPopup
+        isOpen={showUpdatePopup}
+        onClose={() => {
+          setShowUpdatePopup(false);
+        }}
+        onUpdateInsights={handleUpdateInsights}
+        isGenerating={isGeneratingInsights}
+      />
     </div>
   );
 }
@@ -1109,6 +2069,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
       setSupplements(initial.supplements);
     }
   }, [initial?.supplements]);
+  
   const [name, setName] = useState('');
   const [dosage, setDosage] = useState('');
   const [dosageUnit, setDosageUnit] = useState('mg');
@@ -1127,10 +2088,143 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [showDropdown, setShowDropdown] = useState<number | null>(null);
   
-  // Interaction analysis update popup state
+  // Update insights popup state
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
   const [hasExistingAnalysis, setHasExistingAnalysis] = useState(false);
   const [supplementsToSave, setSupplementsToSave] = useState<any[]>([]);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
+  const [imageQualityWarning, setImageQualityWarning] = useState<{front?: string, back?: string}>({});
+  
+  // Populate form fields when editing starts
+  useEffect(() => {
+    if (editingIndex !== null && editingIndex >= 0 && editingIndex < supplements.length) {
+      const supplement = supplements[editingIndex];
+      if (!supplement) {
+        console.warn('Supplement not found at index:', editingIndex);
+        return;
+      }
+      
+      console.log('Populating form for edit:', supplement);
+      
+      // Clear any existing form state first
+      setFrontImage(null);
+      setBackImage(null);
+      // Always use photo-style fields in the UI, regardless of stored method
+      setUploadMethod('photo');
+      
+      const dosageStr = supplement.dosage || '';
+      const dosageParts = dosageStr.split(' ');
+      const baseDosage = dosageParts[0] || '';
+      const baseUnit = dosageParts.length > 1 ? dosageParts[1] : 'mg';
+      
+      setPhotoDosage(baseDosage);
+      setPhotoDosageUnit(baseUnit);
+      
+      const timingArray: string[] = [];
+      const timingDosagesObj: {[key: string]: string} = {};
+      const timingDosageUnitsObj: {[key: string]: string} = {};
+      
+      if (Array.isArray(supplement.timing) && supplement.timing.length > 0) {
+        supplement.timing.forEach((timingStr: string) => {
+          if (typeof timingStr !== 'string') {
+            timingStr = String(timingStr);
+          }
+          
+          if (timingStr.includes(':')) {
+            const parts = timingStr.split(':');
+            if (parts.length >= 2) {
+              const timeName = parts[0].trim();
+              const dosagePart = parts[1].trim();
+              timingArray.push(timeName);
+              
+              const dp = dosagePart.split(' ');
+              if (dp.length >= 2) {
+                timingDosagesObj[timeName] = dp[0];
+                timingDosageUnitsObj[timeName] = dp[1];
+              } else if (dp.length === 1 && dp[0]) {
+                timingDosagesObj[timeName] = dp[0];
+                timingDosageUnitsObj[timeName] = baseUnit;
+              }
+            }
+          } else {
+            const timeName = timingStr.trim();
+            if (timeName) {
+              timingArray.push(timeName);
+              timingDosagesObj[timeName] = baseDosage;
+              timingDosageUnitsObj[timeName] = baseUnit;
+            }
+          }
+        });
+      }
+      
+      setPhotoTiming(timingArray);
+      setPhotoTimingDosages(timingDosagesObj);
+      setPhotoTimingDosageUnits(timingDosageUnitsObj);
+      
+      const scheduleInfo = supplement.scheduleInfo || 'Daily';
+      setPhotoDosageSchedule(scheduleInfo === 'Daily' ? 'daily' : 'specific');
+      if (scheduleInfo !== 'Daily' && scheduleInfo) {
+        setPhotoSelectedDays(scheduleInfo.split(', ').filter(Boolean));
+      } else {
+        setPhotoSelectedDays([]);
+      }
+    } else if (editingIndex === null) {
+      // Clear form when not editing
+      clearPhotoForm();
+    }
+  }, [editingIndex, supplements]);
+
+  // Validate image quality
+  const validateImageQuality = async (file: File, type: 'front' | 'back') => {
+    return new Promise<void>((resolve) => {
+      const img = new window.Image();
+      const url = URL.createObjectURL(file);
+      
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        
+        // Check image dimensions (minimum 800x600 for clarity)
+        const minWidth = 800;
+        const minHeight = 600;
+        
+        // Check file size (too small might indicate poor quality)
+        const minSize = 50 * 1024; // 50KB minimum
+        
+        let warning = '';
+        
+        if (img.width < minWidth || img.height < minHeight) {
+          warning = `Image resolution is low (${img.width}x${img.height}). Please take a clearer photo with better lighting.`;
+        } else if (file.size < minSize) {
+          warning = 'Image file size is very small. Please ensure the photo is clear and well-lit.';
+        }
+        
+        if (warning) {
+          setImageQualityWarning(prev => ({ ...prev, [type]: warning }));
+          // Show alert
+          setTimeout(() => {
+            alert(`⚠️ Image Quality Warning\n\n${warning}\n\nPlease take a clearer image for better accuracy.`);
+          }, 100);
+        } else {
+          setImageQualityWarning(prev => {
+            const updated = { ...prev };
+            delete updated[type];
+            return updated;
+          });
+        }
+        
+        resolve();
+      };
+      
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        setImageQualityWarning(prev => ({ ...prev, [type]: 'Unable to load image. Please try again.' }));
+        resolve();
+      };
+      
+      img.src = url;
+    });
+  };
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -1144,6 +2238,20 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
     document.addEventListener('click', handleClickOutside);
     return () => document.removeEventListener('click', handleClickOutside);
   }, []);
+
+  // Prevent browser navigation when there are unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = 'You have unsaved changes. Please update your insights before leaving.';
+        return e.returnValue;
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
 
   // Check for existing interaction analysis
   useEffect(() => {
@@ -1238,53 +2346,14 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
 
   const addSupplement = async () => {
     const currentDate = new Date().toISOString();
+    const isEditing = editingIndex !== null;
     
-    if (uploadMethod === 'manual' && name && dosage && timing.length > 0) {
-      // Combine timing and individual dosages with units
-      const timingWithDosages = timing.map(time => {
-        const timeSpecificDosage = timingDosages[time];
-        const timeSpecificUnit = timingDosageUnits[time] || dosageUnit;
-        return timeSpecificDosage 
-          ? `${time}: ${timeSpecificDosage} ${timeSpecificUnit}` 
-          : `${time}: ${dosage} ${dosageUnit}`;
-      });
-      
-      const scheduleInfo = dosageSchedule === 'daily' ? 'Daily' : selectedDays.join(', ');
-      
-      const supplementData = { 
-        id: Date.now().toString(), // Unique ID for editing
-        name, 
-        dosage: `${dosage} ${dosageUnit}`, 
-        timing: timingWithDosages, 
-        scheduleInfo: scheduleInfo,
-        method: 'manual',
-        dateAdded: currentDate
-      };
-      
-      if (editingIndex !== null) {
-        // Update existing supplement
-        setSupplements((prev: any[]) => prev.map((item: any, index: number) => 
-          index === editingIndex ? supplementData : item
-        ));
-        setEditingIndex(null);
-      } else {
-        // Add new supplement
-        setSupplements((prev: any[]) => [...prev, supplementData]);
-      }
-      
-      clearForm();
-      
-      // Store data for potential popup action, but don't save immediately
-      const updatedSupplements = editingIndex !== null 
-        ? supplements.map((item: any, index: number) => 
-            index === editingIndex ? supplementData : item
-          )
-        : [...supplements, supplementData];
-      setSupplementsToSave(updatedSupplements);
-      
-      // Show popup and wait for user decision - no automatic actions
-      setShowUpdatePopup(true);
-    } else if (uploadMethod === 'photo' && frontImage && photoDosage && photoTiming.length > 0) {
+    // For new supplements, require both images. For editing, images are optional.
+    const hasRequiredData = isEditing 
+      ? (photoDosage && photoTiming.length > 0)
+      : (frontImage && backImage && photoDosage && photoTiming.length > 0);
+    
+    if (hasRequiredData) {
       // Combine timing and individual dosages with units for photos
       const timingWithDosages = photoTiming.map(time => {
         const timeSpecificDosage = photoTimingDosages[time];
@@ -1296,66 +2365,140 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
       
       const scheduleInfo = photoDosageSchedule === 'daily' ? 'Daily' : photoSelectedDays.join(', ');
       
-      // CRITICAL FIX: Analyze image to extract supplement name instead of using filename
-      let supplementName = 'Analyzing...';
-      try {
-        // Create FormData for image analysis
-        const formData = new FormData();
-        formData.append('image', frontImage);
-        
-        // Call vision API to extract supplement name
-        const visionResponse = await fetch('/api/analyze-supplement-image', {
-          method: 'POST',
-          body: formData
-        });
-        
-        if (visionResponse.ok) {
-          const visionResult = await visionResponse.json();
-          supplementName = visionResult.supplementName || 'Unknown Supplement';
-        } else {
-          supplementName = 'Image Analysis Failed';
+      // Only analyze image if it's a new supplement or if new images are provided
+      let supplementName = isEditing ? supplements[editingIndex].name : 'Analyzing...';
+      
+      if (!isEditing || (frontImage && backImage)) {
+        // CRITICAL FIX: Analyze image to extract supplement name instead of using filename
+        if (frontImage) {
+          try {
+            // Create FormData for image analysis
+            const formData = new FormData();
+            formData.append('image', frontImage);
+            
+            // Call vision API to extract supplement name
+            const visionResponse = await fetch('/api/analyze-supplement-image', {
+              method: 'POST',
+              body: formData
+            });
+            
+            if (visionResponse.ok) {
+              const visionResult = await visionResponse.json();
+              supplementName = visionResult.supplementName || supplementName;
+            }
+          } catch (error) {
+            console.error('Error analyzing supplement image:', error);
+          }
         }
-      } catch (error) {
-        console.error('Error analyzing supplement image:', error);
-        supplementName = 'Analysis Error';
       }
 
       const supplementData = { 
-        id: Date.now().toString(), // Unique ID for editing
-        frontImage: frontImage.name, 
-        backImage: backImage?.name, 
+        id: isEditing ? supplements[editingIndex].id : Date.now().toString(),
+        // Persist existing saved image URL if any (no re-upload required for edits)
+        imageUrl: isEditing ? (supplements[editingIndex].imageUrl || null) : null,
         method: 'photo',
-        name: supplementName, // Use AI-extracted name instead of filename
+        name: supplementName,
         dosage: `${photoDosage} ${photoDosageUnit}`,
         timing: timingWithDosages,
         scheduleInfo: scheduleInfo,
-        dateAdded: currentDate
+        dateAdded: isEditing ? supplements[editingIndex].dateAdded : currentDate
       };
       
       if (editingIndex !== null) {
-        // Update existing supplement
-        setSupplements((prev: any[]) => prev.map((item: any, index: number) => 
+        // Update existing supplement - show popup after saving
+        const updatedSupplements = supplements.map((item: any, index: number) => 
           index === editingIndex ? supplementData : item
-        ));
+        );
+        setSupplements(updatedSupplements);
+        setSupplementsToSave(updatedSupplements);
         setEditingIndex(null);
+        
+        // Save immediately and then show popup
+        try {
+          const response = await fetch('/api/user-data', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ supplements: updatedSupplements })
+          });
+          if (response.ok) {
+            // After successful save, show update insights popup
+            setHasUnsavedChanges(true);
+            setShowUpdatePopup(true);
+          } else {
+            console.error('Failed to save supplement edit');
+          }
+        } catch (error) {
+          console.error('Error saving supplement edit:', error);
+        }
       } else {
-        // Add new supplement
-        setSupplements((prev: any[]) => [...prev, supplementData]);
+        // Add new supplement - show popup
+        setSupplements((prev: any[]) => {
+          const updatedSupplements = [...prev, supplementData];
+          setSupplementsToSave(updatedSupplements);
+          // Mark as having unsaved changes and show popup for new additions
+          setHasUnsavedChanges(true);
+          setShowUpdatePopup(true);
+          return updatedSupplements;
+        });
       }
       
       clearPhotoForm();
-      
-      // Store data for potential popup action, but don't save immediately
-      const updatedSupplements = editingIndex !== null 
-        ? supplements.map((item: any, index: number) => 
-            index === editingIndex ? supplementData : item
-          )
-        : [...supplements, supplementData];
-      setSupplementsToSave(updatedSupplements);
-      
-      // Show popup and wait for user decision - no automatic actions
-      setShowUpdatePopup(true);
     }
+  };
+  
+  // Handle Update Insights button click
+  const handleUpdateInsights = async () => {
+    setIsGeneratingInsights(true);
+    try {
+      // Save supplements to database
+      const response = await fetch('/api/user-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ supplements: supplementsToSave })
+      });
+      
+      if (response.ok) {
+        // Update local state
+        setSupplements(supplementsToSave);
+        setHasUnsavedChanges(false);
+        
+        // Close popup after a short delay to show progress
+        setTimeout(() => {
+          setShowUpdatePopup(false);
+          setIsGeneratingInsights(false);
+        }, 2000);
+      } else {
+        alert('Failed to update insights. Please try again.');
+        setIsGeneratingInsights(false);
+      }
+    } catch (error) {
+      console.error('Error updating insights:', error);
+      alert('Failed to update insights. Please try again.');
+      setIsGeneratingInsights(false);
+    }
+  };
+  
+  // Handle navigation with unsaved changes check
+  const handleNext = () => {
+    if (hasUnsavedChanges) {
+      // Show popup if it's not already showing
+      if (!showUpdatePopup) {
+        setShowUpdatePopup(true);
+      }
+      return;
+    }
+    onNext({ supplements: supplementsToSave && supplementsToSave.length ? supplementsToSave : supplements });
+  };
+  
+  const handleBack = () => {
+    if (hasUnsavedChanges) {
+      // Show popup if it's not already showing
+      if (!showUpdatePopup) {
+        setShowUpdatePopup(true);
+      }
+      return;
+    }
+    onBack();
   };
 
   const clearForm = () => {
@@ -1383,118 +2526,129 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
 
   const editSupplement = (index: number) => {
     const supplement = supplements[index];
+    if (!supplement) {
+      console.error('Supplement not found at index:', index);
+      return;
+    }
+    
+    console.log('Editing supplement:', supplement);
+    
     setEditingIndex(index);
     setShowDropdown(null);
     
-    // Show popup if there's an existing analysis (editing will trigger update)
-    if (hasExistingAnalysis) {
-      setShowUpdatePopup(true);
-    }
-    
-    if (supplement.method === 'manual') {
-      setUploadMethod('manual');
-      setName(supplement.name);
-      
-      // Parse dosage and unit
-      const dosageParts = supplement.dosage.split(' ');
-      setDosage(dosageParts[0]);
-      setDosageUnit(dosageParts[1] || 'mg');
-      
-      // Parse timing data
-      const timingArray = supplement.timing.map((t: string) => t.split(':')[0]);
-      setTiming(timingArray);
-      
-      // Set schedule
-      setDosageSchedule(supplement.scheduleInfo === 'Daily' ? 'daily' : 'specific');
-      if (supplement.scheduleInfo !== 'Daily') {
-        setSelectedDays(supplement.scheduleInfo.split(', '));
+    // Form fields will be populated by useEffect when editingIndex changes
+    // Scroll to form when editing
+    setTimeout(() => {
+      const formElement = document.querySelector('.max-w-md.mx-auto');
+      if (formElement) {
+        formElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
-    } else {
-      setUploadMethod('photo');
-      // For photo method, we'll need to handle this differently
-      // For now, we'll just set the basic info
-      setPhotoDosage(supplement.dosage.split(' ')[0]);
-      setPhotoDosageUnit(supplement.dosage.split(' ')[1] || 'mg');
-      setPhotoDosageSchedule(supplement.scheduleInfo === 'Daily' ? 'daily' : 'specific');
-      if (supplement.scheduleInfo !== 'Daily') {
-        setPhotoSelectedDays(supplement.scheduleInfo.split(', '));
-      }
-    }
+    }, 100);
   };
 
   const removeSupplement = async (index: number) => {
     const updatedSupplements = supplements.filter((_: any, i: number) => i !== index);
     setSupplements(updatedSupplements);
     
-    // CRITICAL FIX: Save to database immediately when deleting
-    try {
-      const response = await fetch('/api/user-data', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ supplements: updatedSupplements })
-      });
-      
-      if (response.ok) {
-        console.log('✅ Supplement deleted and saved to database');
-      } else {
-        console.error('❌ Failed to save supplement deletion:', response.status);
-      }
-    } catch (error) {
-      console.error('❌ Error saving supplement deletion:', error);
-    }
+    // Store updated supplements for potential update action
+    setSupplementsToSave(updatedSupplements);
+    
+    // Mark as having unsaved changes and show update popup
+    setHasUnsavedChanges(true);
+    setShowUpdatePopup(true);
   };
 
   return (
     <div className="max-w-md mx-auto">
       <div className="bg-white rounded-lg shadow-sm p-6">
         <h2 className="text-2xl font-bold mb-4">Upload your supplements</h2>
-        <p className="mb-6 text-gray-600">Add photos or enter manually to get AI guidance on interactions and optimizations.</p>
-        
-        {/* Upload Method Toggle */}
-        <div className="mb-6">
-          <div className="flex rounded-lg border border-gray-200 p-1">
-            <button
-              onClick={() => setUploadMethod('photo')}
-              className={`flex-1 px-3 py-2 rounded-md text-sm transition-colors ${
-                uploadMethod === 'photo'
-                  ? 'bg-green-600 text-white'
-                  : 'text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              📷 Upload Photos
-            </button>
-            <button
-              onClick={() => setUploadMethod('manual')}
-              className={`flex-1 px-3 py-2 rounded-md text-sm transition-colors ${
-                uploadMethod === 'manual'
-                  ? 'bg-green-600 text-white'
-                  : 'text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              ⌨️ Enter Manually
-            </button>
+        {editingIndex !== null && (
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center space-x-2">
+              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              <span className="text-blue-900 font-medium">Editing: {supplements[editingIndex]?.name || 'Supplement'}</span>
+              <button
+                onClick={() => {
+                  setEditingIndex(null);
+                  clearPhotoForm();
+                }}
+                className="ml-auto text-blue-600 hover:text-blue-800 text-sm"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
-        </div>
-
-        {/* Photo Upload Method */}
-        {uploadMethod === 'photo' && (
-          <div className="mb-6 space-y-4">
+        )}
+        <p className="mb-6 text-gray-600">Add photos of both the front and back of your supplement bottles/packets to get accurate AI guidance on interactions and optimizations.</p>
+        
+        {/* Photo Upload Method - Only Option */}
+        <div className="mb-6 space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Front of supplement bottle/packet *
+                Front of supplement bottle/packet {editingIndex === null ? '*' : '(optional when editing)'}
               </label>
+              {editingIndex !== null && (supplements[editingIndex]?.imageUrl) && (
+                <div className="mb-2 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-16 h-16 bg-gray-200 rounded flex items-center justify-center overflow-hidden">
+                        {supplements[editingIndex].imageUrl ? (
+                          <img 
+                            src={supplements[editingIndex].imageUrl} 
+                            alt="Front" 
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                        )}
+                      </div>
+                      <div>
+                        <div className="text-sm font-medium text-gray-700">Current image</div>
+                        <div className="text-xs text-gray-500">{supplements[editingIndex].imageUrl}</div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Mark image for deletion by setting to null
+                        const updatedSupplements = supplements.map((item: any, index: number) => 
+                          index === editingIndex ? { ...item, imageUrl: null } : item
+                        );
+                        setSupplements(updatedSupplements);
+                      }}
+                      className="px-3 py-1 text-xs text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              )}
               <div className="relative">
                 <input
                   type="file"
                   accept="image/*"
                   capture="environment"
-                  onChange={(e) => setFrontImage(e.target.files?.[0] || null)}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    setFrontImage(file);
+                    // Validate image quality
+                    if (file) {
+                      validateImageQuality(file, 'front');
+                    }
+                  }}
                   className="hidden"
                   id="front-image"
+                  required
                 />
                 <label
                   htmlFor="front-image"
-                  className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
+                  className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-gray-50 transition-colors ${
+                    frontImage ? 'border-green-500 bg-green-50' : 'border-gray-300'
+                  }`}
                 >
                   {frontImage ? (
                     <div className="text-center">
@@ -1513,20 +2667,68 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Back of supplement bottle/packet (optional)
+                Back of supplement bottle/packet {editingIndex === null ? '*' : '(optional when editing)'}
               </label>
+              {editingIndex !== null && (supplements[editingIndex]?.imageUrl) && (
+                <div className="mb-2 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-16 h-16 bg-gray-200 rounded flex items-center justify-center overflow-hidden">
+                        {supplements[editingIndex].imageUrl ? (
+                          <img 
+                            src={supplements[editingIndex].imageUrl} 
+                            alt="Back" 
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                        )}
+                      </div>
+                      <div>
+                        <div className="text-sm font-medium text-gray-700">Current image</div>
+                        <div className="text-xs text-gray-500">{supplements[editingIndex].imageUrl}</div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Mark image for deletion by setting to null
+                        const updatedSupplements = supplements.map((item: any, index: number) => 
+                          index === editingIndex ? { ...item, imageUrl: null } : item
+                        );
+                        setSupplements(updatedSupplements);
+                      }}
+                      className="px-3 py-1 text-xs text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              )}
               <div className="relative">
                 <input
                   type="file"
                   accept="image/*"
                   capture="environment"
-                  onChange={(e) => setBackImage(e.target.files?.[0] || null)}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    setBackImage(file);
+                    // Validate image quality
+                    if (file) {
+                      validateImageQuality(file, 'back');
+                    }
+                  }}
                   className="hidden"
                   id="back-image"
+                  required
                 />
                 <label
                   htmlFor="back-image"
-                  className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
+                  className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-gray-50 transition-colors ${
+                    backImage ? 'border-green-500 bg-green-50' : 'border-gray-300'
+                  }`}
                 >
                   {backImage ? (
                     <div className="text-center">
@@ -1685,170 +2887,15 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
             <button 
               className="w-full bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-300" 
               onClick={addSupplement}
-              disabled={!frontImage || !photoDosage || photoTiming.length === 0 || (photoDosageSchedule === 'specific' && photoSelectedDays.length === 0)}
-            >
-              {editingIndex !== null ? 'Update Supplement' : 'Add Supplement Photos'}
-            </button>
-          </div>
-        )}
-
-        {/* Manual Entry Method */}
-        {uploadMethod === 'manual' && (
-          <div className="mb-6 space-y-4">
-            <input 
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-green-500 focus:ring-1 focus:ring-green-500" 
-              type="text" 
-              placeholder="Supplement name" 
-              value={name} 
-              onChange={e => setName(e.target.value)} 
-            />
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Dosage *
-              </label>
-              <div className="flex space-x-2">
-                <input 
-                  className="flex-1 rounded-lg border border-gray-300 px-3 py-2 focus:border-green-500 focus:ring-1 focus:ring-green-500" 
-                  type="text" 
-                  inputMode="numeric"
-                  placeholder="e.g., 1000, 2" 
-                  value={dosage} 
-                  onChange={e => setDosage(e.target.value)} 
-                />
-                <select
-                  value={dosageUnit}
-                  onChange={e => setDosageUnit(e.target.value)}
-                  className="w-24 rounded-lg border border-gray-300 px-2 py-2 focus:border-green-500 focus:ring-1 focus:ring-green-500 text-sm"
-                >
-                  {dosageUnits.map(unit => (
-                    <option key={unit} value={unit}>{unit}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                How often do you take this supplement? *
-              </label>
-              <div className="space-y-3">
-                <div className="flex items-center space-x-3">
-                  <input
-                    type="radio"
-                    checked={dosageSchedule === 'daily'}
-                    onChange={() => handleScheduleChange('daily', false)}
-                    className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 focus:ring-green-500 focus:ring-2"
-                    id="manual-daily"
-                  />
-                  <label htmlFor="manual-daily" className="cursor-pointer">
-                    <span className="text-gray-700">Every day</span>
-                  </label>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <input
-                    type="radio"
-                    checked={dosageSchedule === 'specific'}
-                    onChange={() => handleScheduleChange('specific', false)}
-                    className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 focus:ring-green-500 focus:ring-2"
-                    id="manual-specific"
-                  />
-                  <label htmlFor="manual-specific" className="cursor-pointer">
-                    <span className="text-gray-700">Specific days only</span>
-                  </label>
-                </div>
-                
-                {dosageSchedule === 'specific' && (
-                  <div className="ml-7 space-y-2">
-                    <div className="text-sm text-gray-600 mb-2">Select the days you take this supplement:</div>
-                    <div className="grid grid-cols-2 gap-2">
-                      {daysOfWeek.map(day => (
-                        <div key={day} className="flex items-center space-x-2">
-                          <input
-                            type="checkbox"
-                            checked={selectedDays.includes(day)}
-                            onChange={() => toggleDay(day, false)}
-                            className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
-                            id={`manual-day-${day}`}
-                          />
-                          <label htmlFor={`manual-day-${day}`} className="text-sm cursor-pointer">
-                            {day.substring(0, 3)}
-                          </label>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                When do you take this supplement? *
-              </label>
-              <div className="space-y-3">
-                {timingOptions.map(time => (
-                  <div key={time} className="flex items-center space-x-3">
-                    <input
-                      type="checkbox"
-                      checked={timing.includes(time)}
-                      onChange={() => toggleTiming(time, false)}
-                      className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
-                      id={`manual-timing-${time}`}
-                    />
-                    <label htmlFor={`manual-timing-${time}`} className="flex-1 cursor-pointer">
-                      <span className="text-gray-700">{time}</span>
-                    </label>
-                    {timing.includes(time) && (
-                      <div className="flex space-x-1">
-                        <input
-                          type="text"
-                          inputMode="numeric" placeholder="Amount"
-                          value={timingDosages[time] || ''}
-                          className="w-16 px-2 py-1 border border-gray-300 rounded text-base focus:border-green-500 focus:ring-1 focus:ring-green-500"
-                          onChange={(e) => {
-                            setTimingDosages(prev => ({
-                              ...prev,
-                              [time]: e.target.value
-                            }));
-                          }}
-                        />
-                        <select
-                          value={timingDosageUnits[time] || dosageUnit}
-                          onChange={(e) => {
-                            setTimingDosageUnits(prev => ({
-                              ...prev,
-                              [time]: e.target.value
-                            }));
-                          }}
-                          className="w-16 px-1 py-1 border border-gray-300 rounded text-base focus:border-green-500 focus:ring-1 focus:ring-green-500"
-                        >
-                          {dosageUnits.map(unit => (
-                            <option key={unit} value={unit}>{unit}</option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Tip for per-timing dosages */}
-            <div className="flex items-start space-x-2 p-3 bg-amber-50 rounded-lg">
-              <div className="text-amber-600 text-lg flex-shrink-0">💡</div>
-              <div className="text-sm text-amber-800">
-                <strong>Tip:</strong> If you split your supplement throughout the day, check multiple times and enter the specific dosage for each time.
-              </div>
-            </div>
-
-            <button 
-              className="w-full bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-300" 
-              onClick={addSupplement}
-              disabled={!name || !dosage || timing.length === 0 || (dosageSchedule === 'specific' && selectedDays.length === 0)}
+              disabled={
+                editingIndex !== null 
+                  ? (!photoDosage || photoTiming.length === 0 || (photoDosageSchedule === 'specific' && photoSelectedDays.length === 0))
+                  : (!frontImage || !backImage || !photoDosage || photoTiming.length === 0 || (photoDosageSchedule === 'specific' && photoSelectedDays.length === 0))
+              }
             >
               {editingIndex !== null ? 'Update Supplement' : 'Add Supplement'}
             </button>
           </div>
-        )}
 
         {/* Added Supplements List */}
         {supplements.length > 0 && (
@@ -1953,7 +3000,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
           <div className="mb-6 p-4 bg-blue-50 rounded-lg">
             <div className="flex items-start gap-2">
               <div className="text-blue-600 text-xl">🤖</div>
-              <div>
+              <div className="flex-1">
                 <div className="font-medium text-blue-900">AI Analysis Ready</div>
                 <div className="text-sm text-blue-700">
                   We'll analyze your supplements for interactions, optimal timing, and missing nutrients.
@@ -1963,49 +3010,60 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
           </div>
         )}
 
+        {/* Manual Update Insights Button - Show if there are unsaved changes */}
+        {hasUnsavedChanges && supplements.length > 0 && (
+          <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <div className="font-medium text-yellow-900 mb-1">Update Insights</div>
+                <div className="text-sm text-yellow-700">
+                  You've added supplements that haven't been analyzed yet. Click below to update your insights.
+                </div>
+              </div>
+              <button
+                onClick={() => setShowUpdatePopup(true)}
+                disabled={isGeneratingInsights}
+                className="ml-4 px-4 py-2 bg-helfi-green text-white rounded-lg hover:bg-helfi-green/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed font-medium text-sm whitespace-nowrap"
+              >
+                {isGeneratingInsights ? (
+                  <>
+                    <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2"></span>
+                    Updating...
+                  </>
+                ) : (
+                  'Update Insights'
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Navigation Buttons */}
         <div className="flex justify-between pt-4">
           <button 
             className="border border-green-600 text-green-600 px-6 py-3 rounded-lg hover:bg-green-600 hover:text-white transition-colors" 
-            onClick={onBack}
+            onClick={handleBack}
           >
             Back
           </button>
           <button 
             className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors" 
-            onClick={() => onNext({ supplements: (supplementsToSave && supplementsToSave.length ? supplementsToSave : supplements) })}
+            onClick={handleNext}
           >
             Next
           </button>
         </div>
       </div>
       
-      {/* Interaction Analysis Update Popup */}
-      <InteractionAnalysisUpdatePopup
+      {/* Update Insights Popup */}
+      <UpdateInsightsPopup
         isOpen={showUpdatePopup}
-        onClose={() => setShowUpdatePopup(false)}
-        onUpdate={async () => {
-          try {
-            // Clear existing analysis to trigger re-analysis
-            const response = await fetch('/api/interaction-history', {
-              method: 'DELETE'
-            });
-            if (response.ok) {
-              console.log('✅ Cleared existing analysis - will navigate to page 8 for fresh analysis');
-            }
-            
-            // Close popup first
-            setShowUpdatePopup(false);
-            
-            // CRITICAL FIX: Pass data to navigation function
-            if (onNavigateToAnalysis) {
-              onNavigateToAnalysis({ supplements: supplementsToSave });
-            }
-          } catch (error) {
-            console.error('Error clearing analysis:', error);
-          }
+        onClose={() => {
+          // When "Add More" is clicked, just close the popup
+          setShowUpdatePopup(false);
         }}
-        onNavigateToAnalysis={onNavigateToAnalysis}
+        onUpdateInsights={handleUpdateInsights}
+        isGenerating={isGeneratingInsights}
       />
     </div>
   );
@@ -2020,6 +3078,7 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
       setMedications(initial.medications);
     }
   }, [initial?.medications]);
+  
   const [name, setName] = useState('');
   const [dosage, setDosage] = useState('');
   const [dosageUnit, setDosageUnit] = useState('mg');
@@ -2047,10 +3106,143 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [showDropdown, setShowDropdown] = useState<number | null>(null);
   
-  // Interaction analysis update popup state
+  // Update insights popup state
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
   const [hasExistingAnalysis, setHasExistingAnalysis] = useState(false);
   const [medicationsToSave, setMedicationsToSave] = useState<any[]>([]);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
+  const [imageQualityWarning, setImageQualityWarning] = useState<{front?: string, back?: string}>({});
+  
+  // Populate form fields when editing starts
+  useEffect(() => {
+    if (editingIndex !== null && editingIndex >= 0 && editingIndex < medications.length) {
+      const medication = medications[editingIndex];
+      if (!medication) {
+        console.warn('Medication not found at index:', editingIndex);
+        return;
+      }
+      
+      console.log('Populating form for edit:', medication);
+      
+      // Clear any existing form state first
+      setFrontImage(null);
+      setBackImage(null);
+      // Always use photo-style fields in the UI, regardless of stored method
+      setUploadMethod('photo');
+      
+      const dosageStr = medication.dosage || '';
+      const dosageParts = dosageStr.split(' ');
+      const baseDosage = dosageParts[0] || '';
+      const baseUnit = dosageParts.length > 1 ? dosageParts[1] : 'mg';
+      
+      setPhotoDosage(baseDosage);
+      setPhotoDosageUnit(baseUnit);
+      
+      const timingArray: string[] = [];
+      const timingDosagesObj: {[key: string]: string} = {};
+      const timingDosageUnitsObj: {[key: string]: string} = {};
+      
+      if (Array.isArray(medication.timing) && medication.timing.length > 0) {
+        medication.timing.forEach((timingStr: string) => {
+          if (typeof timingStr !== 'string') {
+            timingStr = String(timingStr);
+          }
+          
+          if (timingStr.includes(':')) {
+            const parts = timingStr.split(':');
+            if (parts.length >= 2) {
+              const timeName = parts[0].trim();
+              const dosagePart = parts[1].trim();
+              timingArray.push(timeName);
+              
+              const dp = dosagePart.split(' ');
+              if (dp.length >= 2) {
+                timingDosagesObj[timeName] = dp[0];
+                timingDosageUnitsObj[timeName] = dp[1];
+              } else if (dp.length === 1 && dp[0]) {
+                timingDosagesObj[timeName] = dp[0];
+                timingDosageUnitsObj[timeName] = baseUnit;
+              }
+            }
+          } else {
+            const timeName = timingStr.trim();
+            if (timeName) {
+              timingArray.push(timeName);
+              timingDosagesObj[timeName] = baseDosage;
+              timingDosageUnitsObj[timeName] = baseUnit;
+            }
+          }
+        });
+      }
+      
+      setPhotoTiming(timingArray);
+      setPhotoTimingDosages(timingDosagesObj);
+      setPhotoTimingDosageUnits(timingDosageUnitsObj);
+      
+      const scheduleInfo = medication.scheduleInfo || 'Daily';
+      setPhotoDosageSchedule(scheduleInfo === 'Daily' ? 'daily' : 'specific');
+      if (scheduleInfo !== 'Daily' && scheduleInfo) {
+        setPhotoSelectedDays(scheduleInfo.split(', ').filter(Boolean));
+      } else {
+        setPhotoSelectedDays([]);
+      }
+    } else if (editingIndex === null) {
+      // Clear form when not editing
+      clearMedPhotoForm();
+    }
+  }, [editingIndex, medications]);
+
+  // Validate image quality
+  const validateImageQuality = async (file: File, type: 'front' | 'back') => {
+    return new Promise<void>((resolve) => {
+      const img = new window.Image();
+      const url = URL.createObjectURL(file);
+      
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        
+        // Check image dimensions (minimum 800x600 for clarity)
+        const minWidth = 800;
+        const minHeight = 600;
+        
+        // Check file size (too small might indicate poor quality)
+        const minSize = 50 * 1024; // 50KB minimum
+        
+        let warning = '';
+        
+        if (img.width < minWidth || img.height < minHeight) {
+          warning = `Image resolution is low (${img.width}x${img.height}). Please take a clearer photo with better lighting.`;
+        } else if (file.size < minSize) {
+          warning = 'Image file size is very small. Please ensure the photo is clear and well-lit.';
+        }
+        
+        if (warning) {
+          setImageQualityWarning(prev => ({ ...prev, [type]: warning }));
+          // Show alert
+          setTimeout(() => {
+            alert(`⚠️ Image Quality Warning\n\n${warning}\n\nPlease take a clearer image for better accuracy.`);
+          }, 100);
+        } else {
+          setImageQualityWarning(prev => {
+            const updated = { ...prev };
+            delete updated[type];
+            return updated;
+          });
+        }
+        
+        resolve();
+      };
+      
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        setImageQualityWarning(prev => ({ ...prev, [type]: 'Unable to load image. Please try again.' }));
+        resolve();
+      };
+      
+      img.src = url;
+    });
+  };
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -2064,6 +3256,20 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
     document.addEventListener('click', handleClickOutside);
     return () => document.removeEventListener('click', handleClickOutside);
   }, []);
+
+  // Prevent browser navigation when there are unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = 'You have unsaved changes. Please update your insights before leaving.';
+        return e.returnValue;
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
 
   // Check for existing interaction analysis
   useEffect(() => {
@@ -2124,53 +3330,14 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
 
   const addMedication = async () => {
     const currentDate = new Date().toISOString();
+    const isEditing = editingIndex !== null;
     
-    if (uploadMethod === 'manual' && name && dosage && timing.length > 0) {
-      // Combine timing and individual dosages with units
-      const timingWithDosages = timing.map(time => {
-        const timeSpecificDosage = timingDosages[time];
-        const timeSpecificUnit = timingDosageUnits[time] || dosageUnit;
-        return timeSpecificDosage 
-          ? `${time}: ${timeSpecificDosage} ${timeSpecificUnit}` 
-          : `${time}: ${dosage} ${dosageUnit}`;
-      });
-      
-      const scheduleInfo = dosageSchedule === 'daily' ? 'Daily' : selectedDays.join(', ');
-      
-      const medicationData = { 
-        id: Date.now().toString(), // Unique ID for editing
-        name, 
-        dosage: `${dosage} ${dosageUnit}`, 
-        timing: timingWithDosages, 
-        scheduleInfo: scheduleInfo,
-        method: 'manual',
-        dateAdded: currentDate
-      };
-      
-      if (editingIndex !== null) {
-        // Update existing medication
-        setMedications((prev: any[]) => prev.map((item: any, index: number) => 
-          index === editingIndex ? medicationData : item
-        ));
-        setEditingIndex(null);
-      } else {
-        // Add new medication
-        setMedications((prev: any[]) => [...prev, medicationData]);
-      }
-      
-      clearMedForm();
-      
-      // Store data for potential popup action, but don't save immediately
-      const updatedMedications = editingIndex !== null 
-        ? medications.map((item: any, index: number) => 
-            index === editingIndex ? medicationData : item
-          )
-        : [...medications, medicationData];
-      setMedicationsToSave(updatedMedications);
-      
-      // Show popup and wait for user decision - no automatic actions
-      setShowUpdatePopup(true);
-    } else if (uploadMethod === 'photo' && frontImage && photoDosage && photoTiming.length > 0) {
+    // For new medications, require both images. For editing, images are optional.
+    const hasRequiredData = isEditing 
+      ? (photoDosage && photoTiming.length > 0)
+      : (frontImage && backImage && photoDosage && photoTiming.length > 0);
+    
+    if (hasRequiredData) {
       // Combine timing and individual dosages with units for photos
       const timingWithDosages = photoTiming.map(time => {
         const timeSpecificDosage = photoTimingDosages[time];
@@ -2182,66 +3349,139 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
       
       const scheduleInfo = photoDosageSchedule === 'daily' ? 'Daily' : photoSelectedDays.join(', ');
       
-      // CRITICAL FIX: Analyze image to extract medication name instead of using filename
-      let medicationName = 'Analyzing...';
-      try {
-        // Create FormData for image analysis
-        const formData = new FormData();
-        formData.append('image', frontImage);
-        
-        // Call vision API to extract medication name
-        const visionResponse = await fetch('/api/analyze-supplement-image', {
-          method: 'POST',
-          body: formData
-        });
-        
-        if (visionResponse.ok) {
-          const visionResult = await visionResponse.json();
-          medicationName = visionResult.supplementName || 'Unknown Medication';
-        } else {
-          medicationName = 'Image Analysis Failed';
+      // Only analyze image if it's a new medication or if new images are provided
+      let medicationName = isEditing ? medications[editingIndex].name : 'Analyzing...';
+      
+      if (!isEditing || (frontImage && backImage)) {
+        // CRITICAL FIX: Analyze image to extract medication name instead of using filename
+        if (frontImage) {
+          try {
+            // Create FormData for image analysis
+            const formData = new FormData();
+            formData.append('image', frontImage);
+            
+            // Call vision API to extract medication name
+            const visionResponse = await fetch('/api/analyze-supplement-image', {
+              method: 'POST',
+              body: formData
+            });
+            
+            if (visionResponse.ok) {
+              const visionResult = await visionResponse.json();
+              medicationName = visionResult.supplementName || medicationName;
+            }
+          } catch (error) {
+            console.error('Error analyzing medication image:', error);
+          }
         }
-      } catch (error) {
-        console.error('Error analyzing medication image:', error);
-        medicationName = 'Analysis Error';
       }
 
       const medicationData = { 
-        id: Date.now().toString(), // Unique ID for editing
-        frontImage: frontImage.name, 
-        backImage: backImage?.name, 
+        id: isEditing ? medications[editingIndex].id : Date.now().toString(),
+        imageUrl: isEditing ? (medications[editingIndex].imageUrl || null) : null,
         method: 'photo',
-        name: medicationName, // Use AI-extracted name instead of filename
+        name: medicationName,
         dosage: `${photoDosage} ${photoDosageUnit}`,
         timing: timingWithDosages,
         scheduleInfo: scheduleInfo,
-        dateAdded: currentDate
+        dateAdded: isEditing ? medications[editingIndex].dateAdded : currentDate
       };
       
       if (editingIndex !== null) {
-        // Update existing medication
-        setMedications((prev: any[]) => prev.map((item: any, index: number) => 
+        // Update existing medication - show popup after saving
+        const updatedMedications = medications.map((item: any, index: number) => 
           index === editingIndex ? medicationData : item
-        ));
+        );
+        setMedications(updatedMedications);
+        setMedicationsToSave(updatedMedications);
         setEditingIndex(null);
+        
+        // Save immediately and then show popup
+        try {
+          const response = await fetch('/api/user-data', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ medications: updatedMedications })
+          });
+          if (response.ok) {
+            // After successful save, show update insights popup
+            setHasUnsavedChanges(true);
+            setShowUpdatePopup(true);
+          } else {
+            console.error('Failed to save medication edit');
+          }
+        } catch (error) {
+          console.error('Error saving medication edit:', error);
+        }
       } else {
-        // Add new medication
-        setMedications((prev: any[]) => [...prev, medicationData]);
+        // Add new medication - show popup
+        setMedications((prev: any[]) => {
+          const updatedMedications = [...prev, medicationData];
+          setMedicationsToSave(updatedMedications);
+          // Mark as having unsaved changes and show popup for new additions
+          setHasUnsavedChanges(true);
+          setShowUpdatePopup(true);
+          return updatedMedications;
+        });
       }
       
       clearMedPhotoForm();
-      
-      // Store data for potential popup action, but don't save immediately
-      const updatedMedications = editingIndex !== null 
-        ? medications.map((item: any, index: number) => 
-            index === editingIndex ? medicationData : item
-          )
-        : [...medications, medicationData];
-      setMedicationsToSave(updatedMedications);
-      
-      // Show popup and wait for user decision - no automatic actions
-      setShowUpdatePopup(true);
     }
+  };
+  
+  // Handle Update Insights button click
+  const handleUpdateInsights = async () => {
+    setIsGeneratingInsights(true);
+    try {
+      // Save medications to database
+      const response = await fetch('/api/user-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ medications: medicationsToSave })
+      });
+      
+      if (response.ok) {
+        // Update local state
+        setMedications(medicationsToSave);
+        setHasUnsavedChanges(false);
+        
+        // Close popup after a short delay to show progress
+        setTimeout(() => {
+          setShowUpdatePopup(false);
+          setIsGeneratingInsights(false);
+        }, 2000);
+      } else {
+        alert('Failed to update insights. Please try again.');
+        setIsGeneratingInsights(false);
+      }
+    } catch (error) {
+      console.error('Error updating insights:', error);
+      alert('Failed to update insights. Please try again.');
+      setIsGeneratingInsights(false);
+    }
+  };
+  
+  // Handle navigation with unsaved changes check
+  const handleNext = () => {
+    if (hasUnsavedChanges) {
+      // Show popup if it's not already showing
+      if (!showUpdatePopup) {
+        setShowUpdatePopup(true);
+      }
+      return;
+    }
+    onNext({ medications: medicationsToSave && medicationsToSave.length ? medicationsToSave : medications });
+  };
+  
+  const handleBack = () => {
+    if (hasUnsavedChanges) {
+      // Show popup if it's not already showing
+      if (!showUpdatePopup) {
+        setShowUpdatePopup(true);
+      }
+      return;
+    }
+    onBack();
   };
 
   const clearMedForm = () => {
@@ -2269,116 +3509,129 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
 
   const editMedication = (index: number) => {
     const medication = medications[index];
+    if (!medication) {
+      console.error('Medication not found at index:', index);
+      return;
+    }
+    
+    console.log('Editing medication:', medication);
+    
     setEditingIndex(index);
     setShowDropdown(null);
     
-    // Show popup if there's an existing analysis (editing will trigger update)
-    if (hasExistingAnalysis) {
-      setShowUpdatePopup(true);
-    }
-    
-    if (medication.method === 'manual') {
-      setUploadMethod('manual');
-      setName(medication.name);
-      
-      // Parse dosage and unit
-      const dosageParts = medication.dosage.split(' ');
-      setDosage(dosageParts[0]);
-      setDosageUnit(dosageParts[1] || 'mg');
-      
-      // Parse timing data
-      const timingArray = medication.timing.map((t: string) => t.split(':')[0]);
-      setTiming(timingArray);
-      
-      // Set schedule
-      setDosageSchedule(medication.scheduleInfo === 'Daily' ? 'daily' : 'specific');
-      if (medication.scheduleInfo !== 'Daily') {
-        setSelectedDays(medication.scheduleInfo.split(', '));
+    // Form fields will be populated by useEffect when editingIndex changes
+    // Scroll to form when editing
+    setTimeout(() => {
+      const formElement = document.querySelector('.max-w-md.mx-auto');
+      if (formElement) {
+        formElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
-    } else {
-      setUploadMethod('photo');
-      setPhotoDosage(medication.dosage.split(' ')[0]);
-      setPhotoDosageUnit(medication.dosage.split(' ')[1] || 'mg');
-      setPhotoDosageSchedule(medication.scheduleInfo === 'Daily' ? 'daily' : 'specific');
-      if (medication.scheduleInfo !== 'Daily') {
-        setPhotoSelectedDays(medication.scheduleInfo.split(', '));
-      }
-    }
+    }, 100);
   };
 
   const removeMedication = async (index: number) => {
     const updatedMedications = medications.filter((_: any, i: number) => i !== index);
     setMedications(updatedMedications);
     
-    // CRITICAL FIX: Save to database immediately when deleting
-    try {
-      const response = await fetch('/api/user-data', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ medications: updatedMedications })
-      });
-      
-      if (response.ok) {
-        console.log('✅ Medication deleted and saved to database');
-      } else {
-        console.error('❌ Failed to save medication deletion:', response.status);
-      }
-    } catch (error) {
-      console.error('❌ Error saving medication deletion:', error);
-    }
+    // Store updated medications for potential update action
+    setMedicationsToSave(updatedMedications);
+    
+    // Mark as having unsaved changes and show update popup
+    setHasUnsavedChanges(true);
+    setShowUpdatePopup(true);
   };
 
   return (
     <div className="max-w-md mx-auto">
       <div className="bg-white rounded-lg shadow-sm p-6">
         <h2 className="text-2xl font-bold mb-4">Add your medications</h2>
-        <p className="mb-6 text-gray-600">Upload photos or enter manually to check for supplement-medication interactions.</p>
-        
-        {/* Upload Method Toggle */}
-        <div className="mb-6">
-          <div className="flex rounded-lg border border-gray-200 p-1">
-            <button
-              onClick={() => setUploadMethod('photo')}
-              className={`flex-1 px-3 py-2 rounded-md text-sm transition-colors ${
-                uploadMethod === 'photo'
-                  ? 'bg-green-600 text-white'
-                  : 'text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              📷 Upload Photos
-            </button>
-            <button
-              onClick={() => setUploadMethod('manual')}
-              className={`flex-1 px-3 py-2 rounded-md text-sm transition-colors ${
-                uploadMethod === 'manual'
-                  ? 'bg-green-600 text-white'
-                  : 'text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              ⌨️ Enter Manually
-            </button>
+        {editingIndex !== null && (
+          <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-center space-x-2">
+              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              <span className="text-blue-900 font-medium">Editing: {medications[editingIndex]?.name || 'Medication'}</span>
+              <button
+                onClick={() => {
+                  setEditingIndex(null);
+                  clearMedPhotoForm();
+                }}
+                className="ml-auto text-blue-600 hover:text-blue-800 text-sm"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
-        </div>
-
-        {/* Photo Upload Method */}
-        {uploadMethod === 'photo' && (
-          <div className="mb-6 space-y-4">
+        )}
+        <p className="mb-6 text-gray-600">Upload photos of both the front and back of your medication bottles/packets to check for supplement-medication interactions.</p>
+        
+        {/* Photo Upload Method - Only Option */}
+        <div className="mb-6 space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Front of medication bottle/packet *
+                Front of medication bottle/packet {editingIndex === null ? '*' : '(optional when editing)'}
               </label>
+              {editingIndex !== null && (medications[editingIndex]?.imageUrl) && (
+                <div className="mb-2 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-16 h-16 bg-gray-200 rounded flex items-center justify-center overflow-hidden">
+                        {medications[editingIndex].imageUrl ? (
+                          <img 
+                            src={medications[editingIndex].imageUrl} 
+                            alt="Front" 
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                        )}
+                      </div>
+                      <div>
+                        <div className="text-sm font-medium text-gray-700">Current image</div>
+                        <div className="text-xs text-gray-500">{medications[editingIndex].imageUrl}</div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Mark image for deletion by setting to null
+                        const updatedMedications = medications.map((item: any, index: number) => 
+                          index === editingIndex ? { ...item, imageUrl: null } : item
+                        );
+                        setMedications(updatedMedications);
+                      }}
+                      className="px-3 py-1 text-xs text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              )}
               <div className="relative">
                 <input
                   type="file"
                   accept="image/*"
                   capture="environment"
-                  onChange={(e) => setFrontImage(e.target.files?.[0] || null)}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    setFrontImage(file);
+                    // Validate image quality
+                    if (file) {
+                      validateImageQuality(file, 'front');
+                    }
+                  }}
                   className="hidden"
                   id="med-front-image"
+                  required
                 />
                 <label
                   htmlFor="med-front-image"
-                  className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
+                  className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-gray-50 transition-colors ${
+                    frontImage ? 'border-green-500 bg-green-50' : 'border-gray-300'
+                  }`}
                 >
                   {frontImage ? (
                     <div className="text-center">
@@ -2397,20 +3650,68 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Back of medication bottle/packet (optional)
+                Back of medication bottle/packet {editingIndex === null ? '*' : '(optional when editing)'}
               </label>
+              {editingIndex !== null && (medications[editingIndex]?.imageUrl) && (
+                <div className="mb-2 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-16 h-16 bg-gray-200 rounded flex items-center justify-center overflow-hidden">
+                        {medications[editingIndex].imageUrl ? (
+                          <img 
+                            src={medications[editingIndex].imageUrl} 
+                            alt="Back" 
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                        )}
+                      </div>
+                      <div>
+                        <div className="text-sm font-medium text-gray-700">Current image</div>
+                        <div className="text-xs text-gray-500">{medications[editingIndex].imageUrl}</div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Mark image for deletion by setting to null
+                        const updatedMedications = medications.map((item: any, index: number) => 
+                          index === editingIndex ? { ...item, imageUrl: null } : item
+                        );
+                        setMedications(updatedMedications);
+                      }}
+                      className="px-3 py-1 text-xs text-red-600 hover:text-red-800 hover:bg-red-50 rounded transition-colors"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              )}
               <div className="relative">
                 <input
                   type="file"
                   accept="image/*"
                   capture="environment"
-                  onChange={(e) => setBackImage(e.target.files?.[0] || null)}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] || null;
+                    setBackImage(file);
+                    // Validate image quality
+                    if (file) {
+                      validateImageQuality(file, 'back');
+                    }
+                  }}
                   className="hidden"
                   id="med-back-image"
+                  required
                 />
                 <label
                   htmlFor="med-back-image"
-                  className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
+                  className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-gray-50 transition-colors ${
+                    backImage ? 'border-green-500 bg-green-50' : 'border-gray-300'
+                  }`}
                 >
                   {backImage ? (
                     <div className="text-center">
@@ -2565,165 +3866,15 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
             <button 
               className="w-full bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-300" 
               onClick={addMedication}
-              disabled={!frontImage || !photoDosage || photoTiming.length === 0 || (photoDosageSchedule === 'specific' && photoSelectedDays.length === 0)}
-            >
-              {editingIndex !== null ? 'Update Medication' : 'Add Medication Photos'}
-            </button>
-          </div>
-        )}
-
-        {/* Manual Entry Method */}
-        {uploadMethod === 'manual' && (
-          <div className="mb-6 space-y-4">
-            <input 
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-green-500 focus:ring-1 focus:ring-green-500" 
-              type="text" 
-              placeholder="Medication name" 
-              value={name} 
-              onChange={e => setName(e.target.value)} 
-            />
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Dosage *
-              </label>
-              <div className="flex space-x-2">
-                <input 
-                  className="flex-1 rounded-lg border border-gray-300 px-3 py-2 focus:border-green-500 focus:ring-1 focus:ring-green-500" 
-                  type="text" 
-                  inputMode="numeric"
-                  placeholder="e.g., 10, 1" 
-                  value={dosage} 
-                  onChange={e => setDosage(e.target.value)} 
-                />
-                <select
-                  value={dosageUnit}
-                  onChange={e => setDosageUnit(e.target.value)}
-                  className="w-24 rounded-lg border border-gray-300 px-2 py-2 focus:border-green-500 focus:ring-1 focus:ring-green-500 text-sm"
-                >
-                  {dosageUnits.map(unit => (
-                    <option key={unit} value={unit}>{unit}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                How often do you take this medication? *
-              </label>
-              <div className="space-y-3">
-                <div className="flex items-center space-x-3">
-                  <input
-                    type="radio"
-                    checked={dosageSchedule === 'daily'}
-                    onChange={() => handleScheduleChange('daily', false)}
-                    className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 focus:ring-green-500 focus:ring-2"
-                    id="manual-med-daily"
-                  />
-                  <label htmlFor="manual-med-daily" className="cursor-pointer">
-                    <span className="text-gray-700">Every day</span>
-                  </label>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <input
-                    type="radio"
-                    checked={dosageSchedule === 'specific'}
-                    onChange={() => handleScheduleChange('specific', false)}
-                    className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 focus:ring-green-500 focus:ring-2"
-                    id="manual-med-specific"
-                  />
-                  <label htmlFor="manual-med-specific" className="cursor-pointer">
-                    <span className="text-gray-700">Specific days only</span>
-                  </label>
-                </div>
-                
-                {dosageSchedule === 'specific' && (
-                  <div className="ml-7 space-y-2">
-                    <div className="text-sm text-gray-600 mb-2">Select the days you take this medication:</div>
-                    <div className="grid grid-cols-2 gap-2">
-                      {daysOfWeek.map(day => (
-                        <div key={day} className="flex items-center space-x-2">
-                          <input
-                            type="checkbox"
-                            checked={selectedDays.includes(day)}
-                            onChange={() => toggleDay(day, false)}
-                            className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
-                            id={`manual-med-day-${day}`}
-                          />
-                          <label htmlFor={`manual-med-day-${day}`} className="text-sm cursor-pointer">
-                            {day.substring(0, 3)}
-                          </label>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                When do you take this medication? *
-              </label>
-              <div className="space-y-3">
-                {timingOptions.map(time => (
-                  <div key={time} className="flex items-center space-x-3">
-                    <input
-                      type="checkbox"
-                      checked={timing.includes(time)}
-                      onChange={() => toggleTiming(time, false)}
-                      className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 focus:ring-2"
-                      id={`timing-${time}`}
-                    />
-                    <label htmlFor={`timing-${time}`} className="flex-1 cursor-pointer">
-                      <span className="text-gray-700">{time}</span>
-                    </label>
-                    {timing.includes(time) && (
-                      <div className="flex space-x-1">
-                        <input
-                          type="text"
-                          inputMode="numeric" placeholder="Amount"
-                          value={timingDosages[time] || ''}
-                          className="w-16 px-2 py-1 border border-gray-300 rounded text-base focus:border-green-500 focus:ring-1 focus:ring-green-500"
-                          onChange={(e) => {
-                            setTimingDosages(prev => ({
-                              ...prev,
-                              [time]: e.target.value
-                            }));
-                          }}
-                        />
-                        <select
-                          value={timingDosageUnits[time] || dosageUnit}
-                          onChange={(e) => {
-                            setTimingDosageUnits(prev => ({
-                              ...prev,
-                              [time]: e.target.value
-                            }));
-                          }}
-                          className="w-16 px-1 py-1 border border-gray-300 rounded text-base focus:border-green-500 focus:ring-1 focus:ring-green-500"
-                        >
-                          {dosageUnits.map(unit => (
-                            <option key={unit} value={unit}>{unit}</option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-              <div className="mt-2 text-xs text-gray-500">
-                💡 Tip: If you split your medication (e.g., 5mg Tadalafil as 2.5mg twice daily), 
-                check multiple times and enter the dosage for each time.
-              </div>
-            </div>
-            <button 
-              className="w-full bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-300" 
-              onClick={addMedication}
-              disabled={!name || !dosage || timing.length === 0 || (dosageSchedule === 'specific' && selectedDays.length === 0)}
+              disabled={
+                editingIndex !== null 
+                  ? (!photoDosage || photoTiming.length === 0 || (photoDosageSchedule === 'specific' && photoSelectedDays.length === 0))
+                  : (!frontImage || !backImage || !photoDosage || photoTiming.length === 0 || (photoDosageSchedule === 'specific' && photoSelectedDays.length === 0))
+              }
             >
               {editingIndex !== null ? 'Update Medication' : 'Add Medication'}
             </button>
           </div>
-        )}
 
         {/* Added Medications List */}
         {medications.length > 0 && (
@@ -2828,7 +3979,7 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
           <div className="mb-6 p-4 bg-orange-50 rounded-lg">
             <div className="flex items-start gap-2">
               <div className="text-orange-600 text-xl">⚠️</div>
-              <div>
+              <div className="flex-1">
                 <div className="font-medium text-orange-900">Important Safety Check</div>
                 <div className="text-sm text-orange-700">
                   We'll analyze potential interactions between your medications and supplements.
@@ -2838,50 +3989,64 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
           </div>
         )}
 
+        {/* Manual Update Insights Button - Show if there are unsaved changes */}
+        {hasUnsavedChanges && medications.length > 0 && (
+          <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <div className="font-medium text-yellow-900 mb-1">Update Insights</div>
+                <div className="text-sm text-yellow-700">
+                  You've added medications that haven't been analyzed yet. Click below to update your insights.
+                </div>
+              </div>
+              <button
+                onClick={() => setShowUpdatePopup(true)}
+                disabled={isGeneratingInsights}
+                className="ml-4 px-4 py-2 bg-helfi-green text-white rounded-lg hover:bg-helfi-green/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed font-medium text-sm whitespace-nowrap"
+              >
+                {isGeneratingInsights ? (
+                  <>
+                    <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2"></span>
+                    Updating...
+                  </>
+                ) : (
+                  'Update Insights'
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Navigation Buttons */}
         <div className="space-y-3">
           <button 
             className="w-full bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-300" 
-            onClick={() => onNext({ medications: (medicationsToSave && medicationsToSave.length ? medicationsToSave : medications) })}
+            onClick={handleNext}
             disabled={medications.length === 0}
           >
             Analyze for Interactions & Contradictions
           </button>
+          <p className="text-center text-sm text-gray-500">
+            Uses AI credits (2× OpenAI cost). Typical total: 6–10 credits depending on your supplements/meds and recommendations.
+          </p>
           <button 
             className="w-full border border-green-600 text-green-600 px-6 py-3 rounded-lg hover:bg-green-600 hover:text-white transition-colors" 
-            onClick={onBack}
+            onClick={handleBack}
           >
             Back
           </button>
         </div>
       </div>
       
-      {/* Interaction Analysis Update Popup */}
-      <InteractionAnalysisUpdatePopup
+      {/* Update Insights Popup */}
+      <UpdateInsightsPopup
         isOpen={showUpdatePopup}
-        onClose={() => setShowUpdatePopup(false)}
-        onUpdate={async () => {
-          try {
-            // Clear existing analysis to trigger re-analysis
-            const response = await fetch('/api/interaction-history', {
-              method: 'DELETE'
-            });
-            if (response.ok) {
-              console.log('✅ Cleared existing analysis - will navigate to page 8 for fresh analysis');
-            }
-            
-            // Close popup first
-            setShowUpdatePopup(false);
-            
-            // CRITICAL FIX: Pass data to navigation function
-            if (onNavigateToAnalysis) {
-              onNavigateToAnalysis({ medications: medicationsToSave });
-            }
-          } catch (error) {
-            console.error('Error clearing analysis:', error);
-          }
+        onClose={() => {
+          // When "Add More" is clicked, just close the popup
+          setShowUpdatePopup(false);
         }}
-        onNavigateToAnalysis={onNavigateToAnalysis}
+        onUpdateInsights={handleUpdateInsights}
+        isGenerating={isGeneratingInsights}
       />
     </div>
   );
@@ -2893,6 +4058,71 @@ function BloodResultsStep({ onNext, onBack, initial }: { onNext: (data: any) => 
   const [images, setImages] = useState<File[]>(initial?.bloodResults?.images || initial?.images || []);
   const [notes, setNotes] = useState(initial?.bloodResults?.notes || initial?.notes || '');
   const [skipped, setSkipped] = useState(initial?.bloodResults?.skipped || initial?.skipped || false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showUpdatePopup, setShowUpdatePopup] = useState(false);
+  const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
+
+  // Track changes from initial values
+  useEffect(() => {
+    const initialDocs = initial?.bloodResults?.documents || initial?.documents || [];
+    const initialImgs = initial?.bloodResults?.images || initial?.images || [];
+    const initialNotes = initial?.bloodResults?.notes || initial?.notes || '';
+    const docsChanged = documents.length !== initialDocs.length || 
+                       documents.some((doc, idx) => doc.name !== initialDocs[idx]?.name);
+    const imgsChanged = images.length !== initialImgs.length || 
+                        images.some((img, idx) => img.name !== initialImgs[idx]?.name);
+    const notesChanged = notes.trim() !== initialNotes.trim();
+    setHasUnsavedChanges((docsChanged || imgsChanged || notesChanged) && !skipped && (documents.length > 0 || images.length > 0 || notes.trim()));
+  }, [documents, images, notes, skipped, initial]);
+
+  // Prevent browser navigation when there are unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = 'You have unsaved changes. Please update your insights before leaving.';
+        return e.returnValue;
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  // Handle Update Insights button click
+  const handleUpdateInsights = async () => {
+    setIsGeneratingInsights(true);
+    try {
+      const response = await fetch('/api/user-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          bloodResults: {
+            uploadMethod,
+            documents: documents.map(f => f.name),
+            images: images.map(f => f.name),
+            notes: notes.trim(),
+            skipped: false
+          }
+        })
+      });
+      
+      if (response.ok) {
+        setHasUnsavedChanges(false);
+        setTimeout(() => {
+          setShowUpdatePopup(false);
+          setIsGeneratingInsights(false);
+        }, 2000);
+      } else {
+        alert('Failed to update insights. Please try again.');
+        setIsGeneratingInsights(false);
+      }
+    } catch (error) {
+      console.error('Error updating insights:', error);
+      alert('Failed to update insights. Please try again.');
+      setIsGeneratingInsights(false);
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'documents' | 'images') => {
     const files = Array.from(e.target.files || []);
@@ -2912,6 +4142,12 @@ function BloodResultsStep({ onNext, onBack, initial }: { onNext: (data: any) => 
   };
 
   const handleNext = () => {
+    if (hasUnsavedChanges) {
+      if (!showUpdatePopup) {
+        setShowUpdatePopup(true);
+      }
+      return;
+    }
     const bloodResultsData = {
       uploadMethod,
       documents: documents.filter(f => f != null).map(f => f.name),
@@ -2923,7 +4159,23 @@ function BloodResultsStep({ onNext, onBack, initial }: { onNext: (data: any) => 
     onNext({ bloodResults: bloodResultsData });
   };
 
+  const handleBack = () => {
+    if (hasUnsavedChanges) {
+      if (!showUpdatePopup) {
+        setShowUpdatePopup(true);
+      }
+      return;
+    }
+    onBack();
+  };
+
   const handleSkip = () => {
+    if (hasUnsavedChanges) {
+      if (!showUpdatePopup) {
+        setShowUpdatePopup(true);
+      }
+      return;
+    }
     setSkipped(true);
     onNext({ bloodResults: { skipped: true, uploadMethod: 'documents', documents: [], images: [], notes: '' } });
   };
@@ -2934,7 +4186,7 @@ function BloodResultsStep({ onNext, onBack, initial }: { onNext: (data: any) => 
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold">Upload your recent blood results</h2>
           <button 
-            onClick={onBack}
+            onClick={handleBack}
             className="text-gray-600 hover:text-gray-900 flex items-center"
           >
             <svg className="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -3109,6 +4361,16 @@ function BloodResultsStep({ onNext, onBack, initial }: { onNext: (data: any) => 
           </button>
         </div>
       </div>
+
+      {/* Update Insights Popup */}
+      <UpdateInsightsPopup
+        isOpen={showUpdatePopup}
+        onClose={() => {
+          setShowUpdatePopup(false);
+        }}
+        onUpdateInsights={handleUpdateInsights}
+        isGenerating={isGeneratingInsights}
+      />
     </div>
   );
 }
@@ -3197,13 +4459,20 @@ function ReviewStep({ onBack, data }: { onBack: () => void, data: any }) {
       });
       
       if (response.ok) {
-        await updateProgress(100, 'Welcome to Helfi! 🎉');
+        await updateProgress(90, 'Generating your personalized insights...');
         console.log('✅ Onboarding data saved to database successfully');
+        console.log('🚀 Starting insights generation...');
+        
+        // Wait for insights generation (up to 30 seconds)
+        // The API already generates insights, but we show progress here
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Show "Generating insights" for at least 2 seconds
+        
+        await updateProgress(100, 'Welcome to Helfi! 🎉');
         console.log('🔄 Starting redirect to dashboard...');
         
         // Brief moment to show completion
         await new Promise(resolve => setTimeout(resolve, 800));
-        
+
         const redirectStart = Date.now();
         window.location.href = '/dashboard';
         
@@ -3350,6 +4619,9 @@ function ReviewStep({ onBack, data }: { onBack: () => void, data: any }) {
           )}
         </button>
       </div>
+      <p className="mt-3 text-sm text-gray-500">
+        AI setup uses credits (billed at 2× OpenAI cost). Typical total: 10–15 credits depending on your answers and data.
+      </p>
     </div>
   );
 }
@@ -3527,6 +4799,8 @@ function InteractionAnalysisStep({ onNext, onBack, initial, onAnalysisSettled }:
         setDidFreshAnalysis(true);
         // CRITICAL FIX: Reload previous analyses after new analysis to show history
         loadPreviousAnalyses();
+        // Notify global listeners to refresh credits meter
+        try { window.dispatchEvent(new Event('helfiCreditsUpdated')); } catch {}
       } else {
         throw new Error('Invalid API response structure');
       }
@@ -3607,8 +4881,8 @@ function InteractionAnalysisStep({ onNext, onBack, initial, onAnalysisSettled }:
       });
       
       if (response.ok) {
-        // Refresh the analyses list
-        loadPreviousAnalyses();
+        // Refresh the analyses list only; do not trigger re-analysis
+        await loadPreviousAnalyses();
         console.log('✅ Analysis deleted successfully');
       } else {
         console.error('Failed to delete analysis');
@@ -4127,7 +5401,17 @@ function InteractionAnalysisStep({ onNext, onBack, initial, onAnalysisSettled }:
 
 export default function Onboarding() {
   const { data: session, status } = useSession();
+  const { profileImage: providerProfileImage } = useUserData();
   
+  // ⚠️ HEALTH SETUP GUARD RAIL
+  // This onboarding component is part of a carefully tuned flow:
+  // - Onboarding is "complete" only when gender, weight, height, and at least one health goal exist.
+  // - The first-time modal MUST continue to appear on this page until setup is complete.
+  // - The "I'll do it later" button sets sessionStorage.onboardingDeferredThisSession = '1'
+  //   and allows the user to use the app for the rest of the browser session without
+  //   redirect loops from the dashboard.
+  // Do NOT change this behaviour without reading HEALTH_SETUP_PROTECTION.md and obtaining
+  // explicit approval from the user.
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<any>({});
   // Removed forced remount to avoid infinite loops
@@ -4138,6 +5422,10 @@ export default function Onboarding() {
   const [profileImage, setProfileImage] = useState<string>('');
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [showFirstTimeModal, setShowFirstTimeModal] = useState(false);
+  // Track if the user has dismissed the first-time modal during this visit,
+  // so they can actually complete the intake instead of being stuck.
+  const [firstTimeModalDismissed, setFirstTimeModalDismissed] = useState(false);
+  const [usageMeterRefresh, setUsageMeterRefresh] = useState(0);
 
   const stepNames = [
     'Gender',
@@ -4157,15 +5445,9 @@ export default function Onboarding() {
 
   // Removed blocking render - users should always be able to access intake to edit information
 
-  // Profile data - using consistent green avatar
-  const defaultAvatar = 'data:image/svg+xml;base64,' + btoa(`
-    <svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="64" cy="64" r="64" fill="#10B981"/>
-      <circle cx="64" cy="48" r="20" fill="white"/>
-      <path d="M64 76c-13.33 0-24 5.34-24 12v16c0 8.84 7.16 16 16 16h16c8.84 0 16-7.16 16-16V88c0-6.66-10.67-12-24-12z" fill="white"/>
-    </svg>
-  `);
-  const userImage = profileImage || session?.user?.image || defaultAvatar;
+  // Profile data - prefer real photos; fall back to professional icon for nav
+  const hasProfileImage = !!(providerProfileImage || profileImage || session?.user?.image)
+  const userImage = (providerProfileImage || profileImage || session?.user?.image || '') as string
   const userName = session?.user?.name || 'User';
 
   useEffect(() => {
@@ -4192,14 +5474,6 @@ export default function Onboarding() {
     };
   }, [dropdownOpen]);
 
-  // Show first-time modal only when arriving with ?first=1
-  useEffect(() => {
-    try {
-      const isFirst = new URLSearchParams(window.location.search).get('first') === '1';
-      if (isFirst) setShowFirstTimeModal(true);
-    } catch {}
-  }, []);
-
   // Basic session validation without aggressive checks
   useEffect(() => {
     if (status === 'loading') return;
@@ -4214,9 +5488,10 @@ export default function Onboarding() {
     }
   }, [status, stepNames.length]);
 
+  const [dataLoaded, setDataLoaded] = useState(false);
   useEffect(() => {
     if (status === 'authenticated') {
-      loadUserData();
+      loadUserData().finally(() => setDataLoaded(true));
     }
   }, [status]);
 
@@ -4240,19 +5515,25 @@ export default function Onboarding() {
     }
   };
 
-  // If arriving without ?first=1 but user is clearly new, show the modal (unless deferred this session)
+  // If user is clearly new or incomplete, show the health-setup modal whenever
+  // they arrive on this page, but allow them to dismiss it for the current visit
+  // so they can actually complete the steps.
   useEffect(() => {
-    if (status !== 'authenticated') return;
+    if (status !== 'authenticated' || !dataLoaded) return;
     try {
       const hasBasic = form && form.gender && form.weight && form.height;
       const hasGoals = Array.isArray(form?.goals) && form.goals.length > 0;
-      const isFirstParam = new URLSearchParams(window.location.search).get('first') === '1';
-      const deferred = sessionStorage.getItem('onboardingDeferredThisSession') === '1';
-      if (!showFirstTimeModal && !isFirstParam && !deferred && (!hasBasic || !hasGoals)) {
+      const needsSetup = !(hasBasic && hasGoals);
+      const shouldForceModal = needsSetup && !firstTimeModalDismissed;
+
+      if (shouldForceModal && !showFirstTimeModal) {
         setShowFirstTimeModal(true);
+      } else if (!shouldForceModal && showFirstTimeModal) {
+        // Auto-hide when user is complete or has dismissed it for this visit
+        setShowFirstTimeModal(false);
       }
     } catch {}
-  }, [status, form, showFirstTimeModal]);
+  }, [status, form, showFirstTimeModal, dataLoaded, firstTimeModalDismissed]);
 
   // Optimized debounced save function
   const debouncedSave = useCallback(async (data: any) => {
@@ -4422,11 +5703,28 @@ export default function Onboarding() {
   const mobileProgress = getMobileProgressWindow();
 
   const handleDeferFirstTime = () => {
-    try { sessionStorage.setItem('onboardingDeferredThisSession', '1'); } catch {}
+    // Allow user to leave onboarding for this browser session without being
+    // forced back from the dashboard, but continue to remind them on future
+    // visits until health setup is actually complete.
+    try {
+      sessionStorage.setItem('onboardingDeferredThisSession', '1')
+    } catch {
+      // Ignore storage errors – deferral will just apply to this navigation
+    }
     window.location.replace('/dashboard?deferred=1');
   };
 
-  const handleContinueFirstTime = () => setShowFirstTimeModal(false);
+  const handleContinueFirstTime = () => {
+    setFirstTimeModalDismissed(true);
+    setShowFirstTimeModal(false);
+  };
+
+  // Refresh UsageMeter when credits are updated elsewhere
+  useEffect(() => {
+    const handler = () => setUsageMeterRefresh((v) => v + 1);
+    try { window.addEventListener('helfiCreditsUpdated', handler as any); } catch {}
+    return () => { try { window.removeEventListener('helfiCreditsUpdated', handler as any); } catch {} };
+  }, []);
 
   return (
     <div className="relative min-h-screen bg-gray-50 overflow-y-auto overflow-x-hidden" id="onboarding-container">
@@ -4451,10 +5749,29 @@ export default function Onboarding() {
               href="/dashboard"
               className="flex items-center text-gray-600 hover:text-gray-900"
               title="back button to Dashboard"
+              onClick={(e) => {
+                try {
+                  // If we're on the Physical step and there are unsaved changes,
+                  // show the Update Insights popup instead of navigating away.
+                  const hasPhysicalUnsaved =
+                    step === 1 &&
+                    (window as any).__helfiOnboardingPhysicalHasUnsavedChanges;
+                  if (hasPhysicalUnsaved) {
+                    e.preventDefault();
+                    window.postMessage(
+                      { type: 'OPEN_PHYSICAL_UPDATE_POPUP' },
+                      '*'
+                    );
+                  }
+                } catch {
+                  // If anything goes wrong, fall back to normal navigation
+                }
+              }}
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
+              <span className="ml-2 hidden md:inline font-medium">Go To Dashboard</span>
             </a>
             
             <h1 className="text-lg font-semibold text-gray-900">
@@ -4481,17 +5798,24 @@ export default function Onboarding() {
                   className="focus:outline-none"
                   aria-label="Open profile menu"
                 >
-                  <Image
-                    src={userImage}
-                    alt="Profile"
-                    width={36}
-                    height={36}
-                    className="w-9 h-9 rounded-full border-2 border-helfi-green shadow-sm object-cover"
-                  />
+                  {hasProfileImage ? (
+                    <Image
+                      src={userImage}
+                      alt="Profile"
+                      width={36}
+                      height={36}
+                      className="w-9 h-9 rounded-full border-2 border-helfi-green shadow-sm object-cover"
+                    />
+                  ) : (
+                    <div className="w-9 h-9 rounded-full bg-helfi-green shadow-sm flex items-center justify-center">
+                      <UserIcon className="w-5 h-5 text-white" aria-hidden="true" />
+                    </div>
+                  )}
                 </button>
                 {dropdownOpen && (
                   <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-100 animate-fade-in">
                     <div className="flex items-center px-4 py-3 border-b border-gray-100">
+                    {hasProfileImage ? (
                       <Image
                         src={userImage}
                         alt="Profile"
@@ -4499,6 +5823,11 @@ export default function Onboarding() {
                         height={40}
                         className="w-10 h-10 rounded-full object-cover mr-3"
                       />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-helfi-green flex items-center justify-center mr-3">
+                        <UserIcon className="w-6 h-6 text-white" aria-hidden="true" />
+                      </div>
+                    )}
                       <div>
                         <div className="font-semibold text-gray-900">{userName}</div>
                         <div className="text-xs text-gray-500">{session?.user?.email || 'user@email.com'}</div>
@@ -4628,6 +5957,11 @@ export default function Onboarding() {
             />
           </div>
 
+          {/* Credits Meter */}
+          <div className="max-w-4xl mx-auto">
+            <UsageMeter inline={true} refreshTrigger={usageMeterRefresh} />
+          </div>
+
           {/* Loading Indicator */}
           {isLoading && (
             <div className="flex items-center justify-center py-2">
@@ -4654,7 +5988,7 @@ export default function Onboarding() {
 
         {/* Content */}
         <div className="flex-1 px-4 py-2 pb-20">
-          {step === 0 && <GenderStep onNext={handleNext} initial={form.gender} />}
+          {step === 0 && <GenderStep onNext={handleNext} initial={form.gender} initialAgreed={form.termsAccepted} />}
           {step === 1 && <PhysicalStep onNext={handleNext} onBack={handleBack} initial={form} />}
           {step === 2 && <ExerciseStep onNext={handleNext} onBack={handleBack} initial={form} />}
           {step === 3 && <HealthGoalsStep onNext={handleNext} onBack={handleBack} initial={form} />}
@@ -4755,37 +6089,29 @@ export default function Onboarding() {
               <span className="text-xs text-gray-400 mt-1 font-medium truncate">Insights</span>
             </Link>
 
-                      {/* Food */}
-          <Link href="/food" className="flex flex-col items-center py-2 px-1 min-w-0 flex-1">
-            <div className="text-gray-400">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-              </svg>
-            </div>
-            <span className="text-xs text-gray-400 mt-1 font-medium truncate">Food</span>
-          </Link>
-
-            {/* Intake (Active) */}
-            <Link href="/onboarding?step=1" className="flex flex-col items-center py-2 px-1 min-w-0 flex-1">
-              <div className="text-helfi-green">
+            {/* Food */}
+            <Link href="/food" className="flex flex-col items-center py-2 px-1 min-w-0 flex-1">
+              <div className="text-gray-400">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                 </svg>
               </div>
-              <span className="text-xs text-helfi-green mt-1 font-bold truncate">Intake</span>
+              <span className="text-xs text-gray-400 mt-1 font-medium truncate">Food</span>
             </Link>
+
+            {/* More */}
+            <MobileMoreMenu />
 
             {/* Settings */}
             <Link href="/settings" className="flex flex-col items-center py-2 px-1 min-w-0 flex-1">
               <div className="text-gray-400">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756.426-1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
               </div>
               <span className="text-xs text-gray-400 mt-1 font-medium truncate">Settings</span>
             </Link>
-
           </div>
         </nav>
 

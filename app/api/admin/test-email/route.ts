@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { Resend } from 'resend'
 import bcrypt from 'bcryptjs'
 import { PrismaClient } from '@prisma/client'
+import { getEmailFooter } from '@/lib/email-footer'
 
 const prisma = new PrismaClient()
 
@@ -73,10 +74,7 @@ export async function POST(request: NextRequest) {
             
             <p>If you received this email, your email delivery system is working correctly! ✅</p>
             
-            <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;">
-            <p style="color: #6b7280; font-size: 14px;">
-              This is an automated test email from the Helfi admin panel.
-            </p>
+            ${getEmailFooter({ recipientEmail: testEmail, emailType: 'admin', reasonText: 'This is an automated test email from the Helfi admin panel.' })}
           </div>
         `
       })

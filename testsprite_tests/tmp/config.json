@@ -1,0 +1,16 @@
+{
+  "status": "commited",
+  "type": "frontend",
+  "scope": "codebase",
+  "localEndpoint": "http://localhost:3000",
+  "executionArgs": {
+    "projectName": "helfi-app",
+    "projectPath": "/Volumes/U34 Bolt/HELFI APP/helfi-app",
+    "testIds": [],
+    "additionalInstruction": "",
+    "envs": {
+      "API_KEY": "sk-user-hpw7jDCMdtXI-EV3eo7yVO9CmR5lonFK69FGjlM5zIJq762Fr-9MCft9S2TsrFAFc0jauHTIJcX4a2NIwj4U1M7EwY3oeUa0JFPvrgJpL8Rs_oj71JW3Y5vRA85Wv9GvFFY"
+    }
+  },
+  "proxy": "http://6cd33a34-e15f-4a48-8325-34c6be30ff8e:xZ2B6yD8q2Vl2Ik8HV7XAekythMzhqdK@tun.testsprite.com:8080"
+}

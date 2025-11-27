@@ -1,8 +1,10 @@
 'use client'
+import { Cog6ToothIcon } from '@heroicons/react/24/outline'
 
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { ReactNode } from 'react'
+import { ReactNode, useEffect, useState } from 'react'
+import UsageMeter from '@/components/UsageMeter'
 
 // Desktop Sidebar Navigation Component  
 function DesktopSidebar() {
@@ -18,11 +20,16 @@ function DesktopSidebar() {
           />
         </div>
         
+        {/* Usage Meter */}
+        <div className="px-4 pt-4 border-b border-gray-200 pb-4">
+          <UsageMeter showResetDate={true} />
+        </div>
+        
         {/* Navigation */}
         <nav className="mt-8 flex-1 px-4 space-y-1">
           <a
             href="/dashboard"
-            className="text-gray-700 hover:text-helfi-green hover:bg-gray-50 group flex items-center px-2 py-2 text-sm font-medium rounded-md"
+            className="text-gray-700 hover:text-helfi-green hover:bg-gray-50 group flex items-center px-2 py-2 text-base font-medium rounded-md"
           >
             <svg className="text-gray-400 group-hover:text-helfi-green mr-3 h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
               <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/>
@@ -32,7 +39,7 @@ function DesktopSidebar() {
           
           <a
             href="/insights"
-            className="text-gray-700 hover:text-helfi-green hover:bg-gray-50 group flex items-center px-2 py-2 text-sm font-medium rounded-md"
+            className="text-gray-700 hover:text-helfi-green hover:bg-gray-50 group flex items-center px-2 py-2 text-base font-medium rounded-md"
           >
             <svg className="text-gray-400 group-hover:text-helfi-green mr-3 h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
@@ -41,8 +48,18 @@ function DesktopSidebar() {
           </a>
           
           <a
+            href="/health-tips"
+            className="text-gray-700 hover:text-helfi-green hover:bg-gray-50 group flex items-center px-2 py-2 text-base font-medium rounded-md"
+          >
+            <svg className="text-gray-400 group-hover:text-helfi-green mr-3 h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7H7m0 0V5a2 2 0 012-2h6m-8 4v6m0 0h6m-6 0H5a2 2 0 01-2-2V7m10-4h2a2 2 0 012 2v8a2 2 0 01-2 2h-2m0 0H9m4 0v2a2 2 0 01-2 2H9" />
+            </svg>
+            Health Tips
+          </a>
+          
+          <a
             href="/food"
-            className="text-gray-700 hover:text-helfi-green hover:bg-gray-50 group flex items-center px-2 py-2 text-sm font-medium rounded-md"
+            className="text-gray-700 hover:text-helfi-green hover:bg-gray-50 group flex items-center px-2 py-2 text-base font-medium rounded-md"
           >
             <svg className="text-gray-400 group-hover:text-helfi-green mr-3 h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
@@ -51,8 +68,28 @@ function DesktopSidebar() {
           </a>
           
           <a
+            href="/symptoms"
+            className="text-gray-700 hover:text-helfi-green hover:bg-gray-50 group flex items-center px-2 py-2 text-base font-medium rounded-md"
+          >
+            <svg className="text-gray-400 group-hover:text-helfi-green mr-3 h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-3-3v6m9 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Symptom Analysis
+          </a>
+
+          <a
+            href="/medical-images"
+            className="text-gray-700 hover:text-helfi-green hover:bg-gray-50 group flex items-center px-2 py-2 text-base font-medium rounded-md"
+          >
+            <svg className="text-gray-400 group-hover:text-helfi-green mr-3 h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            Medical Image Analyzer
+          </a>
+
+          <a
             href="/health-tracking"
-            className="text-gray-700 hover:text-helfi-green hover:bg-gray-50 group flex items-center px-2 py-2 text-sm font-medium rounded-md"
+            className="text-gray-700 hover:text-helfi-green hover:bg-gray-50 group flex items-center px-2 py-2 text-base font-medium rounded-md"
           >
             <svg className="text-gray-400 group-hover:text-helfi-green mr-3 h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -61,8 +98,19 @@ function DesktopSidebar() {
           </a>
           
           <a
+            href="/devices"
+            className="text-gray-700 hover:text-helfi-green hover:bg-gray-50 group flex items-center px-2 py-2 text-base font-medium rounded-md"
+          >
+            <svg className="text-gray-400 group-hover:text-helfi-green mr-3 h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h10a2 2 0 012 2v6a2 2 0 01-2 2H7a2 2 0 01-2-2V9a2 2 0 012-2z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7V5a2 2 0 012-2h6a2 2 0 012 2v2" />
+            </svg>
+            Devices
+          </a>
+          
+          <a
             href="/onboarding?step=1"
-            className="text-gray-700 hover:text-helfi-green hover:bg-gray-50 group flex items-center px-2 py-2 text-sm font-medium rounded-md"
+            className="text-gray-700 hover:text-helfi-green hover:bg-gray-50 group flex items-center px-2 py-2 text-base font-medium rounded-md"
           >
             <svg className="text-gray-400 group-hover:text-helfi-green mr-3 h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -72,19 +120,34 @@ function DesktopSidebar() {
           
           <div className="border-t border-gray-200 mt-6 pt-6">
             <a
-              href="/settings"
-              className="text-gray-700 hover:text-helfi-green hover:bg-gray-50 group flex items-center px-2 py-2 text-sm font-medium rounded-md"
+              href="/check-in"
+              className="text-gray-700 hover:text-helfi-green hover:bg-gray-50 group flex items-center px-2 py-2 text-base font-medium rounded-md"
             >
               <svg className="text-gray-400 group-hover:text-helfi-green mr-3 h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
+              Today's Check-in
+            </a>
+            <a
+              href="/check-in/history"
+              className="text-gray-700 hover:text-helfi-green hover:bg-gray-50 group flex items-center px-2 py-2 text-base font-medium rounded-md"
+            >
+              <svg className="text-gray-400 group-hover:text-helfi-green mr-3 h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3M5 11h14M5 19h14M7 11v8m10-8v8" />
+              </svg>
+              Rating History
+            </a>
+            <a
+              href="/settings"
+              className="text-gray-700 hover:text-helfi-green hover:bg-gray-50 group flex items-center px-2 py-2 text-base font-medium rounded-md"
+            >
+              <Cog6ToothIcon className="text-gray-400 group-hover:text-helfi-green mr-3 h-6 w-6 flex-shrink-0" style={{ minWidth: '24px', minHeight: '24px' }} />
               Settings
             </a>
             
             <a
               href="/reports"
-              className="text-gray-700 hover:text-helfi-green hover:bg-gray-50 group flex items-center px-2 py-2 text-sm font-medium rounded-md"
+              className="text-gray-700 hover:text-helfi-green hover:bg-gray-50 group flex items-center px-2 py-2 text-base font-medium rounded-md"
             >
               <svg className="text-gray-400 group-hover:text-helfi-green mr-3 h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -104,13 +167,66 @@ interface LayoutWrapperProps {
 
 export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   const pathname = usePathname()
+  const router = useRouter()
   const { data: session, status } = useSession()
+  const [showHealthSetupReminder, setShowHealthSetupReminder] = useState(false)
   
   // Pages that should ALWAYS be public (no sidebar regardless of auth status)
   const publicPages = ['/', '/healthapp', '/auth/signin', '/auth/verify', '/auth/check-email', '/onboarding', '/privacy', '/terms', '/help', '/faq']
   
   // Admin panel paths should never show user sidebar
-  const isAdminPanelPath = pathname.startsWith('/admin-panel')
+  const isAdminPanelPath =
+    pathname.startsWith('/admin-panel') || pathname.startsWith('/main-admin')
+
+  // ⚠️ HEALTH SETUP GUARD RAIL
+  // The 5-minute global Health Setup reminder must:
+  // - Only appear for authenticated users on non-public, non-admin pages.
+  // - Use GET /api/health-setup-status to respect account-wide "Don't ask me again".
+  // - Show at most once per browser session via sessionStorage.helfiHealthSetupReminderShownThisSession.
+  // Do NOT convert this into a hard block or change the timing/behaviour without
+  // reading HEALTH_SETUP_PROTECTION.md and obtaining explicit user approval.
+
+  // One-time per-session reminder: if a user has been using the app
+  // for more than ~5 minutes without completing Health Setup, gently prompt
+  // them to finish it. Users can permanently opt out of this reminder for
+  // their account by choosing "Don't ask me again".
+  useEffect(() => {
+    if (status !== 'authenticated') return
+    if (publicPages.includes(pathname) || isAdminPanelPath) return
+    if ((session as any)?.user?.needsVerification) return
+
+    try {
+      if (sessionStorage.getItem('helfiHealthSetupReminderShownThisSession') === '1') {
+        return
+      }
+    } catch {
+      // Ignore storage errors
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch('/api/health-setup-status', { method: 'GET' })
+        if (!res.ok) return
+        const data = await res.json()
+        const complete = !!data.complete
+        const reminderDisabled = !!data.reminderDisabled
+
+        if (!complete && !reminderDisabled) {
+          setShowHealthSetupReminder(true)
+          try {
+            sessionStorage.setItem('helfiHealthSetupReminderShownThisSession', '1')
+          } catch {
+            // Ignore
+          }
+        }
+      } catch {
+        // Non-blocking; ignore failures
+      }
+    }, 5 * 60 * 1000)
+
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, pathname, isAdminPanelPath, publicPages, session])
   
   // Don't show sidebar while session is loading to prevent flickering
   if (status === 'loading') {
@@ -180,8 +296,8 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   
   // Redirect unauthenticated users away from protected pages
   if (status === 'unauthenticated' && !publicPages.includes(pathname) && !isAdminPanelPath) {
-    console.log('🚫 Unauthenticated user on protected page - redirecting to homepage');
-    window.location.href = '/';
+    console.log('🚫 Unauthenticated user on protected page - redirecting to /healthapp');
+    window.location.href = '/healthapp';
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -204,7 +320,49 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
         <DesktopSidebar />
         
         {/* Main Content */}
-        <div className="md:pl-64 flex flex-col flex-1 overflow-y-auto">
+        <div className="md:pl-64 flex flex-col flex-1 overflow-y-auto relative">
+          {showHealthSetupReminder && (
+            <div className="fixed bottom-4 right-4 z-50 max-w-sm w-full mx-4 md:mx-0">
+              <div className="bg-white border border-helfi-green/30 shadow-xl rounded-lg p-4">
+                <h2 className="text-sm font-semibold text-helfi-black mb-1">
+                  Complete your Health Setup for accurate insights
+                </h2>
+                <p className="text-xs text-gray-600 mb-3">
+                  Helfi can only give you precise health guidance when your Health Setup is finished.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowHealthSetupReminder(false)
+                      router.push('/onboarding?step=1')
+                    }}
+                    className="flex-1 bg-helfi-green text-white text-sm px-3 py-2 rounded-md hover:bg-helfi-green-dark transition-colors"
+                  >
+                    Complete Health Setup
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setShowHealthSetupReminder(false)
+                      try {
+                        await fetch('/api/health-setup-status', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ disableReminder: true }),
+                        })
+                      } catch {
+                        // Non-blocking; if this fails we may remind again in a future session
+                      }
+                    }}
+                    className="flex-1 bg-gray-100 text-gray-700 text-sm px-3 py-2 rounded-md hover:bg-gray-200 transition-colors"
+                  >
+                    Don&apos;t ask me again
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
           {children}
         </div>
       </div>

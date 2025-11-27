@@ -1,10 +1,13 @@
 'use client'
+import { Cog6ToothIcon, UserIcon } from '@heroicons/react/24/outline'
 
 import React, { useState, useEffect } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useUserData } from '@/components/providers/UserDataProvider'
+import MobileMoreMenu from '@/components/MobileMoreMenu'
+import PageHeader from '@/components/PageHeader'
 
 export default function Profile() {
   const { data: session } = useSession()
@@ -20,15 +23,9 @@ export default function Profile() {
     gender: ''
   })
 
-  // Profile data - using consistent green avatar
-  const defaultAvatar = 'data:image/svg+xml;base64,' + btoa(`
-    <svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="64" cy="64" r="64" fill="#10B981"/>
-      <circle cx="64" cy="48" r="20" fill="white"/>
-      <path d="M64 76c-13.33 0-24 5.34-24 12v16c0 8.84 7.16 16 16 16h16c8.84 0 16-7.16 16-16V88c0-6.66-10.67-12-24-12z" fill="white"/>
-    </svg>
-  `);
-  const userImage = profileImage || session?.user?.image || defaultAvatar;
+  // Profile data - prefer real photos; fall back to professional icon
+  const hasProfileImage = !!(profileImage || session?.user?.image)
+  const userImage = (profileImage || session?.user?.image || '') as string
   const userName = session?.user?.name || 'User';
 
   // Close dropdown on outside click
@@ -142,79 +139,7 @@ export default function Profile() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Navigation Header - First Row */}
-      <nav className="bg-white border-b border-gray-200 px-4 py-3">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          {/* Logo on the left */}
-          <div className="flex items-center">
-            <Link href="/" className="w-16 h-16 md:w-20 md:h-20 cursor-pointer hover:opacity-80 transition-opacity">
-              <Image
-                src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/HELFI_TRANSPARENT_rmssry.png"
-                alt="Helfi Logo"
-                width={80}
-                height={80}
-                className="w-full h-full object-contain"
-                priority
-              />
-            </Link>
-          </div>
-          
-          {/* Profile Avatar & Dropdown on the right */}
-          <div className="relative dropdown-container" id="profile-dropdown">
-            <button
-              onClick={() => setDropdownOpen((v) => !v)}
-              className="focus:outline-none"
-              aria-label="Open profile menu"
-            >
-              <Image
-                src={userImage}
-                alt="Profile"
-                width={48}
-                height={48}
-                className="w-12 h-12 rounded-full border-2 border-helfi-green shadow-sm object-cover"
-              />
-            </button>
-            {dropdownOpen && (
-              <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-100 animate-fade-in">
-                <div className="flex items-center px-4 py-3 border-b border-gray-100">
-                  <Image
-                    src={userImage}
-                    alt="Profile"
-                    width={40}
-                    height={40}
-                    className="w-10 h-10 rounded-full object-cover mr-3"
-                  />
-                  <div>
-                    <div className="font-semibold text-gray-900">{userName}</div>
-                    <div className="text-xs text-gray-500">{session?.user?.email || 'user@email.com'}</div>
-                  </div>
-                </div>
-                <Link href="/profile" className="block px-4 py-2 text-gray-700 hover:bg-gray-50 bg-gray-50 font-medium">Profile</Link>
-                <Link href="/account" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Account Settings</Link>
-                <Link href="/profile/image" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Upload/Change Profile Photo</Link>
-                <Link href="/billing" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Subscription & Billing</Link>
-                <Link href="/notifications" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Notifications</Link>
-                <Link href="/privacy" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Privacy Settings</Link>
-                <Link href="/help" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
-                <button
-                  onClick={() => signOut()}
-                  className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50 font-semibold"
-                >
-                  Logout
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </nav>
-
-      {/* Second Row - Page Title Centered */}
-      <div className="bg-white border-b border-gray-200 px-4 py-4">
-        <div className="max-w-7xl mx-auto text-center">
-          <h1 className="text-lg md:text-xl font-semibold text-gray-900">Profile</h1>
-          <p className="text-sm text-gray-500 hidden sm:block">Manage your personal information</p>
-        </div>
-      </div>
+      <PageHeader title="Profile" />
 
       {/* Main Content */}
       <div className="max-w-3xl mx-auto px-4 py-8 pb-24 md:pb-8">
@@ -242,14 +167,20 @@ export default function Profile() {
           
           {/* Profile Photo */}
           <div className="mb-8 text-center">
-            <Image
-              src={userImage}
-              alt={userName}
-              width={96}
-              height={96}
-              className="w-24 h-24 rounded-full object-cover mx-auto mb-4"
-              priority
-            />
+            {hasProfileImage ? (
+              <Image
+                src={userImage}
+                alt={userName}
+                width={96}
+                height={96}
+                className="w-24 h-24 rounded-full object-cover mx-auto mb-4"
+                priority
+              />
+            ) : (
+              <div className="w-24 h-24 rounded-full bg-helfi-green flex items-center justify-center mx-auto mb-4">
+                <UserIcon className="w-12 h-12 text-white" aria-hidden="true" />
+              </div>
+            )}
             <Link href="/profile/image" className="text-helfi-green hover:underline">
               Change Profile Photo
             </Link>
@@ -355,22 +286,12 @@ export default function Profile() {
           </Link>
 
           {/* Intake (Onboarding) */}
-          <Link href="/onboarding?step=1" className="flex flex-col items-center py-2 px-1 min-w-0 flex-1">
-            <div className="text-gray-400">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
-            </div>
-            <span className="text-xs text-gray-400 mt-1 font-medium truncate">Intake</span>
-          </Link>
+          <MobileMoreMenu />
 
           {/* Settings */}
           <Link href="/settings" className="flex flex-col items-center py-2 px-1 min-w-0 flex-1">
             <div className="text-gray-400">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
+              <Cog6ToothIcon className="w-6 h-6 flex-shrink-0" style={{ minWidth: '24px', minHeight: '24px' }} />
             </div>
             <span className="text-xs text-gray-400 mt-1 font-medium truncate">Settings</span>
           </Link>

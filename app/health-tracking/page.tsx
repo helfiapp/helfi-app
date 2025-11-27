@@ -1,24 +1,28 @@
 'use client'
+import { Cog6ToothIcon, UserIcon } from '@heroicons/react/24/outline'
 
 import React, { useState, useEffect } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import Image from 'next/image'
+import { useUserData } from '@/components/providers/UserDataProvider'
+import MobileMoreMenu from '@/components/MobileMoreMenu'
+import FitbitSummary from '@/components/devices/FitbitSummary'
+import FitbitCharts from '@/components/devices/FitbitCharts'
+import FitbitCorrelations from '@/components/devices/FitbitCorrelations'
 
 export default function HealthTracking() {
   const { data: session } = useSession()
+  const pathname = usePathname()
+  const { profileImage: providerProfileImage } = useUserData()
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [profileImage, setProfileImage] = useState<string>('')
+  const [fitbitConnected, setFitbitConnected] = useState(false)
 
-  // Profile data - using consistent green avatar
-  const defaultAvatar = 'data:image/svg+xml;base64,' + btoa(`
-    <svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="64" cy="64" r="64" fill="#10B981"/>
-      <circle cx="64" cy="48" r="20" fill="white"/>
-      <path d="M64 76c-13.33 0-24 5.34-24 12v16c0 8.84 7.16 16 16 16h16c8.84 0 16-7.16 16-16V88c0-6.66-10.67-12-24-12z" fill="white"/>
-    </svg>
-  `);
-  const userImage = profileImage || session?.user?.image || defaultAvatar;
+  // Profile data - prefer real photos; fall back to professional icon
+  const hasProfileImage = !!(providerProfileImage || profileImage || session?.user?.image)
+  const userImage = (providerProfileImage || profileImage || session?.user?.image || '') as string
   const userName = session?.user?.name || 'User';
 
   // Close dropdown on outside click
@@ -56,6 +60,19 @@ export default function HealthTracking() {
       loadProfileImage();
     }
   }, [session]);
+
+  useEffect(() => {
+    const checkFitbit = async () => {
+      try {
+        const res = await fetch('/api/fitbit/status')
+        if (res.ok) {
+          const j = await res.json()
+          setFitbitConnected(!!j.connected)
+        }
+      } catch {}
+    }
+    checkFitbit()
+  }, [])
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -122,24 +139,36 @@ export default function HealthTracking() {
                 className="focus:outline-none"
                 aria-label="Open profile menu"
               >
-                <Image
-                  src={userImage}
-                  alt="Profile"
-                  width={48}
-                  height={48}
-                  className="w-12 h-12 rounded-full border-2 border-helfi-green shadow-sm object-cover"
-                />
+                {hasProfileImage ? (
+                  <Image
+                    src={userImage}
+                    alt="Profile"
+                    width={48}
+                    height={48}
+                    className="w-12 h-12 rounded-full border-2 border-helfi-green shadow-sm object-cover"
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded-full bg-helfi-green shadow-sm flex items-center justify-center">
+                    <UserIcon className="w-6 h-6 text-white" aria-hidden="true" />
+                  </div>
+                )}
               </button>
               {dropdownOpen && (
                 <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-100 animate-fade-in">
                   <div className="flex items-center px-4 py-3 border-b border-gray-100">
-                    <Image
-                      src={userImage}
-                      alt="Profile"
-                      width={40}
-                      height={40}
-                      className="w-10 h-10 rounded-full object-cover mr-3"
-                    />
+                    {hasProfileImage ? (
+                      <Image
+                        src={userImage}
+                        alt="Profile"
+                        width={40}
+                        height={40}
+                        className="w-10 h-10 rounded-full object-cover mr-3"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-helfi-green flex items-center justify-center mr-3">
+                        <UserIcon className="w-5 h-5 text-white" aria-hidden="true" />
+                      </div>
+                    )}
                     <div>
                       <div className="font-semibold text-gray-900">{userName}</div>
                       <div className="text-xs text-gray-500">{session?.user?.email || 'user@email.com'}</div>
@@ -153,7 +182,7 @@ export default function HealthTracking() {
                   <Link href="/privacy" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Privacy Settings</Link>
                   <Link href="/help" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
                   <button
-                    onClick={() => signOut()}
+                    onClick={() => signOut({ callbackUrl: '/auth/signin' })}
                     className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50 font-semibold"
                   >
                     Logout
@@ -202,7 +231,7 @@ export default function HealthTracking() {
                   <Link href="/privacy" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Privacy Settings</Link>
                   <Link href="/help" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
                   <button
-                    onClick={() => signOut()}
+                    onClick={() => signOut({ callbackUrl: '/auth/signin' })}
                     className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50 font-semibold"
                   >
                     Logout
@@ -219,120 +248,79 @@ export default function HealthTracking() {
       {/* Main Content */}
               <div className="max-w-7xl mx-auto px-4 py-8 pb-24 md:pb-8">
         <div className="bg-white rounded-lg shadow-sm p-8">
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-helfi-black mb-4">
-              Health Tracking
-            </h1>
-            <p className="text-gray-600">
-              Track your daily health metrics and monitor your progress over time.
-            </p>
+          <div className="mb-6">
+            <h1 className="text-2xl md:text-3xl font-bold text-helfi-black">Health Tracking</h1>
+            <p className="text-gray-600">Monitor your steps, heart rate, sleep, and more — alongside your check-ins.</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div className="bg-helfi-green/5 p-6 rounded-lg border-2 border-helfi-green/20">
-              <h3 className="font-semibold text-helfi-black mb-2">📊 Daily Metrics</h3>
-              <p className="text-sm text-gray-600 mb-4">Track weight, sleep, mood, and energy levels</p>
-              <div className="mt-4 text-center">
-                <span className="text-xl font-bold text-helfi-green">Coming Soon</span>
+          {fitbitConnected ? (
+            <div className="space-y-6">
+              <FitbitSummary rangeDays={7} />
+              <FitbitCharts rangeDays={30} />
+              <FitbitCorrelations rangeDays={30} />
+              <p className="text-xs text-gray-500">
+                Tip: For best results, sync your Fitbit daily so Helfi can align your activity and sleep with your check-ins.
+              </p>
+            </div>
+          ) : (
+            <div className="p-6 rounded-xl border bg-gray-50">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                <div>
+                  <div className="text-lg font-semibold text-gray-900">Connect your Fitbit</div>
+                  <div className="text-sm text-gray-600">See your steps, heart rate, sleep, and weight here once connected.</div>
+                </div>
+                <Link href="/devices" className="px-4 py-2 bg-helfi-green text-white rounded-lg hover:bg-green-600 transition-colors text-sm text-center">
+                  Connect Fitbit
+                </Link>
               </div>
             </div>
-
-            <div className="bg-blue-50 p-6 rounded-lg border-2 border-blue-200">
-              <h3 className="font-semibold text-helfi-black mb-2">💓 Vital Signs</h3>
-              <p className="text-sm text-gray-600 mb-4">Monitor heart rate, blood pressure, and more</p>
-              <div className="mt-4 text-center">
-                <span className="text-xl font-bold text-blue-600">Coming Soon</span>
-              </div>
-            </div>
-
-            <div className="bg-purple-50 p-6 rounded-lg border-2 border-purple-200">
-              <h3 className="font-semibold text-helfi-black mb-2">🏃 Activity</h3>
-              <p className="text-sm text-gray-600 mb-4">Track exercise, steps, and activity levels</p>
-              <div className="mt-4 text-center">
-                <span className="text-xl font-bold text-purple-600">Coming Soon</span>
-              </div>
-            </div>
-
-            <div className="bg-orange-50 p-6 rounded-lg border-2 border-orange-200">
-              <h3 className="font-semibold text-helfi-black mb-2">💊 Medications</h3>
-              <p className="text-sm text-gray-600 mb-4">Track medication adherence and effects</p>
-              <div className="mt-4 text-center">
-                <span className="text-xl font-bold text-orange-600">Coming Soon</span>
-              </div>
-            </div>
-
-            <div className="bg-green-50 p-6 rounded-lg border-2 border-green-200">
-              <h3 className="font-semibold text-helfi-black mb-2">🥗 Nutrition</h3>
-              <p className="text-sm text-gray-600 mb-4">Log meals and track nutritional intake</p>
-              <div className="mt-4 text-center">
-                <span className="text-xl font-bold text-green-600">Coming Soon</span>
-              </div>
-            </div>
-
-            <div className="bg-red-50 p-6 rounded-lg border-2 border-red-200">
-              <h3 className="font-semibold text-helfi-black mb-2">🩺 Symptoms</h3>
-              <p className="text-sm text-gray-600 mb-4">Track symptoms and health changes</p>
-              <div className="mt-4 text-center">
-                <span className="text-xl font-bold text-red-600">Coming Soon</span>
-              </div>
-            </div>
-          </div>
+          )}
         </div>
       </div>
 
-      {/* Mobile Bottom Navigation - Inspired by Google, Facebook, Amazon mobile apps */}
+      {/* Mobile Bottom Navigation - with pressed, ripple and active states */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-2 z-40">
         <div className="flex items-center justify-around">
           
           {/* Dashboard */}
-          <Link href="/dashboard" className="flex flex-col items-center py-2 px-1 min-w-0 flex-1">
-            <div className="text-gray-400">
+          <Link href="/dashboard" className="pressable ripple flex flex-col items-center py-2 px-1 min-w-0 flex-1" onClick={() => { try { const reduced = window.matchMedia('(prefers-reduced-motion: reduce)')?.matches; const pref = localStorage.getItem('hapticsEnabled'); const enabled = pref === null ? true : pref === 'true'; if (enabled && !reduced && 'vibrate' in navigator) navigator.vibrate(10) } catch {} }}>
+            <div className={`icon ${pathname === '/dashboard' ? 'text-helfi-green' : 'text-gray-400'}`}>
               <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/>
               </svg>
             </div>
-            <span className="text-xs text-gray-400 mt-1 font-medium truncate">Dashboard</span>
+            <span className={`label text-xs mt-1 truncate ${pathname === '/dashboard' ? 'text-helfi-green font-bold' : 'text-gray-400 font-medium'}`}>Dashboard</span>
           </Link>
 
           {/* Insights (Active) - renamed from Health */}
-          <Link href="/health-tracking" className="flex flex-col items-center py-2 px-1 min-w-0 flex-1">
-            <div className="text-helfi-green">
+          <Link href="/health-tracking" className="pressable ripple flex flex-col items-center py-2 px-1 min-w-0 flex-1" onClick={() => { try { const reduced = window.matchMedia('(prefers-reduced-motion: reduce)')?.matches; const pref = localStorage.getItem('hapticsEnabled'); const enabled = pref === null ? true : pref === 'true'; if (enabled && !reduced && 'vibrate' in navigator) navigator.vibrate(10) } catch {} }}>
+            <div className={`icon ${pathname === '/health-tracking' ? 'text-helfi-green' : 'text-gray-400'}`}>
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
               </svg>
             </div>
-            <span className="text-xs text-helfi-green mt-1 font-bold truncate">Insights</span>
+            <span className={`label text-xs mt-1 truncate ${pathname === '/health-tracking' ? 'text-helfi-green font-bold' : 'text-gray-400 font-medium'}`}>Insights</span>
           </Link>
 
           {/* Food */}
-          <Link href="/food" className="flex flex-col items-center py-2 px-1 min-w-0 flex-1">
-            <div className="text-gray-400">
+          <Link href="/food" className="pressable ripple flex flex-col items-center py-2 px-1 min-w-0 flex-1" onClick={() => { try { const reduced = window.matchMedia('(prefers-reduced-motion: reduce)')?.matches; const pref = localStorage.getItem('hapticsEnabled'); const enabled = pref === null ? true : pref === 'true'; if (enabled && !reduced && 'vibrate' in navigator) navigator.vibrate(10) } catch {} }}>
+            <div className={`icon ${pathname === '/food' ? 'text-helfi-green' : 'text-gray-400'}`}>
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
               </svg>
             </div>
-            <span className="text-xs text-gray-400 mt-1 font-medium truncate">Food</span>
+            <span className={`label text-xs mt-1 truncate ${pathname === '/food' ? 'text-helfi-green font-bold' : 'text-gray-400 font-medium'}`}>Food</span>
           </Link>
 
-          {/* Health Info (Onboarding) */}
-          <Link href="/onboarding?step=1" className="flex flex-col items-center py-2 px-1 min-w-0 flex-1">
-            <div className="text-gray-400">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
-            </div>
-            <span className="text-xs text-gray-400 mt-1 font-medium truncate">Intake</span>
-          </Link>
+          {/* Intake (Onboarding) */}
+          <MobileMoreMenu />
 
           {/* Settings */}
-          <Link href="/settings" className="flex flex-col items-center py-2 px-1 min-w-0 flex-1">
-            <div className="text-gray-400">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
+          <Link href="/settings" className="pressable ripple flex flex-col items-center py-2 px-1 min-w-0 flex-1" onClick={() => { try { const reduced = window.matchMedia('(prefers-reduced-motion: reduce)')?.matches; const pref = localStorage.getItem('hapticsEnabled'); const enabled = pref === null ? true : pref === 'true'; if (enabled && !reduced && 'vibrate' in navigator) navigator.vibrate(10) } catch {} }}>
+            <div className={`icon ${pathname === '/settings' ? 'text-helfi-green' : 'text-gray-400'}`}>
+              <Cog6ToothIcon className="w-6 h-6 flex-shrink-0" style={{ minWidth: '24px', minHeight: '24px' }} />
             </div>
-            <span className="text-xs text-gray-400 mt-1 font-medium truncate">Settings</span>
+            <span className={`label text-xs mt-1 truncate ${pathname === '/settings' ? 'text-helfi-green font-bold' : 'text-gray-400 font-medium'}`}>Settings</span>
           </Link>
 
         </div>

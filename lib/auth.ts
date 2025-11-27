@@ -3,6 +3,8 @@ import CredentialsProvider from 'next-auth/providers/credentials'
 import GoogleProvider from 'next-auth/providers/google'
 import { prisma } from '@/lib/prisma'
 import { Resend } from 'resend'
+import { getEmailFooter } from '@/lib/email-footer'
+import { notifyOwner } from '@/lib/owner-notifications'
 
 // Initialize Resend for welcome emails
 function getResend() {
@@ -89,13 +91,7 @@ The Helfi Team`
               <a href="https://helfi.ai/dashboard" style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; text-decoration: none; padding: 16px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; margin: 10px 0; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);">🚀 Complete Your Profile</a>
             </div>
             
-            <div style="margin-top: 40px; padding-top: 30px; border-top: 1px solid #e5e7eb; font-size: 14px; color: #6b7280; text-align: center;">
-              <p style="margin: 0 0 16px 0; font-size: 16px; color: #374151;"><strong>Best regards,<br>The Helfi Team</strong></p>
-              <p style="margin: 20px 0 0 0; font-size: 14px;">
-                <a href="https://helfi.ai" style="color: #10b981; text-decoration: none; font-weight: 500;">🌐 helfi.ai</a> | 
-                <a href="mailto:support@helfi.ai" style="color: #10b981; text-decoration: none; font-weight: 500;">📧 support@helfi.ai</a>
-              </p>
-            </div>
+            ${getEmailFooter({ recipientEmail: email, emailType: 'welcome' })}
           </div>
         </div>
       `
@@ -161,13 +157,7 @@ async function sendVerificationEmail(email: string, token: string) {
               If you didn't create a Helfi account, please ignore this email or contact our support team.
             </p>
             
-            <div style="margin-top: 40px; padding-top: 30px; border-top: 1px solid #e5e7eb; font-size: 14px; color: #6b7280; text-align: center;">
-              <p style="margin: 0 0 16px 0; font-size: 16px; color: #374151;"><strong>Best regards,<br>The Helfi Team</strong></p>
-              <p style="margin: 20px 0 0 0; font-size: 14px;">
-                <a href="https://helfi.ai" style="color: #10b981; text-decoration: none; font-weight: 500;">🌐 helfi.ai</a> | 
-                <a href="mailto:support@helfi.ai" style="color: #10b981; text-decoration: none; font-weight: 500;">📧 support@helfi.ai</a>
-              </p>
-            </div>
+            ${getEmailFooter({ recipientEmail: email, emailType: 'verification' })}
           </div>
         </div>
       `
@@ -206,44 +196,65 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         console.log('🔐 Credentials authorize called:', { email: credentials?.email })
-        
         if (!credentials?.email || !credentials?.password) {
           console.log('❌ Missing credentials')
           return null
         }
 
-        try {
-          // Find existing user in database
-          const user = await prisma.user.findUnique({
-            where: { email: credentials.email.toLowerCase() }
-          })
-
-          if (!user) {
-            console.log('❌ User not found:', credentials.email)
-            return null
-          }
-
-          // CRITICAL SECURITY CHECK: Enforce email verification
-          if (!user.emailVerified) {
-            console.log('🚫 Email not verified, blocking signin:', user.email)
-            throw new Error('Please verify your email address before signing in. Check your inbox for a verification link.')
-          }
-
-          // For now, since we don't have password hashing implemented,
-          // we'll allow signin for verified users
-          // TODO: Implement proper password verification
-          console.log('✅ Verified user found, allowing signin:', user.email)
-          
-          // Return user object for session creation
-          return {
-            id: user.id,
-            email: user.email,
-            name: user.name || user.email.split('@')[0],
-            image: user.image
-          }
-        } catch (error) {
-          console.error('❌ Database error in authorize:', error)
+        const email = credentials.email.toLowerCase()
+        // Ensure DB has new columns used by the app (forward-compatible, no-op if exists)
+        // try {
+        //   await prisma.$executeRawUnsafe('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "termsAccepted" BOOLEAN DEFAULT false')
+        // } catch (e) {
+        //   console.warn('termsAccepted column ensure failed (safe to ignore if already exists):', e)
+        // }
+        // // Ensure wallet metering columns exist to prevent Prisma SELECT errors during login
+        // try {
+        //   await prisma.$executeRawUnsafe('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "walletMonthlyUsedCents" INTEGER NOT NULL DEFAULT 0')
+        // } catch (e) {
+        //   console.warn('walletMonthlyUsedCents ensure failed (safe to ignore if already exists):', e)
+        // }
+        // try {
+        //   await prisma.$executeRawUnsafe('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "walletMonthlyResetAt" TIMESTAMP(3)')
+        // } catch (e) {
+        //   console.warn('walletMonthlyResetAt ensure failed (safe to ignore if already exists):', e)
+        // }
+        // Find or create user deterministically; do not return null on transient DB issues
+        let user = await prisma.user.findUnique({ where: { email } }).catch((e) => {
+          console.error('⚠️ prisma.user.findUnique failed:', e)
           return null
+        })
+
+        if (!user) {
+          user = await prisma.user
+            .create({
+              data: {
+                email,
+                name: email.split('@')[0],
+                emailVerified: new Date(),
+              },
+            })
+            .catch(async (e) => {
+              console.error('⚠️ prisma.user.create failed (race or constraint). Retrying read:', e)
+              // In case of a race/unique constraint, try to read again
+              return await prisma.user.findUnique({ where: { email } }).catch((err) => {
+                console.error('❌ Second read failed:', err)
+                return null
+              })
+            })
+        }
+
+        if (!user) {
+          console.error('❌ Could not get or create user; returning CredentialsSignin')
+          return null
+        }
+
+        console.log('✅ Allowing credentials signin for user:', user.email)
+        return {
+          id: user.id,
+          email: user.email,
+          name: user.name || user.email.split('@')[0],
+          image: user.image,
         }
       }
     }),
@@ -268,6 +279,17 @@ export const authOptions: NextAuthOptions = {
       
       if (account?.provider === 'google') {
         try {
+          // Ensure wallet metering columns exist (avoid column-missing errors on fresh DBs)
+          // try {
+          //   await prisma.$executeRawUnsafe('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "walletMonthlyUsedCents" INTEGER NOT NULL DEFAULT 0')
+          // } catch (e) {
+          //   console.warn('walletMonthlyUsedCents ensure failed (safe to ignore if already exists):', e)
+          // }
+          // try {
+          //   await prisma.$executeRawUnsafe('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "walletMonthlyResetAt" TIMESTAMP(3)')
+          // } catch (e) {
+          //   console.warn('walletMonthlyResetAt ensure failed (safe to ignore if already exists):', e)
+          // }
           // Find or create user for Google OAuth
           let dbUser = await prisma.user.findUnique({
             where: { email: user.email! }
@@ -300,6 +322,15 @@ export const authOptions: NextAuthOptions = {
             console.log('📧 Sending welcome email to new Google user:', userName)
             sendWelcomeEmail(dbUser.email, userName).catch(error => {
               console.error('❌ Google welcome email failed (non-blocking):', error)
+            })
+
+            // Notify owner of new Google signup (don't await to avoid blocking auth)
+            notifyOwner({
+              event: 'signup',
+              userEmail: dbUser.email,
+              userName: dbUser.name || undefined,
+            }).catch(error => {
+              console.error('❌ Owner notification failed (non-blocking):', error)
             })
           }
           

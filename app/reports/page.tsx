@@ -3,23 +3,21 @@
 import React, { useState, useEffect } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import Image from 'next/image'
+import { UserIcon } from '@heroicons/react/24/outline'
 import { useUserData } from '@/components/providers/UserDataProvider'
+import MobileMoreMenu from '@/components/MobileMoreMenu'
 
 export default function Reports() {
   const { data: session } = useSession()
+  const pathname = usePathname()
   const { userData, profileImage } = useUserData()
   const [dropdownOpen, setDropdownOpen] = useState(false)
 
-  // Profile data - using consistent green avatar
-  const defaultAvatar = 'data:image/svg+xml;base64,' + btoa(`
-    <svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="64" cy="64" r="64" fill="#10B981"/>
-      <circle cx="64" cy="48" r="20" fill="white"/>
-      <path d="M64 76c-13.33 0-24 5.34-24 12v16c0 8.84 7.16 16 16 16h16c8.84 0 16-7.16 16-16V88c0-6.66-10.67-12-24-12z" fill="white"/>
-    </svg>
-  `);
-  const userImage = profileImage || session?.user?.image || defaultAvatar;
+  // Profile data - prefer real photos; fall back to professional icon
+  const hasProfileImage = !!(profileImage || session?.user?.image)
+  const userImage = (profileImage || session?.user?.image || '') as string
   const userName = session?.user?.name || 'User';
 
   // Close dropdown on outside click
@@ -36,6 +34,27 @@ export default function Reports() {
       return () => document.removeEventListener('mousedown', handleClick);
     }
   }, [dropdownOpen]);
+
+  const [reports, setReports] = useState<any[]>([])
+  const [loadingPreview, setLoadingPreview] = useState<boolean>(false)
+
+  useEffect(() => {
+    async function loadPreview() {
+      try {
+        setLoadingPreview(true)
+        const res = await fetch('/api/reports/weekly/list?preview=1', { cache: 'no-cache' })
+        const data = await res.json().catch(() => ({}))
+        if (data?.reports && Array.isArray(data.reports)) {
+          setReports(data.reports)
+        }
+      } catch (e) {
+        // ignore preview errors
+      } finally {
+        setLoadingPreview(false)
+      }
+    }
+    loadPreview()
+  }, [])
 
   // Profile image now loaded from UserDataProvider cache - no API call needed!
 
@@ -65,24 +84,36 @@ export default function Reports() {
               className="focus:outline-none"
               aria-label="Open profile menu"
             >
-              <Image
-                src={userImage}
-                alt="Profile"
-                width={48}
-                height={48}
-                className="w-12 h-12 rounded-full border-2 border-helfi-green shadow-sm object-cover"
-              />
+              {hasProfileImage ? (
+                <Image
+                  src={userImage}
+                  alt="Profile"
+                  width={48}
+                  height={48}
+                  className="w-12 h-12 rounded-full border-2 border-helfi-green shadow-sm object-cover"
+                />
+              ) : (
+                <div className="w-12 h-12 rounded-full bg-helfi-green shadow-sm flex items-center justify-center">
+                  <UserIcon className="w-6 h-6 text-white" aria-hidden="true" />
+                </div>
+              )}
             </button>
             {dropdownOpen && (
               <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-100 animate-fade-in">
                 <div className="flex items-center px-4 py-3 border-b border-gray-100">
-                  <Image
-                    src={userImage}
-                    alt="Profile"
-                    width={40}
-                    height={40}
-                    className="w-10 h-10 rounded-full object-cover mr-3"
-                  />
+                  {hasProfileImage ? (
+                    <Image
+                      src={userImage}
+                      alt="Profile"
+                      width={40}
+                      height={40}
+                      className="w-10 h-10 rounded-full object-cover mr-3"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-helfi-green flex items-center justify-center mr-3">
+                      <UserIcon className="w-5 h-5 text-white" aria-hidden="true" />
+                    </div>
+                  )}
                   <div>
                     <div className="font-semibold text-gray-900">{userName}</div>
                     <div className="text-xs text-gray-500">{session?.user?.email || 'user@email.com'}</div>
@@ -96,7 +127,7 @@ export default function Reports() {
                 <Link href="/privacy" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Privacy Settings</Link>
                 <Link href="/help" className="block px-4 py-2 text-gray-700 hover:bg-gray-50">Help & Support</Link>
                 <button
-                  onClick={() => signOut()}
+                  onClick={() => signOut({ callbackUrl: '/auth/signin' })}
                   className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-50 font-semibold"
                 >
                   Logout
@@ -128,110 +159,77 @@ export default function Reports() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div className="bg-purple-50 p-6 rounded-lg border-2 border-purple-200">
-              <h3 className="font-semibold text-helfi-black mb-2">📊 Weekly Summary</h3>
-              <p className="text-sm text-gray-600 mb-4">Get a comprehensive overview of your weekly health data</p>
-              <div className="mt-4 text-center">
-                <span className="text-xl font-bold text-purple-600">Coming Soon</span>
-              </div>
-            </div>
-
-            <div className="bg-blue-50 p-6 rounded-lg border-2 border-blue-200">
-              <h3 className="font-semibold text-helfi-black mb-2">📈 Progress Tracking</h3>
-              <p className="text-sm text-gray-600 mb-4">Monitor your progress toward health goals</p>
-              <div className="mt-4 text-center">
-                <span className="text-xl font-bold text-blue-600">Coming Soon</span>
-              </div>
-            </div>
-
-            <div className="bg-green-50 p-6 rounded-lg border-2 border-green-200">
-              <h3 className="font-semibold text-helfi-black mb-2">📋 Detailed Analysis</h3>
-              <p className="text-sm text-gray-600 mb-4">In-depth analysis of health patterns and trends</p>
-              <div className="mt-4 text-center">
-                <span className="text-xl font-bold text-green-600">Coming Soon</span>
-              </div>
-            </div>
-
-            <div className="bg-orange-50 p-6 rounded-lg border-2 border-orange-200">
-              <h3 className="font-semibold text-helfi-black mb-2">🎯 Goal Assessment</h3>
-              <p className="text-sm text-gray-600 mb-4">Evaluate progress toward your health objectives</p>
-              <div className="mt-4 text-center">
-                <span className="text-xl font-bold text-orange-600">Coming Soon</span>
-              </div>
-            </div>
-
-            <div className="bg-red-50 p-6 rounded-lg border-2 border-red-200">
-              <h3 className="font-semibold text-helfi-black mb-2">⚡ Insights Dashboard</h3>
-              <p className="text-sm text-gray-600 mb-4">Key insights and recommendations from your data</p>
-              <div className="mt-4 text-center">
-                <span className="text-xl font-bold text-red-600">Coming Soon</span>
-              </div>
-            </div>
-
-            <div className="bg-yellow-50 p-6 rounded-lg border-2 border-yellow-200">
-              <h3 className="font-semibold text-helfi-black mb-2">📅 Monthly Report</h3>
-              <p className="text-sm text-gray-600 mb-4">Comprehensive monthly health summary and trends</p>
-              <div className="mt-4 text-center">
-                <span className="text-xl font-bold text-yellow-600">Coming Soon</span>
-              </div>
-            </div>
+            {reports.length > 0 ? (
+              reports.map((r) => (
+                <div key={r.id} className="bg-purple-50 p-6 rounded-lg border-2 border-purple-200">
+                  <h3 className="font-semibold text-helfi-black mb-1">📊 Weekly Summary</h3>
+                  <p className="text-sm text-gray-600 mb-2">Week starting {r.weekStart}</p>
+                  <div className="text-sm text-purple-800">{r.summary}</div>
+                </div>
+              ))
+            ) : (
+              <div className="text-sm text-gray-600">{loadingPreview ? 'Loading preview…' : 'No reports yet.'}</div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Mobile Bottom Navigation */}
+      {/* Mobile Bottom Navigation - with pressed, ripple and active states */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-2 z-40">
         <div className="flex items-center justify-around">
           
           {/* Dashboard */}
-          <Link href="/dashboard" className="flex flex-col items-center py-2 px-1 min-w-0 flex-1">
-            <div className="text-gray-400">
+          <Link href="/dashboard" className="pressable ripple flex flex-col items-center py-2 px-1 min-w-0 flex-1" onClick={() => { try { const reduced = window.matchMedia('(prefers-reduced-motion: reduce)')?.matches; const pref = localStorage.getItem('hapticsEnabled'); const enabled = pref === null ? true : pref === 'true'; if (enabled && !reduced && 'vibrate' in navigator) navigator.vibrate(10) } catch {} }}>
+            <div className={`icon ${pathname === '/dashboard' ? 'text-helfi-green' : 'text-gray-400'}`}>
               <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/>
               </svg>
             </div>
-            <span className="text-xs text-gray-400 mt-1 font-medium truncate">Dashboard</span>
+            <span className={`label text-xs mt-1 truncate ${pathname === '/dashboard' ? 'text-helfi-green font-bold' : 'text-gray-400 font-medium'}`}>Dashboard</span>
           </Link>
 
           {/* Health */}
-          <Link href="/health-tracking" className="flex flex-col items-center py-2 px-1 min-w-0 flex-1">
-            <div className="text-gray-400">
+          <Link href="/health-tracking" className="pressable ripple flex flex-col items-center py-2 px-1 min-w-0 flex-1" onClick={() => { try { const reduced = window.matchMedia('(prefers-reduced-motion: reduce)')?.matches; const pref = localStorage.getItem('hapticsEnabled'); const enabled = pref === null ? true : pref === 'true'; if (enabled && !reduced && 'vibrate' in navigator) navigator.vibrate(10) } catch {} }}>
+            <div className={`icon ${pathname === '/health-tracking' ? 'text-helfi-green' : 'text-gray-400'}`}>
               <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
               </svg>
             </div>
-            <span className="text-xs text-gray-400 mt-1 font-medium truncate">Health</span>
+            <span className={`label text-xs mt-1 truncate ${pathname === '/health-tracking' ? 'text-helfi-green font-bold' : 'text-gray-400 font-medium'}`}>Health</span>
           </Link>
 
           {/* Food */}
-          <Link href="/food" className="flex flex-col items-center py-2 px-1 min-w-0 flex-1">
-            <div className="text-gray-400">
+          <Link href="/food" className="pressable ripple flex flex-col items-center py-2 px-1 min-w-0 flex-1" onClick={() => { try { const reduced = window.matchMedia('(prefers-reduced-motion: reduce)')?.matches; const pref = localStorage.getItem('hapticsEnabled'); const enabled = pref === null ? true : pref === 'true'; if (enabled && !reduced && 'vibrate' in navigator) navigator.vibrate(10) } catch {} }}>
+            <div className={`icon ${pathname === '/food' ? 'text-helfi-green' : 'text-gray-400'}`}>
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
               </svg>
             </div>
-            <span className="text-xs text-gray-400 mt-1 font-medium truncate">Food</span>
+            <span className={`label text-xs mt-1 truncate ${pathname === '/food' ? 'text-helfi-green font-bold' : 'text-gray-400 font-medium'}`}>Food</span>
           </Link>
 
           {/* Insights */}
-          <Link href="/insights" className="flex flex-col items-center py-2 px-1 min-w-0 flex-1">
-            <div className="text-gray-400">
+          <Link href="/insights" className="pressable ripple flex flex-col items-center py-2 px-1 min-w-0 flex-1" onClick={() => { try { const reduced = window.matchMedia('(prefers-reduced-motion: reduce)')?.matches; const pref = localStorage.getItem('hapticsEnabled'); const enabled = pref === null ? true : pref === 'true'; if (enabled && !reduced && 'vibrate' in navigator) navigator.vibrate(10) } catch {} }}>
+            <div className={`icon ${pathname === '/insights' ? 'text-helfi-green' : 'text-gray-400'}`}>
               <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
               </svg>
             </div>
-            <span className="text-xs text-gray-400 mt-1 font-medium truncate">Insights</span>
+            <span className={`label text-xs mt-1 truncate ${pathname === '/insights' ? 'text-helfi-green font-bold' : 'text-gray-400 font-medium'}`}>Insights</span>
           </Link>
 
           {/* Reports (Active) */}
-          <Link href="/reports" className="flex flex-col items-center py-2 px-1 min-w-0 flex-1">
-            <div className="text-helfi-green">
+          <Link href="/reports" className="pressable ripple flex flex-col items-center py-2 px-1 min-w-0 flex-1" onClick={() => { try { const reduced = window.matchMedia('(prefers-reduced-motion: reduce)')?.matches; const pref = localStorage.getItem('hapticsEnabled'); const enabled = pref === null ? true : pref === 'true'; if (enabled && !reduced && 'vibrate' in navigator) navigator.vibrate(10) } catch {} }}>
+            <div className={`icon ${pathname === '/reports' ? 'text-helfi-green' : 'text-gray-400'}`}>
               <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/>
               </svg>
             </div>
-            <span className="text-xs text-helfi-green mt-1 font-bold truncate">Reports</span>
+            <span className={`label text-xs mt-1 truncate ${pathname === '/reports' ? 'text-helfi-green font-bold' : 'text-gray-400 font-medium'}`}>Reports</span>
           </Link>
+
+          {/* Intake (Onboarding) */}
+          <MobileMoreMenu />
 
         </div>
       </nav>

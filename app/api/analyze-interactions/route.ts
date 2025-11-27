@@ -4,6 +4,9 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { CreditManager, CREDIT_COSTS } from '@/lib/credit-system';
 import OpenAI from 'openai';
+import { chatCompletionWithCost } from '@/lib/metered-openai';
+import { costCentsEstimateFromText } from '@/lib/cost-meter';
+import { logAIUsage } from '@/lib/ai-usage-logger';
 
 // Lazily initialize OpenAI to avoid build-time env requirements
 function getOpenAIClient() {
@@ -21,7 +24,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { supplements, medications, analysisName } = await request.json();
+    const { supplements, medications, analysisName, reanalysis } = await request.json();
 
     if (!supplements || !medications) {
       return NextResponse.json({ error: 'Missing supplements or medications data' }, { status: 400 });
@@ -30,16 +33,41 @@ export async function POST(request: NextRequest) {
     // Find user and check credit quota
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
-      include: { subscription: true }
+      include: { subscription: true, creditTopUps: true }
     });
 
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    // Trial/Premium gating: allow 1 trial, or 30/month if premium
+    // PREMIUM/CREDITS/FREE USE GATING
     const isPremium = user.subscription?.plan === 'PREMIUM';
+    
+    // Check if user has purchased credits (non-expired)
     const now = new Date();
+    const hasPurchasedCredits = user.creditTopUps.some(
+      (topUp: any) => topUp.expiresAt > now && (topUp.amountCents - topUp.usedCents) > 0
+    );
+    
+    // Check if user has used their free interaction analysis
+    const hasUsedFreeInteraction = (user as any).hasUsedFreeInteractionAnalysis || false;
+    
+    // Allow if: Premium subscription OR has purchased credits OR hasn't used free use yet
+    let allowViaFreeUse = false;
+    if (!isPremium && !hasPurchasedCredits && !hasUsedFreeInteraction && !reanalysis) {
+      // First time use - allow free
+      allowViaFreeUse = true;
+    } else if (!isPremium && !hasPurchasedCredits) {
+      // No subscription, no credits, and already used free - require payment
+      return NextResponse.json(
+        { 
+          error: 'Payment required',
+          message: 'You\'ve used your free interaction analysis. Subscribe to a monthly plan or purchase credits to continue.',
+          requiresPayment: true
+        },
+        { status: 402 }
+      );
+    }
     // Use optional chaining to avoid type errors if field not present in client types
     const lastMonthlyReset = (user as any).lastMonthlyResetDate as Date | null;
     const monthChanged = !lastMonthlyReset || lastMonthlyReset.getUTCFullYear() !== now.getUTCFullYear() || lastMonthlyReset.getUTCMonth() !== now.getUTCMonth();
@@ -54,17 +82,7 @@ export async function POST(request: NextRequest) {
       (user as any).monthlyInteractionAnalysisUsed = 0 as any;
     }
 
-    if (!isPremium && (user as any).trialActive) {
-      if (((user as any).trialInteractionRemaining || 0) <= 0) {
-        return NextResponse.json({ error: "You've reached your trial limit. Subscribe to unlock full access." }, { status: 402 });
-      }
-    } else if (!isPremium && !(user as any).trialActive) {
-      return NextResponse.json({ error: "You've reached your trial limit. Subscribe to unlock full access." }, { status: 402 });
-    } else if (isPremium) {
-      if (((user as any).monthlyInteractionAnalysisUsed || 0) >= 30) {
-        return NextResponse.json({ error: 'Monthly interaction analysis limit reached.' }, { status: 429 });
-      }
-    }
+    // Plan/trial gating removed – wallet pre-check governs access (trial counters still updated later)
 
     // Prepare the data for OpenAI analysis
     const supplementList = (supplements as any[]).map((s: any) => ({
@@ -137,8 +155,36 @@ Be thorough but not alarmist. Provide actionable recommendations.`;
       return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 });
     }
 
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4",
+    const model = reanalysis ? "gpt-4o-mini" : "gpt-4";
+
+    // Wallet pre-check (skip if allowed via free use)
+    if (!allowViaFreeUse) {
+      const cm = new CreditManager(user.id);
+      const estimateCents = costCentsEstimateFromText(model, prompt, 2000 * 4);
+      const wallet = await cm.getWalletStatus();
+      if (wallet.totalAvailableCents < estimateCents) {
+        return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
+      }
+    }
+
+    // Immediate pre-charge (interaction analysis typical cost = CREDIT_COSTS.INTERACTION_ANALYSIS)
+    let prechargedCents = 0;
+    if (!allowViaFreeUse) {
+      try {
+        const cm = new CreditManager(user.id);
+        const immediate = CREDIT_COSTS.INTERACTION_ANALYSIS;
+        const okPre = await cm.chargeCents(immediate);
+        if (!okPre) {
+          return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
+        }
+        prechargedCents = immediate;
+      } catch {
+        return NextResponse.json({ error: 'Billing error' }, { status: 402 });
+      }
+    }
+
+    const wrapped = await chatCompletionWithCost(openai, {
+      model,
       messages: [
         {
           role: "system",
@@ -151,9 +197,9 @@ Be thorough but not alarmist. Provide actionable recommendations.`;
       ],
       temperature: 0.3,
       max_tokens: 2000,
-    });
+    } as any);
 
-    const analysisText = completion.choices[0].message.content;
+    const analysisText = wrapped.completion.choices[0].message.content;
     console.log('OpenAI Response:', analysisText);
     
     // Parse the JSON response with improved error handling
@@ -224,25 +270,58 @@ Be thorough but not alarmist. Provide actionable recommendations.`;
       }
     });
 
-    // Update counters after successful analysis
-    if (!isPremium && (user as any).trialActive) {
-      await prisma.user.update({
-        where: { id: user.id },
-        data: ( {
-          trialInteractionRemaining: Math.max(0, ((user as any).trialInteractionRemaining || 0) - 1),
-          trialActive: ((user as any).trialFoodRemaining || 0) > 0 || (((user as any).trialInteractionRemaining || 0) - 1) > 0
-        } as any )
-      });
-    } else if (isPremium) {
-      await prisma.user.update({
-        where: { id: user.id },
-        data: ( {
-          monthlyInteractionAnalysisUsed: { increment: 1 },
-          totalAnalysisCount: { increment: 1 },
-        } as any )
-      });
+    // Charge wallet and update counters (skip if allowed via free use)
+    if (!allowViaFreeUse) {
+      const cm = new CreditManager(user.id);
+      const remainder = Math.max(0, wrapped.costCents - prechargedCents);
+      const ok = await cm.chargeCents(remainder);
+      if (!ok) {
+        return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
+      }
     }
 
+    // Update counters and mark free use as used
+    if (allowViaFreeUse && !reanalysis) {
+      // Mark free use as used (safe if column doesn't exist yet - migration pending)
+      try {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            hasUsedFreeInteractionAnalysis: true,
+          } as any
+        })
+      } catch (e: any) {
+        // Ignore if column doesn't exist yet (migration pending)
+        if (!e.message?.includes('does not exist')) {
+          console.warn('Failed to update hasUsedFreeInteractionAnalysis:', e)
+        }
+      }
+    }
+    // Update counters (for all users, not just premium)
+    await prisma.user.update({
+      where: { id: user.id },
+      data: ( {
+        monthlyInteractionAnalysisUsed: { increment: 1 },
+        totalInteractionAnalysisCount: { increment: 1 },
+        totalAnalysisCount: { increment: 1 },
+      } as any )
+    });
+
+    // Log AI usage for interaction analysis (fire-and-forget)
+    try {
+      await logAIUsage({
+        context: { feature: 'interactions:analysis', userId: user.id },
+        model,
+        promptTokens: wrapped.promptTokens,
+        completionTokens: wrapped.completionTokens,
+        costCents: wrapped.costCents,
+      });
+    } catch {
+      // Logging should never break the main flow
+    }
+
+    // Fire-and-forget: update insights preview based on new interaction results
+    try { fetch('/api/insights/generate?preview=1', { method: 'POST' }).catch(()=>{}) } catch {}
     return NextResponse.json({ 
       success: true, 
       analysis,
