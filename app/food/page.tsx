@@ -3475,11 +3475,24 @@ Please add nutritional information manually if needed.`);
       setEditedDescription(cleanDescription);
     } else {
       // For manual entries, populate the manual form
+      const enrichedItems = food.items && Array.isArray(food.items) ? enrichItemsFromStarter(food.items) : []
+      setAnalyzedItems(enrichedItems)
+      setAnalyzedNutrition(food.nutrition || null)
+      setAnalyzedTotal(food.total || null)
+      if (enrichedItems.length > 0) {
+        applyRecalculatedNutrition(enrichedItems)
+      }
       setManualFoodName(food.description);
       setManualFoodType('single');
+      setEditedDescription(extractBaseMealDescription(food.description || ''))
+      setShowAiResult(true);
+      setIsEditingDescription(false);
       setShowAddFood(true);
     }
     setShowEntryOptions(null);
+    try {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    } catch {}
   };
 
 
@@ -3601,6 +3614,23 @@ Please add nutritional information manually if needed.`);
       [foodId]: !prev[foodId]
     }));
   };
+
+  // Open a specific entry's detail view and scroll it into view for mobile users.
+  const openEntryDetails = (foodId: string | number) => {
+    const idStr = foodId.toString()
+    setExpandedEntries(() => ({
+      [idStr]: true,
+    }))
+    setShowEntryOptions(null)
+    try {
+      const el = document.getElementById(`food-entry-${idStr}`)
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }
+    } catch {
+      // non-blocking: scroll helpers are best-effort only
+    }
+  }
 
   // Format time with AM/PM
   const formatTimeWithAMPM = (timeString: string) => {
@@ -5998,9 +6028,24 @@ Please add nutritional information manually if needed.`);
                     })
 
                     const renderEntryCard = (food: any) => (
-                      <div key={food.id} className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-visible">
+                      <div
+                        key={food.id}
+                        id={`food-entry-${food.id}`}
+                        className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-visible"
+                      >
                         {/* Collapsed header row */}
-                        <div className="p-4 hover:bg-gray-50 transition-colors">
+                        <div
+                          className="p-4 hover:bg-gray-50 transition-colors cursor-pointer"
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => openEntryDetails(food.id)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault()
+                              openEntryDetails(food.id)
+                            }
+                          }}
+                        >
                           <div className="flex items-center gap-3">
                             <p className="flex-1 text-sm sm:text-base text-gray-900 truncate">
                               {sanitizeMealDescription(food.description.split('\n')[0].split('Calories:')[0])}
@@ -6017,6 +6062,11 @@ Please add nutritional information manually if needed.`);
                                     e.stopPropagation();
                                     setShowEntryOptions(showEntryOptions === food.id.toString() ? null : food.id.toString());
                                   }}
+                                  onClick={(e) => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    setShowEntryOptions(showEntryOptions === food.id.toString() ? null : food.id.toString())
+                                  }}
                                   className="p-1.5 sm:p-2 rounded-lg hover:bg-gray-200 transition-colors"
                                 >
                                   <svg className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
@@ -6026,19 +6076,23 @@ Please add nutritional information manually if needed.`);
                                 {showEntryOptions === food.id.toString() && (
                                   <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-200 z-[9999]" style={{boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)', overflow: 'visible', paddingBottom: '6px'}}>
                                     <button
-                                      onClick={() => editFood(food)}
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        editFood(food)
+                                      }}
                                       className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center transition-colors"
                                     >
                                       <svg className="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                       </svg>
                                       <div>
-                                        <div className="font-medium">Edit Entry</div>
-                                        <div className="text-xs text-gray-500">Modify description & re-analyze</div>
+                                        <div className="font-medium">Show Nutrition Summary</div>
+                                        <div className="text-xs text-gray-500">Open details, edit, or delete</div>
                                       </div>
                                     </button>
                                     <button
-                                      onClick={() => {
+                                      onClick={(e) => {
+                                        e.stopPropagation()
                                         if (isViewingToday) {
                                           deleteFood(food.id)
                                         } else {
@@ -6061,7 +6115,10 @@ Please add nutritional information manually if needed.`);
                               </div>
                               {/* Expand/Collapse Toggle */}
                               <button
-                                onClick={() => toggleExpanded(food.id.toString())}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  toggleExpanded(food.id.toString())
+                                }}
                                 className="p-1.5 sm:p-2 rounded-lg hover:bg-gray-200 transition-colors"
                               >
                                 <svg 
@@ -6151,12 +6208,13 @@ Please add nutritional information manually if needed.`);
                                       >
                                         <div className="relative inline-block">
                                           <MacroRing macros={mealMacros} showLegend={false} size="large" />
-                                          <div className="absolute inset-0 flex items-center justify-center">
+                                          <div className="absolute inset-0 flex flex-col items-center justify-center leading-tight">
                                             <span className="text-xs font-semibold text-gray-800">
                                               {Number.isFinite(mealEnergyKcal) && mealEnergyKcal > 0
                                                 ? mealEnergyInUnit
                                                 : '—'}
                                             </span>
+                                            <span className="text-[11px] text-gray-500">{energyUnit}</span>
                                           </div>
                                         </div>
                                         <span className="mt-2 text-[11px] text-gray-500">Tap to expand</span>
