@@ -16,3 +16,13 @@
 - ☐ When you tap the 3 dots, show the pop-up menu with “Show Nutrition Summary” (replaces “Edit Entry”).
 - ☐ Tapping a food row opens the full detail page with all info plus edit and delete.
 - ☐ On the detail page, show “kcal” under the big calorie number.
+
+## Guidance for the next agent
+- Only do the to-do items above. Everything else stays as-is.
+- Match the Cronometer mobile look shown in the screenshots. Use them as the visual source of truth.
+- Keep desktop behaviour untouched (3-dot menus, buttons, overflow, etc.). Do not break desktop.
+- Respect guard rails in `GUARD_RAILS.md`. Do not change nutrition logic or data logic.
+- Mobile only: swipe right shows the green menu button; swipe left deletes.
+- The 3-dot tap opens the pop-up with “Show Nutrition Summary” (not “Edit Entry”).
+- Tapping a food row opens the full detail page with edit and delete; show “kcal” under the big calorie number.
+- Do not hide or break any existing buttons or menus. Test taps and menus after changes.
