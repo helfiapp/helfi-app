@@ -25,3 +25,13 @@
 - The 3-dot tap opens the pop-up with “Show Nutrition Summary” (not “Edit Entry”).
 - Tapping a food row opens the edit screen (food analysis/edit view) with edit/delete and “kcal” under the big calorie number.
 - Do not hide or break any existing buttons or menus. Test taps and menus after changes.
+
+## Expected behavior (quick summary)
+- Swipe right → show green menu button on the left (see swipe screenshot).
+- Swipe left → delete action.
+- Tap 3 dots → pop-up menu shows “Show Nutrition Summary” (replaces “Edit Entry”).
+- Tap a food row → open the edit screen (see edit screenshot), with edit/delete buttons and “kcal” under the big calorie number.
+
+## Process
+- Work in `preview-staging`; do not touch `master` until approved.
+- Use the linked screenshots as the visual source of truth; keep desktop menus and buttons working.
