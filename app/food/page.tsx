@@ -6190,18 +6190,7 @@ Please add nutritional information manually if needed.`);
                             {/* Action buttons */}
                             <div className="mt-4 flex flex-wrap gap-2">
                               <button
-                                onClick={() => {
-                                  setEditingEntry(food);
-                                  setOriginalEditingEntry(food);
-                                  setAnalyzedNutrition(food.nutrition || null);
-                                  setAnalyzedItems((food as any).items || []);
-                                  setAnalyzedTotal((food as any).total || null);
-                                  setAiDescription((food as any).description || '');
-                                  setShowAiResult(true);
-                                  setIsEditingDescription(true);
-                                  setExpandedItemIndex(null);
-                                  setExpandedEntries({});
-                                }}
+                                onClick={() => editFood(food)}
                                 className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors"
                               >
                                 Edit
