@@ -6022,10 +6022,11 @@ Please add nutritional information manually if needed.`);
                 )}
 
                 {/* Multiple Ingredients Entry */}
-                {/* PROTECTED: INGREDIENTS_CARD START */}
                 {manualFoodType === 'multiple' && (
                   <div className="mb-6 max-h-[60vh] overflow-y-auto overscroll-contain pr-1">
-                    <div className="space-y-4">
+                    {/* PROTECTED: INGREDIENTS_CARD START */}
+                    <div className="mb-6">
+                      <div className="space-y-4">
                       {manualIngredients.map((ing, index) => (
                         <div key={index} className="border border-gray-200 rounded-xl p-4">
                           <div className="flex justify-between items-center mb-3">
@@ -6117,7 +6118,9 @@ Please add nutritional information manually if needed.`);
                     </div>
                   </div>
                 )}
-                {/* PROTECTED: INGREDIENTS_CARD END */}
+                    {/* PROTECTED: INGREDIENTS_CARD END */}
+                  </div>
+                )}
 
                 {/* Action Buttons */}
                 <div className="flex gap-3">
