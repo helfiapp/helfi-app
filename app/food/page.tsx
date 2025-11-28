@@ -3438,6 +3438,30 @@ Please add nutritional information manually if needed.`);
       meal: category,
       category,
     }
+    const buildEntryDedupKey = (food: any) =>
+      [
+        food?.localDate || '',
+        normalizeCategory(food?.meal || food?.category || food?.mealType),
+        (food?.description || '').toString().trim().toLowerCase(),
+        food?.time || '',
+        food?.photo || '',
+      ].join('|')
+    const entryDedupKey = buildEntryDedupKey(entry)
+    const ensureEntryPresent = () => {
+      const insertIfMissing = (list: any[]) => {
+        const exists = list.some((food: any) => buildEntryDedupKey(food) === entryDedupKey)
+        if (exists) return list
+        return [entry, ...list]
+      }
+      if (isViewingToday) {
+        setTodaysFoods((prev) => insertIfMissing(prev))
+      } else {
+        setHistoryFoods((prev: any[] | null) => {
+          const base = Array.isArray(prev) ? prev : []
+          return insertIfMissing(base)
+        })
+      }
+    }
     setSelectedAddCategory(category as typeof MEAL_CATEGORY_ORDER[number])
     setExpandedCategories((prev) => ({
       ...prev,
@@ -3456,6 +3480,7 @@ Please add nutritional information manually if needed.`);
       await refreshEntriesFromServer()
       showQuickToast(`Meal added to ${categoryLabel(category)}`)
     } finally {
+      ensureEntryPresent()
       setShowFavoritesPicker(false)
       setShowPhotoOptions(false)
       setPhotoOptionsAnchor(null)
