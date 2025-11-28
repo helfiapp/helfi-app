@@ -41,8 +41,9 @@ function checkIngredientsCard() {
   // for one build, then paste the updated snapshot below so future edits are guarded.
   const EXPECTED_INGREDIENTS_CARD = `
                 {manualFoodType === 'multiple' && (
-                  <div className="mb-6">
-                    <div className="space-y-4">
+                  <div className="mb-6 max-h-[60vh] overflow-y-auto overscroll-contain pr-1">
+                    <div className="mb-6">
+                      <div className="space-y-4">
                       {manualIngredients.map((ing, index) => (
                         <div key={index} className="border border-gray-200 rounded-xl p-4">
                           <div className="flex justify-between items-center mb-3">
@@ -156,5 +157,3 @@ function main() {
 }
 
 main();
-
-
