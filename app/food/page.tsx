@@ -3356,11 +3356,11 @@ Please add nutritional information manually if needed.`);
     if (!editingEntry) return
     try {
       if (isViewingToday) {
-        await deleteFood(editingEntry.id)
+        await deleteFood(editingEntry)
       } else if ((editingEntry as any)?.dbId) {
         await deleteHistoryFood((editingEntry as any).dbId)
       } else {
-        await deleteFood(editingEntry.id)
+        await deleteFood(editingEntry)
       }
     } finally {
       exitEditingSession()
@@ -3747,11 +3747,15 @@ Please add nutritional information manually if needed.`);
 
 
 
-  const deleteFood = async (foodId: number) => {
+  const deleteFood = async (entry: any) => {
+    if (!entry) return
     // Find the entry being deleted to check if it has a database ID
-    const entryToDelete = todaysFoods.find(food => food.id === foodId);
-    const entryCategory = normalizeCategory(entryToDelete?.meal || entryToDelete?.category || entryToDelete?.mealType)
-    const dbId = (entryToDelete as any)?.dbId;
+    const dbId = (entry as any)?.dbId
+    const entryCategory = normalizeCategory(entry?.meal || entry?.category || entry?.mealType)
+    const entryId = entry.id;
+    const entryToDelete =
+      todaysFoods.find((food) => food.id === entryId) ||
+      (dbId ? todaysFoods.find((food: any) => (food as any).dbId === dbId) : null)
     
     // If entry has a database ID, delete it from the database first
     if (dbId) {
@@ -3771,8 +3775,12 @@ Please add nutritional information manually if needed.`);
       }
     }
     
-    // Remove from local state and update cache
-    const updatedFoods = todaysFoods.filter(food => food.id !== foodId);
+    // Remove from local state and update cache (by both id and dbId to be safe)
+    const updatedFoods = todaysFoods.filter((food: any) => {
+      const sameId = food.id === entryId;
+      const sameDb = dbId && (food as any).dbId === dbId;
+      return !sameId && !sameDb;
+    });
     setTodaysFoods(updatedFoods);
     await saveFoodEntries(updatedFoods, { appendHistory: false });
     // If this was the last entry in the category, collapse that panel
@@ -6321,13 +6329,17 @@ Please add nutritional information manually if needed.`);
                         { label: 'Duplicate Meal', onClick: () => setDuplicateModalEntry(food) },
                         { label: 'Copy to Today', onClick: () => showQuickToast('Copy to Today coming soon') },
                         { label: 'Edit Entry', onClick: () => editFood(food) },
-                        { label: 'Delete', onClick: () => {
-                          if (isViewingToday) {
-                            deleteFood(food.id)
-                          } else {
-                            deleteHistoryFood((food as any).dbId)
-                          }
-                        }, destructive: true },
+                        {
+                          label: 'Delete',
+                          onClick: () => {
+                            if (isViewingToday) {
+                              deleteFood(food)
+                            } else {
+                              deleteHistoryFood((food as any).dbId)
+                            }
+                          },
+                          destructive: true,
+                        },
                       ]
 
                       const closeSwipeMenus = () => {
