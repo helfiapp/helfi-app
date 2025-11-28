@@ -2430,6 +2430,8 @@ const applyStructuredItems = (
         hasItems: Array.isArray(latest?.items) && latest.items.length > 0,
       })
 
+      const snapshotFoods = dedupedFoods
+
       // 2) Persist today's foods snapshot (fast "today" view) via /api/user-data.
       //    Fire-and-forget so UI isn't blocked; failures are logged.
       try {
@@ -2439,7 +2441,7 @@ const applyStructuredItems = (
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            todaysFoods: dedupedFoods, // Use deduplicated array
+            todaysFoods: snapshotFoods, // Use deduplicated array
             appendHistory: false, // Always false - we handle FoodLog separately
           }),
         }).then(async (userDataResponse) => {
@@ -2515,6 +2517,33 @@ const applyStructuredItems = (
               foodLogId: result.id,
               descriptionPreview: payload.description.substring(0, 50),
             })
+            // Attach the real DB id to the newest entry so deletes always work (even for favorites).
+            if (result?.id) {
+              const matchesLatest = (food: any) => {
+                if (!food) return false
+                if (food?.id === latest?.id) return true
+                const sameDesc = String(food?.description || '').trim().toLowerCase() === String(latest?.description || '').trim().toLowerCase()
+                const sameCat =
+                  normalizeCategory(food?.meal || food?.category || food?.mealType) ===
+                  normalizeCategory(latest?.meal || latest?.category || latest?.mealType)
+                const samePhoto = String(food?.photo || '') === String(latest?.photo || '') // usually null/empty
+                return sameDesc && sameCat && samePhoto
+              }
+              const withDbId = snapshotFoods.map((food) =>
+                food?.dbId || !matchesLatest(food) ? food : { ...food, dbId: result.id },
+              )
+              if (isViewingToday) {
+                setTodaysFoods(withDbId)
+                updateUserData({ todaysFoods: withDbId })
+              } else {
+                setHistoryFoods((prev) => {
+                  const base = Array.isArray(prev) ? prev : []
+                  return base.map((food) =>
+                    food?.dbId || !matchesLatest(food) ? food : { ...food, dbId: result.id },
+                  )
+                })
+              }
+            }
             setHistorySaveError(null)
             setLastHistoryPayload(null)
             setPendingQueue([])
