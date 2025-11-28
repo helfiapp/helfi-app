@@ -332,6 +332,14 @@ Before modifying food diary loading logic, agents must test:
    - Timezone handling must be correct
    - Date filtering must account for user's timezone
 
+### 3.6 Mobile Category “+” Toggles (Locked)
+
+The green “+” buttons for each Food Diary category (Breakfast, Lunch, Dinner, Snacks, Other) are a **strict toggle**:
+- Tap the “+” to open the add panel for that category.
+- Tap the **same “+” again** to close it.
+- Do **not** change this to “tap outside to close” or any other behaviour.
+- The “Other/+” panel must remain scrollable so all options are reachable on mobile.
+
 ---
 
 ## 4. Macros Progress Bars & Remaining Calories Ring (Locked)

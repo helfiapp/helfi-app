@@ -1107,6 +1107,8 @@ export default function FoodDiary() {
     macros: MacroSegment[]
   } | null>(null)
   const [quickToast, setQuickToast] = useState<string | null>(null)
+  const deletedEntryKeysRef = useRef<Set<string>>(new Set())
+  const [deletedEntryNonce, setDeletedEntryNonce] = useState(0) // bump to force dedupe refresh after deletes
   const [favorites, setFavorites] = useState<any[]>([])
   const isAddMenuOpen = showCategoryPicker || showPhotoOptions
 
@@ -1193,9 +1195,19 @@ export default function FoodDiary() {
     setAnalyzedTotal(convertTotalsForStorage(recalculated))
   }
 
+  const buildDeleteKey = (entry: any) => {
+    if (!entry) return ''
+    if ((entry as any)?.dbId) return `db:${(entry as any).dbId}`
+    if (entry?.id !== null && entry?.id !== undefined) return `id:${entry.id}`
+    const cat = normalizeCategory(entry?.meal || entry?.category || entry?.mealType)
+    const desc = (entry?.description || '').toString().toLowerCase().trim()
+    return `desc:${cat}|${desc}`
+  }
+
   // Prevent duplicate rows from ever rendering (e.g., double writes or cached copies).
   const dedupeEntries = (list: any[]) => {
     if (!Array.isArray(list)) return []
+    const isDeleted = (entry: any) => deletedEntryKeysRef.current.has(buildDeleteKey(entry))
     // Prefer entries that have a real meal/category over uncategorized copies.
     const hasRealCategory = (entry: any) => {
       const cat = normalizeCategory(entry?.meal || entry?.category || entry?.mealType)
@@ -1211,6 +1223,7 @@ export default function FoodDiary() {
     const seen = new Set<string>()
     const firstPass: any[] = []
     for (const entry of list) {
+      if (isDeleted(entry)) continue
       const cat = normalizeCategory(entry?.meal || entry?.category || entry?.mealType)
       const key = [
         entry?.localDate || '',
@@ -1230,6 +1243,7 @@ export default function FoodDiary() {
     // - the most recent entry when both are equivalent
     const preferred = new Map<string, any>()
     for (const entry of firstPass) {
+      if (isDeleted(entry)) continue
       const cat = normalizeCategory(entry?.meal || entry?.category || entry?.mealType)
       const key = [
         entry?.localDate || '',
@@ -1724,7 +1738,7 @@ const applyStructuredItems = (
 
   const sourceEntries = useMemo(
     () => dedupeEntries(isViewingToday ? todaysFoods : (historyFoods || [])),
-    [todaysFoods, historyFoods, isViewingToday],
+    [todaysFoods, historyFoods, isViewingToday, deletedEntryNonce],
   )
 
   // Close dropdowns on outside click
@@ -3320,6 +3334,7 @@ Please add nutritional information manually if needed.`);
     setShowAddFood(false)
   }
 
+  // Guard rail: category "+" must act as a true toggle (tap to open, tap same "+" to close). Do not change to tap-outside-to-close.
   const handleCategoryPlusClick = (key: typeof MEAL_CATEGORY_ORDER[number]) => {
     if (showPhotoOptions && photoOptionsAnchor === key) {
       closeAddMenus()
@@ -3799,6 +3814,8 @@ Please add nutritional information manually if needed.`);
       return next
     })
     setSwipeMenuEntry((prev) => (prev === entryKey ? null : prev))
+    deletedEntryKeysRef.current.add(buildDeleteKey(entry))
+    setDeletedEntryNonce((n) => n + 1)
     await saveFoodEntries(updatedFoods, { appendHistory: false, suppressToast: true });
     // If this was the last entry in the category, collapse that panel
     const stillHasCategory = updatedFoods.some((f) => normalizeCategory(f.meal || f.category || f.mealType) === entryCategory)
@@ -3822,6 +3839,8 @@ Please add nutritional information manually if needed.`);
         }
         return next
       });
+      deletedEntryKeysRef.current.add(`db:${dbId}`)
+      setDeletedEntryNonce((n) => n + 1)
       // Call API to delete from DB
       await fetch('/api/food-log/delete', {
         method: 'POST',
