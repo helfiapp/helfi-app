@@ -1073,6 +1073,7 @@ export default function FoodDiary() {
   const swipeMetaRef = useRef<Record<string, { startX: number; startY: number; swiping: boolean; hasMoved: boolean }>>({})
   const swipeClickBlockRef = useRef<Record<string, boolean>>({})
   const favoriteSwipeMetaRef = useRef<Record<string, { startX: number; startY: number; swiping: boolean; hasMoved: boolean }>>({})
+  const favoriteClickBlockRef = useRef<Record<string, boolean>>({})
   const SWIPE_MENU_WIDTH = 88
   const SWIPE_DELETE_WIDTH = 96
   const [insightsNotification, setInsightsNotification] = useState<{show: boolean, message: string, type: 'updating' | 'updated'} | null>(null)
@@ -6700,6 +6701,7 @@ Please add nutritional information manually if needed.`);
                       swiping: false,
                       hasMoved: false,
                     }
+                    favoriteClickBlockRef.current[favId] = false
                   }
                   const handleFavTouchMove = (e: React.TouchEvent) => {
                     if (e.touches.length === 0) return
@@ -6716,17 +6718,22 @@ Please add nutritional information manually if needed.`);
                     const clamped = Math.min(0, Math.max(-SWIPE_DELETE_WIDTH, dx))
                     setFavoriteSwipeOffsets((prev) => ({ ...prev, [favId]: clamped }))
                   }
-                  const handleFavTouchEnd = () => {
-                    const meta = favoriteSwipeMetaRef.current[favId]
-                    const offset = favoriteSwipeOffsets[favId] || 0
-                    delete favoriteSwipeMetaRef.current[favId]
-                    if (offset < -70) {
-                      setFavoriteSwipeOffsets((prev) => ({ ...prev, [favId]: -SWIPE_DELETE_WIDTH }))
-                      handleDeleteFavorite(favId)
-                      return
+                    const handleFavTouchEnd = () => {
+                      const meta = favoriteSwipeMetaRef.current[favId]
+                      const offset = favoriteSwipeOffsets[favId] || 0
+                      if (meta?.hasMoved) {
+                        favoriteClickBlockRef.current[favId] = true
+                        setTimeout(() => {
+                          favoriteClickBlockRef.current[favId] = false
+                        }, 160)
+                      }
+                      delete favoriteSwipeMetaRef.current[favId]
+                      if (offset < -70) {
+                        setFavoriteSwipeOffsets((prev) => ({ ...prev, [favId]: -SWIPE_DELETE_WIDTH }))
+                        return
+                      }
+                      setFavoriteSwipeOffsets((prev) => ({ ...prev, [favId]: 0 }))
                     }
-                    setFavoriteSwipeOffsets((prev) => ({ ...prev, [favId]: 0 }))
-                  }
 
                   return (
                     <div key={favId} className="relative w-full overflow-visible">
@@ -6756,7 +6763,10 @@ Please add nutritional information manually if needed.`);
                         onTouchMove={handleFavTouchMove}
                         onTouchEnd={handleFavTouchEnd}
                         onTouchCancel={handleFavTouchEnd}
-                        onClick={() => insertFavoriteIntoDiary(fav, selectedAddCategory)}
+                        onClick={() => {
+                          if (favoriteClickBlockRef.current[favId]) return
+                          insertFavoriteIntoDiary(fav, selectedAddCategory)
+                        }}
                       >
                         <div className="p-4 hover:bg-gray-50 transition-colors">
                           <div className="flex items-center gap-3">
