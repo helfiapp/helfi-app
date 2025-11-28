@@ -6718,14 +6718,14 @@ Please add nutritional information manually if needed.`);
                             </div>
                           </div>
                           {isMobile && isMenuOpen && (
-                            <div className="fixed inset-x-0 bottom-0 z-30 flex justify-center">
+                            <div className="fixed inset-x-0 bottom-0 z-30 flex justify-end">
                               <div className="relative w-full max-w-lg px-4 pb-[env(safe-area-inset-bottom)] mb-16">
                                 <div
                                   className="absolute inset-0"
                                   onClick={closeSwipeMenus}
                                   style={{ background: 'transparent', zIndex: 0 }}
                                 />
-                                <div className="relative z-10 rounded-3xl bg-[#f6f7f9] border border-gray-200 shadow-2xl overflow-hidden w-full max-h-[65vh] overflow-y-auto">
+                                <div className="relative z-10 rounded-3xl bg-[#f6f7f9] border border-gray-200 shadow-2xl overflow-hidden w-full max-h-[65vh] overflow-y-auto" style={{ marginRight: '60px' }}>
                                   {actions.map((item, idx) => (
                                     <button
                                       key={item.label}
