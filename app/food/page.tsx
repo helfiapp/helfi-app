@@ -6618,10 +6618,12 @@ Please add nutritional information manually if needed.`);
                           e.preventDefault()
                           e.stopPropagation()
                         }
-                        setSwipeMenuEntry((prev) => (prev === entryKey ? null : entryKey))
+                        const currentlyOpen = swipeMenuEntry === entryKey
+                        const shouldOpen = !currentlyOpen
+                        setSwipeMenuEntry(shouldOpen ? entryKey : null)
                         setEntrySwipeOffsets((prev) => ({
                           ...prev,
-                          [entryKey]: prev[entryKey] && prev[entryKey] > 0 ? prev[entryKey] : SWIPE_MENU_WIDTH,
+                          [entryKey]: shouldOpen ? SWIPE_MENU_WIDTH : 0,
                         }))
                       }
 
@@ -6718,14 +6720,21 @@ Please add nutritional information manually if needed.`);
                             </div>
                           </div>
                           {isMobile && isMenuOpen && (
-                            <div className="fixed inset-x-0 bottom-0 z-30 flex justify-end pr-16">
-                              <div className="relative w-full max-w-md px-4 pb-[env(safe-area-inset-bottom)] mb-16" style={{ marginLeft: '96px' }}>
+                            <div className="fixed inset-x-0 bottom-0 z-30 flex justify-end">
+                              <div
+                                className="relative w-full px-4 pb-[env(safe-area-inset-bottom)] mb-16"
+                                style={{
+                                  marginLeft: '96px',
+                                  width: 'calc(100% - 96px)',
+                                  maxWidth: 'calc(100% - 96px)',
+                                }}
+                              >
                                 <div
                                   className="absolute inset-0"
                                   onClick={closeSwipeMenus}
                                   style={{ background: 'transparent', zIndex: 0 }}
                                 />
-                                <div className="relative z-10 rounded-3xl bg-[#f6f7f9] border border-gray-200 shadow-2xl overflow-hidden w-full max-h-[65vh] overflow-y-auto" style={{ marginRight: '60px' }}>
+                                <div className="relative z-10 rounded-3xl bg-[#f6f7f9] border border-gray-200 shadow-2xl overflow-hidden w-full max-h-[65vh] overflow-y-auto">
                                   {actions.map((item, idx) => (
                                     <button
                                       key={item.label}
