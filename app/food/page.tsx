@@ -3598,14 +3598,18 @@ Please add nutritional information manually if needed.`);
         return [{ ...entry, dbId: undefined }, ...base]
       })
     }
-    try {
-      await saveFoodEntries(updatedFoods)
-      await refreshEntriesFromServer()
-      showQuickToast(`Added to ${categoryLabel(category)}`)
-    } finally {
-      ensureEntryPresent()
-      setPhotoOptionsAnchor(null)
-    }
+    ensureEntryPresent()
+    ;(async () => {
+      try {
+        await saveFoodEntries(updatedFoods)
+        await refreshEntriesFromServer()
+        showQuickToast(`Added to ${categoryLabel(category)}`)
+      } catch (err) {
+        console.warn('Favorite add sync failed', err)
+      } finally {
+        setPhotoOptionsAnchor(null)
+      }
+    })()
   }
 
   const handleDeleteFavorite = (id: string) => {
@@ -3918,6 +3922,7 @@ Please add nutritional information manually if needed.`);
       return !sameId && !sameDb;
     });
     setTodaysFoods(updatedFoods);
+    triggerHaptic(10)
     setEntrySwipeOffsets((prev) => {
       if (!entryKey) return prev
       const next = { ...prev }
@@ -3927,7 +3932,15 @@ Please add nutritional information manually if needed.`);
     setSwipeMenuEntry((prev) => (prev === entryKey ? null : prev))
     deletedEntryKeysRef.current.add(buildDeleteKey(entry))
     setDeletedEntryNonce((n) => n + 1)
-    await saveFoodEntries(updatedFoods, { appendHistory: false, suppressToast: true });
+    // Persist in background so UI stays instant
+    ;(async () => {
+      try {
+        await saveFoodEntries(updatedFoods, { appendHistory: false, suppressToast: true });
+        await refreshEntriesFromServer();
+      } catch (err) {
+        console.warn('Delete sync failed', err)
+      }
+    })()
     // If this was the last entry in the category, collapse that panel
     const stillHasCategory = updatedFoods.some((f) => normalizeCategory(f.meal || f.category || f.mealType) === entryCategory)
     if (!stillHasCategory) {
@@ -3953,15 +3966,22 @@ Please add nutritional information manually if needed.`);
       deletedEntryKeysRef.current.add(`db:${dbId}`)
       setDeletedEntryNonce((n) => n + 1)
       // Call API to delete from DB
-      await fetch('/api/food-log/delete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: dbId }),
-      }).then(async (r) => {
-        if (!r.ok) {
-          throw new Error('delete_failed')
+      triggerHaptic(10)
+      ;(async () => {
+        try {
+          await fetch('/api/food-log/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: dbId }),
+          }).then(async (r) => {
+            if (!r.ok) {
+              throw new Error('delete_failed')
+            }
+          });
+        } catch (error) {
+          console.error('Failed to delete history entry from database:', error);
         }
-      });
+      })()
     } catch {
       // On error, reload history for the selected date
       try {
@@ -6004,7 +6024,7 @@ Please add nutritional information manually if needed.`);
                 {/* Multiple Ingredients Entry */}
                 {/* PROTECTED: INGREDIENTS_CARD START */}
                 {manualFoodType === 'multiple' && (
-                  <div className="mb-6">
+                  <div className="mb-6 max-h-[60vh] overflow-y-auto overscroll-contain pr-1">
                     <div className="space-y-4">
                       {manualIngredients.map((ing, index) => (
                         <div key={index} className="border border-gray-200 rounded-xl p-4">
