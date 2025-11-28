@@ -3450,11 +3450,12 @@ Please add nutritional information manually if needed.`);
     try {
       await saveFoodEntries(updatedFoods)
       await refreshEntriesFromServer()
-      showQuickToast('Favorite added')
+      showQuickToast('Meal added')
     } finally {
       setShowFavoritesPicker(false)
       setShowPhotoOptions(false)
       setPhotoOptionsAnchor(null)
+      setShowAddFood(false)
     }
   }
 
@@ -6721,18 +6722,7 @@ Please add nutritional information manually if needed.`);
                   const handleFavTouchEnd = () => {
                     const meta = favoriteSwipeMetaRef.current[favId]
                     const offset = favoriteSwipeOffsets[favId] || 0
-                    if (meta?.hasMoved) {
-                      favoriteClickBlockRef.current[favId] = true
-                      setTimeout(() => {
-                        favoriteClickBlockRef.current[favId] = false
-                      }, 160)
-                    }
                     delete favoriteSwipeMetaRef.current[favId]
-                    if (!meta?.hasMoved || Math.abs(offset) < 10) {
-                      setFavoriteSwipeOffsets((prev) => ({ ...prev, [favId]: 0 }))
-                      insertFavoriteIntoDiary(fav, selectedAddCategory)
-                      return
-                    }
                     if (offset < -70) {
                       setFavoriteSwipeOffsets((prev) => ({ ...prev, [favId]: -SWIPE_DELETE_WIDTH }))
                       return
@@ -6769,7 +6759,6 @@ Please add nutritional information manually if needed.`);
                         onTouchEnd={handleFavTouchEnd}
                         onTouchCancel={handleFavTouchEnd}
                         onClick={() => {
-                          // Always allow tap to add; also reset any swipe offset.
                           setFavoriteSwipeOffsets((prev) => ({ ...prev, [favId]: 0 }))
                           insertFavoriteIntoDiary(fav, selectedAddCategory)
                         }}
