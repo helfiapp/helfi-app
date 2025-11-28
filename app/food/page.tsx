@@ -3439,6 +3439,10 @@ Please add nutritional information manually if needed.`);
       category,
     }
     setSelectedAddCategory(category as typeof MEAL_CATEGORY_ORDER[number])
+    setExpandedCategories((prev) => ({
+      ...prev,
+      [category]: true,
+    }))
     const updatedFoods = [entry, ...todaysFoods]
     setTodaysFoods(updatedFoods)
     if (!isViewingToday) {
@@ -3450,7 +3454,7 @@ Please add nutritional information manually if needed.`);
     try {
       await saveFoodEntries(updatedFoods)
       await refreshEntriesFromServer()
-      showQuickToast('Meal added')
+      showQuickToast(`Meal added to ${categoryLabel(category)}`)
     } finally {
       setShowFavoritesPicker(false)
       setShowPhotoOptions(false)
