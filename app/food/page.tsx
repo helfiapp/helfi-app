@@ -1069,8 +1069,10 @@ export default function FoodDiary() {
   const [swipeMenuEntry, setSwipeMenuEntry] = useState<string | null>(null)
   const [duplicateModalEntry, setDuplicateModalEntry] = useState<any | null>(null)
   const [showFavoritesPicker, setShowFavoritesPicker] = useState(false)
+  const [favoriteSwipeOffsets, setFavoriteSwipeOffsets] = useState<Record<string, number>>({})
   const swipeMetaRef = useRef<Record<string, { startX: number; startY: number; swiping: boolean; hasMoved: boolean }>>({})
   const swipeClickBlockRef = useRef<Record<string, boolean>>({})
+  const favoriteSwipeMetaRef = useRef<Record<string, { startX: number; startY: number; swiping: boolean; hasMoved: boolean }>>({})
   const SWIPE_MENU_WIDTH = 88
   const SWIPE_DELETE_WIDTH = 96
   const [insightsNotification, setInsightsNotification] = useState<{show: boolean, message: string, type: 'updating' | 'updated'} | null>(null)
@@ -3453,6 +3455,20 @@ Please add nutritional information manually if needed.`);
       setShowPhotoOptions(false)
       setPhotoOptionsAnchor(null)
     }
+  }
+
+  const handleDeleteFavorite = (id: string) => {
+    setFavoriteSwipeOffsets((prev) => {
+      const next = { ...prev }
+      delete next[id]
+      return next
+    })
+    setFavorites((prev) => {
+      const next = prev.filter((fav: any) => fav.id !== id)
+      persistFavorites(next)
+      return next
+    })
+    showQuickToast('Favorite removed')
   }
 
   const duplicateEntryToCategory = async (targetCategory: typeof MEAL_CATEGORY_ORDER[number]) => {
@@ -6650,67 +6666,116 @@ Please add nutritional information manually if needed.`);
         )}
 
       {showFavoritesPicker && (
-        <div
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 px-4"
-          onClick={() => setShowFavoritesPicker(false)}
-        >
-          <div
-            className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-gray-200 p-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between mb-3">
-              <div>
-                <div className="text-lg font-semibold text-gray-900">Favorites</div>
-                <div className="text-sm text-gray-600">
-                  Add to {categoryLabel(selectedAddCategory)}
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowFavoritesPicker(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <span aria-hidden>✕</span>
-              </button>
+        <div className="fixed inset-0 z-50 bg-white flex flex-col">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+            <div>
+              <div className="text-lg font-semibold text-gray-900">Favorites</div>
+              <div className="text-sm text-gray-600">Add to {categoryLabel(selectedAddCategory)}</div>
             </div>
-            {favorites.length === 0 ? (
-              <div className="text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded-xl p-3">
-                Save a meal using “Add to Favorites” to see it here.
-              </div>
-            ) : (
-              <div className="space-y-2 max-h-[65vh] overflow-y-auto">
+            <button
+              type="button"
+              onClick={() => setShowFavoritesPicker(false)}
+              className="p-2 rounded-full hover:bg-gray-100"
+            >
+              <span aria-hidden>✕</span>
+            </button>
+          </div>
+          {favorites.length === 0 ? (
+            <div className="flex-1 flex items-center justify-center px-6 text-sm text-gray-600">
+              Save a meal using “Add to Favorites” to see it here.
+            </div>
+          ) : (
+            <div className="flex-1 overflow-y-auto bg-gray-50 pb-6">
+              <div className="space-y-3 pt-3">
                 {favorites.map((fav: any) => {
-                  const calories =
-                    Math.round(fav?.nutrition?.calories || fav?.total?.calories || 0) || null
+                  const favId = fav?.id || String(fav?.label || 'favorite')
+                  const calories = Math.round(fav?.nutrition?.calories || fav?.total?.calories || 0) || null
+                  const swipeOffset = favoriteSwipeOffsets[favId] || 0
+                  const handleFavTouchStart = (e: React.TouchEvent) => {
+                    if (e.touches.length === 0) return
+                    const touch = e.touches[0]
+                    favoriteSwipeMetaRef.current[favId] = {
+                      startX: touch.clientX,
+                      startY: touch.clientY,
+                      swiping: false,
+                      hasMoved: false,
+                    }
+                  }
+                  const handleFavTouchMove = (e: React.TouchEvent) => {
+                    if (e.touches.length === 0) return
+                    const meta = favoriteSwipeMetaRef.current[favId]
+                    if (!meta) return
+                    const touch = e.touches[0]
+                    const dx = touch.clientX - meta.startX
+                    const dy = touch.clientY - meta.startY
+                    if (!meta.swiping) {
+                      if (Math.abs(dx) < 6 || Math.abs(dx) < Math.abs(dy)) return
+                      meta.swiping = true
+                    }
+                    meta.hasMoved = true
+                    const clamped = Math.min(0, Math.max(-SWIPE_DELETE_WIDTH, dx))
+                    setFavoriteSwipeOffsets((prev) => ({ ...prev, [favId]: clamped }))
+                  }
+                  const handleFavTouchEnd = () => {
+                    const meta = favoriteSwipeMetaRef.current[favId]
+                    const offset = favoriteSwipeOffsets[favId] || 0
+                    delete favoriteSwipeMetaRef.current[favId]
+                    if (offset < -70) {
+                      setFavoriteSwipeOffsets((prev) => ({ ...prev, [favId]: -SWIPE_DELETE_WIDTH }))
+                      handleDeleteFavorite(favId)
+                      return
+                    }
+                    setFavoriteSwipeOffsets((prev) => ({ ...prev, [favId]: 0 }))
+                  }
+
                   return (
-                    <button
-                      key={fav?.id || fav?.label}
-                      className="w-full text-left p-3 rounded-xl border border-gray-200 hover:border-emerald-400 hover:bg-emerald-50/50 transition-colors flex items-start gap-3"
-                      onClick={() => insertFavoriteIntoDiary(fav, selectedAddCategory)}
-                    >
-                      <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
-                        </svg>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-semibold text-gray-900 truncate">{fav?.label || 'Favorite meal'}</div>
-                        <div className="text-xs text-gray-500 line-clamp-2">
-                          {fav?.description || 'Saved meal'}
+                    <div key={favId} className="relative w-full overflow-visible">
+                      <div className="absolute inset-0 flex items-stretch pointer-events-none">
+                        <div className="flex-1 bg-red-500" />
+                        <div className="flex items-center">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              handleDeleteFavorite(favId)
+                            }}
+                            className="pointer-events-auto h-full min-w-[88px] px-3 bg-red-500 text-white flex items-center justify-center"
+                            aria-label="Delete favorite"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
                         </div>
-                        <div className="text-[11px] text-emerald-700 font-semibold mt-1">
-                          {calories ? `${calories} kcal` : 'Ready to add'}
+                      </div>
+                      <div
+                        className="relative bg-white border border-gray-200 rounded-none sm:rounded-xl shadow-sm transition-transform duration-150 ease-out z-10 w-full"
+                        style={{ transform: `translateX(${swipeOffset}px)`, touchAction: 'pan-y' }}
+                        onTouchStart={handleFavTouchStart}
+                        onTouchMove={handleFavTouchMove}
+                        onTouchEnd={handleFavTouchEnd}
+                        onTouchCancel={handleFavTouchEnd}
+                        onClick={() => insertFavoriteIntoDiary(fav, selectedAddCategory)}
+                      >
+                        <div className="p-4 hover:bg-gray-50 transition-colors">
+                          <div className="flex items-center gap-3">
+                            <p className="flex-1 text-sm sm:text-base text-gray-900 truncate">
+                              {sanitizeMealDescription((fav?.description || fav?.label || '').split('\n')[0].split('Calories:')[0]) || 'Favorite meal'}
+                            </p>
+                            <div className="flex flex-col items-end gap-1 flex-shrink-0 text-xs sm:text-sm text-gray-600">
+                              {calories !== null && <span className="font-semibold text-gray-900">{calories} kcal</span>}
+                              <span className="text-gray-500">{categoryLabel(selectedAddCategory)}</span>
+                            </div>
+                          </div>
                         </div>
                       </div>
-                      <span className="text-[11px] text-gray-600 px-2 py-1 rounded-full bg-gray-100 flex-shrink-0">
-                        {categoryLabel(selectedAddCategory)}
-                      </span>
-                    </button>
+                    </div>
                   )
                 })}
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       )}
 
