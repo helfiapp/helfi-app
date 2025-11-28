@@ -6,12 +6,8 @@
 - Other open items remain: edge-to-edge mobile row width, 3-dot menu copy, edit-entry scroll-to-top, and mobile spacing per screenshots. Keep desktop behavior intact.
 - Relevant screenshots live in `public/mobile-design-screenshots/` (only three remain): DELETE BUTTON ICON.jpg, SPACE ON LEFT AND RIGHT REMOVAL.jpg, FAVORITES MENU.jpg.
 
-## Reference images (always check these)
-- Swipe/delete styling reference (delete icon): `public/mobile-design-screenshots/DELETE BUTTON ICON.jpg`
-- Current spacing/gap issue reference: `public/mobile-design-screenshots/SPACE ON LEFT AND RIGHT REMOVAL.jpg`
-- Favorites option location reference: `public/mobile-design-screenshots/FAVORITES MENU.jpg`
-
-Only the three images above remain relevant in `public/mobile-design-screenshots/`; older images were removed.
+## Reference images
+- `public/mobile-design-screenshots/` is currently empty; prior reference images were removed after tasks were completed. No active visual references in the folder right now.
 
 ## Status
 - ✅ Edit button on the food detail screen opens the real edit flow.
