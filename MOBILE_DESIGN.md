@@ -1,13 +1,13 @@
 # Mobile To-Do (food entries)
 
 # Handover Notes (read before working)
-- Favorites add bug (critical): The Favorites option now shows in the add flow and opens a full-screen list, but tapping a favorite flashes “Saved/Meal added”, closes the sheet, and **does not insert** the meal into the chosen category. Fix: tap should create a diary entry in the active/selected category, show clear “Meal added to {category}” feedback, and return to the diary with the new row visible. Delete swipe is correct—do not change it.
-- Duplicate Meal UX gap: Category picker works and duplicates into the chosen category, but there is minimal feedback (just a green flash). Add clearer confirmation (e.g., “Duplicated to {category}”) so users know it’s happening.
-- Other open items remain: edge-to-edge mobile row width, 3-dot menu copy, edit-entry scroll-to-top, and mobile spacing per screenshots. Keep desktop behavior intact.
-- Relevant screenshots live in `public/mobile-design-screenshots/` (only three remain): DELETE BUTTON ICON.jpg, SPACE ON LEFT AND RIGHT REMOVAL.jpg, FAVORITES MENU.jpg.
+- Favorites add remains broken: tapping a favorite shows “Saved/Meal added”, closes the sheet, and no entry appears in the selected category (e.g., Lunch) after returning to the diary. Needs a reliable insert and visible row in the chosen category.
+- Bottom “Other/+” add menu scroll is broken (critical): when opening the add menu from the bottom category, the pop-up cannot scroll, so Photo Library/Camera, Favorites, and Manual Entry options are cut off. Must restore vertical scroll on mobile for that dropdown.
+- Keep desktop behavior intact; do not alter nutrition or data logic.
 
 ## Reference images
-- `public/mobile-design-screenshots/` is currently empty; prior reference images were removed after tasks were completed. No active visual references in the folder right now.
+- `public/mobile-design-screenshots/FOOD ICON PNT IMAGE.jpg` (food icon placement mock).
+- `public/mobile-design-screenshots/SCROLLING ISSUE.jpg` (bottom add-menu scroll bug).
 
 ## Status
 - ✅ Edit button on the food detail screen opens the real edit flow.
@@ -24,6 +24,7 @@
 - ☐ Edit Entry scroll: opening “Edit Entry” should land at the top of the edit page (not mid-page). Current behavior still lands mid-page.
 - ✅ Delete button visual: when swiping left, show an icon-only delete button like the Cronometer example (see `DELETE BUTTON ICON.jpg`), not the word “Delete”.
 - ☐ Display the food icon from `public/mobile-assets/MOBILE ICONS/FOOD ICON.svg` (or PNG) on the left side of each food panel in the mobile view, matching the placement shown in `public/mobile-design-screenshots/FOOD ICON PLACEMENT IMAGE.jpg` (Cronometer-based mockup with the Helfi icon overlaid); make sure the icon aligns with the panel text and spacing so it looks like the reference.
+- ☐ (critical) Fix bottom “Other/+” add menu scroll on mobile: the dropdown cannot scroll, so Photo Library/Camera, Favorites, and Manual Entry are inaccessible when opened from the bottom category; see `public/mobile-design-screenshots/SCROLLING ISSUE.jpg`.
 
 ## Guidance for the next agent
 - Only do the to-do items above. Everything else stays as-is.
