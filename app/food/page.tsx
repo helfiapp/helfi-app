@@ -3425,10 +3425,15 @@ Please add nutritional information manually if needed.`);
       favorite.items && Array.isArray(favorite.items) && favorite.items.length > 0
         ? JSON.parse(JSON.stringify(favorite.items))
         : null
+    const baseDescription = favorite.description || favorite.label || 'Favorite meal'
+    // Append a hidden meta line so repeated favorites on the same day/category
+    // are treated as separate entries by the dedupe helper, while the visible
+    // row text (which only shows the first line) stays unchanged.
+    const descriptionWithMeta = `${baseDescription}\n(favorite-copy-${Date.now()})`
     const entry = {
       id: Date.now(),
       localDate: selectedDate,
-      description: favorite.description || favorite.label || 'Favorite meal',
+      description: descriptionWithMeta,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       method: favorite.method || 'text',
       photo: favorite.photo || null,
@@ -6599,8 +6604,17 @@ Please add nutritional information manually if needed.`);
 
                             {showPhotoOptions && photoOptionsAnchor === cat.key && !showCategoryPicker && (
                               isMobile ? (
-                                <div className="food-options-dropdown fixed inset-0 z-50 flex items-end justify-center bg-black/30">
-                                  <div className="w-full max-w-md px-4 pb-4">
+                                <div
+                                  className="fixed inset-0 z-50 flex items-end justify-center bg-black/30"
+                                  onClick={() => {
+                                    setShowPhotoOptions(false);
+                                    setPhotoOptionsAnchor(null);
+                                  }}
+                                >
+                                  <div
+                                    className="food-options-dropdown w-full max-w-md px-4 pb-4"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
                                     <div className="rounded-2xl shadow-2xl border border-gray-200 bg-white/95 backdrop-blur-xl overflow-hidden max-h-[75vh] overflow-y-auto overscroll-contain">
                                       <div className="divide-y divide-gray-100">
                                         <button
@@ -6669,6 +6683,17 @@ Please add nutritional information manually if needed.`);
                                           <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                           </svg>
+                                        </button>
+
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setShowPhotoOptions(false);
+                                            setPhotoOptionsAnchor(null);
+                                          }}
+                                          className="w-full text-center px-4 py-3 text-sm text-gray-500 hover:bg-gray-50"
+                                        >
+                                          Cancel
                                         </button>
                                       </div>
                                     </div>
