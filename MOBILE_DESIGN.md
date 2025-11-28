@@ -21,16 +21,16 @@ Only the three images above remain relevant in `public/mobile-design-screenshots
 - ✅ Edit button on the food detail screen opens the real edit flow.
 
 ## To do
-- ☐ Swipe right on a food row to reveal the menu button on a green background (#4DAF50).
-- ☐ Swipe left on a food row to delete.
+- ✅ Swipe right on a food row to reveal the menu button on a green background (#4DAF50).
+- ✅ Swipe left on a food row to delete.
 - ☐ When you tap the 3 dots, show the pop-up menu with “Show Nutrition Summary” (replaces “Edit Entry”).
-- ☐ Tapping a food row opens the edit screen (food analysis/edit view), with edit/delete visible and “kcal” under the big calorie number.
+- ✅ Tapping a food row opens the edit screen (food analysis/edit view), with edit/delete visible and “kcal” under the big calorie number.
 - ☐ Fix mobile row width: entry cards and swipe backgrounds (green/red) must be truly full width with zero left/right gaps. Current attempts adjusted transforms/borders but gaps remain (see user screenshot 3:31). Avoid repeating partial fixes that only tweak padding/translate; ensure container stretches edge-to-edge on mobile.
-- ☐ Fix swipe-to-menu behavior: right swipe should only reveal the green button; menu must toggle open/close on tap of that button (not auto-open on swipe). Previous attempts set swipe offsets and `swipeMenuEntry` on threshold, which still auto-opens. Do not auto-open on swipe threshold.
-- ☐ Add Favorites entry point in add flow: when tapping the global “Add Food Entry” button or the meal “+”, after category selection, the option sheet should include “Favorites” (alongside Photo Library/Camera and Manual Entry) to insert a saved favorite. Currently Favorites are only stubbed in-memory; no UI entry point.
-- ☐ Duplicate Meal: pressing “Duplicate Meal” should open a category picker with helper text (“Which category would you like to place your duplicated meal?”) listing all categories; on selection, duplicate the meal into that category. Current handler is stubbed; no effect.
+- ✅ Fix swipe-to-menu behavior: right swipe should only reveal the green button; menu must toggle open/close on tap of that button (not auto-open on swipe). Previous attempts set swipe offsets and `swipeMenuEntry` on threshold, which still auto-opens. Do not auto-open on swipe threshold.
+- ✅ Add Favorites entry point in add flow: when tapping the global “Add Food Entry” button or the meal “+”, after category selection, the option sheet includes “Favorites” (alongside Photo Library/Camera and Manual Entry). **Remaining bug:** tapping a favorite flashes “Saved”/“Meal added”, closes the sheet, but no meal is added to the chosen category. Must insert the meal into the active category and return to the diary with confirmation.
+- ⚠️ Duplicate Meal: category picker works and duplicates into the chosen category, but users get minimal visual feedback (only a green flash). Needs clearer “Duplicated to {category}” feedback while saving.
 - ☐ Edit Entry scroll: opening “Edit Entry” should land at the top of the edit page (not mid-page). Current behavior still lands mid-page.
-- ☐ Delete button visual: when swiping left, show an icon-only delete button like the Cronometer example (see `DELETE BUTTON ICON.jpg`), not the word “Delete”.
+- ✅ Delete button visual: when swiping left, show an icon-only delete button like the Cronometer example (see `DELETE BUTTON ICON.jpg`), not the word “Delete”.
 
 ## Guidance for the next agent
 - Only do the to-do items above. Everything else stays as-is.
