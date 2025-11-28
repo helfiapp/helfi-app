@@ -6718,21 +6718,26 @@ Please add nutritional information manually if needed.`);
                     const clamped = Math.min(0, Math.max(-SWIPE_DELETE_WIDTH, dx))
                     setFavoriteSwipeOffsets((prev) => ({ ...prev, [favId]: clamped }))
                   }
-                    const handleFavTouchEnd = () => {
-                      const meta = favoriteSwipeMetaRef.current[favId]
-                      const offset = favoriteSwipeOffsets[favId] || 0
-                      if (meta?.hasMoved) {
-                        favoriteClickBlockRef.current[favId] = true
-                        setTimeout(() => {
-                          favoriteClickBlockRef.current[favId] = false
-                        }, 160)
-                      }
-                      delete favoriteSwipeMetaRef.current[favId]
-                      if (offset < -70) {
-                        setFavoriteSwipeOffsets((prev) => ({ ...prev, [favId]: -SWIPE_DELETE_WIDTH }))
-                        return
-                      }
+                  const handleFavTouchEnd = () => {
+                    const meta = favoriteSwipeMetaRef.current[favId]
+                    const offset = favoriteSwipeOffsets[favId] || 0
+                    if (meta?.hasMoved) {
+                      favoriteClickBlockRef.current[favId] = true
+                      setTimeout(() => {
+                        favoriteClickBlockRef.current[favId] = false
+                      }, 160)
+                    }
+                    delete favoriteSwipeMetaRef.current[favId]
+                    if (!meta?.hasMoved || Math.abs(offset) < 10) {
                       setFavoriteSwipeOffsets((prev) => ({ ...prev, [favId]: 0 }))
+                      insertFavoriteIntoDiary(fav, selectedAddCategory)
+                      return
+                    }
+                    if (offset < -70) {
+                      setFavoriteSwipeOffsets((prev) => ({ ...prev, [favId]: -SWIPE_DELETE_WIDTH }))
+                      return
+                    }
+                    setFavoriteSwipeOffsets((prev) => ({ ...prev, [favId]: 0 }))
                     }
 
                   return (
