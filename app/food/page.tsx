@@ -6764,7 +6764,8 @@ Please add nutritional information manually if needed.`);
                         onTouchEnd={handleFavTouchEnd}
                         onTouchCancel={handleFavTouchEnd}
                         onClick={() => {
-                          if (favoriteClickBlockRef.current[favId]) return
+                          // Always allow tap to add; also reset any swipe offset.
+                          setFavoriteSwipeOffsets((prev) => ({ ...prev, [favId]: 0 }))
                           insertFavoriteIntoDiary(fav, selectedAddCategory)
                         }}
                       >
