@@ -6,6 +6,7 @@ import { useSession } from 'next-auth/react'
 interface UserData {
   profileImage?: string
   todaysFoods?: any[]
+  favorites?: any[]
   profileInfo?: any
   healthGoals?: any
   gender?: string

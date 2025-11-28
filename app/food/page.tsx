@@ -1061,14 +1061,18 @@ export default function FoodDiary() {
   const editPhotoInputRef = useRef<HTMLInputElement | null>(null)
   const selectPhotoInputRef = useRef<HTMLInputElement | null>(null)
   const summaryCarouselRef = useRef<HTMLDivElement | null>(null)
+  const pageTopRef = useRef<HTMLDivElement | null>(null)
 
   const [foodImagesLoading, setFoodImagesLoading] = useState<{[key: string]: boolean}>({})
   const [expandedEntries, setExpandedEntries] = useState<{[key: string]: boolean}>({})
   const [entrySwipeOffsets, setEntrySwipeOffsets] = useState<{ [key: string]: number }>({})
   const [swipeMenuEntry, setSwipeMenuEntry] = useState<string | null>(null)
   const [duplicateModalEntry, setDuplicateModalEntry] = useState<any | null>(null)
+  const [showFavoritesPicker, setShowFavoritesPicker] = useState(false)
   const swipeMetaRef = useRef<Record<string, { startX: number; startY: number; swiping: boolean; hasMoved: boolean }>>({})
   const swipeClickBlockRef = useRef<Record<string, boolean>>({})
+  const SWIPE_MENU_WIDTH = 88
+  const SWIPE_DELETE_WIDTH = 96
   const [insightsNotification, setInsightsNotification] = useState<{show: boolean, message: string, type: 'updating' | 'updated'} | null>(null)
   const [fullSizeImage, setFullSizeImage] = useState<string | null>(null)
   const [showSavedToast, setShowSavedToast] = useState<boolean>(false)
@@ -1112,6 +1116,36 @@ export default function FoodDiary() {
     window.addEventListener('resize', updateIsMobile)
     return () => window.removeEventListener('resize', updateIsMobile)
   }, [])
+
+  useEffect(() => {
+    try {
+      if (Array.isArray((userData as any)?.favorites)) {
+        setFavorites((userData as any).favorites)
+        return
+      }
+      if (typeof window !== 'undefined') {
+        const cached = localStorage.getItem('food:favorites')
+        if (cached) {
+          const parsed = JSON.parse(cached)
+          if (Array.isArray(parsed)) {
+            setFavorites(parsed)
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('Could not load favorites', error)
+    }
+  }, [userData?.favorites])
+
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('food:favorites', JSON.stringify(favorites))
+      }
+    } catch {
+      // Best-effort only
+    }
+  }, [favorites])
 
   const dailyTargets = useMemo(() => {
     if (!userData) return { calories: null, protein: null, carbs: null, fat: null }
@@ -3324,14 +3358,140 @@ Please add nutritional information manually if needed.`);
     }
   }
 
-  const handleAddToFavorites = (entry: any) => {
-    const id = (entry as any)?.id || entry
-    if (!id) {
+  const persistFavorites = (nextFavorites: any[]) => {
+    updateUserData({ favorites: nextFavorites })
+    try {
+      fetch('/api/user-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ favorites: nextFavorites }),
+      }).catch(() => {})
+    } catch (error) {
+      console.error('Failed to persist favorites', error)
+    }
+  }
+
+  const handleAddToFavorites = (entry?: any) => {
+    const source = entry || editingEntry
+    if (!source) {
       showQuickToast('Could not add to favorites')
       return
     }
-    setFavorites((prev) => (prev.includes(id) ? prev : [...prev, id]))
+    const cleanLabel =
+      extractBaseMealDescription(source.description || '') ||
+      (source.description || 'Favorite meal').split('\n')[0].split('Calories:')[0].trim()
+    const clonedItems =
+      source.items && Array.isArray(source.items) && source.items.length > 0
+        ? JSON.parse(JSON.stringify(source.items))
+        : null
+    const favoritePayload = {
+      id: `fav-${Date.now()}`,
+      sourceId: (source as any)?.id || (source as any)?.dbId || null,
+      label: cleanLabel || 'Favorite meal',
+      description: source.description || cleanLabel || 'Favorite meal',
+      nutrition: source.nutrition || source.total || null,
+      total: source.total || source.nutrition || null,
+      items: clonedItems,
+      photo: source.photo || null,
+      method: source.method || 'text',
+      meal: normalizeCategory(source.meal || source.category || source.mealType),
+      createdAt: Date.now(),
+    }
+    setFavorites((prev) => {
+      const existingIndex = prev.findIndex(
+        (fav: any) =>
+          (fav.sourceId && favoritePayload.sourceId && fav.sourceId === favoritePayload.sourceId) ||
+          (fav.label && favoritePayload.label && fav.label === favoritePayload.label),
+      )
+      const next =
+        existingIndex >= 0
+          ? prev.map((fav: any, idx: number) =>
+              idx === existingIndex ? { ...favoritePayload, id: fav.id || favoritePayload.id } : fav,
+            )
+          : [...prev, favoritePayload]
+      persistFavorites(next)
+      return next
+    })
     showQuickToast('Added to favorites')
+  }
+
+  const insertFavoriteIntoDiary = async (favorite: any, targetCategory?: typeof MEAL_CATEGORY_ORDER[number]) => {
+    if (!favorite) return
+    const category = normalizeCategory(targetCategory || selectedAddCategory)
+    const clonedItems =
+      favorite.items && Array.isArray(favorite.items) && favorite.items.length > 0
+        ? JSON.parse(JSON.stringify(favorite.items))
+        : null
+    const entry = {
+      id: Date.now(),
+      localDate: selectedDate,
+      description: favorite.description || favorite.label || 'Favorite meal',
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      method: favorite.method || 'text',
+      photo: favorite.photo || null,
+      nutrition: favorite.nutrition || favorite.total || null,
+      items: clonedItems,
+      total: favorite.total || favorite.nutrition || null,
+      meal: category,
+      category,
+    }
+    setSelectedAddCategory(category as typeof MEAL_CATEGORY_ORDER[number])
+    const updatedFoods = [entry, ...todaysFoods]
+    setTodaysFoods(updatedFoods)
+    if (!isViewingToday) {
+      setHistoryFoods((prev: any[] | null) => {
+        const base = Array.isArray(prev) ? prev : []
+        return [{ ...entry, dbId: undefined }, ...base]
+      })
+    }
+    try {
+      await saveFoodEntries(updatedFoods)
+      await refreshEntriesFromServer()
+      showQuickToast('Favorite added')
+    } finally {
+      setShowFavoritesPicker(false)
+      setShowPhotoOptions(false)
+      setPhotoOptionsAnchor(null)
+    }
+  }
+
+  const duplicateEntryToCategory = async (targetCategory: typeof MEAL_CATEGORY_ORDER[number]) => {
+    if (!duplicateModalEntry) return
+    setSwipeMenuEntry(null)
+    setEntrySwipeOffsets({})
+    setShowEntryOptions(null)
+    const category = normalizeCategory(targetCategory)
+    const source = duplicateModalEntry
+    const clonedItems =
+      source.items && Array.isArray(source.items) && source.items.length > 0
+        ? JSON.parse(JSON.stringify(source.items))
+        : null
+    const duplicated = {
+      ...source,
+      id: Date.now(),
+      dbId: undefined,
+      localDate: selectedDate,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      meal: category,
+      category,
+      items: clonedItems,
+    }
+    setSelectedAddCategory(category as typeof MEAL_CATEGORY_ORDER[number])
+    const updatedFoods = [duplicated, ...todaysFoods]
+    setTodaysFoods(updatedFoods)
+    if (!isViewingToday) {
+      setHistoryFoods((prev: any[] | null) => {
+        const base = Array.isArray(prev) ? prev : []
+        return [{ ...duplicated }, ...base]
+      })
+    }
+    try {
+      await saveFoodEntries(updatedFoods)
+      await refreshEntriesFromServer()
+      showQuickToast('Meal duplicated')
+    } finally {
+      setDuplicateModalEntry(null)
+    }
   }
 
   const exitEditingSession = () => {
@@ -3519,6 +3679,13 @@ Please add nutritional information manually if needed.`);
       setShowAddFood(true);
     }
     setShowEntryOptions(null);
+    requestAnimationFrame(() => {
+      if (pageTopRef.current) {
+        pageTopRef.current.scrollIntoView({ behavior: 'auto', block: 'start' })
+      } else if (typeof window !== 'undefined') {
+        window.scrollTo({ top: 0, behavior: 'auto' })
+      }
+    })
   };
 
 
@@ -3754,7 +3921,7 @@ Please add nutritional information manually if needed.`);
   }, [isEditingDescription, editedDescription]);
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-gray-50">
+    <div ref={pageTopRef} className="flex-1 flex flex-col overflow-hidden bg-gray-50">
       {/* Saved Toast (brief confirmation) */}
       {showSavedToast && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[10000]">
@@ -4035,6 +4202,28 @@ Please add nutritional information manually if needed.`);
                     </svg>
                   </button>
 
+                  <button
+                    onClick={() => {
+                      setShowPhotoOptions(false);
+                      setPhotoOptionsAnchor(null);
+                      setShowFavoritesPicker(true);
+                    }}
+                    className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center mr-3 text-amber-600">
+                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <div className="text-base font-semibold text-gray-900">Favorites</div>
+                      <div className="text-xs text-gray-500">Reuse a saved meal in {categoryLabel(selectedAddCategory)}</div>
+                    </div>
+                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+
                   {/* Manual Entry Option */}
                   <button
                     onClick={() => {
@@ -4292,7 +4481,7 @@ Please add nutritional information manually if needed.`);
                   <div className="flex items-center justify-end gap-3 px-4 pt-4">
                     <button
                       type="button"
-                      onClick={handleAddToFavorites}
+                      onClick={() => handleAddToFavorites(editingEntry)}
                       className="px-3 py-1.5 rounded-full border border-gray-200 text-sm font-semibold text-gray-800 hover:bg-gray-50"
                     >
                       Add to Favorites
@@ -6041,7 +6230,10 @@ Please add nutritional information manually if needed.`);
             <>
               <h3 className="text-lg font-semibold mb-4">{isViewingToday ? "Today's Meals" : 'Meals'}</h3>
 
-              <div className="space-y-3 -mx-4 sm:-mx-6">
+              <div
+                className="space-y-3 -mx-4 sm:-mx-6"
+                style={isMobile ? { marginLeft: 'calc(50% - 50vw)', marginRight: 'calc(50% - 50vw)' } : undefined}
+              >
                 {sourceEntries.length === 0 && (
                   <div className="text-sm text-gray-500 px-4 sm:px-6 pb-2">
                     No food entries yet {isViewingToday ? 'today' : 'for this date'}. Add a meal to get started.
@@ -6119,7 +6311,7 @@ Please add nutritional information manually if needed.`);
                           meta.swiping = true
                         }
                         meta.hasMoved = true
-                        const clamped = Math.max(-96, Math.min(96, dx))
+                        const clamped = Math.max(-SWIPE_DELETE_WIDTH, Math.min(SWIPE_MENU_WIDTH, dx))
                         setEntrySwipeOffsets((prev) => ({ ...prev, [entryKey]: clamped }))
                       }
 
@@ -6136,34 +6328,36 @@ Please add nutritional information manually if needed.`);
                         delete swipeMetaRef.current[entryKey]
 
                         if (offset > 70) {
-                          setSwipeMenuEntry(entryKey)
-                          setEntrySwipeOffsets((prev) => ({ ...prev, [entryKey]: 84 }))
+                          setEntrySwipeOffsets((prev) => ({ ...prev, [entryKey]: SWIPE_MENU_WIDTH }))
                           return
                         }
                         if (offset < -70) {
-                          setSwipeMenuEntry(null)
-                          setEntrySwipeOffsets((prev) => ({ ...prev, [entryKey]: -90 }))
+                          setSwipeMenuEntry((prev) => (prev === entryKey ? null : prev))
+                          setEntrySwipeOffsets((prev) => ({ ...prev, [entryKey]: -SWIPE_DELETE_WIDTH }))
                           return
                         }
-                        setSwipeMenuEntry(null)
+                        setSwipeMenuEntry((prev) => (prev === entryKey ? null : prev))
                         setEntrySwipeOffsets((prev) => ({ ...prev, [entryKey]: 0 }))
                       }
 
-  const handleRowPress = () => {
-    if (isMobile && swipeClickBlockRef.current[entryKey]) return
-    closeSwipeMenus()
-    setShowEntryOptions(null)
-    setEnergyUnit('kcal')
-    editFood(food)
-  }
+                      const handleRowPress = () => {
+                        if (isMobile && swipeClickBlockRef.current[entryKey]) return
+                        closeSwipeMenus()
+                        setShowEntryOptions(null)
+                        setEnergyUnit('kcal')
+                        editFood(food)
+                      }
 
                       const openSwipeMenu = (e?: React.SyntheticEvent) => {
                         if (e) {
                           e.preventDefault()
                           e.stopPropagation()
                         }
-                        setSwipeMenuEntry(entryKey)
-                        setEntrySwipeOffsets((prev) => ({ ...prev, [entryKey]: 84 }))
+                        setSwipeMenuEntry((prev) => (prev === entryKey ? null : entryKey))
+                        setEntrySwipeOffsets((prev) => ({
+                          ...prev,
+                          [entryKey]: prev[entryKey] && prev[entryKey] > 0 ? prev[entryKey] : SWIPE_MENU_WIDTH,
+                        }))
                       }
 
                       return (
@@ -6174,7 +6368,8 @@ Please add nutritional information manually if needed.`);
                                 <button
                                   type="button"
                                   onClick={openSwipeMenu}
-                                  className="pointer-events-auto h-full min-w-[72px] px-3 bg-[#4DAF50] text-white flex items-center justify-center font-semibold uppercase tracking-wide"
+                                  className="pointer-events-auto h-full min-w-[88px] px-3 bg-[#4DAF50] text-white flex items-center justify-center"
+                                  aria-label="Open meal actions"
                                 >
                                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -6191,9 +6386,12 @@ Please add nutritional information manually if needed.`);
                                     actions.find((a) => a.label === 'Delete')?.onClick()
                                     closeSwipeMenus()
                                   }}
-                                  className="pointer-events-auto h-full min-w-[88px] px-3 bg-red-500 text-white flex items-center justify-center text-sm font-semibold uppercase tracking-wide"
+                                  className="pointer-events-auto h-full min-w-[88px] px-3 bg-red-500 text-white flex items-center justify-center"
+                                  aria-label="Delete entry"
                                 >
-                                  Delete
+                                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                  </svg>
                                 </button>
                               </div>
                             </div>
@@ -6385,6 +6583,28 @@ Please add nutritional information manually if needed.`);
                                       onClick={() => {
                                         setShowPhotoOptions(false);
                                         setPhotoOptionsAnchor(null);
+                                        setShowFavoritesPicker(true);
+                                      }}
+                                      className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
+                                    >
+                                      <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center mr-3 text-amber-600">
+                                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                                          <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
+                                        </svg>
+                                      </div>
+                                      <div className="flex-1">
+                                        <div className="text-base font-semibold text-gray-900">Favorites</div>
+                                        <div className="text-xs text-gray-500">Insert a saved meal in {categoryLabel(cat.key)}</div>
+                                      </div>
+                                      <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                      </svg>
+                                    </button>
+
+                                    <button
+                                      onClick={() => {
+                                        setShowPhotoOptions(false);
+                                        setPhotoOptionsAnchor(null);
                                         setShowAddFood(true);
                                       }}
                                       className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
@@ -6408,7 +6628,7 @@ Please add nutritional information manually if needed.`);
                             )}
                           </div>
                           {expandedCategories[cat.key] && (
-                            <div className="border-t border-gray-100 bg-white space-y-3 px-4 sm:px-6 pb-3">
+                            <div className="border-t border-gray-100 bg-white space-y-3 px-0 sm:px-6 pb-3">
                               {entries.length === 0 ? (
                                 <div className="text-sm text-gray-500 px-1 py-2">No entries in this category yet.</div>
                               ) : (
@@ -6428,6 +6648,113 @@ Please add nutritional information manually if needed.`);
           )}
         </div>
         )}
+
+      {showFavoritesPicker && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 px-4"
+          onClick={() => setShowFavoritesPicker(false)}
+        >
+          <div
+            className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-gray-200 p-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between mb-3">
+              <div>
+                <div className="text-lg font-semibold text-gray-900">Favorites</div>
+                <div className="text-sm text-gray-600">
+                  Add to {categoryLabel(selectedAddCategory)}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowFavoritesPicker(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <span aria-hidden>✕</span>
+              </button>
+            </div>
+            {favorites.length === 0 ? (
+              <div className="text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded-xl p-3">
+                Save a meal using “Add to Favorites” to see it here.
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-[65vh] overflow-y-auto">
+                {favorites.map((fav: any) => {
+                  const calories =
+                    Math.round(fav?.nutrition?.calories || fav?.total?.calories || 0) || null
+                  return (
+                    <button
+                      key={fav?.id || fav?.label}
+                      className="w-full text-left p-3 rounded-xl border border-gray-200 hover:border-emerald-400 hover:bg-emerald-50/50 transition-colors flex items-start gap-3"
+                      onClick={() => insertFavoriteIntoDiary(fav, selectedAddCategory)}
+                    >
+                      <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
+                        </svg>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-semibold text-gray-900 truncate">{fav?.label || 'Favorite meal'}</div>
+                        <div className="text-xs text-gray-500 line-clamp-2">
+                          {fav?.description || 'Saved meal'}
+                        </div>
+                        <div className="text-[11px] text-emerald-700 font-semibold mt-1">
+                          {calories ? `${calories} kcal` : 'Ready to add'}
+                        </div>
+                      </div>
+                      <span className="text-[11px] text-gray-600 px-2 py-1 rounded-full bg-gray-100 flex-shrink-0">
+                        {categoryLabel(selectedAddCategory)}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {duplicateModalEntry && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+          onClick={() => setDuplicateModalEntry(null)}
+        >
+          <div
+            className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-gray-200 p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <div className="text-lg font-semibold text-gray-900">Duplicate Meal</div>
+                <p className="text-sm text-gray-600 mt-1">
+                  Which category would you like to place your duplicated meal?
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDuplicateModalEntry(null)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <span aria-hidden>✕</span>
+              </button>
+            </div>
+            <div className="grid grid-cols-1 gap-2">
+              {MEAL_CATEGORY_ORDER.map((key) => (
+                <button
+                  key={key}
+                  className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-gray-200 hover:border-emerald-400 hover:bg-emerald-50 transition-colors"
+                  onClick={() => duplicateEntryToCategory(key)}
+                >
+                  <span className="text-sm font-semibold text-gray-900">{categoryLabel(key)}</span>
+                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Macro breakdown popup */}
       {macroPopup && (

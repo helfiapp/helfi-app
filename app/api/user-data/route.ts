@@ -143,6 +143,22 @@ export async function GET(request: NextRequest) {
       console.log('No todays foods data found in storage');
     }
 
+    // Get saved favorites
+    let favorites: any[] = [];
+    try {
+      const storedFavorites = user.healthGoals.find((goal: any) => goal.name === '__FOOD_FAVORITES__');
+      if (storedFavorites && storedFavorites.category) {
+        const parsed = JSON.parse(storedFavorites.category);
+        if (Array.isArray(parsed?.favorites)) {
+          favorites = parsed.favorites;
+        } else if (Array.isArray(parsed)) {
+          favorites = parsed;
+        }
+      }
+    } catch (e) {
+      console.log('No favorites data found in storage');
+    }
+
     // Get device interest (stored in hidden goal record)
     let deviceInterestData: any = {}
     try {
@@ -248,6 +264,7 @@ export async function GET(request: NextRequest) {
       })),
       profileImage: user.image || null,
       todaysFoods: todaysFoods,
+      favorites,
       profileInfo: profileInfoData,
       deviceInterest: deviceInterestData,
       termsAccepted: (user as any).termsAccepted === true,
@@ -838,7 +855,30 @@ export async function POST(request: NextRequest) {
       // Continue with other updates
     }
 
-    // 7. Handle profileInfo data from profile page - store as special health goal
+    // 7. Handle favorites data for quick add flow
+    try {
+      if (data && Array.isArray((data as any).favorites)) {
+        await prisma.healthGoal.deleteMany({
+          where: {
+            userId: user.id,
+            name: '__FOOD_FAVORITES__'
+          }
+        })
+        await prisma.healthGoal.create({
+          data: {
+            userId: user.id,
+            name: '__FOOD_FAVORITES__',
+            category: JSON.stringify({ favorites: (data as any).favorites }),
+            currentRating: 0,
+          }
+        })
+        console.log('Stored favorites data successfully')
+      }
+    } catch (error) {
+      console.error('Error storing favorites data:', error)
+    }
+
+    // 8. Handle profileInfo data from profile page - store as special health goal
     try {
       const incomingProfileInfo =
         data.profileInfo && typeof data.profileInfo === 'object'
