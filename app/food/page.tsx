@@ -1112,6 +1112,15 @@ export default function FoodDiary() {
   const [favorites, setFavorites] = useState<any[]>([])
   const isAddMenuOpen = showCategoryPicker || showPhotoOptions
 
+  const triggerHaptic = (duration: number = 12) => {
+    try {
+      const reduced = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches
+      const pref = typeof localStorage !== 'undefined' ? localStorage.getItem('hapticsEnabled') : null
+      const enabled = pref === null ? true : pref === 'true'
+      if (!reduced && enabled && 'vibrate' in navigator) navigator.vibrate(duration)
+    } catch {}
+  }
+
   useEffect(() => {
     const updateIsMobile = () => {
       if (typeof window === 'undefined') return
@@ -3578,6 +3587,11 @@ Please add nutritional information manually if needed.`);
     }))
     const updatedFoods = [entry, ...todaysFoods]
     setTodaysFoods(updatedFoods)
+    triggerHaptic(10)
+    setShowFavoritesPicker(false)
+    setShowPhotoOptions(false)
+    setShowAddFood(false)
+    setQuickToast(`Adding to ${categoryLabel(category)}...`)
     if (!isViewingToday) {
       setHistoryFoods((prev: any[] | null) => {
         const base = Array.isArray(prev) ? prev : []
@@ -3587,13 +3601,10 @@ Please add nutritional information manually if needed.`);
     try {
       await saveFoodEntries(updatedFoods)
       await refreshEntriesFromServer()
-      showQuickToast(`Meal added to ${categoryLabel(category)}`)
+      showQuickToast(`Added to ${categoryLabel(category)}`)
     } finally {
       ensureEntryPresent()
-      setShowFavoritesPicker(false)
-      setShowPhotoOptions(false)
       setPhotoOptionsAnchor(null)
-      setShowAddFood(false)
     }
   }
 
@@ -6962,12 +6973,12 @@ Please add nutritional information manually if needed.`);
             </div>
           ) : (
             <div className="flex-1 overflow-y-auto bg-gray-50 pb-6">
-              <div className="space-y-3 pt-3">
-                {favorites.map((fav: any) => {
-                  const favId = fav?.id || String(fav?.label || 'favorite')
-                  const calories = Math.round(fav?.nutrition?.calories || fav?.total?.calories || 0) || null
-                  const swipeOffset = favoriteSwipeOffsets[favId] || 0
-                  const handleFavTouchStart = (e: React.TouchEvent) => {
+      <div className="space-y-3 pt-3">
+        {favorites.map((fav: any) => {
+          const favId = fav?.id || String(fav?.label || 'favorite')
+          const calories = Math.round(fav?.nutrition?.calories || fav?.total?.calories || 0) || null
+          const swipeOffset = favoriteSwipeOffsets[favId] || 0
+          const handleFavTouchStart = (e: React.TouchEvent) => {
                     if (e.touches.length === 0) return
                     const touch = e.touches[0]
                     favoriteSwipeMetaRef.current[favId] = {
@@ -7005,11 +7016,11 @@ Please add nutritional information manually if needed.`);
                     }
 
                   return (
-                    <div key={favId} className="relative w-full overflow-visible">
-                      <div className="absolute inset-0 flex items-stretch pointer-events-none">
-                        <div className="flex-1 bg-red-500" />
-                        <div className="flex items-center">
-                          <button
+            <div key={favId} className="relative w-full overflow-visible">
+              <div className="absolute inset-0 flex items-stretch pointer-events-none">
+                <div className="flex-1 bg-red-500" />
+                <div className="flex items-center">
+                  <button
                             type="button"
                             onClick={(e) => {
                               e.preventDefault()
@@ -7025,25 +7036,30 @@ Please add nutritional information manually if needed.`);
                           </button>
                         </div>
                       </div>
-                      <div
-                        className="relative bg-white border border-gray-200 rounded-none sm:rounded-xl shadow-sm transition-transform duration-150 ease-out z-10 w-full"
-                        style={{ transform: `translateX(${swipeOffset}px)`, touchAction: 'pan-y' }}
-                        onTouchStart={handleFavTouchStart}
-                        onTouchMove={handleFavTouchMove}
-                        onTouchEnd={handleFavTouchEnd}
-                        onTouchCancel={handleFavTouchEnd}
-                        onClick={() => {
-                          setFavoriteSwipeOffsets((prev) => ({ ...prev, [favId]: 0 }))
-                          insertFavoriteIntoDiary(fav, selectedAddCategory)
-                        }}
-                      >
-                        <div className="p-4 hover:bg-gray-50 transition-colors">
-                          <div className="flex items-center gap-3">
-                            <p className="flex-1 text-sm sm:text-base text-gray-900 truncate">
-                              {sanitizeMealDescription((fav?.description || fav?.label || '').split('\n')[0].split('Calories:')[0]) || 'Favorite meal'}
-                            </p>
-                            <div className="flex flex-col items-end gap-1 flex-shrink-0 text-xs sm:text-sm text-gray-600">
-                              {calories !== null && <span className="font-semibold text-gray-900">{calories} kcal</span>}
+              <div
+                className="relative bg-white border border-gray-200 rounded-none sm:rounded-xl shadow-sm transition-transform duration-150 ease-out z-10 w-full"
+                style={{ transform: `translateX(${swipeOffset}px)`, touchAction: 'pan-y' }}
+                onTouchStart={handleFavTouchStart}
+                onTouchMove={handleFavTouchMove}
+                onTouchEnd={handleFavTouchEnd}
+                onTouchCancel={handleFavTouchEnd}
+                onClick={() => {
+                  setFavoriteSwipeOffsets((prev) => ({ ...prev, [favId]: 0 }))
+                  insertFavoriteIntoDiary(fav, selectedAddCategory)
+                }}
+              >
+                <div className="p-4 hover:bg-gray-50 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v12m6-6H6" />
+                      </svg>
+                    </div>
+                    <p className="flex-1 text-sm sm:text-base text-gray-900 truncate">
+                      {sanitizeMealDescription((fav?.description || fav?.label || '').split('\n')[0].split('Calories:')[0]) || 'Favorite meal'}
+                    </p>
+                    <div className="flex flex-col items-end gap-1 flex-shrink-0 text-xs sm:text-sm text-gray-600">
+                      {calories !== null && <span className="font-semibold text-gray-900">{calories} kcal</span>}
                               <span className="text-gray-500">{categoryLabel(selectedAddCategory)}</span>
                             </div>
                           </div>
