@@ -1224,7 +1224,10 @@ export default function FoodDiary() {
         firstPass.push(entry)
       }
     }
-    // Second pass: within the same date+category+description+photo, prefer the categorized copy over uncategorized.
+    // Second pass: within the same date+category+description+photo, prefer:
+    // - entries that have a real category over uncategorized
+    // - entries that have a real database id (`dbId`) over purely cached copies
+    // - the most recent entry when both are equivalent
     const preferred = new Map<string, any>()
     for (const entry of firstPass) {
       const cat = normalizeCategory(entry?.meal || entry?.category || entry?.mealType)
@@ -1238,6 +1241,9 @@ export default function FoodDiary() {
       const entryHasCat = hasRealCategory(entry)
       const existingHasCat = hasRealCategory(existing || {})
       if (!existing) {
+        preferred.set(key, entry)
+      } else if (!existing?.dbId && entry?.dbId) {
+        // Always prefer entries that are backed by a real FoodLog row
         preferred.set(key, entry)
       } else if (!existingHasCat && entryHasCat) {
         preferred.set(key, entry)
