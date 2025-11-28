@@ -6376,7 +6376,7 @@ Please add nutritional information manually if needed.`);
                                   </svg>
                                 </button>
                               </div>
-                              <div className="flex-1 bg-[#4DAF50]" />
+                              <div className={`flex-1 ${swipeOffset < 0 ? 'bg-red-500' : 'bg-[#4DAF50]'}`} />
                               <div className="flex items-center">
                                 <button
                                   type="button"
