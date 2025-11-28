@@ -1204,6 +1204,13 @@ export default function FoodDiary() {
     return `desc:${cat}|${desc}`
   }
 
+  const normalizedDescription = (desc: string | null | undefined) =>
+    (desc || '')
+      .toString()
+      .replace(/\(favorite-copy-\d+\)/gi, '')
+      .trim()
+      .toLowerCase()
+
   // Prevent duplicate rows from ever rendering (e.g., double writes or cached copies).
   const dedupeEntries = (list: any[]) => {
     if (!Array.isArray(list)) return []
@@ -3865,6 +3872,31 @@ Please add nutritional information manually if needed.`);
       } catch (error) {
         console.error('Failed to delete entry from database:', error);
         // Continue with local deletion even if DB delete fails
+      }
+    } else {
+      // Fallback: try to find a matching server entry by description/category and delete it
+      try {
+        const tz = new Date().getTimezoneOffset();
+        const res = await fetch(`/api/food-log?date=${entry.localDate || selectedDate}&tz=${tz}`);
+        if (res.ok) {
+          const json = await res.json();
+          const logs = Array.isArray(json.logs) ? json.logs : [];
+          const match = logs.find((l: any) => {
+            const cat = normalizeCategory(l?.meal || l?.category || l?.mealType)
+            const descMatch =
+              normalizedDescription(l?.description || l?.name) === normalizedDescription(entry?.description)
+            return cat === entryCategory && descMatch
+          })
+          if (match?.id) {
+            await fetch('/api/food-log/delete', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id: match.id }),
+            }).catch(() => {})
+          }
+        }
+      } catch (err) {
+        console.warn('Best-effort server delete fallback failed', err)
       }
     }
     
