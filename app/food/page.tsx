@@ -6507,6 +6507,37 @@ Please add nutritional information manually if needed.`);
                         },
                       ]
 
+                      const actionIcons: Record<string, JSX.Element> = {
+                        'Add to Favorites': (
+                          <svg className="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v12m6-6H6" />
+                          </svg>
+                        ),
+                        'Duplicate Meal': (
+                          <svg className="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5h10a2 2 0 012 2v10a2 2 0 01-2 2H9a2 2 0 01-2-2V7a2 2 0 012-2z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 9H5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-2" />
+                          </svg>
+                        ),
+                        'Copy to Today': (
+                          <svg className="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-3-3v6" />
+                            <rect x="5" y="5" width="14" height="14" rx="2" ry="2" />
+                          </svg>
+                        ),
+                        'Edit Entry': (
+                          <svg className="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 20h9" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4L16.5 3.5z" />
+                          </svg>
+                        ),
+                        Delete: (
+                          <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        ),
+                      }
+
                       const closeSwipeMenus = () => {
                         setSwipeMenuEntry(null)
                         setEntrySwipeOffsets((prev) => ({ ...prev, [entryKey]: 0 }))
@@ -6687,25 +6718,35 @@ Please add nutritional information manually if needed.`);
                             </div>
                           </div>
                           {isMobile && isMenuOpen && (
-                            <div className="absolute left-0 right-0 top-full mt-2 px-4 z-20">
-                            <div className="rounded-2xl bg-white border border-gray-200 shadow-xl overflow-hidden w-full">
-                              {actions.map((item, idx) => (
-                                <button
-                                  key={item.label}
-                                  className={`w-full text-left px-4 py-3 text-sm flex items-center justify-between ${item.destructive ? 'text-red-600 hover:bg-red-50' : 'text-gray-800 hover:bg-gray-50'} ${idx > 0 ? 'border-t border-gray-100' : ''}`}
-                                  onClick={() => {
-                                      item.onClick()
-                                      closeSwipeMenus()
-                                    }}
-                                  >
-                                    <span>{item.label}</span>
-                                    {item.destructive && (
-                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                      </svg>
-                                    )}
-                                  </button>
-                                ))}
+                            <div className="fixed inset-0 z-30 flex items-end justify-center" style={{ pointerEvents: 'none' }}>
+                              <div className="absolute inset-0 bg-black/10" onClick={closeSwipeMenus} style={{ pointerEvents: 'auto' }} />
+                              <div className="w-full max-w-lg px-4 pb-[env(safe-area-inset-bottom)] pt-4" style={{ pointerEvents: 'auto' }}>
+                                <div className="rounded-3xl bg-[#f6f7f9] border border-gray-200 shadow-2xl overflow-hidden w-full">
+                                  {actions.map((item, idx) => (
+                                    <button
+                                      key={item.label}
+                                      className={`w-full text-left px-5 py-4 text-base flex items-center gap-3 ${item.destructive ? 'text-red-600' : 'text-gray-900'} ${idx > 0 ? 'border-t border-gray-200' : ''}`}
+                                      onClick={() => {
+                                        item.onClick()
+                                        closeSwipeMenus()
+                                      }}
+                                    >
+                                      <span className="flex-shrink-0">
+                                        {actionIcons[item.label] || (
+                                          <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                                          </svg>
+                                        )}
+                                      </span>
+                                      <span className="flex-1">{item.label}</span>
+                                      {item.destructive && (
+                                        <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                        </svg>
+                                      )}
+                                    </button>
+                                  ))}
+                                </div>
                               </div>
                             </div>
                           )}
