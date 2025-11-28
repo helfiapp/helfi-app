@@ -1,13 +1,9 @@
 # Mobile To-Do (food entries)
 
 # Handover Notes (read before working)
-- Remaining gaps: mobile rows/swipe backgrounds still show left/right space; need truly edge-to-edge cards and swipe backgrounds (green/red) on mobile. Prior tweaks to transforms/padding/borders didn’t eliminate the gaps.
-- Swipe-right menu: currently auto-opens when swiping past threshold. Requirement: swipe should only reveal the green button; tapping the green button toggles the menu open/closed. Do not auto-open on swipe.
-- Delete styling: swipe-left delete must be icon-only (see DELETE BUTTON ICON.jpg), not the word “Delete”.
-- Favorites: “Add to Favorites” is only stubbed; no UI entry point. Add “Favorites” option in the add flow (after category selection, alongside Photo/Camera and Manual Entry) to insert saved favorites.
-- Duplicate Meal: action is stubbed; needs a category picker with helper text (“Which category would you like to place your duplicated meal?”) listing all categories and duplicating into the chosen category.
-- Edit Entry scroll: opening “Edit Entry” should land at the top of the edit page; it currently lands mid-page.
-- Desktop: 3-dots menu must open the same menu items as mobile (Favorites, Duplicate Meal, Copy to Today, Edit Entry, Delete); desktop row click should not auto-open edit.
+- Favorites add bug (critical): The Favorites option now shows in the add flow and opens a full-screen list, but tapping a favorite flashes “Saved/Meal added”, closes the sheet, and **does not insert** the meal into the chosen category. Fix: tap should create a diary entry in the active/selected category, show clear “Meal added to {category}” feedback, and return to the diary with the new row visible. Delete swipe is correct—do not change it.
+- Duplicate Meal UX gap: Category picker works and duplicates into the chosen category, but there is minimal feedback (just a green flash). Add clearer confirmation (e.g., “Duplicated to {category}”) so users know it’s happening.
+- Other open items remain: edge-to-edge mobile row width, 3-dot menu copy, edit-entry scroll-to-top, and mobile spacing per screenshots. Keep desktop behavior intact.
 - Relevant screenshots live in `public/mobile-design-screenshots/` (only three remain): DELETE BUTTON ICON.jpg, SPACE ON LEFT AND RIGHT REMOVAL.jpg, FAVORITES MENU.jpg.
 
 ## Reference images (always check these)
@@ -27,7 +23,7 @@ Only the three images above remain relevant in `public/mobile-design-screenshots
 - ✅ Tapping a food row opens the edit screen (food analysis/edit view), with edit/delete visible and “kcal” under the big calorie number.
 - ☐ Fix mobile row width: entry cards and swipe backgrounds (green/red) must be truly full width with zero left/right gaps. Current attempts adjusted transforms/borders but gaps remain (see user screenshot 3:31). Avoid repeating partial fixes that only tweak padding/translate; ensure container stretches edge-to-edge on mobile.
 - ✅ Fix swipe-to-menu behavior: right swipe should only reveal the green button; menu must toggle open/close on tap of that button (not auto-open on swipe). Previous attempts set swipe offsets and `swipeMenuEntry` on threshold, which still auto-opens. Do not auto-open on swipe threshold.
-- ✅ Add Favorites entry point in add flow: when tapping the global “Add Food Entry” button or the meal “+”, after category selection, the option sheet includes “Favorites” (alongside Photo Library/Camera and Manual Entry). **Remaining bug:** tapping a favorite flashes “Saved”/“Meal added”, closes the sheet, but no meal is added to the chosen category. Must insert the meal into the active category and return to the diary with confirmation.
+- ⚠️ Add Favorites entry point in add flow: option appears and list opens, but tapping a favorite flashes “Saved/Meal added”, closes the sheet, and does **not** add to the chosen category. Must actually insert into the active category and confirm.
 - ⚠️ Duplicate Meal: category picker works and duplicates into the chosen category, but users get minimal visual feedback (only a green flash). Needs clearer “Duplicated to {category}” feedback while saving.
 - ☐ Edit Entry scroll: opening “Edit Entry” should land at the top of the edit page (not mid-page). Current behavior still lands mid-page.
 - ✅ Delete button visual: when swiping left, show an icon-only delete button like the Cronometer example (see `DELETE BUTTON ICON.jpg`), not the word “Delete”.
