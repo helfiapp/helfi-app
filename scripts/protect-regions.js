@@ -128,6 +128,7 @@ function checkIngredientsCard() {
                         Add Ingredient
                       </button>
                     </div>
+                    </div>
                   </div>
                 )}`.replace(/\r\n/g, '\n'); // normalize line endings
 

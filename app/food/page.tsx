@@ -6112,6 +6112,7 @@ Please add nutritional information manually if needed.`);
                         Add Ingredient
                       </button>
                     </div>
+                    </div>
                   </div>
                 )}
                 {/* PROTECTED: INGREDIENTS_CARD END */}
