@@ -1736,8 +1736,31 @@ const applyStructuredItems = (
     });
   })();
 
+  const normalizeDiaryEntry = (entry: any) => {
+    if (!entry) return entry
+    const rawCat = entry.meal ?? entry.category ?? (entry as any)?.mealType ?? (entry as any)?.persistedCategory
+    const normalizedCategory = normalizeCategory(rawCat)
+    const createdAtIso =
+      entry?.createdAt ||
+      (typeof entry?.id === 'number' ? new Date(entry.id).toISOString() : undefined) ||
+      new Date().toISOString()
+    const displayTime =
+      entry?.time ||
+      new Date(createdAtIso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    return {
+      ...entry,
+      meal: normalizedCategory,
+      category: normalizedCategory,
+      persistedCategory: normalizedCategory,
+      createdAt: createdAtIso,
+      time: displayTime,
+    }
+  }
+
+  const normalizeDiaryList = (list: any[]) => (Array.isArray(list) ? list.map(normalizeDiaryEntry) : [])
+
   const sourceEntries = useMemo(
-    () => dedupeEntries(isViewingToday ? todaysFoods : (historyFoods || [])),
+    () => dedupeEntries(normalizeDiaryList(isViewingToday ? todaysFoods : (historyFoods || []))),
     [todaysFoods, historyFoods, isViewingToday, deletedEntryNonce],
   )
 
@@ -2342,22 +2365,29 @@ const applyStructuredItems = (
   }, [selectedDate, isViewingToday]);
 
   const mapLogsToEntries = (logs: any[], fallbackDate: string) =>
-    logs.map((l: any) => ({
-      id: new Date(l.createdAt).getTime(), // UI key and sorting by timestamp
-      dbId: l.id, // actual database id for delete operations
-      description: l.description || l.name,
-      time: new Date(l.createdAt).toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-      }),
-      method: l.imageUrl ? 'photo' : 'text',
-      photo: l.imageUrl || null,
-      nutrition: l.nutrients || null,
-      items: (l as any).items || (l.nutrients as any)?.items || null,
-      meal: normalizeCategory((l as any)?.meal || (l as any)?.category || (l as any)?.mealType),
-      category: normalizeCategory((l as any)?.meal || (l as any)?.category || (l as any)?.mealType),
-      localDate: (l as any).localDate || fallbackDate,
-    }))
+    logs.map((l: any) => {
+      const rawCat = (l as any)?.meal || (l as any)?.category || (l as any)?.mealType
+      const category = normalizeCategory(rawCat)
+      const createdAtIso = l.createdAt ? new Date(l.createdAt).toISOString() : new Date().toISOString()
+      return {
+        id: new Date(createdAtIso).getTime(), // UI key and sorting by timestamp
+        dbId: l.id, // actual database id for delete operations
+        description: l.description || l.name,
+        time: new Date(createdAtIso).toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
+        method: l.imageUrl ? 'photo' : 'text',
+        photo: l.imageUrl || null,
+        nutrition: l.nutrients || null,
+        items: (l as any).items || (l.nutrients as any)?.items || null,
+        meal: category,
+        category,
+        persistedCategory: category,
+        createdAt: createdAtIso,
+        localDate: (l as any).localDate || fallbackDate,
+      }
+    })
 
   // Best-effort reload to keep UI in sync with the authoritative DB rows right after saving.
   const refreshEntriesFromServer = async () => {
@@ -3174,6 +3204,8 @@ Please add nutritional information manually if needed.`);
       analyzedItems && analyzedItems.length > 0 ? buildMealSummaryFromItems(analyzedItems) : '';
     const finalDescription = (baseFromAi || baseFromItems || description || '').trim();
     
+    const category = normalizeCategory(selectedAddCategory)
+    const nowIso = new Date().toISOString()
     const newEntry = {
       id: Date.now(),
       localDate: selectedDate, // pin to the date the user is viewing when saving
@@ -3184,8 +3216,10 @@ Please add nutritional information manually if needed.`);
       nutrition: nutrition || analyzedNutrition,
       items: analyzedItems && analyzedItems.length > 0 ? analyzedItems : null, // Store structured items
       total: analyzedTotal || null, // Store total nutrition
-      meal: selectedAddCategory,
-      category: selectedAddCategory,
+      meal: category,
+      category,
+      persistedCategory: category,
+      createdAt: nowIso,
     };
     
     // Prevent duplicates: check if entry with same ID already exists
@@ -3209,6 +3243,7 @@ Please add nutritional information manually if needed.`);
           dbId: undefined,
           description: newEntry.description,
           time: newEntry.time,
+          createdAt: newEntry.createdAt,
           method: newEntry.method,
           photo: newEntry.photo,
           nutrition: newEntry.nutrition,
@@ -3217,6 +3252,7 @@ Please add nutritional information manually if needed.`);
           total: newEntry.total || null,
           meal: newEntry.meal,
           category: newEntry.category,
+          persistedCategory: newEntry.persistedCategory,
         }
         return [mapped, ...base]
       })
@@ -3480,6 +3516,7 @@ Please add nutritional information manually if needed.`);
   const insertFavoriteIntoDiary = async (favorite: any, targetCategory?: typeof MEAL_CATEGORY_ORDER[number]) => {
     if (!favorite) return
     const category = normalizeCategory(targetCategory || selectedAddCategory)
+    const createdAtIso = new Date().toISOString()
     const clonedItems =
       favorite.items && Array.isArray(favorite.items) && favorite.items.length > 0
         ? JSON.parse(JSON.stringify(favorite.items))
@@ -3501,6 +3538,8 @@ Please add nutritional information manually if needed.`);
       total: favorite.total || favorite.nutrition || null,
       meal: category,
       category,
+      persistedCategory: category,
+      createdAt: createdAtIso,
     }
     const buildEntryDedupKey = (food: any) =>
       [
