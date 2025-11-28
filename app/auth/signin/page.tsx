@@ -52,10 +52,29 @@ export default function SignIn() {
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [rememberMe, setRememberMe] = useState(false)
 
   const handleGoogleAuth = async () => {
     setLoading(true)
     await signIn('google', { callbackUrl: '/onboarding' })
+  }
+
+  const attemptDirectSignin = async (remember: boolean) => {
+    try {
+      const response = await fetch('/api/auth/signin-direct', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, rememberMe: remember })
+      })
+      const data = await response.json().catch(()=>({}))
+      if (response.ok) {
+        return { success: true }
+      }
+      return { success: false, message: data?.error || data?.message || 'Sign in failed. Please try again.' }
+    } catch (err) {
+      console.error('Signin-direct error:', err)
+      return { success: false, message: 'Sign in failed. Please try again.' }
+    }
   }
 
   const handleEmailAuth = async (e: React.FormEvent) => {
@@ -92,26 +111,40 @@ export default function SignIn() {
     } else {
       // Handle signin - Try NextAuth credentials first (most stable), then direct API
       try {
+        // Try direct sign-in first so we can honor the "keep me signed in" setting immediately
+        const directResult = await attemptDirectSignin(rememberMe)
+        if (directResult.success) {
+          setLoading(false)
+          window.location.href = '/onboarding'
+          return
+        }
+        if (directResult.message) {
+          setError(directResult.message)
+        }
+
         const res = await signIn('credentials', { email, password, callbackUrl: '/onboarding', redirect: false })
         if (res?.ok) {
+          // If they wanted a longer session, reissue via direct path to extend the cookie, but don't block redirect
+          if (rememberMe) {
+            attemptDirectSignin(true)
+          }
+          setLoading(false)
           window.location.href = '/onboarding'
+          return
         } else {
-          // Fallback to direct API
-          const response = await fetch('/api/auth/signin-direct', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password })
-          })
-          const data = await response.json().catch(()=>({}))
-          if (response.ok) {
+          const fallback = await attemptDirectSignin(false)
+          if (fallback.success) {
+            setLoading(false)
             window.location.href = '/onboarding'
+            return
           } else {
-            setError((data && (data.error || data.message)) || 'Invalid email or password')
+            setError(fallback.message || 'Invalid email or password')
           }
         }
       } catch (error) {
         console.error('Signin error:', error)
         setError('Signin failed. Please try again.')
+        return
       }
     }
     setLoading(false)
@@ -238,6 +271,21 @@ export default function SignIn() {
                     )}
                   </button>
                 </div>
+              </div>
+
+              <div className="flex items-start justify-between gap-3">
+                <label className="inline-flex items-center gap-2 text-sm text-gray-700 select-none">
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300 text-helfi-green focus:ring-helfi-green"
+                  />
+                  Keep me signed in
+                </label>
+                <span className="text-xs text-gray-500 leading-5">
+                  If unchecked, you stay signed in for at least 24 hours.
+                </span>
               </div>
 
               {error && (

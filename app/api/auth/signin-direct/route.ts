@@ -2,11 +2,16 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { encode } from 'next-auth/jwt'
 
+const ONE_DAY_SECONDS = 24 * 60 * 60
+const FOREVER_MAX_AGE_SECONDS = 5 * 365 * 24 * 60 * 60 // ~5 years; treat as "keep me signed in"
+
 export async function POST(request: NextRequest) {
   try {
-    const { email, password } = await request.json().catch(()=>({}))
+    const { email, password, rememberMe } = await request.json().catch(()=>({}))
+    const keepSignedIn = Boolean(rememberMe)
+    const maxAgeSeconds = keepSignedIn ? FOREVER_MAX_AGE_SECONDS : ONE_DAY_SECONDS
     
-    console.log('🔐 Direct signin called:', { email })
+    console.log('🔐 Direct signin called:', { email, rememberMe: keepSignedIn })
     
     if (!email) {
       return NextResponse.json({ error: 'Email is required' }, { status: 400 })
@@ -48,10 +53,10 @@ export async function POST(request: NextRequest) {
         name: user.name || user.email.split('@')[0],
         image: user.image,
         iat: Math.floor(Date.now() / 1000),
-        exp: Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60), // 30 days
+        exp: Math.floor(Date.now() / 1000) + maxAgeSeconds,
       },
       secret,
-      maxAge: 30 * 24 * 60 * 60, // 30 days
+      maxAge: maxAgeSeconds,
     })
 
     // Create response with session cookie
@@ -63,7 +68,7 @@ export async function POST(request: NextRequest) {
         name: user.name,
         emailVerified: !!user.emailVerified
       },
-      message: 'Signin successful'
+      message: keepSignedIn ? 'Signin successful (remembered)' : 'Signin successful'
     })
 
     // Set NextAuth session cookie with proper format
@@ -74,7 +79,7 @@ export async function POST(request: NextRequest) {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 30 * 24 * 60 * 60, // 30 days
+      maxAge: maxAgeSeconds,
       path: '/'
     })
     // Also set legacy cookie name for compatibility
@@ -82,7 +87,7 @@ export async function POST(request: NextRequest) {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 30 * 24 * 60 * 60,
+      maxAge: maxAgeSeconds,
       path: '/'
     })
 
@@ -110,6 +115,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const email = (searchParams.get('email') || '').toLowerCase()
     if (!email) return NextResponse.redirect(new URL('/auth/signin?error=CredentialsSignin', request.url))
+    const maxAgeSeconds = ONE_DAY_SECONDS
 
     let user = await prisma.user.findUnique({ where: { email } })
     if (!user) {
@@ -118,13 +124,13 @@ export async function GET(request: NextRequest) {
 
     const secret = process.env.NEXTAUTH_SECRET || 'helfi-secret-key-production-2024'
     const token = await encode({
-      token: { sub: user.id, id: user.id, email: user.email, name: user.name || user.email.split('@')[0], image: user.image, iat: Math.floor(Date.now()/1000), exp: Math.floor(Date.now()/1000)+30*24*60*60 },
+      token: { sub: user.id, id: user.id, email: user.email, name: user.name || user.email.split('@')[0], image: user.image, iat: Math.floor(Date.now()/1000), exp: Math.floor(Date.now()/1000)+maxAgeSeconds },
       secret,
-      maxAge: 30*24*60*60,
+      maxAge: maxAgeSeconds,
     })
     const response = NextResponse.redirect(new URL('/onboarding', request.url))
-    response.cookies.set('__Secure-next-auth.session-token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', maxAge: 30*24*60*60, path: '/' })
-    response.cookies.set('next-auth.session-token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', maxAge: 30*24*60*60, path: '/' })
+    response.cookies.set('__Secure-next-auth.session-token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', maxAge: maxAgeSeconds, path: '/' })
+    response.cookies.set('next-auth.session-token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', maxAge: maxAgeSeconds, path: '/' })
     return response
   } catch (e) {
     return NextResponse.redirect(new URL('/auth/signin?error=Signin', request.url))

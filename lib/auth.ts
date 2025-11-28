@@ -179,13 +179,13 @@ function generateVerificationToken(): string {
 export const authOptions: NextAuthOptions = {
   session: {
     strategy: 'jwt',
-    maxAge: 180 * 24 * 60 * 60, // keep sessions alive longer on mobile
-    updateAge: 7 * 24 * 60 * 60, // refresh token once a week to avoid frequent logouts
+    maxAge: 24 * 60 * 60, // default: keep users signed in for at least 24 hours
+    updateAge: 12 * 60 * 60, // refresh twice a day to avoid surprise logouts
   },
   jwt: {
     // Use a stable secret that doesn't change between deployments
     secret: process.env.NEXTAUTH_SECRET || 'helfi-secret-key-production-2024',
-    maxAge: 180 * 24 * 60 * 60, // match session longevity
+    maxAge: 24 * 60 * 60, // match default session window
   },
   providers: [
     CredentialsProvider({
