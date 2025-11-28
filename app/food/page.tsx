@@ -6718,10 +6718,10 @@ Please add nutritional information manually if needed.`);
                             </div>
                           </div>
                           {isMobile && isMenuOpen && (
-                            <div className="fixed inset-x-0 bottom-0 z-30 flex justify-center" style={{ pointerEvents: 'none' }}>
+                            <div className="fixed inset-0 z-30 flex items-end justify-center" style={{ pointerEvents: 'none' }}>
                               <div className="absolute inset-0 bg-transparent" onClick={closeSwipeMenus} style={{ pointerEvents: 'auto' }} />
-                              <div className="w-full max-w-lg px-4 pb-[env(safe-area-inset-bottom)] mb-16" style={{ pointerEvents: 'auto' }}>
-                                <div className="rounded-3xl bg-[#f6f7f9] border border-gray-200 shadow-2xl overflow-hidden w-full max-h-[65vh] overflow-y-auto">
+                              <div className="w-full max-w-lg px-4 pb-[env(safe-area-inset-bottom)] pt-4" style={{ pointerEvents: 'auto' }}>
+                                <div className="rounded-3xl bg-[#f6f7f9] border border-gray-200 shadow-2xl overflow-hidden w-full max-h-[70vh]">
                                   {actions.map((item, idx) => (
                                     <button
                                       key={item.label}
