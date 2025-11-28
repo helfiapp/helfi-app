@@ -6719,13 +6719,13 @@ Please add nutritional information manually if needed.`);
                           </div>
                           {isMobile && isMenuOpen && (
                             <div className="fixed inset-0 z-30 flex items-end justify-center" style={{ pointerEvents: 'none' }}>
-                              <div className="absolute inset-0 bg-black/10" onClick={closeSwipeMenus} style={{ pointerEvents: 'auto' }} />
+                              <div className="absolute inset-0 bg-transparent" onClick={closeSwipeMenus} style={{ pointerEvents: 'auto' }} />
                               <div className="w-full max-w-lg px-4 pb-[env(safe-area-inset-bottom)] pt-4" style={{ pointerEvents: 'auto' }}>
-                                <div className="rounded-3xl bg-[#f6f7f9] border border-gray-200 shadow-2xl overflow-hidden w-full">
+                                <div className="rounded-3xl bg-[#f6f7f9] border border-gray-200 shadow-2xl overflow-hidden w-full max-h-[70vh]">
                                   {actions.map((item, idx) => (
                                     <button
                                       key={item.label}
-                                      className={`w-full text-left px-5 py-4 text-base flex items-center gap-3 ${item.destructive ? 'text-red-600' : 'text-gray-900'} ${idx > 0 ? 'border-t border-gray-200' : ''}`}
+                                      className={`w-full text-left px-5 py-3.5 text-base flex items-center gap-3 ${item.destructive ? 'text-red-600' : 'text-gray-900'} ${idx > 0 ? 'border-t border-gray-200' : ''}`}
                                       onClick={() => {
                                         item.onClick()
                                         closeSwipeMenus()
