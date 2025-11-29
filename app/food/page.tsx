@@ -62,8 +62,6 @@ type NutritionTotals = {
   sugar: number | null
 }
 
-const FOOD_ICON_SRC = '/mobile-assets/MOBILE ICONS/FOOD ICON.svg'
-
 const formatServingsDisplay = (value: number | null | undefined) => {
   const numeric = Number(value)
   if (!Number.isFinite(numeric) || numeric <= 0) return '1'
@@ -3886,21 +3884,12 @@ Please add nutritional information manually if needed.`);
       setShowAddFood(true);
     }
     setShowEntryOptions(null);
-    const scrollToTopNow = () => {
+    requestAnimationFrame(() => {
       if (pageTopRef.current) {
         pageTopRef.current.scrollIntoView({ behavior: 'auto', block: 'start' })
-      }
-      if (typeof window !== 'undefined') {
+      } else if (typeof window !== 'undefined') {
         window.scrollTo({ top: 0, behavior: 'auto' })
-        if (typeof document !== 'undefined') {
-          document.documentElement?.scrollTo?.({ top: 0, behavior: 'auto' })
-          document.body?.scrollTo?.({ top: 0, behavior: 'auto' })
-        }
       }
-    }
-    requestAnimationFrame(() => {
-      scrollToTopNow()
-      setTimeout(scrollToTopNow, 50)
     })
   };
 
@@ -6572,7 +6561,7 @@ Please add nutritional information manually if needed.`);
                               mode: 'copyToToday',
                             }),
                         },
-                        { label: 'Show Nutrition Summary', onClick: () => editFood(food) },
+                        { label: 'Edit Entry', onClick: () => editFood(food) },
                         {
                           label: 'Delete',
                           onClick: handleDeleteAction,
@@ -6580,7 +6569,6 @@ Please add nutritional information manually if needed.`);
                         },
                       ]
 
-                      const actionIcons: Record<string, JSX.Element> = {
                         'Add to Favorites': (
                           <svg className="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v12m6-6H6" />
@@ -6598,7 +6586,7 @@ Please add nutritional information manually if needed.`);
                             <rect x="5" y="5" width="14" height="14" rx="2" ry="2" />
                           </svg>
                         ),
-                        'Show Nutrition Summary': (
+                        'Edit Entry': (
                           <svg className="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 20h9" />
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4L16.5 3.5z" />
@@ -6696,15 +6684,7 @@ Please add nutritional information manually if needed.`);
                       }
 
                       return (
-                        <div
-                          key={food.id}
-                          className="relative w-full overflow-visible"
-                          style={
-                            isMobile
-                              ? { width: '100vw', marginLeft: 'calc(50% - 50vw)', marginRight: 'calc(50% - 50vw)' }
-                              : undefined
-                          }
-                        >
+                        <div key={food.id} className="relative w-full overflow-visible">
                           {isMobile && (
                             <div className="absolute inset-0 flex items-stretch pointer-events-none">
                               <div className="flex items-center">
@@ -6751,11 +6731,6 @@ Please add nutritional information manually if needed.`);
                               onClick={isMobile ? handleRowPress : undefined}
                             >
                               <div className="flex items-center gap-3">
-                                {isMobile && (
-                                  <div className="flex-shrink-0 w-10 h-10 rounded-full border border-emerald-100 bg-emerald-50 flex items-center justify-center">
-                                    <Image src={FOOD_ICON_SRC} alt="Food entry" width={22} height={22} />
-                                  </div>
-                                )}
                                 <p className="flex-1 text-sm sm:text-base text-gray-900 truncate">
                                   {sanitizeMealDescription(food.description.split('\n')[0].split('Calories:')[0])}
                                 </p>
@@ -6921,89 +6896,87 @@ Please add nutritional information manually if needed.`);
 
                             {showPhotoOptions && photoOptionsAnchor === cat.key && !showCategoryPicker && (
                               isMobile ? (
-                                <div className="food-options-dropdown fixed inset-x-0 bottom-0 z-40 px-4 pb-[env(safe-area-inset-bottom)]">
-                                  <div className="mx-auto w-full max-w-xl">
-                                    <div className="rounded-t-3xl shadow-2xl border border-gray-200 bg-white/95 backdrop-blur-xl overflow-hidden max-h-[75vh] overflow-y-auto overscroll-contain">
-                                      <div className="divide-y divide-gray-100">
-                                        <button
-                                          className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
-                                          onClick={() => {
-                                            setPendingPhotoPicker(true);
-                                            setShowPhotoOptions(false);
-                                            setPhotoOptionsAnchor(null);
-                                            setShowAnalysisModeModal(true);
-                                          }}
-                                        >
-                                          <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center mr-3 text-blue-600">
-                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                                            </svg>
-                                          </div>
-                                          <div className="flex-1">
-                                            <div className="text-base font-semibold text-gray-900">Photo Library / Camera</div>
-                                            <div className="text-xs text-gray-500">Capture or pick a photo of your food</div>
-                                          </div>
-                                          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                <div className="food-options-dropdown px-4 sm:px-6 mt-2 z-40">
+                                  <div className="rounded-2xl shadow-2xl border border-gray-200 bg-white/95 backdrop-blur-xl overflow-hidden max-h-[70vh] overflow-y-auto overscroll-contain">
+                                    <div className="divide-y divide-gray-100">
+                                      <button
+                                        className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
+                                        onClick={() => {
+                                          setPendingPhotoPicker(true);
+                                          setShowPhotoOptions(false);
+                                          setPhotoOptionsAnchor(null);
+                                          setShowAnalysisModeModal(true);
+                                        }}
+                                      >
+                                        <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center mr-3 text-blue-600">
+                                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
                                           </svg>
-                                        </button>
+                                        </div>
+                                        <div className="flex-1">
+                                          <div className="text-base font-semibold text-gray-900">Photo Library / Camera</div>
+                                          <div className="text-xs text-gray-500">Capture or pick a photo of your food</div>
+                                        </div>
+                                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                        </svg>
+                                      </button>
 
-                                        <button
-                                          onClick={() => {
-                                            setShowPhotoOptions(false);
-                                            setPhotoOptionsAnchor(null);
-                                            setShowFavoritesPicker(true);
-                                          }}
-                                          className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
-                                        >
-                                          <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center mr-3 text-amber-600">
-                                            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                                              <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
-                                            </svg>
-                                          </div>
-                                          <div className="flex-1">
-                                            <div className="text-base font-semibold text-gray-900">Favorites</div>
-                                            <div className="text-xs text-gray-500">Insert a saved meal in {categoryLabel(cat.key)}</div>
-                                          </div>
-                                          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                      <button
+                                        onClick={() => {
+                                          setShowPhotoOptions(false);
+                                          setPhotoOptionsAnchor(null);
+                                          setShowFavoritesPicker(true);
+                                        }}
+                                        className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
+                                      >
+                                        <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center mr-3 text-amber-600">
+                                          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                                            <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
                                           </svg>
-                                        </button>
+                                        </div>
+                                        <div className="flex-1">
+                                          <div className="text-base font-semibold text-gray-900">Favorites</div>
+                                          <div className="text-xs text-gray-500">Insert a saved meal in {categoryLabel(cat.key)}</div>
+                                        </div>
+                                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                        </svg>
+                                      </button>
 
-                                        <button
-                                          onClick={() => {
-                                            setShowPhotoOptions(false);
-                                            setPhotoOptionsAnchor(null);
-                                            setShowAddFood(true);
-                                          }}
-                                          className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
-                                        >
-                                          <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center mr-3 text-green-600">
-                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                            </svg>
-                                          </div>
-                                          <div className="flex-1">
-                                            <div className="text-base font-semibold text-gray-900">Manual Entry</div>
-                                            <div className="text-xs text-gray-500">Type your food description</div>
-                                          </div>
-                                          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                      <button
+                                        onClick={() => {
+                                          setShowPhotoOptions(false);
+                                          setPhotoOptionsAnchor(null);
+                                          setShowAddFood(true);
+                                        }}
+                                        className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
+                                      >
+                                        <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center mr-3 text-green-600">
+                                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                           </svg>
-                                        </button>
+                                        </div>
+                                        <div className="flex-1">
+                                          <div className="text-base font-semibold text-gray-900">Manual Entry</div>
+                                          <div className="text-xs text-gray-500">Type your food description</div>
+                                        </div>
+                                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                        </svg>
+                                      </button>
 
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            setShowPhotoOptions(false);
-                                            setPhotoOptionsAnchor(null);
-                                          }}
-                                          className="w-full text-center px-4 py-3 text-sm text-gray-500 hover:bg-gray-50"
-                                        >
-                                          Cancel
-                                        </button>
-                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setShowPhotoOptions(false);
+                                          setPhotoOptionsAnchor(null);
+                                        }}
+                                        className="w-full text-center px-4 py-3 text-sm text-gray-500 hover:bg-gray-50"
+                                      >
+                                        Cancel
+                                      </button>
                                     </div>
                                   </div>
                                 </div>
