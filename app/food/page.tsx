@@ -6523,6 +6523,24 @@ Please add nutritional information manually if needed.`);
                       const isMenuOpen = swipeMenuEntry === entryKey
                       const entryTotals = getEntryTotals(food)
                       const entryCalories = Number.isFinite(Number(entryTotals?.calories)) ? Math.round(Number(entryTotals?.calories)) : null
+
+                      const closeSwipeMenus = () => {
+                        setSwipeMenuEntry(null)
+                        setEntrySwipeOffsets((prev) => ({ ...prev, [entryKey]: 0 }))
+                      }
+
+                      const handleDeleteAction = () => {
+                        closeSwipeMenus()
+                        setShowEntryOptions(null)
+                        if (isViewingToday) {
+                          deleteFood(food)
+                        } else if ((food as any)?.dbId) {
+                          deleteHistoryFood((food as any).dbId)
+                        } else {
+                          deleteFood(food)
+                        }
+                      }
+
                       const actions = [
                         { label: 'Add to Favorites', onClick: () => handleAddToFavorites(food) },
                         {
@@ -6546,18 +6564,11 @@ Please add nutritional information manually if needed.`);
                         { label: 'Edit Entry', onClick: () => editFood(food) },
                         {
                           label: 'Delete',
-                          onClick: () => {
-                            if (isViewingToday) {
-                              deleteFood(food)
-                            } else {
-                              deleteHistoryFood((food as any).dbId)
-                            }
-                          },
+                          onClick: handleDeleteAction,
                           destructive: true,
                         },
                       ]
 
-                      const actionIcons: Record<string, JSX.Element> = {
                         'Add to Favorites': (
                           <svg className="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v12m6-6H6" />
@@ -6586,11 +6597,6 @@ Please add nutritional information manually if needed.`);
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                           </svg>
                         ),
-                      }
-
-                      const closeSwipeMenus = () => {
-                        setSwipeMenuEntry(null)
-                        setEntrySwipeOffsets((prev) => ({ ...prev, [entryKey]: 0 }))
                       }
 
                       const handleOptionsToggle = (e?: React.SyntheticEvent) => {
@@ -6700,8 +6706,7 @@ Please add nutritional information manually if needed.`);
                                   onClick={(e) => {
                                     e.preventDefault()
                                     e.stopPropagation()
-                                    actions.find((a) => a.label === 'Delete')?.onClick()
-                                    closeSwipeMenus()
+                                    handleDeleteAction()
                                   }}
                                   className="pointer-events-auto h-full min-w-[88px] px-3 bg-red-500 text-white flex items-center justify-center"
                                   aria-label="Delete entry"
