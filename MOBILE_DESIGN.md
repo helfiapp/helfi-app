@@ -1,17 +1,20 @@
 # Mobile To-Do (food entries)
 
-# Handover Notes (read before working)
-- ☐ Display the food icon from `public/mobile-assets/MOBILE ICONS/FOOD ICON.svg` (or PNG) on the left side of each food panel in the **mobile** view, matching the placement shown in `public/mobile-design-screenshots/FOOD ICON PLACEMENT IMAGE.jpg` (Cronometer mock with Helfi icon overlaid). Align vertically with the text block (title/description/calories/time) and keep spacing consistent with the reference. Use the provided asset; do not swap colors, sizes, or add extra padding beyond what’s needed to mirror the mock. Avoid regressions to swipe/menus/favorites or desktop layouts; this is a visual-only addition on mobile cards.
-- ⚠ Copy-to-Today duplication issue: copying a past-day entry into today sometimes creates two rows with the same timestamp. Fix in `app/food/page.tsx` duplicate/copy flow + dedupe—make sure only one insert/save path runs and that dedupe collapses identical description/time/date even when `localDate` is missing or newly set. Do not weaken guard rails; just stop double insertion and enforce single-row dedupe.
+# Handover Notes (critical issue: entries drop into “Other”)
+- The food diary still renders all meals in “Other” on return navigation (e.g., More → Dashboard → Settings → Food), then sometimes snaps back—other times it stays wrong. Users see a bad first render.
+- Attempts made (unsuccessful):
+  - Added persistent diary snapshot (localStorage + sessionStorage) and normalized meal/category/localDate on hydrate.
+  - Gated render until snapshot hydrated to avoid flashing “Other.”
+  - Ignored old snapshots and marked new ones as normalized only after dedupe/normalize.
+  - Normalized categories and dates at hydrate; kept add/duplicate dedupe intact.
+- Result: issue persists on preview-staging; snapshots still let “Other” render on load. Do not repeat the same snapshot steps; a deeper fix is needed (likely reloading/normalizing the cache before first paint or auditing category persistence paths).
 
 ## Reference images
 - `public/mobile-design-screenshots/FOOD ICON PNT IMAGE.jpg` (food icon placement mock).
 - `public/mobile-design-screenshots/SCROLLING ISSUE.jpg` (bottom add-menu scroll bug).
 
 ## Status
-> Items marked ✅ are locked. Do not modify or “improve” them—treat as working perfectly.
 - ✅ Edit button on the food detail screen opens the real edit flow.
-
 ## To do
 - ✅ Swipe right on a food row to reveal the menu button on a green background (#4DAF50).
 - ✅ Swipe left on a food row to delete.
