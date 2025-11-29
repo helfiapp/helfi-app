@@ -7160,7 +7160,7 @@ Please add nutritional information manually if needed.`);
                             )}
                           </div>
                           {expandedCategories[cat.key] && (
-                            <div className="border-t border-gray-100 bg-white space-y-3 px-0 sm:px-6 pb-3">
+                            <div className="border-t border-gray-100 bg-white space-y-0 divide-y divide-gray-100 px-0 sm:px-6 pb-0">
                               {entries.length === 0 ? (
                                 <div className="text-sm text-gray-500 px-1 py-2">No entries in this category yet.</div>
                               ) : (
