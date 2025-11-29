@@ -6906,6 +6906,10 @@ Please add nutritional information manually if needed.`);
                         }))
                       }
 
+                      const entryCardClass = isMobile
+                        ? 'relative bg-white border border-gray-200 rounded-lg shadow-sm transition-transform duration-150 ease-out z-10 w-full'
+                        : 'relative bg-white border-0 rounded-none shadow-none transition-transform duration-150 ease-out z-10 w-full'
+
                       return (
                         <div key={food.id} className="relative w-full overflow-visible">
                           {isMobile && (
@@ -6942,7 +6946,7 @@ Please add nutritional information manually if needed.`);
                             </div>
                           )}
                           <div
-                            className="relative bg-white border border-gray-200 rounded-none sm:rounded-xl shadow-sm transition-transform duration-150 ease-out z-10 w-full"
+                            className={entryCardClass}
                             style={isMobile ? { transform: `translateX(${swipeOffset}px)`, touchAction: 'pan-y' } : undefined}
                             onTouchStart={handleTouchStart}
                             onTouchMove={handleTouchMove}
@@ -6954,18 +6958,16 @@ Please add nutritional information manually if needed.`);
                               onClick={isMobile ? handleRowPress : undefined}
                             >
                               <div className="flex items-center gap-3">
-                                {isMobile && (
-                                  <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center">
-                                    <Image
-                                      src="/mobile-assets/MOBILE%20ICONS/FOOD%20ICON.png"
-                                      alt="Food item"
-                                      width={32}
-                                      height={32}
-                                      className="w-8 h-8"
-                                      priority={false}
-                                    />
-                                  </div>
-                                )}
+                                <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center">
+                                  <Image
+                                    src="/mobile-assets/MOBILE%20ICONS/FOOD%20ICON.png"
+                                    alt="Food item"
+                                    width={32}
+                                    height={32}
+                                    className="w-8 h-8"
+                                    priority={false}
+                                  />
+                                </div>
                                 <div className="flex-1 min-w-0">
                                   <p className="text-sm sm:text-base text-gray-900 truncate">
                                     {sanitizeMealDescription(food.description.split('\n')[0].split('Calories:')[0])}
