@@ -1884,6 +1884,26 @@ const applyStructuredItems = (
       entry?.createdAt ||
       (typeof entry?.id === 'number' ? new Date(entry.id).toISOString() : undefined) ||
       new Date().toISOString()
+    const deriveLocalDate = () => {
+      if (typeof entry?.localDate === 'string' && entry.localDate.length >= 8) return entry.localDate
+      try {
+        const ts =
+          typeof entry?.id === 'number'
+            ? entry.id
+            : entry?.createdAt
+            ? new Date(entry.createdAt).getTime()
+            : Number(entry?.time)
+        if (Number.isFinite(ts)) {
+          const d = new Date(ts)
+          const y = d.getFullYear()
+          const m = String(d.getMonth() + 1).padStart(2, '0')
+          const day = String(d.getDate()).padStart(2, '0')
+          return `${y}-${m}-${day}`
+        }
+      } catch {}
+      return buildTodayIso()
+    }
+    const localDate = deriveLocalDate()
     const displayTime =
       entry?.time ||
       new Date(createdAtIso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -1893,6 +1913,7 @@ const applyStructuredItems = (
       category: normalizedCategory,
       persistedCategory: normalizedCategory,
       createdAt: createdAtIso,
+      localDate,
       time: displayTime,
     }
   }
