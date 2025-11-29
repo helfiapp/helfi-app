@@ -1,11 +1,7 @@
 # Mobile To-Do (food entries)
 
 # Handover Notes (read before working)
-- Current state: UI work on the mobile swipe menu is partially done. All other tasks are completed.
-- Remaining issue to fix (mobile menu):
-  - The green menu toggle (swipe button) is visible, but tapping it a second time does **not** close the menu. It should toggle the menu closed when tapped again.
-  - The menu sheet width must extend to the **right edge** of the screen only. The left position is correct—do **not** move it left; only widen it to the right so the toggle stays exposed and the sheet reaches the right edge.
-- Everything else is functioning; focus only on the above menu behavior/width adjustment.
+- ☐ Display the food icon from `public/mobile-assets/MOBILE ICONS/FOOD ICON.svg` (or PNG) on the left side of each food panel in the **mobile** view, matching the placement shown in `public/mobile-design-screenshots/FOOD ICON PLACEMENT IMAGE.jpg` (Cronometer mock with Helfi icon overlaid). Align vertically with the text block (title/description/calories/time) and keep spacing consistent with the reference. Use the provided asset; do not swap colors, sizes, or add extra padding beyond what’s needed to mirror the mock. Avoid regressions to swipe/menus/favorites or desktop layouts; this is a visual-only addition on mobile cards.
 
 ## Reference images
 - `public/mobile-design-screenshots/FOOD ICON PNT IMAGE.jpg` (food icon placement mock).
@@ -26,7 +22,7 @@
 - ☐ Edit Entry scroll: opening “Edit Entry” should land at the top of the edit page (not mid-page). Current behavior still lands mid-page.
 - ✅ Delete button visual: when swiping left, show an icon-only delete button like the Cronometer example (see `DELETE BUTTON ICON.jpg`), not the word “Delete”.
 - ☐ Display the food icon from `public/mobile-assets/MOBILE ICONS/FOOD ICON.svg` (or PNG) on the left side of each food panel in the mobile view, matching the placement shown in `public/mobile-design-screenshots/FOOD ICON PLACEMENT IMAGE.jpg` (Cronometer-based mockup with the Helfi icon overlaid); make sure the icon aligns with the panel text and spacing so it looks like the reference.
-- ☐ (critical) Fix bottom “Other/+” add menu scroll on mobile: the dropdown cannot scroll, so Photo Library/Camera, Favorites, and Manual Entry are inaccessible when opened from the bottom category; see `public/mobile-design-screenshots/SCROLLING ISSUE.jpg`.
+- ✅ (critical) Fix bottom “Other/+” add menu scroll on mobile: the dropdown cannot scroll, so Photo Library/Camera, Favorites, and Manual Entry are inaccessible when opened from the bottom category; see `public/mobile-design-screenshots/SCROLLING ISSUE.jpg`.
 
 ## Guidance for the next agent
 - Only do the to-do items above. Everything else stays as-is.
@@ -37,13 +33,6 @@
 - The 3-dot tap opens the pop-up with “Show Nutrition Summary” (not “Edit Entry”).
 - Tapping a food row opens the edit screen (food analysis/edit view) with edit/delete and “kcal” under the big calorie number.
 - Do not hide or break any existing buttons or menus. Test taps and menus after changes.
-
-## Expected behavior (quick summary)
-- Swipe right → show green menu button on the left (see swipe screenshot).
-- Swipe left → delete action.
-- Tap 3 dots → pop-up menu shows “Show Nutrition Summary” (replaces “Edit Entry”).
-- Tap a food row → open the edit screen (see edit screenshot), with edit/delete buttons and “kcal” under the big calorie number.
-- Desktop 3-dots menu must open the same actions as the mobile green menu (Favorites, Duplicate Meal with category picker, Copy to Today, Edit Entry, Delete); desktop row should not auto-open edit.
 
 ## Process
 - Work in `preview-staging`; do not touch `master` until approved.
