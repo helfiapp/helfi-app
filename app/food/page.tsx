@@ -3681,21 +3681,22 @@ Please add nutritional information manually if needed.`);
       foodsForSave = updatedTodaysFoods
     }
 
-    try {
-      await saveFoodEntries(foodsForSave)
-      await refreshEntriesFromServer()
-      setExpandedCategories((prev) => ({
-        ...prev,
-        [category]: true,
-      }))
-      const toastMessage =
-        mode === 'copyToToday'
-          ? `Copied to ${categoryLabel(category)} today`
-          : `Duplicated to ${categoryLabel(category)}`
-      showQuickToast(toastMessage)
-    } finally {
-      setDuplicateModalContext(null)
-    }
+    const toastMessage =
+      mode === 'copyToToday'
+        ? `Copied to ${categoryLabel(category)} today`
+        : `Duplicated to ${categoryLabel(category)}`
+    setExpandedCategories((prev) => ({
+      ...prev,
+      [category]: true,
+    }))
+    showQuickToast(toastMessage)
+    setDuplicateModalContext(null)
+
+    saveFoodEntries(foodsForSave)
+      .then(() => refreshEntriesFromServer())
+      .catch((err) => {
+        console.warn('Duplicate/copy sync failed', err)
+      })
   }
 
   const exitEditingSession = () => {
