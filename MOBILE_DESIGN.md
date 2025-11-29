@@ -9,10 +9,6 @@
   - Normalized categories and dates at hydrate; kept add/duplicate dedupe intact.
 - Result: issue persists on preview-staging; snapshots still let “Other” render on load. Do not repeat the same snapshot steps; a deeper fix is needed (likely reloading/normalizing the cache before first paint or auditing category persistence paths).
 
-## Reference images
-- `public/mobile-design-screenshots/FOOD ICON PNT IMAGE.jpg` (food icon placement mock).
-- `public/mobile-design-screenshots/SCROLLING ISSUE.jpg` (bottom add-menu scroll bug).
-
 ## Status
 - ✅ Edit button on the food detail screen opens the real edit flow.
 ## To do
@@ -26,7 +22,7 @@
 - ✅ Duplicate Meal: category picker works and duplicates into the chosen category, but users get minimal visual feedback (only a green flash). Needs clearer “Duplicated to {category}” feedback while saving.
 - ☐ Edit Entry scroll: opening “Edit Entry” should land at the top of the edit page (not mid-page). Current behavior still lands mid-page.
 - ✅ Delete button visual: when swiping left, show an icon-only delete button like the Cronometer example (see `DELETE BUTTON ICON.jpg`), not the word “Delete”.
-- ☐ Display the food icon from `public/mobile-assets/MOBILE ICONS/FOOD ICON.svg` (or PNG) on the left side of each food panel in the mobile view, matching the placement shown in `public/mobile-design-screenshots/FOOD ICON PLACEMENT IMAGE.jpg` (Cronometer-based mockup with the Helfi icon overlaid); make sure the icon aligns with the panel text and spacing so it looks like the reference.
+- ✅ Display the food icon from `public/mobile-assets/MOBILE ICONS/FOOD ICON.svg` (or PNG) on the left side of each food panel in the mobile view, matching the placement shown in `public/mobile-design-screenshots/FOOD ICON PLACEMENT IMAGE.jpg` (Cronometer-based mockup with the Helfi icon overlaid); make sure the icon aligns with the panel text and spacing so it looks like the reference.
 - ✅ (critical) Fix bottom “Other/+” add menu scroll on mobile: the dropdown cannot scroll, so Photo Library/Camera, Favorites, and Manual Entry are inaccessible when opened from the bottom category; see `public/mobile-design-screenshots/SCROLLING ISSUE.jpg`.
 
 ## Guidance for the next agent
