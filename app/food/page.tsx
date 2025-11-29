@@ -1139,6 +1139,7 @@ export default function FoodDiary() {
     targetDate: string
     mode: 'duplicate' | 'copyToToday'
   } | null>(null)
+  const duplicateInFlightRef = useRef(false)
   const [showFavoritesPicker, setShowFavoritesPicker] = useState(false)
   const [favoriteSwipeOffsets, setFavoriteSwipeOffsets] = useState<Record<string, number>>({})
   const swipeMetaRef = useRef<Record<string, { startX: number; startY: number; swiping: boolean; hasMoved: boolean }>>({})
@@ -1308,7 +1309,7 @@ export default function FoodDiary() {
   }
 
   // Prevent duplicate rows from ever rendering (e.g., double writes or cached copies).
-  const dedupeEntries = (list: any[]) => {
+  const dedupeEntries = (list: any[], options?: { fallbackDate?: string }) => {
     if (!Array.isArray(list)) return []
     const isDeleted = (entry: any) => deletedEntryKeysRef.current.has(buildDeleteKey(entry))
     // Prefer entries that have a real meal/category over uncategorized copies.
@@ -1322,6 +1323,14 @@ export default function FoodDiary() {
         .toLowerCase()
         .replace(/\s+/g, ' ')
         .trim()
+    const timeKey = (raw: any) => {
+      if (raw === null || raw === undefined) return ''
+      if (typeof raw === 'number' && Number.isFinite(raw)) {
+        return new Date(raw).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }
+      return raw.toString().trim().toLowerCase()
+    }
+    const fallbackDate = options?.fallbackDate || ''
     // First pass: drop obvious duplicates within the same category (same date+category+description+time+photo)
     const seen = new Set<string>()
     const firstPass: any[] = []
@@ -1329,10 +1338,10 @@ export default function FoodDiary() {
       if (isDeleted(entry)) continue
       const cat = normalizeCategory(entry?.meal || entry?.category || entry?.mealType)
       const key = [
-        dateKeyForEntry(entry),
+        dateKeyForEntry(entry) || fallbackDate,
         cat,
-        (entry?.description || '').toString().trim().toLowerCase(),
-        entry?.time || '',
+        descKey(entry?.description),
+        timeKey(entry?.time),
         entry?.photo || '',
       ].join('|')
       if (!seen.has(key)) {
@@ -1349,7 +1358,7 @@ export default function FoodDiary() {
       if (isDeleted(entry)) continue
       const cat = normalizeCategory(entry?.meal || entry?.category || entry?.mealType)
       const key = [
-        dateKeyForEntry(entry),
+        dateKeyForEntry(entry) || fallbackDate,
         cat,
         descKey(entry?.description),
         entry?.photo || '',
@@ -1859,8 +1868,8 @@ const applyStructuredItems = (
   const normalizeDiaryList = (list: any[]) => (Array.isArray(list) ? list.map(normalizeDiaryEntry) : [])
 
   const sourceEntries = useMemo(
-    () => dedupeEntries(normalizeDiaryList(isViewingToday ? todaysFoods : (historyFoods || []))),
-    [todaysFoods, historyFoods, isViewingToday, deletedEntryNonce],
+    () => dedupeEntries(normalizeDiaryList(isViewingToday ? todaysFoods : (historyFoods || [])), { fallbackDate: selectedDate }),
+    [todaysFoods, historyFoods, isViewingToday, deletedEntryNonce, selectedDate],
   )
 
   // Close dropdowns on outside click
@@ -1910,7 +1919,7 @@ const applyStructuredItems = (
 
   // Auto-expand categories that have entries
   useEffect(() => {
-    const source = dedupeEntries(isViewingToday ? todaysFoods : (historyFoods || []))
+    const source = dedupeEntries(isViewingToday ? todaysFoods : (historyFoods || []), { fallbackDate: selectedDate })
     setExpandedCategories((prev) => {
       const next = { ...prev }
       let changed = false
@@ -1923,7 +1932,7 @@ const applyStructuredItems = (
       })
       return changed ? next : prev
     })
-  }, [todaysFoods, historyFoods, isViewingToday])
+  }, [todaysFoods, historyFoods, isViewingToday, selectedDate])
 
   // Persist a warm snapshot so returning to the diary avoids a cold reload spinner
   useEffect(() => {
@@ -1996,7 +2005,7 @@ const applyStructuredItems = (
       
       // Deduplicate entries by ID + content to prevent duplicates from context updates
       const seenIds = new Set<number>();
-      const deduped = dedupeEntries(onlySelectedDate).filter((item: any) => {
+      const deduped = dedupeEntries(onlySelectedDate, { fallbackDate: selectedDate }).filter((item: any) => {
         const id = typeof item.id === 'number' ? item.id : Number(item.id);
         if (seenIds.has(id)) {
           return false;
@@ -2517,7 +2526,7 @@ const applyStructuredItems = (
       const json = await res.json();
       const logs = Array.isArray(json.logs) ? json.logs : [];
       const mapped = mapLogsToEntries(logs, selectedDate);
-      const deduped = dedupeEntries(mapped);
+      const deduped = dedupeEntries(mapped, { fallbackDate: selectedDate });
 
       if (isViewingToday) {
         setTodaysFoods(deduped);
@@ -2538,7 +2547,7 @@ const applyStructuredItems = (
     try {
       // 1) Deduplicate before updating context to prevent duplicates
       const seenIds = new Set<number>();
-      const dedupedFoods = updatedFoods.filter((food: any) => {
+      const uniqueById = updatedFoods.filter((food: any) => {
         const id = typeof food.id === 'number' ? food.id : Number(food.id);
         if (seenIds.has(id)) {
           console.log('⚠️ Duplicate entry detected in saveFoodEntries, removing:', id);
@@ -2547,6 +2556,13 @@ const applyStructuredItems = (
         seenIds.add(id);
         return true;
       });
+      const initialLatest =
+        Array.isArray(uniqueById) && uniqueById.length > 0 ? uniqueById[0] : null
+      const dedupeTargetDate =
+        (initialLatest?.localDate && typeof initialLatest.localDate === 'string' && initialLatest.localDate.length >= 8
+          ? initialLatest.localDate
+          : selectedDate) || ''
+      const dedupedFoods = dedupeEntries(uniqueById, { fallbackDate: dedupeTargetDate })
       
       // 2) Update context immediately for instant UI updates (with deduplicated array)
       updateUserData({ todaysFoods: dedupedFoods })
@@ -2561,10 +2577,11 @@ const applyStructuredItems = (
       const appendHistory = options?.appendHistory !== false
 
       // Determine the localDate for logging and saving
-      const latest = Array.isArray(updatedFoods) && updatedFoods.length > 0 ? updatedFoods[0] : null
-      const targetLocalDate = latest && typeof latest?.localDate === 'string' && latest.localDate.length >= 8
-        ? latest.localDate
-        : selectedDate
+      const latest = Array.isArray(dedupedFoods) && dedupedFoods.length > 0 ? dedupedFoods[0] : initialLatest
+      const targetLocalDate =
+        latest && typeof latest?.localDate === 'string' && latest.localDate.length >= 8
+          ? latest.localDate
+          : selectedDate
 
       console.log('📝 saveFoodEntries called:', {
         entryCount: dedupedFoods.length,
@@ -3729,7 +3746,8 @@ Please add nutritional information manually if needed.`);
   }
 
   const duplicateEntryToCategory = async (targetCategory: typeof MEAL_CATEGORY_ORDER[number]) => {
-    if (!duplicateModalContext) return
+    if (!duplicateModalContext || duplicateInFlightRef.current) return
+    duplicateInFlightRef.current = true
     const { entry: source, targetDate, mode } = duplicateModalContext
     setSwipeMenuEntry(null)
     setEntrySwipeOffsets({})
@@ -3758,21 +3776,24 @@ Please add nutritional information manually if needed.`);
     const normalizedHistory = Array.isArray(historyFoods) ? historyFoods : []
     const isTargetToday = targetDate === todayIso
     const isTargetSelected = targetDate === selectedDate
+    const dedupeTargetDate = targetDate || selectedDate
+
+    const dedupeList = (entries: any[]) => dedupeEntries(entries, { fallbackDate: dedupeTargetDate })
 
     let updatedTodaysFoods = todaysFoods
     let updatedHistoryFoods = normalizedHistory
     let foodsForSave = todaysFoods
 
     if (isTargetToday || (isTargetSelected && isViewingToday)) {
-      updatedTodaysFoods = [copiedEntry, ...todaysFoods]
+      updatedTodaysFoods = dedupeList([copiedEntry, ...todaysFoods])
       setTodaysFoods(updatedTodaysFoods)
       foodsForSave = updatedTodaysFoods
     } else if (isTargetSelected && !isViewingToday) {
-      updatedHistoryFoods = [copiedEntry, ...normalizedHistory]
+      updatedHistoryFoods = dedupeList([copiedEntry, ...normalizedHistory])
       setHistoryFoods(updatedHistoryFoods)
       foodsForSave = updatedHistoryFoods
     } else {
-      updatedTodaysFoods = [copiedEntry, ...todaysFoods]
+      updatedTodaysFoods = dedupeList([copiedEntry, ...todaysFoods])
       setTodaysFoods(updatedTodaysFoods)
       foodsForSave = updatedTodaysFoods
     }
@@ -3789,11 +3810,14 @@ Please add nutritional information manually if needed.`);
     setDuplicateModalContext(null)
     triggerHaptic(10)
 
-    saveFoodEntries(foodsForSave)
-      .then(() => refreshEntriesFromServer())
-      .catch((err) => {
-        console.warn('Duplicate/copy sync failed', err)
-      })
+    try {
+      await saveFoodEntries(foodsForSave)
+      await refreshEntriesFromServer()
+    } catch (err) {
+      console.warn('Duplicate/copy sync failed', err)
+    } finally {
+      duplicateInFlightRef.current = false
+    }
   }
 
   const exitEditingSession = () => {
@@ -6307,10 +6331,10 @@ Please add nutritional information manually if needed.`);
         ) : (
         <div className="overflow-visible space-y-6">
           {/* Daily Totals Row - only show on main diary view, not while editing an entry */}
-          {!editingEntry && dedupeEntries(isViewingToday ? todaysFoods : (historyFoods || [])).length > 0 && (
+          {!editingEntry && dedupeEntries(isViewingToday ? todaysFoods : (historyFoods || []), { fallbackDate: selectedDate }).length > 0 && (
             <div className="mb-4">
               {(() => {
-                const source = dedupeEntries(isViewingToday ? todaysFoods : (historyFoods || []))
+                const source = dedupeEntries(isViewingToday ? todaysFoods : (historyFoods || []), { fallbackDate: selectedDate })
 
                 const safeNumber = (value: any) => {
                   const num = Number(value)
@@ -6833,19 +6857,33 @@ Please add nutritional information manually if needed.`);
                               onClick={isMobile ? handleRowPress : undefined}
                             >
                               <div className="flex items-center gap-3">
-                                <p className="flex-1 text-sm sm:text-base text-gray-900 truncate">
-                                  {sanitizeMealDescription(food.description.split('\n')[0].split('Calories:')[0])}
-                                </p>
-                              <div className="flex flex-col items-end gap-1 flex-shrink-0 text-xs sm:text-sm text-gray-600">
+                                {isMobile && (
+                                  <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center">
+                                    <Image
+                                      src="/mobile-assets/MOBILE%20ICONS/FOOD%20ICON.svg"
+                                      alt="Food item"
+                                      width={32}
+                                      height={32}
+                                      className="w-8 h-8"
+                                      priority={false}
+                                    />
+                                  </div>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm sm:text-base text-gray-900 truncate">
+                                    {sanitizeMealDescription(food.description.split('\n')[0].split('Calories:')[0])}
+                                  </p>
+                                </div>
+                                <div className="flex flex-col items-end gap-1 flex-shrink-0 text-xs sm:text-sm text-gray-600">
                                   {entryCalories !== null && <span className="font-semibold text-gray-900">{entryCalories} kcal</span>}
                                   <span className="text-gray-500">{formatTimeWithAMPM(food.time)}</span>
                                 </div>
                                 {!isMobile && (
-                              <div className="relative entry-options-dropdown overflow-visible">
-                                <button
+                                  <div className="relative entry-options-dropdown overflow-visible">
+                                    <button
                                       onMouseDown={handleOptionsToggle}
                                       className="p-1.5 sm:p-2 rounded-lg hover:bg-gray-200 transition-colors"
-                                >
+                                    >
                                       <svg className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
                                         <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
                                       </svg>
