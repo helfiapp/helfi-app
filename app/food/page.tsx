@@ -6860,7 +6860,7 @@ Please add nutritional information manually if needed.`);
                                 {isMobile && (
                                   <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center">
                                     <Image
-                                      src="/mobile-assets/MOBILE%20ICONS/FOOD%20ICON.svg"
+                                      src="/mobile-assets/MOBILE ICONS/FOOD ICON.png"
                                       alt="Food item"
                                       width={32}
                                       height={32}
