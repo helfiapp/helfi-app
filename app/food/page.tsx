@@ -2354,30 +2354,21 @@ const applyStructuredItems = (
           if (res.ok) {
             const json = await res.json();
             const logs = Array.isArray(json.logs) ? json.logs : [];
-            const mapped = logs.map((l: any) => ({
-              id: new Date(l.createdAt).getTime(),
-              dbId: l.id,
-              description: l.description || l.name,
-              time: new Date(l.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-              method: l.imageUrl ? 'photo' : 'text',
-              photo: l.imageUrl || null,
-              nutrition: l.nutrients || null,
-              items: (l as any).items || (l.nutrients as any)?.items || null,
-              localDate: (l as any).localDate || selectedDate,
-            }));
-            if (mapped.length > 0) {
+            const mapped = mapLogsToEntries(logs, selectedDate);
+            const deduped = dedupeEntries(mapped, { fallbackDate: selectedDate });
+            if (deduped.length > 0) {
               // Update the appropriate state based on whether we're viewing today or a past date
               if (isViewingToday) {
-                setTodaysFoods(mapped);
+                setTodaysFoods(deduped);
               } else {
-                setHistoryFoods(mapped);
+                setHistoryFoods(deduped);
               }
               // Persist localDate back to user data for stability
               try {
                 fetch('/api/user-data', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ todaysFoods: mapped, appendHistory: false })
+                  body: JSON.stringify({ todaysFoods: deduped, appendHistory: false })
                 }).catch(() => {})
               } catch {}
             }
@@ -2545,20 +2536,7 @@ const applyStructuredItems = (
           });
           const logs = Array.isArray(json.logs) ? json.logs : []
 
-          const mapped = logs.map((l: any) => ({
-            id: new Date(l.createdAt).getTime(), // UI key and sorting by timestamp
-            dbId: l.id, // actual database id for delete operations
-            description: l.description || l.name,
-            time: new Date(l.createdAt).toLocaleTimeString([], {
-              hour: '2-digit',
-              minute: '2-digit',
-            }),
-            method: l.imageUrl ? 'photo' : 'text',
-            photo: l.imageUrl || null,
-            nutrition: l.nutrients || null,
-            items: (l as any).items || (l.nutrients as any)?.items || null,
-            localDate: (l as any).localDate || selectedDate,
-          }))
+          const mapped = mapLogsToEntries(logs, selectedDate)
 
           // De‑duplicate any accidental duplicate rows (e.g. from multiple
           // history append paths) so the user only sees one copy of each meal.
@@ -4259,17 +4237,9 @@ Please add nutritional information manually if needed.`);
         if (res.ok) {
           const json = await res.json();
           const logs = Array.isArray(json.logs) ? json.logs : [];
-          const mapped = logs.map((l: any) => ({
-            id: new Date(l.createdAt).getTime(),
-            dbId: l.id,
-            description: l.description || l.name,
-            time: new Date(l.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            method: l.imageUrl ? 'photo' : 'text',
-            photo: l.imageUrl || null,
-            nutrition: l.nutrients || null,
-            items: (l as any).items || (l.nutrients as any)?.items || null,
-          }));
-          setHistoryFoods(mapped);
+          const mapped = mapLogsToEntries(logs, selectedDate);
+          const deduped = dedupeEntries(mapped, { fallbackDate: selectedDate });
+          setHistoryFoods(deduped);
         }
       } catch {}
     } finally {
