@@ -136,6 +136,32 @@ const readWarmDiaryState = (): WarmDiaryState | null => {
   }
 }
 
+type DiarySnapshot = {
+  byDate: Record<string, { entries: any[]; expandedCategories?: Record<string, boolean> }>
+}
+
+const readPersistentDiarySnapshot = (): DiarySnapshot | null => {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = localStorage.getItem('foodDiary:persistentSnapshot')
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object') return null
+    return parsed as DiarySnapshot
+  } catch {
+    return null
+  }
+}
+
+const writePersistentDiarySnapshot = (snapshot: DiarySnapshot) => {
+  if (typeof window === 'undefined') return
+  try {
+    localStorage.setItem('foodDiary:persistentSnapshot', JSON.stringify(snapshot))
+  } catch {
+    // Best effort; ignore quota errors
+  }
+}
+
   const normalizeFoodName = (name: string | null | undefined) =>
     String(name || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
 
@@ -980,6 +1006,7 @@ export default function FoodDiary() {
   const pathname = usePathname()
   const { userData, profileImage, updateUserData } = useUserData()
   const warmDiaryState = useMemo(() => readWarmDiaryState(), [])
+  const persistentDiarySnapshot = useMemo(() => readPersistentDiarySnapshot(), [])
   const initialSelectedDate =
     warmDiaryState?.selectedDate && warmDiaryState.selectedDate.length >= 8
       ? warmDiaryState.selectedDate
@@ -1008,6 +1035,8 @@ export default function FoodDiary() {
   const [todaysFoods, setTodaysFoods] = useState<any[]>(() => {
     const warm = Array.isArray(warmDiaryState?.todaysFoods) ? warmDiaryState.todaysFoods : null
     if (warm) return warm
+    const persisted = persistentDiarySnapshot?.byDate?.[initialSelectedDate]?.entries
+    if (Array.isArray(persisted)) return persisted
     return filterEntriesForDate((userData as any)?.todaysFoods, initialSelectedDate)
   })
   const [newFoodText, setNewFoodText] = useState('')
@@ -1120,6 +1149,7 @@ export default function FoodDiary() {
   // New loading state
   const [foodDiaryLoaded, setFoodDiaryLoaded] = useState(() => {
     if (warmDiaryState) return true
+    if (persistentDiarySnapshot?.byDate?.[initialSelectedDate]?.entries) return true
     return Array.isArray((userData as any)?.todaysFoods)
   })
   const [expandedItemIndex, setExpandedItemIndex] = useState<number | null>(null)
@@ -1154,7 +1184,9 @@ export default function FoodDiary() {
   const [selectedDate, setSelectedDate] = useState<string>(() => initialSelectedDate)
   const [historyFoods, setHistoryFoods] = useState<any[] | null>(() => {
     const warmHistory = warmDiaryState?.historyByDate?.[initialSelectedDate]
-    return Array.isArray(warmHistory) ? warmHistory : null
+    if (Array.isArray(warmHistory)) return warmHistory
+    const persisted = persistentDiarySnapshot?.byDate?.[initialSelectedDate]?.entries
+    return Array.isArray(persisted) ? persisted : null
   })
   const [isLoadingHistory, setIsLoadingHistory] = useState<boolean>(false)
   const [showCreditsModal, setShowCreditsModal] = useState<boolean>(false)
@@ -1934,6 +1966,26 @@ const applyStructuredItems = (
     })
   }, [todaysFoods, historyFoods, isViewingToday, selectedDate])
 
+  // Hydrate from persistent snapshot immediately when switching dates to avoid empty flicker
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const snapshot = readPersistentDiarySnapshot()
+      const byDate = snapshot?.byDate?.[selectedDate]
+      if (!byDate || !Array.isArray(byDate.entries)) return
+      const normalized = dedupeEntries(normalizeDiaryList(byDate.entries), { fallbackDate: selectedDate })
+      if (isViewingToday) {
+        setTodaysFoods(normalized)
+      } else {
+        setHistoryFoods(normalized)
+      }
+      setExpandedCategories((prev) => ({ ...prev, ...(byDate.expandedCategories || {}) }))
+      setFoodDiaryLoaded(true)
+    } catch (err) {
+      console.warn('Snapshot hydration failed', err)
+    }
+  }, [selectedDate, isViewingToday])
+
   // Persist a warm snapshot so returning to the diary avoids a cold reload spinner
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -1951,6 +2003,23 @@ const applyStructuredItems = (
       console.warn('Could not cache warm diary state', err)
     }
   }, [selectedDate, todaysFoods, historyFoods, expandedCategories])
+
+  // Persist a durable snapshot per date to avoid reload flicker across navigations
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const snapshot = readPersistentDiarySnapshot() || { byDate: {} }
+      const sourceEntriesForDate = normalizeDiaryList(isViewingToday ? todaysFoods : (historyFoods || []))
+      const normalized = dedupeEntries(sourceEntriesForDate, { fallbackDate: selectedDate })
+      snapshot.byDate[selectedDate] = {
+        entries: normalized,
+        expandedCategories,
+      }
+      writePersistentDiarySnapshot(snapshot)
+    } catch (err) {
+      console.warn('Could not persist diary snapshot', err)
+    }
+  }, [selectedDate, isViewingToday, todaysFoods, historyFoods, expandedCategories])
 
 
 
