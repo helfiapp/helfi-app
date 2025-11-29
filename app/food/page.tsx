@@ -1036,7 +1036,7 @@ export default function FoodDiary() {
     const warm = Array.isArray(warmDiaryState?.todaysFoods) ? warmDiaryState.todaysFoods : null
     if (warm) return warm
     const persisted = persistentDiarySnapshot?.byDate?.[initialSelectedDate]?.entries
-    if (Array.isArray(persisted)) return persisted
+    if (Array.isArray(persisted)) return dedupeEntries(normalizeDiaryList(persisted), { fallbackDate: initialSelectedDate })
     return filterEntriesForDate((userData as any)?.todaysFoods, initialSelectedDate)
   })
   const [newFoodText, setNewFoodText] = useState('')
@@ -1152,6 +1152,11 @@ export default function FoodDiary() {
     if (persistentDiarySnapshot?.byDate?.[initialSelectedDate]?.entries) return true
     return Array.isArray((userData as any)?.todaysFoods)
   })
+  const [diaryHydrated, setDiaryHydrated] = useState<boolean>(() => {
+    if (warmDiaryState) return true
+    if (persistentDiarySnapshot?.byDate?.[initialSelectedDate]?.entries) return true
+    return false
+  })
   const [expandedItemIndex, setExpandedItemIndex] = useState<number | null>(null)
  
   const descriptionTextareaRef = useRef<HTMLTextAreaElement | null>(null)
@@ -1186,7 +1191,7 @@ export default function FoodDiary() {
     const warmHistory = warmDiaryState?.historyByDate?.[initialSelectedDate]
     if (Array.isArray(warmHistory)) return warmHistory
     const persisted = persistentDiarySnapshot?.byDate?.[initialSelectedDate]?.entries
-    return Array.isArray(persisted) ? persisted : null
+    return Array.isArray(persisted) ? dedupeEntries(normalizeDiaryList(persisted), { fallbackDate: initialSelectedDate }) : null
   })
   const [isLoadingHistory, setIsLoadingHistory] = useState<boolean>(false)
   const [showCreditsModal, setShowCreditsModal] = useState<boolean>(false)
@@ -2002,6 +2007,7 @@ const applyStructuredItems = (
       }
       setExpandedCategories((prev) => ({ ...prev, ...(byDate.expandedCategories || {}) }))
       setFoodDiaryLoaded(true)
+      setDiaryHydrated(true)
     } catch (err) {
       console.warn('Snapshot hydration failed', err)
     }
@@ -2041,6 +2047,13 @@ const applyStructuredItems = (
       console.warn('Could not persist diary snapshot', err)
     }
   }, [selectedDate, isViewingToday, todaysFoods, historyFoods, expandedCategories])
+
+  // Ensure diary is considered hydrated once data is loaded through any path
+  useEffect(() => {
+    if (foodDiaryLoaded) {
+      setDiaryHydrated(true)
+    }
+  }, [foodDiaryLoaded])
 
 
 
@@ -6413,7 +6426,7 @@ Please add nutritional information manually if needed.`);
         )}
 
         {/* Loading State - Prevent Empty Flash */}
-        {!foodDiaryLoaded ? (
+        {!diaryHydrated ? (
           <div className="bg-white rounded-lg shadow-sm p-12 flex flex-col items-center justify-center">
             <div className="w-10 h-10 border-4 border-emerald-100 border-t-emerald-500 rounded-full animate-spin mb-4"></div>
             <div className="text-gray-500 font-medium">Loading your food diary...</div>
