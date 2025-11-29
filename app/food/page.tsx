@@ -3659,9 +3659,47 @@ Please add nutritional information manually if needed.`);
     try {
       await saveFoodEntries(updatedFoods)
       await refreshEntriesFromServer()
-      showQuickToast('Meal duplicated')
+      showQuickToast(`Duplicated to ${categoryLabel(category)}`)
     } finally {
       setDuplicateModalEntry(null)
+    }
+  }
+
+  const copyEntryToToday = async (source: any) => {
+    if (!source) return
+    setSwipeMenuEntry(null)
+    setEntrySwipeOffsets({})
+    setShowEntryOptions(null)
+    const category = normalizeCategory(source.meal || source.category || source.mealType)
+    const clonedItems =
+      source.items && Array.isArray(source.items) && source.items.length > 0
+        ? JSON.parse(JSON.stringify(source.items))
+        : null
+    const copied = {
+      ...source,
+      id: Date.now(),
+      dbId: undefined,
+      localDate: selectedDate,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      meal: category,
+      category,
+      items: clonedItems,
+    }
+    setSelectedAddCategory(category as typeof MEAL_CATEGORY_ORDER[number])
+    const updatedFoods = [copied, ...todaysFoods]
+    setTodaysFoods(updatedFoods)
+    if (!isViewingToday) {
+      setHistoryFoods((prev: any[] | null) => {
+        const base = Array.isArray(prev) ? prev : []
+        return [{ ...copied }, ...base]
+      })
+    }
+    try {
+      await saveFoodEntries(updatedFoods)
+      await refreshEntriesFromServer()
+      showQuickToast(`Copied to ${categoryLabel(category)} today`)
+    } catch (err) {
+      console.warn('Copy to today failed', err)
     }
   }
 
@@ -6492,7 +6530,7 @@ Please add nutritional information manually if needed.`);
                       const actions = [
                         { label: 'Add to Favorites', onClick: () => handleAddToFavorites(food) },
                         { label: 'Duplicate Meal', onClick: () => setDuplicateModalEntry(food) },
-                        { label: 'Copy to Today', onClick: () => showQuickToast('Copy to Today coming soon') },
+                        { label: 'Copy to Today', onClick: () => copyEntryToToday(food) },
                         { label: 'Edit Entry', onClick: () => editFood(food) },
                         {
                           label: 'Delete',
