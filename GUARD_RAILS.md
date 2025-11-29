@@ -344,6 +344,7 @@ The green “+” buttons for each Food Diary category (Breakfast, Lunch, Dinner
 - Tap the **same “+” again** to close it.
 - Do **not** change this to “tap outside to close” or any other behaviour.
 - The “Other/+” panel must remain scrollable so all options are reachable on mobile.
+- **Auto-scroll is required on mobile:** when a category “+” is opened, scroll that category row into view (without covering or moving the “+”) so the entire add panel is visible. Do not remove or alter this scroll behavior.
 
 ---
 
