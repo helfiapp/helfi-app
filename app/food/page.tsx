@@ -3660,21 +3660,27 @@ Please add nutritional information manually if needed.`);
     }
     setSelectedAddCategory(category as typeof MEAL_CATEGORY_ORDER[number])
     const normalizedHistory = Array.isArray(historyFoods) ? historyFoods : []
-    const isTargetDateToday = targetDate === todayIso
-    const isTargetDateSelected = targetDate === selectedDate
-    const shouldUpdateTodays = isTargetDateToday || (isTargetDateSelected && isViewingToday)
+    const isTargetToday = targetDate === todayIso
+    const isTargetSelected = targetDate === selectedDate
+
     let updatedTodaysFoods = todaysFoods
-    if (shouldUpdateTodays) {
+    let updatedHistoryFoods = normalizedHistory
+    let foodsForSave = todaysFoods
+
+    if (isTargetToday || (isTargetSelected && isViewingToday)) {
       updatedTodaysFoods = [copiedEntry, ...todaysFoods]
       setTodaysFoods(updatedTodaysFoods)
-    }
-    let updatedHistoryFoods = normalizedHistory
-    if (isTargetDateSelected && !isViewingToday) {
+      foodsForSave = updatedTodaysFoods
+    } else if (isTargetSelected && !isViewingToday) {
       updatedHistoryFoods = [copiedEntry, ...normalizedHistory]
       setHistoryFoods(updatedHistoryFoods)
+      foodsForSave = updatedHistoryFoods
+    } else {
+      updatedTodaysFoods = [copiedEntry, ...todaysFoods]
+      setTodaysFoods(updatedTodaysFoods)
+      foodsForSave = updatedTodaysFoods
     }
-    const foodsForSave =
-      isTargetDateSelected ? (isViewingToday ? updatedTodaysFoods : updatedHistoryFoods) : updatedTodaysFoods
+
     try {
       await saveFoodEntries(foodsForSave)
       await refreshEntriesFromServer()
