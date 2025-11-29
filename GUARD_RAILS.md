@@ -226,6 +226,11 @@ On January 19th, 2025, food diary entries disappeared because entries were being
    - Don't filter out entries just because `localDate` is missing
    - Always merge database entries back into cache with proper `localDate` set
 
+4. **Normalize every `/api/food-log` response before state updates:**
+   - Route **all** fetch results through `mapLogsToEntries(...)` followed by `dedupeEntries(..., { fallbackDate })` before updating `todaysFoods` or `historyFoods` or persisting snapshots.
+   - Do **not** hand-map logs or bypass `dedupeEntries`; ad-hoc mappers caused “all meals under Other on first render” by skipping meal/localDate normalization.
+   - Apply this to every load path (warm-load verify, fallback loads, history loads, delete recovery) so category normalization stays consistent.
+
 **Backend (`app/api/food-log/route.ts`):**
 
 1. **Query broadly, filter precisely:**

@@ -1192,6 +1192,7 @@ export default function FoodDiary() {
   const [fullSizeImage, setFullSizeImage] = useState<string | null>(null)
   const [showSavedToast, setShowSavedToast] = useState<boolean>(false)
   const [selectedDate, setSelectedDate] = useState<string>(() => initialSelectedDate)
+  const categoryRowRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const [historyFoods, setHistoryFoods] = useState<any[] | null>(() => {
     const warmHistory = warmDiaryState?.historyByDate?.[initialSelectedDate]
     if (Array.isArray(warmHistory)) return warmHistory
@@ -1980,6 +1981,22 @@ const applyStructuredItems = (
   useEffect(() => {
     setExpandedItemIndex(null)
   }, [editingEntry?.id])
+
+  // Keep the add-menu dropdown fully visible on mobile by scrolling the tapped category into view.
+  useEffect(() => {
+    if (!isMobile) return
+    if (!showPhotoOptions || !photoOptionsAnchor) return
+    requestAnimationFrame(() => {
+      try {
+        const row = categoryRowRefs.current[photoOptionsAnchor]
+        if (!row) return
+        const top = row.getBoundingClientRect().top + window.scrollY - 12
+        window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' })
+      } catch {
+        // best effort only
+      }
+    })
+  }, [showPhotoOptions, photoOptionsAnchor, isMobile])
 
   // Auto-expand categories that have entries
   useEffect(() => {
@@ -7069,7 +7086,13 @@ Please add nutritional information manually if needed.`);
                         }))
 
                       return (
-                        <div key={cat.key} className="overflow-visible">
+                        <div
+                          key={cat.key}
+                          className="overflow-visible"
+                          ref={(el) => {
+                            categoryRowRefs.current[cat.key] = el
+                          }}
+                        >
                           <div className="relative">
                             <div
                               className={`flex items-center gap-3 px-4 sm:px-6 py-3 ${expandedCategories[cat.key] ? 'bg-white' : 'bg-white'}`}
