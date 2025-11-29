@@ -136,8 +136,14 @@ const readWarmDiaryState = (): WarmDiaryState | null => {
   }
 }
 
+type DiarySnapshotDate = {
+  entries: any[]
+  expandedCategories?: Record<string, boolean>
+  normalized?: boolean
+}
+
 type DiarySnapshot = {
-  byDate: Record<string, { entries: any[]; expandedCategories?: Record<string, boolean> }>
+  byDate: Record<string, DiarySnapshotDate>
 }
 
 const readPersistentDiarySnapshot = (): DiarySnapshot | null => {
@@ -161,6 +167,9 @@ const writePersistentDiarySnapshot = (snapshot: DiarySnapshot) => {
     // Best effort; ignore quota errors
   }
 }
+
+const normalizedSnapshotEntries = (entries: any[], fallbackDate: string) =>
+  dedupeEntries(normalizeDiaryList(entries), { fallbackDate })
 
   const normalizeFoodName = (name: string | null | undefined) =>
     String(name || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
@@ -1035,8 +1044,10 @@ export default function FoodDiary() {
   const [todaysFoods, setTodaysFoods] = useState<any[]>(() => {
     const warm = Array.isArray(warmDiaryState?.todaysFoods) ? warmDiaryState.todaysFoods : null
     if (warm) return warm
-    const persisted = persistentDiarySnapshot?.byDate?.[initialSelectedDate]?.entries
-    if (Array.isArray(persisted)) return dedupeEntries(normalizeDiaryList(persisted), { fallbackDate: initialSelectedDate })
+    const persisted = persistentDiarySnapshot?.byDate?.[initialSelectedDate]
+    if (persisted?.normalized && Array.isArray(persisted.entries)) {
+      return normalizedSnapshotEntries(persisted.entries, initialSelectedDate)
+    }
     return filterEntriesForDate((userData as any)?.todaysFoods, initialSelectedDate)
   })
   const [newFoodText, setNewFoodText] = useState('')
@@ -1190,8 +1201,11 @@ export default function FoodDiary() {
   const [historyFoods, setHistoryFoods] = useState<any[] | null>(() => {
     const warmHistory = warmDiaryState?.historyByDate?.[initialSelectedDate]
     if (Array.isArray(warmHistory)) return warmHistory
-    const persisted = persistentDiarySnapshot?.byDate?.[initialSelectedDate]?.entries
-    return Array.isArray(persisted) ? dedupeEntries(normalizeDiaryList(persisted), { fallbackDate: initialSelectedDate }) : null
+    const persisted = persistentDiarySnapshot?.byDate?.[initialSelectedDate]
+    if (persisted?.normalized && Array.isArray(persisted.entries)) {
+      return normalizedSnapshotEntries(persisted.entries, initialSelectedDate)
+    }
+    return null
   })
   const [isLoadingHistory, setIsLoadingHistory] = useState<boolean>(false)
   const [showCreditsModal, setShowCreditsModal] = useState<boolean>(false)
@@ -1998,8 +2012,8 @@ const applyStructuredItems = (
     try {
       const snapshot = readPersistentDiarySnapshot()
       const byDate = snapshot?.byDate?.[selectedDate]
-      if (!byDate || !Array.isArray(byDate.entries)) return
-      const normalized = dedupeEntries(normalizeDiaryList(byDate.entries), { fallbackDate: selectedDate })
+      if (!byDate || !byDate.normalized || !Array.isArray(byDate.entries)) return
+      const normalized = normalizedSnapshotEntries(byDate.entries, selectedDate)
       if (isViewingToday) {
         setTodaysFoods(normalized)
       } else {
@@ -2041,6 +2055,7 @@ const applyStructuredItems = (
       snapshot.byDate[selectedDate] = {
         entries: normalized,
         expandedCategories,
+        normalized: true,
       }
       writePersistentDiarySnapshot(snapshot)
     } catch (err) {
