@@ -6907,8 +6907,8 @@ Please add nutritional information manually if needed.`);
                       }
 
                       const entryCardClass = isMobile
-                        ? 'relative bg-white border border-gray-200 rounded-lg shadow-sm transition-transform duration-150 ease-out z-10 w-full'
-                        : 'relative bg-white border-0 rounded-none shadow-none transition-transform duration-150 ease-out z-10 w-full'
+                        ? 'relative bg-white border border-gray-200 rounded-lg shadow-sm transition-transform duration-150 ease-out z-10 w-full overflow-visible'
+                        : 'relative bg-white border-0 rounded-none shadow-none transition-transform duration-150 ease-out z-10 w-full overflow-visible'
 
                       return (
                         <div key={food.id} className="relative w-full overflow-visible">
@@ -6952,9 +6952,9 @@ Please add nutritional information manually if needed.`);
                             onTouchMove={handleTouchMove}
                             onTouchEnd={handleTouchEnd}
                             onTouchCancel={handleTouchEnd}
-                          >
+                            >
                             <div
-                              className="p-4 hover:bg-gray-50 transition-colors"
+                              className="p-4 hover:bg-gray-50 transition-colors overflow-visible"
                               onClick={isMobile ? handleRowPress : undefined}
                             >
                               <div className="flex items-center gap-3">
