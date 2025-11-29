@@ -35,5 +35,12 @@
 2. ⏳ Wait for Vercel deployment (should succeed now)
 3. ⚠️ Still need to create Blob storage manually (dashboard only)
 
+## Preview Login Stability (important for mobile testing)
+
+- Set these **Preview** env vars in Vercel so sessions survive new preview builds:
+  - `NEXTAUTH_URL=https://leskis-projects.vercel.app`
+  - `NEXTAUTH_URL_INTERNAL=https://leskis-projects.vercel.app`
+- Always open the preview at `https://leskis-projects.vercel.app` (or a custom preview domain). Cookies stay valid there even after new deployments, so you won’t be forced to re-login on every push.
+- These settings do **not** change app functionality; they only pin the cookie domain to a stable host.
 
 
