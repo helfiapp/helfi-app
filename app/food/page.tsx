@@ -3645,6 +3645,7 @@ Please add nutritional information manually if needed.`);
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       meal: category,
       category,
+      persistedCategory: category,
       items: clonedItems,
     }
     setSelectedAddCategory(category as typeof MEAL_CATEGORY_ORDER[number])
@@ -3670,7 +3671,9 @@ Please add nutritional information manually if needed.`);
     setSwipeMenuEntry(null)
     setEntrySwipeOffsets({})
     setShowEntryOptions(null)
-    const category = normalizeCategory(source.meal || source.category || source.mealType)
+    const rawSourceCategory =
+      source.persistedCategory || source.category || source.meal || source.mealType || selectedAddCategory
+    const category = normalizeCategory(rawSourceCategory)
     const clonedItems =
       source.items && Array.isArray(source.items) && source.items.length > 0
         ? JSON.parse(JSON.stringify(source.items))
@@ -3683,6 +3686,7 @@ Please add nutritional information manually if needed.`);
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       meal: category,
       category,
+      persistedCategory: category,
       items: clonedItems,
     }
     setSelectedAddCategory(category as typeof MEAL_CATEGORY_ORDER[number])
