@@ -8,6 +8,7 @@
 - `public/mobile-design-screenshots/SCROLLING ISSUE.jpg` (bottom add-menu scroll bug).
 
 ## Status
+> Items marked ✅ are locked. Do not modify or “improve” them—treat as working perfectly.
 - ✅ Edit button on the food detail screen opens the real edit flow.
 
 ## To do
