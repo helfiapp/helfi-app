@@ -3639,6 +3639,9 @@ Please add nutritional information manually if needed.`);
     setEntrySwipeOffsets({})
     setShowEntryOptions(null)
     const category = normalizeCategory(targetCategory)
+    const baseDescription = source.description || source.label || 'Duplicated meal'
+    const duplicateMetaTag = `(duplicate-${mode}-${Date.now()})`
+    const descriptionWithMeta = `${baseDescription}\n${duplicateMetaTag}`
     const clonedItems =
       source.items && Array.isArray(source.items) && source.items.length > 0
         ? JSON.parse(JSON.stringify(source.items))
@@ -3653,6 +3656,7 @@ Please add nutritional information manually if needed.`);
       category,
       persistedCategory: category,
       items: clonedItems,
+      description: descriptionWithMeta,
     }
     setSelectedAddCategory(category as typeof MEAL_CATEGORY_ORDER[number])
     const normalizedHistory = Array.isArray(historyFoods) ? historyFoods : []
