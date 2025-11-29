@@ -1288,6 +1288,25 @@ export default function FoodDiary() {
       .trim()
       .toLowerCase()
 
+  // Normalized calendar date for de-dupe; falls back to timestamp so copies with missing localDate
+  // collapse instead of rendering twice.
+  const dateKeyForEntry = (entry: any) => {
+    if (!entry) return ''
+    if (typeof entry?.localDate === 'string' && entry.localDate.length >= 8) return entry.localDate
+    const ts =
+      typeof entry?.id === 'number'
+        ? entry.id
+        : entry?.createdAt
+        ? new Date(entry.createdAt).getTime()
+        : Number(entry?.time) || NaN
+    if (!Number.isFinite(ts)) return ''
+    const d = new Date(ts)
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${y}-${m}-${day}`
+  }
+
   // Prevent duplicate rows from ever rendering (e.g., double writes or cached copies).
   const dedupeEntries = (list: any[]) => {
     if (!Array.isArray(list)) return []
@@ -1310,7 +1329,7 @@ export default function FoodDiary() {
       if (isDeleted(entry)) continue
       const cat = normalizeCategory(entry?.meal || entry?.category || entry?.mealType)
       const key = [
-        entry?.localDate || '',
+        dateKeyForEntry(entry),
         cat,
         (entry?.description || '').toString().trim().toLowerCase(),
         entry?.time || '',
@@ -1330,7 +1349,7 @@ export default function FoodDiary() {
       if (isDeleted(entry)) continue
       const cat = normalizeCategory(entry?.meal || entry?.category || entry?.mealType)
       const key = [
-        entry?.localDate || '',
+        dateKeyForEntry(entry),
         cat,
         descKey(entry?.description),
         entry?.photo || '',
