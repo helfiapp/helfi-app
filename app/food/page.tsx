@@ -1067,7 +1067,11 @@ export default function FoodDiary() {
   const [expandedEntries, setExpandedEntries] = useState<{[key: string]: boolean}>({})
   const [entrySwipeOffsets, setEntrySwipeOffsets] = useState<{ [key: string]: number }>({})
   const [swipeMenuEntry, setSwipeMenuEntry] = useState<string | null>(null)
-  const [duplicateModalEntry, setDuplicateModalEntry] = useState<any | null>(null)
+  const [duplicateModalContext, setDuplicateModalContext] = useState<{
+    entry: any
+    targetDate: string
+    mode: 'duplicate' | 'copyToToday'
+  } | null>(null)
   const [showFavoritesPicker, setShowFavoritesPicker] = useState(false)
   const [favoriteSwipeOffsets, setFavoriteSwipeOffsets] = useState<Record<string, number>>({})
   const swipeMetaRef = useRef<Record<string, { startX: number; startY: number; swiping: boolean; hasMoved: boolean }>>({})
@@ -1724,6 +1728,14 @@ const applyStructuredItems = (
   const userImage = (profileImage || session?.user?.image || '') as string
   const userName = session?.user?.name || 'User';
 
+  const todayIso = (() => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  })();
+
   // Today's date
   const today = new Date().toLocaleDateString('en-US', { 
     weekday: 'long', 
@@ -1732,13 +1744,7 @@ const applyStructuredItems = (
     day: 'numeric' 
   });
 
-  const isViewingToday = (() => {
-    const d = new Date();
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return selectedDate === `${y}-${m}-${day}`;
-  })();
+  const isViewingToday = selectedDate === todayIso;
 
   // Friendly label for selected date (local time)
   const selectedFriendly = (() => {
@@ -3627,21 +3633,21 @@ Please add nutritional information manually if needed.`);
   }
 
   const duplicateEntryToCategory = async (targetCategory: typeof MEAL_CATEGORY_ORDER[number]) => {
-    if (!duplicateModalEntry) return
+    if (!duplicateModalContext) return
+    const { entry: source, targetDate, mode } = duplicateModalContext
     setSwipeMenuEntry(null)
     setEntrySwipeOffsets({})
     setShowEntryOptions(null)
     const category = normalizeCategory(targetCategory)
-    const source = duplicateModalEntry
     const clonedItems =
       source.items && Array.isArray(source.items) && source.items.length > 0
         ? JSON.parse(JSON.stringify(source.items))
         : null
-    const duplicated = {
+    const copiedEntry = {
       ...source,
       id: Date.now(),
       dbId: undefined,
-      localDate: selectedDate,
+      localDate: targetDate,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       meal: category,
       category,
@@ -3649,61 +3655,36 @@ Please add nutritional information manually if needed.`);
       items: clonedItems,
     }
     setSelectedAddCategory(category as typeof MEAL_CATEGORY_ORDER[number])
-    const updatedFoods = [duplicated, ...todaysFoods]
-    setTodaysFoods(updatedFoods)
-    if (!isViewingToday) {
-      setHistoryFoods((prev: any[] | null) => {
-        const base = Array.isArray(prev) ? prev : []
-        return [{ ...duplicated }, ...base]
-      })
+    const normalizedHistory = Array.isArray(historyFoods) ? historyFoods : []
+    const isTargetDateToday = targetDate === todayIso
+    const isTargetDateSelected = targetDate === selectedDate
+    const shouldUpdateTodays = isTargetDateToday || (isTargetDateSelected && isViewingToday)
+    let updatedTodaysFoods = todaysFoods
+    if (shouldUpdateTodays) {
+      updatedTodaysFoods = [copiedEntry, ...todaysFoods]
+      setTodaysFoods(updatedTodaysFoods)
     }
+    let updatedHistoryFoods = normalizedHistory
+    if (isTargetDateSelected && !isViewingToday) {
+      updatedHistoryFoods = [copiedEntry, ...normalizedHistory]
+      setHistoryFoods(updatedHistoryFoods)
+    }
+    const foodsForSave =
+      isTargetDateSelected ? (isViewingToday ? updatedTodaysFoods : updatedHistoryFoods) : updatedTodaysFoods
     try {
-      await saveFoodEntries(updatedFoods)
+      await saveFoodEntries(foodsForSave)
       await refreshEntriesFromServer()
-      showQuickToast(`Duplicated to ${categoryLabel(category)}`)
+      setExpandedCategories((prev) => ({
+        ...prev,
+        [category]: true,
+      }))
+      const toastMessage =
+        mode === 'copyToToday'
+          ? `Copied to ${categoryLabel(category)} today`
+          : `Duplicated to ${categoryLabel(category)}`
+      showQuickToast(toastMessage)
     } finally {
-      setDuplicateModalEntry(null)
-    }
-  }
-
-  const copyEntryToToday = async (source: any) => {
-    if (!source) return
-    setSwipeMenuEntry(null)
-    setEntrySwipeOffsets({})
-    setShowEntryOptions(null)
-    const rawSourceCategory =
-      source.persistedCategory || source.category || source.meal || source.mealType || selectedAddCategory
-    const category = normalizeCategory(rawSourceCategory)
-    const clonedItems =
-      source.items && Array.isArray(source.items) && source.items.length > 0
-        ? JSON.parse(JSON.stringify(source.items))
-        : null
-    const copied = {
-      ...source,
-      id: Date.now(),
-      dbId: undefined,
-      localDate: selectedDate,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      meal: category,
-      category,
-      persistedCategory: category,
-      items: clonedItems,
-    }
-    setSelectedAddCategory(category as typeof MEAL_CATEGORY_ORDER[number])
-    const updatedFoods = [copied, ...todaysFoods]
-    setTodaysFoods(updatedFoods)
-    if (!isViewingToday) {
-      setHistoryFoods((prev: any[] | null) => {
-        const base = Array.isArray(prev) ? prev : []
-        return [{ ...copied }, ...base]
-      })
-    }
-    try {
-      await saveFoodEntries(updatedFoods)
-      await refreshEntriesFromServer()
-      showQuickToast(`Copied to ${categoryLabel(category)} today`)
-    } catch (err) {
-      console.warn('Copy to today failed', err)
+      setDuplicateModalContext(null)
     }
   }
 
@@ -6533,8 +6514,24 @@ Please add nutritional information manually if needed.`);
                       const entryCalories = Number.isFinite(Number(entryTotals?.calories)) ? Math.round(Number(entryTotals?.calories)) : null
                       const actions = [
                         { label: 'Add to Favorites', onClick: () => handleAddToFavorites(food) },
-                        { label: 'Duplicate Meal', onClick: () => setDuplicateModalEntry(food) },
-                        { label: 'Copy to Today', onClick: () => copyEntryToToday(food) },
+                        {
+                          label: 'Duplicate Meal',
+                          onClick: () =>
+                            setDuplicateModalContext({
+                              entry: food,
+                              targetDate: selectedDate,
+                              mode: 'duplicate',
+                            }),
+                        },
+                        {
+                          label: 'Copy to Today',
+                          onClick: () =>
+                            setDuplicateModalContext({
+                              entry: food,
+                              targetDate: todayIso,
+                              mode: 'copyToToday',
+                            }),
+                        },
                         { label: 'Edit Entry', onClick: () => editFood(food) },
                         {
                           label: 'Delete',
@@ -7188,10 +7185,10 @@ Please add nutritional information manually if needed.`);
         </div>
       )}
 
-      {duplicateModalEntry && (
+      {duplicateModalContext && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
-          onClick={() => setDuplicateModalEntry(null)}
+          onClick={() => setDuplicateModalContext(null)}
         >
           <div
             className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-gray-200 p-5"
@@ -7199,14 +7196,18 @@ Please add nutritional information manually if needed.`);
           >
             <div className="flex items-start justify-between mb-4">
               <div>
-                <div className="text-lg font-semibold text-gray-900">Duplicate Meal</div>
+                <div className="text-lg font-semibold text-gray-900">
+                  {duplicateModalContext.mode === 'copyToToday' ? 'Copy to Today' : 'Duplicate Meal'}
+                </div>
                 <p className="text-sm text-gray-600 mt-1">
-                  Which category would you like to place your duplicated meal?
+                  {duplicateModalContext.mode === 'copyToToday'
+                    ? 'Choose the category to add this copy to today.'
+                    : 'Which category would you like to place your duplicated meal?'}
                 </p>
               </div>
               <button
                 type="button"
-                onClick={() => setDuplicateModalEntry(null)}
+                onClick={() => setDuplicateModalContext(null)}
                 className="text-gray-400 hover:text-gray-600"
               >
                 <span aria-hidden>✕</span>
