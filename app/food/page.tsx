@@ -32,7 +32,6 @@ import { STARTER_FOODS } from '@/data/foods-starter'
 import { COMMON_USDA_FOODS } from '@/data/usda-common'
 import { calculateDailyTargets } from '@/lib/daily-targets'
 import { SolidMacroRing } from '@/components/SolidMacroRing'
-import foodIcon from '@/../public/mobile-assets/MOBILE ICONS/FOOD ICON.png'
 
 const NUTRIENT_DISPLAY_ORDER: Array<'calories' | 'protein' | 'carbs' | 'fat' | 'fiber' | 'sugar'> = ['calories', 'protein', 'carbs', 'fat', 'fiber', 'sugar']
 
@@ -6861,7 +6860,7 @@ Please add nutritional information manually if needed.`);
                                 {isMobile && (
                                   <div className="flex-shrink-0 w-10 h-10 flex items-center justify-center">
                                     <Image
-                                      src={foodIcon}
+                                      src="/mobile-assets/MOBILE%20ICONS/FOOD%20ICON.png"
                                       alt="Food item"
                                       width={32}
                                       height={32}
