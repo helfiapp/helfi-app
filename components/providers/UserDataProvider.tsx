@@ -25,7 +25,7 @@ interface UserDataContextType {
 const UserDataContext = createContext<UserDataContextType | undefined>(undefined)
 
 export function UserDataProvider({ children }: { children: React.ReactNode }) {
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
   const [userData, setUserData] = useState<UserData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
@@ -82,13 +82,14 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
 
   // Load data on mount and session change
   useEffect(() => {
+    if (status === 'loading') return
     if (session) {
       loadData()
     } else {
       setUserData(null)
       setIsLoading(false)
     }
-  }, [session])
+  }, [session, status])
 
   const value: UserDataContextType = {
     userData,

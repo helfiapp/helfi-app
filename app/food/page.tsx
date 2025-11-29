@@ -107,6 +107,35 @@ const buildMealSummaryFromItems = (items: any[] | null | undefined) => {
   return summaryParts.join(', ')
 }
 
+const buildTodayIso = () => {
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+type WarmDiaryState = {
+  selectedDate?: string
+  todaysFoods?: any[]
+  historyByDate?: Record<string, any[]>
+  expandedCategories?: Record<string, boolean>
+}
+
+const readWarmDiaryState = (): WarmDiaryState | null => {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = sessionStorage.getItem('foodDiary:warmState')
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object') return null
+    return parsed as WarmDiaryState
+  } catch (err) {
+    console.warn('Unable to read warm diary cache', err)
+    return null
+  }
+}
+
   const normalizeFoodName = (name: string | null | undefined) =>
     String(name || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
 
@@ -950,8 +979,37 @@ export default function FoodDiary() {
   const { data: session } = useSession()
   const pathname = usePathname()
   const { userData, profileImage, updateUserData } = useUserData()
+  const warmDiaryState = useMemo(() => readWarmDiaryState(), [])
+  const initialSelectedDate =
+    warmDiaryState?.selectedDate && warmDiaryState.selectedDate.length >= 8
+      ? warmDiaryState.selectedDate
+      : buildTodayIso()
+  const entryMatchesDate = (entry: any, targetDate: string) => {
+    if (!entry) return false
+    if (typeof entry?.localDate === 'string' && entry.localDate.length >= 8) {
+      return entry.localDate === targetDate
+    }
+    const ts =
+      typeof entry?.id === 'number'
+        ? entry.id
+        : entry?.createdAt
+        ? new Date(entry.createdAt).getTime()
+        : Number(entry?.id)
+    if (!Number.isFinite(ts)) return false
+    const d = new Date(ts)
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${y}-${m}-${day}` === targetDate
+  }
+  const filterEntriesForDate = (entries: any[] | null | undefined, targetDate: string) =>
+    Array.isArray(entries) ? entries.filter((entry) => entryMatchesDate(entry, targetDate)) : []
   const [dropdownOpen, setDropdownOpen] = useState(false)
-  const [todaysFoods, setTodaysFoods] = useState<any[]>([])
+  const [todaysFoods, setTodaysFoods] = useState<any[]>(() => {
+    const warm = Array.isArray(warmDiaryState?.todaysFoods) ? warmDiaryState.todaysFoods : null
+    if (warm) return warm
+    return filterEntriesForDate((userData as any)?.todaysFoods, initialSelectedDate)
+  })
   const [newFoodText, setNewFoodText] = useState('')
   const [showAddFood, setShowAddFood] = useState(false)
   const [showPhotoOptions, setShowPhotoOptions] = useState(false)
@@ -1007,12 +1065,18 @@ export default function FoodDiary() {
       console.warn('Could not persist pending queue', e)
     }
   }, [pendingQueue])
-  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({
-    uncategorized: false,
-    breakfast: false,
-    lunch: false,
-    dinner: false,
-    snacks: false,
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>(() => {
+    const base = {
+      uncategorized: false,
+      breakfast: false,
+      lunch: false,
+      dinner: false,
+      snacks: false,
+    }
+    if (warmDiaryState?.expandedCategories && typeof warmDiaryState.expandedCategories === 'object') {
+      return { ...base, ...warmDiaryState.expandedCategories }
+    }
+    return base
   })
   const MEAL_CATEGORY_ORDER: Array<'breakfast' | 'lunch' | 'dinner' | 'snacks' | 'uncategorized'> = [
     'breakfast',
@@ -1054,7 +1118,10 @@ export default function FoodDiary() {
   const usdaCacheRef = useRef<Map<string, any>>(new Map())
   
   // New loading state
-  const [foodDiaryLoaded, setFoodDiaryLoaded] = useState(false)
+  const [foodDiaryLoaded, setFoodDiaryLoaded] = useState(() => {
+    if (warmDiaryState) return true
+    return Array.isArray((userData as any)?.todaysFoods)
+  })
   const [expandedItemIndex, setExpandedItemIndex] = useState<number | null>(null)
  
   const descriptionTextareaRef = useRef<HTMLTextAreaElement | null>(null)
@@ -1083,14 +1150,11 @@ export default function FoodDiary() {
   const [insightsNotification, setInsightsNotification] = useState<{show: boolean, message: string, type: 'updating' | 'updated'} | null>(null)
   const [fullSizeImage, setFullSizeImage] = useState<string | null>(null)
   const [showSavedToast, setShowSavedToast] = useState<boolean>(false)
-  const [selectedDate, setSelectedDate] = useState<string>(() => {
-    const d = new Date();
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
+  const [selectedDate, setSelectedDate] = useState<string>(() => initialSelectedDate)
+  const [historyFoods, setHistoryFoods] = useState<any[] | null>(() => {
+    const warmHistory = warmDiaryState?.historyByDate?.[initialSelectedDate]
+    return Array.isArray(warmHistory) ? warmHistory : null
   })
-  const [historyFoods, setHistoryFoods] = useState<any[] | null>(null)
   const [isLoadingHistory, setIsLoadingHistory] = useState<boolean>(false)
   const [showCreditsModal, setShowCreditsModal] = useState<boolean>(false)
   const [creditInfo, setCreditInfo] = useState<any>({
@@ -1728,13 +1792,7 @@ const applyStructuredItems = (
   const userImage = (profileImage || session?.user?.image || '') as string
   const userName = session?.user?.name || 'User';
 
-  const todayIso = (() => {
-    const d = new Date();
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
-  })();
+  const todayIso = buildTodayIso();
 
   // Today's date
   const today = new Date().toLocaleDateString('en-US', { 
@@ -1847,6 +1905,24 @@ const applyStructuredItems = (
       return changed ? next : prev
     })
   }, [todaysFoods, historyFoods, isViewingToday])
+
+  // Persist a warm snapshot so returning to the diary avoids a cold reload spinner
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const payload: WarmDiaryState = {
+        selectedDate,
+        todaysFoods,
+        expandedCategories,
+      }
+      if (Array.isArray(historyFoods)) {
+        payload.historyByDate = { [selectedDate]: historyFoods }
+      }
+      sessionStorage.setItem('foodDiary:warmState', JSON.stringify(payload))
+    } catch (err) {
+      console.warn('Could not cache warm diary state', err)
+    }
+  }, [selectedDate, todaysFoods, historyFoods, expandedCategories])
 
 
 
@@ -2310,7 +2386,8 @@ const applyStructuredItems = (
       try {
         console.log(`🔍 Loading history for date: ${selectedDate}, isViewingToday: ${isViewingToday}`);
         setIsLoadingHistory(true);
-        setFoodDiaryLoaded(false); // Reset loading state when switching dates
+        const hasCachedHistory = Array.isArray(historyFoods) && historyFoods.length > 0
+        setFoodDiaryLoaded(hasCachedHistory); // Show cached state instantly when available
         const tz = new Date().getTimezoneOffset();
         const apiUrl = `/api/food-log?date=${selectedDate}&tz=${tz}`;
         console.log(`📡 Fetching from API: ${apiUrl}`);
@@ -3691,6 +3768,7 @@ Please add nutritional information manually if needed.`);
     }))
     showQuickToast(toastMessage)
     setDuplicateModalContext(null)
+    triggerHaptic(10)
 
     saveFoodEntries(foodsForSave)
       .then(() => refreshEntriesFromServer())
@@ -3897,59 +3975,12 @@ Please add nutritional information manually if needed.`);
 
   const deleteFood = async (entry: any) => {
     if (!entry) return
-    // Find the entry being deleted to check if it has a database ID
     const dbId = (entry as any)?.dbId
     const entryCategory = normalizeCategory(entry?.meal || entry?.category || entry?.mealType)
     const entryId = entry.id;
     const entryKey = entryId !== null && entryId !== undefined ? entryId.toString() : ''
-    const entryToDelete =
-      todaysFoods.find((food) => food.id === entryId) ||
-      (dbId ? todaysFoods.find((food: any) => (food as any).dbId === dbId) : null)
-    
-    // If entry has a database ID, delete it from the database first
-    if (dbId) {
-      try {
-        await fetch('/api/food-log/delete', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: dbId }),
-        }).then(async (r) => {
-          if (!r.ok) {
-            throw new Error('delete_failed')
-          }
-        });
-      } catch (error) {
-        console.error('Failed to delete entry from database:', error);
-        // Continue with local deletion even if DB delete fails
-      }
-    } else {
-      // Fallback: try to find a matching server entry by description/category and delete it
-      try {
-        const tz = new Date().getTimezoneOffset();
-        const res = await fetch(`/api/food-log?date=${entry.localDate || selectedDate}&tz=${tz}`);
-        if (res.ok) {
-          const json = await res.json();
-          const logs = Array.isArray(json.logs) ? json.logs : [];
-          const match = logs.find((l: any) => {
-            const cat = normalizeCategory(l?.meal || l?.category || l?.mealType)
-            const descMatch =
-              normalizedDescription(l?.description || l?.name) === normalizedDescription(entry?.description)
-            return cat === entryCategory && descMatch
-          })
-          if (match?.id) {
-            await fetch('/api/food-log/delete', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ id: match.id }),
-            }).catch(() => {})
-          }
-        }
-      } catch (err) {
-        console.warn('Best-effort server delete fallback failed', err)
-      }
-    }
-    
-    // Remove from local state and update cache (by both id and dbId to be safe)
+
+    // Remove from local state instantly and keep the delete cached so DB refreshes don't re-add it
     const updatedFoods = todaysFoods.filter((food: any) => {
       const sameId = food.id === entryId;
       const sameDb = dbId && (food as any).dbId === dbId;
@@ -3981,6 +4012,57 @@ Please add nutritional information manually if needed.`);
       setExpandedCategories((prev) => ({ ...prev, [entryCategory]: false }))
     }
     setShowEntryOptions(null);
+
+    // Persist in background so UI stays instant
+    ;(async () => {
+      try {
+        if (dbId) {
+          await fetch('/api/food-log/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: dbId }),
+          }).then(async (r) => {
+            if (!r.ok) {
+              throw new Error('delete_failed')
+            }
+          });
+        } else {
+          // Fallback: try to find a matching server entry by description/category and delete it
+          try {
+            const tz = new Date().getTimezoneOffset();
+            const res = await fetch(`/api/food-log?date=${entry.localDate || selectedDate}&tz=${tz}`);
+            if (res.ok) {
+              const json = await res.json();
+              const logs = Array.isArray(json.logs) ? json.logs : [];
+              const match = logs.find((l: any) => {
+                const cat = normalizeCategory(l?.meal || l?.category || l?.mealType)
+                const descMatch =
+                  normalizedDescription(l?.description || l?.name) === normalizedDescription(entry?.description)
+                return cat === entryCategory && descMatch
+              })
+              if (match?.id) {
+                await fetch('/api/food-log/delete', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ id: match.id }),
+                }).catch(() => {})
+              }
+            }
+          } catch (err) {
+            console.warn('Best-effort server delete fallback failed', err)
+          }
+        }
+      } catch (error) {
+        console.error('Failed to delete entry from database:', error);
+      } finally {
+        try {
+          await saveFoodEntries(updatedFoods, { appendHistory: false, suppressToast: true });
+          await refreshEntriesFromServer();
+        } catch (err) {
+          console.warn('Delete sync failed', err)
+        }
+      }
+    })()
   };
 
   const deleteHistoryFood = async (dbId: string) => {
