@@ -6569,6 +6569,7 @@ Please add nutritional information manually if needed.`);
                         },
                       ]
 
+                      const actionIcons: Record<string, JSX.Element> = {
                         'Add to Favorites': (
                           <svg className="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v12m6-6H6" />
