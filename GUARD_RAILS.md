@@ -517,6 +517,23 @@ may an agent change any of the protected files in this section.
 
 ---
 
+## 9. Mobile Food Diary “Instant Actions” (delete / duplicate / copy to today)
+
+These mobile interactions are considered tuned and must stay instant and single-action:
+
+- **Files:** `app/food/page.tsx` (action handlers, swipe menu, duplicate/copy logic)
+- **Behaviour that must not regress:**
+  - Delete (swipe + menu) removes the row immediately and only syncs in the background; no spinner or blocking wait.
+  - Duplicate and “Copy to Today” add exactly **one** entry, instantly visible, with no double renders even when localDate is missing; dedupe must normalize date from timestamp.
+  - Add to Favorites stays instant and non-blocking.
+- **Do not:**
+  - Introduce delays/spinners before the UI updates.
+  - Change dedupe keys in a way that allows duplicate copies (same description/time/date) to appear.
+  - Move persistence to the foreground or block the UI on API latency.
+- If you need to change this flow, explain to the user why, confirm approval, and re-test: delete via swipe/menu, duplicate, and copy-to-today across different dates to ensure only one entry appears and the UI updates instantly.
+
+---
+
 ## 6. Medical Image Analyzer & Chat (Locked)
 
 The Medical Image Analyzer has now been stabilised and tuned end‑to‑end:
