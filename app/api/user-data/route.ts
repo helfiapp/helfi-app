@@ -132,7 +132,23 @@ export async function GET(request: NextRequest) {
     }
 
     // Get today's food entries
-    let todaysFoods = [];
+    const normalizeCategory = (raw: any) => {
+      const value = typeof raw === 'string' ? raw.toLowerCase() : ''
+      if (/breakfast/.test(value)) return 'breakfast'
+      if (/lunch/.test(value)) return 'lunch'
+      if (/dinner/.test(value)) return 'dinner'
+      if (/snack/.test(value)) return 'snacks'
+      if (/other/.test(value) || /uncat/.test(value)) return 'uncategorized'
+      return value && value.trim().length > 0 ? value.trim() : 'uncategorized'
+    }
+    const buildTodayIso = () => {
+      const d = new Date()
+      const y = d.getFullYear()
+      const m = String(d.getMonth() + 1).padStart(2, '0')
+      const day = String(d.getDate()).padStart(2, '0')
+      return `${y}-${m}-${day}`
+    }
+    let todaysFoods: any[] = [];
     try {
       const storedFoods = user.healthGoals.find((goal: any) => goal.name === '__TODAYS_FOODS_DATA__');
       if (storedFoods && storedFoods.category) {
@@ -142,6 +158,34 @@ export async function GET(request: NextRequest) {
     } catch (e) {
       console.log('No todays foods data found in storage');
     }
+    const normalizedTodaysFoods = Array.isArray(todaysFoods)
+      ? todaysFoods.map((entry: any) => {
+          const category = normalizeCategory(entry?.meal ?? entry?.category ?? entry?.mealType ?? entry?.persistedCategory)
+          const localDate =
+            typeof entry?.localDate === 'string' && entry.localDate.length >= 8
+              ? entry.localDate
+              : (() => {
+                  try {
+                    const ts = typeof entry?.id === 'number' ? entry.id : Number(entry?.id)
+                    if (Number.isFinite(ts)) {
+                      const d = new Date(ts)
+                      const y = d.getFullYear()
+                      const m = String(d.getMonth() + 1).padStart(2, '0')
+                      const day = String(d.getDate()).padStart(2, '0')
+                      return `${y}-${m}-${day}`
+                    }
+                  } catch {}
+                  return buildTodayIso()
+                })()
+          return {
+            ...entry,
+            meal: category,
+            category,
+            persistedCategory: entry?.persistedCategory ?? category,
+            localDate,
+          }
+        })
+      : []
 
     // Get saved favorites
     let favorites: any[] = [];
@@ -263,7 +307,7 @@ export async function GET(request: NextRequest) {
         imageUrl: med.imageUrl || null
       })),
       profileImage: user.image || null,
-      todaysFoods: todaysFoods,
+      todaysFoods: normalizedTodaysFoods,
       favorites,
       profileInfo: profileInfoData,
       deviceInterest: deviceInterestData,
