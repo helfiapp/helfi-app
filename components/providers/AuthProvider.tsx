@@ -10,7 +10,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // instead of refetching on every focus change.
       refetchOnWindowFocus={false}
       refetchWhenOffline={false}
-      clientMaxAge={60 * 60} // 1 hour cache window before we re-check the session
       refetchInterval={15 * 60} // Light heartbeat to keep tokens fresh without spamming
     >
       {children}
