@@ -4,6 +4,7 @@ import { getToken } from 'next-auth/jwt'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { triggerBackgroundRegeneration } from '@/lib/insights/regeneration-service'
+import { Prisma } from '@prisma/client'
 
 const normalizeMealCategory = (raw: any): string | null => {
   const value = typeof raw === 'string' ? raw.toLowerCase() : ''
@@ -428,7 +429,7 @@ export async function POST(request: NextRequest) {
         description: description || null,
         imageUrl: imageUrl || null,
         nutrients: nutrition || null,
-        items: items || null,
+        items: Array.isArray(items) && items.length > 0 ? items : Prisma.JsonNull,
         localDate: normalizedLocalDate,
         meal: normalizedMeal,
         category: storedCategory,
@@ -569,7 +570,7 @@ export async function PUT(request: NextRequest) {
         description: description || null,
         imageUrl: imageUrl || null,
         nutrients: nutrition || null,
-        items: Array.isArray(items) && items.length > 0 ? items : null,
+        items: Array.isArray(items) && items.length > 0 ? items : Prisma.JsonNull,
         localDate: normalizedLocalDate,
         meal: normalizedMeal,
         category: storedCategory,
