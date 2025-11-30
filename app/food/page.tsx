@@ -1189,6 +1189,9 @@ export default function FoodDiary() {
   const swipeClickBlockRef = useRef<Record<string, boolean>>({})
   const favoriteSwipeMetaRef = useRef<Record<string, { startX: number; startY: number; swiping: boolean; hasMoved: boolean }>>({})
   const favoriteClickBlockRef = useRef<Record<string, boolean>>({})
+  const [favoritesActiveTab, setFavoritesActiveTab] = useState<'all' | 'favorites' | 'custom'>('all')
+  const [favoritesSearch, setFavoritesSearch] = useState('')
+  const [favoritesSort, setFavoritesSort] = useState<'recent' | 'alpha'>('recent')
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false)
   const [barcodeError, setBarcodeError] = useState<string | null>(null)
   const [barcodeValue, setBarcodeValue] = useState('')
@@ -3724,6 +3727,76 @@ Please add nutritional information manually if needed.`);
     setTimeout(() => setQuickToast(null), 1400)
   }
 
+  const normalizeMealLabel = (raw: any) =>
+    sanitizeMealDescription(
+      extractBaseMealDescription((raw || '').toString().split('Calories:')[0]) || (raw || '').toString(),
+    )
+
+  const buildSourceTag = (entry: any) => {
+    if (entry?.sourceTag) return entry.sourceTag
+    if ((entry as any)?.source) {
+      const src = (entry as any).source.toString().toUpperCase()
+      if (['CRDB', 'NCCDB', 'CUSTOM FOOD', 'CUSTOM'].includes(src)) return src
+      return src
+    }
+    if ((entry as any)?.method === 'photo') return 'CRDB'
+    if ((entry as any)?.method === 'text') return 'Custom Food'
+    return 'CRDB'
+  }
+
+  const collectHistoryMeals = () => {
+    const pool: any[] = []
+    if (Array.isArray(todaysFoods)) pool.push(...todaysFoods)
+    if (Array.isArray(historyFoods)) pool.push(...historyFoods)
+    if (persistentDiarySnapshot?.byDate) {
+      Object.values(persistentDiarySnapshot.byDate).forEach((snap: any) => {
+        if (Array.isArray((snap as any)?.entries)) {
+          pool.push(...(snap as any).entries)
+        }
+      })
+    }
+    return dedupeEntries(pool, { fallbackDate: selectedDate })
+  }
+
+  const buildFavoritesDatasets = () => {
+    const history = collectHistoryMeals()
+    const allByKey = new Map<string, any>()
+    history.forEach((entry) => {
+      const key = normalizeMealLabel(entry?.description || entry?.label || '').toLowerCase()
+      if (!key) return
+      const existing = allByKey.get(key)
+      const created = Number(entry?.createdAt ? new Date(entry.createdAt).getTime() : entry?.id || 0)
+      const existingCreated = Number(existing?.createdAt ? new Date(existing.createdAt).getTime() : existing?.id || 0)
+      if (!existing || created > existingCreated) {
+        allByKey.set(key, entry)
+      }
+    })
+
+    const allMeals = Array.from(allByKey.values()).map((entry) => ({
+      id: entry?.id || `all-${Math.random()}`,
+      label: normalizeMealLabel(entry?.description || entry?.label || 'Meal'),
+      entry,
+      createdAt: entry?.createdAt || entry?.id || Date.now(),
+      sourceTag: buildSourceTag(entry),
+      calories: sanitizeNutritionTotals(entry?.total || entry?.nutrition || null)?.calories ?? null,
+      serving: entry?.items?.[0]?.serving_size || entry?.serving || entry?.items?.[0]?.servings || '',
+    }))
+
+    const favoriteMeals = (favorites || []).map((fav: any) => ({
+      id: fav?.id || `fav-${Math.random()}`,
+      label: normalizeMealLabel(fav?.description || fav?.label || 'Favorite meal'),
+      favorite: fav,
+      createdAt: fav?.createdAt || fav?.id || Date.now(),
+      sourceTag: 'Favorite',
+      calories: sanitizeNutritionTotals(fav?.total || fav?.nutrition || null)?.calories ?? null,
+      serving: fav?.items?.[0]?.serving_size || fav?.serving || '',
+    }))
+
+    const customMeals = favoriteMeals.filter((f) => !f.favorite?.sourceId && !f.favorite?.photo)
+
+    return { allMeals, favoriteMeals, customMeals }
+  }
+
   const stopBarcodeScanner = () => {
     if (barcodeScannerRef.current) {
       try {
@@ -3870,18 +3943,25 @@ Please add nutritional information manually if needed.`);
         setBarcodeStatus('idle')
         return
       }
-      const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import('html5-qrcode')
+      const { Html5Qrcode } = await import('html5-qrcode')
+      const cameras = await Html5Qrcode.getCameras().catch(() => [])
+      const preferredCamera = Array.isArray(cameras) && cameras.length > 0 ? cameras[0].id : undefined
       const scanner = new Html5Qrcode(BARCODE_REGION_ID)
       barcodeScannerRef.current = scanner
-      await scanner.start(
-        { facingMode: 'environment' },
-        {
-          fps: 10,
-          qrbox: { width: 250, height: 250 },
-        },
-        (decodedText: string) => handleBarcodeDetected(decodedText),
-        () => {},
-      )
+      const config: any = {
+        fps: 10,
+        qrbox: { width: 250, height: 250 },
+      }
+      if (preferredCamera) {
+        await scanner.start(preferredCamera, config, (decodedText: string) => handleBarcodeDetected(decodedText), () => {})
+      } else {
+        await scanner.start(
+          { facingMode: 'environment' },
+          config,
+          (decodedText: string) => handleBarcodeDetected(decodedText),
+          () => {},
+        )
+      }
       setBarcodeStatus('scanning')
     } catch (err) {
       console.error('Barcode scanner start error', err)
@@ -3930,6 +4010,58 @@ Please add nutritional information manually if needed.`);
       }).catch(() => {})
     } catch (error) {
       console.error('Failed to persist favorites', error)
+    }
+  }
+
+  const insertMealIntoDiary = async (source: any, targetCategory?: typeof MEAL_CATEGORY_ORDER[number]) => {
+    if (!source) return
+    const category = normalizeCategory(targetCategory || selectedAddCategory)
+    const nowIso = new Date().toISOString()
+    const description = normalizeMealLabel(
+      source?.description || source?.label || source?.favorite?.label || 'Meal',
+    )
+    const totals =
+      sanitizeNutritionTotals(source?.nutrition || source?.total || source?.entry?.total || source?.entry?.nutrition) ||
+      null
+    const items =
+      source?.items ||
+      source?.entry?.items ||
+      (Array.isArray(source?.favorite?.items) ? JSON.parse(JSON.stringify(source.favorite.items)) : null)
+    const newEntry = {
+      id: Date.now(),
+      localDate: selectedDate,
+      description,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      method: source?.method || 'text',
+      photo: source?.photo || source?.entry?.photo || null,
+      nutrition: totals,
+      total: totals,
+      items,
+      meal: category,
+      category,
+      persistedCategory: category,
+      createdAt: nowIso,
+    }
+    const updated = dedupeEntries([newEntry, ...todaysFoods], { fallbackDate: selectedDate })
+    setTodaysFoods(updated)
+    if (!isViewingToday) {
+      setHistoryFoods((prev: any[] | null) => {
+        const base = Array.isArray(prev) ? prev : []
+        return dedupeEntries([newEntry, ...base], { fallbackDate: selectedDate })
+      })
+    }
+    setExpandedCategories((prev) => ({ ...prev, [category]: true }))
+    try {
+      await saveFoodEntries(updated)
+      await refreshEntriesFromServer()
+      showQuickToast(`Added to ${categoryLabel(category)}`)
+    } catch (err) {
+      console.warn('Meal insert sync failed', err)
+    } finally {
+      setPhotoOptionsAnchor(null)
+      setShowAddFood(false)
+      setShowPhotoOptions(false)
+      setShowFavoritesPicker(false)
     }
   }
 
@@ -7612,8 +7744,8 @@ Please add nutritional information manually if needed.`);
         <div className="fixed inset-0 z-50 bg-white flex flex-col">
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
             <div>
-              <div className="text-lg font-semibold text-gray-900">Favorites</div>
-              <div className="text-sm text-gray-600">Add to {categoryLabel(selectedAddCategory)}</div>
+              <div className="text-lg font-semibold text-gray-900">Add from favorites</div>
+              <div className="text-sm text-gray-600">Insert into {categoryLabel(selectedAddCategory)}</div>
             </div>
             <button
               type="button"
@@ -7623,110 +7755,144 @@ Please add nutritional information manually if needed.`);
               <span aria-hidden>✕</span>
             </button>
           </div>
-          {favorites.length === 0 ? (
-            <div className="flex-1 flex items-center justify-center px-6 text-sm text-gray-600">
-              Save a meal using “Add to Favorites” to see it here.
-            </div>
-          ) : (
-            <div className="flex-1 overflow-y-auto bg-gray-50 pb-6">
-      <div className="space-y-3 pt-3">
-        {favorites.map((fav: any) => {
-          const favId = fav?.id || String(fav?.label || 'favorite')
-          const calories = Math.round(fav?.nutrition?.calories || fav?.total?.calories || 0) || null
-          const swipeOffset = favoriteSwipeOffsets[favId] || 0
-          const handleFavTouchStart = (e: React.TouchEvent) => {
-                    if (e.touches.length === 0) return
-                    const touch = e.touches[0]
-                    favoriteSwipeMetaRef.current[favId] = {
-                      startX: touch.clientX,
-                      startY: touch.clientY,
-                      swiping: false,
-                      hasMoved: false,
-                    }
-                    favoriteClickBlockRef.current[favId] = false
-                  }
-                  const handleFavTouchMove = (e: React.TouchEvent) => {
-                    if (e.touches.length === 0) return
-                    const meta = favoriteSwipeMetaRef.current[favId]
-                    if (!meta) return
-                    const touch = e.touches[0]
-                    const dx = touch.clientX - meta.startX
-                    const dy = touch.clientY - meta.startY
-                    if (!meta.swiping) {
-                      if (Math.abs(dx) < 6 || Math.abs(dx) < Math.abs(dy)) return
-                      meta.swiping = true
-                    }
-                    meta.hasMoved = true
-                    const clamped = Math.min(0, Math.max(-SWIPE_DELETE_WIDTH, dx))
-                    setFavoriteSwipeOffsets((prev) => ({ ...prev, [favId]: clamped }))
-                  }
-                  const handleFavTouchEnd = () => {
-                    const meta = favoriteSwipeMetaRef.current[favId]
-                    const offset = favoriteSwipeOffsets[favId] || 0
-                    delete favoriteSwipeMetaRef.current[favId]
-                    if (offset < -70) {
-                      setFavoriteSwipeOffsets((prev) => ({ ...prev, [favId]: -SWIPE_DELETE_WIDTH }))
-                      return
-                    }
-                    setFavoriteSwipeOffsets((prev) => ({ ...prev, [favId]: 0 }))
-                    }
 
-                  return (
-            <div key={favId} className="relative w-full overflow-visible">
-              <div className="absolute inset-0 flex items-stretch pointer-events-none">
-                <div className="flex-1 bg-red-500" />
-                <div className="flex items-center">
+          <div className="px-4 pt-3 space-y-3">
+            <div className="flex items-center gap-2">
+              <div className="flex-1 relative">
+                <input
+                  value={favoritesSearch}
+                  onChange={(e) => setFavoritesSearch(e.target.value)}
+                  placeholder="Search all foods..."
+                  className="w-full pl-10 pr-20 py-3 rounded-2xl border border-gray-200 bg-gray-50 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                />
+                <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M10 18a8 8 0 100-16 8 8 0 000 16z" />
+                </svg>
+                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                  {favoritesSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setFavoritesSearch('')}
+                      className="p-2 rounded-full hover:bg-gray-200 text-gray-500"
+                    >
+                      ✕
+                    </button>
+                  )}
                   <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault()
-                              e.stopPropagation()
-                              handleDeleteFavorite(favId)
-                            }}
-                            className="pointer-events-auto h-full min-w-[88px] px-3 bg-red-500 text-white flex items-center justify-center"
-                            aria-label="Delete favorite"
-                          >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
-                        </div>
-                      </div>
-              <div
-                className="relative bg-white border border-gray-200 rounded-none sm:rounded-xl shadow-sm transition-transform duration-150 ease-out z-10 w-full"
-                style={{ transform: `translateX(${swipeOffset}px)`, touchAction: 'pan-y' }}
-                onTouchStart={handleFavTouchStart}
-                onTouchMove={handleFavTouchMove}
-                onTouchEnd={handleFavTouchEnd}
-                onTouchCancel={handleFavTouchEnd}
-                onClick={() => {
-                  setFavoriteSwipeOffsets((prev) => ({ ...prev, [favId]: 0 }))
-                  insertFavoriteIntoDiary(fav, selectedAddCategory)
-                }}
+                    type="button"
+                    onClick={() => {
+                      setShowFavoritesPicker(false)
+                      setShowBarcodeScanner(true)
+                      setBarcodeError(null)
+                      setBarcodeValue('')
+                    }}
+                    className="p-2 rounded-full hover:bg-gray-200 text-gray-600"
+                    aria-label="Open barcode scanner"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4h4v2H6v2H4V4zm12 0h4v4h-2V6h-2V4zm0 16h2v-2h2v4h-4v-2zM4 16h2v2h2v2H4v-4z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 9h6v6H9z" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setFavoritesSort((prev) => (prev === 'recent' ? 'alpha' : 'recent'))}
+                className="px-3 py-2 text-sm rounded-full border border-gray-200 bg-white hover:bg-gray-50"
               >
-                <div className="p-4 hover:bg-gray-50 transition-colors">
-                  <div className="flex items-center gap-3">
-                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v12m6-6H6" />
-                      </svg>
-                    </div>
-                    <p className="flex-1 text-sm sm:text-base text-gray-900 truncate">
-                      {sanitizeMealDescription((fav?.description || fav?.label || '').split('\n')[0].split('Calories:')[0]) || 'Favorite meal'}
-                    </p>
-                    <div className="flex flex-col items-end gap-1 flex-shrink-0 text-xs sm:text-sm text-gray-600">
-                      {calories !== null && <span className="font-semibold text-gray-900">{calories} kcal</span>}
-                              <span className="text-gray-500">{categoryLabel(selectedAddCategory)}</span>
-                            </div>
+                {favoritesSort === 'recent' ? 'Most Recent' : 'A–Z'}
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {(['all', 'favorites', 'custom'] as const).map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setFavoritesActiveTab(tab)}
+                  className={`flex-1 py-2 rounded-full text-sm font-semibold ${
+                    favoritesActiveTab === tab ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'
+                  }`}
+                >
+                  {tab === 'all' ? 'All' : tab === 'favorites' ? 'Favorites' : 'Custom'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto mt-3 pb-6">
+            {(() => {
+              const { allMeals, favoriteMeals, customMeals } = buildFavoritesDatasets()
+              const search = favoritesSearch.trim().toLowerCase()
+              const filterBySearch = (item: any) => {
+                if (!search) return true
+                return (
+                  item?.label?.toLowerCase().includes(search) ||
+                  (item?.serving || '').toString().toLowerCase().includes(search) ||
+                  (item?.sourceTag || '').toString().toLowerCase().includes(search)
+                )
+              }
+              const sortList = (list: any[]) =>
+                [...list].sort((a, b) =>
+                  favoritesSort === 'recent'
+                    ? (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0)
+                    : (a.label || '').localeCompare(b.label || ''),
+                )
+              let data: any[] = []
+              if (favoritesActiveTab === 'all') data = sortList(allMeals.filter(filterBySearch))
+              if (favoritesActiveTab === 'favorites') data = sortList(favoriteMeals.filter(filterBySearch))
+              if (favoritesActiveTab === 'custom') data = sortList(customMeals.filter(filterBySearch))
+
+              if (data.length === 0) {
+                return (
+                  <div className="px-4 py-10 text-center text-sm text-gray-500">
+                    {favoritesActiveTab === 'all'
+                      ? 'No meals yet. Add some entries to see them here.'
+                      : favoritesActiveTab === 'favorites'
+                      ? 'Save a meal using “Add to Favorites” to see it here.'
+                      : 'Create custom meals and they will appear here.'}
+                  </div>
+                )
+              }
+
+              return (
+                <div className="space-y-2 px-4">
+                  {data.map((item) => {
+                    const calories = item?.calories
+                    const tag = item?.sourceTag || (favoritesActiveTab === 'favorites' ? 'Favorite' : 'Custom')
+                    const serving = item?.serving || '1 serving'
+                    const handleSelect = () => {
+                      if (item.favorite) {
+                        insertFavoriteIntoDiary(item.favorite, selectedAddCategory)
+                      } else if (item.entry) {
+                        insertMealIntoDiary(item.entry, selectedAddCategory)
+                      } else {
+                        insertMealIntoDiary(item, selectedAddCategory)
+                      }
+                    }
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={handleSelect}
+                        className="w-full text-left bg-white border border-gray-200 rounded-xl px-4 py-3 shadow-sm hover:border-gray-300 transition-colors"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="text-sm font-semibold text-gray-900 truncate">{item.label}</div>
+                            <div className="text-xs text-gray-600 truncate">{serving}</div>
+                          </div>
+                          <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                            {calories != null && <span className="text-sm font-semibold text-gray-900">{calories} kcal</span>}
+                            <span className="text-xs text-gray-500">{tag}</span>
                           </div>
                         </div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
+                      </button>
+                    )
+                  })}
+                </div>
+              )
+            })()}
+          </div>
         </div>
       )}
 
