@@ -1191,7 +1191,6 @@ export default function FoodDiary() {
   const favoriteClickBlockRef = useRef<Record<string, boolean>>({})
   const [favoritesActiveTab, setFavoritesActiveTab] = useState<'all' | 'favorites' | 'custom'>('all')
   const [favoritesSearch, setFavoritesSearch] = useState('')
-  const [favoritesSort, setFavoritesSort] = useState<'recent' | 'alpha'>('recent')
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false)
   const [barcodeError, setBarcodeError] = useState<string | null>(null)
   const [barcodeValue, setBarcodeValue] = useState('')
@@ -7773,7 +7772,8 @@ Please add nutritional information manually if needed.`);
                   value={favoritesSearch}
                   onChange={(e) => setFavoritesSearch(e.target.value)}
                   placeholder="Search all foods..."
-                  className="w-full pl-10 pr-20 py-3 rounded-2xl border border-gray-200 bg-gray-50 text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  className="w-full pl-10 pr-16 py-3 border border-gray-300 bg-white text-sm focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
+                  style={{ borderRadius: 0 }}
                 />
                 <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M10 18a8 8 0 100-16 8 8 0 000 16z" />
@@ -7783,7 +7783,7 @@ Please add nutritional information manually if needed.`);
                     <button
                       type="button"
                       onClick={() => setFavoritesSearch('')}
-                      className="p-2 rounded-full hover:bg-gray-200 text-gray-500"
+                      className="p-2 text-gray-500 hover:text-gray-700"
                     >
                       ✕
                     </button>
@@ -7796,7 +7796,7 @@ Please add nutritional information manually if needed.`);
                       setBarcodeError(null)
                       setBarcodeValue('')
                     }}
-                    className="p-2 rounded-full hover:bg-gray-200 text-gray-600"
+                    className="p-2 text-gray-700 hover:text-gray-900"
                     aria-label="Open barcode scanner"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -7806,13 +7806,6 @@ Please add nutritional information manually if needed.`);
                   </button>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setFavoritesSort((prev) => (prev === 'recent' ? 'alpha' : 'recent'))}
-                className="px-3 py-2 text-sm rounded-full border border-gray-200 bg-white hover:bg-gray-50"
-              >
-                {favoritesSort === 'recent' ? 'Most Recent' : 'A–Z'}
-              </button>
             </div>
 
             <div className="flex items-center gap-2">
@@ -7820,9 +7813,10 @@ Please add nutritional information manually if needed.`);
                 <button
                   key={tab}
                   onClick={() => setFavoritesActiveTab(tab)}
-                  className={`flex-1 py-2 rounded-full text-sm font-semibold ${
-                    favoritesActiveTab === tab ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'
+                  className={`flex-1 py-2 text-sm font-semibold border ${
+                    favoritesActiveTab === tab ? 'bg-gray-200 text-gray-900 border-gray-300' : 'bg-white text-gray-700 border-gray-300'
                   }`}
+                  style={{ borderRadius: 0 }}
                 >
                   {tab === 'all' ? 'All' : tab === 'favorites' ? 'Favorites' : 'Custom'}
                 </button>
@@ -7843,11 +7837,7 @@ Please add nutritional information manually if needed.`);
                 )
               }
               const sortList = (list: any[]) =>
-                [...list].sort((a, b) =>
-                  favoritesSort === 'recent'
-                    ? (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0)
-                    : (a.label || '').localeCompare(b.label || ''),
-                )
+                [...list].sort((a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0))
               let data: any[] = []
               if (favoritesActiveTab === 'all') data = sortList(allMeals.filter(filterBySearch))
               if (favoritesActiveTab === 'favorites') data = sortList(favoriteMeals.filter(filterBySearch))
@@ -7855,7 +7845,7 @@ Please add nutritional information manually if needed.`);
 
               if (data.length === 0) {
                 return (
-                  <div className="px-4 py-10 text-center text-sm text-gray-500">
+                  <div className="px-4 py-8 text-center text-sm text-gray-500 border-t border-b border-gray-200">
                     {favoritesActiveTab === 'all'
                       ? 'No meals yet. Add some entries to see them here.'
                       : favoritesActiveTab === 'favorites'
@@ -7866,7 +7856,7 @@ Please add nutritional information manually if needed.`);
               }
 
               return (
-                <div className="space-y-2 px-4">
+                <div className="px-0 divide-y divide-gray-200 border-t border-b border-gray-200">
                   {data.map((item) => {
                     const calories = item?.calories
                     const tag = item?.sourceTag || (favoritesActiveTab === 'favorites' ? 'Favorite' : 'Custom')
@@ -7884,7 +7874,8 @@ Please add nutritional information manually if needed.`);
                       <button
                         key={item.id}
                         onClick={handleSelect}
-                        className="w-full text-left bg-white border border-gray-200 rounded-xl px-4 py-3 shadow-sm hover:border-gray-300 transition-colors"
+                        className="w-full text-left bg-white px-4 py-3 hover:bg-gray-50"
+                        style={{ borderRadius: 0 }}
                       >
                         <div className="flex items-center justify-between gap-3">
                           <div className="min-w-0">
