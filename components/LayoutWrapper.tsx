@@ -3,7 +3,7 @@ import { Cog6ToothIcon } from '@heroicons/react/24/outline'
 
 import { usePathname, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { ReactNode, useEffect, useState, useCallback } from 'react'
+import { ReactNode, useEffect, useState } from 'react'
 import UsageMeter from '@/components/UsageMeter'
 
 // Desktop Sidebar Navigation Component  
@@ -170,7 +170,6 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   const router = useRouter()
   const { data: session, status } = useSession()
   const [showHealthSetupReminder, setShowHealthSetupReminder] = useState(false)
-  const [resumeAttempted, setResumeAttempted] = useState(false)
   
   // Pages that should ALWAYS be public (no sidebar regardless of auth status)
   const publicPages = ['/', '/healthapp', '/auth/signin', '/auth/verify', '/auth/check-email', '/onboarding', '/privacy', '/terms', '/help', '/faq']
@@ -295,71 +294,14 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
     )
   }
   
-  // Redirect unauthenticated users away from protected pages
-  const tryRememberedSessionRestore = useCallback(async () => {
-    if (typeof window === 'undefined') return false
-    try {
-      const REMEMBER_FLAG = 'helfi:rememberMe'
-      const REMEMBER_EMAIL = 'helfi:rememberEmail'
-      const REMEMBER_TOKEN = 'helfi:rememberToken'
-      const REMEMBER_TOKEN_EXP = 'helfi:rememberTokenExp'
-      const LAST_RELOAD = 'helfi:lastSessionReload'
-      const remembered = localStorage.getItem(REMEMBER_FLAG) === '1'
-      const email = (localStorage.getItem(REMEMBER_EMAIL) || '').trim().toLowerCase()
-      const token = localStorage.getItem(REMEMBER_TOKEN) || ''
-      const tokenExp = parseInt(localStorage.getItem(REMEMBER_TOKEN_EXP) || '0', 10)
-      const lastReloadAt = parseInt(localStorage.getItem(LAST_RELOAD) || '0', 10)
-
-      if (!remembered || !email) return false
-      if (lastReloadAt && Date.now() - lastReloadAt < 10_000) return false // avoid reload loops
-
-      if (token) {
-        const now = Date.now()
-        const msLeft = tokenExp ? Math.max(tokenExp - now, 5_000) : 5 * 365 * 24 * 60 * 60 * 1000
-        const maxAgeSeconds = Math.floor(msLeft / 1000)
-        const secureFlag = window.location.protocol === 'https:' ? '; Secure' : ''
-        document.cookie = `__Secure-next-auth.session-token=${token}; path=/; max-age=${maxAgeSeconds}; SameSite=Lax${secureFlag}`
-        document.cookie = `next-auth.session-token=${token}; path=/; max-age=${maxAgeSeconds}; SameSite=Lax${secureFlag}`
-      }
-
-      const res = await fetch('/api/auth/session', { cache: 'no-store', credentials: 'same-origin' })
-      const data = await res.json().catch(() => null)
-      if (res.ok && data?.user) {
-        localStorage.setItem(LAST_RELOAD, Date.now().toString())
-        return true
-      }
-    } catch (err) {
-      console.warn('Remember-me restore before redirect failed', err)
-    }
-    return false
-  }, [])
-
-  useEffect(() => {
-    if (status !== 'unauthenticated') return
-    if (publicPages.includes(pathname) || isAdminPanelPath) return
-    if (resumeAttempted) return
-
-    let cancelled = false
-    setResumeAttempted(true)
-    tryRememberedSessionRestore().then((restored) => {
-      if (cancelled) return
-      if (!restored) {
-        window.location.href = '/healthapp'
-      } else {
-        router.refresh()
-      }
-    })
-
-    return () => {
-      cancelled = true
-    }
-  }, [status, pathname, isAdminPanelPath, publicPages, resumeAttempted, tryRememberedSessionRestore])
-
   if (status === 'unauthenticated' && !publicPages.includes(pathname) && !isAdminPanelPath) {
+    if (typeof window !== 'undefined') {
+      window.location.href = '/auth/signin'
+    }
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <p className="text-gray-600">Reconnecting your session…</p>
+          <p className="text-gray-600">Redirecting...</p>
         </div>
       </div>
     )
