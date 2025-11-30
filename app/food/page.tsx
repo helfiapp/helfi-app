@@ -4026,6 +4026,7 @@ Please add nutritional information manually if needed.`);
           Html5QrcodeSupportedFormats.CODE_39,
         ],
         useBarCodeDetectorIfSupported: true,
+        verbose: false,
       })
       barcodeScannerRef.current = scanner
       const scanConfig: any = {
