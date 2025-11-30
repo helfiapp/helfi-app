@@ -58,6 +58,7 @@ export async function POST(request: NextRequest) {
       secret,
       maxAge: maxAgeSeconds,
     })
+    const tokenExpiresAtMs = Date.now() + (maxAgeSeconds * 1000)
 
     // Create response with session cookie
     const response = NextResponse.json({ 
@@ -68,7 +69,10 @@ export async function POST(request: NextRequest) {
         name: user.name,
         emailVerified: !!user.emailVerified
       },
-      message: keepSignedIn ? 'Signin successful (remembered)' : 'Signin successful'
+      message: keepSignedIn ? 'Signin successful (remembered)' : 'Signin successful',
+      token: keepSignedIn ? token : undefined,
+      tokenExpiresAtMs: keepSignedIn ? tokenExpiresAtMs : undefined,
+      remembered: keepSignedIn
     })
 
     // Set NextAuth session cookie with proper format

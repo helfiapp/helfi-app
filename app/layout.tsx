@@ -64,6 +64,8 @@ export default function RootLayout({
                 try {
                   const REMEMBER_FLAG = 'helfi:rememberMe'
                   const REMEMBER_EMAIL = 'helfi:rememberEmail'
+                  const REMEMBER_TOKEN = 'helfi:rememberToken'
+                  const REMEMBER_TOKEN_EXP = 'helfi:rememberTokenExp'
                   const LAST_MANUAL_SIGNOUT = 'helfi:lastManualSignOut'
                   const LAST_SESSION_RESTORE = 'helfi:lastSessionRestore'
                   const remembered = localStorage.getItem(REMEMBER_FLAG) === '1'
@@ -76,6 +78,19 @@ export default function RootLayout({
 
                   const lastRestoreAt = parseInt(localStorage.getItem(LAST_SESSION_RESTORE) || '0', 10)
                   if (now - lastRestoreAt < 15_000) return
+
+                  const token = localStorage.getItem(REMEMBER_TOKEN) || ''
+                  const tokenExp = parseInt(localStorage.getItem(REMEMBER_TOKEN_EXP) || '0', 10)
+                  const secureFlag = window.location.protocol === 'https:' ? '; Secure' : ''
+                  if (token) {
+                    const msLeft = tokenExp ? Math.max(tokenExp - now, 5_000) : 5 * 365 * 24 * 60 * 60 * 1000
+                    const maxAgeSeconds = Math.floor(msLeft / 1000)
+                    document.cookie = \`__Secure-next-auth.session-token=\${token}; path=/; max-age=\${maxAgeSeconds}; SameSite=Lax\${secureFlag}\`
+                    document.cookie = \`next-auth.session-token=\${token}; path=/; max-age=\${maxAgeSeconds}; SameSite=Lax\${secureFlag}\`
+                    localStorage.setItem(LAST_SESSION_RESTORE, now.toString())
+                    localStorage.removeItem(LAST_MANUAL_SIGNOUT)
+                    return
+                  }
 
                   fetch('/api/auth/session', { credentials: 'same-origin', cache: 'no-store' })
                     .then((res) => Promise.all([res.ok, res.json().catch(() => null)]))

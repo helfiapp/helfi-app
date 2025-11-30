@@ -74,15 +74,23 @@ export default function SignIn() {
     await signIn('google', { callbackUrl: '/onboarding' })
   }
 
-  const persistRememberState = (remember: boolean, emailValue: string) => {
+  const persistRememberState = (remember: boolean, emailValue: string, token?: string, tokenExpiresAtMs?: number) => {
     try {
       if (remember && emailValue) {
         localStorage.setItem('helfi:rememberMe', '1')
         localStorage.setItem('helfi:rememberEmail', emailValue.toLowerCase())
         localStorage.removeItem('helfi:lastManualSignOut')
+        if (token) {
+          localStorage.setItem('helfi:rememberToken', token)
+        }
+        if (tokenExpiresAtMs) {
+          localStorage.setItem('helfi:rememberTokenExp', tokenExpiresAtMs.toString())
+        }
       } else {
         localStorage.removeItem('helfi:rememberMe')
         localStorage.removeItem('helfi:rememberEmail')
+        localStorage.removeItem('helfi:rememberToken')
+        localStorage.removeItem('helfi:rememberTokenExp')
       }
     } catch (storageError) {
       console.warn('Remember me storage failed', storageError)
@@ -99,7 +107,7 @@ export default function SignIn() {
       })
       const data = await response.json().catch(()=>({}))
       if (response.ok) {
-        return { success: true }
+        return { success: true, token: data?.token, tokenExpiresAtMs: data?.tokenExpiresAtMs }
       }
       return { success: false, message: data?.error || data?.message || 'Sign in failed. Please try again.' }
     } catch (err) {
@@ -147,7 +155,7 @@ export default function SignIn() {
         // Try direct sign-in first so we can honor the "keep me signed in" setting immediately
         const directResult = await attemptDirectSignin(rememberMe)
         if (directResult.success) {
-          persistRememberState(rememberMe, normalizedEmail)
+          persistRememberState(rememberMe, normalizedEmail, directResult.token, directResult.tokenExpiresAtMs)
           setLoading(false)
           window.location.href = '/onboarding'
           return
@@ -160,8 +168,8 @@ export default function SignIn() {
         if (res?.ok) {
           // If they wanted a longer session, reissue via direct path to extend the cookie, but don't block redirect
           if (rememberMe) {
-            persistRememberState(true, normalizedEmail)
-            attemptDirectSignin(true, normalizedEmail)
+            const extendResult = await attemptDirectSignin(true, normalizedEmail)
+            persistRememberState(true, normalizedEmail, extendResult.token, extendResult.tokenExpiresAtMs)
           } else {
             persistRememberState(false, normalizedEmail)
           }
@@ -171,7 +179,7 @@ export default function SignIn() {
         } else {
           const fallback = await attemptDirectSignin(false)
           if (fallback.success) {
-            persistRememberState(rememberMe, normalizedEmail)
+            persistRememberState(rememberMe, normalizedEmail, fallback.token, fallback.tokenExpiresAtMs)
             setLoading(false)
             window.location.href = '/onboarding'
             return

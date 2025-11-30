@@ -13,6 +13,8 @@ function SessionKeepAlive() {
 
     const REMEMBER_FLAG = 'helfi:rememberMe'
     const REMEMBER_EMAIL = 'helfi:rememberEmail'
+    const REMEMBER_TOKEN = 'helfi:rememberToken'
+    const REMEMBER_TOKEN_EXP = 'helfi:rememberTokenExp'
     const LAST_MANUAL_SIGNOUT = 'helfi:lastManualSignOut'
     const LAST_SESSION_RESTORE = 'helfi:lastSessionRestore'
 
@@ -21,6 +23,8 @@ function SessionKeepAlive() {
         localStorage.setItem(LAST_MANUAL_SIGNOUT, Date.now().toString())
         localStorage.removeItem(REMEMBER_FLAG)
         localStorage.removeItem(REMEMBER_EMAIL)
+        localStorage.removeItem(REMEMBER_TOKEN)
+        localStorage.removeItem(REMEMBER_TOKEN_EXP)
       } catch {
         // ignore storage issues
       }
@@ -44,11 +48,13 @@ function SessionKeepAlive() {
         return {
           remembered: localStorage.getItem(REMEMBER_FLAG) === '1',
           email: localStorage.getItem(REMEMBER_EMAIL) || '',
+          token: localStorage.getItem(REMEMBER_TOKEN) || '',
+          tokenExp: parseInt(localStorage.getItem(REMEMBER_TOKEN_EXP) || '0', 10),
           manualSignOutAt: parseInt(localStorage.getItem(LAST_MANUAL_SIGNOUT) || '0', 10),
           lastRestoreAt: parseInt(localStorage.getItem(LAST_SESSION_RESTORE) || '0', 10),
         }
       } catch {
-        return { remembered: false, email: '', manualSignOutAt: 0, lastRestoreAt: 0 }
+        return { remembered: false, email: '', token: '', tokenExp: 0, manualSignOutAt: 0, lastRestoreAt: 0 }
       }
     }
 
@@ -71,7 +77,8 @@ function SessionKeepAlive() {
 
       const sessionData = await sessionRes.json().catch(() => null)
       const hasSession = sessionRes.ok && sessionData?.user
-      const { remembered, email, manualSignOutAt, lastRestoreAt } = readRememberState()
+      const { remembered, email, token, tokenExp, manualSignOutAt, lastRestoreAt } = readRememberState()
+      const now = Date.now()
 
       if (hasSession) {
         // Keep the remembered email in sync so we can reissue a cookie later if iOS drops it.
@@ -89,7 +96,21 @@ function SessionKeepAlive() {
       if (restoreInFlight) return
       if (shouldRespectManualSignOut(manualSignOutAt)) return
 
-      const now = Date.now()
+      if (token) {
+        const msLeft = tokenExp ? Math.max(tokenExp - now, 5_000) : 5 * 365 * 24 * 60 * 60 * 1000
+        const maxAgeSeconds = Math.floor(msLeft / 1000)
+        try {
+          const secureFlag = window.location.protocol === 'https:' ? '; Secure' : ''
+          document.cookie = `__Secure-next-auth.session-token=${token}; path=/; max-age=${maxAgeSeconds}; SameSite=Lax${secureFlag}`
+          document.cookie = `next-auth.session-token=${token}; path=/; max-age=${maxAgeSeconds}; SameSite=Lax${secureFlag}`
+          localStorage.setItem(LAST_SESSION_RESTORE, now.toString())
+          localStorage.removeItem(LAST_MANUAL_SIGNOUT)
+          return
+        } catch {
+          // fall through to network reissue
+        }
+      }
+
       if (now - lastRestoreAt < 15_000) return // throttle re-issue attempts
 
       restoreInFlight = true
@@ -112,6 +133,8 @@ function SessionKeepAlive() {
           try {
             localStorage.removeItem(REMEMBER_FLAG)
             localStorage.removeItem(REMEMBER_EMAIL)
+            localStorage.removeItem(REMEMBER_TOKEN)
+            localStorage.removeItem(REMEMBER_TOKEN_EXP)
           } catch {
             // ignore storage errors
           }
