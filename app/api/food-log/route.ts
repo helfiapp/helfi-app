@@ -484,6 +484,118 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// Update an existing log entry
+export async function PUT(request: NextRequest) {
+  const startTime = Date.now()
+  let userEmail: string | null = null
+
+  try {
+    let session = await getServerSession(authOptions)
+    userEmail = session?.user?.email ?? null
+    let usedTokenFallback = false
+
+    if (!userEmail) {
+      try {
+        const token = await getToken({
+          req: request,
+          secret: process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET || 'helfi-secret-key-production-2024',
+        })
+        if (token?.email) {
+          userEmail = String(token.email)
+          usedTokenFallback = true
+        }
+      } catch (tokenError) {
+        console.error('❌ PUT /api/food-log - JWT auth fallback failed:', tokenError)
+      }
+    }
+
+    if (!userEmail) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    }
+
+    const user = await prisma.user.findUnique({ where: { email: userEmail } })
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    const body = await request.json()
+    const { id, description, nutrition, imageUrl, items, localDate, meal, category } = body || {}
+
+    const logId = typeof id === 'string' && id.trim().length > 0 ? id.trim() : null
+    if (!logId) {
+      return NextResponse.json({ error: 'Missing id' }, { status: 400 })
+    }
+
+    const existing = await prisma.foodLog.findUnique({ where: { id: logId as any } })
+    if (!existing || existing.userId !== user.id) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    }
+
+    const normalizedMeal = normalizeMealCategory(meal ?? category ?? existing.meal ?? existing.category)
+    const storedCategory = normalizedMeal ?? (typeof category === 'string' ? category.trim() : existing.category)
+
+    let normalizedLocalDate: string | null = existing.localDate || null
+    if (localDate && typeof localDate === 'string' && localDate.length >= 8) {
+      const datePattern = /^\d{4}-\d{2}-\d{2}$/
+      if (datePattern.test(localDate)) {
+        normalizedLocalDate = localDate
+      } else {
+        try {
+          const parsed = new Date(localDate)
+          if (!isNaN(parsed.getTime())) {
+            const y = parsed.getFullYear()
+            const m = String(parsed.getMonth() + 1).padStart(2, '0')
+            const d = String(parsed.getDate()).padStart(2, '0')
+            normalizedLocalDate = `${y}-${m}-${d}`
+          }
+        } catch (e) {
+          console.error('❌ PUT /api/food-log - Failed to parse localDate:', localDate, e)
+        }
+      }
+    }
+
+    const name = (description || existing.description || existing.name || '')
+      .toString()
+      .split('\n')[0]
+      .split('Calories:')[0]
+      .split(',')[0]
+      .split('.')[0]
+      .trim() || existing.name || 'Food item'
+
+    const updated = await prisma.foodLog.update({
+      where: { id: logId as any },
+      data: {
+        name,
+        description: description || null,
+        imageUrl: imageUrl || null,
+        nutrients: nutrition || null,
+        items: Array.isArray(items) && items.length > 0 ? items : null,
+        localDate: normalizedLocalDate,
+        meal: normalizedMeal,
+        category: storedCategory,
+      },
+    })
+
+    triggerBackgroundRegeneration({
+      userId: user.id,
+      changeType: 'food',
+      timestamp: new Date(),
+    }).catch((error) => {
+      console.warn('⚠️ Failed to trigger nutrition insights regeneration after update', error)
+    })
+
+    return NextResponse.json({ success: true, id: updated.id })
+  } catch (error) {
+    const duration = Date.now() - startTime
+    console.error('❌ PUT /api/food-log - Error:', {
+      error,
+      message: error instanceof Error ? error.message : String(error),
+      durationMs: duration,
+    })
+    return NextResponse.json({ error: 'Failed to update log' }, { status: 500 })
+  }
+}
+
 // Legacy DELETE handler kept for compatibility with older clients
 // Newer clients can use POST /api/food-log/delete, but both share the same logic.
 export async function DELETE(request: NextRequest) {

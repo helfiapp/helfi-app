@@ -3551,13 +3551,46 @@ Please add nutritional information manually if needed.`);
       total: analyzedTotal || (editingEntry.total || null)
     };
 
-    const updatedFoods = todaysFoods.map(food => 
+    const sourceFoods = isViewingToday ? todaysFoods : (historyFoods || [])
+    const updatedFoods = sourceFoods.map(food => 
       food.id === editingEntry.id ? updatedEntry : food
     );
     
     setIsSavingEntry(true)
     try {
-      setTodaysFoods(updatedFoods);
+      if (isViewingToday) {
+        setTodaysFoods(updatedFoods);
+      } else {
+        setHistoryFoods(updatedFoods);
+      }
+
+      // Persist edit to FoodLog when we have a database id
+      const dbId = editingEntry.dbId || editingEntry.id
+      if (dbId) {
+        const res = await fetch('/api/food-log', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id: dbId,
+            description: updatedEntry.description,
+            nutrition: updatedEntry.nutrition,
+            imageUrl: updatedEntry.photo,
+            items: updatedEntry.items,
+            localDate: updatedEntry.localDate || selectedDate,
+            meal: updatedEntry.meal || updatedEntry.category,
+            category: updatedEntry.category || updatedEntry.meal,
+          }),
+        })
+        if (!res.ok) {
+          const text = await res.text()
+          console.error('❌ Failed to update FoodLog entry', { status: res.status, text })
+          setHistorySaveError('Updating your entry failed. Please retry.')
+        }
+      } else {
+        console.warn('⚠️ Editing entry without dbId; skipping FoodLog update')
+      }
+
+      // Keep local snapshot in sync (but do not create a new history row)
       await saveFoodEntries(updatedFoods, { appendHistory: false });
       await refreshEntriesFromServer();
       
