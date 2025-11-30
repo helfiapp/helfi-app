@@ -231,6 +231,10 @@ On January 19th, 2025, food diary entries disappeared because entries were being
    - Do **not** hand-map logs or bypass `dedupeEntries`; ad-hoc mappers caused “all meals under Other on first render” by skipping meal/localDate normalization.
    - Apply this to every load path (warm-load verify, fallback loads, history loads, delete recovery) so category normalization stays consistent.
 
+5. **Desktop entry menu overflow (do not break):**
+   - Keep desktop food entry cards square-cornered **with** a thin outline (`border border-gray-200`); do not remove the border or reintroduce rounding.
+   - The desktop entry action menu must fully overflow: parents/cards must allow `overflow-visible`, and raise z-index when the menu is open so all menu items are reachable. Do **not** reintroduce clipping or hide the menu behind containers. If you change the menu, you must ensure it still displays fully (use a portal if needed).
+
 **Backend (`app/api/food-log/route.ts`):**
 
 1. **Query broadly, filter precisely:**
