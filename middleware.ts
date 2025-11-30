@@ -5,8 +5,8 @@ import { getToken } from 'next-auth/jwt'
 const ADMIN_GATE_COOKIE_MAX_AGE = 30 * 24 * 60 * 60 // 30 days
 
 export async function middleware(request: NextRequest) {
-  const isPreviewEnv = process.env.VERCEL_ENV === 'preview'
-  const skipAdminGate = process.env.NEXT_PUBLIC_SKIP_ADMIN_GATE === 'true' || isPreviewEnv
+  // Preview-staging should always skip the admin gate to avoid iOS logout loops
+  const skipAdminGate = true
 
   // Skip middleware for static files and API routes that don't need auth
   if (
