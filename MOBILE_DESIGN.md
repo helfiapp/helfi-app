@@ -1,22 +1,12 @@
 # Mobile To-Do (food entries)
 
-# Handover Notes – Next Feature: Favorites Picker Revamp
-- Objective: Replace the current “Favorites” picker (opened from the bottom add menu: Photo Library/Camera → Favorites → Manual Entry) with a Cronometer-style selector.
-- New screen layout (see provided Cronometer screenshot):
-  - Top search bar with clear (X) and filter/order icon, plus a barcode scan icon on the right.
-  - Tabs: “All”, “Favorites”, “Custom”. All shows every unique meal the user has ever entered (no duplicates). Favorites shows only meals the user favorited. Custom shows user-defined meals not yet added to history.
-  - List shows recents/most recent; sorting toggle like the orange “Most Recent” in the screenshot.
-  - Each row shows name, serving/amount, and a source tag (e.g., CRDB/NCCDB/Custom Food). Match the Cronometer visual hierarchy from the screenshot.
-  - Tapping a meal inserts it into the currently active category in the food diary and confirms (toast/feedback). Keep category context from the add sheet.
-- Data rules:
-  - All meals tab: dedupe by canonical meal name/description; include everything the user has saved historically. No duplicate rows.
-  - Favorites tab: only favorited meals (reuse existing favorites flag; fix earlier bug where tapping favorite didn’t add to category).
-  - Custom tab: user-created meals not in history; allow selection to add to diary.
-  - Search should filter within the active tab. Barcode icon should trigger existing scan flow (wire to current scanner entry point).
-- UX notes:
-  - Keep current bottom add menu entry point and flows intact for desktop; this change is mobile-only.
-  - Do not break existing add flows (photo/manual). The Favorites button should open the new selector.
-  - Follow Cronometer styling from screenshot: pill tabs, search bar with trailing icons, list spacing/typography similar to reference.
+# Handover Notes – Barcode Scanner (unresolved)
+- The barcode scanner is still not working on iOS Safari even with camera permission set to “Allow”. The preview stays gray/empty; no scans are produced.
+- The current scanner modal has multiple footer buttons (Restart camera, Switch camera, Open camera settings, Reload page). They feel crowded and the last button may be hard to reach because the modal content doesn’t scroll far enough on small screens.
+- “Switch camera (2/7)” refers to enumerated camera devices; it is confusing and non-standard for a barcode scanner. Consider simplifying to back/front toggle or removing if not reliable.
+- User confirmed Safari camera permissions are enabled and reloaded after allowing; still no preview.
+- Manual fallback (typing the barcode) works, but the live camera feed is not available.
+- Please reassess the html5-qrcode integration on iOS Safari and UX for the footer buttons (stacked, scrollable, or reduced to essential actions).
 
 ## Status
 - ✅ Edit button on the food detail screen opens the real edit flow.
