@@ -5,6 +5,8 @@ import { getToken } from 'next-auth/jwt'
 const ADMIN_GATE_COOKIE_MAX_AGE = 30 * 24 * 60 * 60 // 30 days
 
 export async function middleware(request: NextRequest) {
+  const skipAdminGate = process.env.NEXT_PUBLIC_SKIP_ADMIN_GATE === 'true'
+
   // Skip middleware for static files and API routes that don't need auth
   if (
     request.nextUrl.pathname.startsWith('/_next') ||
@@ -58,6 +60,9 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
   const needsAdminGate = pathname === '/auth/signin'
+  if (skipAdminGate && needsAdminGate) {
+    return NextResponse.next()
+  }
   const hasPassedGate = request.cookies.get('passed_admin_gate')?.value === '1'
   if (needsAdminGate && !hasPassedGate) {
     const url = request.nextUrl.clone()

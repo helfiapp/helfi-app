@@ -17,9 +17,14 @@ export default function HealthApp() {
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const router = useRouter()
+  const skipAdminGate = process.env.NEXT_PUBLIC_SKIP_ADMIN_GATE === 'true'
 
   useEffect(() => {
     if (typeof window === 'undefined') return
+    if (skipAdminGate) {
+      router.replace('/auth/signin')
+      return
+    }
 
     const hasCookie = document.cookie.includes('passed_admin_gate=1')
     let hasLocalFlag = false
@@ -44,6 +49,10 @@ export default function HealthApp() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (skipAdminGate) {
+      router.replace('/auth/signin')
+      return
+    }
     setLoading(true)
     setError('')
 
