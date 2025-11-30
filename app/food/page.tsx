@@ -6948,7 +6948,11 @@ Please add nutritional information manually if needed.`);
                           )}
                           <div
                             className={entryCardClass}
-                            style={isMobile ? { transform: `translateX(${swipeOffset}px)`, touchAction: 'pan-y' } : undefined}
+                            style={
+                              isMobile
+                                ? { transform: `translateX(${swipeOffset}px)`, touchAction: 'pan-y' }
+                                : { borderRadius: 0 }
+                            }
                             onTouchStart={handleTouchStart}
                             onTouchMove={handleTouchMove}
                             onTouchEnd={handleTouchEnd}
