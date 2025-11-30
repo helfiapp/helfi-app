@@ -6908,7 +6908,7 @@ Please add nutritional information manually if needed.`);
 
                       const entryCardClass = isMobile
                         ? 'relative bg-white border border-gray-200 rounded-lg shadow-sm transition-transform duration-150 ease-out z-10 w-full overflow-visible'
-                        : 'relative bg-white border-0 rounded-none shadow-none transition-transform duration-150 ease-out z-10 w-full overflow-visible'
+                        : 'relative bg-white border border-gray-200 rounded-none shadow-none transition-transform duration-150 ease-out z-10 w-full overflow-visible'
 
                       return (
                         <div key={food.id} className="relative w-full overflow-visible">
