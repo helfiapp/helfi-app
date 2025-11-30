@@ -17,7 +17,7 @@ export default function HealthApp() {
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const router = useRouter()
-  const skipAdminGate = process.env.NEXT_PUBLIC_SKIP_ADMIN_GATE === 'true'
+  const skipAdminGate = process.env.NEXT_PUBLIC_SKIP_ADMIN_GATE === 'true' || process.env.NEXT_PUBLIC_VERCEL_ENV === 'preview' || process.env.VERCEL_ENV === 'preview'
 
   useEffect(() => {
     if (typeof window === 'undefined') return

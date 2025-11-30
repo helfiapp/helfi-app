@@ -5,7 +5,8 @@ import { getToken } from 'next-auth/jwt'
 const ADMIN_GATE_COOKIE_MAX_AGE = 30 * 24 * 60 * 60 // 30 days
 
 export async function middleware(request: NextRequest) {
-  const skipAdminGate = process.env.NEXT_PUBLIC_SKIP_ADMIN_GATE === 'true'
+  const isPreviewEnv = process.env.VERCEL_ENV === 'preview'
+  const skipAdminGate = process.env.NEXT_PUBLIC_SKIP_ADMIN_GATE === 'true' || isPreviewEnv
 
   // Skip middleware for static files and API routes that don't need auth
   if (
