@@ -1197,6 +1197,8 @@ export default function FoodDiary() {
   const [barcodeStatus, setBarcodeStatus] = useState<'idle' | 'scanning' | 'loading'>('idle')
   const barcodeScannerRef = useRef<any>(null)
   const barcodeLookupInFlightRef = useRef(false)
+  const [cameraDevices, setCameraDevices] = useState<Array<{ id: string; label: string }>>([])
+  const [cameraIndex, setCameraIndex] = useState(0)
   const SWIPE_MENU_WIDTH = 88
   const SWIPE_DELETE_WIDTH = 96
   const [insightsNotification, setInsightsNotification] = useState<{show: boolean, message: string, type: 'updating' | 'updated'} | null>(null)
@@ -3815,6 +3817,12 @@ Please add nutritional information manually if needed.`);
     }
   }
 
+  const resetBarcodeState = () => {
+    setBarcodeStatus('idle')
+    setBarcodeError(null)
+    setBarcodeValue('')
+  }
+
   const insertBarcodeFoodIntoDiary = async (food: any, code?: string) => {
     const category = normalizeCategory(selectedAddCategory)
     const nowIso = new Date().toISOString()
@@ -3954,22 +3962,53 @@ Please add nutritional information manually if needed.`);
       }
       const { Html5Qrcode } = await import('html5-qrcode')
       const cameras = await Html5Qrcode.getCameras().catch(() => [])
-      const preferredCamera = Array.isArray(cameras) && cameras.length > 0 ? cameras[0].id : undefined
+      const normalizedCameras =
+        Array.isArray(cameras) && cameras.length
+          ? cameras.map((c: any) => ({ id: c.id, label: c.label || 'Camera' }))
+          : []
+      setCameraDevices(normalizedCameras)
+      if (normalizedCameras.length === 0) {
+        setBarcodeError('No cameras detected. Try reloading and check Safari camera permissions.')
+        setBarcodeStatus('idle')
+        return
+      }
+      const preferredIndex =
+        normalizedCameras.findIndex((c) => /back|rear/i.test(c.label)) >= 0
+          ? normalizedCameras.findIndex((c) => /back|rear/i.test(c.label))
+          : cameraIndex < normalizedCameras.length
+          ? cameraIndex
+          : 0
+      setCameraIndex(preferredIndex)
+      const preferredCamera = normalizedCameras[preferredIndex]?.id
       const scanner = new Html5Qrcode(BARCODE_REGION_ID)
       barcodeScannerRef.current = scanner
       const config: any = {
         fps: 10,
         qrbox: { width: 250, height: 250 },
       }
-      if (preferredCamera) {
-        await scanner.start(preferredCamera, config, (decodedText: string) => handleBarcodeDetected(decodedText), () => {})
-      } else {
+      try {
         await scanner.start(
-          { facingMode: 'environment' },
+          preferredCamera,
           config,
           (decodedText: string) => handleBarcodeDetected(decodedText),
           () => {},
         )
+      } catch (startErr) {
+        console.error('Scanner start failed, retrying with environment fallback', startErr)
+        try {
+          await scanner.start(
+            { facingMode: 'environment' },
+            config,
+            (decodedText: string) => handleBarcodeDetected(decodedText),
+            () => {},
+          )
+        } catch (envErr) {
+          console.error('Environment fallback failed', envErr)
+          setBarcodeError('Camera failed to start. Try switching camera or reloading after allowing permissions.')
+          setBarcodeStatus('idle')
+          stopBarcodeScanner()
+          return
+        }
       }
       setBarcodeStatus('scanning')
     } catch (err) {
@@ -3984,9 +4023,7 @@ Please add nutritional information manually if needed.`);
       startBarcodeScanner()
     } else {
       stopBarcodeScanner()
-      setBarcodeError(null)
-      setBarcodeValue('')
-      setBarcodeStatus('idle')
+      resetBarcodeState()
     }
     return () => {
       stopBarcodeScanner()
@@ -7930,11 +7967,11 @@ Please add nutritional information manually if needed.`);
                 </div>
               </div>
               <div className="space-y-2">
-                {barcodeError && (
-                  <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">
-                    {barcodeError}
-                  </div>
-                )}
+              {barcodeError && (
+                <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">
+                  {barcodeError}
+                </div>
+              )}
                 <div className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg p-3">
                   If you see a gray area, camera access is blocked. Tap “Open camera settings”, allow camera for this site,
                   then tap “Restart camera”. On iOS Safari you may need to reload after allowing. You can also type the barcode below.
@@ -7957,12 +7994,12 @@ Please add nutritional information manually if needed.`);
                   Lookup &amp; add
                 </button>
               </div>
-              <div className="flex items-center justify-between text-xs text-gray-500 gap-2">
+              <div className="flex flex-col gap-2 text-xs text-gray-500">
                 <button
                   type="button"
                   onClick={startBarcodeScanner}
                   disabled={barcodeStatus === 'loading'}
-                  className="inline-flex flex-1 items-center justify-center gap-2 px-3 py-3 border border-gray-300 hover:bg-gray-50 disabled:opacity-60 text-sm font-medium"
+                  className="inline-flex items-center justify-center gap-2 px-3 py-3 border border-gray-300 hover:bg-gray-50 disabled:opacity-60 text-sm font-medium"
                   style={{ borderRadius: 0 }}
                 >
                   <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -7972,8 +8009,24 @@ Please add nutritional information manually if needed.`);
                 </button>
                 <button
                   type="button"
+                  onClick={() => {
+                    const nextIndex = cameraDevices.length ? (cameraIndex + 1) % cameraDevices.length : 0
+                    setCameraIndex(nextIndex)
+                    startBarcodeScanner()
+                  }}
+                  disabled={barcodeStatus === 'loading' || cameraDevices.length === 0}
+                  className="inline-flex items-center justify-center gap-2 px-3 py-3 border border-gray-300 hover:bg-gray-50 disabled:opacity-60 text-sm font-medium"
+                  style={{ borderRadius: 0 }}
+                >
+                  <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 8l7 4-7 4M9 16l-7-4 7-4m1 12V4m4 16V4" />
+                  </svg>
+                  Switch camera {cameraDevices.length > 0 ? `(${cameraIndex + 1}/${cameraDevices.length})` : ''}
+                </button>
+                <button
+                  type="button"
                   onClick={showCameraSettingsHelp}
-                  className="inline-flex flex-1 items-center justify-center gap-2 px-3 py-3 border border-gray-300 hover:bg-gray-50 disabled:opacity-60 text-sm font-medium"
+                  className="inline-flex items-center justify-center gap-2 px-3 py-3 border border-gray-300 hover:bg-gray-50 disabled:opacity-60 text-sm font-medium"
                   style={{ borderRadius: 0 }}
                 >
                   <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -7989,13 +8042,13 @@ Please add nutritional information manually if needed.`);
                       window.location.reload()
                     } catch {}
                   }}
-                  className="inline-flex flex-1 items-center justify-center gap-2 px-3 py-3 border border-gray-300 hover:bg-gray-50 text-sm font-medium"
+                  className="inline-flex items-center justify-center gap-2 px-3 py-3 border border-gray-300 hover:bg-gray-50 text-sm font-medium"
                   style={{ borderRadius: 0 }}
                 >
                   Reload page
                 </button>
+                <div className="text-[11px] text-gray-500 text-center">Powered by FatSecret barcode lookup</div>
               </div>
-              <div className="text-[11px] text-gray-500 text-center mt-1">Powered by FatSecret barcode lookup</div>
             </div>
           </div>
         </div>
