@@ -58,6 +58,51 @@ export default function RootLayout({
                   // Ignore localStorage errors in SSR
                 }
               })();
+
+              // Pre-hydration remember-me restore to avoid Safari/PWA cookie eviction on resume
+              (function() {
+                try {
+                  const REMEMBER_FLAG = 'helfi:rememberMe'
+                  const REMEMBER_EMAIL = 'helfi:rememberEmail'
+                  const LAST_MANUAL_SIGNOUT = 'helfi:lastManualSignOut'
+                  const LAST_SESSION_RESTORE = 'helfi:lastSessionRestore'
+                  const remembered = localStorage.getItem(REMEMBER_FLAG) === '1'
+                  const email = (localStorage.getItem(REMEMBER_EMAIL) || '').trim().toLowerCase()
+                  if (!remembered || !email) return
+
+                  const now = Date.now()
+                  const manualSignOutAt = parseInt(localStorage.getItem(LAST_MANUAL_SIGNOUT) || '0', 10)
+                  if (manualSignOutAt && now - manualSignOutAt < 5 * 60 * 1000) return
+
+                  const lastRestoreAt = parseInt(localStorage.getItem(LAST_SESSION_RESTORE) || '0', 10)
+                  if (now - lastRestoreAt < 15_000) return
+
+                  fetch('/api/auth/session', { credentials: 'same-origin', cache: 'no-store' })
+                    .then((res) => Promise.all([res.ok, res.json().catch(() => null)]))
+                    .then(async ([ok, data]) => {
+                      const hasSession = ok && data && data.user
+                      if (hasSession) return
+
+                      const res = await fetch('/api/auth/signin-direct', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'same-origin',
+                        body: JSON.stringify({ email, rememberMe: true })
+                      })
+
+                      if (res.ok) {
+                        localStorage.setItem(LAST_SESSION_RESTORE, Date.now().toString())
+                        localStorage.removeItem(LAST_MANUAL_SIGNOUT)
+                      } else if (res.status === 401) {
+                        localStorage.removeItem(REMEMBER_FLAG)
+                        localStorage.removeItem(REMEMBER_EMAIL)
+                      }
+                    })
+                    .catch(() => {})
+                } catch (e) {
+                  // Ignore restore issues so login page still renders
+                }
+              })();
             `,
           }}
         />
