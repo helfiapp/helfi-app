@@ -6908,7 +6908,7 @@ Please add nutritional information manually if needed.`);
 
                       const isDesktopMenuOpen = !isMobile && showEntryOptions === entryKey
                       const entryCardClass = isMobile
-                        ? 'relative bg-white border border-gray-200 rounded-lg shadow-sm transition-transform duration-150 ease-out z-10 w-full overflow-visible'
+                        ? 'relative bg-white border border-gray-200 rounded-none shadow-sm transition-transform duration-150 ease-out z-10 w-full overflow-visible'
                         : `relative bg-white border border-gray-200 rounded-none shadow-none transition-transform duration-150 ease-out w-full overflow-visible ${isDesktopMenuOpen ? 'z-30' : 'z-10'}`
 
                       return (
