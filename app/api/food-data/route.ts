@@ -26,8 +26,14 @@ export async function GET(request: NextRequest) {
     let actualSource = source
 
     if (source === 'auto' || !source) {
+      const usdaDataType =
+        kind === 'packaged' ? 'branded' : kind === 'single' ? 'generic' : 'all'
       // Auto mode: try all sources with fallback
-      items = await lookupFoodNutrition(query, { preferSource: 'usda', maxResults: 5 })
+      items = await lookupFoodNutrition(query, {
+        preferSource: 'usda',
+        maxResults: 5,
+        usdaDataType,
+      })
       actualSource = items.length > 0 ? items[0].source : 'none'
     } else if (source === 'openfoodfacts') {
       items = await searchOpenFoodFactsByQuery(query, { pageSize: 5 })
@@ -50,5 +56,4 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'Failed to fetch food data' }, { status: 500 })
   }
 }
-
 

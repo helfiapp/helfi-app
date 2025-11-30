@@ -443,25 +443,27 @@ export async function lookupFoodNutrition(
   options?: {
     preferSource?: 'usda' | 'fatsecret' | 'openfoodfacts'
     maxResults?: number
+    usdaDataType?: 'branded' | 'generic' | 'all'
   },
 ): Promise<NormalizedFoodItem[]> {
   const maxResults = options?.maxResults ?? 3
   const preferSource = options?.preferSource || 'usda'
+  const usdaDataType = options?.usdaDataType
 
   // Try sources in order of preference
   const sources: Array<() => Promise<NormalizedFoodItem[]>> = []
 
   if (preferSource === 'usda') {
-    sources.push(() => searchUsdaFoods(query, { pageSize: maxResults }))
+    sources.push(() => searchUsdaFoods(query, { pageSize: maxResults, dataType: usdaDataType }))
     sources.push(() => searchFatSecretFoods(query, { pageSize: maxResults }))
     sources.push(() => searchOpenFoodFactsByQuery(query, { pageSize: maxResults }))
   } else if (preferSource === 'fatsecret') {
     sources.push(() => searchFatSecretFoods(query, { pageSize: maxResults }))
-    sources.push(() => searchUsdaFoods(query, { pageSize: maxResults }))
+    sources.push(() => searchUsdaFoods(query, { pageSize: maxResults, dataType: usdaDataType }))
     sources.push(() => searchOpenFoodFactsByQuery(query, { pageSize: maxResults }))
   } else {
     sources.push(() => searchOpenFoodFactsByQuery(query, { pageSize: maxResults }))
-    sources.push(() => searchUsdaFoods(query, { pageSize: maxResults }))
+    sources.push(() => searchUsdaFoods(query, { pageSize: maxResults, dataType: usdaDataType }))
     sources.push(() => searchFatSecretFoods(query, { pageSize: maxResults }))
   }
 
@@ -482,4 +484,3 @@ export async function lookupFoodNutrition(
   console.warn(`⚠️ No results found from any source for query: ${query}`)
   return []
 }
-

@@ -115,6 +115,8 @@ const buildTodayIso = () => {
   return `${y}-${m}-${day}`
 }
 
+const BARCODE_REGION_ID = 'food-barcode-reader'
+
 type WarmDiaryState = {
   selectedDate?: string
   todaysFoods?: any[]
@@ -1134,6 +1136,7 @@ export default function FoodDiary() {
   const [showAddIngredientModal, setShowAddIngredientModal] = useState<boolean>(false)
   const [officialSearchQuery, setOfficialSearchQuery] = useState<string>('')
   const [officialResults, setOfficialResults] = useState<any[]>([])
+  const [officialResultsSource, setOfficialResultsSource] = useState<string>('usda')
   const [officialSource, setOfficialSource] = useState<'packaged' | 'single'>('packaged')
   const [officialLoading, setOfficialLoading] = useState<boolean>(false)
   const [officialError, setOfficialError] = useState<string | null>(null)
@@ -1186,6 +1189,12 @@ export default function FoodDiary() {
   const swipeClickBlockRef = useRef<Record<string, boolean>>({})
   const favoriteSwipeMetaRef = useRef<Record<string, { startX: number; startY: number; swiping: boolean; hasMoved: boolean }>>({})
   const favoriteClickBlockRef = useRef<Record<string, boolean>>({})
+  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false)
+  const [barcodeError, setBarcodeError] = useState<string | null>(null)
+  const [barcodeValue, setBarcodeValue] = useState('')
+  const [barcodeStatus, setBarcodeStatus] = useState<'idle' | 'scanning' | 'loading'>('idle')
+  const barcodeScannerRef = useRef<any>(null)
+  const barcodeLookupInFlightRef = useRef(false)
   const SWIPE_MENU_WIDTH = 88
   const SWIPE_DELETE_WIDTH = 96
   const [insightsNotification, setInsightsNotification] = useState<{show: boolean, message: string, type: 'updating' | 'updated'} | null>(null)
@@ -1524,30 +1533,31 @@ export default function FoodDiary() {
     }
     setOfficialError(null)
     setOfficialLoading(true)
-    setOfficialResults([])
-    setOfficialSource(mode)
-    try {
-      const params = new URLSearchParams({
-        source: 'usda',
-        q: officialSearchQuery.trim(),
-        kind: mode,
-      })
-      const res = await fetch(`/api/food-data?${params.toString()}`, {
-        method: 'GET',
+      setOfficialResults([])
+      setOfficialSource(mode)
+      try {
+        const params = new URLSearchParams({
+          source: 'auto',
+          q: officialSearchQuery.trim(),
+          kind: mode,
+        })
+        const res = await fetch(`/api/food-data?${params.toString()}`, {
+          method: 'GET',
       })
       if (!res.ok) {
         const text = await res.text()
         console.error('Food data search failed:', text)
         setOfficialError('Unable to fetch official data right now. Please try again.')
         return
-      }
-      const data = await res.json()
-      setOfficialResults(Array.isArray(data.items) ? data.items : [])
-    } catch (err) {
-      console.error('Food data search error:', err)
-      setOfficialError('Something went wrong while searching. Please try again.')
-    } finally {
-      setOfficialLoading(false)
+          }
+          const data = await res.json()
+          setOfficialResults(Array.isArray(data.items) ? data.items : [])
+          setOfficialResultsSource(data?.source || 'auto')
+        } catch (err) {
+          console.error('Food data search error:', err)
+          setOfficialError('Something went wrong while searching. Please try again.')
+        } finally {
+          setOfficialLoading(false)
     }
   }
 
@@ -3714,6 +3724,195 @@ Please add nutritional information manually if needed.`);
     setTimeout(() => setQuickToast(null), 1400)
   }
 
+  const stopBarcodeScanner = () => {
+    if (barcodeScannerRef.current) {
+      try {
+        barcodeScannerRef.current.stop().catch(() => {})
+      } catch {}
+      barcodeScannerRef.current = null
+    }
+  }
+
+  const insertBarcodeFoodIntoDiary = async (food: any, code?: string) => {
+    const category = normalizeCategory(selectedAddCategory)
+    const nowIso = new Date().toISOString()
+    const totals = sanitizeNutritionTotals({
+      calories: food?.calories,
+      protein: food?.protein_g,
+      carbs: food?.carbs_g,
+      fat: food?.fat_g,
+      fiber: food?.fiber_g,
+      sugar: food?.sugar_g,
+    })
+    const entry = {
+      id: Date.now(),
+      localDate: selectedDate,
+      description: [food?.name, food?.brand].filter(Boolean).join(' – ') || 'Scanned food',
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      method: 'text',
+      photo: null,
+      nutrition: totals,
+      total: totals,
+      items: [
+        {
+          name: food?.name || 'Scanned food',
+          brand: food?.brand || null,
+          serving_size: food?.serving_size || '1 serving',
+          servings: 1,
+          calories: Number.isFinite(Number(food?.calories)) ? Number(food?.calories) : null,
+          protein_g: Number.isFinite(Number(food?.protein_g)) ? Number(food?.protein_g) : null,
+          carbs_g: Number.isFinite(Number(food?.carbs_g)) ? Number(food?.carbs_g) : null,
+          fat_g: Number.isFinite(Number(food?.fat_g)) ? Number(food?.fat_g) : null,
+          fiber_g: Number.isFinite(Number(food?.fiber_g)) ? Number(food?.fiber_g) : null,
+          sugar_g: Number.isFinite(Number(food?.sugar_g)) ? Number(food?.sugar_g) : null,
+          source: food?.source || 'fatsecret',
+          barcode: code || null,
+        },
+      ],
+      meal: category,
+      category,
+      persistedCategory: category,
+      createdAt: nowIso,
+    }
+    const updated = dedupeEntries([entry, ...todaysFoods], { fallbackDate: selectedDate })
+    setTodaysFoods(updated)
+    if (!isViewingToday) {
+      setHistoryFoods((prev: any[] | null) => {
+        const base = Array.isArray(prev) ? prev : []
+        return dedupeEntries([entry, ...base], { fallbackDate: selectedDate })
+      })
+    }
+    setExpandedCategories((prev) => ({
+      ...prev,
+      [category]: true,
+    }))
+    try {
+      await saveFoodEntries(updated)
+      await refreshEntriesFromServer()
+      showQuickToast(`Added to ${categoryLabel(category)}`)
+    } catch (err) {
+      console.warn('Barcode add sync failed', err)
+    } finally {
+      setPhotoOptionsAnchor(null)
+      setShowAddFood(false)
+      setShowPhotoOptions(false)
+    }
+  }
+
+  const lookupBarcodeAndAdd = async (code: string) => {
+    const normalized = (code || '').replace(/[^0-9A-Za-z]/g, '')
+    if (!normalized) {
+      setBarcodeError('Enter a valid barcode to search.')
+      setBarcodeStatus('scanning')
+      return
+    }
+    if (barcodeLookupInFlightRef.current) return
+    barcodeLookupInFlightRef.current = true
+    setBarcodeStatus('loading')
+    setBarcodeError(null)
+    try {
+      const res = await fetch(`/api/barcode/lookup?code=${encodeURIComponent(normalized)}`)
+      if (res.status === 404) {
+        setBarcodeError('No food found for this barcode. Try again or enter it manually.')
+        setBarcodeStatus('scanning')
+        return
+      }
+      if (!res.ok) {
+        const txt = await res.text()
+        throw new Error(txt || 'Lookup failed')
+      }
+      const data = await res.json()
+      if (!data?.food) {
+        setBarcodeError('No food found for this barcode. Try again or enter it manually.')
+        setBarcodeStatus('scanning')
+        startBarcodeScanner()
+        return
+      }
+      await insertBarcodeFoodIntoDiary(data.food, normalized)
+      setShowBarcodeScanner(false)
+      setBarcodeValue('')
+    } catch (err) {
+      console.error('Barcode lookup failed', err)
+      setBarcodeError('Could not find a match. Please rescan or type the code.')
+      setBarcodeStatus('scanning')
+      startBarcodeScanner()
+    } finally {
+      barcodeLookupInFlightRef.current = false
+    }
+  }
+
+  const handleBarcodeDetected = (rawCode: string) => {
+    if (!rawCode || barcodeLookupInFlightRef.current) return
+    const cleaned = rawCode.replace(/[^0-9A-Za-z]/g, '')
+    if (!cleaned) return
+    stopBarcodeScanner()
+    lookupBarcodeAndAdd(cleaned)
+  }
+
+  const startBarcodeScanner = async () => {
+    if (!showBarcodeScanner) return
+    try {
+      setBarcodeStatus('loading')
+      setBarcodeError(null)
+      barcodeLookupInFlightRef.current = false
+      stopBarcodeScanner()
+      if (typeof window === 'undefined') {
+        setBarcodeError('Camera is only available in the browser.')
+        setBarcodeStatus('idle')
+        return
+      }
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+        stream.getTracks().forEach((t) => t.stop())
+      } catch (permError) {
+        console.error('Camera permission error:', permError)
+        setBarcodeError('Camera permission denied. Please allow camera access and try again.')
+        setBarcodeStatus('idle')
+        return
+      }
+      const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import('html5-qrcode')
+      const scanner = new Html5Qrcode(BARCODE_REGION_ID)
+      barcodeScannerRef.current = scanner
+      await scanner.start(
+        { facingMode: 'environment' },
+        {
+          fps: 10,
+          qrbox: { width: 250, height: 250 },
+          formatsToSupport: [
+            Html5QrcodeSupportedFormats.EAN_13,
+            Html5QrcodeSupportedFormats.EAN_8,
+            Html5QrcodeSupportedFormats.UPC_A,
+            Html5QrcodeSupportedFormats.UPC_E,
+            Html5QrcodeSupportedFormats.CODE_128,
+            Html5QrcodeSupportedFormats.CODE_39,
+          ],
+        },
+        (decodedText: string) => handleBarcodeDetected(decodedText),
+        () => {},
+      )
+      setBarcodeStatus('scanning')
+    } catch (err) {
+      console.error('Barcode scanner start error', err)
+      setBarcodeError('Could not start the camera. Check permissions and try again.')
+      setBarcodeStatus('idle')
+    }
+  }
+
+  useEffect(() => {
+    if (showBarcodeScanner) {
+      startBarcodeScanner()
+    } else {
+      stopBarcodeScanner()
+      setBarcodeError(null)
+      setBarcodeValue('')
+      setBarcodeStatus('idle')
+    }
+    return () => {
+      stopBarcodeScanner()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showBarcodeScanner])
+
   const handleDeleteEditingEntry = async () => {
     if (!editingEntry) return
     try {
@@ -4739,6 +4938,30 @@ Please add nutritional information manually if needed.`);
                     <div className="flex-1">
                       <div className="text-base font-semibold text-gray-900">Favorites</div>
                       <div className="text-xs text-gray-500">Reuse a saved meal in {categoryLabel(selectedAddCategory)}</div>
+                    </div>
+                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setShowPhotoOptions(false);
+                      setPhotoOptionsAnchor(null);
+                      setShowBarcodeScanner(true);
+                      setBarcodeError(null);
+                      setBarcodeValue('');
+                    }}
+                    className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center mr-3 text-indigo-600">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h2m2 0h2m2 0h2m2 0h2M4 18h2m2 0h2m2 0h2m2 0h2M7 6v12m4-12v12m4-12v12" />
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <div className="text-base font-semibold text-gray-900">Barcode Scanner</div>
+                      <div className="text-xs text-gray-500">Scan packaged foods (FatSecret lookup)</div>
                     </div>
                     <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -5875,7 +6098,7 @@ Please add nutritional information manually if needed.`);
                         <div className="p-4">
                           <div className="space-y-2">
                             <label className="block text-sm font-medium text-gray-900">
-                              Search foods (USDA)
+                              Search foods (USDA first, FatSecret fallback)
                             </label>
                             <div className="flex flex-col sm:flex-row gap-2">
                               <input
@@ -5913,13 +6136,12 @@ Please add nutritional information manually if needed.`);
                               </div>
                             </div>
                             <p className="text-xs text-gray-500">
-                              Results are powered by USDA FoodData Central. Use the toggles to focus on packaged
-                              products or generic single foods.
+                              We search USDA FoodData Central first, then fall back to FatSecret if USDA is unavailable or rate limited. Use the toggles to focus on packaged products or generic single foods.
                             </p>
                           </div>
                           {officialError && <div className="mt-3 text-xs text-red-600">{officialError}</div>}
                           {officialLoading && (
-                            <div className="mt-3 text-xs text-gray-500">Searching USDA…</div>
+                            <div className="mt-3 text-xs text-gray-500">Searching USDA → FatSecret…</div>
                           )}
                           {!officialLoading && !officialError && officialResults.length > 0 && (
                             <div className="mt-3 max-h-80 overflow-y-auto space-y-2">
@@ -5947,7 +6169,14 @@ Please add nutritional information manually if needed.`);
                                       {r.fat_g != null && <span className="ml-2">{`${r.fat_g} g fat`}</span>}
                                     </div>
                                     <div className="mt-1 text-[11px] text-gray-400">
-                                      Source: USDA FoodData Central
+                                      Source:{' '}
+                                      {r.source === 'usda'
+                                        ? 'USDA FoodData Central'
+                                        : r.source === 'fatsecret'
+                                        ? 'FatSecret'
+                                        : r.source === 'openfoodfacts'
+                                        ? 'OpenFoodFacts'
+                                        : officialResultsSource || 'Unknown'}
                                     </div>
                                   </div>
                                   <button
@@ -7232,6 +7461,31 @@ Please add nutritional information manually if needed.`);
                                         onClick={() => {
                                           setShowPhotoOptions(false);
                                           setPhotoOptionsAnchor(null);
+                                          setSelectedAddCategory(cat.key)
+                                          setShowBarcodeScanner(true);
+                                          setBarcodeError(null);
+                                          setBarcodeValue('');
+                                        }}
+                                        className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
+                                      >
+                                        <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center mr-3 text-indigo-600">
+                                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h2m2 0h2m2 0h2m2 0h2M4 18h2m2 0h2m2 0h2m2 0h2M7 6v12m4-12v12m4-12v12" />
+                                          </svg>
+                                        </div>
+                                        <div className="flex-1">
+                                          <div className="text-base font-semibold text-gray-900">Barcode Scanner</div>
+                                          <div className="text-xs text-gray-500">Scan packaged foods (FatSecret lookup)</div>
+                                        </div>
+                                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                        </svg>
+                                      </button>
+
+                                      <button
+                                        onClick={() => {
+                                          setShowPhotoOptions(false);
+                                          setPhotoOptionsAnchor(null);
                                           setShowAddFood(true);
                                         }}
                                         className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
@@ -7481,6 +7735,78 @@ Please add nutritional information manually if needed.`);
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {showBarcodeScanner && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-xl">
+            <div className="flex items-start justify-between p-4 border-b border-gray-100">
+              <div>
+                <div className="text-lg font-semibold text-gray-900">Scan a barcode</div>
+                <div className="text-sm text-gray-600">
+                  Add scanned items straight into {categoryLabel(selectedAddCategory)} (FatSecret lookup)
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowBarcodeScanner(false)}
+                className="p-2 rounded-full hover:bg-gray-100"
+              >
+                <span aria-hidden>✕</span>
+              </button>
+            </div>
+            <div className="p-4 space-y-4">
+              <div className="rounded-xl border border-gray-200 bg-gray-50 overflow-hidden">
+                <div
+                  id={BARCODE_REGION_ID}
+                  className="aspect-video min-h-[240px] flex items-center justify-center text-sm text-gray-500"
+                >
+                  {barcodeStatus === 'loading'
+                    ? 'Starting camera…'
+                    : barcodeStatus === 'scanning'
+                    ? 'Point your camera at the product barcode'
+                    : 'Camera idle'}
+                </div>
+              </div>
+              {barcodeError && (
+                <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">
+                  {barcodeError}
+                </div>
+              )}
+              <div className="flex flex-col sm:flex-row gap-2">
+                <input
+                  type="text"
+                  value={barcodeValue}
+                  onChange={(e) => setBarcodeValue(e.target.value)}
+                  placeholder="Type or paste barcode digits"
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={() => lookupBarcodeAndAdd(barcodeValue)}
+                  disabled={barcodeStatus === 'loading'}
+                  className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-60"
+                >
+                  Lookup &amp; add
+                </button>
+              </div>
+              <div className="flex items-center justify-between text-xs text-gray-500">
+                <button
+                  type="button"
+                  onClick={startBarcodeScanner}
+                  disabled={barcodeStatus === 'loading'}
+                  className="inline-flex items-center gap-1 px-3 py-2 rounded-full border border-gray-200 hover:bg-gray-50 disabled:opacity-60"
+                >
+                  <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5m0 6v5m16-16v5m0 6v5M4 4h5m6 0h5M4 20h5m6 0h5M9 4v5m0 6v5m6-16v5m0 6v5" />
+                  </svg>
+                  Restart camera
+                </button>
+                <span>Powered by FatSecret barcode lookup</span>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
