@@ -331,28 +331,30 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
     return false
   }, [])
 
-  if (status === 'unauthenticated' && !publicPages.includes(pathname) && !isAdminPanelPath) {
-    if (!resumeAttempted) {
-      setResumeAttempted(true)
-      tryRememberedSessionRestore().then((restored) => {
-        if (!restored) {
-          window.location.href = '/healthapp'
-        }
-      })
-      return (
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="text-center">
-            <p className="text-gray-600">Reconnecting your session…</p>
-          </div>
-        </div>
-      )
-    }
+  useEffect(() => {
+    if (status !== 'unauthenticated') return
+    if (publicPages.includes(pathname) || isAdminPanelPath) return
+    if (resumeAttempted) return
 
-    window.location.href = '/healthapp';
+    let cancelled = false
+    setResumeAttempted(true)
+    tryRememberedSessionRestore().then((restored) => {
+      if (cancelled) return
+      if (!restored) {
+        window.location.href = '/healthapp'
+      }
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [status, pathname, isAdminPanelPath, publicPages, resumeAttempted, tryRememberedSessionRestore])
+
+  if (status === 'unauthenticated' && !publicPages.includes(pathname) && !isAdminPanelPath) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <p className="text-gray-600">Redirecting...</p>
+          <p className="text-gray-600">Reconnecting your session…</p>
         </div>
       </div>
     )
