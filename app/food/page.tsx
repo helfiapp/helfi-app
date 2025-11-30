@@ -6717,7 +6717,7 @@ Please add nutritional information manually if needed.`);
               <h3 className="text-lg font-semibold mb-4">{isViewingToday ? "Today's Meals" : 'Meals'}</h3>
 
               <div
-                className="space-y-3 -mx-4 sm:-mx-6"
+                className="space-y-3 -mx-4 sm:-mx-6 overflow-visible"
                 style={isMobile ? { marginLeft: 'calc(50% - 50vw)', marginRight: 'calc(50% - 50vw)' } : undefined}
               >
                 {sourceEntries.length === 0 && (
@@ -6906,9 +6906,10 @@ Please add nutritional information manually if needed.`);
                         }))
                       }
 
+                      const isDesktopMenuOpen = !isMobile && showEntryOptions === entryKey
                       const entryCardClass = isMobile
                         ? 'relative bg-white border border-gray-200 rounded-lg shadow-sm transition-transform duration-150 ease-out z-10 w-full overflow-visible'
-                        : 'relative bg-white border border-gray-200 rounded-none shadow-none transition-transform duration-150 ease-out z-10 w-full overflow-visible'
+                        : `relative bg-white border border-gray-200 rounded-none shadow-none transition-transform duration-150 ease-out w-full overflow-visible ${isDesktopMenuOpen ? 'z-30' : 'z-10'}`
 
                       return (
                         <div key={food.id} className="relative w-full overflow-visible">
