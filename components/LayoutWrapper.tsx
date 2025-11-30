@@ -303,12 +303,15 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
       const REMEMBER_EMAIL = 'helfi:rememberEmail'
       const REMEMBER_TOKEN = 'helfi:rememberToken'
       const REMEMBER_TOKEN_EXP = 'helfi:rememberTokenExp'
+      const LAST_RELOAD = 'helfi:lastSessionReload'
       const remembered = localStorage.getItem(REMEMBER_FLAG) === '1'
       const email = (localStorage.getItem(REMEMBER_EMAIL) || '').trim().toLowerCase()
       const token = localStorage.getItem(REMEMBER_TOKEN) || ''
       const tokenExp = parseInt(localStorage.getItem(REMEMBER_TOKEN_EXP) || '0', 10)
+      const lastReloadAt = parseInt(localStorage.getItem(LAST_RELOAD) || '0', 10)
 
       if (!remembered || !email) return false
+      if (lastReloadAt && Date.now() - lastReloadAt < 10_000) return false // avoid reload loops
 
       if (token) {
         const now = Date.now()
@@ -322,7 +325,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
       const res = await fetch('/api/auth/session', { cache: 'no-store', credentials: 'same-origin' })
       const data = await res.json().catch(() => null)
       if (res.ok && data?.user) {
-        window.location.reload()
+        localStorage.setItem(LAST_RELOAD, Date.now().toString())
         return true
       }
     } catch (err) {
@@ -342,6 +345,8 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
       if (cancelled) return
       if (!restored) {
         window.location.href = '/healthapp'
+      } else {
+        router.refresh()
       }
     })
 
