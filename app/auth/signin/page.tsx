@@ -54,17 +54,48 @@ export default function SignIn() {
   const [showPassword, setShowPassword] = useState(false)
   const [rememberMe, setRememberMe] = useState(false)
 
+  useEffect(() => {
+    try {
+      const storedRemember = localStorage.getItem('helfi:rememberMe') === '1'
+      const storedEmail = localStorage.getItem('helfi:rememberEmail')
+      if (storedRemember) {
+        setRememberMe(true)
+        if (storedEmail) {
+          setEmail(storedEmail)
+        }
+      }
+    } catch (storageError) {
+      console.warn('Remember me restore failed', storageError)
+    }
+  }, [])
+
   const handleGoogleAuth = async () => {
     setLoading(true)
     await signIn('google', { callbackUrl: '/onboarding' })
   }
 
-  const attemptDirectSignin = async (remember: boolean) => {
+  const persistRememberState = (remember: boolean, emailValue: string) => {
+    try {
+      if (remember && emailValue) {
+        localStorage.setItem('helfi:rememberMe', '1')
+        localStorage.setItem('helfi:rememberEmail', emailValue.toLowerCase())
+        localStorage.removeItem('helfi:lastManualSignOut')
+      } else {
+        localStorage.removeItem('helfi:rememberMe')
+        localStorage.removeItem('helfi:rememberEmail')
+      }
+    } catch (storageError) {
+      console.warn('Remember me storage failed', storageError)
+    }
+  }
+
+  const attemptDirectSignin = async (remember: boolean, emailOverride?: string) => {
+    const normalizedEmail = (emailOverride ?? email).trim().toLowerCase()
     try {
       const response = await fetch('/api/auth/signin-direct', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, rememberMe: remember })
+        body: JSON.stringify({ email: normalizedEmail, password, rememberMe: remember })
       })
       const data = await response.json().catch(()=>({}))
       if (response.ok) {
@@ -80,6 +111,8 @@ export default function SignIn() {
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!email || !password) return
+
+    const normalizedEmail = email.trim().toLowerCase()
     
     setLoading(true)
     setError('')
@@ -114,6 +147,7 @@ export default function SignIn() {
         // Try direct sign-in first so we can honor the "keep me signed in" setting immediately
         const directResult = await attemptDirectSignin(rememberMe)
         if (directResult.success) {
+          persistRememberState(rememberMe, normalizedEmail)
           setLoading(false)
           window.location.href = '/onboarding'
           return
@@ -126,7 +160,10 @@ export default function SignIn() {
         if (res?.ok) {
           // If they wanted a longer session, reissue via direct path to extend the cookie, but don't block redirect
           if (rememberMe) {
-            attemptDirectSignin(true)
+            persistRememberState(true, normalizedEmail)
+            attemptDirectSignin(true, normalizedEmail)
+          } else {
+            persistRememberState(false, normalizedEmail)
           }
           setLoading(false)
           window.location.href = '/onboarding'
@@ -134,6 +171,7 @@ export default function SignIn() {
         } else {
           const fallback = await attemptDirectSignin(false)
           if (fallback.success) {
+            persistRememberState(rememberMe, normalizedEmail)
             setLoading(false)
             window.location.href = '/onboarding'
             return
