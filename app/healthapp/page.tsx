@@ -77,6 +77,14 @@ export default function HealthApp() {
     setLoading(false)
   }
 
+  if (skipAdminGate) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-white to-green-50 p-4">
+        <div className="text-center text-gray-700">Redirecting…</div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-white to-green-50 p-4">
       <div className="max-w-md w-full space-y-8">

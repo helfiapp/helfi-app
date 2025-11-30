@@ -54,6 +54,11 @@ export async function middleware(request: NextRequest) {
 
   // Gate sign-in routes behind /healthapp admin check
   const pathname = request.nextUrl.pathname
+  if (skipAdminGate && pathname === '/healthapp') {
+    const url = request.nextUrl.clone()
+    url.pathname = '/auth/signin'
+    return NextResponse.redirect(url)
+  }
   // Never allow direct access to the temporary staging sign-in page
   if (pathname === '/staging-signin') {
     const url = request.nextUrl.clone()
