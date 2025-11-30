@@ -7750,6 +7750,7 @@ Please add nutritional information manually if needed.`);
         )}
 
       {showFavoritesPicker && (
+        /* GUARD RAIL: Favorites picker UI is locked per user request. Do not change without approval. */
         <div className="fixed inset-0 z-50 bg-white flex flex-col">
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
             <div>
@@ -7936,7 +7937,7 @@ Please add nutritional information manually if needed.`);
                 )}
                 <div className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg p-3">
                   If you see a gray area, camera access is blocked. Tap “Open camera settings”, allow camera for this site,
-                  then tap “Restart camera”. You can also type the barcode below.
+                  then tap “Restart camera”. On iOS Safari you may need to reload after allowing. You can also type the barcode below.
                 </div>
               </div>
               <div className="flex flex-col sm:flex-row gap-2">
@@ -7956,12 +7957,13 @@ Please add nutritional information manually if needed.`);
                   Lookup &amp; add
                 </button>
               </div>
-              <div className="flex items-center justify-between text-xs text-gray-500">
+              <div className="flex items-center justify-between text-xs text-gray-500 gap-2">
                 <button
                   type="button"
                   onClick={startBarcodeScanner}
                   disabled={barcodeStatus === 'loading'}
-                  className="inline-flex items-center gap-1 px-3 py-2 rounded-full border border-gray-200 hover:bg-gray-50 disabled:opacity-60"
+                  className="inline-flex flex-1 items-center justify-center gap-2 px-3 py-3 border border-gray-300 hover:bg-gray-50 disabled:opacity-60 text-sm font-medium"
+                  style={{ borderRadius: 0 }}
                 >
                   <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5m0 6v5m16-16v5m0 6v5M4 4h5m6 0h5M4 20h5m6 0h5M9 4v5m0 6v5m6-16v5m0 6v5" />
@@ -7971,7 +7973,8 @@ Please add nutritional information manually if needed.`);
                 <button
                   type="button"
                   onClick={showCameraSettingsHelp}
-                  className="inline-flex items-center gap-1 px-3 py-2 rounded-full border border-gray-200 hover:bg-gray-50 disabled:opacity-60"
+                  className="inline-flex flex-1 items-center justify-center gap-2 px-3 py-3 border border-gray-300 hover:bg-gray-50 disabled:opacity-60 text-sm font-medium"
+                  style={{ borderRadius: 0 }}
                 >
                   <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3z" />
@@ -7979,8 +7982,20 @@ Please add nutritional information manually if needed.`);
                   </svg>
                   Open camera settings
                 </button>
-                <span>Powered by FatSecret barcode lookup</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    try {
+                      window.location.reload()
+                    } catch {}
+                  }}
+                  className="inline-flex flex-1 items-center justify-center gap-2 px-3 py-3 border border-gray-300 hover:bg-gray-50 text-sm font-medium"
+                  style={{ borderRadius: 0 }}
+                >
+                  Reload page
+                </button>
               </div>
+              <div className="text-[11px] text-gray-500 text-center mt-1">Powered by FatSecret barcode lookup</div>
             </div>
           </div>
         </div>
