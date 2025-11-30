@@ -1,20 +1,26 @@
 # Mobile To-Do (food entries)
 
-# Handover Notes (critical issue: mobile logouts)
-- On iOS (Safari/installed web app), users are forced to log in again whenever the app is backgrounded and reopened. Desktop stays signed in; mobile does not.
-- Attempts made (unsuccessful so far):
-  - Extended NextAuth session/JWT maxAge to ~5 years (`authOptions.session.maxAge`, `jwt.maxAge`).
-  - Added explicit long-lived, first-party cookies with `sameSite: 'lax'`, secure flags, `__Secure`/`__Host` names, and maxAge ~5 years in `lib/auth.ts` to stop Safari from dropping tokens between app switches.
-  - Sign-in flow already calls `/api/auth/signin-direct` with `rememberMe` to issue a long-lived JWT/cookie, plus a follow-up extend after credentials sign-in when “Keep me signed in” is checked.
-  - Verified that desktop persists; iOS still loses the session when switching apps.
-- What to try next (do not remove existing protections):
-  - Confirm cookies are actually set on iOS: both `__Secure-next-auth.session-token` (or fallback) and `next-auth.session-token` should exist with multi-year maxAge. Check if a PWA/standalone mode strips cookies—may need to force localStorage-based token mirror as a fallback for iOS WebView/PWA.
-  - Consider `sameSite: 'none'` + `secure: true` if WebView treats the app as cross-site, but only if tests show `lax` is being dropped.
-  - Add a heartbeat/refresh on app resume that reissues the session token via `/api/auth/signin-direct` when “keep me signed in” was selected, using a locally stored flag (e.g., localStorage `helfi:rememberMe=true`) while respecting CSRF.
-  - If using a PWA, test in Safari vs. standalone; standalone can evict cookies aggressively. A persistent localStorage-backed token with manual header auth may be required for that mode.
+# Handover Notes – Next Feature: Favorites Picker Revamp
+- Objective: Replace the current “Favorites” picker (opened from the bottom add menu: Photo Library/Camera → Favorites → Manual Entry) with a Cronometer-style selector.
+- New screen layout (see provided Cronometer screenshot):
+  - Top search bar with clear (X) and filter/order icon, plus a barcode scan icon on the right.
+  - Tabs: “All”, “Favorites”, “Custom”. All shows every unique meal the user has ever entered (no duplicates). Favorites shows only meals the user favorited. Custom shows user-defined meals not yet added to history.
+  - List shows recents/most recent; sorting toggle like the orange “Most Recent” in the screenshot.
+  - Each row shows name, serving/amount, and a source tag (e.g., CRDB/NCCDB/Custom Food). Match the Cronometer visual hierarchy from the screenshot.
+  - Tapping a meal inserts it into the currently active category in the food diary and confirms (toast/feedback). Keep category context from the add sheet.
+- Data rules:
+  - All meals tab: dedupe by canonical meal name/description; include everything the user has saved historically. No duplicate rows.
+  - Favorites tab: only favorited meals (reuse existing favorites flag; fix earlier bug where tapping favorite didn’t add to category).
+  - Custom tab: user-created meals not in history; allow selection to add to diary.
+  - Search should filter within the active tab. Barcode icon should trigger existing scan flow (wire to current scanner entry point).
+- UX notes:
+  - Keep current bottom add menu entry point and flows intact for desktop; this change is mobile-only.
+  - Do not break existing add flows (photo/manual). The Favorites button should open the new selector.
+  - Follow Cronometer styling from screenshot: pill tabs, search bar with trailing icons, list spacing/typography similar to reference.
 
 ## Status
 - ✅ Edit button on the food detail screen opens the real edit flow.
+
 ## To do
 - ✅ Swipe right on a food row to reveal the menu button on a green background (#4DAF50).
 - ✅ Swipe left on a food row to delete.
