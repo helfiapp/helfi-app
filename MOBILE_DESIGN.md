@@ -1,13 +1,17 @@
 # Mobile To-Do (food entries)
 
-# Handover Notes (critical issue: entries drop into “Other”)
-- The food diary still renders all meals in “Other” on return navigation (e.g., More → Dashboard → Settings → Food), then sometimes snaps back—other times it stays wrong. Users see a bad first render.
-- Attempts made (unsuccessful):
-  - Added persistent diary snapshot (localStorage + sessionStorage) and normalized meal/category/localDate on hydrate.
-  - Gated render until snapshot hydrated to avoid flashing “Other.”
-  - Ignored old snapshots and marked new ones as normalized only after dedupe/normalize.
-  - Normalized categories and dates at hydrate; kept add/duplicate dedupe intact.
-- Result: issue persists on preview-staging; snapshots still let “Other” render on load. Do not repeat the same snapshot steps; a deeper fix is needed (likely reloading/normalizing the cache before first paint or auditing category persistence paths).
+# Handover Notes (critical issue: mobile logouts)
+- On iOS (Safari/installed web app), users are forced to log in again whenever the app is backgrounded and reopened. Desktop stays signed in; mobile does not.
+- Attempts made (unsuccessful so far):
+  - Extended NextAuth session/JWT maxAge to ~5 years (`authOptions.session.maxAge`, `jwt.maxAge`).
+  - Added explicit long-lived, first-party cookies with `sameSite: 'lax'`, secure flags, `__Secure`/`__Host` names, and maxAge ~5 years in `lib/auth.ts` to stop Safari from dropping tokens between app switches.
+  - Sign-in flow already calls `/api/auth/signin-direct` with `rememberMe` to issue a long-lived JWT/cookie, plus a follow-up extend after credentials sign-in when “Keep me signed in” is checked.
+  - Verified that desktop persists; iOS still loses the session when switching apps.
+- What to try next (do not remove existing protections):
+  - Confirm cookies are actually set on iOS: both `__Secure-next-auth.session-token` (or fallback) and `next-auth.session-token` should exist with multi-year maxAge. Check if a PWA/standalone mode strips cookies—may need to force localStorage-based token mirror as a fallback for iOS WebView/PWA.
+  - Consider `sameSite: 'none'` + `secure: true` if WebView treats the app as cross-site, but only if tests show `lax` is being dropped.
+  - Add a heartbeat/refresh on app resume that reissues the session token via `/api/auth/signin-direct` when “keep me signed in” was selected, using a locally stored flag (e.g., localStorage `helfi:rememberMe=true`) while respecting CSRF.
+  - If using a PWA, test in Safari vs. standalone; standalone can evict cookies aggressively. A persistent localStorage-backed token with manual header auth may be required for that mode.
 
 ## Status
 - ✅ Edit button on the food detail screen opens the real edit flow.
