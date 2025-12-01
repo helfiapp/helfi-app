@@ -8,6 +8,7 @@ const REMEMBER_COOKIE = 'helfi-remember-token'
 const SESSION_COOKIE = '__Secure-next-auth.session-token'
 const LEGACY_SESSION_COOKIE = 'next-auth.session-token'
 const JWT_SECRET = process.env.NEXTAUTH_SECRET || 'helfi-secret-key-production-2024'
+const REMEMBER_HEADER = 'x-helfi-remember-token'
 
 export async function middleware(request: NextRequest) {
   // Preview-staging should always skip the admin gate to avoid iOS logout loops
@@ -33,9 +34,9 @@ export async function middleware(request: NextRequest) {
         : 'next-auth.session-token'
     })
 
-    // If no session cookie but remember token exists, re-issue session cookies (helps iOS PWA when cookies are dropped)
+    // If no session cookie, try remember token from cookie or header and re-issue session cookies
     if (!token) {
-      const remember = request.cookies.get(REMEMBER_COOKIE)?.value
+      const remember = request.cookies.get(REMEMBER_COOKIE)?.value || request.headers.get(REMEMBER_HEADER) || ''
       if (remember) {
         try {
           const decoded = await decode({ token: remember, secret: JWT_SECRET })
