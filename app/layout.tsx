@@ -91,16 +91,18 @@ export default function RootLayout({
 
                   const token = localStorage.getItem(REMEMBER_TOKEN) || ''
                   const tokenExp = parseInt(localStorage.getItem(REMEMBER_TOKEN_EXP) || '0', 10)
-                  const secureFlag = window.location.protocol === 'https:' ? '; Secure' : ''
                   const hasSessionCookie = document.cookie.includes('__Secure-next-auth.session-token') || document.cookie.includes('next-auth.session-token')
                   const reissueSession = async () => {
                     if (!canRetry()) return
                     try {
-                      const res = await fetch('/api/auth/signin-direct', {
+                      const useRestore = !!token
+                      const payload = useRestore ? { token } : { email, rememberMe: true }
+                      const endpoint = useRestore ? '/api/auth/restore' : '/api/auth/signin-direct'
+                      const res = await fetch(endpoint, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         credentials: 'same-origin',
-                        body: JSON.stringify({ email, rememberMe: true })
+                        body: JSON.stringify(payload)
                       })
                       if (res.ok) {
                         localStorage.setItem(LAST_SESSION_RESTORE, Date.now().toString())
@@ -112,9 +114,10 @@ export default function RootLayout({
                     } catch {}
                   }
 
-                  if (token) {
-                    const msLeft = tokenExp ? Math.max(tokenExp - now, 5_000) : 5 * 365 * 24 * 60 * 60 * 1000
-                    const maxAgeSeconds = Math.floor(msLeft / 1000)
+                  if (token && tokenExp) {
+                    const secureFlag = window.location.protocol === 'https:' ? '; Secure' : ''
+                    const msLeft = Math.max(tokenExp - now, 5)
+                    const maxAgeSeconds = Math.floor(msLeft)
                     document.cookie = \`__Secure-next-auth.session-token=\${token}; path=/; max-age=\${maxAgeSeconds}; SameSite=Lax\${secureFlag}\`
                     document.cookie = \`next-auth.session-token=\${token}; path=/; max-age=\${maxAgeSeconds}; SameSite=Lax\${secureFlag}\`
                     localStorage.setItem(LAST_SESSION_RESTORE, now.toString())
@@ -130,22 +133,8 @@ export default function RootLayout({
                     .then(async ([ok, data]) => {
                       const hasSession = ok && data && data.user
                       if (hasSession) return
-
                       if (canRetry()) {
-                        const res = await fetch('/api/auth/signin-direct', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          credentials: 'same-origin',
-                          body: JSON.stringify({ email, rememberMe: true })
-                        })
-
-                        if (res.ok) {
-                          localStorage.setItem(LAST_SESSION_RESTORE, Date.now().toString())
-                          localStorage.removeItem(LAST_MANUAL_SIGNOUT)
-                        } else if (res.status === 401) {
-                          localStorage.removeItem(REMEMBER_FLAG)
-                          localStorage.removeItem(REMEMBER_EMAIL)
-                        }
+                        await reissueSession()
                       }
                     })
                     .catch(() => {})
