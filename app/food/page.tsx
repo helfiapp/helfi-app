@@ -4025,7 +4025,8 @@ Please add nutritional information manually if needed.`);
           Html5QrcodeSupportedFormats.CODE_128,
           Html5QrcodeSupportedFormats.CODE_39,
         ],
-        useBarCodeDetectorIfSupported: true,
+        // BarcodeDetector on iOS Safari can silently fail; disable there.
+        useBarCodeDetectorIfSupported: !isIosSafari,
         verbose: false,
       })
       barcodeScannerRef.current = scanner
@@ -4034,21 +4035,16 @@ Please add nutritional information manually if needed.`);
         qrbox: { width: 260, height: 200 },
         aspectRatio: 16 / 9,
       }
-      const startAttempts: Array<{ label: string; config: any }> = []
-      if (preferredCamera?.id && !isIosSafari) {
-        startAttempts.push({
-          label: 'preferred-device',
-          config: { deviceId: { exact: preferredCamera.id } },
-        })
-      }
-      startAttempts.push({
-        label: `${desiredFacing}-facing`,
-        config: { facingMode: desiredFacing === 'front' ? 'user' : { ideal: 'environment' }, width: { ideal: 1280 } },
-      })
+      const startAttempts: Array<{ label: string; config: any }> = [
+        {
+          label: `${desiredFacing}-facing`,
+          config: { facingMode: desiredFacing === 'front' ? 'user' : 'environment' },
+        },
+      ]
       if (desiredFacing === 'back') {
         startAttempts.push({
           label: 'front-fallback',
-          config: { facingMode: 'user', width: { ideal: 1280 } },
+          config: { facingMode: 'user' },
         })
       }
       let started = false
