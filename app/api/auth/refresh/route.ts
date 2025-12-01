@@ -10,7 +10,10 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}))
     const headerToken = req.headers.get(REFRESH_HEADER)
-    const refreshToken = typeof body.token === 'string' && body.token.length > 0 ? body.token : headerToken
+    const cookieToken = req.cookies.get('__Secure-helfi-refresh-token')?.value
+    const refreshToken = typeof body.token === 'string' && body.token.length > 0
+      ? body.token
+      : headerToken || cookieToken
 
     if (!refreshToken) {
       return NextResponse.json({ error: 'Missing refresh token' }, { status: 400 })
@@ -58,6 +61,14 @@ export async function POST(req: NextRequest) {
     const sameSite = secure ? 'none' : 'lax'
 
     response.cookies.set('__Secure-next-auth.session-token', sessionToken, {
+      httpOnly: true,
+      secure,
+      sameSite,
+      path: '/',
+      maxAge: SESSION_MAX_AGE_SECONDS,
+    })
+    // Refresh cookie: renew alongside session so the server always has a restore token
+    response.cookies.set('__Secure-helfi-refresh-token', refreshToken, {
       httpOnly: true,
       secure,
       sameSite,

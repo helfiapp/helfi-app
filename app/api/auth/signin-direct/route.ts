@@ -96,6 +96,7 @@ export async function POST(request: NextRequest) {
     const secureCookie = '__Secure-next-auth.session-token'
     const legacyCookie = 'next-auth.session-token'
     const rememberCookie = 'helfi-remember-token'
+    const refreshCookie = '__Secure-helfi-refresh-token'
 
     response.cookies.set(secureCookie, token, {
       httpOnly: true,
@@ -111,6 +112,14 @@ export async function POST(request: NextRequest) {
       sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
       maxAge: sessionMaxAgeSeconds,
       path: '/'
+    })
+    // HttpOnly refresh cookie so the server always has a restore token even if SW/local storage aren’t ready
+    response.cookies.set(refreshCookie, keepSignedIn ? refreshToken : '', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      maxAge: keepSignedIn ? REFRESH_MAX_AGE_SECONDS : 0,
+      path: '/',
     })
     // Restore a non-HttpOnly remember cookie so middleware can reissue on resume even if the SW isn't ready.
     response.cookies.set(rememberCookie, keepSignedIn ? refreshToken : '', {

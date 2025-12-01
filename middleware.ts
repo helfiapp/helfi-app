@@ -9,6 +9,7 @@ const LEGACY_SESSION_COOKIE = 'next-auth.session-token'
 const JWT_SECRET = process.env.NEXTAUTH_SECRET || 'helfi-secret-key-production-2024'
 const REFRESH_HEADER = 'x-helfi-refresh-token'
 const REMEMBER_COOKIE = 'helfi-remember-token'
+const REFRESH_COOKIE = '__Secure-helfi-refresh-token'
 
 async function encodeSessionLike(decoded: any, maxAge: number) {
   const nowSeconds = Math.floor(Date.now() / 1000)
@@ -53,7 +54,7 @@ export async function middleware(request: NextRequest) {
 
     // If no session cookie but a refresh token header exists, re-issue session cookies (used by SW/IDB flow)
     if (!token) {
-      const refreshToken = request.headers.get(REFRESH_HEADER)
+      const refreshToken = request.headers.get(REFRESH_HEADER) || request.cookies.get(REFRESH_COOKIE)?.value
       const rememberToken = request.cookies.get(REMEMBER_COOKIE)?.value
 
       const candidateToken = refreshToken || rememberToken
