@@ -89,6 +89,18 @@ export default function SignIn() {
         if (tokenExpiresAtMs) {
           localStorage.setItem('helfi:rememberTokenExp', tokenExpiresAtMs.toString())
         }
+        // Best-effort: also send to service worker so it can restore cookies if iOS drops them.
+        try {
+          const post = () => navigator.serviceWorker?.controller?.postMessage({ type: 'SET_REMEMBER_TOKEN', token, exp: tokenExpiresAtMs || 0 })
+          if (navigator.serviceWorker) {
+            navigator.serviceWorker.ready.then((reg) => {
+              reg.active?.postMessage({ type: 'SET_REMEMBER_TOKEN', token, exp: tokenExpiresAtMs || 0 })
+            }).catch(() => post())
+            post()
+          }
+        } catch {
+          // ignore message errors
+        }
       } else {
         localStorage.removeItem('helfi:rememberMe')
         localStorage.removeItem('helfi:rememberEmail')
