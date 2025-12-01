@@ -1200,6 +1200,8 @@ export default function FoodDiary() {
   const [cameraDevices, setCameraDevices] = useState<Array<{ id: string; label: string; facing: 'front' | 'back' | 'unknown' }>>([])
   const [cameraFacing, setCameraFacing] = useState<'front' | 'back'>('back')
   const [activeCameraLabel, setActiveCameraLabel] = useState<string>('')
+  const nativeBarcodeInputRef = useRef<HTMLInputElement>(null)
+  const [isIosDevice, setIsIosDevice] = useState(false)
   const SWIPE_MENU_WIDTH = 88
   const SWIPE_DELETE_WIDTH = 96
   const [insightsNotification, setInsightsNotification] = useState<{show: boolean, message: string, type: 'updating' | 'updated'} | null>(null)
@@ -4105,6 +4107,58 @@ Please add nutritional information manually if needed.`);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showBarcodeScanner])
+
+  // Detect iOS for native camera fallback
+  useEffect(() => {
+    if (typeof navigator !== 'undefined') {
+      const ua = navigator.userAgent || ''
+      const ios = /iP(hone|od|ad)/i.test(ua)
+      setIsIosDevice(ios)
+    }
+  }, [])
+
+  // Handle native camera capture for iOS barcode scanning
+  const handleNativeBarcodeCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    
+    setBarcodeStatus('loading')
+    setBarcodeError(null)
+    
+    try {
+      const { Html5Qrcode } = await import('html5-qrcode')
+      const scanner = new Html5Qrcode('native-barcode-decoder', { verbose: false })
+      
+      const result = await scanner.scanFile(file, false)
+      
+      if (result) {
+        const cleaned = result.replace(/[^0-9A-Za-z]/g, '')
+        if (cleaned) {
+          lookupBarcodeAndAdd(cleaned)
+        } else {
+          setBarcodeError('Could not read barcode. Please try again or type the code manually.')
+          setBarcodeStatus('idle')
+        }
+      } else {
+        setBarcodeError('No barcode detected in image. Please try again.')
+        setBarcodeStatus('idle')
+      }
+      
+      // Clean up
+      try {
+        scanner.clear()
+      } catch {}
+    } catch (err) {
+      console.error('Native barcode scan error:', err)
+      setBarcodeError('Could not decode barcode from image. Please try again or type the code manually.')
+      setBarcodeStatus('idle')
+    }
+    
+    // Reset input so the same file can be selected again
+    if (nativeBarcodeInputRef.current) {
+      nativeBarcodeInputRef.current.value = ''
+    }
+  }
 
   const handleDeleteEditingEntry = async () => {
     if (!editingEntry) return
@@ -8012,6 +8066,20 @@ Please add nutritional information manually if needed.`);
 
       {showBarcodeScanner && (
         <div className="fixed inset-0 z-50 bg-white overflow-y-auto">
+          {/* Hidden container for native barcode decoder */}
+          <div id="native-barcode-decoder" style={{ display: 'none' }} />
+          
+          {/* Hidden native camera input for iOS */}
+          <input
+            ref={nativeBarcodeInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={handleNativeBarcodeCapture}
+            className="hidden"
+            aria-hidden="true"
+          />
+          
           <div className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-white">
             <button
               type="button"
@@ -8031,7 +8099,7 @@ Please add nutritional information manually if needed.`);
             <div>
               <div className="text-2xl font-semibold text-gray-900">Scan a barcode</div>
               <div className="text-sm text-gray-600">
-                Add scanned items straight into {categoryLabel(selectedAddCategory)} (FatSecret lookup)
+                Add scanned items straight into {categoryLabel(selectedAddCategory)}
               </div>
             </div>
 
@@ -8044,13 +8112,29 @@ Please add nutritional information manually if needed.`);
                 </div>
                 {barcodeStatus === 'loading' && (
                   <div className="absolute inset-0 flex items-center justify-center bg-black/40 text-white text-sm">
-                    Starting camera…
+                    {isIosDevice ? 'Processing barcode…' : 'Starting camera…'}
                   </div>
                 )}
               </div>
             </div>
 
             <div className="text-base font-semibold text-gray-800">Point your camera at the product barcode.</div>
+
+            {/* iOS Camera Button - prominent for iOS users */}
+            {isIosDevice && (
+              <button
+                type="button"
+                onClick={() => nativeBarcodeInputRef.current?.click()}
+                disabled={barcodeStatus === 'loading'}
+                className="w-full flex items-center justify-center gap-3 px-5 py-4 rounded-xl bg-blue-600 text-white text-base font-semibold hover:bg-blue-700 disabled:opacity-60 shadow-lg"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                Take Photo of Barcode
+              </button>
+            )}
 
             <div className="flex flex-col sm:flex-row gap-2">
               <input
@@ -8075,12 +8159,41 @@ Please add nutritional information manually if needed.`);
                 {barcodeError}
               </div>
             )}
+            
+            {/* Help text - iOS specific advice */}
             <div className="text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg p-3">
-              If you see a gray area, camera access is blocked. Tap “Open camera settings”, allow camera for this site,
-              then tap “Restart camera”. On iOS Safari you may need to reload after allowing. You can also type the barcode below.
+              {isIosDevice ? (
+                <>
+                  <strong>iPhone/iPad:</strong> Use the blue &quot;Take Photo of Barcode&quot; button above for best results. 
+                  You can also type the barcode number below and tap &quot;Lookup &amp; add&quot;.
+                </>
+              ) : (
+                <>
+                  If you see a gray area, camera access is blocked. Tap &quot;Camera settings&quot;, allow camera for this site,
+                  then tap &quot;Restart&quot;. You can also type the barcode number manually.
+                </>
+              )}
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm font-medium">
+            {/* Action buttons - show different options for iOS vs other devices */}
+            <div className={`grid gap-3 text-sm font-medium ${isIosDevice ? 'grid-cols-2' : 'grid-cols-1 sm:grid-cols-3'}`}>
+              {/* Photo button for iOS */}
+              {isIosDevice && (
+                <button
+                  type="button"
+                  onClick={() => nativeBarcodeInputRef.current?.click()}
+                  disabled={barcodeStatus === 'loading'}
+                  className="flex items-center justify-center gap-2 px-4 py-3 border border-blue-300 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 disabled:opacity-60"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  Take Photo
+                </button>
+              )}
+              
+              {/* Restart button - always show */}
               <button
                 type="button"
                 onClick={() => startBarcodeScanner()}
@@ -8092,32 +8205,40 @@ Please add nutritional information manually if needed.`);
                 </svg>
                 Restart
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const nextFacing = cameraFacing === 'back' ? 'front' : 'back'
-                  setCameraFacing(nextFacing)
-                  startBarcodeScanner({ forceFacing: nextFacing })
-                }}
-                disabled={barcodeStatus === 'loading' || !hasAlternateCamera}
-                className="flex items-center justify-center gap-2 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-60"
-              >
-                <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 8l7 4-7 4M9 16l-7-4 7-4m1 12V4m4 16V4" />
-                </svg>
-                Switch ({cameraFacing === 'back' ? 'Front' : 'Back'})
-              </button>
-              <button
-                type="button"
-                onClick={showCameraSettingsHelp}
-                className="flex items-center justify-center gap-2 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-60"
-              >
-                <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21c0-3.866-3.134-7-7-7s-7 3.134-7 7" />
-                </svg>
-                Camera settings
-              </button>
+              
+              {/* Switch camera button - only for non-iOS or if alternate camera available */}
+              {!isIosDevice && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const nextFacing = cameraFacing === 'back' ? 'front' : 'back'
+                    setCameraFacing(nextFacing)
+                    startBarcodeScanner({ forceFacing: nextFacing })
+                  }}
+                  disabled={barcodeStatus === 'loading' || !hasAlternateCamera}
+                  className="flex items-center justify-center gap-2 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-60"
+                >
+                  <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 8l7 4-7 4M9 16l-7-4 7-4m1 12V4m4 16V4" />
+                  </svg>
+                  Switch ({cameraFacing === 'back' ? 'Front' : 'Back'})
+                </button>
+              )}
+              
+              {/* Camera settings button - only for non-iOS */}
+              {!isIosDevice && (
+                <button
+                  type="button"
+                  onClick={showCameraSettingsHelp}
+                  className="flex items-center justify-center gap-2 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-60"
+                >
+                  <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21c0-3.866-3.134-7-7-7s-7 3.134-7 7" />
+                  </svg>
+                  Camera settings
+                </button>
+              )}
             </div>
           </div>
         </div>

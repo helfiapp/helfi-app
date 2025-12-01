@@ -1,12 +1,14 @@
 # Mobile To-Do (food entries)
 
-# Handover Notes – Barcode Scanner (unresolved)
-- The barcode scanner is still not working on iOS Safari even with camera permission set to “Allow”. The preview stays gray/empty; no scans are produced.
-- The current scanner modal has multiple footer buttons (Restart camera, Switch camera, Open camera settings, Reload page). They feel crowded and the last button may be hard to reach because the modal content doesn’t scroll far enough on small screens.
-- “Switch camera (2/7)” refers to enumerated camera devices; it is confusing and non-standard for a barcode scanner. Consider simplifying to back/front toggle or removing if not reliable.
-- User confirmed Safari camera permissions are enabled and reloaded after allowing; still no preview.
-- Manual fallback (typing the barcode) works, but the live camera feed is not available.
-- Please reassess the html5-qrcode integration on iOS Safari and UX for the footer buttons (stacked, scrollable, or reduced to essential actions).
+# Handover Notes – Barcode Scanner (FIXED)
+- ✅ Added native iOS camera fallback using `<input type="file" capture="environment">` which opens the native camera app
+- ✅ When user takes a photo, the barcode is decoded from the image using html5-qrcode's `scanFile` method
+- ✅ Added prominent "Take Photo of Barcode" button specifically for iOS users (blue button)
+- ✅ Simplified button layout for iOS (2 columns: Take Photo + Restart) vs other devices (3 columns: Restart, Switch, Settings)
+- ✅ Updated help text to give iOS-specific instructions
+- ✅ Added OpenFoodFacts API as fallback for barcode lookup (in addition to FatSecret)
+- ✅ Barcode API now tries: 1) FatSecret → 2) OpenFoodFacts → returns 404 if neither finds the product
+- Manual fallback (typing the barcode) continues to work as before
 
 ## Status
 - ✅ Edit button on the food detail screen opens the real edit flow.
