@@ -129,25 +129,13 @@ function SessionKeepAlive() {
       }
 
       if (token) {
-        const msLeft = tokenExp ? Math.max(tokenExp - now, 5_000) : 5 * 365 * 24 * 60 * 60 * 1000
-        const maxAgeSeconds = Math.floor(msLeft / 1000)
-        try {
-          const secureFlag = window.location.protocol === 'https:' ? '; Secure' : ''
-          const sameSite = window.location.protocol === 'https:' ? 'SameSite=None' : 'SameSite=Lax'
-          console.log('[AUTH-PROVIDER] Setting cookies from localStorage token:', {
-            reason,
-            maxAgeSeconds,
-            sameSite,
-          })
-          document.cookie = `__Secure-next-auth.session-token=${token}; path=/; max-age=${maxAgeSeconds}; ${sameSite}${secureFlag}`
-          document.cookie = `next-auth.session-token=${token}; path=/; max-age=${maxAgeSeconds}; ${sameSite}${secureFlag}`
-          localStorage.setItem(LAST_SESSION_RESTORE, now.toString())
-          localStorage.removeItem(LAST_MANUAL_SIGNOUT)
-          return
-        } catch (err) {
-          console.warn('[AUTH-PROVIDER] Cookie setting failed, falling through to network reissue:', err)
-          // fall through to network reissue
-        }
+        // Client-side cookie setting cannot properly set SameSite=None
+        // Must use server-side endpoint to set cookies with proper SameSite=None; Secure
+        // Fall through to network reissue which will set cookies server-side
+        console.log('[AUTH-PROVIDER] Token found, will use server restore endpoint:', {
+          reason,
+          hasToken: !!token,
+        })
       }
 
       if (now - lastRestoreAt < 15_000) {

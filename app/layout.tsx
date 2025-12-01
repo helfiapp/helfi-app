@@ -154,19 +154,12 @@ export default function RootLayout({
                   }
 
                   if (token && tokenExp) {
-                    const secureFlag = window.location.protocol === 'https:' ? '; Secure' : ''
-                    const msLeft = Math.max(tokenExp - now, 5)
-                    const maxAgeSeconds = Math.floor(msLeft)
-                    const sameSite = window.location.protocol === 'https:' ? 'SameSite=None' : 'SameSite=Lax'
-                    console.log('[PRE-HYDRATION] Setting cookies from localStorage token:', {
+                    // Client-side cookie setting cannot properly set SameSite=None
+                    // Must use server-side endpoint to set cookies with proper SameSite=None; Secure
+                    console.log('[PRE-HYDRATION] Token found, calling server restore endpoint:', {
                       hasToken: !!token,
-                      maxAgeSeconds: maxAgeSeconds,
-                      sameSite: sameSite,
+                      tokenExpired: now > tokenExp,
                     })
-                    document.cookie = \`__Secure-next-auth.session-token=\${token}; path=/; max-age=\${maxAgeSeconds}; \${sameSite}\${secureFlag}\`
-                    document.cookie = \`next-auth.session-token=\${token}; path=/; max-age=\${maxAgeSeconds}; \${sameSite}\${secureFlag}\`
-                    localStorage.setItem(LAST_SESSION_RESTORE, now.toString())
-                    localStorage.removeItem(LAST_MANUAL_SIGNOUT)
                     if (!hasSessionCookie) {
                       console.log('[PRE-HYDRATION] No session cookie found, calling reissueSession')
                       reissueSession()
