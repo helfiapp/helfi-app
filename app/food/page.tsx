@@ -4147,35 +4147,45 @@ Please add nutritional information manually if needed.`);
         verbose: false,
       })
       barcodeScannerRef.current = scanner
-      const scanConfig: any = {
-        fps: 10,
-        aspectRatio: 16 / 9,
-        disableFlip: false,
-      }
+      const scanConfig: any = isIosSafari
+        ? {
+            fps: 10,
+            disableFlip: false,
+          }
+        : {
+            fps: 10,
+            aspectRatio: 16 / 9,
+            disableFlip: false,
+          }
       const startAttempts: Array<{ label: string; config: any }> = []
       if (preferredCamera?.id) {
         startAttempts.push({
           label: 'preferred-device',
-          config: { deviceId: { exact: preferredCamera.id }, width: { ideal: 1280 } },
+          config: { deviceId: { exact: preferredCamera.id } },
         })
       }
       startAttempts.push({
-        label: `${desiredFacing}-facing`,
-        config: { facingMode: desiredFacing === 'front' ? 'user' : 'environment', width: { ideal: 1280 } },
+        label: `${desiredFacing}-ideal`,
+        config: { facingMode: { ideal: desiredFacing === 'front' ? 'user' : 'environment' } },
+      })
+      startAttempts.push({
+        label: `${desiredFacing}-simple`,
+        config: { facingMode: desiredFacing === 'front' ? 'user' : 'environment' },
       })
       if (desiredFacing === 'back') {
         startAttempts.push({
           label: 'front-fallback',
-          config: { facingMode: 'user', width: { ideal: 1280 } },
+          config: { facingMode: 'user' },
         })
       }
       // Some iOS PWA builds only resolve when camera is unspecified
       startAttempts.push({
         label: 'default-video',
-        config: { video: true },
+        config: { facingMode: undefined },
       })
       let started = false
       let lastError: any = null
+      let lastErrorMessage = ''
       for (const attempt of startAttempts) {
         try {
           await scanner.start(
@@ -4188,6 +4198,10 @@ Please add nutritional information manually if needed.`);
           break
         } catch (err) {
           lastError = err
+          lastErrorMessage =
+            (err as any)?.message ||
+            (err as any)?.name ||
+            (typeof err === 'string' ? err : '')
           console.error('Scanner start failed on attempt', attempt.label, err)
           try {
             await scanner.stop()
@@ -4208,7 +4222,8 @@ Please add nutritional information manually if needed.`);
         setBarcodeError(
           isIosSafari
             ? 'Camera failed to start. Ensure Private Browsing is off, refresh after granting camera, then tap Restart.'
-            : 'Camera failed to start. Try switching camera or reloading after allowing permissions.',
+            : 'Camera failed to start. Try switching camera or reloading after allowing permissions.'
+        + (lastErrorMessage ? ` (${lastErrorMessage})` : ''),
         )
         setBarcodeStatus('idle')
         stopBarcodeScanner()
