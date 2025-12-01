@@ -229,6 +229,20 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, pathname, isAdminPanelPath, publicPages, session])
 
+  // Track the last in-app page the user visited (for “resume where I left off”).
+  // We only store non-public, non-admin paths so onboarding / auth pages are excluded.
+  useEffect(() => {
+    if (status !== 'authenticated') return
+    if (publicPages.includes(pathname) || isAdminPanelPath) return
+    if (typeof window === 'undefined') return
+    try {
+      const fullPath = window.location.pathname + window.location.search
+      localStorage.setItem('helfi:lastPath', fullPath)
+    } catch {
+      // Ignore storage errors
+    }
+  }, [status, pathname, isAdminPanelPath, publicPages])
+
   // Silent re-login for iOS PWA: if the app resumes in standalone mode,
   // there is no active session, but the user previously chose "Keep me signed in",
   // quietly call the direct sign-in endpoint once before sending them to /auth/signin.

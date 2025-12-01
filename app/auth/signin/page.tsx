@@ -58,11 +58,46 @@ export default function SignIn() {
 
   // If the user is already logged in and somehow lands on the sign-in page
   // (for example, via the iOS Home Screen icon), immediately send them into
-  // the main app instead of making them log in again.
+  // the main app instead of making them log in again. Respect Health Setup:
+  // - If Health Setup is incomplete, always go to /onboarding (existing behaviour).
+  // - If complete, resume last in-app page when possible, otherwise go to dashboard.
   useEffect(() => {
-    if (status === 'authenticated') {
+    if (status !== 'authenticated') return
+    if (typeof window === 'undefined') {
       router.replace('/dashboard')
+      return
     }
+
+    const resume = async () => {
+      // First, check Health Setup status without changing its existing rules.
+      try {
+        const res = await fetch('/api/health-setup-status', { method: 'GET' })
+        if (res.ok) {
+          const data = await res.json()
+          const complete = !!data.complete
+          if (!complete) {
+            router.replace('/onboarding')
+            return
+          }
+        }
+      } catch {
+        // If this fails, fall back to normal behaviour below.
+      }
+
+      // Health Setup complete: try to restore last in-app path.
+      let target = '/dashboard'
+      try {
+        const lastPath = localStorage.getItem('helfi:lastPath')
+        if (lastPath && !lastPath.startsWith('/auth') && lastPath !== '/' && !lastPath.startsWith('/healthapp')) {
+          target = lastPath
+        }
+      } catch {
+        // Ignore storage errors and use default target.
+      }
+      router.replace(target)
+    }
+
+    void resume()
   }, [status, router])
 
   useEffect(() => {
