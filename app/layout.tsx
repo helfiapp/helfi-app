@@ -70,6 +70,12 @@ export default function RootLayout({
                   const LAST_SESSION_RESTORE = 'helfi:lastSessionRestore'
                   const remembered = localStorage.getItem(REMEMBER_FLAG) === '1'
                   const email = (localStorage.getItem(REMEMBER_EMAIL) || '').trim().toLowerCase()
+                  const ensureRememberedFlag = () => {
+                    try {
+                      localStorage.setItem(REMEMBER_FLAG, '1')
+                    } catch {}
+                  }
+                  ensureRememberedFlag()
                   if (!remembered || !email) return
 
                   const now = Date.now()
@@ -82,6 +88,25 @@ export default function RootLayout({
                   const token = localStorage.getItem(REMEMBER_TOKEN) || ''
                   const tokenExp = parseInt(localStorage.getItem(REMEMBER_TOKEN_EXP) || '0', 10)
                   const secureFlag = window.location.protocol === 'https:' ? '; Secure' : ''
+                  const hasSessionCookie = document.cookie.includes('__Secure-next-auth.session-token') || document.cookie.includes('next-auth.session-token')
+                  const reissueSession = async () => {
+                    try {
+                      const res = await fetch('/api/auth/signin-direct', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'same-origin',
+                        body: JSON.stringify({ email, rememberMe: true })
+                      })
+                      if (res.ok) {
+                        localStorage.setItem(LAST_SESSION_RESTORE, Date.now().toString())
+                        localStorage.removeItem(LAST_MANUAL_SIGNOUT)
+                      } else if (res.status === 401) {
+                        localStorage.removeItem(REMEMBER_FLAG)
+                        localStorage.removeItem(REMEMBER_EMAIL)
+                      }
+                    } catch {}
+                  }
+
                   if (token) {
                     const msLeft = tokenExp ? Math.max(tokenExp - now, 5_000) : 5 * 365 * 24 * 60 * 60 * 1000
                     const maxAgeSeconds = Math.floor(msLeft / 1000)
@@ -89,6 +114,9 @@ export default function RootLayout({
                     document.cookie = \`next-auth.session-token=\${token}; path=/; max-age=\${maxAgeSeconds}; SameSite=Lax\${secureFlag}\`
                     localStorage.setItem(LAST_SESSION_RESTORE, now.toString())
                     localStorage.removeItem(LAST_MANUAL_SIGNOUT)
+                    if (!hasSessionCookie) {
+                      reissueSession()
+                    }
                     return
                   }
 
