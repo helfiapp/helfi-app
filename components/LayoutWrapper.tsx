@@ -170,6 +170,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   const router = useRouter()
   const { data: session, status } = useSession()
   const [showHealthSetupReminder, setShowHealthSetupReminder] = useState(false)
+  const [silentRestoreAttempted, setSilentRestoreAttempted] = useState(false)
   
   // Pages that should ALWAYS be public (no sidebar regardless of auth status)
   const publicPages = ['/', '/healthapp', '/auth/signin', '/auth/verify', '/auth/check-email', '/onboarding', '/privacy', '/terms', '/help', '/faq']
@@ -227,6 +228,67 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, pathname, isAdminPanelPath, publicPages, session])
+
+  // Silent re-login for iOS PWA: if the app resumes in standalone mode,
+  // there is no active session, but the user previously chose "Keep me signed in",
+  // quietly call the direct sign-in endpoint once before sending them to /auth/signin.
+  useEffect(() => {
+    if (status !== 'unauthenticated') return
+    if (publicPages.includes(pathname) || isAdminPanelPath) return
+    if (silentRestoreAttempted) return
+    if (typeof window === 'undefined') return
+
+    // Detect PWA / standalone mode
+    const isStandalone =
+      (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+      // Safari iOS legacy flag
+      (window.navigator as any).standalone === true
+
+    if (!isStandalone) {
+      // Let normal redirect logic handle browser mode.
+      setSilentRestoreAttempted(true)
+      return
+    }
+
+    let remembered = false
+    let email = ''
+    try {
+      remembered = localStorage.getItem('helfi:rememberMe') === '1'
+      email = (localStorage.getItem('helfi:rememberEmail') || '').trim().toLowerCase()
+    } catch {
+      // If we can't read storage, fall back to normal redirect.
+      setSilentRestoreAttempted(true)
+      return
+    }
+
+    if (!remembered || !email) {
+      setSilentRestoreAttempted(true)
+      return
+    }
+
+    setSilentRestoreAttempted(true)
+
+    ;(async () => {
+      try {
+        const res = await fetch('/api/auth/signin-direct', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ email, password: '', rememberMe: true }),
+        })
+
+        if (res.ok) {
+          // Fresh session cookies set – reload current page so the app sees the new session.
+          window.location.reload()
+        } else {
+          window.location.href = '/auth/signin'
+        }
+      } catch {
+        window.location.href = '/auth/signin'
+      }
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, pathname, isAdminPanelPath, publicPages, silentRestoreAttempted])
   
   // Don't show sidebar while session is loading to prevent flickering
   if (status === 'loading') {
@@ -296,7 +358,11 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   
   if (status === 'unauthenticated' && !publicPages.includes(pathname) && !isAdminPanelPath) {
     if (typeof window !== 'undefined') {
-      window.location.href = '/auth/signin'
+      // If silent restore has already been attempted (or not applicable),
+      // fall back to the normal sign-in redirect.
+      if (silentRestoreAttempted) {
+        window.location.href = '/auth/signin'
+      }
     }
     return (
       <div className="min-h-screen flex items-center justify-center">
