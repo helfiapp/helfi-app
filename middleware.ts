@@ -101,7 +101,7 @@ export async function middleware(request: NextRequest) {
   if (pathname === '/auth/signin') {
     const rememberHeader = request.headers.get('x-helfi-remember-token') || request.cookies.get(REMEMBER_COOKIE)?.value
     const hasSessionCookie = request.cookies.get(SESSION_COOKIE)?.value || request.cookies.get(LEGACY_SESSION_COOKIE)?.value
-    if (token || hasSessionCookie || rememberHeader) {
+    if ((typeof token !== 'undefined' && token) || hasSessionCookie || rememberHeader) {
       const url = request.nextUrl.clone()
       url.pathname = '/healthapp'
       return NextResponse.redirect(url)
