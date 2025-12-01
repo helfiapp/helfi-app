@@ -92,12 +92,17 @@ export async function middleware(request: NextRequest) {
     // Continue without session preservation if there's an error
   }
 
-  // Gate sign-in routes behind /healthapp admin check
   const pathname = request.nextUrl.pathname
-  if (skipAdminGate && pathname === '/healthapp') {
-    const url = request.nextUrl.clone()
-    url.pathname = '/auth/signin'
-    return NextResponse.redirect(url)
+  // Allow authenticated users to land on /healthapp without redirecting to signin
+  if (pathname === '/healthapp') {
+    if (token) {
+      return NextResponse.next()
+    }
+    if (skipAdminGate) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/auth/signin'
+      return NextResponse.redirect(url)
+    }
   }
   // Never allow direct access to the temporary staging sign-in page
   if (pathname === '/staging-signin') {
