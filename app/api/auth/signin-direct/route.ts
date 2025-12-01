@@ -78,6 +78,7 @@ export async function POST(request: NextRequest) {
     // Set NextAuth session cookie with proper format
     const secureCookie = '__Secure-next-auth.session-token'
     const legacyCookie = 'next-auth.session-token'
+    const rememberCookie = 'helfi-remember-token'
 
     response.cookies.set(secureCookie, token, {
       httpOnly: true,
@@ -93,6 +94,14 @@ export async function POST(request: NextRequest) {
       sameSite: 'lax',
       maxAge: maxAgeSeconds,
       path: '/'
+    })
+    // Store a non-HttpOnly remember token so we can re-issue the session on PWA resume if Safari drops cookies
+    response.cookies.set(rememberCookie, keepSignedIn ? token : '', {
+      httpOnly: false,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: keepSignedIn ? maxAgeSeconds : 0,
+      path: '/',
     })
 
     console.log('✅ Direct signin successful with NextAuth-compatible session created')
