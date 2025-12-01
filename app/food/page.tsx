@@ -8070,15 +8070,15 @@ Please add nutritional information manually if needed.`);
                 </button>
               </div>
               <div className="flex flex-col gap-2 text-xs text-gray-500">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={startBarcodeScanner}
-                    disabled={barcodeStatus === 'loading'}
-                    className="w-full inline-flex items-center justify-center gap-2 px-3 py-3 border border-gray-300 hover:bg-gray-50 disabled:opacity-60 text-sm font-medium"
-                    style={{ borderRadius: 0 }}
-                  >
-                    <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => startBarcodeScanner()}
+                        disabled={barcodeStatus === 'loading'}
+                        className="w-full inline-flex items-center justify-center gap-2 px-3 py-3 border border-gray-300 hover:bg-gray-50 disabled:opacity-60 text-sm font-medium"
+                        style={{ borderRadius: 0 }}
+                      >
+                        <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5m0 6v5m16-16v5m0 6v5M4 4h5m6 0h5M4 20h5m6 0h5M9 4v5m0 6v5m6-16v5m0 6v5" />
                     </svg>
                     Restart camera
