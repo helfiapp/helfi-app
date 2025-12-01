@@ -80,24 +80,25 @@ export async function POST(request: NextRequest) {
     const legacyCookie = 'next-auth.session-token'
     const rememberCookie = 'helfi-remember-token'
 
+    const isProduction = process.env.NODE_ENV === 'production'
+
     response.cookies.set(secureCookie, token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      secure: isProduction,
+      sameSite: isProduction ? 'none' : 'lax',
       maxAge: maxAgeSeconds,
       path: '/'
     })
     // Also set legacy cookie name for compatibility
     response.cookies.set(legacyCookie, token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      secure: isProduction,
+      sameSite: isProduction ? 'none' : 'lax',
       maxAge: maxAgeSeconds,
       path: '/'
     })
     // Store a non-HttpOnly remember token so we can re-issue the session on PWA resume if Safari drops cookies
     // Use SameSite=None; Secure for iOS PWA compatibility (required for cross-site cookie persistence)
-    const isProduction = process.env.NODE_ENV === 'production'
     response.cookies.set(rememberCookie, keepSignedIn ? token : '', {
       httpOnly: false,
       secure: isProduction,
@@ -144,8 +145,9 @@ export async function GET(request: NextRequest) {
       maxAge: maxAgeSeconds,
     })
     const response = NextResponse.redirect(new URL('/onboarding', request.url))
-    response.cookies.set('__Secure-next-auth.session-token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', maxAge: maxAgeSeconds, path: '/' })
-    response.cookies.set('next-auth.session-token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', maxAge: maxAgeSeconds, path: '/' })
+    const isProduction = process.env.NODE_ENV === 'production'
+    response.cookies.set('__Secure-next-auth.session-token', token, { httpOnly: true, secure: isProduction, sameSite: isProduction ? 'none' : 'lax', maxAge: maxAgeSeconds, path: '/' })
+    response.cookies.set('next-auth.session-token', token, { httpOnly: true, secure: isProduction, sameSite: isProduction ? 'none' : 'lax', maxAge: maxAgeSeconds, path: '/' })
     return response
   } catch (e) {
     return NextResponse.redirect(new URL('/auth/signin?error=Signin', request.url))
