@@ -94,7 +94,7 @@ export async function middleware(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname
   // Allow /healthapp to render without forcing a redirect so PWA can start there
-  if (pathname === '/healthapp') {
+  if (pathname === '/healthapp' || pathname === '/pwa-start') {
     return NextResponse.next()
   }
   // Never allow direct access to the temporary staging sign-in page

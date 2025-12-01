@@ -13,7 +13,7 @@
       "sizes": "512x512"
     }
   ],
-  "start_url": "/healthapp",
+  "start_url": "/pwa-start?launch=1",
   "scope": "/",
   "display": "standalone",
   "background_color": "#ffffff",
