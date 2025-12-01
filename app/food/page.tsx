@@ -4153,7 +4153,7 @@ Please add nutritional information manually if needed.`);
         disableFlip: false,
       }
       const startAttempts: Array<{ label: string; config: any }> = []
-      if (preferredCamera?.id && !isIosSafari) {
+      if (preferredCamera?.id) {
         startAttempts.push({
           label: 'preferred-device',
           config: { deviceId: { exact: preferredCamera.id }, width: { ideal: 1280 } },
@@ -4169,6 +4169,11 @@ Please add nutritional information manually if needed.`);
           config: { facingMode: 'user', width: { ideal: 1280 } },
         })
       }
+      // Some iOS PWA builds only resolve when camera is unspecified
+      startAttempts.push({
+        label: 'default-video',
+        config: { video: true },
+      })
       let started = false
       let lastError: any = null
       for (const attempt of startAttempts) {
