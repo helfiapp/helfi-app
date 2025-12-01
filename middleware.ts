@@ -8,7 +8,6 @@ const REMEMBER_COOKIE = 'helfi-remember-token'
 const SESSION_COOKIE = '__Secure-next-auth.session-token'
 const LEGACY_SESSION_COOKIE = 'next-auth.session-token'
 const JWT_SECRET = process.env.NEXTAUTH_SECRET || 'helfi-secret-key-production-2024'
-const REMEMBER_HEADER = 'x-helfi-remember-token'
 
 export async function middleware(request: NextRequest) {
   // Preview-staging should always skip the admin gate to avoid iOS logout loops
@@ -34,9 +33,9 @@ export async function middleware(request: NextRequest) {
         : 'next-auth.session-token'
     })
 
-    // If no session cookie, try remember token from cookie or header and re-issue session cookies
+    // If no session cookie but remember token exists, re-issue session cookies (helps iOS PWA when cookies are dropped)
     if (!token) {
-      const remember = request.cookies.get(REMEMBER_COOKIE)?.value || request.headers.get(REMEMBER_HEADER) || ''
+      const remember = request.cookies.get(REMEMBER_COOKIE)?.value
       if (remember) {
         try {
           const decoded = await decode({ token: remember, secret: JWT_SECRET })
@@ -92,20 +91,12 @@ export async function middleware(request: NextRequest) {
     // Continue without session preservation if there's an error
   }
 
+  // Gate sign-in routes behind /healthapp admin check
   const pathname = request.nextUrl.pathname
-  // Allow /healthapp to render without forcing a redirect so PWA can start there
-  if (pathname === '/healthapp' || pathname === '/pwa-start') {
-    return NextResponse.next()
-  }
-  // If already authenticated (or has remember header/cookie), redirect away from auth/signin
-  if (pathname === '/auth/signin') {
-    const rememberHeader = request.headers.get('x-helfi-remember-token') || request.cookies.get(REMEMBER_COOKIE)?.value
-    const hasSessionCookie = request.cookies.get(SESSION_COOKIE)?.value || request.cookies.get(LEGACY_SESSION_COOKIE)?.value
-    if ((typeof token !== 'undefined' && token) || hasSessionCookie || rememberHeader) {
-      const url = request.nextUrl.clone()
-      url.pathname = '/healthapp'
-      return NextResponse.redirect(url)
-    }
+  if (skipAdminGate && pathname === '/healthapp') {
+    const url = request.nextUrl.clone()
+    url.pathname = '/auth/signin'
+    return NextResponse.redirect(url)
   }
   // Never allow direct access to the temporary staging sign-in page
   if (pathname === '/staging-signin') {

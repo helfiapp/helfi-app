@@ -13,9 +13,10 @@
       "sizes": "512x512"
     }
   ],
-  "start_url": "/pwa-start?launch=1",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#ffffff"
 }
+
