@@ -4022,28 +4022,30 @@ Please add nutritional information manually if needed.`);
           Html5QrcodeSupportedFormats.EAN_8,
           Html5QrcodeSupportedFormats.UPC_A,
           Html5QrcodeSupportedFormats.UPC_E,
+          Html5QrcodeSupportedFormats.UPC_EAN_EXTENSION,
           Html5QrcodeSupportedFormats.CODE_128,
           Html5QrcodeSupportedFormats.CODE_39,
+          Html5QrcodeSupportedFormats.CODE_93,
         ],
-        // BarcodeDetector on iOS Safari can silently fail; disable there.
-        useBarCodeDetectorIfSupported: !isIosSafari,
+        useBarCodeDetectorIfSupported: true,
         verbose: false,
       })
       barcodeScannerRef.current = scanner
       const scanConfig: any = {
         fps: 10,
         aspectRatio: 16 / 9,
+        disableFlip: false,
       }
       const startAttempts: Array<{ label: string; config: any }> = [
         {
           label: `${desiredFacing}-facing`,
-          config: { facingMode: desiredFacing === 'front' ? 'user' : 'environment' },
+          config: { facingMode: desiredFacing === 'front' ? 'user' : 'environment', width: { ideal: 1280 } },
         },
       ]
       if (desiredFacing === 'back') {
         startAttempts.push({
           label: 'front-fallback',
-          config: { facingMode: 'user' },
+          config: { facingMode: 'user', width: { ideal: 1280 } },
         })
       }
       let started = false
@@ -8033,9 +8035,6 @@ Please add nutritional information manually if needed.`);
                 <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-white/90">
                   <div className="text-lg font-semibold drop-shadow-sm">Scan Barcode</div>
                   <div className="text-sm text-white/80 drop-shadow-sm">Place barcode in the frame to scan</div>
-                </div>
-                <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                  <div className="w-64 h-64 border-4 border-white/85 rounded-2xl shadow-[0_0_0_2000px_rgba(0,0,0,0.35)]" />
                 </div>
                 {barcodeStatus === 'loading' && (
                   <div className="absolute inset-0 flex items-center justify-center bg-black/40 text-white text-sm">
