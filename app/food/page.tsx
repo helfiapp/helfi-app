@@ -1197,6 +1197,9 @@ export default function FoodDiary() {
   const [barcodeStatus, setBarcodeStatus] = useState<'idle' | 'scanning' | 'loading'>('idle')
   const barcodeScannerRef = useRef<any>(null)
   const barcodeLookupInFlightRef = useRef(false)
+  const nativeBarcodeStreamRef = useRef<MediaStream | null>(null)
+  const nativeBarcodeVideoRef = useRef<HTMLVideoElement | null>(null)
+  const nativeBarcodeFrameRef = useRef<number | null>(null)
   const [cameraDevices, setCameraDevices] = useState<Array<{ id: string; label: string; facing: 'front' | 'back' | 'unknown' }>>([])
   const [cameraFacing, setCameraFacing] = useState<'front' | 'back'>('back')
   const [activeCameraLabel, setActiveCameraLabel] = useState<string>('')
@@ -3815,7 +3818,36 @@ Please add nutritional information manually if needed.`);
     return { allMeals, favoriteMeals, customMeals }
   }
 
+  const stopNativeBarcodeDetector = () => {
+    const hadNativeVideo = !!nativeBarcodeVideoRef.current
+    if (nativeBarcodeFrameRef.current) {
+      cancelAnimationFrame(nativeBarcodeFrameRef.current)
+      nativeBarcodeFrameRef.current = null
+    }
+    if (nativeBarcodeVideoRef.current) {
+      try {
+        nativeBarcodeVideoRef.current.pause()
+      } catch {}
+      nativeBarcodeVideoRef.current.srcObject = null
+      nativeBarcodeVideoRef.current.remove()
+      nativeBarcodeVideoRef.current = null
+    }
+    if (nativeBarcodeStreamRef.current) {
+      nativeBarcodeStreamRef.current.getTracks().forEach((t) => {
+        try {
+          t.stop()
+        } catch {}
+      })
+      nativeBarcodeStreamRef.current = null
+    }
+    if (hadNativeVideo && typeof document !== 'undefined') {
+      const region = document.getElementById(BARCODE_REGION_ID)
+      if (region) region.innerHTML = ''
+    }
+  }
+
   const stopBarcodeScanner = () => {
+    stopNativeBarcodeDetector()
     const scanner = barcodeScannerRef.current
     if (scanner) {
       try {
@@ -3827,6 +3859,10 @@ Please add nutritional information manually if needed.`);
         }
       } catch {}
       barcodeScannerRef.current = null
+    }
+    if (typeof document !== 'undefined') {
+      const region = document.getElementById(BARCODE_REGION_ID)
+      if (region) region.innerHTML = ''
     }
   }
 
@@ -3952,6 +3988,68 @@ Please add nutritional information manually if needed.`);
     lookupBarcodeAndAdd(cleaned)
   }
 
+  const startNativeBarcodeDetector = async (desiredFacing: 'front' | 'back') => {
+    if (typeof window === 'undefined' || typeof navigator === 'undefined') return false
+    const BarcodeDetectorCtor = (window as any).BarcodeDetector
+    if (!BarcodeDetectorCtor) return false
+    const region = document.getElementById(BARCODE_REGION_ID)
+    if (!region) return false
+
+    stopNativeBarcodeDetector()
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: desiredFacing === 'front' ? 'user' : { ideal: 'environment' },
+        },
+      })
+      const videoEl = document.createElement('video')
+      videoEl.setAttribute('playsinline', 'true')
+      videoEl.setAttribute('autoplay', 'true')
+      videoEl.muted = true
+      videoEl.style.width = '100%'
+      videoEl.style.height = '100%'
+      videoEl.style.objectFit = 'cover'
+      region.innerHTML = ''
+      region.appendChild(videoEl)
+      videoEl.srcObject = stream
+
+      nativeBarcodeStreamRef.current = stream
+      nativeBarcodeVideoRef.current = videoEl
+
+      await videoEl.play().catch(() => {})
+
+      const detector = new BarcodeDetectorCtor({
+        formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'code_93', 'codabar'],
+      })
+
+      const scanFrame = async () => {
+        if (!nativeBarcodeVideoRef.current) return
+        try {
+          const detections = await detector.detect(nativeBarcodeVideoRef.current)
+          const first = detections?.[0]
+          const detectedValue =
+            first?.rawValue ||
+            (first?.rawData ? new TextDecoder().decode(first.rawData) : null)
+          if (detectedValue) {
+            handleBarcodeDetected(detectedValue)
+            return
+          }
+        } catch (err) {
+          console.error('Native barcode detect error', err)
+        }
+        nativeBarcodeFrameRef.current = requestAnimationFrame(scanFrame)
+      }
+
+      nativeBarcodeFrameRef.current = requestAnimationFrame(scanFrame)
+      return true
+    } catch (err) {
+      console.error('Native barcode start failed', err)
+      stopNativeBarcodeDetector()
+      return false
+    }
+  }
+
   const startBarcodeScanner = async (options?: { forceFacing?: 'front' | 'back' }) => {
     if (!showBarcodeScanner) return
     const desiredFacing: 'front' | 'back' = options?.forceFacing || cameraFacing || 'back'
@@ -3959,6 +4057,11 @@ Please add nutritional information manually if needed.`);
     const isIos = /iP(hone|od|ad)/i.test(userAgent)
     const isSafari = /^((?!chrome|android).)*safari/i.test(userAgent)
     const isIosSafari = isIos && isSafari
+    const isStandalone = typeof window !== 'undefined'
+      ? (window.matchMedia?.('(display-mode: standalone)').matches || (window.navigator as any).standalone === true)
+      : false
+    const canUseNativeDetector = typeof window !== 'undefined' && typeof (window as any).BarcodeDetector !== 'undefined'
+    const preferNativeDetector = isIosSafari && isStandalone && canUseNativeDetector
     setBarcodeStatus('loading')
     try {
       setBarcodeError(null)
@@ -3968,6 +4071,16 @@ Please add nutritional information manually if needed.`);
         setBarcodeError('Camera is only available in the browser.')
         setBarcodeStatus('idle')
         return
+      }
+      if (preferNativeDetector) {
+        const nativeStarted = await startNativeBarcodeDetector(desiredFacing)
+        if (nativeStarted) {
+          setCameraFacing(desiredFacing)
+          setActiveCameraLabel(desiredFacing === 'front' ? 'Front camera' : 'Back camera')
+          setBarcodeStatus('scanning')
+          return
+        }
+        console.warn('Native barcode detector fallback failed, trying html5-qrcode')
       }
       try {
         const permissionStream = await navigator.mediaDevices.getUserMedia({
@@ -4077,6 +4190,15 @@ Please add nutritional information manually if needed.`);
         }
       }
       if (!started) {
+        if (canUseNativeDetector) {
+          const nativeStarted = await startNativeBarcodeDetector(desiredFacing)
+          if (nativeStarted) {
+            setCameraFacing(desiredFacing)
+            setActiveCameraLabel(desiredFacing === 'front' ? 'Front camera' : 'Back camera')
+            setBarcodeStatus('scanning')
+            return
+          }
+        }
         console.error('All scanner start attempts failed', lastError)
         setBarcodeError(
           isIosSafari
@@ -4090,6 +4212,15 @@ Please add nutritional information manually if needed.`);
       setBarcodeStatus('scanning')
     } catch (err) {
       console.error('Barcode scanner start error', err)
+      if (canUseNativeDetector) {
+        const nativeStarted = await startNativeBarcodeDetector(desiredFacing)
+        if (nativeStarted) {
+          setCameraFacing(desiredFacing)
+          setActiveCameraLabel(desiredFacing === 'front' ? 'Front camera' : 'Back camera')
+          setBarcodeStatus('scanning')
+          return
+        }
+      }
       setBarcodeError('Could not start the camera. Tap “Open camera settings”, allow camera, then hit Restart.')
       setBarcodeStatus('idle')
     }
