@@ -11,12 +11,13 @@ export async function POST(req: NextRequest) {
     }
 
     const decoded = await decode({ token, secret: SECRET }).catch(() => null)
-    if (!decoded || !decoded.exp) {
+    if (!decoded || !decoded.exp || typeof decoded.exp !== 'number') {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
     }
 
     const nowSeconds = Math.floor(Date.now() / 1000)
-    const ttlSeconds = Math.max(decoded.exp - nowSeconds, 5)
+    const exp = decoded.exp as number
+    const ttlSeconds = Math.max(exp - nowSeconds, 5)
     if (ttlSeconds <= 0) {
       return NextResponse.json({ error: 'Token expired' }, { status: 401 })
     }
