@@ -84,13 +84,17 @@ export default function RootLayout({
                   if (manualSignOutAt && now - manualSignOutAt < 5 * 60 * 1000) return
 
                   const lastRestoreAt = parseInt(localStorage.getItem(LAST_SESSION_RESTORE) || '0', 10)
-                  if (now - lastRestoreAt < 15_000) return
+                  const canRetry = () => {
+                    const diff = Date.now() - parseInt(localStorage.getItem(LAST_SESSION_RESTORE) || '0', 10)
+                    return diff > 2_000
+                  }
 
                   const token = localStorage.getItem(REMEMBER_TOKEN) || ''
                   const tokenExp = parseInt(localStorage.getItem(REMEMBER_TOKEN_EXP) || '0', 10)
                   const secureFlag = window.location.protocol === 'https:' ? '; Secure' : ''
                   const hasSessionCookie = document.cookie.includes('__Secure-next-auth.session-token') || document.cookie.includes('next-auth.session-token')
                   const reissueSession = async () => {
+                    if (!canRetry()) return
                     try {
                       const res = await fetch('/api/auth/signin-direct', {
                         method: 'POST',
@@ -127,22 +131,34 @@ export default function RootLayout({
                       const hasSession = ok && data && data.user
                       if (hasSession) return
 
-                      const res = await fetch('/api/auth/signin-direct', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        credentials: 'same-origin',
-                        body: JSON.stringify({ email, rememberMe: true })
-                      })
+                      if (canRetry()) {
+                        const res = await fetch('/api/auth/signin-direct', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          credentials: 'same-origin',
+                          body: JSON.stringify({ email, rememberMe: true })
+                        })
 
-                      if (res.ok) {
-                        localStorage.setItem(LAST_SESSION_RESTORE, Date.now().toString())
-                        localStorage.removeItem(LAST_MANUAL_SIGNOUT)
-                      } else if (res.status === 401) {
-                        localStorage.removeItem(REMEMBER_FLAG)
-                        localStorage.removeItem(REMEMBER_EMAIL)
+                        if (res.ok) {
+                          localStorage.setItem(LAST_SESSION_RESTORE, Date.now().toString())
+                          localStorage.removeItem(LAST_MANUAL_SIGNOUT)
+                        } else if (res.status === 401) {
+                          localStorage.removeItem(REMEMBER_FLAG)
+                          localStorage.removeItem(REMEMBER_EMAIL)
+                        }
                       }
                     })
                     .catch(() => {})
+
+                  const bindResume = () => {
+                    const handler = () => reissueSession()
+                    window.addEventListener('pageshow', handler)
+                    window.addEventListener('focus', handler)
+                    document.addEventListener('visibilitychange', () => {
+                      if (document.visibilityState === 'visible') reissueSession()
+                    })
+                  }
+                  bindResume()
                 } catch (e) {
                   // Ignore restore issues so login page still renders
                 }
