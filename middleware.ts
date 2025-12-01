@@ -93,16 +93,9 @@ export async function middleware(request: NextRequest) {
   }
 
   const pathname = request.nextUrl.pathname
-  // Allow authenticated users to land on /healthapp without redirecting to signin
+  // Allow /healthapp to render without forcing a redirect so PWA can start there
   if (pathname === '/healthapp') {
-    if (token) {
-      return NextResponse.next()
-    }
-    if (skipAdminGate) {
-      const url = request.nextUrl.clone()
-      url.pathname = '/auth/signin'
-      return NextResponse.redirect(url)
-    }
+    return NextResponse.next()
   }
   // Never allow direct access to the temporary staging sign-in page
   if (pathname === '/staging-signin') {
