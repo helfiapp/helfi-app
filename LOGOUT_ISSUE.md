@@ -1,6 +1,24 @@
 # iOS PWA Logout Issue – Handover Document
 
-## 🚨 CRITICAL HANDOVER FOR NEXT AGENT
+## 🚨 CRITICAL HANDOVER FOR NEXT AGENT (Updated after rollback to /auth/signin)
+
+### What I changed in this session (Dec 1, ~9pm AEDT) and current state
+- Rolled everything back to use the normal `/auth/signin` entry (manifest start_url back to default, no `/pwa-start` or `/healthapp` overrides). Commit: `499f8049`.
+- Removed the experimental `/pwa-start` page and the middleware redirects that were forcing `/healthapp`.
+- Reverted middleware to the earlier stable version (only cookie restore + admin gate logic from before the PWA start experiments).
+- No service-worker header restore or manifest scope experiments remain; only the original restore layers (middleware + restore endpoint + AuthProvider + pre-hydration) are active.
+- Deployment with these rollbacks is in progress/just pushed. Check latest production deployment after `499f8049`.
+
+### Key recent failed attempts (do not retry)
+- Adding `/pwa-start` as manifest start_url and changing manifest away from `/auth/signin` → didn’t help; caused install confusion and persistent `/auth/signin` autofill in Safari.
+- Middleware redirect from `/auth/signin` to `/healthapp` when a session/remember token existed → still saw forced sign-in; also caused build errors (fixed, then reverted).
+- Service worker header-based restore + remember-token passthrough → cookies still dropped; user forced to sign in after device lock.
+- Changing manifest start_url to `/healthapp` → Safari kept auto-filling old `/auth/signin` when adding to Home Screen; user frustration escalated.
+
+### Current known behavior
+- Desktop works fine (Safari/Chrome) because cookies aren’t dropped; `/auth/signin` is stable there.
+- iOS PWA still logs out after lock/unlock/app switch, even when starting from `/auth/signin`.
+- User wants to keep `/auth/signin` as the entry point; admin gate not needed right now on mobile.
 
 **Date:** December 1, 2025  
 **Status:** Issue persists - user still being logged out when switching apps on iOS PWA  
