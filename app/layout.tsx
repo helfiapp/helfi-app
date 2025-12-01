@@ -69,6 +69,20 @@ export default function RootLayout({
                   const cachedToken = localStorage.getItem('helfi:refreshToken') || localStorage.getItem('helfi:rememberToken')
                   const cachedExp = parseInt(localStorage.getItem('helfi:rememberTokenExp') || '0', 10)
 
+                  const callRefreshEndpoint = async () => {
+                    if (!cachedToken) return
+                    try {
+                      await fetch('/api/auth/refresh', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'x-helfi-refresh-token': cachedToken },
+                        credentials: 'include',
+                        body: JSON.stringify({ token: cachedToken })
+                      })
+                    } catch (e) {
+                      // ignore refresh errors during pre-hydration
+                    }
+                  }
+
                   const pingServiceWorker = () => {
                     const message = { type: 'REFRESH_SESSION_NOW' };
                     if (navigator.serviceWorker?.controller) {
@@ -84,6 +98,7 @@ export default function RootLayout({
                         navigator.serviceWorker.ready.then((reg) => reg.active?.postMessage(setMessage)).catch(() => {});
                       }
                     }
+                    callRefreshEndpoint();
                   };
                   pingServiceWorker();
                   window.addEventListener('pageshow', pingServiceWorker);

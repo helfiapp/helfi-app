@@ -118,6 +118,14 @@ function SessionKeepAlive() {
 
       restoreInFlight = true
       try {
+        if (token) {
+          await fetch('/api/auth/refresh', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-helfi-refresh-token': token },
+            credentials: 'include',
+            body: JSON.stringify({ token })
+          }).catch(() => {})
+        }
         sendSwMessage({ type: 'REFRESH_SESSION_NOW' })
         localStorage.setItem(LAST_SESSION_RESTORE, now.toString())
         localStorage.removeItem(LAST_MANUAL_SIGNOUT)
