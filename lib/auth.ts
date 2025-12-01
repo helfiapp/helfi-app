@@ -188,14 +188,13 @@ export const authOptions: NextAuthOptions = {
     secret: process.env.NEXTAUTH_SECRET || 'helfi-secret-key-production-2024',
     maxAge: 5 * 365 * 24 * 60 * 60, // align with session maxAge (~5 years)
   },
-  // Force long-lived cookies with SameSite=None for iOS PWA compatibility
-  // SameSite=None requires Secure=true and works better for PWAs that get backgrounded
+  // Force long-lived, first-party cookies so mobile Safari won’t drop sessions between app switches.
   cookies: {
     sessionToken: {
       name: process.env.NODE_ENV === 'production' ? '__Secure-next-auth.session-token' : 'next-auth.session-token',
       options: {
         httpOnly: true,
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // SameSite=None for iOS PWA cookie persistence
+        sameSite: 'lax',
         path: '/',
         secure: process.env.NODE_ENV === 'production',
         maxAge: 5 * 365 * 24 * 60 * 60, // ~5 years
@@ -204,7 +203,7 @@ export const authOptions: NextAuthOptions = {
     callbackUrl: {
       name: process.env.NODE_ENV === 'production' ? '__Secure-next-auth.callback-url' : 'next-auth.callback-url',
       options: {
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // SameSite=None for iOS PWA compatibility
+        sameSite: 'lax',
         path: '/',
         secure: process.env.NODE_ENV === 'production',
       },
@@ -213,7 +212,7 @@ export const authOptions: NextAuthOptions = {
       name: process.env.NODE_ENV === 'production' ? '__Host-next-auth.csrf-token' : 'next-auth.csrf-token',
       options: {
         httpOnly: true,
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', // SameSite=None for iOS PWA compatibility
+        sameSite: 'lax',
         path: '/',
         secure: process.env.NODE_ENV === 'production',
       },
