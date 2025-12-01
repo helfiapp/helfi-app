@@ -4032,7 +4032,6 @@ Please add nutritional information manually if needed.`);
       barcodeScannerRef.current = scanner
       const scanConfig: any = {
         fps: 10,
-        qrbox: { width: 260, height: 200 },
         aspectRatio: 16 / 9,
       }
       const startAttempts: Array<{ label: string; config: any }> = [
