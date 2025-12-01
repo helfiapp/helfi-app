@@ -8090,170 +8090,118 @@ Please add nutritional information manually if needed.`);
       )}
 
       {showBarcodeScanner && (
-        <div className="fixed inset-0 z-50 bg-white overflow-y-auto">
-          <div className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-white">
+        <div className="fixed inset-0 z-50 bg-black flex flex-col">
+          {/* Hidden elements for barcode processing */}
+          <div id="native-barcode-decoder" style={{ display: 'none' }} aria-hidden="true" />
+          <input
+            ref={nativeBarcodeInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={handleNativeBarcodeCapture}
+            className="hidden"
+            aria-hidden="true"
+          />
+          
+          {/* Header - matches Cronometer style */}
+          <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200">
             <button
               type="button"
               onClick={() => setShowBarcodeScanner(false)}
-              className="inline-flex items-center gap-2 text-sm font-semibold text-gray-700"
+              className="w-10 h-10 flex items-center justify-center"
+              aria-label="Close scanner"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              <svg className="w-6 h-6 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
-              Back
             </button>
-            <div className="text-base font-semibold text-gray-900">Barcode scanner</div>
-            <div className="w-12" />
+            <div className="text-lg font-semibold text-gray-900">Scan Barcode</div>
+            <div className="w-10" />
           </div>
 
-          <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
-            <div>
-              <div className="text-2xl font-semibold text-gray-900">Scan a barcode</div>
-              <div className="text-sm text-gray-600">
-                Add scanned items straight into {categoryLabel(selectedAddCategory)}
+          {/* Camera area - full screen like Cronometer */}
+          <div className="flex-1 relative bg-black overflow-hidden">
+            {/* Camera feed container */}
+            <div id={BARCODE_REGION_ID} className="absolute inset-0" />
+            
+            {/* Overlay with scanning frame */}
+            <div className="absolute inset-0 pointer-events-none">
+              {/* Darkened edges */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                {/* Scanning frame container */}
+                <div className="relative">
+                  {/* Text above frame */}
+                  <div className="absolute -top-20 left-0 right-0 text-center">
+                    <div className="text-white text-xl font-semibold drop-shadow-lg">Scan Barcode</div>
+                    <div className="text-white/80 text-sm mt-1 drop-shadow">Place barcode in the frame to scan</div>
+                  </div>
+                  
+                  {/* White scanning frame - rounded rectangle */}
+                  <div 
+                    className="w-64 h-48 border-4 border-white rounded-2xl"
+                    style={{ 
+                      boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.5)',
+                    }}
+                  />
+                </div>
               </div>
             </div>
 
-            {/* Camera preview area - only show for non-iOS or if camera is working */}
-            {!isIosDevice && (
-              <div className="rounded-3xl border border-gray-200 bg-black overflow-hidden shadow-lg relative">
-                <div className="relative aspect-[3/4] min-h-[420px] bg-black">
-                  <div id={BARCODE_REGION_ID} className="absolute inset-0 bg-black" />
-                  <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-white/90">
-                    <div className="text-lg font-semibold drop-shadow-sm">Scan Barcode</div>
-                    <div className="text-sm text-white/80 drop-shadow-sm">Place barcode in the frame to scan</div>
-                  </div>
-                  {barcodeStatus === 'loading' && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/40 text-white text-sm">
-                      Starting camera…
-                    </div>
-                  )}
+            {/* Loading overlay */}
+            {barcodeStatus === 'loading' && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+                <div className="flex flex-col items-center gap-3">
+                  <svg className="animate-spin h-10 w-10 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <span className="text-white text-sm font-medium">Starting camera...</span>
                 </div>
               </div>
             )}
+          </div>
 
-            {/* iOS-specific camera interface */}
-            {isIosDevice && (
-              <div className="rounded-3xl border border-gray-200 bg-gradient-to-b from-indigo-50 to-white overflow-hidden shadow-lg p-8">
-                <div className="flex flex-col items-center justify-center text-center space-y-4">
-                  <div className="w-20 h-20 rounded-full bg-indigo-100 flex items-center justify-center">
-                    <svg className="w-10 h-10 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <div className="text-lg font-semibold text-gray-900">Tap to scan barcode</div>
-                    <div className="text-sm text-gray-600 mt-1">Your camera will open to take a photo of the barcode</div>
-                  </div>
-                  <label className="w-full cursor-pointer">
-                    <input
-                      ref={nativeBarcodeInputRef}
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      onChange={handleNativeBarcodeCapture}
-                      className="hidden"
-                    />
-                    <div className="w-full flex items-center justify-center gap-3 px-6 py-4 rounded-xl bg-indigo-600 text-white text-base font-semibold hover:bg-indigo-700 active:bg-indigo-800 transition-colors shadow-lg">
-                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                      Open Camera &amp; Scan Barcode
-                    </div>
-                  </label>
-                  {barcodeStatus === 'loading' && (
-                    <div className="flex items-center gap-2 text-indigo-600">
-                      <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      <span className="text-sm font-medium">Processing barcode...</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-            
-            {/* Hidden container for barcode decoder */}
-            <div id="native-barcode-decoder" style={{ display: 'none' }} aria-hidden="true" />
-
-            {/* Manual entry section */}
-            <div className="pt-2">
-              <div className="text-sm font-medium text-gray-700 mb-2">Or enter barcode manually:</div>
-              <div className="flex flex-col sm:flex-row gap-2">
-                <input
-                  type="text"
-                  value={barcodeValue}
-                  onChange={(e) => setBarcodeValue(e.target.value)}
-                  placeholder="Type or paste barcode digits (e.g., 5000159407236)"
-                  className="flex-1 px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base"
-                  inputMode="numeric"
-                />
-                <button
-                  type="button"
-                  onClick={() => lookupBarcodeAndAdd(barcodeValue)}
-                  disabled={barcodeStatus === 'loading' || !barcodeValue.trim()}
-                  className="px-6 py-3 rounded-xl bg-emerald-600 text-white text-base font-semibold hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  Lookup &amp; Add
-                </button>
-              </div>
+          {/* Error message if any */}
+          {barcodeError && (
+            <div className="flex-shrink-0 px-4 py-3 bg-red-500 text-white text-center text-sm">
+              {barcodeError}
             </div>
+          )}
 
-            {barcodeError && (
-              <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl p-4">
-                {barcodeError}
-              </div>
-            )}
-            
-            {/* Action buttons for non-iOS */}
-            {!isIosDevice && (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm font-medium">
-                <button
-                  type="button"
-                  onClick={() => startBarcodeScanner()}
-                  disabled={barcodeStatus === 'loading'}
-                  className="flex items-center justify-center gap-2 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-60"
-                >
-                  <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5m0 6v5m16-16v5m0 6v5M4 4h5m6 0h5M4 20h5m6 0h5M9 4v5m0 6v5m6-16v5m0 6v5" />
-                  </svg>
-                  Restart Camera
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const nextFacing = cameraFacing === 'back' ? 'front' : 'back'
-                    setCameraFacing(nextFacing)
-                    startBarcodeScanner({ forceFacing: nextFacing })
-                  }}
-                  disabled={barcodeStatus === 'loading' || !hasAlternateCamera}
-                  className="flex items-center justify-center gap-2 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-60"
-                >
-                  <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 8l7 4-7 4M9 16l-7-4 7-4m1 12V4m4 16V4" />
-                  </svg>
-                  Switch Camera
-                </button>
-                <button
-                  type="button"
-                  onClick={showCameraSettingsHelp}
-                  className="flex items-center justify-center gap-2 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-60"
-                >
-                  <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                  Camera Settings
-                </button>
-              </div>
-            )}
+          {/* Bottom bar - matches Cronometer style */}
+          <div className="flex-shrink-0 bg-stone-100 border-t border-gray-200" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+            <div className="flex items-center justify-between px-6 py-4">
+              {/* Flash toggle */}
+              <button
+                type="button"
+                onClick={() => {
+                  // Flash toggle - html5-qrcode doesn't support torch, but we keep the UI
+                  // In future could add torch support via MediaStream track capabilities
+                }}
+                className="flex items-center gap-2 text-gray-700 font-semibold"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                <span className="text-sm uppercase tracking-wide">Flash</span>
+              </button>
 
-            {/* Help text */}
-            <div className="text-xs text-gray-500 text-center">
-              Supported barcodes: UPC, EAN, Code 128, Code 39
+              {/* Type Barcode button */}
+              <button
+                type="button"
+                onClick={() => {
+                  const code = prompt('Enter barcode number:')
+                  if (code && code.trim()) {
+                    lookupBarcodeAndAdd(code.trim())
+                  }
+                }}
+                className="flex items-center gap-2 text-gray-700 font-semibold"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h2m2 0h2m2 0h2m2 0h2M4 18h2m2 0h2m2 0h2m2 0h2M7 6v12m4-12v12m4-12v12" />
+                </svg>
+                <span className="text-sm uppercase tracking-wide">Type Barcode</span>
+              </button>
             </div>
           </div>
         </div>
