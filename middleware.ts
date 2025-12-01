@@ -97,6 +97,16 @@ export async function middleware(request: NextRequest) {
   if (pathname === '/healthapp' || pathname === '/pwa-start') {
     return NextResponse.next()
   }
+  // If already authenticated (or has remember header/cookie), redirect away from auth/signin
+  if (pathname === '/auth/signin') {
+    const rememberHeader = request.headers.get('x-helfi-remember-token') || request.cookies.get(REMEMBER_COOKIE)?.value
+    const hasSessionCookie = request.cookies.get(SESSION_COOKIE)?.value || request.cookies.get(LEGACY_SESSION_COOKIE)?.value
+    if (token || hasSessionCookie || rememberHeader) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/healthapp'
+      return NextResponse.redirect(url)
+    }
+  }
   // Never allow direct access to the temporary staging sign-in page
   if (pathname === '/staging-signin') {
     const url = request.nextUrl.clone()
