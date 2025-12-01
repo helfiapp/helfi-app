@@ -77,39 +77,15 @@ export default function SignIn() {
     await signIn('google', { callbackUrl: '/onboarding' })
   }
 
-  const persistRememberState = (remember: boolean, emailValue: string, token?: string, tokenExpiresAtMs?: number) => {
+  const persistRememberState = (remember: boolean, emailValue: string) => {
     try {
       if (remember && emailValue) {
         localStorage.setItem('helfi:rememberMe', '1')
         localStorage.setItem('helfi:rememberEmail', emailValue.toLowerCase())
         localStorage.removeItem('helfi:lastManualSignOut')
-        localStorage.removeItem('helfi:rememberToken')
-        if (token) {
-          localStorage.setItem('helfi:refreshToken', token)
-        }
-        if (tokenExpiresAtMs) {
-          localStorage.setItem('helfi:rememberTokenExp', tokenExpiresAtMs.toString())
-        }
-        // Best-effort: also send to service worker so it can restore cookies if iOS drops them.
-        try {
-          const post = () => navigator.serviceWorker?.controller?.postMessage({ type: 'SET_REFRESH_TOKEN', token, exp: tokenExpiresAtMs || 0 })
-          if (navigator.serviceWorker) {
-            navigator.serviceWorker.ready.then((reg) => {
-              reg.active?.postMessage({ type: 'SET_REFRESH_TOKEN', token, exp: tokenExpiresAtMs || 0 })
-            }).catch(() => post())
-            post()
-          }
-        } catch {
-          // ignore message errors
-        }
       } else {
         localStorage.removeItem('helfi:rememberMe')
         localStorage.removeItem('helfi:rememberEmail')
-        localStorage.removeItem('helfi:refreshToken')
-        localStorage.removeItem('helfi:rememberTokenExp')
-        try {
-          navigator.serviceWorker?.controller?.postMessage({ type: 'CLEAR_REFRESH_TOKEN' })
-        } catch {}
       }
     } catch (storageError) {
       console.warn('Remember me storage failed', storageError)
@@ -174,7 +150,7 @@ export default function SignIn() {
         // Try direct sign-in first so we can honor the "keep me signed in" setting immediately
         const directResult = await attemptDirectSignin(rememberMe)
         if (directResult.success) {
-          persistRememberState(true, normalizedEmail, directResult.token, directResult.tokenExpiresAtMs)
+          persistRememberState(true, normalizedEmail)
           setLoading(false)
           window.location.href = '/onboarding'
           return
@@ -187,14 +163,16 @@ export default function SignIn() {
         if (res?.ok) {
           // If they wanted a longer session, reissue via direct path to extend the cookie, but don't block redirect
           const extendResult = await attemptDirectSignin(true, normalizedEmail)
-          persistRememberState(true, normalizedEmail, extendResult.token, extendResult.tokenExpiresAtMs)
+          if (extendResult.success) {
+            persistRememberState(true, normalizedEmail)
+          }
           setLoading(false)
           window.location.href = '/onboarding'
           return
         } else {
           const fallback = await attemptDirectSignin(false)
           if (fallback.success) {
-            persistRememberState(true, normalizedEmail, fallback.token, fallback.tokenExpiresAtMs)
+            persistRememberState(true, normalizedEmail)
             setLoading(false)
             window.location.href = '/onboarding'
             return

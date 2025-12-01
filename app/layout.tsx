@@ -58,58 +58,6 @@ export default function RootLayout({
                   // Ignore localStorage errors in SSR
                 }
               })();
-
-              // Pre-hydration refresh trigger to avoid Safari/PWA cookie eviction on resume.
-              (function() {
-                try {
-                  const REMEMBER_FLAG = 'helfi:rememberMe';
-                  if (!localStorage.getItem(REMEMBER_FLAG)) {
-                    localStorage.setItem(REMEMBER_FLAG, '1');
-                  }
-                  const cachedToken = localStorage.getItem('helfi:refreshToken') || localStorage.getItem('helfi:rememberToken')
-                  const cachedExp = parseInt(localStorage.getItem('helfi:rememberTokenExp') || '0', 10)
-
-                  const callRefreshEndpoint = async () => {
-                    if (!cachedToken) return
-                    try {
-                      await fetch('/api/auth/refresh', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'x-helfi-refresh-token': cachedToken },
-                        credentials: 'include',
-                        body: JSON.stringify({ token: cachedToken })
-                      })
-                    } catch (e) {
-                      // ignore refresh errors during pre-hydration
-                    }
-                  }
-
-                  const pingServiceWorker = () => {
-                    const message = { type: 'REFRESH_SESSION_NOW' };
-                    if (navigator.serviceWorker?.controller) {
-                      navigator.serviceWorker.controller.postMessage(message);
-                    } else if (navigator.serviceWorker?.ready) {
-                      navigator.serviceWorker.ready.then((reg) => reg.active?.postMessage(message)).catch(() => {});
-                    }
-                    if (cachedToken) {
-                      const setMessage = { type: 'SET_REFRESH_TOKEN', token: cachedToken, exp: cachedExp || 0 }
-                      if (navigator.serviceWorker?.controller) {
-                        navigator.serviceWorker.controller.postMessage(setMessage)
-                      } else if (navigator.serviceWorker?.ready) {
-                        navigator.serviceWorker.ready.then((reg) => reg.active?.postMessage(setMessage)).catch(() => {});
-                      }
-                    }
-                    callRefreshEndpoint();
-                  };
-                  pingServiceWorker();
-                  window.addEventListener('pageshow', pingServiceWorker);
-                  window.addEventListener('focus', pingServiceWorker);
-                  document.addEventListener('visibilitychange', () => {
-                    if (document.visibilityState === 'visible') pingServiceWorker();
-                  });
-                } catch (e) {
-                  // Ignore restore issues so login page still renders
-                }
-              })();
             `,
           }}
         />
