@@ -19,6 +19,7 @@
 - Desktop works fine (Safari/Chrome) because cookies aren’t dropped; `/auth/signin` is stable there.
 - iOS PWA still logs out after lock/unlock/app switch, even when starting from `/auth/signin`.
 - User wants to keep `/auth/signin` as the entry point; admin gate not needed right now on mobile.
+- New finding: On desktop, after logging in, the manual “Logout” button does nothing (cannot log out); on mobile PWA, sessions drop automatically. Investigate logout handler and signOut flow.
 
 **Date:** December 1, 2025  
 **Status:** Issue persists - user still being logged out when switching apps on iOS PWA  
