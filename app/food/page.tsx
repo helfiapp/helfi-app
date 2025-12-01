@@ -1200,6 +1200,7 @@ export default function FoodDiary() {
   const nativeBarcodeStreamRef = useRef<MediaStream | null>(null)
   const nativeBarcodeVideoRef = useRef<HTMLVideoElement | null>(null)
   const nativeBarcodeFrameRef = useRef<number | null>(null)
+  const hybridBarcodeFrameRef = useRef<number | null>(null)
   const [cameraDevices, setCameraDevices] = useState<Array<{ id: string; label: string; facing: 'front' | 'back' | 'unknown' }>>([])
   const [cameraFacing, setCameraFacing] = useState<'front' | 'back'>('back')
   const [activeCameraLabel, setActiveCameraLabel] = useState<string>('')
@@ -3824,6 +3825,10 @@ Please add nutritional information manually if needed.`);
       cancelAnimationFrame(nativeBarcodeFrameRef.current)
       nativeBarcodeFrameRef.current = null
     }
+    if (hybridBarcodeFrameRef.current) {
+      cancelAnimationFrame(hybridBarcodeFrameRef.current)
+      hybridBarcodeFrameRef.current = null
+    }
     if (nativeBarcodeVideoRef.current) {
       try {
         nativeBarcodeVideoRef.current.pause()
@@ -3984,8 +3989,39 @@ Please add nutritional information manually if needed.`);
     if (!rawCode || barcodeLookupInFlightRef.current) return
     const cleaned = rawCode.replace(/[^0-9A-Za-z]/g, '')
     if (!cleaned) return
+    if (hybridBarcodeFrameRef.current) {
+      cancelAnimationFrame(hybridBarcodeFrameRef.current)
+      hybridBarcodeFrameRef.current = null
+    }
     stopBarcodeScanner()
     lookupBarcodeAndAdd(cleaned)
+  }
+
+  const startHybridDetector = () => {
+    if (typeof window === 'undefined' || typeof (window as any).BarcodeDetector === 'undefined') return
+    const region = document.getElementById(BARCODE_REGION_ID)
+    const videoEl = region?.querySelector('video') as HTMLVideoElement | null
+    if (!videoEl) return
+    const detector = new (window as any).BarcodeDetector({
+      formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'code_93', 'codabar'],
+    })
+    const scanFrame = async () => {
+      try {
+        const detections = await detector.detect(videoEl)
+        const first = detections?.[0]
+        const detectedValue =
+          first?.rawValue ||
+          (first?.rawData ? new TextDecoder().decode(first.rawData) : null)
+        if (detectedValue) {
+          handleBarcodeDetected(detectedValue)
+          return
+        }
+      } catch {
+        // ignore and continue
+      }
+      hybridBarcodeFrameRef.current = requestAnimationFrame(scanFrame)
+    }
+    hybridBarcodeFrameRef.current = requestAnimationFrame(scanFrame)
   }
 
   const startNativeBarcodeDetector = async (desiredFacing: 'front' | 'back') => {
@@ -4231,6 +4267,7 @@ Please add nutritional information manually if needed.`);
         stopBarcodeScanner()
         return
       }
+      startHybridDetector()
       setBarcodeStatus('scanning')
     } catch (err) {
       console.error('Barcode scanner start error', err)

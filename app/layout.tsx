@@ -68,11 +68,12 @@ export default function RootLayout({
                   const REMEMBER_TOKEN_EXP = 'helfi:rememberTokenExp'
                   const LAST_MANUAL_SIGNOUT = 'helfi:lastManualSignOut'
                   const LAST_SESSION_RESTORE = 'helfi:lastSessionRestore'
-                  const remembered = localStorage.getItem(REMEMBER_FLAG) === '1'
+                  let remembered = localStorage.getItem(REMEMBER_FLAG) === '1'
                   const email = (localStorage.getItem(REMEMBER_EMAIL) || '').trim().toLowerCase()
                   const ensureRememberedFlag = () => {
                     try {
                       localStorage.setItem(REMEMBER_FLAG, '1')
+                      remembered = true
                     } catch {}
                   }
                   ensureRememberedFlag()
