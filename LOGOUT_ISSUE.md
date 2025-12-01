@@ -1,5 +1,19 @@
 # iOS PWA Logout Issue – Handover Document
 
+## 🚨 Latest Handover (after commit 57bb9dbd)
+- Status: Still logs out on iOS PWA when leaving the app and coming back (user was on Food Diary when it happened). Desktop logout button had been reported as not working earlier.
+- What changed this session (all failed to fix it):
+  - Added refresh-token flow with service worker/IndexedDB and refresh endpoint; shortened session cookie to 7 days (commit 88540138).
+  - Added pre-hydration refresh call and AuthProvider refresh on resume (commit b24ebc74).
+  - Restored non-HttpOnly remember cookie and middleware fallback to it (commit 2236c47a).
+  - Added HttpOnly refresh cookie (__Secure-helfi-refresh-token) so middleware/refresh endpoint can restore even if SW/local storage are empty; middleware now accepts refresh header, refresh cookie, or remember cookie (commit 57bb9dbd).
+- What’s deployed now (57bb9dbd):
+  - Sign-in sets: session cookies (SameSite=None in prod), HttpOnly refresh cookie, non-HttpOnly remember cookie, and issues a refresh token in the response.
+  - Middleware restores session if any of: refresh header, refresh cookie, or remember cookie are present; otherwise it redirects.
+  - Service worker stores refresh token in IDB (DB v2) and attaches it; pre-hydration also calls /api/auth/refresh on resume.
+- Result: User still forced to login again on iOS PWA after app switch/background; PWA reinstall did not help. Safari settings show cookies allowed and tracking protection off.
+- Please do not retry the above paths; look for a different root cause (e.g., navigation/redirect path, scope, or first-request timing).
+
 ## 🚨 CRITICAL HANDOVER FOR NEXT AGENT (Updated after rollback to /auth/signin)
 
 ### What I changed in this session (Dec 1, ~9pm AEDT) and current state
@@ -114,6 +128,35 @@
   - Middleware reissue logic added
   - Signin-direct sets remember cookie
 - **Result:** ❌ Logout persisted
+
+---
+
+### Session 3: This agent (latest session, issue still persists)
+
+#### Commit: 88540138 - "Add refresh-token flow for PWA auth persistence"
+- **What:**
+  - Added long-lived refresh token issued on sign-in; stored in IndexedDB via service worker; session cookies shortened to 7 days; remember cookie removed at this step.
+  - Service worker v2 DB `refresh`, attaches `x-helfi-refresh-token` header, refresh endpoint `/api/auth/refresh`, middleware restores only if refresh header present.
+  - NextAuth cookies set to SameSite=None in prod; AuthProvider/pre-hydration simplified to use refresh.
+- **Result:** ❌ Logout persisted on iOS PWA resume.
+
+#### Commit: b24ebc74 - "Pre-hydrate refresh call to avoid resume redirect"
+- **What:**
+  - Pre-hydration script calls `/api/auth/refresh` immediately on resume.
+  - AuthProvider also calls `/api/auth/refresh` on resume before pinging SW.
+- **Result:** ❌ Logout persisted.
+
+#### Commit: 2236c47a - "Restore remember cookie fallback alongside refresh header"
+- **What:**
+  - Brought back non-HttpOnly `helfi-remember-token` so middleware could restore if SW/header missing.
+  - Middleware now accepts refresh header or remember cookie to reissue session.
+- **Result:** ❌ Logout persisted.
+
+#### Commit: 57bb9dbd - "Add HttpOnly refresh cookie fallback and use remember cookie in middleware"
+- **What:**
+  - Sign-in now also sets HttpOnly refresh cookie `__Secure-helfi-refresh-token`; middleware checks header, refresh cookie, or remember cookie.
+  - Refresh endpoint renews the refresh cookie; remember cookie still issued for SW/visibility.
+- **Result:** ❌ Logout persisted after PWA reinstall; user forced to login again when returning from another app (on Food Diary page before leaving).
 
 ---
 
