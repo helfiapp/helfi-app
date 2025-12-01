@@ -64,21 +64,41 @@ function SessionKeepAlive() {
       return Date.now() - manualSignOutAt < FIVE_MINUTES
     }
 
-    const ensureSession = async (_reason: string) => {
+    const ensureSession = async (reason: string) => {
       if (!isActive) return
+
+      // Logging for iOS PWA logout debugging
+      const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent)
+      const { remembered, email, token, tokenExp, manualSignOutAt, lastRestoreAt } = readRememberState()
+      const hasSessionCookie = document.cookie.includes('__Secure-next-auth.session-token') || document.cookie.includes('next-auth.session-token')
+      const hasRememberCookie = document.cookie.includes('helfi-remember-token')
 
       let sessionRes: Response | null = null
       try {
         sessionRes = await fetch('/api/auth/session', { cache: 'no-store', credentials: 'same-origin' })
       } catch (error) {
-        console.warn('Session heartbeat failed', error)
+        console.warn('[AUTH-PROVIDER] Session heartbeat failed', { reason, error })
         return
       }
 
       const sessionData = await sessionRes.json().catch(() => null)
       const hasSession = sessionRes.ok && sessionData?.user
-      const { remembered, email, token, tokenExp, manualSignOutAt, lastRestoreAt } = readRememberState()
       const now = Date.now()
+
+      console.log('[AUTH-PROVIDER] Session check:', {
+        reason,
+        isIOS: isIOS || false,
+        status,
+        hasSession,
+        hasSessionCookie,
+        hasRememberCookie,
+        remembered,
+        hasEmail: !!email,
+        hasToken: !!token,
+        tokenExpired: tokenExp ? now > tokenExp : true,
+        restoreInFlight,
+        timestamp: new Date().toISOString(),
+      })
 
       if (hasSession) {
         // Keep the remembered email in sync so we can reissue a cookie later if iOS drops it.
@@ -95,29 +115,53 @@ function SessionKeepAlive() {
         return
       }
 
-      if (!remembered || !email) return
-      if (restoreInFlight) return
-      if (shouldRespectManualSignOut(manualSignOutAt)) return
+      if (!remembered || !email) {
+        console.log('[AUTH-PROVIDER] Skipping restore - no remember flag or email')
+        return
+      }
+      if (restoreInFlight) {
+        console.log('[AUTH-PROVIDER] Skipping restore - already in flight')
+        return
+      }
+      if (shouldRespectManualSignOut(manualSignOutAt)) {
+        console.log('[AUTH-PROVIDER] Skipping restore - recent manual signout')
+        return
+      }
 
       if (token) {
         const msLeft = tokenExp ? Math.max(tokenExp - now, 5_000) : 5 * 365 * 24 * 60 * 60 * 1000
         const maxAgeSeconds = Math.floor(msLeft / 1000)
         try {
           const secureFlag = window.location.protocol === 'https:' ? '; Secure' : ''
-          document.cookie = `__Secure-next-auth.session-token=${token}; path=/; max-age=${maxAgeSeconds}; SameSite=Lax${secureFlag}`
-          document.cookie = `next-auth.session-token=${token}; path=/; max-age=${maxAgeSeconds}; SameSite=Lax${secureFlag}`
+          const sameSite = window.location.protocol === 'https:' ? 'SameSite=None' : 'SameSite=Lax'
+          console.log('[AUTH-PROVIDER] Setting cookies from localStorage token:', {
+            reason,
+            maxAgeSeconds,
+            sameSite,
+          })
+          document.cookie = `__Secure-next-auth.session-token=${token}; path=/; max-age=${maxAgeSeconds}; ${sameSite}${secureFlag}`
+          document.cookie = `next-auth.session-token=${token}; path=/; max-age=${maxAgeSeconds}; ${sameSite}${secureFlag}`
           localStorage.setItem(LAST_SESSION_RESTORE, now.toString())
           localStorage.removeItem(LAST_MANUAL_SIGNOUT)
           return
-        } catch {
+        } catch (err) {
+          console.warn('[AUTH-PROVIDER] Cookie setting failed, falling through to network reissue:', err)
           // fall through to network reissue
         }
       }
 
-      if (now - lastRestoreAt < 15_000) return // throttle re-issue attempts
+      if (now - lastRestoreAt < 15_000) {
+        console.log('[AUTH-PROVIDER] Skipping restore - throttled (last restore:', Math.floor((now - lastRestoreAt) / 1000), 's ago)')
+        return // throttle re-issue attempts
+      }
 
       restoreInFlight = true
       try {
+        console.log('[AUTH-PROVIDER] Attempting network session restore:', {
+          reason,
+          email,
+          endpoint: '/api/auth/signin-direct',
+        })
         const res = await fetch('/api/auth/signin-direct', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -126,6 +170,7 @@ function SessionKeepAlive() {
         })
 
         if (res.ok) {
+          console.log('[AUTH-PROVIDER] Network session restore successful')
           try {
             localStorage.setItem(LAST_SESSION_RESTORE, now.toString())
             localStorage.removeItem(LAST_MANUAL_SIGNOUT)
@@ -133,6 +178,7 @@ function SessionKeepAlive() {
             // ignore storage errors
           }
         } else if (res.status === 401) {
+          console.warn('[AUTH-PROVIDER] Network session restore failed - 401 unauthorized')
           try {
             localStorage.removeItem(REMEMBER_FLAG)
             localStorage.removeItem(REMEMBER_EMAIL)
@@ -141,9 +187,11 @@ function SessionKeepAlive() {
           } catch {
             // ignore storage errors
           }
+        } else {
+          console.warn('[AUTH-PROVIDER] Network session restore failed:', res.status)
         }
       } catch (error) {
-        console.warn('Session restore failed', error)
+        console.error('[AUTH-PROVIDER] Network session restore error:', error)
       } finally {
         restoreInFlight = false
       }

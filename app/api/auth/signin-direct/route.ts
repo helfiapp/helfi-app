@@ -96,10 +96,12 @@ export async function POST(request: NextRequest) {
       path: '/'
     })
     // Store a non-HttpOnly remember token so we can re-issue the session on PWA resume if Safari drops cookies
+    // Use SameSite=None; Secure for iOS PWA compatibility (required for cross-site cookie persistence)
+    const isProduction = process.env.NODE_ENV === 'production'
     response.cookies.set(rememberCookie, keepSignedIn ? token : '', {
       httpOnly: false,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      secure: isProduction,
+      sameSite: isProduction ? 'none' : 'lax', // SameSite=None required for iOS PWA cookie persistence
       maxAge: keepSignedIn ? maxAgeSeconds : 0,
       path: '/',
     })

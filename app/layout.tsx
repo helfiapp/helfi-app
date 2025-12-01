@@ -68,8 +68,30 @@ export default function RootLayout({
                   const REMEMBER_TOKEN_EXP = 'helfi:rememberTokenExp'
                   const LAST_MANUAL_SIGNOUT = 'helfi:lastManualSignOut'
                   const LAST_SESSION_RESTORE = 'helfi:lastSessionRestore'
+                  
+                  // Logging for iOS PWA logout debugging
+                  const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent)
+                  const visibilityState = document.visibilityState
+                  const hasSessionCookie = document.cookie.includes('__Secure-next-auth.session-token') || document.cookie.includes('next-auth.session-token')
+                  const hasRememberCookie = document.cookie.includes('helfi-remember-token')
+                  
                   let remembered = localStorage.getItem(REMEMBER_FLAG) === '1'
                   const email = (localStorage.getItem(REMEMBER_EMAIL) || '').trim().toLowerCase()
+                  const token = localStorage.getItem(REMEMBER_TOKEN) || ''
+                  const tokenExp = parseInt(localStorage.getItem(REMEMBER_TOKEN_EXP) || '0', 10)
+                  
+                  console.log('[PRE-HYDRATION] Resume check:', {
+                    isIOS: isIOS || false,
+                    visibilityState: visibilityState,
+                    hasSessionCookie: hasSessionCookie,
+                    hasRememberCookie: hasRememberCookie,
+                    hasRememberFlag: remembered,
+                    hasEmail: !!email,
+                    hasToken: !!token,
+                    tokenExpired: tokenExp ? Date.now() > tokenExp : true,
+                    timestamp: new Date().toISOString(),
+                  })
+                  
                   const ensureRememberedFlag = () => {
                     try {
                       localStorage.setItem(REMEMBER_FLAG, '1')
@@ -77,11 +99,17 @@ export default function RootLayout({
                     } catch {}
                   }
                   ensureRememberedFlag()
-                  if (!remembered || !email) return
+                  if (!remembered || !email) {
+                    console.log('[PRE-HYDRATION] Skipping restore - no remember flag or email')
+                    return
+                  }
 
                   const now = Date.now()
                   const manualSignOutAt = parseInt(localStorage.getItem(LAST_MANUAL_SIGNOUT) || '0', 10)
-                  if (manualSignOutAt && now - manualSignOutAt < 5 * 60 * 1000) return
+                  if (manualSignOutAt && now - manualSignOutAt < 5 * 60 * 1000) {
+                    console.log('[PRE-HYDRATION] Skipping restore - recent manual signout')
+                    return
+                  }
 
                   const lastRestoreAt = parseInt(localStorage.getItem(LAST_SESSION_RESTORE) || '0', 10)
                   const canRetry = () => {
@@ -89,15 +117,20 @@ export default function RootLayout({
                     return diff > 2_000
                   }
 
-                  const token = localStorage.getItem(REMEMBER_TOKEN) || ''
-                  const tokenExp = parseInt(localStorage.getItem(REMEMBER_TOKEN_EXP) || '0', 10)
-                  const hasSessionCookie = document.cookie.includes('__Secure-next-auth.session-token') || document.cookie.includes('next-auth.session-token')
                   const reissueSession = async () => {
-                    if (!canRetry()) return
+                    if (!canRetry()) {
+                      console.log('[PRE-HYDRATION] Skipping reissue - throttled')
+                      return
+                    }
                     try {
                       const useRestore = !!token
                       const payload = useRestore ? { token } : { email, rememberMe: true }
                       const endpoint = useRestore ? '/api/auth/restore' : '/api/auth/signin-direct'
+                      console.log('[PRE-HYDRATION] Attempting session restore:', {
+                        endpoint: endpoint,
+                        method: useRestore ? 'restore' : 'signin-direct',
+                        hasToken: !!token,
+                      })
                       const res = await fetch(endpoint, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -105,24 +138,37 @@ export default function RootLayout({
                         body: JSON.stringify(payload)
                       })
                       if (res.ok) {
+                        console.log('[PRE-HYDRATION] Session restore successful')
                         localStorage.setItem(LAST_SESSION_RESTORE, Date.now().toString())
                         localStorage.removeItem(LAST_MANUAL_SIGNOUT)
                       } else if (res.status === 401) {
+                        console.warn('[PRE-HYDRATION] Session restore failed - 401 unauthorized')
                         localStorage.removeItem(REMEMBER_FLAG)
                         localStorage.removeItem(REMEMBER_EMAIL)
+                      } else {
+                        console.warn('[PRE-HYDRATION] Session restore failed:', res.status)
                       }
-                    } catch {}
+                    } catch (err) {
+                      console.error('[PRE-HYDRATION] Session restore error:', err)
+                    }
                   }
 
                   if (token && tokenExp) {
                     const secureFlag = window.location.protocol === 'https:' ? '; Secure' : ''
                     const msLeft = Math.max(tokenExp - now, 5)
                     const maxAgeSeconds = Math.floor(msLeft)
-                    document.cookie = \`__Secure-next-auth.session-token=\${token}; path=/; max-age=\${maxAgeSeconds}; SameSite=Lax\${secureFlag}\`
-                    document.cookie = \`next-auth.session-token=\${token}; path=/; max-age=\${maxAgeSeconds}; SameSite=Lax\${secureFlag}\`
+                    const sameSite = window.location.protocol === 'https:' ? 'SameSite=None' : 'SameSite=Lax'
+                    console.log('[PRE-HYDRATION] Setting cookies from localStorage token:', {
+                      hasToken: !!token,
+                      maxAgeSeconds: maxAgeSeconds,
+                      sameSite: sameSite,
+                    })
+                    document.cookie = \`__Secure-next-auth.session-token=\${token}; path=/; max-age=\${maxAgeSeconds}; \${sameSite}\${secureFlag}\`
+                    document.cookie = \`next-auth.session-token=\${token}; path=/; max-age=\${maxAgeSeconds}; \${sameSite}\${secureFlag}\`
                     localStorage.setItem(LAST_SESSION_RESTORE, now.toString())
                     localStorage.removeItem(LAST_MANUAL_SIGNOUT)
                     if (!hasSessionCookie) {
+                      console.log('[PRE-HYDRATION] No session cookie found, calling reissueSession')
                       reissueSession()
                     }
                     return
@@ -132,12 +178,19 @@ export default function RootLayout({
                     .then((res) => Promise.all([res.ok, res.json().catch(() => null)]))
                     .then(async ([ok, data]) => {
                       const hasSession = ok && data && data.user
+                      console.log('[PRE-HYDRATION] Session check result:', {
+                        hasSession: hasSession,
+                        ok: ok,
+                        hasUser: !!data?.user,
+                      })
                       if (hasSession) return
                       if (canRetry()) {
                         await reissueSession()
                       }
                     })
-                    .catch(() => {})
+                    .catch((err) => {
+                      console.error('[PRE-HYDRATION] Session check error:', err)
+                    })
 
                   const bindResume = () => {
                     const handler = () => reissueSession()

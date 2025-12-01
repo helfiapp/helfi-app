@@ -33,6 +33,22 @@ export async function middleware(request: NextRequest) {
         : 'next-auth.session-token'
     })
 
+    // Logging for iOS PWA logout debugging
+    const isIOS = request.headers.get('user-agent')?.includes('iPhone') || request.headers.get('user-agent')?.includes('iPad')
+    const hasSessionCookie = !!request.cookies.get(SESSION_COOKIE) || !!request.cookies.get(LEGACY_SESSION_COOKIE)
+    const hasRememberCookie = !!request.cookies.get(REMEMBER_COOKIE)
+    const rememberValue = request.cookies.get(REMEMBER_COOKIE)?.value
+    
+    console.log('[MIDDLEWARE] Session check:', {
+      path: request.nextUrl.pathname,
+      isIOS: isIOS || false,
+      hasSessionCookie,
+      hasRememberCookie,
+      hasToken: !!token,
+      rememberTokenPreview: rememberValue ? `${rememberValue.substring(0, 20)}...` : 'none',
+      timestamp: new Date().toISOString(),
+    })
+
     // If no session cookie but remember token exists, re-issue session cookies (helps iOS PWA when cookies are dropped)
     if (!token) {
       const remember = request.cookies.get(REMEMBER_COOKIE)?.value
@@ -43,27 +59,43 @@ export async function middleware(request: NextRequest) {
           const nowSeconds = Math.floor(Date.now() / 1000)
           if (exp && exp > nowSeconds) {
             const maxAge = Math.max(exp - nowSeconds, 5)
+            console.log('[MIDDLEWARE] Reissuing session cookies from remember token:', {
+              path: request.nextUrl.pathname,
+              isIOS: isIOS || false,
+              maxAgeSeconds: maxAge,
+              expiresAt: new Date(exp * 1000).toISOString(),
+            })
             const response = NextResponse.next()
+            // Use SameSite=None; Secure for iOS PWA compatibility
+            const isSecure = request.nextUrl.protocol === 'https:'
             response.cookies.set(SESSION_COOKIE, remember, {
               httpOnly: true,
-              secure: request.nextUrl.protocol === 'https:',
-              sameSite: 'lax',
+              secure: isSecure,
+              sameSite: isSecure ? 'none' : 'lax',
               maxAge,
               path: '/',
             })
             response.cookies.set(LEGACY_SESSION_COOKIE, remember, {
               httpOnly: true,
-              secure: request.nextUrl.protocol === 'https:',
-              sameSite: 'lax',
+              secure: isSecure,
+              sameSite: isSecure ? 'none' : 'lax',
               maxAge,
               path: '/',
             })
             token = decoded as any
             return response
+          } else {
+            console.warn('[MIDDLEWARE] Remember token expired:', {
+              exp,
+              nowSeconds,
+              expired: exp <= nowSeconds,
+            })
           }
         } catch (err) {
-          console.warn('Remember token decode failed', err)
+          console.warn('[MIDDLEWARE] Remember token decode failed', err)
         }
+      } else {
+        console.log('[MIDDLEWARE] No remember token found for restoration')
       }
     }
 
