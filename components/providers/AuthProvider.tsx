@@ -58,6 +58,33 @@ function SessionKeepAlive() {
       }
     }
 
+    const sendRememberToServiceWorker = (token?: string, tokenExp?: number) => {
+      try {
+        if (!navigator.serviceWorker?.controller && navigator.serviceWorker) {
+          // Ensure the SW is ready before posting
+          navigator.serviceWorker.ready.then((reg) => {
+            reg.active?.postMessage({ type: 'SET_REMEMBER_TOKEN', token, exp: tokenExp || 0 })
+          })
+          return
+        }
+        navigator.serviceWorker.controller?.postMessage({ type: 'SET_REMEMBER_TOKEN', token, exp: tokenExp || 0 })
+      } catch {
+        // ignore postMessage errors
+      }
+    }
+
+    const clearRememberInServiceWorker = () => {
+      try {
+        if (!navigator.serviceWorker?.controller && navigator.serviceWorker) {
+          navigator.serviceWorker.ready.then((reg) => reg.active?.postMessage({ type: 'CLEAR_REMEMBER_TOKEN' }))
+          return
+        }
+        navigator.serviceWorker.controller?.postMessage({ type: 'CLEAR_REMEMBER_TOKEN' })
+      } catch {
+        // ignore
+      }
+    }
+
     const shouldRespectManualSignOut = (manualSignOutAt: number) => {
       if (!manualSignOutAt) return false
       const FIVE_MINUTES = 5 * 60 * 1000
@@ -109,6 +136,9 @@ function SessionKeepAlive() {
           if (!email && sessionData?.user?.email) {
             localStorage.setItem(REMEMBER_EMAIL, sessionData.user.email.toLowerCase())
           }
+          if (token && tokenExp) {
+            sendRememberToServiceWorker(token, tokenExp)
+          }
         } catch {
           // ignore storage errors
         }
@@ -125,6 +155,7 @@ function SessionKeepAlive() {
       }
       if (shouldRespectManualSignOut(manualSignOutAt)) {
         console.log('[AUTH-PROVIDER] Skipping restore - recent manual signout')
+        clearRememberInServiceWorker()
         return
       }
 
@@ -136,6 +167,9 @@ function SessionKeepAlive() {
           reason,
           hasToken: !!token,
         })
+        if (tokenExp) {
+          sendRememberToServiceWorker(token, tokenExp)
+        }
       }
 
       if (now - lastRestoreAt < 15_000) {
@@ -162,6 +196,10 @@ function SessionKeepAlive() {
           try {
             localStorage.setItem(LAST_SESSION_RESTORE, now.toString())
             localStorage.removeItem(LAST_MANUAL_SIGNOUT)
+            const { remembered: wasRemembered } = readRememberState()
+            if (wasRemembered && token) {
+              sendRememberToServiceWorker(token, tokenExp)
+            }
           } catch {
             // ignore storage errors
           }
@@ -172,6 +210,7 @@ function SessionKeepAlive() {
             localStorage.removeItem(REMEMBER_EMAIL)
             localStorage.removeItem(REMEMBER_TOKEN)
             localStorage.removeItem(REMEMBER_TOKEN_EXP)
+            clearRememberInServiceWorker()
           } catch {
             // ignore storage errors
           }
