@@ -3957,8 +3957,8 @@ Please add nutritional information manually if needed.`);
     const isIos = /iP(hone|od|ad)/i.test(userAgent)
     const isSafari = /^((?!chrome|android).)*safari/i.test(userAgent)
     const isIosSafari = isIos && isSafari
+    setBarcodeStatus('loading')
     try {
-      setBarcodeStatus('loading')
       setBarcodeError(null)
       barcodeLookupInFlightRef.current = false
       stopBarcodeScanner()
@@ -4027,7 +4027,8 @@ Please add nutritional information manually if needed.`);
           Html5QrcodeSupportedFormats.CODE_39,
           Html5QrcodeSupportedFormats.CODE_93,
         ],
-        useBarCodeDetectorIfSupported: true,
+        // BarcodeDetector can hang silently on iOS Safari; keep it off there.
+        useBarCodeDetectorIfSupported: !isIosSafari,
         verbose: false,
       })
       barcodeScannerRef.current = scanner
@@ -4036,12 +4037,17 @@ Please add nutritional information manually if needed.`);
         aspectRatio: 16 / 9,
         disableFlip: false,
       }
-      const startAttempts: Array<{ label: string; config: any }> = [
-        {
-          label: `${desiredFacing}-facing`,
-          config: { facingMode: desiredFacing === 'front' ? 'user' : 'environment', width: { ideal: 1280 } },
-        },
-      ]
+      const startAttempts: Array<{ label: string; config: any }> = []
+      if (preferredCamera?.id && !isIosSafari) {
+        startAttempts.push({
+          label: 'preferred-device',
+          config: { deviceId: { exact: preferredCamera.id }, width: { ideal: 1280 } },
+        })
+      }
+      startAttempts.push({
+        label: `${desiredFacing}-facing`,
+        config: { facingMode: desiredFacing === 'front' ? 'user' : 'environment', width: { ideal: 1280 } },
+      })
       if (desiredFacing === 'back') {
         startAttempts.push({
           label: 'front-fallback',
@@ -4072,7 +4078,7 @@ Please add nutritional information manually if needed.`);
         console.error('All scanner start attempts failed', lastError)
         setBarcodeError(
           isIosSafari
-            ? 'Camera failed to start. Check Safari camera permission for this site, disable Private Browsing, then tap Restart.'
+            ? 'Camera failed to start. Ensure Private Browsing is off, refresh after granting camera, then tap Restart.'
             : 'Camera failed to start. Try switching camera or reloading after allowing permissions.',
         )
         setBarcodeStatus('idle')
