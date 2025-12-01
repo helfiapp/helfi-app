@@ -4142,8 +4142,8 @@ Please add nutritional information manually if needed.`);
           Html5QrcodeSupportedFormats.CODE_39,
           Html5QrcodeSupportedFormats.CODE_93,
         ],
-        // BarcodeDetector can hang silently on iOS Safari; keep it off there.
-        useBarCodeDetectorIfSupported: !isIosSafari,
+        // Try native detector when available; native fallback is also handled above.
+        useBarCodeDetectorIfSupported: true,
         verbose: false,
       })
       barcodeScannerRef.current = scanner
@@ -4151,11 +4151,13 @@ Please add nutritional information manually if needed.`);
         ? {
             fps: 10,
             disableFlip: false,
+            qrbox: { width: 280, height: 180 },
           }
         : {
             fps: 10,
             aspectRatio: 16 / 9,
             disableFlip: false,
+            qrbox: { width: 280, height: 180 },
           }
       const startAttempts: Array<{ label: string; config: any }> = []
       if (preferredCamera?.id) {

@@ -52,17 +52,20 @@ export default function SignIn() {
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [rememberMe, setRememberMe] = useState(false)
+  const [rememberMe, setRememberMe] = useState(true)
 
   useEffect(() => {
     try {
-      const storedRemember = localStorage.getItem('helfi:rememberMe') === '1'
+      const storedRemember = localStorage.getItem('helfi:rememberMe')
       const storedEmail = localStorage.getItem('helfi:rememberEmail')
-      if (storedRemember) {
-        setRememberMe(true)
-        if (storedEmail) {
-          setEmail(storedEmail)
-        }
+      if (storedRemember === null) {
+        // Default to remembered on first load so PWA sessions don't evaporate
+        localStorage.setItem('helfi:rememberMe', '1')
+      } else {
+        setRememberMe(storedRemember === '1')
+      }
+      if (storedEmail) {
+        setEmail(storedEmail)
       }
     } catch (storageError) {
       console.warn('Remember me restore failed', storageError)
@@ -155,7 +158,7 @@ export default function SignIn() {
         // Try direct sign-in first so we can honor the "keep me signed in" setting immediately
         const directResult = await attemptDirectSignin(rememberMe)
         if (directResult.success) {
-          persistRememberState(rememberMe, normalizedEmail, directResult.token, directResult.tokenExpiresAtMs)
+          persistRememberState(true, normalizedEmail, directResult.token, directResult.tokenExpiresAtMs)
           setLoading(false)
           window.location.href = '/onboarding'
           return
@@ -167,19 +170,15 @@ export default function SignIn() {
         const res = await signIn('credentials', { email, password, callbackUrl: '/onboarding', redirect: false })
         if (res?.ok) {
           // If they wanted a longer session, reissue via direct path to extend the cookie, but don't block redirect
-          if (rememberMe) {
-            const extendResult = await attemptDirectSignin(true, normalizedEmail)
-            persistRememberState(true, normalizedEmail, extendResult.token, extendResult.tokenExpiresAtMs)
-          } else {
-            persistRememberState(false, normalizedEmail)
-          }
+          const extendResult = await attemptDirectSignin(true, normalizedEmail)
+          persistRememberState(true, normalizedEmail, extendResult.token, extendResult.tokenExpiresAtMs)
           setLoading(false)
           window.location.href = '/onboarding'
           return
         } else {
           const fallback = await attemptDirectSignin(false)
           if (fallback.success) {
-            persistRememberState(rememberMe, normalizedEmail, fallback.token, fallback.tokenExpiresAtMs)
+            persistRememberState(true, normalizedEmail, fallback.token, fallback.tokenExpiresAtMs)
             setLoading(false)
             window.location.href = '/onboarding'
             return

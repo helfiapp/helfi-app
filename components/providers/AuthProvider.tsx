@@ -82,12 +82,15 @@ function SessionKeepAlive() {
 
       if (hasSession) {
         // Keep the remembered email in sync so we can reissue a cookie later if iOS drops it.
-        if (remembered && !email && sessionData?.user?.email) {
-          try {
-            localStorage.setItem(REMEMBER_EMAIL, sessionData.user.email.toLowerCase())
-          } catch {
-            // ignore storage errors
+        try {
+          if (!remembered) {
+            localStorage.setItem(REMEMBER_FLAG, '1')
           }
+          if (!email && sessionData?.user?.email) {
+            localStorage.setItem(REMEMBER_EMAIL, sessionData.user.email.toLowerCase())
+          }
+        } catch {
+          // ignore storage errors
         }
         return
       }
