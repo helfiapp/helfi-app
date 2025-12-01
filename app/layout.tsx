@@ -59,95 +59,38 @@ export default function RootLayout({
                 }
               })();
 
-              // Pre-hydration remember-me restore to avoid Safari/PWA cookie eviction on resume
+              // Pre-hydration refresh trigger to avoid Safari/PWA cookie eviction on resume.
               (function() {
                 try {
-                  const REMEMBER_FLAG = 'helfi:rememberMe'
-                  const REMEMBER_EMAIL = 'helfi:rememberEmail'
-                  const REMEMBER_TOKEN = 'helfi:rememberToken'
-                  const REMEMBER_TOKEN_EXP = 'helfi:rememberTokenExp'
-                  const LAST_MANUAL_SIGNOUT = 'helfi:lastManualSignOut'
-                  const LAST_SESSION_RESTORE = 'helfi:lastSessionRestore'
-                  let remembered = localStorage.getItem(REMEMBER_FLAG) === '1'
-                  const email = (localStorage.getItem(REMEMBER_EMAIL) || '').trim().toLowerCase()
-                  const ensureRememberedFlag = () => {
-                    try {
-                      localStorage.setItem(REMEMBER_FLAG, '1')
-                      remembered = true
-                    } catch {}
+                  const REMEMBER_FLAG = 'helfi:rememberMe';
+                  if (!localStorage.getItem(REMEMBER_FLAG)) {
+                    localStorage.setItem(REMEMBER_FLAG, '1');
                   }
-                  ensureRememberedFlag()
-                  if (!remembered || !email) return
+                  const cachedToken = localStorage.getItem('helfi:refreshToken') || localStorage.getItem('helfi:rememberToken')
+                  const cachedExp = parseInt(localStorage.getItem('helfi:rememberTokenExp') || '0', 10)
 
-                  const now = Date.now()
-                  const manualSignOutAt = parseInt(localStorage.getItem(LAST_MANUAL_SIGNOUT) || '0', 10)
-                  if (manualSignOutAt && now - manualSignOutAt < 5 * 60 * 1000) return
-
-                  const lastRestoreAt = parseInt(localStorage.getItem(LAST_SESSION_RESTORE) || '0', 10)
-                  const canRetry = () => {
-                    const diff = Date.now() - parseInt(localStorage.getItem(LAST_SESSION_RESTORE) || '0', 10)
-                    return diff > 2_000
-                  }
-
-                  const token = localStorage.getItem(REMEMBER_TOKEN) || ''
-                  const tokenExp = parseInt(localStorage.getItem(REMEMBER_TOKEN_EXP) || '0', 10)
-                  const hasSessionCookie = document.cookie.includes('__Secure-next-auth.session-token') || document.cookie.includes('next-auth.session-token')
-                  const reissueSession = async () => {
-                    if (!canRetry()) return
-                    try {
-                      const useRestore = !!token
-                      const payload = useRestore ? { token } : { email, rememberMe: true }
-                      const endpoint = useRestore ? '/api/auth/restore' : '/api/auth/signin-direct'
-                      const res = await fetch(endpoint, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        credentials: 'same-origin',
-                        body: JSON.stringify(payload)
-                      })
-                      if (res.ok) {
-                        localStorage.setItem(LAST_SESSION_RESTORE, Date.now().toString())
-                        localStorage.removeItem(LAST_MANUAL_SIGNOUT)
-                      } else if (res.status === 401) {
-                        localStorage.removeItem(REMEMBER_FLAG)
-                        localStorage.removeItem(REMEMBER_EMAIL)
-                      }
-                    } catch {}
-                  }
-
-                  if (token && tokenExp) {
-                    const secureFlag = window.location.protocol === 'https:' ? '; Secure' : ''
-                    const msLeft = Math.max(tokenExp - now, 5)
-                    const maxAgeSeconds = Math.floor(msLeft)
-                    document.cookie = \`__Secure-next-auth.session-token=\${token}; path=/; max-age=\${maxAgeSeconds}; SameSite=Lax\${secureFlag}\`
-                    document.cookie = \`next-auth.session-token=\${token}; path=/; max-age=\${maxAgeSeconds}; SameSite=Lax\${secureFlag}\`
-                    localStorage.setItem(LAST_SESSION_RESTORE, now.toString())
-                    localStorage.removeItem(LAST_MANUAL_SIGNOUT)
-                    if (!hasSessionCookie) {
-                      reissueSession()
+                  const pingServiceWorker = () => {
+                    const message = { type: 'REFRESH_SESSION_NOW' };
+                    if (navigator.serviceWorker?.controller) {
+                      navigator.serviceWorker.controller.postMessage(message);
+                    } else if (navigator.serviceWorker?.ready) {
+                      navigator.serviceWorker.ready.then((reg) => reg.active?.postMessage(message)).catch(() => {});
                     }
-                    return
-                  }
-
-                  fetch('/api/auth/session', { credentials: 'same-origin', cache: 'no-store' })
-                    .then((res) => Promise.all([res.ok, res.json().catch(() => null)]))
-                    .then(async ([ok, data]) => {
-                      const hasSession = ok && data && data.user
-                      if (hasSession) return
-                      if (canRetry()) {
-                        await reissueSession()
+                    if (cachedToken) {
+                      const setMessage = { type: 'SET_REFRESH_TOKEN', token: cachedToken, exp: cachedExp || 0 }
+                      if (navigator.serviceWorker?.controller) {
+                        navigator.serviceWorker.controller.postMessage(setMessage)
+                      } else if (navigator.serviceWorker?.ready) {
+                        navigator.serviceWorker.ready.then((reg) => reg.active?.postMessage(setMessage)).catch(() => {});
                       }
-                    })
-                    .catch(() => {})
-
-                  const bindResume = () => {
-                    const handler = () => reissueSession()
-                    window.addEventListener('pageshow', handler)
-                    window.addEventListener('focus', handler)
-                    document.addEventListener('visibilitychange', () => {
-                      if (document.visibilityState === 'visible') reissueSession()
-                    })
-                  }
-                  bindResume()
+                    }
+                  };
+                  pingServiceWorker();
+                  window.addEventListener('pageshow', pingServiceWorker);
+                  window.addEventListener('focus', pingServiceWorker);
+                  document.addEventListener('visibilitychange', () => {
+                    if (document.visibilityState === 'visible') pingServiceWorker();
+                  });
                 } catch (e) {
                   // Ignore restore issues so login page still renders
                 }

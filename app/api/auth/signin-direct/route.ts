@@ -4,12 +4,14 @@ import { encode } from 'next-auth/jwt'
 
 const ONE_DAY_SECONDS = 24 * 60 * 60
 const FOREVER_MAX_AGE_SECONDS = 5 * 365 * 24 * 60 * 60 // ~5 years; treat as "keep me signed in"
+const REFRESH_MAX_AGE_SECONDS = FOREVER_MAX_AGE_SECONDS
+const SESSION_MAX_AGE_SECONDS = 7 * 24 * 60 * 60 // cookies get reissued via refresh token
 
 export async function POST(request: NextRequest) {
   try {
     const { email, password, rememberMe } = await request.json().catch(()=>({}))
     const keepSignedIn = Boolean(rememberMe)
-    const maxAgeSeconds = keepSignedIn ? FOREVER_MAX_AGE_SECONDS : ONE_DAY_SECONDS
+    const sessionMaxAgeSeconds = keepSignedIn ? SESSION_MAX_AGE_SECONDS : ONE_DAY_SECONDS
     
     console.log('🔐 Direct signin called:', { email, rememberMe: keepSignedIn })
     
@@ -44,7 +46,7 @@ export async function POST(request: NextRequest) {
 
     // Create NextAuth-compatible JWT token using NextAuth's encode method
     const secret = process.env.NEXTAUTH_SECRET || 'helfi-secret-key-production-2024'
-    
+    const sessionExp = Math.floor(Date.now() / 1000) + sessionMaxAgeSeconds
     const token = await encode({
       token: {
         sub: user.id,
@@ -53,12 +55,27 @@ export async function POST(request: NextRequest) {
         name: user.name || user.email.split('@')[0],
         image: user.image,
         iat: Math.floor(Date.now() / 1000),
-        exp: Math.floor(Date.now() / 1000) + maxAgeSeconds,
+        exp: sessionExp,
       },
       secret,
-      maxAge: maxAgeSeconds,
+      maxAge: keepSignedIn ? SESSION_MAX_AGE_SECONDS : ONE_DAY_SECONDS,
     })
-    const tokenExpiresAtMs = Date.now() + (maxAgeSeconds * 1000)
+    const refreshExpSeconds = Math.floor(Date.now() / 1000) + REFRESH_MAX_AGE_SECONDS
+    const refreshToken = await encode({
+      token: {
+        sub: user.id,
+        id: user.id,
+        email: user.email,
+        name: user.name || user.email.split('@')[0],
+        image: user.image,
+        kind: 'refresh',
+        iat: Math.floor(Date.now() / 1000),
+        exp: refreshExpSeconds,
+      },
+      secret,
+      maxAge: REFRESH_MAX_AGE_SECONDS,
+    })
+    const tokenExpiresAtMs = Date.now() + (sessionMaxAgeSeconds * 1000)
 
     // Create response with session cookie
     const response = NextResponse.json({ 
@@ -70,8 +87,8 @@ export async function POST(request: NextRequest) {
         emailVerified: !!user.emailVerified
       },
       message: keepSignedIn ? 'Signin successful (remembered)' : 'Signin successful',
-      token: keepSignedIn ? token : undefined,
-      tokenExpiresAtMs: keepSignedIn ? tokenExpiresAtMs : undefined,
+      token: keepSignedIn ? refreshToken : undefined,
+      tokenExpiresAtMs: keepSignedIn ? refreshExpSeconds * 1000 : undefined,
       remembered: keepSignedIn
     })
 
@@ -83,24 +100,24 @@ export async function POST(request: NextRequest) {
     response.cookies.set(secureCookie, token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: maxAgeSeconds,
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      maxAge: sessionMaxAgeSeconds,
       path: '/'
     })
     // Also set legacy cookie name for compatibility
     response.cookies.set(legacyCookie, token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: maxAgeSeconds,
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      maxAge: sessionMaxAgeSeconds,
       path: '/'
     })
-    // Store a non-HttpOnly remember token so we can re-issue the session on PWA resume if Safari drops cookies
-    response.cookies.set(rememberCookie, keepSignedIn ? token : '', {
+    // We no longer rely on a remember cookie. The refresh token travels via service worker/IndexedDB.
+    response.cookies.set(rememberCookie, '', {
       httpOnly: false,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: keepSignedIn ? maxAgeSeconds : 0,
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      maxAge: 0,
       path: '/',
     })
 
@@ -142,8 +159,8 @@ export async function GET(request: NextRequest) {
       maxAge: maxAgeSeconds,
     })
     const response = NextResponse.redirect(new URL('/onboarding', request.url))
-    response.cookies.set('__Secure-next-auth.session-token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', maxAge: maxAgeSeconds, path: '/' })
-    response.cookies.set('next-auth.session-token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', maxAge: maxAgeSeconds, path: '/' })
+    response.cookies.set('__Secure-next-auth.session-token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', maxAge: maxAgeSeconds, path: '/' })
+    response.cookies.set('next-auth.session-token', token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax', maxAge: maxAgeSeconds, path: '/' })
     return response
   } catch (e) {
     return NextResponse.redirect(new URL('/auth/signin?error=Signin', request.url))

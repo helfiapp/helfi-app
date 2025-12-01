@@ -1,13 +1,30 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { getToken } from 'next-auth/jwt'
-import { decode } from 'next-auth/jwt'
+import { decode, encode } from 'next-auth/jwt'
 
 const ADMIN_GATE_COOKIE_MAX_AGE = 30 * 24 * 60 * 60 // 30 days
-const REMEMBER_COOKIE = 'helfi-remember-token'
 const SESSION_COOKIE = '__Secure-next-auth.session-token'
 const LEGACY_SESSION_COOKIE = 'next-auth.session-token'
 const JWT_SECRET = process.env.NEXTAUTH_SECRET || 'helfi-secret-key-production-2024'
+const REFRESH_HEADER = 'x-helfi-refresh-token'
+
+async function encodeSessionLike(decoded: any, maxAge: number) {
+  const nowSeconds = Math.floor(Date.now() / 1000)
+  return encode({
+    token: {
+      sub: decoded?.sub,
+      id: decoded?.id || decoded?.sub,
+      email: decoded?.email,
+      name: decoded?.name,
+      image: decoded?.image,
+      iat: nowSeconds,
+      exp: nowSeconds + maxAge,
+    },
+    secret: JWT_SECRET,
+    maxAge,
+  })
+}
 
 export async function middleware(request: NextRequest) {
   // Preview-staging should always skip the admin gate to avoid iOS logout loops
@@ -33,28 +50,34 @@ export async function middleware(request: NextRequest) {
         : 'next-auth.session-token'
     })
 
-    // If no session cookie but remember token exists, re-issue session cookies (helps iOS PWA when cookies are dropped)
+    // If no session cookie but a refresh token header exists, re-issue session cookies (used by SW/IDB flow)
     if (!token) {
-      const remember = request.cookies.get(REMEMBER_COOKIE)?.value
-      if (remember) {
+      const refreshToken = request.headers.get(REFRESH_HEADER)
+
+      if (refreshToken) {
         try {
-          const decoded = await decode({ token: remember, secret: JWT_SECRET })
+          const decoded = await decode({ token: refreshToken, secret: JWT_SECRET })
           const exp = (decoded as any)?.exp
           const nowSeconds = Math.floor(Date.now() / 1000)
           if (exp && exp > nowSeconds) {
-            const maxAge = Math.max(exp - nowSeconds, 5)
+            const maxAge = Math.max(Math.min(exp - nowSeconds, 7 * 24 * 60 * 60), 5)
             const response = NextResponse.next()
-            response.cookies.set(SESSION_COOKIE, remember, {
+            const sameSite = request.nextUrl.protocol === 'https:' ? 'none' : 'lax'
+            const sessionToken = await encodeSessionLike(decoded as any, maxAge)
+            if (!sessionToken) {
+              return response
+            }
+            response.cookies.set(SESSION_COOKIE, sessionToken, {
               httpOnly: true,
               secure: request.nextUrl.protocol === 'https:',
-              sameSite: 'lax',
+              sameSite,
               maxAge,
               path: '/',
             })
-            response.cookies.set(LEGACY_SESSION_COOKIE, remember, {
+            response.cookies.set(LEGACY_SESSION_COOKIE, sessionToken, {
               httpOnly: true,
               secure: request.nextUrl.protocol === 'https:',
-              sameSite: 'lax',
+              sameSite,
               maxAge,
               path: '/',
             })
@@ -62,7 +85,7 @@ export async function middleware(request: NextRequest) {
             return response
           }
         } catch (err) {
-          console.warn('Remember token decode failed', err)
+          console.warn('Refresh token decode failed', err)
         }
       }
     }

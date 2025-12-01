@@ -13,18 +13,33 @@ function SessionKeepAlive() {
 
     const REMEMBER_FLAG = 'helfi:rememberMe'
     const REMEMBER_EMAIL = 'helfi:rememberEmail'
-    const REMEMBER_TOKEN = 'helfi:rememberToken'
+    const REFRESH_TOKEN = 'helfi:refreshToken'
+    const LEGACY_REMEMBER_TOKEN = 'helfi:rememberToken'
     const REMEMBER_TOKEN_EXP = 'helfi:rememberTokenExp'
     const LAST_MANUAL_SIGNOUT = 'helfi:lastManualSignOut'
     const LAST_SESSION_RESTORE = 'helfi:lastSessionRestore'
+
+    const sendSwMessage = (message: any) => {
+      try {
+        if (navigator.serviceWorker?.controller) {
+          navigator.serviceWorker.controller.postMessage(message)
+        } else if (navigator.serviceWorker?.ready) {
+          navigator.serviceWorker.ready.then((reg) => reg.active?.postMessage(message)).catch(() => {})
+        }
+      } catch {
+        // ignore messaging failures
+      }
+    }
 
     const markManualSignOut = () => {
       try {
         localStorage.setItem(LAST_MANUAL_SIGNOUT, Date.now().toString())
         localStorage.removeItem(REMEMBER_FLAG)
         localStorage.removeItem(REMEMBER_EMAIL)
-        localStorage.removeItem(REMEMBER_TOKEN)
+        localStorage.removeItem(REFRESH_TOKEN)
+        localStorage.removeItem(LEGACY_REMEMBER_TOKEN)
         localStorage.removeItem(REMEMBER_TOKEN_EXP)
+        sendSwMessage({ type: 'CLEAR_REFRESH_TOKEN' })
       } catch {
         // ignore storage issues
       }
@@ -48,7 +63,7 @@ function SessionKeepAlive() {
         return {
           remembered: localStorage.getItem(REMEMBER_FLAG) === '1',
           email: localStorage.getItem(REMEMBER_EMAIL) || '',
-          token: localStorage.getItem(REMEMBER_TOKEN) || '',
+          token: localStorage.getItem(REFRESH_TOKEN) || localStorage.getItem(LEGACY_REMEMBER_TOKEN) || '',
           tokenExp: parseInt(localStorage.getItem(REMEMBER_TOKEN_EXP) || '0', 10),
           manualSignOutAt: parseInt(localStorage.getItem(LAST_MANUAL_SIGNOUT) || '0', 10),
           lastRestoreAt: parseInt(localStorage.getItem(LAST_SESSION_RESTORE) || '0', 10),
@@ -99,49 +114,13 @@ function SessionKeepAlive() {
       if (restoreInFlight) return
       if (shouldRespectManualSignOut(manualSignOutAt)) return
 
-      if (token) {
-        const msLeft = tokenExp ? Math.max(tokenExp - now, 5_000) : 5 * 365 * 24 * 60 * 60 * 1000
-        const maxAgeSeconds = Math.floor(msLeft / 1000)
-        try {
-          const secureFlag = window.location.protocol === 'https:' ? '; Secure' : ''
-          document.cookie = `__Secure-next-auth.session-token=${token}; path=/; max-age=${maxAgeSeconds}; SameSite=Lax${secureFlag}`
-          document.cookie = `next-auth.session-token=${token}; path=/; max-age=${maxAgeSeconds}; SameSite=Lax${secureFlag}`
-          localStorage.setItem(LAST_SESSION_RESTORE, now.toString())
-          localStorage.removeItem(LAST_MANUAL_SIGNOUT)
-          return
-        } catch {
-          // fall through to network reissue
-        }
-      }
-
       if (now - lastRestoreAt < 15_000) return // throttle re-issue attempts
 
       restoreInFlight = true
       try {
-        const res = await fetch('/api/auth/signin-direct', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'same-origin',
-          body: JSON.stringify({ email, rememberMe: true }),
-        })
-
-        if (res.ok) {
-          try {
-            localStorage.setItem(LAST_SESSION_RESTORE, now.toString())
-            localStorage.removeItem(LAST_MANUAL_SIGNOUT)
-          } catch {
-            // ignore storage errors
-          }
-        } else if (res.status === 401) {
-          try {
-            localStorage.removeItem(REMEMBER_FLAG)
-            localStorage.removeItem(REMEMBER_EMAIL)
-            localStorage.removeItem(REMEMBER_TOKEN)
-            localStorage.removeItem(REMEMBER_TOKEN_EXP)
-          } catch {
-            // ignore storage errors
-          }
-        }
+        sendSwMessage({ type: 'REFRESH_SESSION_NOW' })
+        localStorage.setItem(LAST_SESSION_RESTORE, now.toString())
+        localStorage.removeItem(LAST_MANUAL_SIGNOUT)
       } catch (error) {
         console.warn('Session restore failed', error)
       } finally {

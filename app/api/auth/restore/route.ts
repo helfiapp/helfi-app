@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { decode } from 'next-auth/jwt'
+import { decode, encode } from 'next-auth/jwt'
 
 const SECRET = process.env.NEXTAUTH_SECRET || 'helfi-secret-key-production-2024'
 
 export async function POST(req: NextRequest) {
   try {
     const { token } = await req.json().catch(() => ({}))
-    const headerToken = req.headers.get('x-helfi-remember-token')
+    const headerToken = req.headers.get('x-helfi-refresh-token') || req.headers.get('x-helfi-remember-token')
     const sessionToken = token || headerToken
 
     if (!sessionToken || typeof sessionToken !== 'string') {
@@ -28,18 +28,36 @@ export async function POST(req: NextRequest) {
     const response = NextResponse.json({ ok: true })
     const secure = process.env.NODE_ENV === 'production'
     const maxAge = ttlSeconds
+    const sameSite = secure ? 'none' : 'lax'
+
+    const needsSessionEncode = (decoded as any)?.kind === 'refresh'
+    const cookieValue = needsSessionEncode
+      ? await encode({
+          token: {
+            sub: (decoded as any)?.sub,
+            id: (decoded as any)?.id || (decoded as any)?.sub,
+            email: (decoded as any)?.email,
+            name: (decoded as any)?.name,
+            image: (decoded as any)?.image,
+            iat: nowSeconds,
+            exp: nowSeconds + maxAge,
+          },
+          secret: SECRET,
+          maxAge,
+        })
+      : sessionToken
 
     // Use SameSite=None; Secure for iOS PWA compatibility
-    response.cookies.set('__Secure-next-auth.session-token', sessionToken, {
+    response.cookies.set('__Secure-next-auth.session-token', cookieValue, {
       httpOnly: true,
-      sameSite: secure ? 'none' : 'lax', // SameSite=None required for iOS PWA cookie persistence
+      sameSite,
       secure,
       path: '/',
       maxAge,
     })
-    response.cookies.set('next-auth.session-token', sessionToken, {
+    response.cookies.set('next-auth.session-token', cookieValue, {
       httpOnly: true,
-      sameSite: secure ? 'none' : 'lax', // SameSite=None required for iOS PWA cookie persistence
+      sameSite,
       secure,
       path: '/',
       maxAge,

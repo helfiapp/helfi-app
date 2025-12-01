@@ -1,7 +1,7 @@
 // Service Worker with three roles:
 // 1) Keep PWA install/push notifications working.
-// 2) Restore auth cookies on iOS PWA resume using stored remember token.
-// 3) If cookies are gone, attach a short-lived auth header so the server can reissue cookies on the next request.
+// 2) Hold a long-lived refresh token in IndexedDB (survives iOS PWA resume better than cookies).
+// 3) Before navigations or when asked by the page, exchange that refresh token for fresh HttpOnly session cookies.
 
 // ---------- Install/activate ----------
 self.addEventListener('install', (event) => {
@@ -12,10 +12,10 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim());
 });
 
-// ---------- Lightweight IndexedDB helpers for the remember token ----------
+// ---------- Lightweight IndexedDB helpers for the refresh token ----------
 const DB_NAME = 'helfi-auth';
-const DB_VERSION = 1;
-const STORE = 'remember';
+const DB_VERSION = 2;
+const STORE = 'refresh';
 let memoryCache = null; // quick in-memory cache to reduce IDB reads
 
 function openDb() {
@@ -32,7 +32,7 @@ function openDb() {
   });
 }
 
-async function saveRememberToken(value) {
+async function saveRefreshToken(value) {
   memoryCache = value;
   try {
     const db = await openDb();
@@ -47,7 +47,7 @@ async function saveRememberToken(value) {
   }
 }
 
-async function readRememberToken() {
+async function readRefreshToken() {
   if (memoryCache) return memoryCache;
   try {
     const db = await openDb();
@@ -62,7 +62,7 @@ async function readRememberToken() {
   }
 }
 
-async function clearRememberToken() {
+async function clearRefreshToken() {
   memoryCache = null;
   try {
     const db = await openDb();
@@ -71,48 +71,55 @@ async function clearRememberToken() {
   } catch (err) {}
 }
 
-// ---------- Message bridge: page -> SW to cache remember token ----------
+// ---------- Message bridge: page -> SW to cache refresh token ----------
 self.addEventListener('message', (event) => {
   const data = event.data || {};
-  if (data.type === 'SET_REMEMBER_TOKEN' && data.token) {
-    saveRememberToken({ token: data.token, exp: data.exp || 0 });
+  if ((data.type === 'SET_REFRESH_TOKEN' || data.type === 'SET_REMEMBER_TOKEN') && data.token) {
+    saveRefreshToken({ token: data.token, exp: data.exp || 0 });
   }
-  if (data.type === 'CLEAR_REMEMBER_TOKEN') {
-    clearRememberToken();
+  if (data.type === 'CLEAR_REFRESH_TOKEN' || data.type === 'CLEAR_REMEMBER_TOKEN') {
+    clearRefreshToken();
+  }
+  if (data.type === 'REFRESH_SESSION_NOW') {
+    refreshSession();
   }
 });
 
-// ---------- Attach auth header when cookies are missing ----------
-async function withAuthHeader(request) {
-  const cached = await readRememberToken();
-  if (!cached || !cached.token) return request;
-  const headers = new Headers(request.headers);
-  headers.set('x-helfi-remember-token', cached.token);
-  return new Request(request, { headers });
-}
-
-// ---------- Auth restore on navigation ----------
+// ---------- Auth restore on navigation or explicit request ----------
 let lastRestoreAt = 0;
-async function maybeRestoreSession() {
+async function refreshSession() {
   const now = Date.now();
   if (now - lastRestoreAt < 5000) return; // throttle to avoid loops
-  const cached = await readRememberToken();
+  const cached = await readRefreshToken();
   if (!cached || !cached.token) return;
-  if (cached.exp && cached.exp < now) {
-    await clearRememberToken();
+  if (cached.exp && cached.exp * 1000 < now) {
+    await clearRefreshToken();
     return;
   }
   lastRestoreAt = now;
   try {
-    await fetch(`${self.location.origin}/api/auth/restore`, {
+    await fetch(`${self.location.origin}/api/auth/refresh`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-helfi-refresh-token': cached.token },
       credentials: 'include',
       body: JSON.stringify({ token: cached.token }),
     });
   } catch (err) {
-    // ignore restore errors
+    // ignore refresh errors
   }
+}
+
+// ---------- Attach auth header so middleware can reissue if needed ----------
+async function withAuthHeader(request) {
+  const cached = await readRefreshToken();
+  if (!cached || !cached.token) return request;
+  if (cached.exp && cached.exp * 1000 < Date.now()) {
+    await clearRefreshToken();
+    return request;
+  }
+  const headers = new Headers(request.headers);
+  headers.set('x-helfi-refresh-token', cached.token);
+  return new Request(request, { headers });
 }
 
 self.addEventListener('fetch', (event) => {
@@ -126,7 +133,7 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     (async () => {
       if (shouldTryRestore) {
-        await maybeRestoreSession();
+        await refreshSession();
       }
       if (isSameOrigin) {
         try {
@@ -174,4 +181,3 @@ self.addEventListener('notificationclick', (event) => {
     })
   );
 });
-
