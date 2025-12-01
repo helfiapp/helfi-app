@@ -1,10 +1,10 @@
 'use client'
 
-import { signIn } from 'next-auth/react'
+import { signIn, useSession } from 'next-auth/react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useState, useEffect, Suspense } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 
 // Separate component for search params handling with Suspense
 function SearchParamsHandler({ setError, setMessage }: { setError: (error: string) => void, setMessage: (message: string) => void }) {
@@ -45,6 +45,8 @@ function SearchParamsHandler({ setError, setMessage }: { setError: (error: strin
 }
 
 export default function SignIn() {
+  const router = useRouter()
+  const { status } = useSession()
   const [loading, setLoading] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -53,6 +55,15 @@ export default function SignIn() {
   const [message, setMessage] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [rememberMe, setRememberMe] = useState(true)
+
+  // If the user is already logged in and somehow lands on the sign-in page
+  // (for example, via the iOS Home Screen icon), immediately send them into
+  // the main app instead of making them log in again.
+  useEffect(() => {
+    if (status === 'authenticated') {
+      router.replace('/dashboard')
+    }
+  }, [status, router])
 
   useEffect(() => {
     try {
