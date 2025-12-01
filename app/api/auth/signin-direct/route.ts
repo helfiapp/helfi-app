@@ -112,12 +112,12 @@ export async function POST(request: NextRequest) {
       maxAge: sessionMaxAgeSeconds,
       path: '/'
     })
-    // We no longer rely on a remember cookie. The refresh token travels via service worker/IndexedDB.
-    response.cookies.set(rememberCookie, '', {
+    // Restore a non-HttpOnly remember cookie so middleware can reissue on resume even if the SW isn't ready.
+    response.cookies.set(rememberCookie, keepSignedIn ? refreshToken : '', {
       httpOnly: false,
       secure: process.env.NODE_ENV === 'production',
       sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-      maxAge: 0,
+      maxAge: keepSignedIn ? REFRESH_MAX_AGE_SECONDS : 0,
       path: '/',
     })
 
