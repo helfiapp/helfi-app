@@ -6,6 +6,10 @@ import { prisma } from '@/lib/prisma';
 import { CreditManager } from '@/lib/credit-system';
 import { chatCompletionWithCost } from '@/lib/metered-openai';
 import { logAIUsage } from '@/lib/ai-usage-logger';
+import { consumeRateLimit } from '@/lib/rate-limit';
+
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const RATE_LIMIT_MAX = 3;
 
 function getOpenAIClient() {
   if (!process.env.OPENAI_API_KEY) {
@@ -59,6 +63,17 @@ export async function POST(req: NextRequest) {
 
     if (!imageFile) {
       return NextResponse.json({ error: 'No image provided' }, { status: 400 });
+    }
+
+    const clientIp = (req.headers.get('x-forwarded-for') || '').split(',')[0]?.trim() || 'unknown';
+    const rateKey = user.id ? `user:${user.id}` : `ip:${clientIp}`;
+    const rateCheck = consumeRateLimit('medical-image', rateKey, RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_MS);
+    if (!rateCheck.allowed) {
+      const retryAfter = Math.max(1, Math.ceil(rateCheck.retryAfterMs / 1000));
+      return NextResponse.json(
+        { error: 'Too many medical image analyses. Please wait and try again.' },
+        { status: 429, headers: { 'Retry-After': String(retryAfter) } }
+      );
     }
 
     // Convert image to base64

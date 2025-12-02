@@ -50,15 +50,17 @@ export async function GET(request: Request) {
     }
   } catch {}
 
-  // Kick off background regeneration without blocking the response
-  try {
-    const origin = new URL(request.url).origin
-    fetch(`${origin}/api/insights/generate?preview=1&t=${Date.now()}`, {
-      method: 'POST',
-      cache: 'no-cache',
-      headers: { cookie: request.headers.get('cookie') || '' },
-    }).catch(() => {})
-  } catch {}
+  // Kick off background regeneration only when explicitly requested
+  if (regen) {
+    try {
+      const origin = new URL(request.url).origin
+      fetch(`${origin}/api/insights/generate?preview=1&t=${Date.now()}`, {
+        method: 'POST',
+        cache: 'no-cache',
+        headers: { cookie: request.headers.get('cookie') || '' },
+      }).catch(() => {})
+    } catch {}
+  }
 
   // Secondary fallback: derive personalized preview from stored onboarding data
   try {
@@ -139,5 +141,4 @@ export async function GET(request: Request) {
   ]
   return NextResponse.json({ enabled: true, items, preview: true }, { status: 200 })
 }
-
 

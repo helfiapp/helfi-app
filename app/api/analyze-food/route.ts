@@ -13,9 +13,12 @@ import { prisma } from '@/lib/prisma';
 import { searchFatSecretFoods } from '@/lib/food-data';
 import { CreditManager, CREDIT_COSTS } from '@/lib/credit-system';
 import crypto from 'crypto';
+import { consumeRateLimit } from '@/lib/rate-limit';
 
 // Bump this when changing curated nutrition to invalidate old cached images.
 const CACHE_VERSION = 'v2';
+const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute
+const RATE_LIMIT_MAX_REQUESTS = 3;   // stop runaway loops quickly
 
 // Guard rail: this route powers the main Food Analyzer. Billing enforcement
 // (BILLING_ENFORCED) must remain true for production unless the user explicitly
@@ -132,55 +135,6 @@ const enrichPackagedItemsWithFatSecret = async (items: any[]): Promise<{ items: 
     items: enriched,
     total: changed ? computeTotalsFromItems(enriched) : null,
   };
-};
-
-// Secondary per-serving extractor for packaged labels: forces the model to read ONLY the per-serving column.
-const extractPerServingFromLabel = async (
-  openai: OpenAI,
-  imageDataUrl: string,
-): Promise<
-  | {
-      serving_size?: string | null;
-      calories?: number | null;
-      protein_g?: number | null;
-      carbs_g?: number | null;
-      fat_g?: number | null;
-      fiber_g?: number | null;
-      sugar_g?: number | null;
-    }
-  | null
-> => {
-  try {
-    const completion = await chatCompletionWithCost(openai, {
-      model: 'gpt-4o',
-      messages: [
-        {
-          role: 'user',
-          content: [
-            { type: 'text', text: `Read ONLY the PER-SERVING column from this nutrition label. Ignore per 100g/ml values. Return JSON only in this shape:
-{"serving_size":"string","calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"sugar_g":0}
-- Copy the per-serving numbers verbatim.
-- If you see multiple columns, choose the one labelled per serve/per serving.
-- For fat: read the TOTAL FAT row from the per-serving column. Do NOT add saturated or trans fat; just use the total fat per serving.
-- Do NOT estimate or scale from per 100g.
-- No prose, just JSON.` },
-            { type: 'image_url', image_url: { url: imageDataUrl } },
-          ],
-        },
-      ],
-      max_tokens: 180,
-      temperature: 0,
-    } as any);
-    const raw = completion.completion.choices?.[0]?.message?.content?.trim() || '';
-    const cleaned = raw.replace(/```json/gi, '').replace(/```/g, '').trim();
-    const parsed = cleaned ? parseItemsJsonRelaxed(cleaned) : null;
-    if (parsed && typeof parsed === 'object') {
-      return parsed as any;
-    }
-  } catch (err) {
-    console.warn('Per-serving extractor failed (non-fatal)', err);
-  }
-  return null;
 };
 
 // Optional: decode barcode from label image (OpenAI vision quick pass).
@@ -408,6 +362,18 @@ export async function POST(req: NextRequest) {
     
     console.log('✅ OpenAI API key configured');
 
+    // Quick rate limit to stop accidental loops or repeated triggers
+    const clientIp = (req.headers.get('x-forwarded-for') || '').split(',')[0]?.trim() || 'unknown';
+    const rateKey = user.id ? `user:${user.id}` : `ip:${clientIp}`;
+    const rateCheck = consumeRateLimit('food-analyzer', rateKey, RATE_LIMIT_MAX_REQUESTS, RATE_LIMIT_WINDOW_MS);
+    if (!rateCheck.allowed) {
+      const retryAfter = Math.max(1, Math.ceil(rateCheck.retryAfterMs / 1000));
+      return NextResponse.json(
+        { error: 'Too many analyses in a short period. Please wait and try again.' },
+        { status: 429, headers: { 'Retry-After': String(retryAfter) } }
+      );
+    }
+
     const contentType = req.headers.get('content-type');
     console.log('📝 Content-Type:', contentType);
     let messages: any[] = [];
@@ -555,7 +521,7 @@ CRITICAL REQUIREMENTS:
       console.log('🔄 Converting image to base64...');
       const imageBuffer = await imageFile.arrayBuffer();
       const imageBase64 = Buffer.from(imageBuffer).toString('base64');
-      const imageDataUrl = `data:${imageFile.type};base64,${imageBase64}`;
+      imageDataUrl = `data:${imageFile.type};base64,${imageBase64}`;
       imageHash = crypto.createHash('sha256').update(Buffer.from(imageBuffer)).digest('hex');
       
       console.log('✅ Image conversion complete:', {
@@ -914,31 +880,9 @@ CRITICAL REQUIREMENTS:
     const hasFat = /fat\s*[:\-]?\s*\d+(?:\.\d+)?\s*g/i.test(analysis);
 
     if (!(hasCalories && hasProtein && hasCarbs && hasFat)) {
-      try {
-        console.log('ℹ️ Nutrition line missing; running compact extractor');
-        const extract = await chatCompletionWithCost(openai, {
-          model: 'gpt-4o',
-          messages: [
-            {
-              role: 'user',
-              content:
-                `From the following text, extract ONLY a single line in this exact format: \n\n` +
-                `Calories: [number], Protein: [g], Carbs: [g], Fat: [g]\n\n` +
-                `If you cannot infer a value, write 'unknown' for that field. No extra words.\n\nText:\n${analysis}`,
-            },
-          ],
-          max_tokens: 60,
-          temperature: 0,
-        } as any);
-        totalCostCents += extract.costCents;
-        const extracted = extract.completion.choices?.[0]?.message?.content?.trim();
-        if (extracted && /calories/i.test(extracted)) {
-          analysis = `${analysis}\n${extracted}`;
-          console.log('✅ Appended nutrition line:', extracted);
-        }
-      } catch (exErr) {
-        console.warn('Nutrition extraction fallback failed:', exErr);
-      }
+      const fallbackLine = 'Calories: unknown, Protein: unknown, Carbs: unknown, Fat: unknown';
+      analysis = `${analysis}\n${fallbackLine}`;
+      console.log('ℹ️ Nutrition line missing; appended static fallback to avoid extra AI calls');
     }
     
     // Note: Charging happens after health compatibility check to include all costs
@@ -1009,37 +953,33 @@ CRITICAL REQUIREMENTS:
       }
 
       // If the main analysis did not contain a usable ITEMS_JSON block, make a
-      // compact follow-up call whose ONLY job is to produce structured items.
+      // compact follow-up call whose ONLY job is to produce structured items
+      // so the UI can render editable ingredient cards. This is text-only and
+      // only runs when the first call missed items.
       if ((!resp.items || resp.items.length === 0) && analysis.length > 0) {
         try {
-          console.log('ℹ️ No ITEMS_JSON found, running structured-items extractor');
+          console.log('ℹ️ No ITEMS_JSON found, running lightweight items extractor (text-only)');
           const extractor = await chatCompletionWithCost(openai, {
             model: 'gpt-4o-mini',
             messages: [
               {
                 role: 'user',
                 content:
-                  'From the following nutrition analysis text, extract a JSON object with this exact shape:\n\n' +
+                  'Convert the nutrition analysis text below into JSON with this exact shape:\n' +
                   '{"items":[{"name":"string","brand":null,"serving_size":"string","servings":1,"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"sugar_g":0}],' +
-                  '"total":{"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"sugar_g":0}}\n\n' +
-                  'Rules:\n' +
-                  '- Use PER-SERVING nutrition values for each item based on REALISTIC standard nutrition databases.\n' +
-                  '- The "total" object must be the sum of all items multiplied by their servings.\n' +
-                  '- Use realistic values: burger bun ~150 cal, 6oz beef patty ~400 cal, cheese slice ~100 cal, bacon (2 slices) ~80 cal.\n' +
-                  '- A typical burger should total 600-900 calories, NOT 40-50 calories.\n' +
-                  '- If you are unsure about fiber or sugar, set them to 0.\n' +
-                  '- Respond with JSON ONLY, no backticks, no comments, no extra text.\n\n' +
+                  '"total":{"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"sugar_g":0}}\n' +
+                  '- Use realistic per-serving values based on the analysis.\n' +
+                  '- If unsure about fiber or sugar, set them to 0.\n' +
+                  '- Respond with JSON only, no backticks.\n\n' +
                   'Analysis text:\n' +
                   analysis,
               },
             ],
-            max_tokens: 260,
+            max_tokens: 220,
             temperature: 0,
           } as any);
           totalCostCents += extractor.costCents;
           const text = extractor.completion.choices?.[0]?.message?.content?.trim() || '';
-          // Handle cases where the assistant still wraps JSON in ```json fences
-          // despite instructions to return raw JSON only.
           const cleaned =
             text
               .replace(/```json/gi, '')
@@ -1059,6 +999,29 @@ CRITICAL REQUIREMENTS:
           }
         } catch (e) {
           console.warn('ITEMS_JSON extractor follow-up failed (non-fatal):', e);
+        }
+
+        // If we still have no items, build a single editable item from the nutrition line
+        if (!resp.items || resp.items.length === 0) {
+          const caloriesMatch = analysis.match(/calories\s*[:\-]?\s*(\d+)/i);
+          const proteinMatch = analysis.match(/protein\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*g/i);
+          const carbsMatch = analysis.match(/carbs?\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*g/i);
+          const fatMatch = analysis.match(/fat\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*g/i);
+          const fallbackItem = {
+            name: 'Meal',
+            brand: null,
+            serving_size: '1 serving',
+            servings: 1,
+            calories: caloriesMatch ? Number(caloriesMatch[1]) : null,
+            protein_g: proteinMatch ? Number(proteinMatch[1]) : null,
+            carbs_g: carbsMatch ? Number(carbsMatch[1]) : null,
+            fat_g: fatMatch ? Number(fatMatch[1]) : null,
+            fiber_g: 0,
+            sugar_g: 0,
+          };
+          resp.items = [fallbackItem];
+          resp.total = resp.total || computeTotalsFromItems(resp.items) || null;
+          console.log('ℹ️ Using fallback single-item card to keep editor usable');
         }
       }
     }
@@ -1092,64 +1055,9 @@ CRITICAL REQUIREMENTS:
       }
     }
 
-    // Packaged mode: force-read per-serving column and REPLACE macros with the per-serving read
+    // Packaged mode: skip secondary OpenAI per-serving extraction to keep one API call per analysis.
     if (packagedMode && resp.items && Array.isArray(resp.items) && resp.items.length > 0 && imageDataUrl) {
-      // 1) Force per-serving extraction first and replace macros for all items.
-      const forced = await extractPerServingFromLabel(openai, imageDataUrl);
-      if (forced) {
-        const toNum = (v: any) => (Number.isFinite(Number(v)) ? Number(v) : null);
-        const forcedValues = {
-          serving_size: forced.serving_size ?? null,
-          calories: toNum(forced.calories),
-          protein_g: toNum(forced.protein_g),
-          carbs_g: toNum(forced.carbs_g),
-          fat_g: toNum(forced.fat_g),
-          fiber_g: toNum(forced.fiber_g),
-          sugar_g: toNum(forced.sugar_g),
-        };
-
-        // If implied calories from macros exceed label calories by >15%, clamp fat to fit label calories (total fat row only).
-        if (forcedValues.calories && forcedValues.calories > 0) {
-          const proteinCals = (forcedValues.protein_g ?? 0) * 4;
-          const carbCals = (forcedValues.carbs_g ?? 0) * 4;
-          const fatCals = (forcedValues.fat_g ?? 0) * 9;
-          const implied = proteinCals + carbCals + fatCals;
-          if (implied > forcedValues.calories * 1.15) {
-            const remaining = forcedValues.calories - (proteinCals + carbCals);
-            const adjustedFat = Math.max(0, remaining / 9);
-            forcedValues.fat_g = Math.round(adjustedFat * 10) / 10;
-          }
-          // If carbs look too low relative to label calories, adjust carbs from remaining calories (after protein/fat).
-          if ((forcedValues.carbs_g ?? 0) > 0) {
-            const remainingAfterProteinFat =
-              forcedValues.calories - (proteinCals + (forcedValues.fat_g ?? 0) * 9);
-            const impliedCarbs = remainingAfterProteinFat / 4;
-            if (impliedCarbs > 0 && impliedCarbs > (forcedValues.carbs_g ?? 0) * 1.25) {
-              forcedValues.carbs_g = Math.round(impliedCarbs * 10) / 10;
-            }
-          }
-        }
-
-        resp.items = resp.items.map((item: any) => ({
-          ...item,
-          serving_size: forcedValues.serving_size || item.serving_size,
-          calories: forcedValues.calories ?? item.calories,
-          protein_g: forcedValues.protein_g ?? item.protein_g,
-          carbs_g: forcedValues.carbs_g ?? item.carbs_g,
-          fat_g: forcedValues.fat_g ?? item.fat_g,
-          fiber_g: forcedValues.fiber_g ?? item.fiber_g,
-          sugar_g: forcedValues.sugar_g ?? item.sugar_g,
-        }));
-
-        resp.total = computeTotalsFromItems(resp.items);
-
-        // If calories present on label, keep them authoritative even if macro-implied differs.
-        if (forcedValues.calories != null && resp.total) {
-          resp.total.calories = Math.round(forcedValues.calories);
-        }
-      }
-
-      // 2) Barcode fallback disabled for now to avoid wrong matches (burger mixups). Keep label per-serving as source of truth.
+      console.log('ℹ️ Packaged mode active; secondary per-serving OpenAI call disabled to reduce usage.');
     }
 
     // NOTE: USDA/FatSecret database enhancement removed from AI photo analysis flow
@@ -1157,186 +1065,13 @@ CRITICAL REQUIREMENTS:
     // The AI analysis works better without database interference - it provides accurate
     // estimates based on visual analysis and portion sizes, which databases can't match.
 
-    // HEALTH COMPATIBILITY CHECK: Analyze food against user's health data
+    // HEALTH COMPATIBILITY CHECK: temporarily skipped to keep one OpenAI call per analysis
     try {
-      console.log('🏥 Starting health compatibility check...');
-      
-      // Fetch user's health situations data (fresh from database, no cache)
-      const healthSituationsGoal = await prisma.healthGoal.findFirst({
-        where: {
-          userId: currentUser.id,
-          name: '__HEALTH_SITUATIONS_DATA__'
-        }
-      });
-
-      // Also fetch selected health goals/issues (current active health concerns)
-      const selectedIssuesGoal = await prisma.healthGoal.findFirst({
-        where: {
-          userId: currentUser.id,
-          name: '__SELECTED_ISSUES__'
-        }
-      });
-
-      let healthData = null;
-      let selectedHealthGoals: string[] = [];
-      
-      // Parse health situations data
-      if (healthSituationsGoal?.category) {
-        try {
-          const parsed = JSON.parse(healthSituationsGoal.category);
-          healthData = {
-            healthIssues: parsed.healthIssues || '',
-            healthProblems: parsed.healthProblems || '',
-            additionalInfo: parsed.additionalInfo || ''
-          };
-          console.log('📋 Health situations data:', {
-            hasIssues: !!healthData.healthIssues,
-            hasProblems: !!healthData.healthProblems,
-            hasAdditionalInfo: !!healthData.additionalInfo
-          });
-        } catch (e) {
-          console.warn('Failed to parse health situations data:', e);
-        }
-      }
-
-      // Parse selected health goals/issues
-      if (selectedIssuesGoal?.category) {
-        try {
-          const parsed = JSON.parse(selectedIssuesGoal.category);
-          if (Array.isArray(parsed)) {
-            selectedHealthGoals = parsed.map((name: any) => String(name || '').trim()).filter(Boolean);
-          }
-          console.log('📋 Selected health goals:', selectedHealthGoals);
-        } catch (e) {
-          console.warn('Failed to parse selected issues:', e);
-        }
-      }
-
-      // Build comprehensive health context from BOTH sources
-      const hasHealthSituations = healthData && (
-        healthData.healthIssues.trim() || 
-        healthData.healthProblems.trim() || 
-        healthData.additionalInfo.trim()
-      );
-      const hasHealthGoals = selectedHealthGoals.length > 0;
-
-      // Only perform health check if user has ANY health data
-      if (hasHealthSituations || hasHealthGoals) {
-        console.log('✅ User has health data, performing compatibility check...', {
-          hasHealthSituations,
-          hasHealthGoals,
-          goalsCount: selectedHealthGoals.length
-        });
-        
-        // Extract food name/description from analysis (first line or first sentence)
-        const foodDescription = analysis.split('\n')[0].substring(0, 200);
-        
-        // Build health context prompt from BOTH health situations AND selected goals
-        const healthContextParts: string[] = [];
-        
-        if (healthData) {
-          if (healthData.healthIssues.trim()) {
-            healthContextParts.push(`Current health issues: ${healthData.healthIssues}`);
-          }
-          if (healthData.healthProblems.trim()) {
-            healthContextParts.push(`Ongoing health problems: ${healthData.healthProblems}`);
-          }
-          if (healthData.additionalInfo.trim()) {
-            healthContextParts.push(`Additional health information: ${healthData.additionalInfo}`);
-          }
-        }
-        
-        if (selectedHealthGoals.length > 0) {
-          healthContextParts.push(`Health goals/concerns being tracked: ${selectedHealthGoals.join(', ')}`);
-        }
-        
-        const healthContext = healthContextParts.join('\n');
-        
-        console.log('📝 Health context being sent to AI:', healthContext.substring(0, 200) + '...');
-
-        // Perform health compatibility analysis
-        const healthCheckPrompt = `You are a health advisor analyzing whether a food item is suitable for a person based ONLY on their specific health information.
-
-USER'S HEALTH INFORMATION:
-${healthContext}
-
-FOOD ITEM TO ANALYZE:
-${foodDescription}
-
-CRITICAL INSTRUCTIONS:
-1. Analyze if this food could be problematic or harmful based ONLY on the user's health information provided above
-2. If the food is NOT suitable, provide a clear, specific warning explaining why (e.g., "This contains peppers which can irritate ulcers" or "Black coffee can worsen ulcer symptoms")
-3. If the food IS suitable, respond with "SAFE" only
-4. CRITICAL: Base your analysis ONLY on the health information explicitly provided above. Do NOT infer, assume, or guess about health conditions that are NOT mentioned in the user's health information
-5. Do NOT mention health concerns that are not listed in the user's health information (e.g., if libido/hormones are not mentioned, do not reference them)
-6. Be specific about which ingredient or component of the food is problematic and why, but ONLY if it relates to the health information provided
-7. If the food does not conflict with any of the provided health information, respond with "SAFE"
-
-If the food is NOT suitable, format your response as:
-⚠️ HEALTH WARNING: [specific reason why this food is problematic for their condition]
-
-If the food IS suitable, respond with:
-SAFE
-
-Your analysis:`;
-
-        const healthCheck = await chatCompletionWithCost(openai, {
-          model: 'gpt-4o-mini', // Use cheaper model for health check
-          messages: [
-            {
-              role: 'user',
-              content: healthCheckPrompt
-            }
-          ],
-          max_tokens: 200,
-          temperature: 0.3,
-        } as any);
-
-        const healthCheckResult = healthCheck.completion.choices?.[0]?.message?.content?.trim() || '';
-        totalCostCents += healthCheck.costCents;
-
-        // If food is not suitable, get alternative recommendations
-        if (healthCheckResult && !healthCheckResult.toUpperCase().includes('SAFE') && healthCheckResult.includes('⚠️')) {
-          console.log('⚠️ Food is not suitable for user, getting alternatives...');
-          
-          const alternativesPrompt = `A person with the following health information is about to eat: "${foodDescription}"
-
-However, this food is NOT suitable because: ${healthCheckResult.replace('⚠️ HEALTH WARNING:', '').trim()}
-
-USER'S HEALTH INFORMATION:
-${healthContext}
-
-Provide 2-3 specific alternative food recommendations that would be MORE suitable for their health condition. Be specific and practical. Format as a simple list.
-
-Your recommendations:`;
-
-          const alternativesCheck = await chatCompletionWithCost(openai, {
-            model: 'gpt-4o-mini',
-            messages: [
-              {
-                role: 'user',
-                content: alternativesPrompt
-              }
-            ],
-            max_tokens: 150,
-            temperature: 0.4,
-          } as any);
-
-          const alternativesResult = alternativesCheck.completion.choices?.[0]?.message?.content?.trim() || '';
-          totalCostCents += alternativesCheck.costCents;
-
-          resp.healthWarning = healthCheckResult;
-          resp.alternatives = alternativesResult;
-          console.log('✅ Health compatibility check complete - food is NOT suitable');
-        } else {
-          console.log('✅ Health compatibility check complete - food is suitable');
-        }
-      } else {
-        console.log('ℹ️ No health data found, skipping compatibility check');
-      }
+      resp.healthWarning = null;
+      resp.alternatives = null;
+      console.log('ℹ️ Health compatibility check skipped to reduce OpenAI usage.');
     } catch (healthError) {
-      console.warn('⚠️ Health compatibility check failed (non-blocking):', healthError);
-      // Don't fail the entire request if health check fails
+      console.warn('⚠️ Health compatibility section skipped due to error:', healthError);
     }
 
     // Charge wallet for all costs (food analysis + health checks)
@@ -1369,11 +1104,6 @@ Your recommendations:`;
     } catch {
       // Logging must never affect the Food Analyzer behaviour
     }
-
-    // Fire-and-forget: generate updated insights in preview mode
-    try {
-      fetch('/api/insights/generate?preview=1', { method: 'POST' }).catch(() => {})
-    } catch {}
 
     // Cache successful image analyses to keep repeat results stable
     if (imageHash) {

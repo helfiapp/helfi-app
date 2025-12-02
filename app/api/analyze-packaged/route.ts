@@ -3,6 +3,10 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import OpenAI from 'openai'
 import { runChatCompletionWithLogging } from '@/lib/ai-usage-logger'
+import { consumeRateLimit } from '@/lib/rate-limit'
+
+const RATE_LIMIT_WINDOW_MS = 60_000
+const RATE_LIMIT_MAX = 3
 
 const getOpenAIClient = () => {
   if (!process.env.OPENAI_API_KEY) return null
@@ -16,6 +20,17 @@ export async function POST(req: NextRequest) {
   const contentType = req.headers.get('content-type') || ''
   const openai = getOpenAIClient()
   if (!openai) return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 })
+
+  const clientIp = (req.headers.get('x-forwarded-for') || '').split(',')[0]?.trim() || 'unknown'
+  const rateKey = (session.user as any)?.id ? `user:${(session.user as any)?.id}` : `ip:${clientIp}`
+  const rateCheck = consumeRateLimit('analyze-packaged', rateKey, RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_MS)
+  if (!rateCheck.allowed) {
+    const retryAfter = Math.max(1, Math.ceil(rateCheck.retryAfterMs / 1000))
+    return NextResponse.json(
+      { error: 'Too many packaged label analyses. Please wait and try again.' },
+      { status: 429, headers: { 'Retry-After': String(retryAfter) } }
+    )
+  }
 
   let promptText = ''
   let imageDataUrl: string | null = null
@@ -72,4 +87,3 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ success: true, raw: content.trim(), parsed })
 }
-

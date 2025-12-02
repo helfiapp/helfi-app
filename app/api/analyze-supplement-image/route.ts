@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { runChatCompletionWithLogging } from '@/lib/ai-usage-logger';
+import { consumeRateLimit } from '@/lib/rate-limit';
+
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const RATE_LIMIT_MAX = 3;
 
 function getOpenAIClient() {
   if (!process.env.OPENAI_API_KEY) {
@@ -16,6 +20,16 @@ export async function POST(req: NextRequest) {
 
     if (!imageFile) {
       return NextResponse.json({ error: 'No image provided' }, { status: 400 });
+    }
+
+    const clientIp = (req.headers.get('x-forwarded-for') || '').split(',')[0]?.trim() || 'unknown';
+    const rateCheck = consumeRateLimit('supplement-image', `ip:${clientIp}`, RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_MS);
+    if (!rateCheck.allowed) {
+      const retryAfter = Math.max(1, Math.ceil(rateCheck.retryAfterMs / 1000));
+      return NextResponse.json(
+        { error: 'Too many supplement image analyses. Please wait and try again.' },
+        { status: 429, headers: { 'Retry-After': String(retryAfter) } }
+      );
     }
 
     // Convert image to base64

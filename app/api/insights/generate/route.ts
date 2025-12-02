@@ -3,6 +3,10 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { runChatCompletionWithLogging } from '@/lib/ai-usage-logger'
+import { consumeRateLimit } from '@/lib/rate-limit'
+
+const INSIGHTS_RATE_WINDOW_MS = 5 * 60 * 1000 // 5 minutes
+const INSIGHTS_RATE_MAX = 2
 
 // Lazy OpenAI import to avoid build-time env requirements
 let _openai: any = null
@@ -185,6 +189,17 @@ export async function POST(request: Request) {
   }
 
   // Real AI generation (also allowed in preview to bypass flag safely)
+  const clientIp = (request.headers.get('x-forwarded-for') || '').split(',')[0]?.trim() || 'unknown'
+  const rateKey = profile?.id ? `user:${profile.id}` : `ip:${clientIp}`
+  const rateCheck = consumeRateLimit('insights-generate', rateKey, INSIGHTS_RATE_MAX, INSIGHTS_RATE_WINDOW_MS)
+  if (!rateCheck.allowed) {
+    const retryAfter = Math.max(1, Math.ceil(rateCheck.retryAfterMs / 1000))
+    return NextResponse.json(
+      { enabled: enabled || preview, items: fallback(), rateLimited: true },
+      { status: 429, headers: { 'Retry-After': String(retryAfter) } }
+    )
+  }
+
   {
     try {
       const openai = getOpenAI()
@@ -253,4 +268,3 @@ Profile: ${profileText}`
 
   return NextResponse.json({ enabled: true, items: fallback(), preview: true }, { status: 200 })
 }
-
