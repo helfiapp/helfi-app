@@ -7808,36 +7808,38 @@ Please add nutritional information manually if needed.`);
                                       </svg>
                                     </button>
                                     {showEntryOptions === food.id.toString() && (
-                                      {/* Guard rail: desktop dropdown must stay fixed/edge-aware with scrollable overflow; do not revert to clipped absolute menus. */}
-                                      <div
-                                        className="fixed entry-options-dropdown w-56 bg-white rounded-lg shadow-xl border border-gray-200 z-[9999] overflow-y-auto"
-                                        style={{
-                                          top: entryMenuPosition?.top,
-                                          bottom: entryMenuPosition?.bottom,
-                                          right: entryMenuPosition?.right ?? 16,
-                                          maxHeight: entryMenuPosition?.maxHeight ?? 360,
-                                          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-                                          overscrollBehavior: 'contain',
-                                        }}
-                                      >
-                                        {actions.map((item, idx) => (
-                                          <button
-                                            key={item.label}
-                                            onClick={() => {
-                                              item.onClick()
-                                              setShowEntryOptions(null)
-                                            }}
-                                            className={`w-full px-4 py-3 text-left text-sm flex items-center justify-between ${item.destructive ? 'text-red-600 hover:bg-red-50 border-t border-gray-100' : 'text-gray-800 hover:bg-gray-50'} ${idx === 0 ? '' : !item.destructive ? 'border-t border-gray-100' : ''}`}
-                                          >
-                                            <span>{item.label}</span>
-                                            {item.destructive && (
-                                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                              </svg>
-                                            )}
-                                          </button>
-                                        ))}
-                                      </div>
+                                      <>
+                                        {/* Guard rail: desktop dropdown must stay fixed/edge-aware with scrollable overflow; do not revert to clipped absolute menus. */}
+                                        <div
+                                          className="fixed entry-options-dropdown w-56 bg-white rounded-lg shadow-xl border border-gray-200 z-[9999] overflow-y-auto"
+                                          style={{
+                                            top: entryMenuPosition?.top,
+                                            bottom: entryMenuPosition?.bottom,
+                                            right: entryMenuPosition?.right ?? 16,
+                                            maxHeight: entryMenuPosition?.maxHeight ?? 360,
+                                            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                                            overscrollBehavior: 'contain',
+                                          }}
+                                        >
+                                          {actions.map((item, idx) => (
+                                            <button
+                                              key={item.label}
+                                              onClick={() => {
+                                                item.onClick()
+                                                setShowEntryOptions(null)
+                                              }}
+                                              className={`w-full px-4 py-3 text-left text-sm flex items-center justify-between ${item.destructive ? 'text-red-600 hover:bg-red-50 border-t border-gray-100' : 'text-gray-800 hover:bg-gray-50'} ${idx === 0 ? '' : !item.destructive ? 'border-t border-gray-100' : ''}`}
+                                            >
+                                              <span>{item.label}</span>
+                                              {item.destructive && (
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                                </svg>
+                                              )}
+                                            </button>
+                                          ))}
+                                        </div>
+                                      </>
                                     )}
                                   </div>
                                 )}
