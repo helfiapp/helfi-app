@@ -16,6 +16,7 @@
 - Overlay is a single white rounded frame; video is forced to fill the screen; torch toggle remains.
 - Despite this, user reports: camera sometimes black (no feed) or feed present but **no scans**.
 - Overlay dimming: attempted full-screen dim (`bg-black/35`), but user still sees dim only over part of the view. Needs further layout fix.
+- Next agent must follow `GUARD_RAILS.md` when touching any protected areas to avoid breaking locked flows.
 
 ## Likely root cause
 - iOS PWA camera/decoder instability: html5-qrcode is flaky on iOS PWAs; native `BarcodeDetector` may not be available or may fail to start due to permissions/environment.
