@@ -3884,7 +3884,8 @@ Please add nutritional information manually if needed.`);
     }
     const track = stream.getVideoTracks?.()[0]
     barcodeTorchTrackRef.current = track || null
-    const canTorch = !!track?.getCapabilities?.().torch
+    const capabilities = (track?.getCapabilities?.() as any) || {}
+    const canTorch = !!capabilities.torch
     setTorchAvailable(canTorch)
     if (!canTorch) setTorchEnabled(false)
   }
