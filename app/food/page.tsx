@@ -8425,7 +8425,6 @@ Please add nutritional information manually if needed.`);
 
             {/* Overlay with scanning frame */}
             <div className="absolute inset-0 pointer-events-none">
-              <div className="absolute inset-0 bg-gradient-to-b from-black/45 via-black/20 to-black/55 backdrop-blur-sm" />
               <div className="absolute inset-0 flex flex-col items-center justify-center px-6">
                 <div className="text-center mb-6">
                   <div className="text-white text-xl font-semibold drop-shadow-lg">Scan Barcode</div>
@@ -8433,7 +8432,8 @@ Please add nutritional information manually if needed.`);
                 </div>
                 
                 <div 
-                  className="w-72 h-[220px] rounded-[22px] border-[3px] border-white/90 shadow-[0_0_0_9999px_rgba(0,0,0,0.55)]"
+                  className="w-72 h-[220px] rounded-[22px] border-[3px] border-white/90"
+                  style={{ boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.55)' }}
                 />
               </div>
             </div>
