@@ -7700,7 +7700,7 @@ Please add nutritional information manually if needed.`);
                                 <button
                                   type="button"
                                   onClick={openSwipeMenu}
-                                  className="pointer-events-auto h-full min-w-[88px] px-3 bg-[#4DAF50] text-white flex items-center justify-center"
+                                  className={`pointer-events-auto h-full min-w-[88px] px-3 bg-[#4DAF50] text-white flex items-center justify-center ${isMenuOpen ? 'relative z-[10001]' : ''}`}
                                   aria-label="Open meal actions"
                                 >
                                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
