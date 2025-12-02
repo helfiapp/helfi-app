@@ -4303,17 +4303,18 @@ Please add nutritional information manually if needed.`);
         verbose: false,
       })
       barcodeScannerRef.current = scanner
+      const qrBox = { width: 320, height: 220 }
       const scanConfig: any = isIosSafari
         ? {
             fps: 10,
             disableFlip: false,
-            qrbox: { width: 280, height: 180 },
+            qrbox: qrBox,
           }
         : {
             fps: 10,
             aspectRatio: 16 / 9,
             disableFlip: false,
-            qrbox: { width: 280, height: 180 },
+            qrbox: qrBox,
           }
       const startAttempts: Array<{ label: string; config: any }> = []
       if (preferredCamera?.id) {
@@ -8430,17 +8431,9 @@ Please add nutritional information manually if needed.`);
                   <div className="text-white/80 text-sm mt-1 drop-shadow">Place barcode in the frame to scan</div>
                 </div>
                 
-                <div className="relative">
-                  <div 
-                    className="w-72 h-[220px] rounded-[22px] border-[3px] border-white/90 shadow-[0_0_0_9999px_rgba(0,0,0,0.55)]"
-                  />
-                  <div className="pointer-events-none absolute inset-0">
-                    <div className="absolute -left-3 top-8 h-10 w-[3px] bg-white/80 rounded-full" />
-                    <div className="absolute -left-3 bottom-8 h-10 w-[3px] bg-white/80 rounded-full" />
-                    <div className="absolute -right-3 top-8 h-10 w-[3px] bg-white/80 rounded-full" />
-                    <div className="absolute -right-3 bottom-8 h-10 w-[3px] bg-white/80 rounded-full" />
-                  </div>
-                </div>
+                <div 
+                  className="w-72 h-[220px] rounded-[22px] border-[3px] border-white/90 shadow-[0_0_0_9999px_rgba(0,0,0,0.55)]"
+                />
               </div>
             </div>
 
