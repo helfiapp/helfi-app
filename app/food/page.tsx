@@ -3975,42 +3975,72 @@ Please add nutritional information manually if needed.`);
     resetTorchState()
   }
 
+  const buildBarcodeIngredientItem = (food: any, code?: string) => {
+    const toNumber = (value: any) => {
+      const num = Number(value)
+      return Number.isFinite(num) ? num : null
+    }
+    return {
+      name: food?.name || 'Scanned food',
+      brand: food?.brand || null,
+      serving_size: food?.serving_size || '1 serving',
+      servings: 1,
+      portionMode: 'servings',
+      weightAmount: null,
+      weightUnit: 'g',
+      customGramsPerServing: null,
+      customMlPerServing: null,
+      calories: toNumber(food?.calories),
+      protein_g: toNumber(food?.protein_g),
+      carbs_g: toNumber(food?.carbs_g),
+      fat_g: toNumber(food?.fat_g),
+      fiber_g: toNumber(food?.fiber_g),
+      sugar_g: toNumber(food?.sugar_g),
+      source: food?.source || 'barcode',
+      barcode: code || food?.barcode || null,
+      barcodeSource: food?.source || null,
+      detectionMethod: 'barcode',
+    }
+  }
+
+  const isBarcodeEntry = (entry: any) =>
+    Array.isArray(entry?.items) &&
+    entry.items.some(
+      (it: any) => it?.barcode || it?.detectionMethod === 'barcode' || it?.barcodeSource,
+    )
+
   const insertBarcodeFoodIntoDiary = async (food: any, code?: string) => {
     const category = normalizeCategory(selectedAddCategory)
     const nowIso = new Date().toISOString()
-    const totals = sanitizeNutritionTotals({
-      calories: food?.calories,
-      protein: food?.protein_g,
-      carbs: food?.carbs_g,
-      fat: food?.fat_g,
-      fiber: food?.fiber_g,
-      sugar: food?.sugar_g,
-    })
+    const item = buildBarcodeIngredientItem(food, code)
+    const normalizedItems = normalizeDiscreteServingsWithLabel([item])
+    const items = normalizedItems.length > 0 ? normalizedItems : [item]
+    const recalculatedTotals = recalculateNutritionFromItems(items)
+    const totals =
+      recalculatedTotals ||
+      sanitizeNutritionTotals({
+        calories: food?.calories,
+        protein: food?.protein_g,
+        carbs: food?.carbs_g,
+        fat: food?.fat_g,
+        fiber: food?.fiber_g,
+        sugar: food?.sugar_g,
+      })
+    const totalsForStorage = convertTotalsForStorage(totals)
+    const description =
+      buildMealSummaryFromItems(items) ||
+      [food?.name, food?.brand].filter(Boolean).join(' – ') ||
+      'Scanned food'
     const entry = {
       id: Date.now(),
       localDate: selectedDate,
-      description: [food?.name, food?.brand].filter(Boolean).join(' – ') || 'Scanned food',
+      description,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       method: 'text',
       photo: null,
       nutrition: totals,
-      total: totals,
-      items: [
-        {
-          name: food?.name || 'Scanned food',
-          brand: food?.brand || null,
-          serving_size: food?.serving_size || '1 serving',
-          servings: 1,
-          calories: Number.isFinite(Number(food?.calories)) ? Number(food?.calories) : null,
-          protein_g: Number.isFinite(Number(food?.protein_g)) ? Number(food?.protein_g) : null,
-          carbs_g: Number.isFinite(Number(food?.carbs_g)) ? Number(food?.carbs_g) : null,
-          fat_g: Number.isFinite(Number(food?.fat_g)) ? Number(food?.fat_g) : null,
-          fiber_g: Number.isFinite(Number(food?.fiber_g)) ? Number(food?.fiber_g) : null,
-          sugar_g: Number.isFinite(Number(food?.sugar_g)) ? Number(food?.sugar_g) : null,
-          source: food?.source || 'fatsecret',
-          barcode: code || null,
-        },
-      ],
+      total: totalsForStorage,
+      items,
       meal: category,
       category,
       persistedCategory: category,
@@ -4757,12 +4787,13 @@ Please add nutritional information manually if needed.`);
       setOriginalEditingEntry(food)
     }
     // Populate the form with existing data and go directly to editing
-    if (food.method === 'photo') {
+    const useIngredientCards = food.method === 'photo' || isBarcodeEntry(food)
+    if (useIngredientCards) {
       // Clear all state first to ensure clean rebuild
       setAnalyzedItems([]);
       setAnalyzedNutrition(null);
       setAnalyzedTotal(null);
-      setPhotoPreview(food.photo);
+      setPhotoPreview(food.photo || null);
       // Set aiDescription AFTER clearing items so useEffect can rebuild
       setAiDescription(food.description || '');
       setAnalyzedNutrition(food.nutrition);
@@ -4772,7 +4803,10 @@ Please add nutritional information manually if needed.`);
       
       // First priority: use saved items if they exist and are valid
       if (food.items && Array.isArray(food.items) && food.items.length > 0) {
-        const enriched = enrichItemsFromStarter(food.items)
+        const baseItems = isBarcodeEntry(food)
+          ? normalizeDiscreteServingsWithLabel(food.items)
+          : food.items
+        const enriched = enrichItemsFromStarter(baseItems)
         setAnalyzedItems(enriched);
         applyRecalculatedNutrition(enriched);
         itemsRestored = true;
