@@ -1215,6 +1215,7 @@ export default function FoodDiary() {
   const [barcodeError, setBarcodeError] = useState<string | null>(null)
   const [barcodeValue, setBarcodeValue] = useState('')
   const [barcodeStatus, setBarcodeStatus] = useState<'idle' | 'scanning' | 'loading'>('idle')
+  const [barcodeStatusHint, setBarcodeStatusHint] = useState<string>('')
   const [torchEnabled, setTorchEnabled] = useState(false)
   const [torchAvailable, setTorchAvailable] = useState(false)
   const [showManualBarcodeInput, setShowManualBarcodeInput] = useState(false)
@@ -3930,6 +3931,7 @@ Please add nutritional information manually if needed.`);
   }
 
   const stopBarcodeScanner = () => {
+    setBarcodeStatusHint('')
     disableTorch()
     const scanner = barcodeScannerRef.current as any
     if (scanner?.controls?.stop) {
@@ -4220,37 +4222,22 @@ Please add nutritional information manually if needed.`);
     setShowManualBarcodeInput(false)
     const desiredFacing: 'front' | 'back' = options?.forceFacing || cameraFacing || 'back'
     setBarcodeStatus('loading')
+    setBarcodeStatusHint('Starting camera…')
     try {
       setBarcodeError(null)
       barcodeLookupInFlightRef.current = false
       stopBarcodeScanner()
       if (typeof window === 'undefined' || typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
         setBarcodeError('Camera is only available in the browser.')
+        setBarcodeStatusHint('Camera unavailable in this browser')
         setBarcodeStatus('idle')
         return
       }
-      const constraints: MediaStreamConstraints = {
-        video: {
-          facingMode: desiredFacing === 'front' ? 'user' : { ideal: 'environment' },
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
-      }
-      let stream: MediaStream | null = null
-      try {
-        stream = await navigator.mediaDevices.getUserMedia(constraints)
-      } catch (permError) {
-        console.error('Camera permission/start error:', permError)
-        setBarcodeError('Camera blocked. Allow camera access, then tap Restart.')
-        setBarcodeStatus('idle')
-        return
-      }
-
       const region = document.getElementById(BARCODE_REGION_ID)
       if (!region) {
         setBarcodeError('Camera area missing. Close and reopen the scanner.')
+        setBarcodeStatusHint('Camera area missing')
         setBarcodeStatus('idle')
-        stream.getTracks().forEach((t) => t.stop())
         return
       }
 
@@ -4264,14 +4251,11 @@ Please add nutritional information manually if needed.`);
       videoEl.style.width = '100%'
       videoEl.style.height = '100%'
       videoEl.style.objectFit = 'cover'
-      videoEl.srcObject = stream
       region.appendChild(videoEl)
-
-      await videoEl.play().catch(() => {})
-      attachTorchTrack(stream)
 
       const { BrowserMultiFormatReader, BarcodeFormat } = await import('@zxing/browser')
       const { DecodeHintType } = await import('@zxing/library')
+
       const hints = new Map()
       hints.set(DecodeHintType.POSSIBLE_FORMATS, [
         BarcodeFormat.EAN_13,
@@ -4283,20 +4267,34 @@ Please add nutritional information manually if needed.`);
         BarcodeFormat.CODE_93,
         BarcodeFormat.ITF,
       ])
+      hints.set(DecodeHintType.TRY_HARDER, true)
+
       const reader = new BrowserMultiFormatReader()
       reader.setHints(hints)
 
-      const controls = await reader.decodeFromStream(stream, videoEl, (result: any) => {
+      const constraints: any = {
+        video: {
+          facingMode: desiredFacing === 'front' ? 'user' : { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          advanced: [{ focusMode: 'continuous' }],
+        },
+      }
+
+      const controls = await reader.decodeFromConstraints(constraints, videoEl, (result: any) => {
         const text = result?.getText ? result.getText() : result?.text
         if (text) handleBarcodeDetected(text)
       })
 
-      barcodeScannerRef.current = { reader, controls, stream, videoEl }
+      barcodeScannerRef.current = { reader, controls, videoEl }
       setCameraFacing(desiredFacing)
       setBarcodeStatus('scanning')
+      setBarcodeStatusHint('Scanning…')
+      setTimeout(() => attachTorchTrackFromDom(), 150)
     } catch (err) {
       console.error('Barcode scanner start error', err)
       setBarcodeError('Could not start the camera. Please allow camera access, then tap Restart.')
+      setBarcodeStatusHint('Camera start failed')
       setBarcodeStatus('idle')
       stopBarcodeScanner()
     }
@@ -8326,6 +8324,14 @@ Please add nutritional information manually if needed.`);
               <div 
                 className="w-72 h-[220px] rounded-[22px] border-[4px] border-white/95 shadow-[0_0_30px_rgba(0,0,0,0.35)]"
               />
+
+              {barcodeStatusHint && (
+                <div className="absolute bottom-6 left-0 right-0 text-center">
+                  <div className="inline-flex items-center px-3 py-1 rounded-full bg-black/55 text-white text-xs font-semibold shadow-lg">
+                    {barcodeStatusHint}
+                  </div>
+                </div>
+              )}
             </div>
 
             {showManualBarcodeInput && (
