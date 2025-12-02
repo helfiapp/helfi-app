@@ -4093,7 +4093,7 @@ Please add nutritional information manually if needed.`);
       setBarcodeError('Flash is not available for this camera.')
       return
     }
-    const capabilities = typeof track.getCapabilities === 'function' ? track.getCapabilities() : null
+    const capabilities = typeof track.getCapabilities === 'function' ? (track.getCapabilities() as any) : null
     if (!capabilities?.torch) {
       setTorchAvailable(false)
       setTorchEnabled(false)
