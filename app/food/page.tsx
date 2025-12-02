@@ -1225,9 +1225,7 @@ export default function FoodDiary() {
   const nativeBarcodeVideoRef = useRef<HTMLVideoElement | null>(null)
   const nativeBarcodeFrameRef = useRef<number | null>(null)
   const hybridBarcodeFrameRef = useRef<number | null>(null)
-  const [cameraDevices, setCameraDevices] = useState<Array<{ id: string; label: string; facing: 'front' | 'back' | 'unknown' }>>([])
   const [cameraFacing, setCameraFacing] = useState<'front' | 'back'>('back')
-  const [activeCameraLabel, setActiveCameraLabel] = useState<string>('')
   const manualBarcodeInputRef = useRef<HTMLInputElement | null>(null)
   const SWIPE_MENU_WIDTH = 88
   const SWIPE_DELETE_WIDTH = 96
@@ -1267,10 +1265,6 @@ export default function FoodDiary() {
   const [deletedEntryNonce, setDeletedEntryNonce] = useState(0) // bump to force dedupe refresh after deletes
   const [favorites, setFavorites] = useState<any[]>([])
   const isAddMenuOpen = showCategoryPicker || showPhotoOptions
-  const hasAlternateCamera =
-    cameraDevices.length === 0
-      ? true
-      : cameraDevices.some((c) => (cameraFacing === 'back' ? c.facing === 'front' : c.facing === 'back'))
 
   const triggerHaptic = (duration: number = 12) => {
     try {
@@ -3936,20 +3930,35 @@ Please add nutritional information manually if needed.`);
   }
 
   const stopBarcodeScanner = () => {
-    stopNativeBarcodeDetector()
     disableTorch()
-    const scanner = barcodeScannerRef.current
-    if (scanner) {
+    const scanner = barcodeScannerRef.current as any
+    if (scanner?.controls?.stop) {
       try {
-        scanner.stop().catch(() => {})
+        scanner.controls.stop()
       } catch {}
-      try {
-        if (typeof scanner.clear === 'function') {
-          scanner.clear()
-        }
-      } catch {}
-      barcodeScannerRef.current = null
     }
+    if (scanner?.reader?.reset) {
+      try {
+        scanner.reader.reset()
+      } catch {}
+    }
+    if (scanner?.videoEl) {
+      try {
+        scanner.videoEl.pause()
+      } catch {}
+      try {
+        scanner.videoEl.srcObject = null
+      } catch {}
+      try {
+        scanner.videoEl.remove()
+      } catch {}
+    }
+    if (scanner?.stream) {
+      try {
+        ;(scanner.stream as MediaStream).getTracks().forEach((t) => t.stop())
+      } catch {}
+    }
+    barcodeScannerRef.current = null
     if (typeof document !== 'undefined') {
       const region = document.getElementById(BARCODE_REGION_ID)
       if (region) region.innerHTML = ''
@@ -4210,15 +4219,6 @@ Please add nutritional information manually if needed.`);
     resetTorchState()
     setShowManualBarcodeInput(false)
     const desiredFacing: 'front' | 'back' = options?.forceFacing || cameraFacing || 'back'
-    const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : ''
-    const isIos = /iP(hone|od|ad)/i.test(userAgent)
-    const isSafari = /^((?!chrome|android).)*safari/i.test(userAgent)
-    const isIosSafari = isIos && isSafari
-    const isStandalone = typeof window !== 'undefined'
-      ? (window.matchMedia?.('(display-mode: standalone)').matches || (window.navigator as any).standalone === true)
-      : false
-    const canUseNativeDetector = typeof window !== 'undefined' && typeof (window as any).BarcodeDetector !== 'undefined'
-    const forceNativeDetector = isIos && canUseNativeDetector
     setBarcodeStatus('loading')
     try {
       setBarcodeError(null)
@@ -4229,206 +4229,75 @@ Please add nutritional information manually if needed.`);
         setBarcodeStatus('idle')
         return
       }
-      if (forceNativeDetector) {
-        const nativeStarted = await startNativeBarcodeDetector(desiredFacing)
-        if (nativeStarted) {
-          setCameraFacing(desiredFacing)
-          setActiveCameraLabel(desiredFacing === 'front' ? 'Front camera' : 'Back camera')
-          setBarcodeStatus('scanning')
-          return
-        }
-        // No native detector available
-        setBarcodeError('Camera scanning is blocked on this device.')
-        setBarcodeStatus('idle')
-        return
+      const constraints: MediaStreamConstraints = {
+        video: {
+          facingMode: desiredFacing === 'front' ? 'user' : { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
       }
+      let stream: MediaStream | null = null
       try {
-        const permissionStream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: desiredFacing === 'front' ? 'user' : { ideal: 'environment' },
-          },
-        })
-        permissionStream.getTracks().forEach((t) => t.stop())
+        stream = await navigator.mediaDevices.getUserMedia(constraints)
       } catch (permError) {
-        console.error('Camera permission error:', permError)
-        setBarcodeError(
-          isIosSafari
-            ? 'Safari blocked camera access. Allow camera for this site, disable Private Browsing, then tap Restart.'
-            : 'Camera permission denied. Tap “Open camera settings”, allow camera, then hit Restart.',
-        )
+        console.error('Camera permission/start error:', permError)
+        setBarcodeError('Camera blocked. Allow camera access, then tap Restart.')
         setBarcodeStatus('idle')
         return
       }
-      const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import('html5-qrcode')
-      const cameras = await Html5Qrcode.getCameras().catch(() => [])
-      const normalizedCameras =
-        Array.isArray(cameras) && cameras.length
-          ? cameras
-              .map((c: any) => {
-                const label = c.label || 'Camera'
-                const lower = label.toLowerCase()
-                const facing: 'front' | 'back' | 'unknown' = /back|rear|environment/.test(lower)
-                  ? 'back'
-                  : /front|user|face/.test(lower)
-                  ? 'front'
-                  : 'unknown'
-                return { id: c.id, label, facing }
-              })
-              .filter((c: any, idx: number, arr: any[]) => arr.findIndex((item) => item.id === c.id) === idx)
-          : []
-      setCameraDevices(normalizedCameras)
-      const pickCamera = (facing: 'front' | 'back') => {
-        const match = normalizedCameras.find((c) => (facing === 'back' ? c.facing === 'back' : c.facing === 'front'))
-        if (match) return match
-        const unknown = normalizedCameras.find((c) => c.facing === 'unknown')
-        return unknown || normalizedCameras[0] || null
-      }
-      const preferredCamera = pickCamera(desiredFacing)
-      if (preferredCamera) {
-        setCameraFacing(preferredCamera.facing === 'front' ? 'front' : 'back')
-        setActiveCameraLabel(preferredCamera.label)
-      } else {
-        setCameraFacing(desiredFacing)
-        setActiveCameraLabel(desiredFacing === 'front' ? 'Front camera' : 'Back camera')
-      }
-      const scanner = new Html5Qrcode(BARCODE_REGION_ID, {
-        formatsToSupport: [
-          Html5QrcodeSupportedFormats.EAN_13,
-          Html5QrcodeSupportedFormats.EAN_8,
-          Html5QrcodeSupportedFormats.UPC_A,
-          Html5QrcodeSupportedFormats.UPC_E,
-          Html5QrcodeSupportedFormats.UPC_EAN_EXTENSION,
-          Html5QrcodeSupportedFormats.CODE_128,
-          Html5QrcodeSupportedFormats.CODE_39,
-          Html5QrcodeSupportedFormats.CODE_93,
-        ],
-        // Try native detector when available; native fallback is also handled above.
-        useBarCodeDetectorIfSupported: true,
-        verbose: false,
-      })
-      barcodeScannerRef.current = scanner
-      // Hide html5-qrcode's default shaded/corner overlay; we render our own frame
-      if (typeof document !== 'undefined') {
-        const styleId = 'barcode-overlay-cleanup'
-        if (!document.getElementById(styleId)) {
-          const s = document.createElement('style')
-          s.id = styleId
-          s.textContent = `
-            #${BARCODE_REGION_ID} #qr-shaded-region,
-            #${BARCODE_REGION_ID} .qr-shaded-region,
-            #${BARCODE_REGION_ID} .scan-region-highlight {
-              display: none !important;
-            }
-            #${BARCODE_REGION_ID},
-            #${BARCODE_REGION_ID} > div {
-              width: 100% !important;
-              height: 100% !important;
-              position: absolute;
-              inset: 0;
-            }
-            #${BARCODE_REGION_ID} video {
-              width: 100% !important;
-              height: 100% !important;
-              object-fit: cover !important;
-              position: absolute;
-              inset: 0;
-            }
-          `
-          document.head.appendChild(s)
-        }
-      }
-      const qrBox = { width: 320, height: 220 }
-      const scanConfig: any = isIosSafari
-        ? {
-            fps: 10,
-            disableFlip: false,
-            qrbox: qrBox,
-          }
-        : {
-            fps: 10,
-            aspectRatio: 16 / 9,
-            disableFlip: false,
-            qrbox: qrBox,
-          }
-      const startAttempts: Array<{ label: string; config: any }> = []
-      if (preferredCamera?.id) {
-        startAttempts.push({
-          label: 'preferred-device',
-          config: { deviceId: { exact: preferredCamera.id } },
-        })
-      }
-      startAttempts.push({
-        label: `${desiredFacing}-ideal`,
-        config: { facingMode: { ideal: desiredFacing === 'front' ? 'user' : 'environment' } },
-      })
-      startAttempts.push({
-        label: `${desiredFacing}-simple`,
-        config: { facingMode: desiredFacing === 'front' ? 'user' : 'environment' },
-      })
-      if (desiredFacing === 'back') {
-        startAttempts.push({
-          label: 'front-fallback',
-          config: { facingMode: 'user' },
-        })
-      }
-      // Some iOS PWA builds only resolve when camera is unspecified
-      startAttempts.push({
-        label: 'default-video',
-        config: { facingMode: undefined },
-      })
-      let started = false
-      let lastError: any = null
-      let lastErrorMessage = ''
-      for (const attempt of startAttempts) {
-        try {
-          await scanner.start(
-            attempt.config,
-            scanConfig,
-            (decodedText: string) => handleBarcodeDetected(decodedText),
-            () => {},
-          )
-          started = true
-          break
-        } catch (err) {
-          lastError = err
-          lastErrorMessage =
-            (err as any)?.message ||
-            (err as any)?.name ||
-            (typeof err === 'string' ? err : '')
-          console.error('Scanner start failed on attempt', attempt.label, err)
-          try {
-            await scanner.stop()
-          } catch {}
-        }
-      }
-      if (!started) {
-        console.error('All scanner start attempts failed', lastError)
-        setBarcodeError(
-          isIosSafari
-            ? 'Camera failed to start. Ensure Private Browsing is off, refresh after granting camera, then tap Restart.'
-            : 'Camera failed to start. Try switching camera or reloading after allowing permissions.'
-        + (lastErrorMessage ? ` (${lastErrorMessage})` : ''),
-        )
+
+      const region = document.getElementById(BARCODE_REGION_ID)
+      if (!region) {
+        setBarcodeError('Camera area missing. Close and reopen the scanner.')
         setBarcodeStatus('idle')
-        stopBarcodeScanner()
+        stream.getTracks().forEach((t) => t.stop())
         return
       }
-      attachTorchTrackFromDom()
-      startHybridDetector()
+
+      region.innerHTML = ''
+      const videoEl = document.createElement('video')
+      videoEl.setAttribute('playsinline', 'true')
+      videoEl.setAttribute('autoplay', 'true')
+      videoEl.muted = true
+      videoEl.playsInline = true
+      videoEl.autoplay = true
+      videoEl.style.width = '100%'
+      videoEl.style.height = '100%'
+      videoEl.style.objectFit = 'cover'
+      videoEl.srcObject = stream
+      region.appendChild(videoEl)
+
+      await videoEl.play().catch(() => {})
+      attachTorchTrack(stream)
+
+      const { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } = await import('@zxing/browser')
+      const hints = new Map()
+      hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+        BarcodeFormat.EAN_13,
+        BarcodeFormat.EAN_8,
+        BarcodeFormat.UPC_A,
+        BarcodeFormat.UPC_E,
+        BarcodeFormat.CODE_128,
+        BarcodeFormat.CODE_39,
+        BarcodeFormat.CODE_93,
+        BarcodeFormat.ITF,
+      ])
+      const reader = new BrowserMultiFormatReader()
+      reader.setHints(hints)
+
+      const controls = await reader.decodeFromStream(stream, videoEl, (result: any) => {
+        const text = result?.getText ? result.getText() : result?.text
+        if (text) handleBarcodeDetected(text)
+      })
+
+      barcodeScannerRef.current = { reader, controls, stream, videoEl }
+      setCameraFacing(desiredFacing)
       setBarcodeStatus('scanning')
     } catch (err) {
       console.error('Barcode scanner start error', err)
-      if (canUseNativeDetector) {
-        const nativeStarted = await startNativeBarcodeDetector(desiredFacing)
-        if (nativeStarted) {
-          setCameraFacing(desiredFacing)
-          setActiveCameraLabel(desiredFacing === 'front' ? 'Front camera' : 'Back camera')
-          setBarcodeStatus('scanning')
-          return
-        }
-      }
-      setBarcodeError('Could not start the camera. Tap “Open camera settings”, allow camera, then hit Restart.')
+      setBarcodeError('Could not start the camera. Please allow camera access, then tap Restart.')
       setBarcodeStatus('idle')
+      stopBarcodeScanner()
     }
   }
 
