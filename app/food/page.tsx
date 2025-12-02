@@ -4218,7 +4218,7 @@ Please add nutritional information manually if needed.`);
       ? (window.matchMedia?.('(display-mode: standalone)').matches || (window.navigator as any).standalone === true)
       : false
     const canUseNativeDetector = typeof window !== 'undefined' && typeof (window as any).BarcodeDetector !== 'undefined'
-    const preferNativeDetector = isIosSafari && isStandalone && canUseNativeDetector
+    const forceNativeDetector = isIos
     setBarcodeStatus('loading')
     try {
       setBarcodeError(null)
@@ -4229,7 +4229,12 @@ Please add nutritional information manually if needed.`);
         setBarcodeStatus('idle')
         return
       }
-      if (preferNativeDetector) {
+      if (forceNativeDetector) {
+        if (!canUseNativeDetector) {
+          setBarcodeError('Camera scanning is blocked on this device. Please allow camera access or type the barcode.')
+          setBarcodeStatus('idle')
+          return
+        }
         const nativeStarted = await startNativeBarcodeDetector(desiredFacing)
         if (nativeStarted) {
           setCameraFacing(desiredFacing)
@@ -4237,7 +4242,9 @@ Please add nutritional information manually if needed.`);
           setBarcodeStatus('scanning')
           return
         }
-        console.warn('Native barcode detector fallback failed, trying html5-qrcode')
+        setBarcodeError('Camera scanner failed to start. Please allow camera access or type the barcode.')
+        setBarcodeStatus('idle')
+        return
       }
       try {
         const permissionStream = await navigator.mediaDevices.getUserMedia({
