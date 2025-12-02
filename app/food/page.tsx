@@ -4216,6 +4216,8 @@ Please add nutritional information manually if needed.`);
     }
   }
 
+  // GUARD RAIL: Barcode scanner is locked. Do not change decoder/library/flow without explicit user approval.
+  // ZXing decodeFromConstraints with rear camera + autofocus + try-harder; no photo flow or alternate decoders.
   const startBarcodeScanner = async (options?: { forceFacing?: 'front' | 'back' }) => {
     if (!showBarcodeScanner) return
     resetTorchState()

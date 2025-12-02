@@ -665,6 +665,17 @@ If changes are requested, explain them to the user first, get explicit approval,
 
 ---
 
+## 11. Barcode Scanner (Locked)
+
+**Protected file:** `app/food/page.tsx` (barcode scanner UI + ZXing decoder)
+
+- The barcode scanner is now stable on iOS PWA using **ZXing** with `decodeFromConstraints`, rear camera, continuous autofocus hint, “try harder” hint, and no photo/fallback flows.
+- The overlay is intentionally minimal (clear view + frame + flash + small status chip).
+- Do **not** swap the decoder (no html5-qrcode, no native `BarcodeDetector`), change constraints, add photo upload, or alter the overlay without explicit written approval from the user.
+- If you must touch this area, first explain the exact change in plain language and get approval; then re-test live scanning on iOS PWA.
+
+---
+
 ## 8. Rules for Future Modifications
 
 Before changing anything in the protected areas above, an agent **must**:
