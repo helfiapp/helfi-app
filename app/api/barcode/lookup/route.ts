@@ -1,4 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
+import { CreditManager } from '@/lib/credit-system'
 
 // Barcode lookup with multiple API fallbacks:
 // 1. FatSecret (primary - has great barcode coverage for packaged foods)
@@ -9,6 +13,7 @@ const FATSECRET_CLIENT_ID = process.env.FATSECRET_CLIENT_ID || '5b035e5de0b041ff
 const FATSECRET_CLIENT_SECRET = process.env.FATSECRET_CLIENT_SECRET || 'd544f96d19494c9ca8a3dec1bcaf1da3'
 const USDA_API_KEY = process.env.USDA_API_KEY
 const OPENFOODFACTS_USER_AGENT = 'helfi-app/1.0 (support@helfi.ai)'
+const BARCODE_SCAN_COST_CENTS = 3
 
 type FatSecretServing = {
   measurement_description?: string
@@ -373,25 +378,65 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Missing barcode code' }, { status: 400 })
   }
 
-  console.log('🔍 Looking up barcode:', code)
-
-  // Try FatSecret first (best for packaged foods)
-  let food = await fetchFoodFromFatSecret(code)
-  if (food) {
-    return NextResponse.json({ found: true, food })
+  // Require signed-in user for credit charge
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.email) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // Try OpenFoodFacts second (great global coverage)
-  const openFoodFacts = await fetchFoodFromOpenFoodFacts(code)
-  if (openFoodFacts.food) {
-    return NextResponse.json({ found: true, food: openFoodFacts.food })
+  const user = await prisma.user.findUnique({
+    where: { email: session.user.email },
+    include: { subscription: true, creditTopUps: true },
+  })
+
+  if (!user) {
+    return NextResponse.json({ error: 'User not found' }, { status: 404 })
+  }
+
+  const cm = new CreditManager(user.id)
+  const wallet = await cm.getWalletStatus()
+  if (wallet.totalAvailableCents < BARCODE_SCAN_COST_CENTS) {
+    return NextResponse.json(
+      { error: 'Insufficient credits', message: 'Barcode scanning requires 3 credits.' },
+      { status: 402 },
+    )
+  }
+
+  console.log('🔍 Looking up barcode:', code)
+  let food: NormalizedFood | null = null
+  let openFoodFacts: OpenFoodFactsResult | null = null
+
+  // Try FatSecret first (best for packaged foods)
+  food = await fetchFoodFromFatSecret(code)
+
+  // Try OpenFoodFacts second (great global coverage) if still missing
+  if (!food) {
+    openFoodFacts = await fetchFoodFromOpenFoodFacts(code)
+    if (openFoodFacts.food) {
+      food = openFoodFacts.food
+    }
   }
 
   // Try USDA using the best available product name (OpenFoodFacts often has a label even when nutrition is missing)
-  const usdaQuery = openFoodFacts.productName || code
-  const usdaFood = await searchFoodFromUSDA(usdaQuery, code)
-  if (usdaFood) {
-    return NextResponse.json({ found: true, food: usdaFood })
+  if (!food) {
+    const usdaQuery = openFoodFacts?.productName || code
+    const usdaFood = await searchFoodFromUSDA(usdaQuery, code)
+    if (usdaFood) {
+      food = usdaFood
+    }
+  }
+
+  // Charge exactly once per scan request
+  const charged = await cm.chargeCents(BARCODE_SCAN_COST_CENTS)
+  if (!charged) {
+    return NextResponse.json(
+      { error: 'Insufficient credits', message: 'Barcode scanning requires 3 credits.' },
+      { status: 402 },
+    )
+  }
+
+  if (food) {
+    return NextResponse.json({ found: true, food })
   }
 
   console.log('⚠️ No barcode match found after FatSecret, OpenFoodFacts, or USDA for:', code)

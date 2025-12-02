@@ -4059,6 +4059,21 @@ Please add nutritional information manually if needed.`);
         setBarcodeStatus('scanning')
         return
       }
+      if (res.status === 402) {
+        const data = await res.json().catch(() => null)
+        const msg =
+          data?.message ||
+          data?.error ||
+          'Not enough credits to scan. Each barcode scan costs 3 credits.'
+        setBarcodeError(msg)
+        setBarcodeStatus('idle')
+        return
+      }
+      if (res.status === 401) {
+        setBarcodeError('Please sign in to scan barcodes.')
+        setBarcodeStatus('idle')
+        return
+      }
       if (!res.ok) {
         const txt = await res.text()
         throw new Error(txt || 'Lookup failed')
