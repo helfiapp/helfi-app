@@ -672,6 +672,8 @@ If changes are requested, explain them to the user first, get explicit approval,
 - The barcode scanner is now stable on iOS PWA using **ZXing** with `decodeFromConstraints`, rear camera, continuous autofocus hint, “try harder” hint, and no photo/fallback flows.
 - The overlay is intentionally minimal (clear view + frame + flash + small status chip).
 - Do **not** swap the decoder (no html5-qrcode, no native `BarcodeDetector`), change constraints, add photo upload, or alter the overlay without explicit written approval from the user.
+- Barcode results must be saved as a single **ingredient card** item (same shape as photo/AI `analyzedItems`) using `buildBarcodeIngredientItem` → `insertBarcodeFoodIntoDiary`; keep barcode metadata (`barcode`, `barcodeSource`, `detectionMethod: 'barcode'`) and rely on ingredient cards for totals.
+- Editing barcode entries must open the ingredient-card editor (triggered by `isBarcodeEntry` in `editFood`); do not strip the barcode markers or fall back to the manual text editor.
 - If you must touch this area, first explain the exact change in plain language and get approval; then re-test live scanning on iOS PWA.
 
 ---
