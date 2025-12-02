@@ -8317,19 +8317,15 @@ Please add nutritional information manually if needed.`);
             <div id={BARCODE_REGION_ID} className="absolute inset-0" />
 
             {/* Overlay with scanning frame */}
-            <div className="absolute inset-0 pointer-events-none">
-              <div className="absolute inset-0 bg-black/35" />
-              <div className="absolute inset-0 flex flex-col items-center justify-center px-6">
-                <div className="text-center mb-6">
-                  <div className="text-white text-xl font-semibold drop-shadow-lg">Scan Barcode</div>
-                  <div className="text-white/80 text-sm mt-1 drop-shadow">Place barcode in the frame to scan</div>
-                </div>
-                
-                <div 
-                  className="w-72 h-[220px] rounded-[22px] border-[3px] border-white/90"
-                  style={{ boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.55)' }}
-                />
+            <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center px-6">
+              <div className="text-center mb-6">
+                <div className="text-white text-xl font-semibold drop-shadow-lg">Scan Barcode</div>
+                <div className="text-white/80 text-sm mt-1 drop-shadow">Place barcode in the frame to scan</div>
               </div>
+              
+              <div 
+                className="w-72 h-[220px] rounded-[22px] border-[4px] border-white/95 shadow-[0_0_30px_rgba(0,0,0,0.35)]"
+              />
             </div>
 
             {showManualBarcodeInput && (
