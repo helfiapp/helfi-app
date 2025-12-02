@@ -4304,6 +4304,25 @@ Please add nutritional information manually if needed.`);
         verbose: false,
       })
       barcodeScannerRef.current = scanner
+      // Hide html5-qrcode's default shaded/corner overlay; we render our own frame
+      if (typeof document !== 'undefined') {
+        const styleId = 'barcode-overlay-cleanup'
+        if (!document.getElementById(styleId)) {
+          const s = document.createElement('style')
+          s.id = styleId
+          s.textContent = `
+            #${BARCODE_REGION_ID} #qr-shaded-region,
+            #${BARCODE_REGION_ID} .qr-shaded-region,
+            #${BARCODE_REGION_ID} .scan-region-highlight {
+              display: none !important;
+            }
+            #${BARCODE_REGION_ID} video {
+              object-fit: cover;
+            }
+          `
+          document.head.appendChild(s)
+        }
+      }
       const qrBox = { width: 320, height: 220 }
       const scanConfig: any = isIosSafari
         ? {
@@ -8420,7 +8439,7 @@ Please add nutritional information manually if needed.`);
           </div>
 
           {/* Camera area */}
-          <div className="flex-1 relative bg-black overflow-hidden">
+            <div className="flex-1 relative bg-black overflow-hidden">
             <div id={BARCODE_REGION_ID} className="absolute inset-0" />
 
             {/* Overlay with scanning frame */}
