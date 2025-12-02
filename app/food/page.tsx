@@ -8448,6 +8448,7 @@ Please add nutritional information manually if needed.`);
 
             {/* Overlay with scanning frame */}
             <div className="absolute inset-0 pointer-events-none">
+              <div className="absolute inset-0 bg-black/35" />
               <div className="absolute inset-0 flex flex-col items-center justify-center px-6">
                 <div className="text-center mb-6">
                   <div className="text-white text-xl font-semibold drop-shadow-lg">Scan Barcode</div>
