@@ -30,8 +30,8 @@ export async function middleware(request: NextRequest) {
 
     // If we have a valid token, preserve it by adding stability headers
     if (token) {
-      // If the user is already signed in and hits the sign-in page or root (e.g., via Home Screen),
-      // short-circuit to the PWA entry route so we don't render the login or marketing page at all.
+      // PWA guard rail: signed-in Home Screen opens must skip login/marketing.
+      // If you touch this, read GUARD_RAILS.md (PWA Home Screen / Entry Path).
       if (request.nextUrl.pathname === '/auth/signin' || request.nextUrl.pathname === '/') {
         const redirectUrl = request.nextUrl.clone()
         redirectUrl.pathname = '/pwa-entry'
