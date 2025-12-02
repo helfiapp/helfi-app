@@ -4270,7 +4270,8 @@ Please add nutritional information manually if needed.`);
       await videoEl.play().catch(() => {})
       attachTorchTrack(stream)
 
-      const { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } = await import('@zxing/browser')
+      const { BrowserMultiFormatReader, BarcodeFormat } = await import('@zxing/browser')
+      const { DecodeHintType } = await import('@zxing/library')
       const hints = new Map()
       hints.set(DecodeHintType.POSSIBLE_FORMATS, [
         BarcodeFormat.EAN_13,
