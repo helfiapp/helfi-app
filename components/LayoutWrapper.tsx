@@ -238,6 +238,10 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
     try {
       const fullPath = window.location.pathname + window.location.search
       localStorage.setItem('helfi:lastPath', fullPath)
+      // Mirror the last path into a simple cookie so the server can redirect
+      const encoded = encodeURIComponent(fullPath)
+      const maxAgeSeconds = 5 * 365 * 24 * 60 * 60 // ~5 years
+      document.cookie = `helfi-last-path=${encoded}; path=/; max-age=${maxAgeSeconds}; samesite=lax`
     } catch {
       // Ignore storage errors
     }

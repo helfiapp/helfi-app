@@ -19,22 +19,21 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       {
-        url: 'https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/FAVICON_ntiqz6.png',
-        sizes: '32x32',
+        url: '/icons/app-192.png',
+        sizes: '192x192',
         type: 'image/png',
       },
       {
-        url: 'https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/FAVICON_ntiqz6.png',
-        sizes: '16x16',
+        url: '/icons/app-512.png',
+        sizes: '512x512',
         type: 'image/png',
-      }
+      },
     ],
-    apple: {
-      url: 'https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/FAVICON_ntiqz6.png',
-      sizes: '180x180',
-      type: 'image/png',
-    }
-  }
+    apple: [
+      { url: '/icons/app-192.png', sizes: '192x192' },
+      { url: '/icons/app-512.png', sizes: '512x512' },
+    ],
+  },
 }
 
 export default function RootLayout({
