@@ -28,6 +28,36 @@
 3) **Feature-detect `BarcodeDetector`:** If absent on iOS, don’t try html5-qrcode; instead, show a concise “Camera scanning not supported here; please type the barcode” to avoid the black screen loop.
 4) **Keep UI minimal:** Single frame, torch toggle (optional), manual entry. No photo upload/button.
 
+---
+
+## NEW: Current Stable State (Dec 3, 2025) and Next Task
+
+What’s working now:
+- Scanner is rock-solid on iPhone PWA using **ZXing** (`decodeFromConstraints`) with rear camera, autofocus hint, try-harder hint, no photo flow. UI is clear (frame + flash + status chip).
+- Barcode lookup uses FatSecret → OpenFoodFacts → USDA fallback. It now charges **3 credits only when a product is found** (signed-in users; 402 if insufficient credits).
+- Guard rail added: `GUARD_RAILS.md` section 11 locks the scanner/decoder (ZXing only; no html5-qrcode/BarcodeDetector swaps) and an in-code note at `startBarcodeScanner`.
+
+User’s new request (high priority):
+- When a barcode-scanned entry is edited, it currently opens as a **manual food entry**. The user wants it to open as an **ingredient card** (like “Detected Foods” from photo/AI analysis).
+- For barcode scans, save the diary entry in the same ingredient-card shape as photo analysis (single item with name, brand, serving_size, per-serving macros, portion mode, barcode metadata). Mark it so the edit UI picks the ingredient card, not the manual editor.
+- Do **not** change the scanner itself; only adjust how barcode results are stored and how the edit flow decides to render them.
+
+Implementation notes for next agent:
+1) Map the barcode lookup result (`source`, `name`, `brand`, `serving_size`, `calories`, `protein_g`, `carbs_g`, `fat_g`, `fiber_g`, `sugar_g`, `barcode`) into the same data shape used by `analyzedItems`/ingredient cards in `app/food/page.tsx`. One item per scan is fine.
+2) When inserting into the diary after a barcode hit, store this item payload (and a marker) so the edit flow recognizes it as an ingredient card entry.
+3) Update the edit/view logic to render the ingredient card when that marker/data shape is present (instead of the manual text editor). Keep barcode metadata intact.
+4) Keep all guard rails: don’t alter the ZXing scanner or reintroduce photo flow.
+
+Pointers in code:
+- Scanner/handler: `app/food/page.tsx` (`lookupBarcodeAndAdd` and the insert path for barcode results).
+- Ingredient cards: same file, “Detected Foods” section and the data shape powering `analyzedItems`.
+- API: `app/api/barcode/lookup/route.ts` (already locked/credit-checked; no change needed for this task).
+
+What not to do:
+- Don’t touch the scanner implementation or decoder choice.
+- Don’t remove credit charging (3 credits, only when product found).
+- Don’t reintroduce photo upload for scanning.
+
 ## Files touched
 - `app/food/page.tsx` (scanner UI and detector logic)
 - `app/api/barcode/lookup/route.ts` (minor USDA/OpenFoodFacts fallback tweak earlier in the session)
