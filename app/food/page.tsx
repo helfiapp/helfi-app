@@ -1131,6 +1131,23 @@ export default function FoodDiary() {
     uncategorized: 'Other',
   }
   const categoryLabel = (key: typeof MEAL_CATEGORY_ORDER[number]) => CATEGORY_LABELS[key] || 'Other'
+  const collapseEmptyCategories = (expanded: Record<string, boolean>, entries: any[]) => {
+    const counts: Record<string, number> = {}
+    entries.forEach((entry) => {
+      const cat = normalizeCategory(entry?.meal || entry?.category || entry?.mealType)
+      counts[cat] = (counts[cat] || 0) + 1
+    })
+    const next = { ...expanded }
+    let changed = false
+    MEAL_CATEGORY_ORDER.forEach((cat) => {
+      const hasEntries = (counts[cat] || 0) > 0
+      if (!hasEntries && next[cat]) {
+        next[cat] = false
+        changed = true
+      }
+    })
+    return { map: next, changed }
+  }
   const [selectedAddCategory, setSelectedAddCategory] = useState<typeof MEAL_CATEGORY_ORDER[number]>('uncategorized')
   const [showCategoryPicker, setShowCategoryPicker] = useState(false)
   const [showAddIngredientModal, setShowAddIngredientModal] = useState<boolean>(false)
@@ -2026,6 +2043,18 @@ const applyStructuredItems = (
     })
   }, [showPhotoOptions, photoOptionsAnchor, isMobile])
 
+  // Auto-collapse empty categories when loading a date (do not persist empty sections as open).
+  const appliedEmptyCollapseRef = useRef<Record<string, boolean>>({})
+  useEffect(() => {
+    if (!diaryHydrated) return
+    if (appliedEmptyCollapseRef.current[selectedDate]) return
+    const { map, changed } = collapseEmptyCategories(expandedCategories, sourceEntries)
+    if (changed) {
+      setExpandedCategories(map)
+    }
+    appliedEmptyCollapseRef.current[selectedDate] = true
+  }, [diaryHydrated, selectedDate, sourceEntries, expandedCategories])
+
   // Auto-expand categories that have entries
   useEffect(() => {
     const source = dedupeEntries(isViewingToday ? todaysFoods : (historyFoods || []), { fallbackDate: selectedDate })
@@ -2056,7 +2085,11 @@ const applyStructuredItems = (
       } else {
         setHistoryFoods(normalized)
       }
-      setExpandedCategories((prev) => ({ ...prev, ...(byDate.expandedCategories || {}) }))
+      setExpandedCategories((prev) => {
+        const merged = { ...prev, ...(byDate.expandedCategories || {}) }
+        const { map } = collapseEmptyCategories(merged, normalized)
+        return map
+      })
       setFoodDiaryLoaded(true)
       setDiaryHydrated(true)
     } catch (err) {
@@ -2071,7 +2104,7 @@ const applyStructuredItems = (
       const payload: WarmDiaryState = {
         selectedDate,
         todaysFoods,
-        expandedCategories,
+        expandedCategories: collapseEmptyCategories(expandedCategories, sourceEntries).map,
       }
       if (Array.isArray(historyFoods)) {
         payload.historyByDate = { [selectedDate]: historyFoods }
@@ -2091,7 +2124,7 @@ const applyStructuredItems = (
       const normalized = dedupeEntries(sourceEntriesForDate, { fallbackDate: selectedDate })
       snapshot.byDate[selectedDate] = {
         entries: normalized,
-        expandedCategories,
+        expandedCategories: collapseEmptyCategories(expandedCategories, normalized).map,
         normalized: true,
       }
       writePersistentDiarySnapshot(snapshot)

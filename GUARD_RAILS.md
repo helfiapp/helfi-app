@@ -361,6 +361,11 @@ Before modifying food diary loading logic, agents must test:
 - Do **not** change the toggle logic to only open; it must be a true toggle (open/close).
 
 Any change to these behaviours requires explicit user approval and must be re-tested on both desktop and mobile.
+
+### 4.4 Category expansion defaults for empty sections
+- Empty meal categories must default to **closed** whenever the Food Diary screen loads (including returning to the page or relaunching).
+- If a category has no entries, do not persist it as open in warm or durable snapshots; auto-collapse it on hydrate so accidental opens don’t stick.
+- Categories with entries should preserve the user’s last choice; do not auto-close them unless the user explicitly closes them.
    - Timezone handling must be correct
    - Date filtering must account for user's timezone
 
