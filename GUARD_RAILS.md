@@ -338,6 +338,29 @@ Before modifying food diary loading logic, agents must test:
 
 5. **Cross-day boundary:**
    - Entries created late at night should appear on correct date
+
+---
+
+## 4. Food Diary Action Menus (Desktop dropdown + Mobile swipe toggle)
+
+**Protected file:** `app/food/page.tsx` (action menu rendering near lines ~7570-7820)
+
+### 4.1 Desktop 3-dot menu (must stay usable near viewport edges)
+- The entry action dropdown is rendered as a **fixed** element with computed `top`/`bottom`/`right` and a `maxHeight` + `overflow-y: auto`.
+- Parents/cards must allow `overflow-visible` and raise z-index for the open menu. Do **not** revert to relative/absolute positioning that clips the menu.
+- If changing the dropdown, preserve edge-aware positioning so items remain reachable when the entry is near the bottom of the viewport. Portal is acceptable if behaviour remains identical.
+
+### 4.2 Mobile green swipe-toggle (must open AND close)
+- The green toggle button must remain **clickable above the action sheet** (z-index bump when the sheet is open) so a second tap closes the sheet.
+- Tapping the toggle must always set `swipeMenuEntry` to `null` (closing) when the same entry is already open, and should reset swipe offsets for previously open entries.
+- Do not remove stopPropagation/preventDefault that keeps the tap from falling through. Do not drop the z-index class; it is required to make the close tap land.
+
+### 4.3 What agents must not break
+- Do **not** reintroduce clipping/hidden overflow on the desktop menu.
+- Do **not** lower the green toggle behind the sheet (no z-index removal), or the close tap will be blocked.
+- Do **not** change the toggle logic to only open; it must be a true toggle (open/close).
+
+Any change to these behaviours requires explicit user approval and must be re-tested on both desktop and mobile.
    - Timezone handling must be correct
    - Date filtering must account for user's timezone
 

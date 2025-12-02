@@ -7700,6 +7700,7 @@ Please add nutritional information manually if needed.`);
                                 <button
                                   type="button"
                                   onClick={openSwipeMenu}
+                                  // Guard rail: keep z-index bump so second tap closes the sheet; do not remove or the tap will be blocked by the open menu.
                                   className={`pointer-events-auto h-full min-w-[88px] px-3 bg-[#4DAF50] text-white flex items-center justify-center ${isMenuOpen ? 'relative z-[10001]' : ''}`}
                                   aria-label="Open meal actions"
                                 >
@@ -7774,6 +7775,7 @@ Please add nutritional information manually if needed.`);
                                       </svg>
                                     </button>
                                     {showEntryOptions === food.id.toString() && (
+                                      {/* Guard rail: desktop dropdown must stay fixed/edge-aware with scrollable overflow; do not revert to clipped absolute menus. */}
                                       <div
                                         className="fixed entry-options-dropdown w-56 bg-white rounded-lg shadow-xl border border-gray-200 z-[9999] overflow-y-auto"
                                         style={{
