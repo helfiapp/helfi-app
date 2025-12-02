@@ -1229,7 +1229,6 @@ export default function FoodDiary() {
   const [cameraFacing, setCameraFacing] = useState<'front' | 'back'>('back')
   const [activeCameraLabel, setActiveCameraLabel] = useState<string>('')
   const manualBarcodeInputRef = useRef<HTMLInputElement | null>(null)
-  const nativeBarcodeInputRef = useRef<HTMLInputElement | null>(null)
   const SWIPE_MENU_WIDTH = 88
   const SWIPE_DELETE_WIDTH = 96
   const [insightsNotification, setInsightsNotification] = useState<{show: boolean, message: string, type: 'updating' | 'updated'} | null>(null)
@@ -4238,8 +4237,8 @@ Please add nutritional information manually if needed.`);
           setBarcodeStatus('scanning')
           return
         }
-        // No native detector available; prompt for photo capture instead of live scanning
-        setBarcodeError('Camera scanning is blocked. Tap “Take Photo” below to scan a barcode.')
+        // No native detector available
+        setBarcodeError('Camera scanning is blocked on this device.')
         setBarcodeStatus('idle')
         return
       }
@@ -8423,48 +8422,9 @@ Please add nutritional information manually if needed.`);
       )}
 
       {showBarcodeScanner && (
-        <div className="fixed inset-0 z-50 bg-black flex flex-col">
+      <div className="fixed inset-0 z-50 bg-black flex flex-col">
           {/* Hidden elements for barcode processing */}
           <div id="native-barcode-decoder" style={{ display: 'none' }} aria-hidden="true" />
-          <input
-            ref={nativeBarcodeInputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            className="hidden"
-            aria-hidden="true"
-            onChange={async (e) => {
-              const file = e.target.files?.[0]
-              if (!file) return
-              setBarcodeStatus('loading')
-              setBarcodeError(null)
-              try {
-                const { Html5Qrcode } = await import('html5-qrcode')
-                const scanner = new Html5Qrcode('native-barcode-decoder', { verbose: false })
-                const result = await scanner.scanFile(file, false)
-                if (result) {
-                  const cleaned = result.replace(/[^0-9A-Za-z]/g, '')
-                  if (cleaned) {
-                    handleBarcodeDetected(cleaned)
-                  } else {
-                    setBarcodeError('Could not read barcode. Please try again or type the code.')
-                    setBarcodeStatus('idle')
-                  }
-                } else {
-                  setBarcodeError('No barcode detected in photo. Please try again.')
-                  setBarcodeStatus('idle')
-                }
-                try {
-                  scanner.clear()
-                } catch {}
-              } catch (err) {
-                console.error('Photo barcode decode failed', err)
-                setBarcodeError('Could not decode barcode. Please try again or type the code.')
-                setBarcodeStatus('idle')
-              }
-              if (nativeBarcodeInputRef.current) nativeBarcodeInputRef.current.value = ''
-            }}
-          />
 
           {/* Header */}
           <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200">
@@ -8575,18 +8535,6 @@ Please add nutritional information manually if needed.`);
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
                 <span className="text-sm uppercase tracking-wide">{torchEnabled ? 'Flash On' : 'Flash'}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => nativeBarcodeInputRef.current?.click()}
-                className="flex items-center gap-2 text-gray-800 font-semibold"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h3l2 3h8a1 1 0 01.894.553l2.382 4.763A3 3 0 0121 13.236V17a3 3 0 01-3 3H7a3 3 0 01-3-3V4z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 16a2 2 0 11-4 0 2 2 0 014 0z" />
-                </svg>
-                <span className="text-sm uppercase tracking-wide">Take Photo</span>
               </button>
 
               {/* Type Barcode button */}
