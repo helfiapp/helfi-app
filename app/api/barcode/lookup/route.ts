@@ -395,6 +395,7 @@ export async function GET(req: NextRequest) {
 
   const cm = new CreditManager(user.id)
   const wallet = await cm.getWalletStatus()
+  // Pre-check for sufficient credits, but only charge if a product is actually found
   if (wallet.totalAvailableCents < BARCODE_SCAN_COST_CENTS) {
     return NextResponse.json(
       { error: 'Insufficient credits', message: 'Barcode scanning requires 3 credits.' },
@@ -426,16 +427,15 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // Charge exactly once per scan request
-  const charged = await cm.chargeCents(BARCODE_SCAN_COST_CENTS)
-  if (!charged) {
-    return NextResponse.json(
-      { error: 'Insufficient credits', message: 'Barcode scanning requires 3 credits.' },
-      { status: 402 },
-    )
-  }
-
   if (food) {
+    // Charge only when we actually have a product to return
+    const charged = await cm.chargeCents(BARCODE_SCAN_COST_CENTS)
+    if (!charged) {
+      return NextResponse.json(
+        { error: 'Insufficient credits', message: 'Barcode scanning requires 3 credits.' },
+        { status: 402 },
+      )
+    }
     return NextResponse.json({ found: true, food })
   }
 
