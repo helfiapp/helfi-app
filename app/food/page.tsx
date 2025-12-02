@@ -5133,6 +5133,18 @@ Please add nutritional information manually if needed.`);
         </div>
       )}
       
+      {/* Backdrop to block clicks on entries while dropdown menus are open */}
+      {(showPhotoOptions || showCategoryPicker) && (
+        <div
+          className="fixed inset-0 z-40 bg-transparent"
+          onClick={() => {
+            setShowPhotoOptions(false)
+            setPhotoOptionsAnchor(null)
+            setShowCategoryPicker(false)
+          }}
+        />
+      )}
+
       {/* Insights Update Notification - Subtle and non-intrusive */}
       {insightsNotification && (
         <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[10000] transition-opacity duration-300">
@@ -5434,12 +5446,12 @@ Please add nutritional information manually if needed.`);
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h2m2 0h2m2 0h2m2 0h2M4 18h2m2 0h2m2 0h2m2 0h2M7 6v12m4-12v12m4-12v12" />
                       </svg>
                     </div>
-                                          <div className="flex-1">
-                                            <div className="text-base font-semibold text-gray-900">Barcode Scanner</div>
-                                            <div className="text-xs text-gray-500">
-                                              Scan packaged foods (FatSecret lookup) • 3 credits per scan
-                                            </div>
-                                          </div>
+                    <div className="flex-1">
+                      <div className="text-base font-semibold text-gray-900">Barcode Scanner</div>
+                      <div className="text-xs text-gray-500">
+                        Scan packaged foods • 3 credits per scan (FatSecret lookup)
+                      </div>
+                    </div>
                     <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>
@@ -7993,7 +8005,7 @@ Please add nutritional information manually if needed.`);
                                         </div>
                                           <div className="flex-1">
                                             <div className="text-base font-semibold text-gray-900">Barcode Scanner</div>
-                                            <div className="text-xs text-gray-500">Scan packaged foods (FatSecret lookup) • 3 credits per scan</div>
+                                            <div className="text-xs text-gray-500">Scan packaged foods • 3 credits per scan (FatSecret lookup)</div>
                                           </div>
                                         <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
