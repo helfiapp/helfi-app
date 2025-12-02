@@ -3868,7 +3868,10 @@ Please add nutritional information manually if needed.`);
     const track = barcodeTorchTrackRef.current
     if (track && typeof track.applyConstraints === 'function') {
       try {
-        track.applyConstraints({ advanced: [{ torch: false }] }).catch(() => {})
+        const constraints: MediaTrackConstraints & { advanced?: Array<{ torch?: boolean }> } = {
+          advanced: [{ torch: false }],
+        }
+        ;(track as any).applyConstraints(constraints).catch(() => {})
       } catch {}
     }
     resetTorchState()
@@ -4098,7 +4101,10 @@ Please add nutritional information manually if needed.`);
     }
     try {
       const next = !torchEnabled
-      await track.applyConstraints({ advanced: [{ torch: next }] })
+      const constraints: MediaTrackConstraints & { advanced?: Array<{ torch?: boolean }> } = {
+        advanced: [{ torch: next }],
+      }
+      await (track as any).applyConstraints(constraints)
       setTorchEnabled(next)
       setBarcodeError(null)
     } catch (err) {
