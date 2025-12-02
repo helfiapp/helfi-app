@@ -1215,8 +1215,12 @@ export default function FoodDiary() {
   const [barcodeError, setBarcodeError] = useState<string | null>(null)
   const [barcodeValue, setBarcodeValue] = useState('')
   const [barcodeStatus, setBarcodeStatus] = useState<'idle' | 'scanning' | 'loading'>('idle')
+  const [torchEnabled, setTorchEnabled] = useState(false)
+  const [torchAvailable, setTorchAvailable] = useState(false)
+  const [showManualBarcodeInput, setShowManualBarcodeInput] = useState(false)
   const barcodeScannerRef = useRef<any>(null)
   const barcodeLookupInFlightRef = useRef(false)
+  const barcodeTorchTrackRef = useRef<MediaStreamTrack | null>(null)
   const nativeBarcodeStreamRef = useRef<MediaStream | null>(null)
   const nativeBarcodeVideoRef = useRef<HTMLVideoElement | null>(null)
   const nativeBarcodeFrameRef = useRef<number | null>(null)
@@ -1224,8 +1228,7 @@ export default function FoodDiary() {
   const [cameraDevices, setCameraDevices] = useState<Array<{ id: string; label: string; facing: 'front' | 'back' | 'unknown' }>>([])
   const [cameraFacing, setCameraFacing] = useState<'front' | 'back'>('back')
   const [activeCameraLabel, setActiveCameraLabel] = useState<string>('')
-  const nativeBarcodeInputRef = useRef<HTMLInputElement>(null)
-  const [isIosDevice, setIsIosDevice] = useState(false)
+  const manualBarcodeInputRef = useRef<HTMLInputElement | null>(null)
   const SWIPE_MENU_WIDTH = 88
   const SWIPE_DELETE_WIDTH = 96
   const [insightsNotification, setInsightsNotification] = useState<{show: boolean, message: string, type: 'updating' | 'updated'} | null>(null)
@@ -3855,7 +3858,48 @@ Please add nutritional information manually if needed.`);
     return { allMeals, favoriteMeals, customMeals }
   }
 
+  const resetTorchState = () => {
+    barcodeTorchTrackRef.current = null
+    setTorchEnabled(false)
+    setTorchAvailable(false)
+  }
+
+  const disableTorch = () => {
+    const track = barcodeTorchTrackRef.current
+    if (track && typeof track.applyConstraints === 'function') {
+      try {
+        track.applyConstraints({ advanced: [{ torch: false }] }).catch(() => {})
+      } catch {}
+    }
+    resetTorchState()
+  }
+
+  const attachTorchTrack = (stream: MediaStream | null) => {
+    if (!stream) {
+      resetTorchState()
+      return
+    }
+    const track = stream.getVideoTracks?.()[0]
+    barcodeTorchTrackRef.current = track || null
+    const canTorch = !!track?.getCapabilities?.().torch
+    setTorchAvailable(canTorch)
+    if (!canTorch) setTorchEnabled(false)
+  }
+
+  const attachTorchTrackFromDom = (retry: boolean = true) => {
+    if (typeof document === 'undefined') return
+    const region = document.getElementById(BARCODE_REGION_ID)
+    const videoEl = region?.querySelector('video') as HTMLVideoElement | null
+    const stream = (videoEl?.srcObject as MediaStream) || null
+    if (!stream && retry) {
+      setTimeout(() => attachTorchTrackFromDom(false), 250)
+      return
+    }
+    attachTorchTrack(stream)
+  }
+
   const stopNativeBarcodeDetector = () => {
+    disableTorch()
     const hadNativeVideo = !!nativeBarcodeVideoRef.current
     if (nativeBarcodeFrameRef.current) {
       cancelAnimationFrame(nativeBarcodeFrameRef.current)
@@ -3889,6 +3933,7 @@ Please add nutritional information manually if needed.`);
 
   const stopBarcodeScanner = () => {
     stopNativeBarcodeDetector()
+    disableTorch()
     const scanner = barcodeScannerRef.current
     if (scanner) {
       try {
@@ -3911,6 +3956,8 @@ Please add nutritional information manually if needed.`);
     setBarcodeStatus('idle')
     setBarcodeError(null)
     setBarcodeValue('')
+    setShowManualBarcodeInput(false)
+    resetTorchState()
   }
 
   const insertBarcodeFoodIntoDiary = async (food: any, code?: string) => {
@@ -4011,6 +4058,7 @@ Please add nutritional information manually if needed.`);
       await insertBarcodeFoodIntoDiary(data.food, normalized)
       setShowBarcodeScanner(false)
       setBarcodeValue('')
+      setShowManualBarcodeInput(false)
     } catch (err) {
       console.error('Barcode lookup failed', err)
       setBarcodeError('Could not find a match. Please rescan or type the code.')
@@ -4031,6 +4079,33 @@ Please add nutritional information manually if needed.`);
     }
     stopBarcodeScanner()
     lookupBarcodeAndAdd(cleaned)
+  }
+
+  const toggleTorch = async () => {
+    const track = barcodeTorchTrackRef.current
+    if (!track) {
+      setTorchAvailable(false)
+      setTorchEnabled(false)
+      setBarcodeError('Flash is not available for this camera.')
+      return
+    }
+    const capabilities = typeof track.getCapabilities === 'function' ? track.getCapabilities() : null
+    if (!capabilities?.torch) {
+      setTorchAvailable(false)
+      setTorchEnabled(false)
+      setBarcodeError('Flash is not available for this camera.')
+      return
+    }
+    try {
+      const next = !torchEnabled
+      await track.applyConstraints({ advanced: [{ torch: next }] })
+      setTorchEnabled(next)
+      setBarcodeError(null)
+    } catch (err) {
+      console.warn('Torch toggle failed', err)
+      setBarcodeError('Could not control the flash on this device.')
+      resetTorchState()
+    }
   }
 
   const startHybridDetector = () => {
@@ -4088,6 +4163,7 @@ Please add nutritional information manually if needed.`);
 
       nativeBarcodeStreamRef.current = stream
       nativeBarcodeVideoRef.current = videoEl
+      attachTorchTrack(stream)
 
       await videoEl.play().catch(() => {})
 
@@ -4124,6 +4200,8 @@ Please add nutritional information manually if needed.`);
 
   const startBarcodeScanner = async (options?: { forceFacing?: 'front' | 'back' }) => {
     if (!showBarcodeScanner) return
+    resetTorchState()
+    setShowManualBarcodeInput(false)
     const desiredFacing: 'front' | 'back' = options?.forceFacing || cameraFacing || 'back'
     const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : ''
     const isIos = /iP(hone|od|ad)/i.test(userAgent)
@@ -4288,6 +4366,7 @@ Please add nutritional information manually if needed.`);
           if (nativeStarted) {
             setCameraFacing(desiredFacing)
             setActiveCameraLabel(desiredFacing === 'front' ? 'Front camera' : 'Back camera')
+            attachTorchTrackFromDom()
             setBarcodeStatus('scanning')
             return
           }
@@ -4303,6 +4382,7 @@ Please add nutritional information manually if needed.`);
         stopBarcodeScanner()
         return
       }
+      attachTorchTrackFromDom()
       startHybridDetector()
       setBarcodeStatus('scanning')
     } catch (err) {
@@ -4334,57 +4414,11 @@ Please add nutritional information manually if needed.`);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showBarcodeScanner])
 
-  // Detect iOS for native camera fallback
   useEffect(() => {
-    if (typeof navigator !== 'undefined') {
-      const ua = navigator.userAgent || ''
-      const ios = /iP(hone|od|ad)/i.test(ua)
-      setIsIosDevice(ios)
+    if (showManualBarcodeInput && manualBarcodeInputRef.current) {
+      manualBarcodeInputRef.current.focus()
     }
-  }, [])
-
-  // Handle native camera capture for iOS barcode scanning
-  const handleNativeBarcodeCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    
-    setBarcodeStatus('loading')
-    setBarcodeError(null)
-    
-    try {
-      const { Html5Qrcode } = await import('html5-qrcode')
-      const scanner = new Html5Qrcode('native-barcode-decoder', { verbose: false })
-      
-      const result = await scanner.scanFile(file, false)
-      
-      if (result) {
-        const cleaned = result.replace(/[^0-9A-Za-z]/g, '')
-        if (cleaned) {
-          lookupBarcodeAndAdd(cleaned)
-        } else {
-          setBarcodeError('Could not read barcode. Please try again or type the code manually.')
-          setBarcodeStatus('idle')
-        }
-      } else {
-        setBarcodeError('No barcode detected in image. Please try again.')
-        setBarcodeStatus('idle')
-      }
-      
-      // Clean up
-      try {
-        scanner.clear()
-      } catch {}
-    } catch (err) {
-      console.error('Native barcode scan error:', err)
-      setBarcodeError('Could not decode barcode from image. Please try again or type the code manually.')
-      setBarcodeStatus('idle')
-    }
-    
-    // Reset input so the same file can be selected again
-    if (nativeBarcodeInputRef.current) {
-      nativeBarcodeInputRef.current.value = ''
-    }
-  }
+  }, [showManualBarcodeInput])
 
   const handleDeleteEditingEntry = async () => {
     if (!editingEntry) return
@@ -8360,17 +8394,8 @@ Please add nutritional information manually if needed.`);
         <div className="fixed inset-0 z-50 bg-black flex flex-col">
           {/* Hidden elements for barcode processing */}
           <div id="native-barcode-decoder" style={{ display: 'none' }} aria-hidden="true" />
-          <input
-            ref={nativeBarcodeInputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            onChange={handleNativeBarcodeCapture}
-            className="hidden"
-            aria-hidden="true"
-          />
-          
-          {/* Header - matches Cronometer style */}
+
+          {/* Header */}
           <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200">
             <button
               type="button"
@@ -8386,33 +8411,72 @@ Please add nutritional information manually if needed.`);
             <div className="w-10" />
           </div>
 
-          {/* Camera area - full screen like Cronometer */}
+          {/* Camera area */}
           <div className="flex-1 relative bg-black overflow-hidden">
-            {/* Camera feed container */}
             <div id={BARCODE_REGION_ID} className="absolute inset-0" />
-            
+
             {/* Overlay with scanning frame */}
             <div className="absolute inset-0 pointer-events-none">
-              {/* Darkened edges */}
-              <div className="absolute inset-0 flex items-center justify-center">
-                {/* Scanning frame container */}
+              <div className="absolute inset-0 bg-gradient-to-b from-black/45 via-black/20 to-black/55 backdrop-blur-sm" />
+              <div className="absolute inset-0 flex flex-col items-center justify-center px-6">
+                <div className="text-center mb-6">
+                  <div className="text-white text-xl font-semibold drop-shadow-lg">Scan Barcode</div>
+                  <div className="text-white/80 text-sm mt-1 drop-shadow">Place barcode in the frame to scan</div>
+                </div>
+                
                 <div className="relative">
-                  {/* Text above frame */}
-                  <div className="absolute -top-20 left-0 right-0 text-center">
-                    <div className="text-white text-xl font-semibold drop-shadow-lg">Scan Barcode</div>
-                    <div className="text-white/80 text-sm mt-1 drop-shadow">Place barcode in the frame to scan</div>
-                  </div>
-                  
-                  {/* White scanning frame - rounded rectangle */}
                   <div 
-                    className="w-64 h-48 border-4 border-white rounded-2xl"
-                    style={{ 
-                      boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.5)',
-                    }}
+                    className="w-72 h-[220px] rounded-[22px] border-[3px] border-white/90 shadow-[0_0_0_9999px_rgba(0,0,0,0.55)]"
                   />
+                  <div className="pointer-events-none absolute inset-0">
+                    <div className="absolute -left-3 top-8 h-10 w-[3px] bg-white/80 rounded-full" />
+                    <div className="absolute -left-3 bottom-8 h-10 w-[3px] bg-white/80 rounded-full" />
+                    <div className="absolute -right-3 top-8 h-10 w-[3px] bg-white/80 rounded-full" />
+                    <div className="absolute -right-3 bottom-8 h-10 w-[3px] bg-white/80 rounded-full" />
+                  </div>
                 </div>
               </div>
             </div>
+
+            {showManualBarcodeInput && (
+              <div
+                className="pointer-events-auto absolute left-4 right-4 bg-white/95 rounded-2xl shadow-2xl border border-gray-200 p-4 space-y-3"
+                style={{ bottom: '110px' }}
+              >
+                <div className="text-sm font-semibold text-gray-900">Type the barcode</div>
+                <div className="flex items-center gap-2">
+                  <input
+                    ref={manualBarcodeInputRef}
+                    value={barcodeValue}
+                    onChange={(e) => setBarcodeValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        lookupBarcodeAndAdd(barcodeValue)
+                      }
+                    }}
+                    placeholder="Enter barcode number"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => lookupBarcodeAndAdd(barcodeValue)}
+                    className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold shadow-sm hover:bg-emerald-700"
+                  >
+                    Search
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowManualBarcodeInput(false)
+                    setBarcodeValue('')
+                  }}
+                  className="text-xs text-gray-500 underline font-medium"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
 
             {/* Loading overlay */}
             {barcodeStatus === 'loading' && (
@@ -8435,39 +8499,37 @@ Please add nutritional information manually if needed.`);
             </div>
           )}
 
-          {/* Bottom bar - matches Cronometer style */}
+          {/* Bottom bar */}
           <div className="flex-shrink-0 bg-stone-100 border-t border-gray-200" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
-            <div className="flex items-center justify-between px-6 py-4">
-              {/* Flash toggle */}
+            <div className="flex items-center justify-evenly px-6 py-4 gap-6">
               <button
                 type="button"
-                onClick={() => {
-                  // Flash toggle - html5-qrcode doesn't support torch, but we keep the UI
-                  // In future could add torch support via MediaStream track capabilities
-                }}
-                className="flex items-center gap-2 text-gray-700 font-semibold"
+                onClick={toggleTorch}
+                disabled={!torchAvailable}
+                className={`flex items-center gap-2 font-semibold ${torchAvailable ? 'text-gray-800' : 'text-gray-400'}`}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
-                <span className="text-sm uppercase tracking-wide">Flash</span>
+                <span className="text-sm uppercase tracking-wide">{torchEnabled ? 'Flash On' : 'Flash'}</span>
               </button>
 
               {/* Type Barcode button */}
               <button
                 type="button"
                 onClick={() => {
-                  const code = prompt('Enter barcode number:')
-                  if (code && code.trim()) {
-                    lookupBarcodeAndAdd(code.trim())
-                  }
+                  setShowManualBarcodeInput((prev) => !prev)
+                  setBarcodeError(null)
+                  setTimeout(() => {
+                    manualBarcodeInputRef.current?.focus()
+                  }, 50)
                 }}
-                className="flex items-center gap-2 text-gray-700 font-semibold"
+                className="flex items-center gap-2 text-gray-800 font-semibold"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h2m2 0h2m2 0h2m2 0h2M4 18h2m2 0h2m2 0h2m2 0h2M7 6v12m4-12v12m4-12v12" />
                 </svg>
-                <span className="text-sm uppercase tracking-wide">Type Barcode</span>
+                <span className="text-sm uppercase tracking-wide">{showManualBarcodeInput ? 'Hide Input' : 'Type Barcode'}</span>
               </button>
             </div>
           </div>
