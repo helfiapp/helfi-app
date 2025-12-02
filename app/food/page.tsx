@@ -4316,8 +4316,19 @@ Please add nutritional information manually if needed.`);
             #${BARCODE_REGION_ID} .scan-region-highlight {
               display: none !important;
             }
+            #${BARCODE_REGION_ID},
+            #${BARCODE_REGION_ID} > div {
+              width: 100% !important;
+              height: 100% !important;
+              position: absolute;
+              inset: 0;
+            }
             #${BARCODE_REGION_ID} video {
-              object-fit: cover;
+              width: 100% !important;
+              height: 100% !important;
+              object-fit: cover !important;
+              position: absolute;
+              inset: 0;
             }
           `
           document.head.appendChild(s)
