@@ -1,63 +1,27 @@
-# Barcode Scanner Attempts (Handover)
+# Barcode Scanner Handover (Dec 3, 2025)
 
-## What I tried in this session
-- **UI alignment/overlay fixes:** Removed extra corner brackets, removed blur overlays, forced the camera video to be full-screen behind a single white frame (Cronometer-style), widened the scan box to match the frame.
-- **Torch support:** Added torch toggle using MediaStream track constraints; later relaxed typing to satisfy builds.
-- **Backend lookup:** Kept FatSecret → OpenFoodFacts → USDA fallback flow; no changes to lookup logic beyond a small USDA fallback tweak earlier.
-- **Decoders tested:**
-  - **html5-qrcode live camera:** Original approach; on iOS PWA it showed video but often failed to decode. Hid its default overlay; still unreliable.
-  - **Native `BarcodeDetector` live camera (iOS):** Switched to native detector as the primary path on iOS. In some cases the camera feed failed to start (black screen) or detector returned nothing even with a clear barcode.
-  - **Photo decode fallback (added, then removed):** Added a “Take Photo” option that decoded a still image via html5-qrcode; user requested removal, so this flow is now gone.
-- **Permissions/error handling:** Added clearer errors when camera start failed or detector unavailable. Currently, if native detector fails on iOS, it falls back to html5-qrcode; but html5-qrcode has been unreliable on the user’s device.
+## Current stable state
+- Scanner is solid on iPhone PWA using **ZXing** (`decodeFromConstraints`) with rear camera, autofocus hint, try-harder hint, and no photo flow. UI is clear (frame + flash + status chip).
+- Barcode lookup uses **FatSecret → OpenFoodFacts → USDA**. It charges **3 credits only when a product is found** (signed-in users; 402 if insufficient credits).
+- Guard rail: `GUARD_RAILS.md` section 11 locks the scanner/decoder (ZXing only; no html5-qrcode/BarcodeDetector swaps) and there is an in-code note at `startBarcodeScanner`.
 
-## Current state (after my last change)
-- iOS tries **native `BarcodeDetector`** first; if unavailable or fails, it falls back to **html5-qrcode** live scanning.
-- “Take Photo” button and photo-decoding flow **removed** per user request.
-- Overlay is a single white rounded frame; video is forced to fill the screen; torch toggle remains.
-- Despite this, user reports: camera sometimes black (no feed) or feed present but **no scans**.
-- Overlay dimming: attempted full-screen dim (`bg-black/35`), but user still sees dim only over part of the view. Needs further layout fix.
-- Next agent must follow `GUARD_RAILS.md` when touching any protected areas to avoid breaking locked flows.
-
-## Likely root cause
-- iOS PWA camera/decoder instability: html5-qrcode is flaky on iOS PWAs; native `BarcodeDetector` may not be available or may fail to start due to permissions/environment.
-- Camera permission/workflow may need a dedicated permission prompt flow, and a hard fallback path without html5-qrcode.
-
-## Suggested next steps for the next agent
-1) **Drop html5-qrcode on iOS entirely.** Use native `BarcodeDetector` if present; otherwise present a clear “camera not supported in this mode” message and only offer manual entry (per user request, no photo flow).
-2) **Camera start debug:** Add logging around `getUserMedia` errors and surface a specific prompt to the user (e.g., allow camera in Safari settings, disable Private Browsing). Confirm if the PWA is in standalone mode and whether camera is allowed.
-3) **Feature-detect `BarcodeDetector`:** If absent on iOS, don’t try html5-qrcode; instead, show a concise “Camera scanning not supported here; please type the barcode” to avoid the black screen loop.
-4) **Keep UI minimal:** Single frame, torch toggle (optional), manual entry. No photo upload/button.
-
----
-
-## NEW: Current Stable State (Dec 3, 2025) and Next Task
-
-What’s working now:
-- Scanner is rock-solid on iPhone PWA using **ZXing** (`decodeFromConstraints`) with rear camera, autofocus hint, try-harder hint, no photo flow. UI is clear (frame + flash + status chip).
-- Barcode lookup uses FatSecret → OpenFoodFacts → USDA fallback. It now charges **3 credits only when a product is found** (signed-in users; 402 if insufficient credits).
-- Guard rail added: `GUARD_RAILS.md` section 11 locks the scanner/decoder (ZXing only; no html5-qrcode/BarcodeDetector swaps) and an in-code note at `startBarcodeScanner`.
-
-User’s new request (high priority):
-- When a barcode-scanned entry is edited, it currently opens as a **manual food entry**. The user wants it to open as an **ingredient card** (like “Detected Foods” from photo/AI analysis).
+## Next task (user request)
+- Barcode-scanned entries currently open as a **manual food entry** when edited. The user wants them to open as an **ingredient card** (like “Detected Foods” from photo/AI analysis).
 - For barcode scans, save the diary entry in the same ingredient-card shape as photo analysis (single item with name, brand, serving_size, per-serving macros, portion mode, barcode metadata). Mark it so the edit UI picks the ingredient card, not the manual editor.
 - Do **not** change the scanner itself; only adjust how barcode results are stored and how the edit flow decides to render them.
 
-Implementation notes for next agent:
+Implementation notes:
 1) Map the barcode lookup result (`source`, `name`, `brand`, `serving_size`, `calories`, `protein_g`, `carbs_g`, `fat_g`, `fiber_g`, `sugar_g`, `barcode`) into the same data shape used by `analyzedItems`/ingredient cards in `app/food/page.tsx`. One item per scan is fine.
 2) When inserting into the diary after a barcode hit, store this item payload (and a marker) so the edit flow recognizes it as an ingredient card entry.
 3) Update the edit/view logic to render the ingredient card when that marker/data shape is present (instead of the manual text editor). Keep barcode metadata intact.
 4) Keep all guard rails: don’t alter the ZXing scanner or reintroduce photo flow.
 
-Pointers in code:
+Pointers:
 - Scanner/handler: `app/food/page.tsx` (`lookupBarcodeAndAdd` and the insert path for barcode results).
-- Ingredient cards: same file, “Detected Foods” section and the data shape powering `analyzedItems`.
+- Ingredient cards: `app/food/page.tsx` (“Detected Foods” section and the data shape powering `analyzedItems`).
 - API: `app/api/barcode/lookup/route.ts` (already locked/credit-checked; no change needed for this task).
 
 What not to do:
 - Don’t touch the scanner implementation or decoder choice.
 - Don’t remove credit charging (3 credits, only when product found).
 - Don’t reintroduce photo upload for scanning.
-
-## Files touched
-- `app/food/page.tsx` (scanner UI and detector logic)
-- `app/api/barcode/lookup/route.ts` (minor USDA/OpenFoodFacts fallback tweak earlier in the session)
