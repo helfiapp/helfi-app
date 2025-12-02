@@ -1176,6 +1176,9 @@ export default function FoodDiary() {
   const [foodImagesLoading, setFoodImagesLoading] = useState<{[key: string]: boolean}>({})
   const [expandedEntries, setExpandedEntries] = useState<{[key: string]: boolean}>({})
   const [entrySwipeOffsets, setEntrySwipeOffsets] = useState<{ [key: string]: number }>({})
+  const [entryMenuPositions, setEntryMenuPositions] = useState<
+    Record<string, { top?: number; bottom?: number; right: number; maxHeight: number }>
+  >({})
   const [swipeMenuEntry, setSwipeMenuEntry] = useState<string | null>(null)
   const [duplicateModalContext, setDuplicateModalContext] = useState<{
     entry: any
@@ -7573,12 +7576,34 @@ Please add nutritional information manually if needed.`);
                         ),
                       }
 
-                      const handleOptionsToggle = (e?: React.SyntheticEvent) => {
+                      const handleOptionsToggle = (e?: React.MouseEvent<HTMLButtonElement>) => {
                         if (e) {
                           e.preventDefault()
                           e.stopPropagation()
                         }
-                        setShowEntryOptions(showEntryOptions === entryKey ? null : entryKey)
+                        const willOpen = showEntryOptions !== entryKey
+                        if (willOpen && e && typeof window !== 'undefined') {
+                          const rect = e.currentTarget.getBoundingClientRect()
+                          const viewportHeight = window.innerHeight || 0
+                          const viewportWidth = window.innerWidth || 0
+                          const spaceBelow = viewportHeight - rect.bottom
+                          const spaceAbove = rect.top
+                          const estimatedHeight = actions.length * 52
+                          const openUp = spaceBelow < estimatedHeight && spaceAbove > spaceBelow
+                          const availableSpace = openUp ? spaceAbove - 12 : spaceBelow - 12
+                          const maxHeight = Math.max(160, Math.min(availableSpace, 420))
+
+                          setEntryMenuPositions((prev) => ({
+                            ...prev,
+                            [entryKey]: {
+                              top: openUp ? undefined : rect.bottom + 8,
+                              bottom: openUp ? viewportHeight - rect.top + 8 : undefined,
+                              right: Math.max(12, viewportWidth - rect.right),
+                              maxHeight: Number.isFinite(maxHeight) ? maxHeight : 320,
+                            },
+                          }))
+                        }
+                        setShowEntryOptions(willOpen ? entryKey : null)
                         closeSwipeMenus()
                       }
 
@@ -7648,16 +7673,21 @@ Please add nutritional information manually if needed.`);
                           e.preventDefault()
                           e.stopPropagation()
                         }
-                        const currentlyOpen = swipeMenuEntry === entryKey
-                        const shouldOpen = !currentlyOpen
-                        setSwipeMenuEntry(shouldOpen ? entryKey : null)
-                        setEntrySwipeOffsets((prev) => ({
-                          ...prev,
-                          [entryKey]: shouldOpen ? SWIPE_MENU_WIDTH : 0,
-                        }))
+                        setSwipeMenuEntry((prevOpen) => {
+                          const closingCurrent = prevOpen === entryKey
+                          const nextEntry = closingCurrent ? null : entryKey
+                          setEntrySwipeOffsets((prev) => {
+                            const nextOffsets = { ...prev }
+                            if (prevOpen && prevOpen !== entryKey) nextOffsets[prevOpen] = 0
+                            nextOffsets[entryKey] = nextEntry ? SWIPE_MENU_WIDTH : 0
+                            return nextOffsets
+                          })
+                          return nextEntry
+                        })
                       }
 
                       const isDesktopMenuOpen = !isMobile && showEntryOptions === entryKey
+                      const entryMenuPosition = entryMenuPositions[entryKey]
                       const entryCardClass = isMobile
                         ? 'relative bg-white border border-gray-200 rounded-none shadow-sm transition-transform duration-150 ease-out z-10 w-full overflow-visible'
                         : `relative bg-white border border-gray-200 rounded-none shadow-none transition-transform duration-150 ease-out w-full overflow-visible ${isDesktopMenuOpen ? 'z-30' : 'z-10'}`
@@ -7744,7 +7774,17 @@ Please add nutritional information manually if needed.`);
                                       </svg>
                                     </button>
                                     {showEntryOptions === food.id.toString() && (
-                                      <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-lg shadow-xl border border-gray-200 z-[9999]" style={{boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)', overflow: 'visible'}}>
+                                      <div
+                                        className="fixed entry-options-dropdown w-56 bg-white rounded-lg shadow-xl border border-gray-200 z-[9999] overflow-y-auto"
+                                        style={{
+                                          top: entryMenuPosition?.top,
+                                          bottom: entryMenuPosition?.bottom,
+                                          right: entryMenuPosition?.right ?? 16,
+                                          maxHeight: entryMenuPosition?.maxHeight ?? 360,
+                                          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                                          overscrollBehavior: 'contain',
+                                        }}
+                                      >
                                         {actions.map((item, idx) => (
                                           <button
                                             key={item.label}
