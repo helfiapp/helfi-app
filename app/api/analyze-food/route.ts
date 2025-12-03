@@ -865,6 +865,9 @@ CRITICAL REQUIREMENTS:
         logVisionUsage({
           timestamp: Date.now(),
           feature: isReanalysis ? 'food:image-reanalysis' : 'food:image-analysis',
+          scanId: imageHash ? `food-${imageHash.slice(0, 8)}` : `food-${Date.now()}`,
+          userId: currentUser.id || null,
+          userLabel: currentUser.email || null,
           model,
           promptTokens: primary.promptTokens,
           completionTokens: primary.completionTokens,

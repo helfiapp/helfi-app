@@ -85,6 +85,9 @@ export async function POST(req: NextRequest) {
   }, { feature: 'food:analyze-packaged', userId: (session.user as any)?.id ?? null }, imageDataUrl ? {
     feature: 'food:analyze-packaged',
     endpoint: '/api/analyze-packaged',
+    userId: (session.user as any)?.id ?? null,
+    userLabel: (session.user as any)?.email || null,
+    scanId: `packaged-${Date.now()}`,
     image: {
       width: imageMeta?.width ?? null,
       height: imageMeta?.height ?? null,

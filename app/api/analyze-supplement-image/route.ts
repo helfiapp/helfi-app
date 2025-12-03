@@ -92,6 +92,9 @@ Return only the product name, no explanations or additional text.`
     }, { feature: 'supplements:image-name' }, {
       feature: 'supplements:image-name',
       endpoint: '/api/analyze-supplement-image',
+      userId: null,
+      userLabel: clientIp ? `ip:${clientIp}` : null,
+      scanId: `supplement-${Date.now()}`,
       image: {
         width: meta.width,
         height: meta.height,

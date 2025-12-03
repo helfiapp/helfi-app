@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { extractAdminFromHeaders } from '@/lib/admin-auth'
-import { getVisionUsageSummary, loadVisionUsageFromDisk } from '@/lib/vision-usage-logger'
+import { buildVisionUsageAnalytics, getVisionUsageSummary, loadVisionUsageFromDisk } from '@/lib/vision-usage-logger'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -27,18 +27,11 @@ export async function GET(req: NextRequest) {
     const filtered = cutoff ? entries.filter((e) => Number(e.timestamp) >= cutoff) : entries
 
     const grouped = getVisionUsageSummary(filtered)
+    const analytics = buildVisionUsageAnalytics(filtered)
     const totalCostCents = filtered.reduce((acc, e) => acc + Number(e.costCents || 0), 0)
     const totalCalls = filtered.length
 
-    const recent = filtered
-      .slice()
-      .sort((a, b) => Number(b.timestamp) - Number(a.timestamp))
-      .slice(0, 50)
-      .map((e) => ({
-        ...e,
-        timestampIso: new Date(Number(e.timestamp)).toISOString(),
-        costUsd: Number(e.costCents || 0) / 100,
-      }))
+    const recent = analytics.scans.slice(0, 100)
 
     return NextResponse.json({
       success: true,
@@ -48,6 +41,10 @@ export async function GET(req: NextRequest) {
       features: Object.keys(grouped).length,
       grouped,
       recent,
+      featureSummary: analytics.featureSummary,
+      userSummary: analytics.userSummary,
+      trend: analytics.trend,
+      totals: analytics.totals,
     })
   } catch (err) {
     console.error('[admin vision-usage] error', err)

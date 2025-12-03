@@ -67,6 +67,9 @@ export async function runChatCompletionWithLogging(
   visionMeta?: {
     feature?: string
     endpoint?: string | null
+    userId?: string | null
+    userLabel?: string | null
+    scanId?: string | null
     image?: {
       width: number | null
       height: number | null
@@ -90,6 +93,9 @@ export async function runChatCompletionWithLogging(
     const entry: VisionUsageEntry = {
       timestamp: Date.now(),
       feature: visionMeta.feature || context.feature,
+      userId: visionMeta.userId ?? null,
+      userLabel: visionMeta.userLabel ?? null,
+      scanId: visionMeta.scanId ?? null,
       model,
       promptTokens,
       completionTokens,

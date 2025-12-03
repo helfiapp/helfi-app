@@ -186,6 +186,9 @@ export async function POST(req: NextRequest) {
       logVisionUsage({
         timestamp: Date.now(),
         feature: 'medical-image:analysis',
+        scanId: `medical-${Date.now()}`,
+        userId: user.id || null,
+        userLabel: user.email || null,
         model: "gpt-4o",
         promptTokens: wrapped.promptTokens,
         completionTokens: wrapped.completionTokens,

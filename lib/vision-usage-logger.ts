@@ -3,7 +3,10 @@ import path from 'path'
 
 export type VisionUsageEntry = {
   timestamp: number
+  scanId?: string | null
   feature: string
+  userId?: string | null
+  userLabel?: string | null
   model: string
   promptTokens: number
   completionTokens: number
@@ -13,6 +16,7 @@ export type VisionUsageEntry = {
   imageBytes: number | null
   imageMime: string | null
   endpoint?: string | null
+  detail?: string | null
 }
 
 const GLOBAL_KEY = '__helfiVisionUsage__'
@@ -53,6 +57,7 @@ export function getVisionUsageSummary(entries?: VisionUsageEntry[]) {
       avgResolution: string
       maxWidth: number | null
       maxHeight: number | null
+      models: Record<string, number>
     }
   > = {}
 
@@ -68,6 +73,7 @@ export function getVisionUsageSummary(entries?: VisionUsageEntry[]) {
         avgResolution: '',
         maxWidth: null,
         maxHeight: null,
+        models: {},
       }
     }
     const bucket = grouped[key]
@@ -76,6 +82,9 @@ export function getVisionUsageSummary(entries?: VisionUsageEntry[]) {
     bucket.completionTokens += Number(row.completionTokens || 0)
     bucket.tokens = bucket.promptTokens + bucket.completionTokens
     bucket.costCents += Number(row.costCents || 0)
+    if (row.model) {
+      bucket.models[row.model] = (bucket.models[row.model] || 0) + 1
+    }
     if (row.imageWidth && row.imageHeight) {
       bucket.maxWidth = bucket.maxWidth ? Math.max(bucket.maxWidth, row.imageWidth) : row.imageWidth
       bucket.maxHeight = bucket.maxHeight ? Math.max(bucket.maxHeight, row.imageHeight) : row.imageHeight
@@ -132,4 +141,129 @@ export function loadVisionUsageFromDisk(limit: number = DEFAULT_DISK_LIMIT): Vis
     console.warn('[vision-usage] failed to read log file', err)
     return []
   }
+}
+
+export function buildVisionUsageAnalytics(entries?: VisionUsageEntry[]) {
+  const data = (entries && entries.length ? entries : getStore()).slice()
+  const featureSummary: Record<
+    string,
+    {
+      count: number
+      promptTokens: number
+      completionTokens: number
+      costCents: number
+      models: Record<string, number>
+      maxWidth: number | null
+      maxHeight: number | null
+    }
+  > = {}
+
+  const userSummary: Record<
+    string,
+    {
+      label: string
+      count: number
+      promptTokens: number
+      completionTokens: number
+      costCents: number
+      features: Record<string, number>
+    }
+  > = {}
+
+  const trendByDay: Record<string, { costCents: number; calls: number }> = {}
+
+  let monthCostCents = 0
+  let monthPromptTokens = 0
+  let monthCompletionTokens = 0
+  const now = new Date()
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime()
+
+  data.forEach((row) => {
+    // Feature aggregation
+    const fKey = row.feature || 'unknown'
+    if (!featureSummary[fKey]) {
+      featureSummary[fKey] = {
+        count: 0,
+        promptTokens: 0,
+        completionTokens: 0,
+        costCents: 0,
+        models: {},
+        maxWidth: null,
+        maxHeight: null,
+      }
+    }
+    const f = featureSummary[fKey]
+    f.count += 1
+    f.promptTokens += Number(row.promptTokens || 0)
+    f.completionTokens += Number(row.completionTokens || 0)
+    f.costCents += Number(row.costCents || 0)
+    if (row.model) {
+      f.models[row.model] = (f.models[row.model] || 0) + 1
+    }
+    if (row.imageWidth && row.imageHeight) {
+      f.maxWidth = f.maxWidth ? Math.max(f.maxWidth, row.imageWidth) : row.imageWidth
+      f.maxHeight = f.maxHeight ? Math.max(f.maxHeight, row.imageHeight) : row.imageHeight
+    }
+
+    // User aggregation
+    const userKey = row.userId || row.userLabel || 'unknown'
+    const userLabel = row.userLabel || row.userId || 'unknown'
+    if (!userSummary[userKey]) {
+      userSummary[userKey] = {
+        label: userLabel,
+        count: 0,
+        promptTokens: 0,
+        completionTokens: 0,
+        costCents: 0,
+        features: {},
+      }
+    }
+    const u = userSummary[userKey]
+    u.count += 1
+    u.promptTokens += Number(row.promptTokens || 0)
+    u.completionTokens += Number(row.completionTokens || 0)
+    u.costCents += Number(row.costCents || 0)
+    u.features[fKey] = (u.features[fKey] || 0) + 1
+
+    // Trend by day
+    const day = new Date(Number(row.timestamp || Date.now())).toISOString().slice(0, 10)
+    if (!trendByDay[day]) {
+      trendByDay[day] = { costCents: 0, calls: 0 }
+    }
+    trendByDay[day].costCents += Number(row.costCents || 0)
+    trendByDay[day].calls += 1
+
+    // Month-to-date
+    if (Number(row.timestamp) >= monthStart) {
+      monthCostCents += Number(row.costCents || 0)
+      monthPromptTokens += Number(row.promptTokens || 0)
+      monthCompletionTokens += Number(row.completionTokens || 0)
+    }
+  })
+
+  const trend = Object.entries(trendByDay)
+    .map(([day, v]) => ({ day, costCents: v.costCents, calls: v.calls }))
+    .sort((a, b) => a.day.localeCompare(b.day))
+
+  const scans = data
+    .slice()
+    .sort((a, b) => Number(b.timestamp) - Number(a.timestamp))
+    .map((row) => ({
+      ...row,
+      tokens: Number(row.promptTokens || 0) + Number(row.completionTokens || 0),
+      costUsd: Number(row.costCents || 0) / 100,
+      timestampIso: new Date(Number(row.timestamp || Date.now())).toISOString(),
+    }))
+
+  const totals = {
+    totalCalls: data.length,
+    totalCostCents: data.reduce((acc, r) => acc + Number(r.costCents || 0), 0),
+    totalPromptTokens: data.reduce((acc, r) => acc + Number(r.promptTokens || 0), 0),
+    totalCompletionTokens: data.reduce((acc, r) => acc + Number(r.completionTokens || 0), 0),
+    monthCostCents,
+    monthPromptTokens,
+    monthCompletionTokens,
+  }
+
+  return { featureSummary, userSummary, trend, scans, totals }
 }
