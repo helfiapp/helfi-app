@@ -1983,14 +1983,19 @@ const applyStructuredItems = (
   // Close dropdowns on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent) {
-      const target = e.target as HTMLElement;
+      const target = e.target as EventTarget | null;
+      if (!(target instanceof Element)) return;
+
+      // Ignore clicks that originate inside the food add dropdown itself
+      if (target.closest('.food-options-dropdown')) {
+        return;
+      }
       
       // Check if the click is inside any dropdown
       if (!target.closest('.dropdown-container')) {
         setDropdownOpen(false);
       }
       if (
-        !target.closest('.food-options-dropdown') &&
         !target.closest('.add-food-entry-container') &&
         !target.closest('.category-add-button')
       ) {
@@ -5386,6 +5391,7 @@ Please add nutritional information manually if needed.`);
               className="food-options-dropdown absolute top-full left-0 w-full sm:w-80 sm:left-auto sm:right-0 mt-2 z-50 max-h-[75vh] overflow-y-auto overscroll-contain"
               onMouseDown={(e) => e.stopPropagation()}
               onTouchStart={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
             >
               <div className="rounded-2xl shadow-2xl border border-gray-200 bg-white/95 backdrop-blur-xl overflow-hidden divide-y divide-gray-100">
                 {MEAL_CATEGORY_ORDER.map((key) => {
@@ -5423,6 +5429,7 @@ Please add nutritional information manually if needed.`);
               className="food-options-dropdown absolute top-full left-0 w-full sm:w-80 sm:left-auto sm:right-0 mt-2 z-50 max-h-[75vh] overflow-y-auto overscroll-contain"
               onMouseDown={(e) => e.stopPropagation()}
               onTouchStart={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
             >
               <div className="rounded-2xl shadow-2xl border border-gray-200 bg-white/90 backdrop-blur-xl overflow-hidden">
                 <div className="divide-y divide-gray-100">
@@ -7984,6 +7991,7 @@ Please add nutritional information manually if needed.`);
                                   className="food-options-dropdown px-4 sm:px-6 mt-2 z-40"
                                   onMouseDown={(e) => e.stopPropagation()}
                                   onTouchStart={(e) => e.stopPropagation()}
+                                  onClick={(e) => e.stopPropagation()}
                                 >
                                   <div className="rounded-2xl shadow-2xl border border-gray-200 bg-white/95 backdrop-blur-xl overflow-hidden max-h-[70vh] overflow-y-auto overscroll-contain">
                                     <div className="divide-y divide-gray-100">
@@ -8098,6 +8106,7 @@ Please add nutritional information manually if needed.`);
                                   className="food-options-dropdown absolute left-0 right-0 top-full mt-2 z-50 px-4 sm:px-6 max-h-[75vh] overflow-y-auto overscroll-contain"
                                   onMouseDown={(e) => e.stopPropagation()}
                                   onTouchStart={(e) => e.stopPropagation()}
+                                  onClick={(e) => e.stopPropagation()}
                                 >
                                   <div className="rounded-2xl shadow-2xl border border-gray-200 bg-white/95 backdrop-blur-xl overflow-hidden">
                                     <div className="divide-y divide-gray-100">
