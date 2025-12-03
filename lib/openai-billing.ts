@@ -127,13 +127,10 @@ export async function fetchOpenAIUsageTotals(args: { startDate: string; endDate:
 
   // Fallback to the older billing endpoint for cost only
   try {
-    const resp = await fetch(
-      `https://api.openai.com/dashboard/billing/usage?start_date=${startDate}&end_date=${endDate}`,
-      {
-        headers,
-        method: 'GET',
-      }
-    )
+    const resp = await fetch(`https://api.openai.com/dashboard/billing/usage?start_date=${startDate}&end_date=${endDate}`, {
+      headers,
+      method: 'GET',
+    })
     const body = await resp.json().catch(() => ({}))
     if (resp.ok && hasValue(body.total_usage)) {
       const cents = toNumber(body.total_usage)
@@ -149,7 +146,30 @@ export async function fetchOpenAIUsageTotals(args: { startDate: string; endDate:
         error: primaryError,
       }
     }
+    // Some accounts now expect a single "date" param; try that if we see a missing-date error
     const fallbackError = body?.error?.message || resp.statusText
+    if (fallbackError && fallbackError.toLowerCase().includes('date')) {
+      const singleResp = await fetch(`https://api.openai.com/dashboard/billing/usage?date=${endDate}`, {
+        headers,
+        method: 'GET',
+      })
+      const singleBody = await singleResp.json().catch(() => ({}))
+      if (singleResp.ok && hasValue(singleBody.total_usage)) {
+        const cents = toNumber(singleBody.total_usage)
+        return {
+          startDate,
+          endDate,
+          totalUsageCents: cents,
+          costUsd: cents / 100,
+          tokenTotals: null,
+          source: 'billing_fallback',
+          usingFallback: true,
+          fetchedAt,
+          error: primaryError,
+        }
+      }
+    }
+
     return {
       startDate,
       endDate,
