@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import OpenAI from 'openai'
 import { runChatCompletionWithLogging } from '@/lib/ai-usage-logger'
+import { logAiUsageEvent } from '@/lib/ai-usage-logger'
 import { consumeRateLimit } from '@/lib/rate-limit'
 import { getImageMetadata } from '@/lib/image-metadata'
 
