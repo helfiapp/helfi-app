@@ -1146,17 +1146,18 @@ CRITICAL REQUIREMENTS:
 
     // Log AI usage for the main Food Analyzer (fire-and-forget).
     // Use the primary analysis tokens and the total combined cost (analysis + follow-ups).
-    try {
-      await logAIUsage({
-        context: { feature: 'food:analysis', userId: currentUser.id },
-        model,
-        promptTokens: primary.promptTokens,
-        completionTokens: primary.completionTokens,
-        costCents: totalCostCents,
-      });
-    } catch {
-      // Logging must never affect the Food Analyzer behaviour
-    }
+    logAiUsageEvent({
+      feature: 'food:analysis',
+      userId: currentUser.id || null,
+      userLabel: currentUser.email || null,
+      scanId: imageHash ? `food-${imageHash.slice(0, 8)}` : `food-${Date.now()}`,
+      model,
+      promptTokens: primary.promptTokens,
+      completionTokens: primary.completionTokens,
+      costCents: totalCostCents,
+      endpoint: '/api/analyze-food',
+      success: true,
+    }).catch(() => {});
 
     // Cache successful image analyses to keep repeat results stable
     if (imageHash) {
