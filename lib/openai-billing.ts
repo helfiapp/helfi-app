@@ -106,14 +106,20 @@ export async function fetchOpenAIUsageTotals(args: { startDate: string; endDate:
   const errors: string[] = []
 
   const attempts: Array<{
-    label: 'usage' | 'billing_range' | 'billing_single';
+    label: 'usage_range' | 'usage_single' | 'billing_range' | 'billing_single';
     url: string;
     source: 'usage' | 'billing_fallback';
     usingFallback: boolean;
   }> = [
     {
-      label: 'usage',
+      label: 'usage_range',
       url: `https://api.openai.com/v1/usage?start_date=${startDate}&end_date=${endDate}`,
+      source: 'usage',
+      usingFallback: false,
+    },
+    {
+      label: 'usage_single',
+      url: `https://api.openai.com/v1/usage?date=${endDate}`,
       source: 'usage',
       usingFallback: false,
     },
@@ -142,11 +148,14 @@ export async function fetchOpenAIUsageTotals(args: { startDate: string; endDate:
 
         if (!resp.ok) {
           const msg = body?.error?.message || resp.statusText || `${attempt.label} failed`
-          errors.push(msg)
+          errors.push(`${attempt.label}: ${msg} (status ${resp.status})`)
           continue
         }
 
-        const parsed = attempt.label === 'usage' ? summarizeUsageList(body) : { usageCents: body?.total_usage ?? null, tokens: null }
+        const parsed =
+          attempt.label === 'usage_range' || attempt.label === 'usage_single'
+            ? summarizeUsageList(body)
+            : { usageCents: body?.total_usage ?? null, tokens: null }
         const cents = parsed.usageCents !== null ? toNumber(parsed.usageCents) : hasValue(body.total_usage) ? toNumber(body.total_usage) : null
 
         if (cents !== null) {
@@ -165,7 +174,7 @@ export async function fetchOpenAIUsageTotals(args: { startDate: string; endDate:
 
         errors.push(`${attempt.label} returned no total_usage`)
       } catch (err: any) {
-        errors.push(err?.message || `${attempt.label} exception`)
+        errors.push(`${attempt.label} exception: ${err?.message || 'unknown'}`)
       }
     }
   }
