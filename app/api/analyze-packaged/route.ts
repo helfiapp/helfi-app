@@ -77,24 +77,60 @@ export async function POST(req: NextRequest) {
         },
   ]
 
-  const result: any = await runChatCompletionWithLogging(openai, {
-    model: 'gpt-4o-mini',
-    messages,
-    max_tokens: 400,
-    temperature: 0,
-  }, { feature: 'food:analyze-packaged', userId: (session.user as any)?.id ?? null }, imageDataUrl ? {
-    feature: 'food:analyze-packaged',
-    endpoint: '/api/analyze-packaged',
-    userId: (session.user as any)?.id ?? null,
-    userLabel: (session.user as any)?.email || null,
-    scanId: `packaged-${Date.now()}`,
-    image: {
-      width: imageMeta?.width ?? null,
-      height: imageMeta?.height ?? null,
-      bytes: imageBytes,
-      mime: imageMime,
+  const result: any = await runChatCompletionWithLogging(
+    openai,
+    {
+      model: 'gpt-4o-mini',
+      messages,
+      max_tokens: 400,
+      temperature: 0,
     },
-  } : undefined)
+    { feature: 'food:analyze-packaged', userId: (session.user as any)?.id ?? null },
+    imageDataUrl
+      ? {
+          image: {
+            width: imageMeta?.width ?? null,
+            height: imageMeta?.height ?? null,
+            bytes: imageBytes,
+            mime: imageMime,
+          },
+        }
+      : undefined
+  )
+
+  if (imageDataUrl) {
+    logAiUsageEvent({
+      feature: 'food:analyze-packaged',
+      endpoint: '/api/analyze-packaged',
+      userId: (session.user as any)?.id ?? null,
+      userLabel: (session.user as any)?.email || null,
+      scanId: `packaged-${Date.now()}`,
+      model: 'gpt-4o-mini',
+      promptTokens: (result as any)?.promptTokens || 0,
+      completionTokens: (result as any)?.completionTokens || 0,
+      costCents: (result as any)?.costCents || 0,
+      image: {
+        width: imageMeta?.width ?? null,
+        height: imageMeta?.height ?? null,
+        bytes: imageBytes,
+        mime: imageMime,
+      },
+      success: true,
+    }).catch(() => {})
+  } else {
+    logAiUsageEvent({
+      feature: 'food:analyze-packaged',
+      endpoint: '/api/analyze-packaged',
+      userId: (session.user as any)?.id ?? null,
+      userLabel: (session.user as any)?.email || null,
+      scanId: `packaged-${Date.now()}`,
+      model: 'gpt-4o-mini',
+      promptTokens: (result as any)?.promptTokens || 0,
+      completionTokens: (result as any)?.completionTokens || 0,
+      costCents: (result as any)?.costCents || 0,
+      success: true,
+    }).catch(() => {})
+  }
   const content = result.choices?.[0]?.message?.content || ''
   const m = content.match(/<NUTR_JSON>([\s\S]*?)<\/NUTR_JSON>/i)
   let parsed: any = null
