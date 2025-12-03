@@ -3727,40 +3727,38 @@ Please add nutritional information manually if needed.`);
     setShowAddFood(false)
   }
 
+  const computeDesktopAddMenuPosition = (key: typeof MEAL_CATEGORY_ORDER[number]) => {
+    const row = categoryRowRefs.current[key]
+    if (!row || typeof window === 'undefined') {
+      setPhotoOptionsPosition(null)
+      return
+    }
+    const rect = row.getBoundingClientRect()
+    const viewportHeight = window.innerHeight || 0
+    const viewportWidth = window.innerWidth || 0
+    const maxHeight = Math.max(300, Math.min(480, viewportHeight - 40))
+    let top = rect.bottom + 8
+    const overflowBottom = top + maxHeight - (viewportHeight - 12)
+    if (overflowBottom > 0) {
+      top = Math.max(12, top - overflowBottom)
+      // If still too low and there's room above, anchor above the button
+      if (top < 12 && rect.top - 8 - maxHeight > 12) {
+        top = rect.top - 8 - maxHeight
+      }
+    }
+    const width = Math.min(rect.width, viewportWidth - 24)
+    const left = Math.max(12, Math.min(rect.left, viewportWidth - width - 12))
+    setPhotoOptionsPosition({ top, left, width, maxHeight })
+  }
+
   // Guard rail: category "+" must act as a true toggle (tap to open, tap same "+" to close). Do not change to tap-outside-to-close.
   const handleCategoryPlusClick = (key: typeof MEAL_CATEGORY_ORDER[number]) => {
     if (showPhotoOptions && photoOptionsAnchor === key) {
       closeAddMenus()
       return
     }
-    if (!isMobile && typeof window !== 'undefined') {
-      const row = categoryRowRefs.current[key]
-      if (row) {
-        const rect = row.getBoundingClientRect()
-        const viewportHeight = window.innerHeight || 0
-        const viewportWidth = window.innerWidth || 0
-        const spaceBelow = viewportHeight - rect.bottom
-        const spaceAbove = rect.top
-        const desiredHeight = 400
-        const openUp = spaceBelow < desiredHeight && spaceAbove > spaceBelow
-        const maxHeight = Math.max(
-          240,
-          Math.min(openUp ? spaceAbove - 16 : spaceBelow - 16, 520)
-        )
-        const width = Math.min(rect.width, viewportWidth - 24)
-        const left = Math.max(12, Math.min(rect.left, viewportWidth - width - 12))
-        const top = openUp
-          ? Math.max(12, rect.top - maxHeight - 8)
-          : rect.bottom + 8
-        setPhotoOptionsPosition({
-          top,
-          left,
-          width,
-          maxHeight,
-        })
-      } else {
-        setPhotoOptionsPosition(null)
-      }
+    if (!isMobile) {
+      computeDesktopAddMenuPosition(key)
     } else {
       setPhotoOptionsPosition(null)
     }
@@ -3779,34 +3777,8 @@ Please add nutritional information manually if needed.`);
       closeAddMenus()
       return
     }
-    if (!isMobile && typeof window !== 'undefined') {
-      const row = categoryRowRefs.current[key]
-      if (row) {
-        const rect = row.getBoundingClientRect()
-        const viewportHeight = window.innerHeight || 0
-        const viewportWidth = window.innerWidth || 0
-        const spaceBelow = viewportHeight - rect.bottom
-        const spaceAbove = rect.top
-        const desiredHeight = 400
-        const openUp = spaceBelow < desiredHeight && spaceAbove > spaceBelow
-        const maxHeight = Math.max(
-          240,
-          Math.min(openUp ? spaceAbove - 16 : spaceBelow - 16, 520)
-        )
-        const width = Math.min(rect.width, viewportWidth - 24)
-        const left = Math.max(12, Math.min(rect.left, viewportWidth - width - 12))
-        const top = openUp
-          ? Math.max(12, rect.top - maxHeight - 8)
-          : rect.bottom + 8
-        setPhotoOptionsPosition({
-          top,
-          left,
-          width,
-          maxHeight,
-        })
-      } else {
-        setPhotoOptionsPosition(null)
-      }
+    if (!isMobile) {
+      computeDesktopAddMenuPosition(key)
     } else {
       setPhotoOptionsPosition(null)
     }
