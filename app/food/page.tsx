@@ -5373,7 +5373,7 @@ Please add nutritional information manually if needed.`);
           {showCategoryPicker && (
             <div
               className="food-options-dropdown absolute top-full left-0 w-full sm:w-80 sm:left-auto sm:right-0 mt-2 z-50 max-h-[75vh] overflow-y-auto overscroll-contain"
-              onPointerDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
+              onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => e.stopPropagation()}
             >
               <div className="rounded-2xl shadow-2xl border border-gray-200 bg-white/95 backdrop-blur-xl overflow-hidden divide-y divide-gray-100">
@@ -5411,7 +5411,7 @@ Please add nutritional information manually if needed.`);
           {showPhotoOptions && photoOptionsAnchor === 'global' && !showCategoryPicker && (
             <div
               className="food-options-dropdown absolute top-full left-0 w-full sm:w-80 sm:left-auto sm:right-0 mt-2 z-50 max-h-[75vh] overflow-y-auto overscroll-contain"
-              onPointerDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
+              onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => e.stopPropagation()}
             >
               <div className="rounded-2xl shadow-2xl border border-gray-200 bg-white/90 backdrop-blur-xl overflow-hidden">
@@ -7976,7 +7976,7 @@ Please add nutritional information manually if needed.`);
                               isMobile ? (
                                 <div
                                   className="food-options-dropdown px-4 sm:px-6 mt-2 z-40"
-                                  onPointerDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
+                                  onPointerDown={(e) => e.stopPropagation()}
                                   onClick={(e) => e.stopPropagation()}
                                 >
                                   <div className="rounded-2xl shadow-2xl border border-gray-200 bg-white/95 backdrop-blur-xl overflow-hidden max-h-[70vh] overflow-y-auto overscroll-contain">
@@ -8091,10 +8091,10 @@ Please add nutritional information manually if needed.`);
                                     </div>
                                   </div>
                                 </div>
-                              ) : (
+                                ) : (
                                 <div
                                   className="food-options-dropdown absolute left-0 right-0 top-full mt-2 z-50 px-4 sm:px-6 max-h-[75vh] overflow-y-auto overscroll-contain"
-                                  onPointerDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
+                                  onPointerDown={(e) => e.stopPropagation()}
                                   onClick={(e) => e.stopPropagation()}
                                 >
                                   <div className="rounded-2xl shadow-2xl border border-gray-200 bg-white/95 backdrop-blur-xl overflow-hidden">
