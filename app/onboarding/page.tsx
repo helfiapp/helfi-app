@@ -2421,9 +2421,8 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
             body: JSON.stringify({ supplements: updatedSupplements })
           });
           if (response.ok) {
-            // After successful save, show update insights popup
+            // Flag unsaved changes so we prompt on navigation
             setHasUnsavedChanges(true);
-            setShowUpdatePopup(true);
           } else {
             console.error('Failed to save supplement edit');
           }
@@ -2431,13 +2430,12 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
           console.error('Error saving supplement edit:', error);
         }
       } else {
-        // Add new supplement - show popup
+        // Add new supplement - defer popup until user tries to navigate away
         setSupplements((prev: any[]) => {
           const updatedSupplements = [...prev, supplementData];
           setSupplementsToSave(updatedSupplements);
-          // Mark as having unsaved changes and show popup for new additions
+          // Mark as having unsaved changes for future navigation prompts
           setHasUnsavedChanges(true);
-          setShowUpdatePopup(true);
           return updatedSupplements;
         });
       }
@@ -2553,9 +2551,8 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
     // Store updated supplements for potential update action
     setSupplementsToSave(updatedSupplements);
     
-    // Mark as having unsaved changes and show update popup
+    // Mark as having unsaved changes (prompt will show on navigation)
     setHasUnsavedChanges(true);
-    setShowUpdatePopup(true);
   };
 
   return (
@@ -3404,9 +3401,8 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
             body: JSON.stringify({ medications: updatedMedications })
           });
           if (response.ok) {
-            // After successful save, show update insights popup
+            // After successful save, flag unsaved changes for navigation prompts
             setHasUnsavedChanges(true);
-            setShowUpdatePopup(true);
           } else {
             console.error('Failed to save medication edit');
           }
@@ -3414,13 +3410,12 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
           console.error('Error saving medication edit:', error);
         }
       } else {
-        // Add new medication - show popup
+        // Add new medication - defer popup until navigation
         setMedications((prev: any[]) => {
           const updatedMedications = [...prev, medicationData];
           setMedicationsToSave(updatedMedications);
-          // Mark as having unsaved changes and show popup for new additions
+          // Mark as having unsaved changes for future prompts
           setHasUnsavedChanges(true);
-          setShowUpdatePopup(true);
           return updatedMedications;
         });
       }
@@ -3536,9 +3531,8 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
     // Store updated medications for potential update action
     setMedicationsToSave(updatedMedications);
     
-    // Mark as having unsaved changes and show update popup
+    // Mark as having unsaved changes (prompt will show on navigation)
     setHasUnsavedChanges(true);
-    setShowUpdatePopup(true);
   };
 
   return (
