@@ -90,11 +90,6 @@ Return only the product name, no explanations or additional text.`
       max_tokens: 50,
       temperature: 0.1
     }, { feature: 'supplements:image-name' }, {
-      feature: 'supplements:image-name',
-      endpoint: '/api/analyze-supplement-image',
-      userId: null,
-      userLabel: clientIp ? `ip:${clientIp}` : null,
-      scanId: `supplement-${Date.now()}`,
       image: {
         width: meta.width,
         height: meta.height,
@@ -102,6 +97,26 @@ Return only the product name, no explanations or additional text.`
         mime: imageFile.type || null
       }
     });
+
+    // Persist usage (vision)
+    logAiUsageEvent({
+      feature: 'supplements:image-name',
+      endpoint: '/api/analyze-supplement-image',
+      userId: null,
+      userLabel: clientIp ? `ip:${clientIp}` : null,
+      scanId: `supplement-${Date.now()}`,
+      model: "gpt-4o",
+      promptTokens: (response as any)?.promptTokens || 0,
+      completionTokens: (response as any)?.completionTokens || 0,
+      costCents: (response as any)?.costCents || 0,
+      image: {
+        width: meta.width,
+        height: meta.height,
+        bytes: imageBuffer.byteLength,
+        mime: imageFile.type || null
+      },
+      success: true,
+    }).catch(() => {});
 
     const supplementName = response.choices[0]?.message?.content?.trim() || 'Unknown Supplement';
     
