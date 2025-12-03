@@ -76,6 +76,8 @@ export async function fetchOpenAIUsageTotals(args: { startDate: string; endDate:
   const endDate = args.endDate
   const fetchedAt = new Date().toISOString()
   const apiKey = process.env.OPENAI_API_KEY
+  const projectId = process.env.OPENAI_PROJECT_ID || process.env.OPENAI_PROJECT
+  const orgId = process.env.OPENAI_ORG_ID || process.env.OPENAI_ORGANIZATION || process.env.OPENAI_ORG
 
   if (!apiKey) {
     return {
@@ -93,91 +95,79 @@ export async function fetchOpenAIUsageTotals(args: { startDate: string; endDate:
   const headers = {
     Authorization: `Bearer ${apiKey}`,
   }
+  if (orgId) {
+    ;(headers as any)['OpenAI-Organization'] = orgId
+  }
+
+  const headerVariants: Record<string, string>[] = projectId
+    ? [headers, { ...headers, 'OpenAI-Project': projectId }]
+    : [headers]
 
   const errors: string[] = []
 
-  // 1) Preferred: usage API with start/end
-  try {
-    const resp = await fetch(`https://api.openai.com/v1/usage?start_date=${startDate}&end_date=${endDate}`, {
-      headers,
-      method: 'GET',
-    })
-    const body = await resp.json().catch(() => ({}))
-    if (resp.ok) {
-      const parsed = summarizeUsageList(body)
-      if (parsed.usageCents !== null) {
-        return {
-          startDate,
-          endDate,
-          totalUsageCents: parsed.usageCents,
-          costUsd: parsed.usageCents / 100,
-          tokenTotals: parsed.tokens,
-          source: 'usage',
-          usingFallback: false,
-          fetchedAt,
-          error: null,
+  const attempts: Array<{
+    label: 'usage' | 'billing_range' | 'billing_single';
+    url: string;
+    source: 'usage' | 'billing_fallback';
+    usingFallback: boolean;
+  }> = [
+    {
+      label: 'usage',
+      url: `https://api.openai.com/v1/usage?start_date=${startDate}&end_date=${endDate}`,
+      source: 'usage',
+      usingFallback: false,
+    },
+    {
+      label: 'billing_range',
+      url: `https://api.openai.com/dashboard/billing/usage?start_date=${startDate}&end_date=${endDate}`,
+      source: 'billing_fallback',
+      usingFallback: true,
+    },
+    {
+      label: 'billing_single',
+      url: `https://api.openai.com/dashboard/billing/usage?date=${endDate}`,
+      source: 'billing_fallback',
+      usingFallback: true,
+    },
+  ]
+
+  for (const attempt of attempts) {
+    for (const hv of headerVariants) {
+      try {
+        const resp = await fetch(attempt.url, {
+          headers: hv,
+          method: 'GET',
+        })
+        const body = await resp.json().catch(() => ({}))
+
+        if (!resp.ok) {
+          const msg = body?.error?.message || resp.statusText || `${attempt.label} failed`
+          errors.push(msg)
+          continue
         }
-      }
-      errors.push('Usage API returned no total_usage value')
-    } else {
-      errors.push(body?.error?.message || resp.statusText || 'Usage API failed')
-    }
-  } catch (err: any) {
-    errors.push(err?.message || 'Usage API exception')
-  }
 
-  // 2) Billing endpoint with start/end
-  try {
-    const resp = await fetch(`https://api.openai.com/dashboard/billing/usage?start_date=${startDate}&end_date=${endDate}`, {
-      headers,
-      method: 'GET',
-    })
-    const body = await resp.json().catch(() => ({}))
-    if (resp.ok && hasValue(body.total_usage)) {
-      const cents = toNumber(body.total_usage)
-      return {
-        startDate,
-        endDate,
-        totalUsageCents: cents,
-        costUsd: cents / 100,
-        tokenTotals: null,
-        source: 'billing_fallback',
-        usingFallback: true,
-        fetchedAt,
-        error: errors[errors.length - 1] || null,
-      }
-    }
-    const msg = body?.error?.message || resp.statusText || 'Billing start/end failed'
-    errors.push(msg)
-  } catch (err: any) {
-    errors.push(err?.message || 'Billing start/end exception')
-  }
+        const parsed = attempt.label === 'usage' ? summarizeUsageList(body) : { usageCents: body?.total_usage ?? null, tokens: null }
+        const cents = parsed.usageCents !== null ? toNumber(parsed.usageCents) : hasValue(body.total_usage) ? toNumber(body.total_usage) : null
 
-  // 3) Billing endpoint with single date (some accounts require this)
-  try {
-    const resp = await fetch(`https://api.openai.com/dashboard/billing/usage?date=${endDate}`, {
-      headers,
-      method: 'GET',
-    })
-    const body = await resp.json().catch(() => ({}))
-    if (resp.ok && hasValue(body.total_usage)) {
-      const cents = toNumber(body.total_usage)
-      return {
-        startDate,
-        endDate,
-        totalUsageCents: cents,
-        costUsd: cents / 100,
-        tokenTotals: null,
-        source: 'billing_fallback',
-        usingFallback: true,
-        fetchedAt,
-        error: errors[errors.length - 1] || null,
+        if (cents !== null) {
+          return {
+            startDate,
+            endDate,
+            totalUsageCents: cents,
+            costUsd: cents / 100,
+            tokenTotals: parsed.tokens || null,
+            source: attempt.source,
+            usingFallback: attempt.usingFallback,
+            fetchedAt,
+            error: errors.length ? errors[errors.length - 1] : null,
+          }
+        }
+
+        errors.push(`${attempt.label} returned no total_usage`)
+      } catch (err: any) {
+        errors.push(err?.message || `${attempt.label} exception`)
       }
     }
-    const msg = body?.error?.message || resp.statusText || 'Billing single-date failed'
-    errors.push(msg)
-  } catch (err: any) {
-    errors.push(err?.message || 'Billing single-date exception')
   }
 
   // If everything failed, return error
