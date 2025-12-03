@@ -1224,9 +1224,11 @@ export async function precomputeQuickSectionsForUser(
           (await generateDegradedSectionQuickStrict({
             issueName: summary.name,
             issueSummary: summary.highlight,
+            issueSlug: slug,
             items: [],
             otherItems: [],
             profile: landing.profile,
+            userId,
             mode: modeKey,
           }, { minSuggested: 4, minAvoid: 4 }))
         let strictResult: any = null
@@ -2411,7 +2413,7 @@ async function buildQuickSection(
       modeKey: 'supplements' | 'medications' | 'exercise' | 'nutrition' | 'lifestyle' | 'labs'
     ) =>
       generateDegradedSectionQuick(
-        { issueName: summary.name, issueSummary: summary.highlight, mode: modeKey, items: [], otherItems: [], profile: landing.profile },
+        { issueName: summary.name, issueSummary: summary.highlight, issueSlug: slug, mode: modeKey, items: [], otherItems: [], profile: landing.profile, userId },
         { minSuggested: 4, minAvoid: 4 }
       )
 
@@ -3059,9 +3061,11 @@ async function buildExerciseSection(
     {
       issueName: issue.name,
       issueSummary: issue.highlight,
+      issueSlug: issue.slug,
       items: normalizedLogs,
       otherItems: context.supplements.map((supp) => ({ name: supp.name, dosage: supp.dosage ?? null })),
       profile: context.profile,
+      userId: context.userId,
       mode: 'exercise',
     },
     { minWorking, minSuggested: 4, minAvoid: 4, maxRetries }
@@ -3464,9 +3468,11 @@ async function buildSupplementsSection(
     {
       issueName: issue.name,
       issueSummary: issue.highlight,
+      issueSlug: issue.slug,
       items: normalizedSupplements,
       otherItems: context.medications.map((med) => ({ name: med.name, dosage: med.dosage ?? null })),
       profile: context.profile,
+      userId: context.userId,
       mode: 'supplements',
     },
     { minWorking: Math.min(3, Math.max(0, normalizedSupplements.length)), minSuggested: 4, minAvoid: 4 }
@@ -3486,9 +3492,11 @@ async function buildSupplementsSection(
       {
         issueName: issue.name,
         issueSummary: issue.highlight,
+        issueSlug: issue.slug,
         items: normalizedSupplements,
         otherItems: context.medications.map((med) => ({ name: med.name, dosage: med.dosage ?? null })),
         profile: context.profile,
+        userId: context.userId,
         mode: 'supplements',
       },
       { minSuggested: 4, minAvoid: 4 }
@@ -3932,9 +3940,11 @@ async function buildMedicationsSection(
     {
       issueName: issue.name,
       issueSummary: issue.highlight,
+      issueSlug: issue.slug,
       items: normalizedMeds,
       otherItems: context.supplements.map((supp) => ({ name: supp.name, dosage: supp.dosage ?? null })),
       profile: context.profile,
+      userId: context.userId,
       mode: 'medications',
     },
     { minWorking: normalizedMeds.length > 0 ? 1 : 0, minSuggested: 4, minAvoid: 4 }
@@ -3946,9 +3956,11 @@ async function buildMedicationsSection(
       {
         issueName: issue.name,
         issueSummary: issue.highlight,
+        issueSlug: issue.slug,
         items: normalizedMeds,
         otherItems: context.supplements.map((supp) => ({ name: supp.name, dosage: supp.dosage ?? null })),
         profile: context.profile,
+        userId: context.userId,
         mode: 'medications',
       },
       { minSuggested: 4, minAvoid: 4 }
@@ -4408,9 +4420,11 @@ async function buildLabsSection(
     {
       issueName: issue.name,
       issueSummary: issue.highlight,
+      issueSlug: issue.slug,
       items: labItems,
       otherItems: context.supplements.map((supp) => ({ name: supp.name, dosage: supp.dosage ?? null })),
       profile: context.profile,
+      userId: context.userId,
       mode: 'labs',
     },
     { minWorking: labItems.length > 0 ? 1 : 0, minSuggested: 4, minAvoid: 4 }
@@ -4422,9 +4436,11 @@ async function buildLabsSection(
       {
         issueName: issue.name,
         issueSummary: issue.highlight,
+        issueSlug: issue.slug,
         items: labItems,
         otherItems: context.supplements.map((supp) => ({ name: supp.name, dosage: supp.dosage ?? null })),
         profile: context.profile,
+        userId: context.userId,
         mode: 'labs',
       },
       { minSuggested: 4, minAvoid: 4 }
@@ -4610,9 +4626,11 @@ async function buildNutritionSection(
     {
       issueName: issue.name,
       issueSummary: issue.highlight,
+      issueSlug: issue.slug,
       items: normalizedFoods,
       otherItems: context.supplements.map((supp) => ({ name: supp.name, dosage: supp.dosage ?? null })),
       profile: context.profile,
+      userId: context.userId,
       mode: 'nutrition',
     },
     { minWorking: hasLoggedFoods ? 1 : 0, minSuggested: 4, minAvoid: 4 }
@@ -4624,9 +4642,11 @@ async function buildNutritionSection(
       {
         issueName: issue.name,
         issueSummary: issue.highlight,
+        issueSlug: issue.slug,
         items: normalizedFoods,
         otherItems: context.supplements.map((supp) => ({ name: supp.name, dosage: supp.dosage ?? null })),
         profile: context.profile,
+        userId: context.userId,
         mode: 'nutrition',
       },
       { minSuggested: 4, minAvoid: 4 }
@@ -4919,9 +4939,11 @@ async function buildLifestyleSection(
     {
       issueName: issue.name,
       issueSummary: issue.highlight,
+      issueSlug: issue.slug,
       items: lifestyleItems,
       otherItems: context.supplements.map((supp) => ({ name: supp.name, dosage: supp.dosage ?? null })),
       profile: context.profile,
+      userId: context.userId,
       mode: 'lifestyle',
     },
     { minWorking: lifestyleItems.length > 0 ? 1 : 0, minSuggested: 4, minAvoid: 4 }
@@ -4933,9 +4955,11 @@ async function buildLifestyleSection(
       {
         issueName: issue.name,
         issueSummary: issue.highlight,
+        issueSlug: issue.slug,
         items: lifestyleItems,
         otherItems: context.supplements.map((supp) => ({ name: supp.name, dosage: supp.dosage ?? null })),
         profile: context.profile,
+        userId: context.userId,
         mode: 'lifestyle',
       },
       { minSuggested: 4, minAvoid: 4 }

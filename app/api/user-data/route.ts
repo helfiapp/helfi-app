@@ -1002,95 +1002,16 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ POST /api/user-data - All updates completed successfully')
 
+    const insightsAutoEnabled = process.env.ENABLE_INSIGHTS_BACKGROUND_REGEN === 'true'
+    let insightsUpdateRequired = false
+
     if (user?.id) {
-      // Check if this is a full onboarding completion (all data provided at once)
-      // This indicates a new user completing onboarding, so we should charge for insights generation
+      // Determine whether this payload represents a complete onboarding submission
       const isFullOnboarding = !!(data.gender && data.weight && data.height && 
         (data.goals?.length || data.supplements?.length || data.medications?.length))
-      
-      // Charge credits for insights generation if this is full onboarding
-      if (isFullOnboarding) {
-        try {
-          const cm = new CreditManager(user.id)
-          const hasCredits = await cm.checkCredits('INSIGHTS_GENERATION')
-          
-          if (hasCredits.hasCredits) {
-            // Charge credits for insights generation
-            const costCents = CREDIT_COSTS.INSIGHTS_GENERATION
-            const charged = await cm.chargeCents(costCents)
-            
-            if (charged) {
-              // Update monthly counter
-              await prisma.user.update({
-                where: { id: user.id },
-                data: {
-                  monthlyInsightsGenerationUsed: { increment: 1 },
-                } as any,
-              })
-              console.log('✅ Charged credits for insights generation:', costCents)
-            } else {
-              console.warn('⚠️ Insufficient credits for insights generation, skipping')
-            }
-          }
-        } catch (error) {
-          console.warn('⚠️ Failed to charge credits for insights generation:', error)
-          // Continue with insights generation even if charging fails (don't block onboarding)
-        }
-      }
-      
-      // Generate FULL insights when user completes onboarding
-      // This ensures all insights are ready immediately after onboarding
-      if (isFullOnboarding) {
-        try {
-          console.log('🚀 Generating FULL insights for user:', user.id)
-          // Generate full insights (not just quick cache)
-          // Wait up to 30 seconds for completion - this is acceptable during onboarding
-          const fullInsightsPromise = precomputeIssueSectionsForUser(user.id, { concurrency: 4 })
-          
-          await Promise.race([
-            fullInsightsPromise.then(() => {
-              console.log('✅ Full insights generation completed')
-              return 'done'
-            }),
-            new Promise((resolve) => setTimeout(() => {
-              console.log('⏱️ Full insights generation timed out after 30s, continuing in background')
-              resolve('timeout')
-            }, 30000)), // Wait up to 30 seconds
-          ])
-          
-          // Continue generation in background if it's still running
-          fullInsightsPromise.catch((error) => {
-            console.warn('⚠️ Full insights generation error (continuing):', error)
-          })
-        } catch (e) {
-          console.warn('⚠️ Full insights generation failed (continuing):', e)
-          // Continue even if insights generation fails
-        }
-      } else {
-        // For partial updates (not full onboarding), use quick cache + background full generation
-        try {
-          console.log('🚀 Priming insights QUICK cache for user:', user.id)
-          const quickPriming = precomputeQuickSectionsForUser(user.id, { concurrency: 4 })
-          // Wait up to ~6.5s; do not block longer
-          await Promise.race([
-            quickPriming.then(() => 'done'),
-            new Promise((resolve) => setTimeout(() => resolve('timeout'), 6500)),
-          ])
-          console.log('✅ Quick cache priming finished or timed out (<=6.5s)')
-        } catch (e) {
-          console.warn('⚠️ Quick cache priming failed (continuing):', e)
-        }
-        // Fire-and-forget heavy precompute in background (do not block response)
-        try {
-          precomputeIssueSectionsForUser(user.id, { concurrency: 4 }).catch(() => {})
-        } catch {}
-      }
 
-      // When health data is updated (not full onboarding), generate ALL insights
-      // This ensures insights are ready when user navigates to insights page
+      const changedTypes: Array<'supplements' | 'medications' | 'food' | 'exercise' | 'health_goals' | 'profile' | 'blood_results'> = []
       if (!isFullOnboarding) {
-        const changedTypes: Array<'supplements' | 'medications' | 'food' | 'exercise' | 'health_goals' | 'profile' | 'blood_results'> = []
-        
         if (data.supplements) changedTypes.push('supplements')
         if (data.medications) changedTypes.push('medications')
         if (data.goals) changedTypes.push('health_goals')
@@ -1106,14 +1027,80 @@ export async function POST(request: NextRequest) {
         if (data.exerciseFrequency || data.exerciseTypes) changedTypes.push('exercise')
         if (data.bloodResults) changedTypes.push('blood_results')
         if (data.todaysFoods) changedTypes.push('food')
+      }
 
-        // If any health data changed, generate ALL insights (not just affected sections)
-        // This ensures complete insights are ready when user navigates to insights page
-        if (changedTypes.length > 0) {
+      insightsUpdateRequired = isFullOnboarding || changedTypes.length > 0
+
+      if (insightsAutoEnabled) {
+        // Charge credits and generate insights automatically (legacy behaviour; now gated)
+        if (isFullOnboarding) {
+          try {
+            const cm = new CreditManager(user.id)
+            const hasCredits = await cm.checkCredits('INSIGHTS_GENERATION')
+            
+            if (hasCredits.hasCredits) {
+              const costCents = CREDIT_COSTS.INSIGHTS_GENERATION
+              const charged = await cm.chargeCents(costCents)
+              
+              if (charged) {
+                await prisma.user.update({
+                  where: { id: user.id },
+                  data: {
+                    monthlyInsightsGenerationUsed: { increment: 1 },
+                  } as any,
+                })
+                console.log('✅ Charged credits for insights generation:', costCents)
+              } else {
+                console.warn('⚠️ Insufficient credits for insights generation, skipping')
+              }
+            }
+          } catch (error) {
+            console.warn('⚠️ Failed to charge credits for insights generation:', error)
+          }
+        }
+        
+        if (isFullOnboarding) {
+          try {
+            console.log('🚀 Generating FULL insights for user:', user.id)
+            const fullInsightsPromise = precomputeIssueSectionsForUser(user.id, { concurrency: 4 })
+            
+            await Promise.race([
+              fullInsightsPromise.then(() => {
+                console.log('✅ Full insights generation completed')
+                return 'done'
+              }),
+              new Promise((resolve) => setTimeout(() => {
+                console.log('⏱️ Full insights generation timed out after 30s, continuing in background')
+                resolve('timeout')
+              }, 30000)),
+            ])
+            
+            fullInsightsPromise.catch((error) => {
+              console.warn('⚠️ Full insights generation error (continuing):', error)
+            })
+          } catch (e) {
+            console.warn('⚠️ Full insights generation failed (continuing):', e)
+          }
+        } else {
+          try {
+            console.log('🚀 Priming insights QUICK cache for user:', user.id)
+            const quickPriming = precomputeQuickSectionsForUser(user.id, { concurrency: 4 })
+            await Promise.race([
+              quickPriming.then(() => 'done'),
+              new Promise((resolve) => setTimeout(() => resolve('timeout'), 6500)),
+            ])
+            console.log('✅ Quick cache priming finished or timed out (<=6.5s)')
+          } catch (e) {
+            console.warn('⚠️ Quick cache priming failed (continuing):', e)
+          }
+          try {
+            precomputeIssueSectionsForUser(user.id, { concurrency: 4 }).catch(() => {})
+          } catch {}
+        }
+
+        if (!isFullOnboarding && changedTypes.length > 0) {
           try {
             console.log('🚀 Generating ALL insights after health data update for user:', user.id)
-            // Generate full insights for all issues (not just affected sections)
-            // This runs in background - user sees progress bar on their page
             precomputeIssueSectionsForUser(user.id, { concurrency: 4 }).catch((error) => {
               console.warn('⚠️ Failed to generate insights after health data update:', error)
             })
@@ -1122,6 +1109,12 @@ export async function POST(request: NextRequest) {
             console.warn('⚠️ Error triggering insights generation:', error)
           }
         }
+      } else if (insightsUpdateRequired) {
+        console.log('⏸️ Insights auto-generation skipped (disabled via ENABLE_INSIGHTS_BACKGROUND_REGEN)', {
+          userId: user.id,
+          isFullOnboarding,
+          changedTypes
+        })
       }
     }
 
@@ -1138,6 +1131,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ 
       success: true, 
       message: 'Data saved successfully',
+      insightsUpdateRequired,
+      insightsAutoGenerationEnabled: insightsAutoEnabled,
       debug: {
         userId: user.id,
         email: userEmail,

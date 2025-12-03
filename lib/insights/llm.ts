@@ -86,6 +86,7 @@ type SectionMode =
 interface LLMInputData {
   issueName: string
   issueSummary?: string | null
+  issueSlug?: string | null
   items?: Array<{ name: string; dosage?: string | null; timing?: string[] | null }>
   otherItems?: Array<{ name: string; dosage?: string | null }>
   profile?: {
@@ -96,6 +97,7 @@ interface LLMInputData {
     exerciseFrequency?: string | null
     exerciseTypes?: string[] | null
   }
+  userId?: string | null
   mode: SectionMode
 }
 
@@ -134,6 +136,8 @@ export async function generateSectionCandidates(params: {
   profile?: LLMInputData['profile']
   mode: SectionMode
   count?: { suggested?: number; avoid?: number }
+  userId?: string | null
+  issueSlug?: string | null
 }): Promise<GeneratedCandidateItem[] | null> {
   const openai = getOpenAIClient()
   if (!openai) return null
@@ -161,7 +165,7 @@ Return strict JSON {"suggested": [...], "avoid": [...]}`
         { role: 'system', content: 'You propose domain-appropriate items with concise clinical reasons. Output JSON only.' },
         { role: 'user', content: user },
       ],
-    }, { feature: `insights:generate-section-candidates:${params.mode}` })
+    }, { feature: `insights:generate-section-candidates:${params.mode}`, userId: params.userId, issueSlug: params.issueSlug ?? null })
     console.timeEnd(`[insights.genCandidates:${params.mode}]`)
     const content = response.choices?.[0]?.message?.content
     if (!content) return null
@@ -482,8 +486,10 @@ async function classifyCandidatesForSection(params: {
   mode: SectionMode
   items: ClassificationEntry[]
   trace: string
+  userId?: string | null
+  issueSlug?: string | null
 }): Promise<ClassifiedItem[] | null> {
-  const { issueName, mode, items, trace } = params
+  const { issueName, mode, items, trace, userId, issueSlug } = params
   if (!items.length) return []
   try {
     const system = 'You are a precise classifier. For each item, assign a canonicalType and whether it is in-domain for the requested section. Output strict JSON.'
@@ -503,7 +509,7 @@ Items:\n${JSON.stringify(items, null, 2)}`
         { role: 'system', content: system },
         { role: 'user', content: user },
       ],
-    }, { feature: `insights:classify:${mode}` })
+    }, { feature: `insights:classify:${mode}`, userId, issueSlug })
     console.timeEnd(`${trace}:classify`)
 
     const content = response.choices?.[0]?.message?.content
@@ -540,8 +546,10 @@ async function rewriteCandidatesToDomain(params: {
   items: Array<{ name: string; reason: string }>
   attempts?: number
   trace: string
+  userId?: string | null
+  issueSlug?: string | null
 }): Promise<Array<{ name: string; reason: string }> | null> {
-  const { issueName, mode, bucket, expectedType, items, attempts = 2, trace } = params
+  const { issueName, mode, bucket, expectedType, items, attempts = 2, trace, userId, issueSlug } = params
   if (!items.length) return []
   const openai = getOpenAIClient()
   if (!openai) return null
@@ -566,7 +574,7 @@ async function rewriteCandidatesToDomain(params: {
 Items to rewrite:\n${JSON.stringify(items, null, 2)}`,
           },
         ],
-      }, { feature: `insights:rewrite:${mode}` })
+      }, { feature: `insights:rewrite:${mode}`, userId, issueSlug })
       console.timeEnd(`${trace}:rewrite-${bucket}#${tries}`)
       const content = response.choices?.[0]?.message?.content
       if (!content) continue
@@ -599,8 +607,10 @@ async function fillMissingItemsForSection(params: {
   needed: number
   disallowNames: string[]
   trace: string
+  userId?: string | null
+  issueSlug?: string | null
 }): Promise<Array<{ name: string; reason: string; protocol?: string | null }> | null> {
-  const { issueName, mode, bucket, expectedType, needed, disallowNames, trace } = params
+  const { issueName, mode, bucket, expectedType, needed, disallowNames, trace, userId, issueSlug } = params
   if (needed <= 0) return []
   const openai = getOpenAIClient()
   if (!openai) return null
@@ -635,7 +645,7 @@ ${diversityHint}`
         { role: 'system', content: 'You generate concise, clinically-relevant items. Output strict JSON only.' },
         { role: 'user', content: prompt },
       ],
-    }, { feature: `insights:fill-missing:${mode}` })
+    }, { feature: `insights:fill-missing:${mode}`, userId, issueSlug })
     console.timeEnd(`${trace}:fill-${bucket}`)
     const content = response.choices?.[0]?.message?.content
     if (!content) return null
@@ -777,6 +787,8 @@ export async function generateDegradedSection(
 ): Promise<SectionLLMResult | null> {
   const openai = getOpenAIClient()
   if (!openai) return null
+  const userId = input.userId ?? null
+  const issueSlug = input.issueSlug ?? null
   const minSuggested = Math.max(4, options.minSuggested ?? 4)
   const minAvoid = Math.max(4, options.minAvoid ?? 4)
   const typeSet = allowedCanonicalTypesForMode(input.mode)
@@ -802,7 +814,7 @@ Counts: suggested≥${minSuggested}, avoid≥${minAvoid}.`
         { role: 'system', content: 'Produce domain-correct, concise items. Output JSON only.' },
         { role: 'user', content: user },
       ],
-    }, { feature: `insights:degraded:${input.mode}` })
+    }, { feature: `insights:degraded:${input.mode}`, userId, issueSlug })
     console.timeEnd(`${trace}:generate`)
     generateMs += Date.now() - g0
     const content = resp.choices?.[0]?.message?.content
@@ -834,6 +846,8 @@ Counts: suggested≥${minSuggested}, avoid≥${minAvoid}.`
       mode: input.mode,
       items: itemsForClassification,
       trace,
+      userId,
+      issueSlug,
     })
     classifyMs += Date.now() - c0
     const typeMap = new Map<string, CanonicalType>()
@@ -862,6 +876,8 @@ Counts: suggested≥${minSuggested}, avoid≥${minAvoid}.`
         needed: needSuggested,
         disallowNames: disallow,
         trace,
+        userId,
+        issueSlug,
       })
       fillMs += Date.now() - f0
       suggested = uniqueByName([...suggested, ...(more ?? [])])
@@ -880,6 +896,8 @@ Counts: suggested≥${minSuggested}, avoid≥${minAvoid}.`
           ...avoid.map((a) => a.name),
         ],
         trace,
+        userId,
+        issueSlug,
       })
       fillMs += Date.now() - f1
       avoid = uniqueByName([...avoid, ...(more ?? [])])
@@ -923,6 +941,8 @@ export async function generateDegradedSectionQuick(
       profile: input.profile,
       mode: input.mode,
       count: { suggested: Math.max(6, minSuggested), avoid: Math.max(6, minAvoid) },
+      userId: input.userId ?? null,
+      issueSlug: input.issueSlug ?? null,
     })
     if (!candidates) return null
 
@@ -990,6 +1010,8 @@ export async function generateDegradedSectionQuickStrict(
       profile: input.profile,
       mode: input.mode,
       count: { suggested: Math.max(10, minSuggested), avoid: Math.max(10, minAvoid) },
+      userId: input.userId ?? null,
+      issueSlug: input.issueSlug ?? null,
     })
     if (!candidates) return null
     const keep = (ct: CanonicalType) => (expected ? ct === expected : true)
@@ -1042,6 +1064,8 @@ export async function generateSectionInsightsFromLLM(
     return null
   }
 
+  const userId = input.userId ?? null
+  const issueSlug = input.issueSlug ?? null
   const focusItems = (input.items ?? []).slice(0, 8)
   const otherItems = (input.otherItems ?? []).slice(0, 6)
   const minWorking = options.minWorking ?? (focusItems.length > 0 ? 1 : 0)
@@ -1117,7 +1141,7 @@ export async function generateSectionInsightsFromLLM(
           },
           { role: 'user', content: prompt },
         ],
-      }, { feature: `insights:generate:${input.mode}` })
+      }, { feature: `insights:generate:${input.mode}`, userId, issueSlug })
       console.timeEnd(`[insights.gen:${input.mode}]`)
       const elapsed = Date.now() - g0
       generateMs += elapsed
@@ -1264,6 +1288,8 @@ export async function generateSectionInsightsFromLLM(
         items: droppedSuggested.map((it) => ({ name: it.name, reason: it.reason })),
         attempts: 2,
         trace,
+        userId,
+        issueSlug,
       })
       rewriteMs += Date.now() - rw0
       if (rewritten?.length) {
@@ -1273,6 +1299,8 @@ export async function generateSectionInsightsFromLLM(
           mode: input.mode,
           items: rewritten.map((m) => ({ name: m.name, reason: m.reason })),
           trace,
+          userId,
+          issueSlug,
         })
       classifyMs += Date.now() - cc0
         const filtered = (reClassified ?? [])
@@ -1294,6 +1322,8 @@ export async function generateSectionInsightsFromLLM(
         items: droppedAvoid.map((it) => ({ name: it.name, reason: it.reason })),
         attempts: 2,
         trace,
+        userId,
+        issueSlug,
       })
       rewriteMs += Date.now() - rw1
       if (rewritten?.length) {
@@ -1303,6 +1333,8 @@ export async function generateSectionInsightsFromLLM(
           mode: input.mode,
           items: rewritten.map((m) => ({ name: m.name, reason: m.reason })),
           trace,
+          userId,
+          issueSlug,
         })
         classifyMs += Date.now() - cc1
         const filtered = (reClassified ?? [])
@@ -1337,6 +1369,8 @@ export async function generateSectionInsightsFromLLM(
           needed: need,
           disallowNames: disallow,
           trace,
+          userId,
+          issueSlug,
         })
         fillMs += Date.now() - f0
         attempts += 1
@@ -1348,6 +1382,8 @@ export async function generateSectionInsightsFromLLM(
           mode: input.mode,
           items: more.map((m) => ({ name: m.name, reason: m.reason })),
           trace,
+          userId,
+          issueSlug,
         })
         classifyMs += Date.now() - c1
         const filtered = (moreClassified ?? [])
