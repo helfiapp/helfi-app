@@ -1839,35 +1839,84 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
 
             {!visionUsageLoading && visionUsage && (
               <>
+                <div className="space-y-3">
+                  {visionUsage?.billing && (
+                    <div className="bg-emerald-50 border border-emerald-100 text-emerald-800 rounded-lg p-4">
+                      <div className="font-semibold">Real OpenAI billing</div>
+                      <div className="text-sm">
+                        Totals pulled directly from OpenAI billing/usage API
+                        {visionUsage?.billing?.range?.usingFallback ? ' (fallback endpoint in use)' : ''}. No in-app estimates shown here.
+                      </div>
+                      <div className="text-xs text-emerald-700 mt-1">
+                        Range: {visionUsage?.billing?.range?.startDate || '—'} → {visionUsage?.billing?.range?.endDate || '—'} · MTD starts{' '}
+                        {visionUsage?.billing?.monthToDate?.startDate || '—'}
+                      </div>
+                      <div className="text-xs text-emerald-700">
+                        Key present: {visionUsage?.keyStatus?.hasKey ? 'yes' : 'no'} · Endpoint: {visionUsage?.keyStatus?.baseUrl || 'api.openai.com'}
+                        {visionUsage?.keyStatus?.altKeys?.length
+                          ? ` · Other key vars: ${visionUsage.keyStatus.altKeys.join(', ')}`
+                          : ''}
+                      </div>
+                    </div>
+                  )}
+                  {visionUsage?.billing?.range?.error && (
+                    <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 text-sm">
+                      OpenAI billing fetch issue: {visionUsage.billing.range.error}
+                    </div>
+                  )}
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                   <div className="bg-white rounded-lg shadow p-4">
-                    <div className="text-xs text-gray-500 uppercase">Total Calls</div>
-                    <div className="text-2xl font-bold text-emerald-600">{visionUsage?.totals?.totalCalls || 0}</div>
-                  </div>
-                  <div className="bg-white rounded-lg shadow p-4">
-                    <div className="text-xs text-gray-500 uppercase">Range Cost</div>
+                    <div className="text-xs text-gray-500 uppercase">Real Cost (Range)</div>
                     <div className="text-2xl font-bold text-blue-600">
-                      ${(Number(visionUsage?.totalCostCents || 0) / 100).toFixed(2)}
+                      {typeof visionUsage?.billing?.range?.costUsd === 'number'
+                        ? `$${Number(visionUsage.billing.range.costUsd).toFixed(2)}`
+                        : visionUsage?.billing?.range?.totalUsageCents
+                        ? `$${(Number(visionUsage.billing.range.totalUsageCents) / 100).toFixed(2)}`
+                        : '—'}
+                    </div>
+                    <div className="text-[11px] text-gray-500">
+                      {visionUsage?.billing?.range?.usingFallback ? 'OpenAI billing (fallback)' : 'OpenAI usage API'}
                     </div>
                   </div>
                   <div className="bg-white rounded-lg shadow p-4">
-                    <div className="text-xs text-gray-500 uppercase">MTD Cost</div>
+                    <div className="text-xs text-gray-500 uppercase">Real Cost (MTD)</div>
                     <div className="text-2xl font-bold text-amber-600">
-                      ${(Number(visionUsage?.totals?.monthCostCents || 0) / 100).toFixed(2)}
+                      {typeof visionUsage?.billing?.monthToDate?.costUsd === 'number'
+                        ? `$${Number(visionUsage.billing.monthToDate.costUsd).toFixed(2)}`
+                        : visionUsage?.billing?.monthToDate?.totalUsageCents
+                        ? `$${(Number(visionUsage.billing.monthToDate.totalUsageCents) / 100).toFixed(2)}`
+                        : '—'}
                     </div>
                     <div className="text-[11px] text-gray-500">OpenAI month-to-date</div>
                   </div>
                   <div className="bg-white rounded-lg shadow p-4">
                     <div className="text-xs text-gray-500 uppercase">Tokens (P/C)</div>
                     <div className="text-lg font-semibold text-purple-600">
-                      {(visionUsage?.totals?.totalPromptTokens || 0).toLocaleString()} /
-                      {(visionUsage?.totals?.totalCompletionTokens || 0).toLocaleString()}
+                      {(visionUsage?.billing?.range?.tokenTotals?.promptTokens ??
+                        visionUsage?.totals?.totalPromptTokens ??
+                        0
+                      ).toLocaleString()}{' '}
+                      /
+                      {(visionUsage?.billing?.range?.tokenTotals?.completionTokens ??
+                        visionUsage?.totals?.totalCompletionTokens ??
+                        0
+                      ).toLocaleString()}
                     </div>
-                    <div className="text-[11px] text-gray-500">Range tokens</div>
+                    <div className="text-[11px] text-gray-500">
+                      {visionUsage?.billing?.range?.tokenTotals ? 'From OpenAI usage API' : 'From Helfi logs (best-effort)'}
+                    </div>
                   </div>
                   <div className="bg-white rounded-lg shadow p-4">
-                    <div className="text-xs text-gray-500 uppercase">Features Tracked</div>
+                    <div className="text-xs text-gray-500 uppercase">Total Calls</div>
+                    <div className="text-2xl font-bold text-emerald-600">{visionUsage?.totals?.totalCalls || 0}</div>
+                    <div className="text-[11px] text-gray-500">In selected range</div>
+                  </div>
+                  <div className="bg-white rounded-lg shadow p-4">
+                    <div className="text-xs text-gray-500 uppercase">Feature Mapping</div>
                     <div className="text-2xl font-bold text-gray-800">{visionUsage.features || 0}</div>
+                    <div className="text-[11px] text-gray-500">Per-feature cost uses OpenAI rate card (no markup)</div>
                   </div>
                 </div>
 
@@ -1880,6 +1929,13 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                     </div>
                   </div>
                 )}
+
+                <div className="bg-blue-50 border border-blue-200 text-blue-800 rounded-lg p-4">
+                  <div className="font-semibold">Per-feature split (best-effort)</div>
+                  <div className="text-sm">
+                    Costs below use Helfi request logs + OpenAI rate card (no markup). If a feature can't be mapped cleanly you'll see "Not available yet" instead of an estimate.
+                  </div>
+                </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -1906,6 +1962,7 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                                 .map(([k, v]) => [k, Number(v || 0)] as [string, number])
                                 .sort((a, b) => b[1] - a[1])
                               const topModel = models[0]?.[0] || 'n/a'
+                              const costValue = Number((stats as any).costCents)
                               const res =
                                 (stats as any).maxWidth && (stats as any).maxHeight
                                   ? `${(stats as any).maxWidth}x${(stats as any).maxHeight}`
@@ -1919,7 +1976,7 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                                     {(stats as any).completionTokens?.toLocaleString?.() || (stats as any).completionTokens}
                                   </td>
                                   <td className="px-4 py-3 text-gray-700">
-                                    ${(Number((stats as any).costCents || 0) / 100).toFixed(2)}
+                                    {Number.isFinite(costValue) ? `$${(costValue / 100).toFixed(2)}` : 'Not available yet'}
                                   </td>
                                   <td className="px-4 py-3 text-gray-700">
                                     {topModel} • {res}
@@ -1966,9 +2023,10 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                                 .slice(0, 2)
                                 .map(([f, c]) => `${f} (${c})`)
                                 .join(', ')
-                              const costUsd = Number((stats as any).costCents || 0) / 100
+                              const rawCostCents = Number((stats as any).costCents)
+                              const costUsd = Number.isFinite(rawCostCents) ? rawCostCents / 100 : null
                               const status =
-                                (stats as any).count > 50 || costUsd > 5
+                                (stats as any).count > 50 || (costUsd ?? 0) > 5
                                   ? '🚩 FLAG'
                                   : (stats as any).count > 20
                                   ? '⚠️ Watch'
@@ -1977,7 +2035,9 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                                 <tr key={userKey} className="hover:bg-gray-50">
                                   <td className="px-4 py-3 font-medium text-gray-900">{(stats as any).label || userKey}</td>
                                   <td className="px-4 py-3 text-gray-700">{(stats as any).count}</td>
-                                  <td className="px-4 py-3 text-gray-700">${costUsd.toFixed(2)}</td>
+                                  <td className="px-4 py-3 text-gray-700">
+                                    {costUsd !== null ? `$${costUsd.toFixed(2)}` : 'Not available yet'}
+                                  </td>
                                   <td className="px-4 py-3 text-gray-700">{featureList || 'n/a'}</td>
                                   <td className="px-4 py-3 text-gray-700">{status}</td>
                                 </tr>

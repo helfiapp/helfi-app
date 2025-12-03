@@ -58,6 +58,14 @@ export function getModelPrices(model: string): ModelPrices {
   return DEFAULT_PRICES[key] || DEFAULT_PRICES['gpt-4o'];
 }
 
+// Raw OpenAI cost (no markup). Useful for reporting true spend against the vendor bill.
+export function openaiCostCentsForTokens(model: string, usage: TokenUsage): number {
+  const { inputCentsPer1k, outputCentsPer1k } = getModelPrices(model);
+  const inCost = (usage.promptTokens / 1000) * inputCentsPer1k;
+  const outCost = (usage.completionTokens / 1000) * outputCentsPer1k;
+  return Math.ceil(inCost + outCost);
+}
+
 export function costCentsForTokens(model: string, usage: TokenUsage): number {
   const { inputCentsPer1k, outputCentsPer1k } = getModelPrices(model);
   const inCost = (usage.promptTokens / 1000) * inputCentsPer1k;
@@ -84,7 +92,6 @@ export function costCentsEstimateFromText(
   const completionTokens = Math.ceil(expectedOutputChars / 4);
   return costCentsForTokens(model, { promptTokens, completionTokens });
 }
-
 
 
 
