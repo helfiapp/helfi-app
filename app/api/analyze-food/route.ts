@@ -27,6 +27,8 @@ import OpenAI from 'openai';
 import { chatCompletionWithCost } from '@/lib/metered-openai';
 import { costCentsEstimateFromText } from '@/lib/cost-meter';
 import { logAIUsage } from '@/lib/ai-usage-logger';
+import { getImageMetadata } from '@/lib/image-metadata';
+import { logVisionUsage } from '@/lib/vision-usage-logger';
 // NOTE: USDA/FatSecret lookup removed from AI analysis - kept only for manual ingredient lookup via /api/food-data
 
 // Best-effort relaxed JSON parsing to handle minor LLM formatting issues
@@ -283,6 +285,9 @@ export async function POST(req: NextRequest) {
     console.log('=== FOOD ANALYZER DEBUG START ===');
     let imageHash: string | null = null;
     let imageDataUrl: string | null = null;
+    let imageMeta: ReturnType<typeof getImageMetadata> | null = null;
+    let imageBytes: number | null = null;
+    let imageMime: string | null = null;
     
     // Check authentication - pass request headers for proper session resolution
     const session = await getServerSession(authOptions);
@@ -521,8 +526,11 @@ CRITICAL REQUIREMENTS:
       console.log('🔄 Converting image to base64...');
       const imageBuffer = await imageFile.arrayBuffer();
       const imageBase64 = Buffer.from(imageBuffer).toString('base64');
+      imageMeta = getImageMetadata(imageBuffer);
       imageDataUrl = `data:${imageFile.type};base64,${imageBase64}`;
       imageHash = crypto.createHash('sha256').update(Buffer.from(imageBuffer)).digest('hex');
+      imageBytes = imageBuffer.byteLength;
+      imageMime = imageFile.type || null;
       
       console.log('✅ Image conversion complete:', {
         bufferSize: imageBuffer.byteLength,
@@ -851,6 +859,26 @@ CRITICAL REQUIREMENTS:
     } as any);
 
     const response = primary.completion;
+
+    if (imageDataUrl) {
+      try {
+        logVisionUsage({
+          timestamp: Date.now(),
+          feature: isReanalysis ? 'food:image-reanalysis' : 'food:image-analysis',
+          model,
+          promptTokens: primary.promptTokens,
+          completionTokens: primary.completionTokens,
+          costCents: primary.costCents,
+          imageWidth: imageMeta?.width ?? null,
+          imageHeight: imageMeta?.height ?? null,
+          imageBytes,
+          imageMime,
+          endpoint: '/api/analyze-food',
+        });
+      } catch {
+        // keep main flow safe
+      }
+    }
 
     console.log('📋 OpenAI Response:', {
       hasResponse: !!response,

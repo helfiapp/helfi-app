@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { runChatCompletionWithLogging } from '@/lib/ai-usage-logger';
 import { consumeRateLimit } from '@/lib/rate-limit';
+import { getImageMetadata } from '@/lib/image-metadata';
 
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX = 3;
@@ -35,6 +36,7 @@ export async function POST(req: NextRequest) {
     // Convert image to base64
     const imageBuffer = await imageFile.arrayBuffer();
     const imageBase64 = Buffer.from(imageBuffer).toString('base64');
+    const meta = getImageMetadata(imageBuffer);
     
     console.log('Analyzing supplement image:', {
       name: imageFile.name,
@@ -87,7 +89,16 @@ Return only the product name, no explanations or additional text.`
       ],
       max_tokens: 50,
       temperature: 0.1
-    }, { feature: 'supplements:image-name' });
+    }, { feature: 'supplements:image-name' }, {
+      feature: 'supplements:image-name',
+      endpoint: '/api/analyze-supplement-image',
+      image: {
+        width: meta.width,
+        height: meta.height,
+        bytes: imageBuffer.byteLength,
+        mime: imageFile.type || null
+      }
+    });
 
     const supplementName = response.choices[0]?.message?.content?.trim() || 'Unknown Supplement';
     

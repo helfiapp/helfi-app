@@ -18,6 +18,11 @@ export default function AdminPanel() {
   const [aiInsights, setAiInsights] = useState<string>('')
   const [activeTab, setActiveTab] = useState('overview')
   const [loadingInsights, setLoadingInsights] = useState(false)
+  const [visionUsage, setVisionUsage] = useState<any>(null)
+  const [visionRecent, setVisionRecent] = useState<any[]>([])
+  const [visionUsageRange, setVisionUsageRange] = useState(7)
+  const [visionUsageLoading, setVisionUsageLoading] = useState(false)
+  const [visionUsageError, setVisionUsageError] = useState('')
   
   // Additional admin data states
   const [waitlistData, setWaitlistData] = useState<any[]>([])
@@ -203,6 +208,8 @@ export default function AdminPanel() {
     setAnalyticsData([])
     setAnalyticsSummary(null)
     setAiInsights('')
+    setVisionUsage(null)
+    setVisionRecent([])
   }
 
   const loadAnalyticsData = async () => {
@@ -226,6 +233,31 @@ export default function AdminPanel() {
       }
     } catch (error) {
       console.error('Error loading analytics:', error)
+    }
+  }
+
+  const loadVisionUsage = async (range?: number) => {
+    const days = range ?? visionUsageRange
+    setVisionUsageRange(days)
+    setVisionUsageLoading(true)
+    setVisionUsageError('')
+    try {
+      const authToken = sessionStorage.getItem('adminToken') || adminToken
+      const res = await fetch(`/api/admin/vision-usage?rangeDays=${days}`, {
+        headers: { Authorization: `Bearer ${authToken}` },
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setVisionUsageError(data?.error || 'Failed to load vision usage')
+        setVisionUsageLoading(false)
+        return
+      }
+      setVisionUsage(data)
+      setVisionRecent(data.recent || [])
+    } catch (err: any) {
+      setVisionUsageError(err?.message || 'Failed to load vision usage')
+    } finally {
+      setVisionUsageLoading(false)
     }
   }
 
@@ -1562,6 +1594,7 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
           <div className="grid grid-cols-2 gap-2">
             {[
               { id: 'overview', label: 'Overview' },
+              { id: 'usage', label: 'AI Usage' },
               { id: 'waitlist', label: 'Waitlist' },
               { id: 'users', label: 'Users' },
               { id: 'settings', label: 'Settings' },
@@ -1571,6 +1604,9 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                 onClick={() => {
                   setActiveTab(item.id)
                   setMobileMenuOpen(false)
+                  if (item.id === 'usage' && !visionUsage) {
+                    loadVisionUsage(visionUsageRange)
+                  }
                   if (item.id === 'settings') {
                     checkPushNotificationStatus()
                   }
@@ -1592,6 +1628,7 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
           <nav className="flex space-x-4 md:space-x-8 overflow-x-auto whitespace-nowrap no-scrollbar -mx-4 px-4">
             {[
               { id: 'overview', label: '📊 Overview', desc: 'Key metrics' },
+              { id: 'usage', label: '💰 AI Usage', desc: 'Vision costs' },
               { id: 'events', label: '📋 Events', desc: 'Raw data' },
               { id: 'insights', label: '🤖 AI Insights', desc: 'OpenAI analysis' },
               { id: 'waitlist', label: '📧 Waitlist', desc: 'Signups' },
@@ -1607,6 +1644,9 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                   setActiveTab(tab.id)
                   if (tab.id === 'insights' && !aiInsights) {
                     loadAiInsights()
+                  }
+                  if (tab.id === 'usage' && !visionUsage) {
+                    loadVisionUsage(visionUsageRange)
                   }
                   if (tab.id === 'management') {
                     loadUserManagement(userSearch, userFilter, currentPage)
@@ -1743,6 +1783,148 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                 </tbody>
               </table>
             </div>
+          </div>
+        )}
+
+        {activeTab === 'usage' && (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900">AI Vision Usage</h2>
+                <p className="text-sm text-gray-600">Grouped by feature with cost and token usage.</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-gray-600">Range</label>
+                <select
+                  value={visionUsageRange}
+                  onChange={(e) => loadVisionUsage(Number(e.target.value))}
+                  className="border-gray-300 rounded-lg text-sm"
+                >
+                  <option value={1}>Last 24h</option>
+                  <option value={7}>Last 7d</option>
+                  <option value={30}>Last 30d</option>
+                  <option value={90}>Last 90d</option>
+                </select>
+                <button
+                  onClick={() => loadVisionUsage(visionUsageRange)}
+                  className="px-3 py-2 bg-emerald-600 text-white rounded-md text-sm hover:bg-emerald-700"
+                >
+                  Refresh
+                </button>
+              </div>
+            </div>
+
+            {visionUsageError && (
+              <div className="bg-red-50 text-red-700 border border-red-200 rounded-lg p-3 text-sm">
+                {visionUsageError}
+              </div>
+            )}
+
+            {visionUsageLoading && (
+              <div className="bg-white rounded-lg shadow p-6 text-gray-600">Loading usage...</div>
+            )}
+
+            {!visionUsageLoading && visionUsage && (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="bg-white rounded-lg shadow p-4">
+                    <div className="text-2xl font-bold text-emerald-600">{visionUsage.totalCalls || 0}</div>
+                    <div className="text-sm text-gray-600">Total Calls</div>
+                  </div>
+                  <div className="bg-white rounded-lg shadow p-4">
+                    <div className="text-2xl font-bold text-blue-600">
+                      ${(Number(visionUsage.totalCostCents || 0) / 100).toFixed(2)}
+                    </div>
+                    <div className="text-sm text-gray-600">Total Cost</div>
+                  </div>
+                  <div className="bg-white rounded-lg shadow p-4">
+                    <div className="text-2xl font-bold text-purple-600">{visionUsage.features || 0}</div>
+                    <div className="text-sm text-gray-600">Features</div>
+                  </div>
+                  <div className="bg-white rounded-lg shadow p-4">
+                    <div className="text-2xl font-bold text-amber-600">
+                      {visionUsage?.grouped
+                        ? Object.values<any>(visionUsage.grouped).reduce(
+                            (acc, item: any) => acc + Number(item.tokens || 0),
+                            0
+                          )
+                        : 0}
+                    </div>
+                    <div className="text-sm text-gray-600">Total Tokens</div>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-lg shadow overflow-hidden">
+                  <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+                    <h3 className="font-semibold text-gray-900">Cost by Feature</h3>
+                    <span className="text-xs text-gray-500">Range: last {visionUsage.rangeDays} day(s)</span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Feature</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Calls</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Cost (USD)</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Tokens (p/c/total)</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Max Resolution</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200 text-sm">
+                        {Object.entries<any>(visionUsage.grouped || {})
+                          .sort((a, b) => Number((b[1] as any).costCents || 0) - Number((a[1] as any).costCents || 0))
+                          .map(([feature, stats]) => (
+                            <tr key={feature} className="hover:bg-gray-50">
+                              <td className="px-4 py-3 font-medium text-gray-900">{feature}</td>
+                              <td className="px-4 py-3 text-gray-700">{(stats as any).count}</td>
+                              <td className="px-4 py-3 text-gray-700">
+                                ${(Number((stats as any).costCents || 0) / 100).toFixed(2)}
+                              </td>
+                              <td className="px-4 py-3 text-gray-700">
+                                {(stats as any).promptTokens}/{(stats as any).completionTokens} (
+                                {Number((stats as any).tokens || 0)})
+                              </td>
+                              <td className="px-4 py-3 text-gray-700">{(stats as any).avgResolution}</td>
+                            </tr>
+                          ))}
+                        {Object.keys(visionUsage.grouped || {}).length === 0 && (
+                          <tr>
+                            <td colSpan={5} className="px-4 py-6 text-center text-gray-500">
+                              No usage recorded for this range yet.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-lg shadow">
+                  <div className="p-4 border-b border-gray-200">
+                    <h3 className="font-semibold text-gray-900">Recent Calls</h3>
+                    <p className="text-xs text-gray-500">Last {visionRecent.length} entries (most recent first)</p>
+                  </div>
+                  <div className="divide-y divide-gray-200">
+                    {visionRecent.length === 0 && (
+                      <div className="p-4 text-sm text-gray-600">No recent entries.</div>
+                    )}
+                    {visionRecent.map((entry, idx) => (
+                      <div key={idx} className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                        <div>
+                          <div className="text-sm font-semibold text-gray-900">{entry.feature}</div>
+                          <div className="text-xs text-gray-500">
+                            {entry.timestampIso} • {entry.model} • {entry.imageWidth && entry.imageHeight ? `${entry.imageWidth}x${entry.imageHeight}` : 'n/a'}
+                          </div>
+                        </div>
+                        <div className="text-sm text-gray-700">
+                          Cost: ${Number(entry.costUsd || 0).toFixed(4)} | Tokens: {entry.promptTokens}/{entry.completionTokens}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         )}
 

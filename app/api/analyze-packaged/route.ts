@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import OpenAI from 'openai'
 import { runChatCompletionWithLogging } from '@/lib/ai-usage-logger'
 import { consumeRateLimit } from '@/lib/rate-limit'
+import { getImageMetadata } from '@/lib/image-metadata'
 
 const RATE_LIMIT_WINDOW_MS = 60_000
 const RATE_LIMIT_MAX = 3
@@ -34,6 +35,9 @@ export async function POST(req: NextRequest) {
 
   let promptText = ''
   let imageDataUrl: string | null = null
+  let imageMeta: ReturnType<typeof getImageMetadata> | null = null
+  let imageBytes: number | null = null
+  let imageMime: string | null = null
 
   if (contentType.includes('application/json')) {
     const { text } = await req.json()
@@ -46,6 +50,9 @@ export async function POST(req: NextRequest) {
     const buf = await image.arrayBuffer()
     const base64 = Buffer.from(buf).toString('base64')
     imageDataUrl = `data:${image.type};base64,${base64}`
+    imageMeta = getImageMetadata(buf)
+    imageBytes = buf.byteLength
+    imageMime = image.type || null
   }
 
   // Ask the model to extract per-portion nutrition from either text or image
@@ -75,7 +82,16 @@ export async function POST(req: NextRequest) {
     messages,
     max_tokens: 400,
     temperature: 0,
-  }, { feature: 'food:analyze-packaged', userId: (session.user as any)?.id ?? null })
+  }, { feature: 'food:analyze-packaged', userId: (session.user as any)?.id ?? null }, imageDataUrl ? {
+    feature: 'food:analyze-packaged',
+    endpoint: '/api/analyze-packaged',
+    image: {
+      width: imageMeta?.width ?? null,
+      height: imageMeta?.height ?? null,
+      bytes: imageBytes,
+      mime: imageMime,
+    },
+  } : undefined)
   const content = result.choices?.[0]?.message?.content || ''
   const m = content.match(/<NUTR_JSON>([\s\S]*?)<\/NUTR_JSON>/i)
   let parsed: any = null

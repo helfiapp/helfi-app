@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { chatCompletionWithCost } from './metered-openai'
+import { logVisionUsage, VisionUsageEntry } from './vision-usage-logger'
 
 type UsageContext = {
   feature: string
@@ -62,7 +63,17 @@ export async function logAIUsage(entry: {
 export async function runChatCompletionWithLogging(
   openai: any,
   params: any,
-  context: UsageContext
+  context: UsageContext,
+  visionMeta?: {
+    feature?: string
+    endpoint?: string | null
+    image?: {
+      width: number | null
+      height: number | null
+      bytes: number | null
+      mime: string | null
+    }
+  }
 ) {
   const { completion, costCents, promptTokens, completionTokens } = await chatCompletionWithCost(openai, params)
   const model = (completion as any)?.model || params?.model || 'unknown'
@@ -73,5 +84,27 @@ export async function runChatCompletionWithLogging(
     completionTokens,
     costCents,
   }).catch(() => {})
+
+  // Optional structured vision logging
+  if (visionMeta) {
+    const entry: VisionUsageEntry = {
+      timestamp: Date.now(),
+      feature: visionMeta.feature || context.feature,
+      model,
+      promptTokens,
+      completionTokens,
+      costCents,
+      imageWidth: visionMeta.image?.width ?? null,
+      imageHeight: visionMeta.image?.height ?? null,
+      imageBytes: visionMeta.image?.bytes ?? null,
+      imageMime: visionMeta.image?.mime ?? null,
+      endpoint: visionMeta.endpoint ?? null,
+    }
+    try {
+      logVisionUsage(entry)
+    } catch {
+      // keep core flow stable
+    }
+  }
   return completion
 }

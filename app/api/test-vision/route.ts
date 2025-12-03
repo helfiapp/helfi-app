@@ -7,6 +7,8 @@ import { CreditManager } from '@/lib/credit-system';
 import { chatCompletionWithCost } from '@/lib/metered-openai';
 import { logAIUsage } from '@/lib/ai-usage-logger';
 import { consumeRateLimit } from '@/lib/rate-limit';
+import { getImageMetadata } from '@/lib/image-metadata';
+import { logVisionUsage } from '@/lib/vision-usage-logger';
 
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX = 3;
@@ -79,6 +81,7 @@ export async function POST(req: NextRequest) {
     // Convert image to base64
     const imageBuffer = await imageFile.arrayBuffer();
     const imageBase64 = Buffer.from(imageBuffer).toString('base64');
+    const imageMeta = getImageMetadata(imageBuffer);
     
     console.log('Image info:', {
       name: imageFile.name,
@@ -178,6 +181,24 @@ export async function POST(req: NextRequest) {
       max_tokens: 900,
       temperature: 0.15
     } as any);
+
+    try {
+      logVisionUsage({
+        timestamp: Date.now(),
+        feature: 'medical-image:analysis',
+        model: "gpt-4o",
+        promptTokens: wrapped.promptTokens,
+        completionTokens: wrapped.completionTokens,
+        costCents: wrapped.costCents,
+        imageWidth: imageMeta.width,
+        imageHeight: imageMeta.height,
+        imageBytes: imageBuffer.byteLength,
+        imageMime: imageFile.type || null,
+        endpoint: '/api/test-vision',
+      });
+    } catch {
+      // keep flow safe
+    }
 
     const analysisRaw = wrapped.completion.choices[0]?.message?.content || '';
 
