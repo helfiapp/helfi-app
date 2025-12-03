@@ -248,10 +248,17 @@ async function updateMetadataAfterGeneration(
 }
 
 /**
- * Trigger background regeneration for affected sections
- * This is the KEY function that makes insights instant - it runs in the background!
+ * Trigger background regeneration for affected sections.
+ * Temporarily paused unless explicitly enabled to stop runaway background calls.
  */
+const BACKGROUND_REGEN_ENABLED = process.env.ENABLE_INSIGHTS_BACKGROUND_REGEN === 'true'
+
 export async function triggerBackgroundRegeneration(event: DataChangeEvent): Promise<void> {
+  if (!BACKGROUND_REGEN_ENABLED) {
+    console.log('[regeneration-service] Background regeneration is disabled; skipping trigger.', event)
+    return
+  }
+
   const { userId, changeType } = event
 
   try {
@@ -359,4 +366,3 @@ export function getStatusMessage(status: 'fresh' | 'stale' | 'missing' | 'genera
       return { message: 'Insights available', tone: 'neutral' }
   }
 }
-
