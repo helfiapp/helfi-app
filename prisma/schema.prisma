@@ -192,6 +192,28 @@ model ExerciseLog {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+model AIUsageEvent {
+  id                String    @id @default(cuid())
+  createdAt         DateTime  @default(now())
+  feature           String
+  userId            String?
+  userLabel         String?
+  scanId            String?
+  model             String
+  promptTokens      Int       @default(0)
+  completionTokens  Int       @default(0)
+  totalTokens       Int       @default(0)
+  costCents         Int       @default(0)
+  imageWidth        Int?
+  imageHeight       Int?
+  imageBytes        Int?
+  imageMime         String?
+  endpoint          String?
+  success           Boolean   @default(true)
+  errorMessage      String?
+  detail            String?
+}
+
 // Fitbit Data Sync - stores synced data from Fitbit API
 model FitbitData {
   id        String   @id @default(cuid())

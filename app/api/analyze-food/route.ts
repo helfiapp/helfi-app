@@ -26,9 +26,8 @@ const RATE_LIMIT_MAX_REQUESTS = 3;   // stop runaway loops quickly
 import OpenAI from 'openai';
 import { chatCompletionWithCost } from '@/lib/metered-openai';
 import { costCentsEstimateFromText } from '@/lib/cost-meter';
-import { logAIUsage } from '@/lib/ai-usage-logger';
+import { logAiUsageEvent, runChatCompletionWithLogging } from '@/lib/ai-usage-logger';
 import { getImageMetadata } from '@/lib/image-metadata';
-import { logVisionUsage } from '@/lib/vision-usage-logger';
 // NOTE: USDA/FatSecret lookup removed from AI analysis - kept only for manual ingredient lookup via /api/food-data
 
 // Best-effort relaxed JSON parsing to handle minor LLM formatting issues
@@ -861,26 +860,37 @@ CRITICAL REQUIREMENTS:
     const response = primary.completion;
 
     if (imageDataUrl) {
-      try {
-        logVisionUsage({
-          timestamp: Date.now(),
-          feature: isReanalysis ? 'food:image-reanalysis' : 'food:image-analysis',
-          scanId: imageHash ? `food-${imageHash.slice(0, 8)}` : `food-${Date.now()}`,
-          userId: currentUser.id || null,
-          userLabel: currentUser.email || null,
-          model,
-          promptTokens: primary.promptTokens,
-          completionTokens: primary.completionTokens,
-          costCents: primary.costCents,
-          imageWidth: imageMeta?.width ?? null,
-          imageHeight: imageMeta?.height ?? null,
-          imageBytes,
-          imageMime,
-          endpoint: '/api/analyze-food',
-        });
-      } catch {
-        // keep main flow safe
-      }
+      logAiUsageEvent({
+        feature: isReanalysis ? 'food:image-reanalysis' : 'food:image-analysis',
+        userId: currentUser.id || null,
+        userLabel: currentUser.email || null,
+        scanId: imageHash ? `food-${imageHash.slice(0, 8)}` : `food-${Date.now()}`,
+        model,
+        promptTokens: primary.promptTokens,
+        completionTokens: primary.completionTokens,
+        costCents: primary.costCents,
+        image: {
+          width: imageMeta?.width ?? null,
+          height: imageMeta?.height ?? null,
+          bytes: imageBytes,
+          mime: imageMime,
+        },
+        endpoint: '/api/analyze-food',
+        success: true,
+      }).catch(() => {});
+    } else {
+      logAiUsageEvent({
+        feature: isReanalysis ? 'food:text-reanalysis' : 'food:text-analysis',
+        userId: currentUser.id || null,
+        userLabel: currentUser.email || null,
+        scanId: `food-${Date.now()}`,
+        model,
+        promptTokens: primary.promptTokens,
+        completionTokens: primary.completionTokens,
+        costCents: primary.costCents,
+        endpoint: '/api/analyze-food',
+        success: true,
+      }).catch(() => {});
     }
 
     console.log('📋 OpenAI Response:', {
@@ -1009,6 +1019,18 @@ CRITICAL REQUIREMENTS:
             max_tokens: 220,
             temperature: 0,
           } as any);
+          logAiUsageEvent({
+            feature: 'food:items-extractor',
+            userId: currentUser.id || null,
+            userLabel: currentUser.email || null,
+            scanId: imageHash ? `food-${imageHash.slice(0, 8)}` : `food-${Date.now()}`,
+            model: 'gpt-4o-mini',
+            promptTokens: extractor.promptTokens,
+            completionTokens: extractor.completionTokens,
+            costCents: extractor.costCents,
+            endpoint: '/api/analyze-food',
+            success: true,
+          }).catch(() => {});
           totalCostCents += extractor.costCents;
           const text = extractor.completion.choices?.[0]?.message?.content?.trim() || '';
           const cleaned =

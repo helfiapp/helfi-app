@@ -5,10 +5,9 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { CreditManager } from '@/lib/credit-system';
 import { chatCompletionWithCost } from '@/lib/metered-openai';
-import { logAIUsage } from '@/lib/ai-usage-logger';
+import { logAiUsageEvent } from '@/lib/ai-usage-logger';
 import { consumeRateLimit } from '@/lib/rate-limit';
 import { getImageMetadata } from '@/lib/image-metadata';
-import { logVisionUsage } from '@/lib/vision-usage-logger';
 
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX = 3;
@@ -182,26 +181,24 @@ export async function POST(req: NextRequest) {
       temperature: 0.15
     } as any);
 
-    try {
-      logVisionUsage({
-        timestamp: Date.now(),
-        feature: 'medical-image:analysis',
-        scanId: `medical-${Date.now()}`,
-        userId: user.id || null,
-        userLabel: user.email || null,
-        model: "gpt-4o",
-        promptTokens: wrapped.promptTokens,
-        completionTokens: wrapped.completionTokens,
-        costCents: wrapped.costCents,
-        imageWidth: imageMeta.width,
-        imageHeight: imageMeta.height,
-        imageBytes: imageBuffer.byteLength,
-        imageMime: imageFile.type || null,
-        endpoint: '/api/test-vision',
-      });
-    } catch {
-      // keep flow safe
-    }
+    logAiUsageEvent({
+      feature: 'medical-image:analysis',
+      scanId: `medical-${Date.now()}`,
+      userId: user.id || null,
+      userLabel: user.email || null,
+      model: "gpt-4o",
+      promptTokens: wrapped.promptTokens,
+      completionTokens: wrapped.completionTokens,
+      costCents: wrapped.costCents,
+      image: {
+        width: imageMeta.width,
+        height: imageMeta.height,
+        bytes: imageBuffer.byteLength,
+        mime: imageFile.type || null,
+      },
+      endpoint: '/api/test-vision',
+      success: true,
+    }).catch(() => {});
 
     const analysisRaw = wrapped.completion.choices[0]?.message?.content || '';
 
@@ -245,19 +242,6 @@ export async function POST(req: NextRequest) {
       }
     }
     
-    // Log AI usage for medical image analysis (fire-and-forget)
-    try {
-      await logAIUsage({
-        context: { feature: 'medical-image:analysis', userId: user.id },
-        model: "gpt-4o",
-        promptTokens: wrapped.promptTokens,
-        completionTokens: wrapped.completionTokens,
-        costCents: wrapped.costCents,
-      });
-    } catch {
-      // Logging errors should not impact the user
-    }
-
     // Update monthly counter (for all users, not just premium)
     await prisma.user.update({
       where: { id: user.id },

@@ -21,6 +21,7 @@ export default function AdminPanel() {
   const [visionUsage, setVisionUsage] = useState<any>(null)
   const [visionRecent, setVisionRecent] = useState<any[]>([])
   const [visionUsageRange, setVisionUsageRange] = useState(7)
+  const [visionUsageUserFilter, setVisionUsageUserFilter] = useState('')
   const [visionUsageLoading, setVisionUsageLoading] = useState(false)
   const [visionUsageError, setVisionUsageError] = useState('')
   
@@ -165,6 +166,15 @@ export default function AdminPanel() {
     }
   }, [])
 
+  // Auto-refresh AI usage when tab is active
+  useEffect(() => {
+    if (activeTab !== 'usage') return
+    const id = setInterval(() => {
+      loadVisionUsage()
+    }, 15000)
+    return () => clearInterval(id)
+  }, [activeTab, visionUsageRange, visionUsageUserFilter])
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -236,14 +246,19 @@ export default function AdminPanel() {
     }
   }
 
-  const loadVisionUsage = async (range?: number) => {
+  const loadVisionUsage = async (range?: number, userFilter?: string) => {
     const days = range ?? visionUsageRange
+    const filter = userFilter !== undefined ? userFilter : visionUsageUserFilter
     setVisionUsageRange(days)
+    setVisionUsageUserFilter(filter)
     setVisionUsageLoading(true)
     setVisionUsageError('')
     try {
       const authToken = sessionStorage.getItem('adminToken') || adminToken
-      const res = await fetch(`/api/admin/vision-usage?rangeDays=${days}`, {
+      const params = new URLSearchParams()
+      params.set('rangeDays', String(days))
+      if (filter) params.set('user', filter)
+      const res = await fetch(`/api/admin/vision-usage?${params.toString()}`, {
         headers: { Authorization: `Bearer ${authToken}` },
       })
       const data = await res.json()
@@ -1793,7 +1808,7 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                 <h2 className="text-xl font-semibold text-gray-900">AI Usage & Cost</h2>
                 <p className="text-sm text-gray-600">Feature + user breakdown, per-scan costs, trends, and MTD meter.</p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <label className="text-sm text-gray-600">Range</label>
                 <select
                   value={visionUsageRange}
@@ -1805,6 +1820,13 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                   <option value={30}>Last 30d</option>
                   <option value={90}>Last 90d</option>
                 </select>
+                <input
+                  value={visionUsageUserFilter}
+                  onChange={(e) => setVisionUsageUserFilter(e.target.value)}
+                  onBlur={() => loadVisionUsage(visionUsageRange, visionUsageUserFilter)}
+                  placeholder="Filter by user/email"
+                  className="border-gray-300 rounded-lg text-sm px-2 py-1"
+                />
                 <button
                   onClick={() => loadVisionUsage(visionUsageRange)}
                   className="px-3 py-2 bg-emerald-600 text-white rounded-md text-sm hover:bg-emerald-700"
@@ -1857,6 +1879,16 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                     <div className="text-2xl font-bold text-gray-800">{visionUsage.features || 0}</div>
                   </div>
                 </div>
+
+                {visionUsage?.spikeAlert && (
+                  <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-4">
+                    <div className="font-semibold">Daily cost spike detected</div>
+                    <div className="text-sm">
+                      Today: ${(Number(visionUsage.spikeAlert.todayCostCents || 0) / 100).toFixed(2)} vs Yesterday: ${(Number(visionUsage.spikeAlert.yesterdayCostCents || 0) / 100).toFixed(2)} (
+                      {Number(visionUsage.spikeAlert.increasePct || 0).toFixed(1)}% increase)
+                    </div>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -2018,7 +2050,7 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                       <div key={idx} className="p-4 flex flex-col gap-1">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <div className="text-sm font-semibold text-gray-900">
-                            {entry.scanId || entry.feature} • {entry.feature}
+                            {entry.scanId || entry.feature} • {entry.feature} {entry.expensive ? '🚨' : ''}
                           </div>
                           <div className="text-sm text-gray-700">
                             Cost: ${Number(entry.costUsd || 0).toFixed(4)} | Tokens: {entry.tokens?.toLocaleString?.() || entry.tokens}
