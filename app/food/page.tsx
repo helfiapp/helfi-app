@@ -5159,7 +5159,7 @@ Please add nutritional information manually if needed.`);
       {/* Backdrop to block clicks on entries while dropdown menus are open */}
       {(showPhotoOptions || showCategoryPicker) && (
         <div
-          className="fixed inset-0 z-30 bg-transparent pointer-events-auto"
+          className="fixed inset-0 z-30 bg-transparent pointer-events-none"
         />
       )}
 
