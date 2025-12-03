@@ -1980,31 +1980,15 @@ const applyStructuredItems = (
     [todaysFoods, historyFoods, isViewingToday, deletedEntryNonce, selectedDate],
   )
 
-  // Close dropdowns on outside click
+  // Close dropdowns on outside click (exclude add-food menu to avoid accidental closes)
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       const target = e.target as EventTarget | null;
       if (!(target instanceof Element)) return;
 
-      // Ignore clicks that originate inside the food add dropdown itself
-      if (target.closest('.food-options-dropdown')) {
-        return;
-      }
-      
       // Check if the click is inside any dropdown
       if (!target.closest('.dropdown-container')) {
         setDropdownOpen(false);
-      }
-      if (
-        !target.closest('.add-food-entry-container') &&
-        !target.closest('.category-add-button')
-      ) {
-        // Keep category add menus open on mobile unless the user taps the + toggle again
-        const isCategoryMenu = photoOptionsAnchor && photoOptionsAnchor !== 'global'
-        if (!(isMobile && isCategoryMenu)) {
-          setShowPhotoOptions(false);
-          setPhotoOptionsAnchor(null);
-        }
       }
       if (!target.closest('.entry-options-dropdown')) {
         setShowEntryOptions(null);
@@ -2016,11 +2000,11 @@ const applyStructuredItems = (
         setShowEditActionsMenu(false);
       }
     }
-    if (dropdownOpen || showPhotoOptions || showEntryOptions || showIngredientOptions || showEditActionsMenu) {
+    if (dropdownOpen || showEntryOptions || showIngredientOptions || showEditActionsMenu) {
       document.addEventListener('mousedown', handleClick);
       return () => document.removeEventListener('mousedown', handleClick);
     }
-  }, [dropdownOpen, showPhotoOptions, showEntryOptions, showIngredientOptions, showEditActionsMenu, isMobile, photoOptionsAnchor]);
+  }, [dropdownOpen, showEntryOptions, showIngredientOptions, showEditActionsMenu]);
 
   // Reset which ingredient card is expanded whenever we switch which entry is being edited.
   // Multi-ingredient meals will start with all cards collapsed; single-ingredient meals
@@ -5389,8 +5373,7 @@ Please add nutritional information manually if needed.`);
           {showCategoryPicker && (
             <div
               className="food-options-dropdown absolute top-full left-0 w-full sm:w-80 sm:left-auto sm:right-0 mt-2 z-50 max-h-[75vh] overflow-y-auto overscroll-contain"
-              onMouseDown={(e) => e.stopPropagation()}
-              onTouchStart={(e) => e.stopPropagation()}
+              onPointerDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
               onClick={(e) => e.stopPropagation()}
             >
               <div className="rounded-2xl shadow-2xl border border-gray-200 bg-white/95 backdrop-blur-xl overflow-hidden divide-y divide-gray-100">
@@ -5399,6 +5382,7 @@ Please add nutritional information manually if needed.`);
                   return (
                   <button
                     key={key}
+                    type="button"
                     className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
                     onClick={() => {
                       setSelectedAddCategory(key)
@@ -5427,14 +5411,14 @@ Please add nutritional information manually if needed.`);
           {showPhotoOptions && photoOptionsAnchor === 'global' && !showCategoryPicker && (
             <div
               className="food-options-dropdown absolute top-full left-0 w-full sm:w-80 sm:left-auto sm:right-0 mt-2 z-50 max-h-[75vh] overflow-y-auto overscroll-contain"
-              onMouseDown={(e) => e.stopPropagation()}
-              onTouchStart={(e) => e.stopPropagation()}
+              onPointerDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
               onClick={(e) => e.stopPropagation()}
             >
               <div className="rounded-2xl shadow-2xl border border-gray-200 bg-white/90 backdrop-blur-xl overflow-hidden">
                 <div className="divide-y divide-gray-100">
                   {/* Take Photo Option - Modern card */}
                   <button
+                    type="button"
                     className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
                     onClick={() => {
                       setPendingPhotoPicker(true);
@@ -5459,6 +5443,7 @@ Please add nutritional information manually if needed.`);
                   </button>
 
                   <button
+                    type="button"
                     onClick={() => {
                       setShowPhotoOptions(false);
                       setPhotoOptionsAnchor(null);
@@ -5481,6 +5466,7 @@ Please add nutritional information manually if needed.`);
                   </button>
 
                   <button
+                    type="button"
                     onClick={() => {
                       setShowPhotoOptions(false);
                       setPhotoOptionsAnchor(null);
@@ -5508,6 +5494,7 @@ Please add nutritional information manually if needed.`);
 
                   {/* Manual Entry Option */}
                   <button
+                    type="button"
                     onClick={() => {
                       setShowPhotoOptions(false);
                       setPhotoOptionsAnchor(null);
@@ -7989,13 +7976,13 @@ Please add nutritional information manually if needed.`);
                               isMobile ? (
                                 <div
                                   className="food-options-dropdown px-4 sm:px-6 mt-2 z-40"
-                                  onMouseDown={(e) => e.stopPropagation()}
-                                  onTouchStart={(e) => e.stopPropagation()}
+                                  onPointerDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
                                   onClick={(e) => e.stopPropagation()}
                                 >
                                   <div className="rounded-2xl shadow-2xl border border-gray-200 bg-white/95 backdrop-blur-xl overflow-hidden max-h-[70vh] overflow-y-auto overscroll-contain">
                                     <div className="divide-y divide-gray-100">
                                       <button
+                                        type="button"
                                         className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
                                         onClick={() => {
                                           setPendingPhotoPicker(true);
@@ -8020,6 +8007,7 @@ Please add nutritional information manually if needed.`);
                                       </button>
 
                                       <button
+                                        type="button"
                                         onClick={() => {
                                           setShowPhotoOptions(false);
                                           setPhotoOptionsAnchor(null);
@@ -8042,6 +8030,7 @@ Please add nutritional information manually if needed.`);
                                       </button>
 
                                       <button
+                                        type="button"
                                         onClick={() => {
                                           setShowPhotoOptions(false);
                                           setPhotoOptionsAnchor(null);
@@ -8067,6 +8056,7 @@ Please add nutritional information manually if needed.`);
                                       </button>
 
                                       <button
+                                        type="button"
                                         onClick={() => {
                                           setShowPhotoOptions(false);
                                           setPhotoOptionsAnchor(null);
@@ -8104,13 +8094,13 @@ Please add nutritional information manually if needed.`);
                               ) : (
                                 <div
                                   className="food-options-dropdown absolute left-0 right-0 top-full mt-2 z-50 px-4 sm:px-6 max-h-[75vh] overflow-y-auto overscroll-contain"
-                                  onMouseDown={(e) => e.stopPropagation()}
-                                  onTouchStart={(e) => e.stopPropagation()}
+                                  onPointerDown={(e) => { e.stopPropagation(); e.preventDefault(); }}
                                   onClick={(e) => e.stopPropagation()}
                                 >
                                   <div className="rounded-2xl shadow-2xl border border-gray-200 bg-white/95 backdrop-blur-xl overflow-hidden">
                                     <div className="divide-y divide-gray-100">
                                       <button
+                                        type="button"
                                         className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
                                         onClick={() => {
                                           setPendingPhotoPicker(true);
@@ -8135,6 +8125,7 @@ Please add nutritional information manually if needed.`);
                                       </button>
 
                                       <button
+                                        type="button"
                                         onClick={() => {
                                           setShowPhotoOptions(false);
                                           setPhotoOptionsAnchor(null);
@@ -8157,6 +8148,7 @@ Please add nutritional information manually if needed.`);
                                       </button>
 
                                       <button
+                                        type="button"
                                         onClick={() => {
                                           setShowPhotoOptions(false);
                                           setPhotoOptionsAnchor(null);
@@ -8182,6 +8174,7 @@ Please add nutritional information manually if needed.`);
                                       </button>
 
                                       <button
+                                        type="button"
                                         onClick={() => {
                                           setShowPhotoOptions(false);
                                           setPhotoOptionsAnchor(null);
