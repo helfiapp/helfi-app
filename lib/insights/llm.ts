@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { runChatCompletionWithLogging } from '../ai-usage-logger'
 
 const CACHE_TTL_MS = 1000 * 60 * 30
+const INSIGHTS_LLM_ENABLED = process.env.ENABLE_INSIGHTS_LLM === 'true'
 
 const insightCache = new Map<
   string,
@@ -12,6 +13,10 @@ const insightCache = new Map<
 let _openai: any = null
 
 function getOpenAIClient() {
+  if (!INSIGHTS_LLM_ENABLED) {
+    console.warn('[insights.llm] LLM disabled via ENABLE_INSIGHTS_LLM flag')
+    return null
+  }
   if (_openai) return _openai
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) {
