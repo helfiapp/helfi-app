@@ -1879,7 +1879,9 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                           {Object.entries<any>(visionUsage.featureSummary || {})
                             .sort((a, b) => Number((b[1] as any).costCents || 0) - Number((a[1] as any).costCents || 0))
                             .map(([feature, stats]) => {
-                              const models = Object.entries((stats as any).models || {}).sort((a, b) => b[1] - a[1])
+                              const models = (Object.entries((stats as any).models || {}) as Array<[string, any]>)
+                                .map(([k, v]) => [k, Number(v || 0)] as [string, number])
+                                .sort((a, b) => b[1] - a[1])
                               const topModel = models[0]?.[0] || 'n/a'
                               const res =
                                 (stats as any).maxWidth && (stats as any).maxHeight
