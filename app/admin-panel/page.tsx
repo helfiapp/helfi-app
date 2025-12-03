@@ -166,15 +166,6 @@ export default function AdminPanel() {
     }
   }, [])
 
-  // Auto-refresh AI usage when tab is active
-  useEffect(() => {
-    if (activeTab !== 'usage') return
-    const id = setInterval(() => {
-      loadVisionUsage()
-    }, 15000)
-    return () => clearInterval(id)
-  }, [activeTab, visionUsageRange, visionUsageUserFilter])
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
