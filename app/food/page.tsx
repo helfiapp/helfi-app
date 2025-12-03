@@ -5382,7 +5382,11 @@ Please add nutritional information manually if needed.`);
 
           {/* Category picker first */}
           {showCategoryPicker && (
-            <div className="food-options-dropdown absolute top-full left-0 w-full sm:w-80 sm:left-auto sm:right-0 mt-2 z-50 max-h-[75vh] overflow-y-auto overscroll-contain">
+            <div
+              className="food-options-dropdown absolute top-full left-0 w-full sm:w-80 sm:left-auto sm:right-0 mt-2 z-50 max-h-[75vh] overflow-y-auto overscroll-contain"
+              onMouseDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
+            >
               <div className="rounded-2xl shadow-2xl border border-gray-200 bg-white/95 backdrop-blur-xl overflow-hidden divide-y divide-gray-100">
                 {MEAL_CATEGORY_ORDER.map((key) => {
                   const label = categoryLabel(key)
@@ -5415,7 +5419,11 @@ Please add nutritional information manually if needed.`);
 
           {/* Simplified Dropdown Options */}
           {showPhotoOptions && photoOptionsAnchor === 'global' && !showCategoryPicker && (
-            <div className="food-options-dropdown absolute top-full left-0 w-full sm:w-80 sm:left-auto sm:right-0 mt-2 z-50 max-h-[75vh] overflow-y-auto overscroll-contain">
+            <div
+              className="food-options-dropdown absolute top-full left-0 w-full sm:w-80 sm:left-auto sm:right-0 mt-2 z-50 max-h-[75vh] overflow-y-auto overscroll-contain"
+              onMouseDown={(e) => e.stopPropagation()}
+              onTouchStart={(e) => e.stopPropagation()}
+            >
               <div className="rounded-2xl shadow-2xl border border-gray-200 bg-white/90 backdrop-blur-xl overflow-hidden">
                 <div className="divide-y divide-gray-100">
                   {/* Take Photo Option - Modern card */}
@@ -7972,7 +7980,11 @@ Please add nutritional information manually if needed.`);
 
                             {showPhotoOptions && photoOptionsAnchor === cat.key && !showCategoryPicker && (
                               isMobile ? (
-                                <div className="food-options-dropdown px-4 sm:px-6 mt-2 z-40">
+                                <div
+                                  className="food-options-dropdown px-4 sm:px-6 mt-2 z-40"
+                                  onMouseDown={(e) => e.stopPropagation()}
+                                  onTouchStart={(e) => e.stopPropagation()}
+                                >
                                   <div className="rounded-2xl shadow-2xl border border-gray-200 bg-white/95 backdrop-blur-xl overflow-hidden max-h-[70vh] overflow-y-auto overscroll-contain">
                                     <div className="divide-y divide-gray-100">
                                       <button
@@ -8082,7 +8094,11 @@ Please add nutritional information manually if needed.`);
                                   </div>
                                 </div>
                               ) : (
-                                <div className="food-options-dropdown absolute left-0 right-0 top-full mt-2 z-50 px-4 sm:px-6 max-h-[75vh] overflow-y-auto overscroll-contain">
+                                <div
+                                  className="food-options-dropdown absolute left-0 right-0 top-full mt-2 z-50 px-4 sm:px-6 max-h-[75vh] overflow-y-auto overscroll-contain"
+                                  onMouseDown={(e) => e.stopPropagation()}
+                                  onTouchStart={(e) => e.stopPropagation()}
+                                >
                                   <div className="rounded-2xl shadow-2xl border border-gray-200 bg-white/95 backdrop-blur-xl overflow-hidden">
                                     <div className="divide-y divide-gray-100">
                                       <button
