@@ -1167,6 +1167,12 @@ export default function FoodDiary() {
   const [showEntryOptions, setShowEntryOptions] = useState<string | null>(null)
   const [showIngredientOptions, setShowIngredientOptions] = useState<string | null>(null)
   const [photoOptionsAnchor, setPhotoOptionsAnchor] = useState<'global' | string | null>(null)
+  const [photoOptionsPosition, setPhotoOptionsPosition] = useState<{
+    top?: number
+    left?: number
+    width?: number
+    maxHeight?: number
+  } | null>(null)
   const [editingEntry, setEditingEntry] = useState<any>(null)
   const [originalEditingEntry, setOriginalEditingEntry] = useState<any>(null)
   const [showEditActionsMenu, setShowEditActionsMenu] = useState(false)
@@ -3716,6 +3722,7 @@ Please add nutritional information manually if needed.`);
     setShowPhotoOptions(false)
     setShowCategoryPicker(false)
     setPhotoOptionsAnchor(null)
+    setPhotoOptionsPosition(null)
     setPendingPhotoPicker(false)
     setShowAddFood(false)
   }
@@ -3725,6 +3732,37 @@ Please add nutritional information manually if needed.`);
     if (showPhotoOptions && photoOptionsAnchor === key) {
       closeAddMenus()
       return
+    }
+    if (!isMobile && typeof window !== 'undefined') {
+      const row = categoryRowRefs.current[key]
+      if (row) {
+        const rect = row.getBoundingClientRect()
+        const viewportHeight = window.innerHeight || 0
+        const viewportWidth = window.innerWidth || 0
+        const spaceBelow = viewportHeight - rect.bottom
+        const spaceAbove = rect.top
+        const desiredHeight = 400
+        const openUp = spaceBelow < desiredHeight && spaceAbove > spaceBelow
+        const maxHeight = Math.max(
+          240,
+          Math.min(openUp ? spaceAbove - 16 : spaceBelow - 16, 520)
+        )
+        const width = Math.min(rect.width, viewportWidth - 24)
+        const left = Math.max(12, Math.min(rect.left, viewportWidth - width - 12))
+        const top = openUp
+          ? Math.max(12, rect.top - maxHeight - 8)
+          : rect.bottom + 8
+        setPhotoOptionsPosition({
+          top,
+          left,
+          width,
+          maxHeight,
+        })
+      } else {
+        setPhotoOptionsPosition(null)
+      }
+    } else {
+      setPhotoOptionsPosition(null)
     }
     setSelectedAddCategory(key)
     setShowCategoryPicker(false)
@@ -3740,6 +3778,37 @@ Please add nutritional information manually if needed.`);
     if (showPhotoOptions && photoOptionsAnchor === key) {
       closeAddMenus()
       return
+    }
+    if (!isMobile && typeof window !== 'undefined') {
+      const row = categoryRowRefs.current[key]
+      if (row) {
+        const rect = row.getBoundingClientRect()
+        const viewportHeight = window.innerHeight || 0
+        const viewportWidth = window.innerWidth || 0
+        const spaceBelow = viewportHeight - rect.bottom
+        const spaceAbove = rect.top
+        const desiredHeight = 400
+        const openUp = spaceBelow < desiredHeight && spaceAbove > spaceBelow
+        const maxHeight = Math.max(
+          240,
+          Math.min(openUp ? spaceAbove - 16 : spaceBelow - 16, 520)
+        )
+        const width = Math.min(rect.width, viewportWidth - 24)
+        const left = Math.max(12, Math.min(rect.left, viewportWidth - width - 12))
+        const top = openUp
+          ? Math.max(12, rect.top - maxHeight - 8)
+          : rect.bottom + 8
+        setPhotoOptionsPosition({
+          top,
+          left,
+          width,
+          maxHeight,
+        })
+      } else {
+        setPhotoOptionsPosition(null)
+      }
+    } else {
+      setPhotoOptionsPosition(null)
     }
     // Otherwise open this category's add menu
     setSelectedAddCategory(key)
@@ -8088,9 +8157,15 @@ Please add nutritional information manually if needed.`);
                                 </div>
                                 ) : (
                                 <div
-                                  className="food-options-dropdown absolute left-0 right-0 top-full mt-2 z-50 px-4 sm:px-6 max-h-[75vh] overflow-y-auto overscroll-contain"
+                                  className="food-options-dropdown fixed z-50 px-4 sm:px-6 max-h-[75vh] overflow-y-auto overscroll-contain"
                                   onPointerDown={(e) => e.stopPropagation()}
                                   onClick={(e) => e.stopPropagation()}
+                                  style={{
+                                    top: photoOptionsPosition?.top,
+                                    left: photoOptionsPosition?.left,
+                                    width: photoOptionsPosition?.width,
+                                    maxHeight: photoOptionsPosition?.maxHeight,
+                                  }}
                                 >
                                   <div className="rounded-2xl shadow-2xl border border-gray-200 bg-white/95 backdrop-blur-xl overflow-hidden">
                                     <div className="divide-y divide-gray-100">
