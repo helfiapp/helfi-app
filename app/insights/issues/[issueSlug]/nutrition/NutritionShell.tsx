@@ -320,7 +320,11 @@ export default function NutritionShell({ children, initialResult, issueSlug }: N
           <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
             <div>
               <h2 className="text-lg font-semibold text-gray-900 mb-2">Nutrition report</h2>
-              <p className="text-sm text-gray-700 leading-relaxed">{result.summary}</p>
+              <p className="text-sm text-gray-700 leading-relaxed">
+                {result.summary && !result.summary.toLowerCase().includes('couldn’t generate')
+                  ? result.summary
+                  : 'No nutrition insights yet. Click “Generate Nutrition Insights” to create them using your latest food diary entries.'}
+              </p>
               <p className="text-xs text-gray-500 mt-3">
                 Generated {new Date(result.generatedAt).toLocaleString()} • Confidence {(result.confidence * 100).toFixed(0)}%
               </p>
