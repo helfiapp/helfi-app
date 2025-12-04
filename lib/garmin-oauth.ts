@@ -180,12 +180,7 @@ export async function deregisterGarminUser(accessToken: string, accessTokenSecre
     data,
   }
 
-  const headers = oauth.toHeader(
-    oauth.authorize(requestData, token, {
-      timestamp: Math.floor(Date.now() / 1000),
-      nonce: crypto.randomBytes(8).toString('hex'),
-    })
-  )
+  const headers = oauth.toHeader(oauth.authorize(requestData, token))
 
   return fetch(requestData.url, {
     method: 'DELETE',
