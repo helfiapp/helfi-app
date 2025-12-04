@@ -1,29 +1,34 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { useSession } from 'next-auth/react'
 import Link from 'next/link'
 import PageHeader from '@/components/PageHeader'
-import MobileMoreMenu from '@/components/MobileMoreMenu'
 import FitbitSummary from '@/components/devices/FitbitSummary'
 import FitbitCharts from '@/components/devices/FitbitCharts'
 import FitbitCorrelations from '@/components/devices/FitbitCorrelations'
 
 export default function DevicesPage() {
-  const { data: session } = useSession()
   const [fitbitConnected, setFitbitConnected] = useState(false)
   const [fitbitLoading, setFitbitLoading] = useState(false)
   const [syncingFitbit, setSyncingFitbit] = useState(false)
   const [popupOpen, setPopupOpen] = useState(false)
   const [checkingStatus, setCheckingStatus] = useState(false)
+  const [garminConnected, setGarminConnected] = useState(false)
+  const [garminLoading, setGarminLoading] = useState(false)
+  const [garminPopupOpen, setGarminPopupOpen] = useState(false)
+  const [garminCheckingStatus, setGarminCheckingStatus] = useState(false)
   const [loadingDemo, setLoadingDemo] = useState(false)
   const [clearingDemo, setClearingDemo] = useState(false)
   const popupRef = useRef<Window | null>(null)
   const checkIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const closedCheckRef = useRef<NodeJS.Timeout | null>(null)
+  const garminPopupRef = useRef<Window | null>(null)
+  const garminCheckIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const garminClosedCheckRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     checkFitbitStatus()
+    checkGarminStatus()
     
     // Check URL params for Fitbit connection result
     const params = new URLSearchParams(window.location.search)
@@ -35,6 +40,14 @@ export default function DevicesPage() {
       alert('Fitbit connection failed: ' + params.get('fitbit_error'))
       window.history.replaceState({}, '', '/devices')
     }
+    if (params.get('garmin_connected') === 'true') {
+      setGarminConnected(true)
+      window.history.replaceState({}, '', '/devices')
+    }
+    if (params.get('garmin_error')) {
+      alert('Garmin connection failed: ' + params.get('garmin_error'))
+      window.history.replaceState({}, '', '/devices')
+    }
 
     // Listen for messages from popup window
     const handleMessage = (event: MessageEvent) => {
@@ -44,6 +57,12 @@ export default function DevicesPage() {
       } else if (event.data?.type === 'FITBIT_ERROR') {
         alert('Fitbit connection failed: ' + event.data.error)
         setFitbitLoading(false)
+      } else if (event.data?.type === 'GARMIN_CONNECTED' && event.data.success) {
+        checkGarminStatus()
+        setGarminLoading(false)
+      } else if (event.data?.type === 'GARMIN_ERROR') {
+        alert('Garmin connection failed: ' + event.data.error)
+        setGarminLoading(false)
       }
     }
 
@@ -62,6 +81,21 @@ export default function DevicesPage() {
       return false
     } catch (error) {
       console.error('Error checking Fitbit status:', error)
+      return false
+    }
+  }
+
+  const checkGarminStatus = async () => {
+    try {
+      const response = await fetch('/api/garmin/status')
+      if (response.ok) {
+        const data = await response.json()
+        setGarminConnected(data.connected)
+        return data.connected
+      }
+      return false
+    } catch (error) {
+      console.error('Error checking Garmin status:', error)
       return false
     }
   }
@@ -197,6 +231,125 @@ export default function DevicesPage() {
     }
   }
 
+  const handleConnectGarmin = async () => {
+    setGarminLoading(true)
+    setGarminPopupOpen(true)
+    setGarminCheckingStatus(true)
+
+    try {
+      const width = 600
+      const height = 700
+      const left = window.screen.width / 2 - width / 2
+      const top = window.screen.height / 2 - height / 2
+
+      const popup = window.open(
+        '/api/auth/garmin/authorize',
+        'Garmin Authorization',
+        `width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no,scrollbars=yes,resizable=yes`
+      )
+
+      if (!popup) {
+        alert('Please allow popups for this site to connect Garmin')
+        setGarminLoading(false)
+        setGarminPopupOpen(false)
+        setGarminCheckingStatus(false)
+        return
+      }
+
+      garminPopupRef.current = popup
+
+      garminClosedCheckRef.current = setInterval(() => {
+        if (popup.closed) {
+          if (garminClosedCheckRef.current) {
+            clearInterval(garminClosedCheckRef.current)
+            garminClosedCheckRef.current = null
+          }
+          if (garminCheckIntervalRef.current) {
+            clearInterval(garminCheckIntervalRef.current)
+            garminCheckIntervalRef.current = null
+          }
+          setGarminLoading(false)
+          setGarminPopupOpen(false)
+          setGarminCheckingStatus(false)
+          setTimeout(() => checkGarminStatus(), 1000)
+        }
+      }, 500)
+
+      garminCheckIntervalRef.current = setInterval(async () => {
+        setGarminCheckingStatus(true)
+        const connected = await checkGarminStatus()
+        if (connected) {
+          if (garminClosedCheckRef.current) {
+            clearInterval(garminClosedCheckRef.current)
+            garminClosedCheckRef.current = null
+          }
+          if (garminCheckIntervalRef.current) {
+            clearInterval(garminCheckIntervalRef.current)
+            garminCheckIntervalRef.current = null
+          }
+          if (popup && !popup.closed) {
+            try {
+              popup.close()
+            } catch (e) {}
+          }
+          setGarminLoading(false)
+          setGarminPopupOpen(false)
+          setGarminCheckingStatus(false)
+        }
+      }, 1000)
+
+      setTimeout(() => {
+        if (garminClosedCheckRef.current) {
+          clearInterval(garminClosedCheckRef.current)
+          garminClosedCheckRef.current = null
+        }
+        if (garminCheckIntervalRef.current) {
+          clearInterval(garminCheckIntervalRef.current)
+          garminCheckIntervalRef.current = null
+        }
+        setGarminLoading(false)
+        setGarminPopupOpen(false)
+        setGarminCheckingStatus(false)
+      }, 180000)
+    } catch (error) {
+      console.error('Error connecting Garmin:', error)
+      alert('Failed to connect Garmin. Please try again.')
+      setGarminLoading(false)
+      setGarminPopupOpen(false)
+      setGarminCheckingStatus(false)
+    }
+  }
+
+  const handleCloseGarminPopupAndCheck = async () => {
+    if (garminPopupRef.current && !garminPopupRef.current.closed) {
+      try {
+        garminPopupRef.current.close()
+      } catch (e) {}
+    }
+
+    if (garminClosedCheckRef.current) {
+      clearInterval(garminClosedCheckRef.current)
+      garminClosedCheckRef.current = null
+    }
+    if (garminCheckIntervalRef.current) {
+      clearInterval(garminCheckIntervalRef.current)
+      garminCheckIntervalRef.current = null
+    }
+
+    setGarminPopupOpen(false)
+    setGarminCheckingStatus(true)
+
+    const connected = await checkGarminStatus()
+    if (connected) {
+      setGarminLoading(false)
+      setGarminCheckingStatus(false)
+    } else {
+      setGarminLoading(false)
+      setGarminCheckingStatus(false)
+      alert('Garmin connection not detected. Please try connecting again.')
+    }
+  }
+
   // Cleanup intervals on unmount
   useEffect(() => {
     return () => {
@@ -205,6 +358,12 @@ export default function DevicesPage() {
       }
       if (closedCheckRef.current) {
         clearInterval(closedCheckRef.current)
+      }
+      if (garminCheckIntervalRef.current) {
+        clearInterval(garminCheckIntervalRef.current)
+      }
+      if (garminClosedCheckRef.current) {
+        clearInterval(garminClosedCheckRef.current)
       }
     }
   }, [])
@@ -228,6 +387,28 @@ export default function DevicesPage() {
       alert('Failed to disconnect Fitbit. Please try again.')
     } finally {
       setFitbitLoading(false)
+    }
+  }
+
+  const handleDisconnectGarmin = async () => {
+    if (!confirm('Disconnect Garmin? This will stop new data from reaching Helfi.')) {
+      return
+    }
+
+    setGarminLoading(true)
+    try {
+      const response = await fetch('/api/garmin/status', { method: 'DELETE' })
+      if (response.ok) {
+        setGarminConnected(false)
+        alert('Garmin account disconnected successfully')
+      } else {
+        throw new Error('Failed to disconnect Garmin')
+      }
+    } catch (error) {
+      console.error('Error disconnecting Garmin:', error)
+      alert('Failed to disconnect Garmin. Please try again.')
+    } finally {
+      setGarminLoading(false)
     }
   }
 
@@ -494,15 +675,125 @@ export default function DevicesPage() {
           )}
         </div>
 
+        {/* Garmin Device Card */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 mb-6">
+          <div className="flex items-start justify-between mb-4">
+            <div className="flex items-center gap-4">
+              <div className="text-4xl">💪</div>
+              <div>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-1">Garmin (beta)</h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Connect Garmin to start receiving wellness data via secure webhooks.
+                </p>
+              </div>
+            </div>
+            {garminConnected && (
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                <span className="text-sm text-green-600 dark:text-green-400 font-medium">Connected</span>
+              </div>
+            )}
+          </div>
+
+          {garminPopupOpen && (
+            <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0">
+                  {garminCheckingStatus ? (
+                    <svg className="animate-spin h-5 w-5 text-blue-600 dark:text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  ) : (
+                    <div className="w-5 h-5 bg-blue-600 dark:bg-blue-400 rounded-full"></div>
+                  )}
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-1">
+                    {garminCheckingStatus ? 'Checking connection status...' : 'Popup window is open'}
+                  </p>
+                  <p className="text-xs text-blue-700 dark:text-blue-300 mb-3">
+                    Complete the Garmin login in the popup window. If it gets stuck, click below to close it and re-check.
+                  </p>
+                  <button
+                    onClick={handleCloseGarminPopupAndCheck}
+                    disabled={garminCheckingStatus}
+                    className="text-xs px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {garminCheckingStatus ? 'Checking...' : 'Close Popup & Check Status'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {garminConnected ? (
+            <div className="space-y-4">
+              <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                <p className="text-sm text-gray-700 dark:text-gray-300">
+                  Garmin is connected. Data will be delivered automatically via webhooks and logged for processing.
+                </p>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={handleDisconnectGarmin}
+                  disabled={garminLoading}
+                  className="px-4 py-2 border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                >
+                  Disconnect
+                </button>
+              </div>
+
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Webhook endpoint: <span className="font-mono">/api/garmin/webhook</span> (auto-registered). Data is stored in raw form for downstream mapping.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="p-4 bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-700 rounded-lg">
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                  Connect your Garmin account to allow Helfi to receive daily, sleep, and activity data directly from Garmin&apos;s Health API.
+                </p>
+                <button
+                  onClick={handleConnectGarmin}
+                  disabled={garminLoading}
+                  className="w-full px-4 py-3 bg-helfi-green text-white rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium flex items-center justify-center gap-2"
+                >
+                  {garminLoading ? (
+                    <>
+                      <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Connecting...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                      </svg>
+                      Connect Garmin
+                    </>
+                  )}
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                You&apos;ll be redirected to Garmin to approve access. We keep the popup open so you can continue browsing while you authorize.
+              </p>
+            </div>
+          )}
+        </div>
+
         {/* Coming Soon Devices */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Coming Soon</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
               { icon: '⌚', name: 'Apple Watch' },
-              { icon: '💪', name: 'Garmin' },
               { icon: '📱', name: 'Samsung Health' },
               { icon: '💍', name: 'Oura Ring' },
+              { icon: '🏃', name: 'Google Fit' },
             ].map((device) => (
               <div key={device.name} className="text-center p-4 border border-gray-200 dark:border-gray-700 rounded-lg opacity-50">
                 <div className="text-3xl mb-2">{device.icon}</div>
@@ -559,4 +850,3 @@ export default function DevicesPage() {
     </div>
   )
 }
-

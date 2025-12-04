@@ -40,6 +40,7 @@
     "jsonwebtoken": "^9.0.2",
     "next": "14.1.0",
     "next-auth": "^4.24.5",
+    "oauth-1.0a": "^2.2.6",
     "openai": "^5.7.0",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^5.4.394",

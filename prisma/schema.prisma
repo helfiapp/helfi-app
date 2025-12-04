@@ -66,6 +66,8 @@ model User {
   interactionAnalyses InteractionAnalysis[]
   creditTopUps        CreditTopUp[]
   fitbitData          FitbitData[]
+  garminRequestTokens GarminRequestToken[]
+  garminWebhookLogs   GarminWebhookLog[]
 
   // File relationships (PHASE 2 addition)
   uploadedFiles File[] @relation("UploadedFiles")
@@ -229,6 +231,33 @@ model FitbitData {
   @@unique([userId, date, dataType])
   @@index([userId, date])
   @@index([userId, dataType])
+}
+
+// Garmin OAuth handshake request tokens (short-lived)
+model GarminRequestToken {
+  id               String   @id @default(cuid())
+  userId           String
+  oauthToken       String   @unique
+  oauthTokenSecret String
+  createdAt        DateTime @default(now())
+  expiresAt        DateTime?
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// Raw Garmin webhook payloads for auditing/debugging
+model GarminWebhookLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  oauthToken String?
+  dataType   String?
+  payload    Json
+  receivedAt DateTime @default(now())
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([oauthToken])
+  @@index([userId])
 }
 
 model Subscription {
