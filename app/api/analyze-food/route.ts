@@ -268,6 +268,17 @@ const imageAnalysisCache = new Map<
   { analysis: string; items: any[] | null; total: any | null }
 >();
 
+// Detect when the AI returned a generic single card instead of per-component items
+const looksLikeSingleGenericItem = (items: any[] | null | undefined): boolean => {
+  if (!Array.isArray(items) || items.length !== 1) return false;
+  const item = items[0] || {};
+  const name = String(item.name || '').trim().toLowerCase();
+  const servingSize = String(item.serving_size || '').trim().toLowerCase();
+  const genericNames = ['meal', 'food', 'entry'];
+  const hasMinimalDetail = !servingSize || servingSize === '1 serving';
+  return genericNames.includes(name) || hasMinimalDetail;
+};
+
 // Initialize OpenAI client only when API key is available
 // Updated: 2025-06-26 - Ensure environment variable is properly loaded
 const getOpenAIClient = () => {
@@ -1076,6 +1087,60 @@ CRITICAL REQUIREMENTS:
           resp.total = resp.total || computeTotalsFromItems(resp.items) || null;
           console.log('ℹ️ Using fallback single-item card to keep editor usable');
         }
+      }
+    }
+
+    // If we still don't have meaningful per-component items (or only a generic "Meal" card)
+    // but the prompt was multi-detect capable, run a lightweight structure-only pass to
+    // force separate components. This keeps the ingredient cards usable when the primary
+    // model skips ITEMS_JSON.
+    if (
+      wantStructured &&
+      preferMultiDetect &&
+      (!resp.items || resp.items.length === 0 || looksLikeSingleGenericItem(resp.items))
+    ) {
+      try {
+        console.log('ℹ️ Enforcing multi-item breakdown via structure-only follow-up');
+        const hintTotal = resp.total || computeTotalsFromItems(resp.items || []) || null;
+        const followUp = await chatCompletionWithCost(openai, {
+          model: 'gpt-4o-mini',
+          messages: [
+            {
+              role: 'user',
+              content:
+                'Split this meal description into separate ingredients/components and return JSON only with this shape:\n' +
+                '{"items":[{"name":"string","brand":null,"serving_size":"string","servings":1,"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"sugar_g":0}],"total":{"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"sugar_g":0}}\n' +
+                '- Use realistic per-serving values for EACH component (eggs, bacon, bagel, juice, etc).\n' +
+                '- Keep servings to 1 by default and use household measures ("1 slice", "1 cup", "1 egg").\n' +
+                '- Do not collapse everything into a single "Meal" item. Return 1 item per distinct component.\n' +
+                (hintTotal
+                  ? `- Keep totals roughly consistent with Calories ${hintTotal.calories ?? 'unknown'} / Protein ${
+                      hintTotal.protein_g ?? 'unknown'
+                    }g / Carbs ${hintTotal.carbs_g ?? 'unknown'}g / Fat ${hintTotal.fat_g ?? 'unknown'}g.\n`
+                  : '') +
+                '\nAnalysis text:\n' +
+                analysis,
+            },
+          ],
+          max_tokens: 220,
+          temperature: 0,
+        } as any);
+
+        totalCostCents += followUp.costCents;
+        const text = followUp.completion.choices?.[0]?.message?.content?.trim() || '';
+        const cleaned = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+        const parsed = cleaned ? parseItemsJsonRelaxed(cleaned) : null;
+        if (parsed && typeof parsed === 'object') {
+          const items = Array.isArray(parsed.items) ? parsed.items : [];
+          const total = typeof parsed.total === 'object' ? parsed.total : null;
+          if (items.length > 1 || (items.length === 1 && !looksLikeSingleGenericItem(items))) {
+            resp.items = items;
+            resp.total = total || computeTotalsFromItems(items) || resp.total || null;
+            console.log('✅ Multi-item follow-up produced structured items:', items.length);
+          }
+        }
+      } catch (multiErr) {
+        console.warn('Multi-item follow-up failed (non-fatal):', multiErr);
       }
     }
 
