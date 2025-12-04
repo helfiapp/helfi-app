@@ -110,9 +110,9 @@ function DesktopSidebar() {
           
           <a
             href="/onboarding?step=1"
-            className="text-gray-700 hover:text-helfi-green hover:bg-gray-50 group flex items-center px-2 py-2 text-base font-medium rounded-md"
+            className="text-gray-100 hover:text-white hover:bg-gray-700/80 group flex items-center px-2 py-2 text-base font-medium rounded-md"
           >
-            <svg className="text-gray-400 group-hover:text-helfi-green mr-3 h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="text-gray-300 group-hover:text-white mr-3 h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
             </svg>
             Health Setup

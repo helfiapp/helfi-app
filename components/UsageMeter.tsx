@@ -204,8 +204,8 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
   return (
     <div className={`px-4 py-3 ${className}`}>
       <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Credits remaining</span>
-        <span className="text-xs font-semibold text-gray-900 dark:text-white">
+        <span className="text-xs font-medium text-white">Credits remaining</span>
+        <span className="text-xs font-semibold text-white">
           {creditsDisplay?.toLocaleString()}
         </span>
       </div>
@@ -218,12 +218,11 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
         />
       </div>
       {showResetDate && walletRefreshAt && (
-        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">
+        <p className="text-xs text-gray-200 mt-1.5">
           Resets {new Date(walletRefreshAt).toLocaleDateString()}
         </p>
       )}
     </div>
   )
 }
-
 
