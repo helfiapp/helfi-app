@@ -38,6 +38,7 @@ Before pushing ANY code changes to GitHub, you MUST:
 - **Vercel Dashboard**: https://vercel.com/louie-veleskis-projects/helfi-app/deployments
 - **Project Name**: `helfi-app`
 - **Team ID**: `team_DLxtczVMOZUXhiInxhTSDrCs`
+- **Food Analyzer Canary**: run `CANARY_AUTH_COOKIE="next-auth.session-token=..." node scripts/canary-food-analyzer.js` (optionally set `CANARY_BASE_URL`) to verify multi-item breakdown still works.
 
 ## After Pushing Code
 
@@ -57,4 +58,3 @@ git push origin master
 ---
 
 **Remember**: The user is counting on you to verify deployments. Don't skip this step.
-

@@ -1100,6 +1100,7 @@ CRITICAL REQUIREMENTS:
       (!resp.items || resp.items.length === 0 || looksLikeSingleGenericItem(resp.items))
     ) {
       try {
+        console.warn('⚠️ Photo analyzer: generic/missing items detected; running multi-item follow-up.');
         console.log('ℹ️ Enforcing multi-item breakdown via structure-only follow-up');
         const hintTotal = resp.total || computeTotalsFromItems(resp.items || []) || null;
         const followUp = await chatCompletionWithCost(openai, {
