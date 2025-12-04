@@ -105,6 +105,29 @@ const steps = [
   'review',
 ];
 
+type InsightChangeType =
+  | 'supplements'
+  | 'medications'
+  | 'food'
+  | 'exercise'
+  | 'health_goals'
+  | 'profile'
+  | 'blood_results';
+
+async function triggerTargetedInsightsRefresh(changeTypes: InsightChangeType[]) {
+  const unique = Array.from(new Set(changeTypes || [])).filter(Boolean) as InsightChangeType[];
+  if (!unique.length) return;
+  try {
+    await fetch('/api/insights/regenerate-targeted', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ changeTypes: unique }),
+    });
+  } catch (error) {
+    console.warn('Failed to trigger targeted insights regeneration', error);
+  }
+}
+
 // Track when the user chooses to continue without running Update Insights so navigation isn't blocked
 function useUnsavedNavigationAllowance(hasUnsavedChanges: boolean) {
   const [allowUnsavedNavigation, setAllowUnsavedNavigation] = useState(false);
@@ -508,6 +531,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
 
       if (response.ok) {
         setHasUnsavedChanges(false);
+        triggerTargetedInsightsRefresh(['profile']);
         setTimeout(() => {
           setShowUpdatePopup(false);
           setIsGeneratingInsights(false);
@@ -966,6 +990,7 @@ function ExerciseStep({ onNext, onBack, initial }: { onNext: (data: any) => void
       
       if (response.ok) {
         setHasUnsavedChanges(false);
+        triggerTargetedInsightsRefresh(['exercise']);
         setTimeout(() => {
           setShowUpdatePopup(false);
           setIsGeneratingInsights(false);
@@ -1431,6 +1456,7 @@ function HealthGoalsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
       ]);
       
       setHasUnsavedChanges(false);
+      triggerTargetedInsightsRefresh(['health_goals']);
       setTimeout(() => {
         setShowUpdatePopup(false);
         setIsGeneratingInsights(false);
@@ -1962,6 +1988,7 @@ function HealthSituationsStep({ onNext, onBack, initial }: { onNext: (data: any)
       
       if (response.ok) {
         setHasUnsavedChanges(false);
+        triggerTargetedInsightsRefresh(['blood_results']);
         setTimeout(() => {
           setShowUpdatePopup(false);
           setIsGeneratingInsights(false);
@@ -2505,6 +2532,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
         // Update local state
         setSupplements(supplementsToSave);
         setHasUnsavedChanges(false);
+        triggerTargetedInsightsRefresh(['supplements']);
         
         // Close popup after a short delay to show progress
         setTimeout(() => {
@@ -3476,6 +3504,7 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
         // Update local state
         setMedications(medicationsToSave);
         setHasUnsavedChanges(false);
+        triggerTargetedInsightsRefresh(['medications']);
         
         // Close popup after a short delay to show progress
         setTimeout(() => {

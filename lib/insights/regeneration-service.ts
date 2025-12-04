@@ -51,7 +51,7 @@ function createDataFingerprint(data: any): string {
 /**
  * Map change types to affected insight sections
  */
-function getAffectedSections(changeType: DataChangeEvent['changeType']): IssueSectionKey[] {
+export function getAffectedSections(changeType: DataChangeEvent['changeType']): IssueSectionKey[] {
   const mapping: Record<DataChangeEvent['changeType'], IssueSectionKey[]> = {
     supplements: ['supplements', 'interactions'],
     medications: ['medications', 'interactions'],
@@ -329,6 +329,78 @@ export async function triggerBackgroundRegeneration(event: DataChangeEvent): Pro
   } catch (error) {
     console.error('[regeneration-service] Error triggering regeneration', error)
   }
+}
+
+/**
+ * Manually trigger regeneration for selected change types, even when background
+ * regeneration is disabled. This is used for explicit "Update Insights" clicks
+ * so we only regenerate the affected sections.
+ */
+export async function triggerManualSectionRegeneration(
+  userId: string,
+  changeTypes: DataChangeEvent['changeType'][]
+): Promise<IssueSectionKey[]> {
+  const requestedTypes = Array.isArray(changeTypes) ? changeTypes : []
+  const affectedSections = Array.from(
+    new Set(
+      requestedTypes.flatMap((type) => getAffectedSections(type)).filter(Boolean)
+    )
+  )
+
+  if (!userId || affectedSections.length === 0) {
+    return []
+  }
+
+  try {
+    await markSectionsStale(userId, affectedSections)
+
+    setImmediate(async () => {
+      try {
+        await ensureMetadataTable()
+        const user = await prisma.user.findUnique({
+          where: { id: userId },
+          include: { healthGoals: true },
+        })
+
+        if (!user) return
+
+        const issueNames = user.healthGoals
+          .filter((g) => !g.name.startsWith('__'))
+          .map((g) => g.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'))
+
+        // Mark as generating
+        for (const issueSlug of issueNames) {
+          for (const section of affectedSections) {
+            await prisma.$queryRawUnsafe(
+              `UPDATE "InsightsMetadata" SET "status" = 'generating', "updatedAt" = NOW() 
+               WHERE "userId" = $1 AND "issueSlug" = $2 AND "section" = $3`,
+              userId,
+              issueSlug,
+              section
+            )
+          }
+        }
+
+        await precomputeIssueSectionsForUser(userId, { concurrency: 2, sectionsFilter: affectedSections })
+
+        for (const issueSlug of issueNames) {
+          for (const section of affectedSections) {
+            await updateMetadataAfterGeneration(userId, issueSlug, section)
+          }
+        }
+        console.log(`[manual-regeneration] Completed sections: ${affectedSections.join(', ')} for user ${userId}`)
+      } catch (error) {
+        console.error('[manual-regeneration] Failed to regenerate sections', error)
+        try {
+          await markSectionsStale(userId, affectedSections)
+        } catch {}
+      }
+    })
+  } catch (error) {
+    console.error('[manual-regeneration] Failed to start regeneration', error)
+  }
+
+  return affectedSections
 }
 
 /**
