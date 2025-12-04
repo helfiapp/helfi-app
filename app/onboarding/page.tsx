@@ -108,20 +108,41 @@ const steps = [
 // Track when the user chooses to continue without running Update Insights so navigation isn't blocked
 function useUnsavedNavigationAllowance(hasUnsavedChanges: boolean) {
   const [allowUnsavedNavigation, setAllowUnsavedNavigation] = useState(false);
+  const pendingActionRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     if (!hasUnsavedChanges && allowUnsavedNavigation) {
       setAllowUnsavedNavigation(false);
+      pendingActionRef.current = null;
     }
   }, [hasUnsavedChanges, allowUnsavedNavigation]);
 
   const acknowledgeUnsavedChanges = useCallback(() => {
     setAllowUnsavedNavigation(true);
+    const pending = pendingActionRef.current;
+    pendingActionRef.current = null;
+    if (pending) {
+      pending();
+    }
   }, []);
+
+  const requestNavigation = useCallback(
+    (action: () => void, triggerPopup: () => void) => {
+      if (hasUnsavedChanges && !allowUnsavedNavigation) {
+        pendingActionRef.current = action;
+        triggerPopup();
+        return;
+      }
+      action();
+    },
+    [hasUnsavedChanges, allowUnsavedNavigation],
+  );
 
   return {
     shouldBlockNavigation: hasUnsavedChanges && !allowUnsavedNavigation,
+    allowUnsavedNavigation,
     acknowledgeUnsavedChanges,
+    requestNavigation,
   };
 }
 
@@ -281,7 +302,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
-  const { shouldBlockNavigation, acknowledgeUnsavedChanges } = useUnsavedNavigationAllowance(hasUnsavedChanges);
+  const { shouldBlockNavigation, allowUnsavedNavigation, acknowledgeUnsavedChanges, requestNavigation } = useUnsavedNavigationAllowance(hasUnsavedChanges);
 
   const parseNumber = (value: string): number | null => {
     if (!value) return null;
@@ -408,7 +429,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
   // Warn if the user tries to close the tab or browser with unsaved changes
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (hasUnsavedChanges) {
+      if (shouldBlockNavigation) {
         e.preventDefault();
         e.returnValue =
           'You have unsaved changes. Please update your insights before leaving.';
@@ -418,7 +439,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [hasUnsavedChanges]);
+  }, [shouldBlockNavigation]);
 
   // Expose unsaved state globally so the header "Go To Dashboard" link can respect it
   useEffect(() => {
@@ -489,24 +510,18 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
     }
   };
 
-  const handleNextWithGuard = () => {
-    if (shouldBlockNavigation) {
-      if (!showUpdatePopup) {
-        setShowUpdatePopup(true);
-      }
-      return;
+  const triggerPopup = () => {
+    if (!showUpdatePopup) {
+      setShowUpdatePopup(true);
     }
-    handleNext();
+  };
+
+  const handleNextWithGuard = () => {
+    requestNavigation(handleNext, triggerPopup);
   };
 
   const handleBackWithGuard = () => {
-    if (shouldBlockNavigation) {
-      if (!showUpdatePopup) {
-        setShowUpdatePopup(true);
-      }
-      return;
-    }
-    onBack();
+    requestNavigation(onBack, triggerPopup);
   };
 
   const handleUnitChange = useCallback(
@@ -825,22 +840,26 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
       <div className="flex justify-between">
         <button className="border border-green-600 text-green-600 px-6 py-3 rounded-lg hover:bg-green-600 hover:text-white transition-colors" onClick={handleBackWithGuard}>Back</button>
         <div className="flex space-x-3">
-          <button 
-            className="text-gray-600 hover:text-gray-900 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors"
-            onClick={() =>
-              onNext({
-                weight: weight || '0',
-                height: height || '0',
-                feet: feet || '0',
-                inches: inches || '0',
-                bodyType: bodyType || 'not specified',
-                unit,
-                birthdate: birthdate || '',
-              })
-            }
-          >
-            Skip
-          </button>
+        <button 
+          className="text-gray-600 hover:text-gray-900 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+          onClick={() =>
+            requestNavigation(
+              () =>
+                onNext({
+                  weight: weight || '0',
+                  height: height || '0',
+                  feet: feet || '0',
+                  inches: inches || '0',
+                  bodyType: bodyType || 'not specified',
+                  unit,
+                  birthdate: birthdate || '',
+                }),
+              triggerPopup,
+            )
+          }
+        >
+          Skip
+        </button>
           <button 
             className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors" 
             onClick={handleNextWithGuard}
@@ -875,7 +894,7 @@ function ExerciseStep({ onNext, onBack, initial }: { onNext: (data: any) => void
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
-  const { shouldBlockNavigation, acknowledgeUnsavedChanges } = useUnsavedNavigationAllowance(hasUnsavedChanges);
+  const { shouldBlockNavigation, allowUnsavedNavigation, acknowledgeUnsavedChanges, requestNavigation } = useUnsavedNavigationAllowance(hasUnsavedChanges);
 
   const handleDurationChange = (type: string, value: string) => {
     setExerciseDurations((prev) => {
@@ -915,7 +934,7 @@ function ExerciseStep({ onNext, onBack, initial }: { onNext: (data: any) => void
   // Prevent browser navigation when there are unsaved changes
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (hasUnsavedChanges) {
+      if (shouldBlockNavigation) {
         e.preventDefault();
         e.returnValue = 'You have unsaved changes. Please update your insights before leaving.';
         return e.returnValue;
@@ -924,7 +943,7 @@ function ExerciseStep({ onNext, onBack, initial }: { onNext: (data: any) => void
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [hasUnsavedChanges]);
+  }, [shouldBlockNavigation]);
 
   // Handle Update Insights button click
   const handleUpdateInsights = async () => {
@@ -958,28 +977,24 @@ function ExerciseStep({ onNext, onBack, initial }: { onNext: (data: any) => void
   };
 
   // Handle navigation with unsaved changes check
-  const handleNext = () => {
-    if (shouldBlockNavigation) {
-      if (!showUpdatePopup) {
-        setShowUpdatePopup(true);
-      }
-      return;
+  const triggerPopup = () => {
+    if (!showUpdatePopup) {
+      setShowUpdatePopup(true);
     }
-    onNext({
-      exerciseFrequency: exerciseFrequency || 'not specified',
-      exerciseTypes: exerciseTypes || [],
-      exerciseDurations,
-    });
+  };
+
+  const handleNext = () => {
+    requestNavigation(() => {
+      onNext({
+        exerciseFrequency: exerciseFrequency || 'not specified',
+        exerciseTypes: exerciseTypes || [],
+        exerciseDurations,
+      });
+    }, triggerPopup);
   };
 
   const handleBack = () => {
-    if (shouldBlockNavigation) {
-      if (!showUpdatePopup) {
-        setShowUpdatePopup(true);
-      }
-      return;
-    }
-    onBack();
+    requestNavigation(onBack, triggerPopup);
   };
 
   return (
@@ -1310,15 +1325,13 @@ function ExerciseStep({ onNext, onBack, initial }: { onNext: (data: any) => void
             <button 
               className="text-gray-600 hover:text-gray-900 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors"
               onClick={() => {
-                if (shouldBlockNavigation) {
-                  setShowUpdatePopup(true);
-                  return;
-                }
-                onNext({
-                  exerciseFrequency: exerciseFrequency || 'not specified',
-                  exerciseTypes: exerciseTypes || [],
-                  exerciseDurations,
-                });
+                requestNavigation(() => {
+                  onNext({
+                    exerciseFrequency: exerciseFrequency || 'not specified',
+                    exerciseTypes: exerciseTypes || [],
+                    exerciseDurations,
+                  });
+                }, triggerPopup);
               }}
             >
               Skip
@@ -1374,7 +1387,7 @@ function HealthGoalsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
-  const { shouldBlockNavigation, acknowledgeUnsavedChanges } = useUnsavedNavigationAllowance(hasUnsavedChanges);
+  const { shouldBlockNavigation, allowUnsavedNavigation, acknowledgeUnsavedChanges, requestNavigation } = useUnsavedNavigationAllowance(hasUnsavedChanges);
 
   // Track changes from initial values
   useEffect(() => {
@@ -1388,7 +1401,7 @@ function HealthGoalsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
   // Prevent browser navigation when there are unsaved changes
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (hasUnsavedChanges) {
+      if (shouldBlockNavigation) {
         e.preventDefault();
         e.returnValue = 'You have unsaved changes. Please update your insights before leaving.';
         return e.returnValue;
@@ -1397,7 +1410,7 @@ function HealthGoalsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [hasUnsavedChanges]);
+  }, [shouldBlockNavigation]);
 
   // Handle Update Insights button click
   const handleUpdateInsights = async () => {
@@ -1547,107 +1560,110 @@ function HealthGoalsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
   };
 
   const handleNext = async () => {
-    // Check for unsaved changes first
-    if (shouldBlockNavigation) {
+    const triggerPopup = () => {
       if (!showUpdatePopup) {
         setShowUpdatePopup(true);
       }
-      return;
-    }
+    };
 
-    // If check-ins feature is enabled, handle check-ins first to avoid step-5 flash
-    try {
-      if (process.env.NEXT_PUBLIC_CHECKINS_ENABLED === 'true') {
-        const allIssues = [...goals, ...customGoals].map((name: string) => ({ name }));
-        // Fire-and-forget: snapshot selected issues for Insights fallback
-        try {
-          const currentNames = allIssues.map(i => i.name.trim()).filter(Boolean)
-          if (currentNames.length) {
-            fetch('/api/user-data', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ goals: currentNames })
-            }).catch(() => {})
-          }
-        } catch {}
-        // Kick off previous list load in parallel to minimize latency
-        const previousPromise = (async () => {
+    const proceed = async () => {
+      try {
+        if (process.env.NEXT_PUBLIC_CHECKINS_ENABLED === 'true') {
+          const allIssues = [...goals, ...customGoals].map((name: string) => ({ name }));
+          // Fire-and-forget: snapshot selected issues for Insights fallback
           try {
-            const prevRes = await fetch('/api/checkins/issues', { cache: 'no-store' as any })
-            if (prevRes.ok) {
-              const prevJson = await prevRes.json()
-              return Array.isArray(prevJson?.issues)
-                ? prevJson.issues.map((i: any) => String(i.name || '').trim()).filter(Boolean)
-                : []
+            const currentNames = allIssues.map(i => i.name.trim()).filter(Boolean)
+            if (currentNames.length) {
+              fetch('/api/user-data', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ goals: currentNames })
+              }).catch(() => {})
             }
           } catch {}
-          return [] as string[]
-        })()
+          // Kick off previous list load in parallel to minimize latency
+          const previousPromise = (async () => {
+            try {
+              const prevRes = await fetch('/api/checkins/issues', { cache: 'no-store' as any })
+              if (prevRes.ok) {
+                const prevJson = await prevRes.json()
+                return Array.isArray(prevJson?.issues)
+                  ? prevJson.issues.map((i: any) => String(i.name || '').trim()).filter(Boolean)
+                  : []
+              }
+            } catch {}
+            return [] as string[]
+          })()
 
-        if (allIssues.length) {
-          // Save current issues; only await this (single request) then navigate
-          await fetch('/api/checkins/issues', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ issues: allIssues })
-          }).catch(() => {});
-        }
-        // If settings already exist, skip prompts entirely
-        let hasSettings = false
-        try {
-          const s = await fetch('/api/checkins/settings', { cache: 'no-store' as any })
-          if (s.ok) {
-            const j = await s.json()
-            if (j && (j.time1 || j.frequency)) hasSettings = true
-          }
-        } catch {}
-
-        if (!hasSettings) {
-          // First-time onboarding: progress the local step state too
-          onNext({ goals, customGoals });
-          // Only ask once when not configured
-          const enable = window.confirm(
-            'Daily Check‑ins\n\nTrack how you are going 1–3 times a day. This helps AI understand your progress and improves future reports.\n\nEnable now? (You can change this later in Settings)'
-          );
-          if (enable) {
-            const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-            const t1 = window.prompt('Lunch reminder time (HH:MM)', '12:30') || '12:30';
-            const t2 = window.prompt('Evening reminder time (HH:MM)', '18:30') || '18:30';
-            const t3 = window.prompt('Bedtime reminder time (HH:MM)', '21:30') || '21:30';
-            await fetch('/api/checkins/settings', {
+          if (allIssues.length) {
+            // Save current issues; only await this (single request) then navigate
+            await fetch('/api/checkins/issues', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ time1: t1, time2: t2, time3: t3, timezone: tz, frequency: 3 })
+              body: JSON.stringify({ issues: allIssues })
             }).catch(() => {});
           }
-        } // else: returning user, do not advance step here
-        // Compute newly added names compared to previous selection
-        const currentNames = allIssues.map(i => i.name.trim())
-        const previousNames = await previousPromise
-        const prevSet = new Set(previousNames.map((n: string) => n.toLowerCase()))
-        const newlyAdded = currentNames.filter(n => !prevSet.has(n.toLowerCase()))
-        const query = newlyAdded.length ? ('?new=' + encodeURIComponent(newlyAdded.join('|'))) : ''
-        // Navigate instantly; avoid intermediate step-5 flash by replacing instead of normal navigation
-        window.location.replace('/check-in' + query);
-        return
+          // If settings already exist, skip prompts entirely
+          let hasSettings = false
+          try {
+            const s = await fetch('/api/checkins/settings', { cache: 'no-store' as any })
+            if (s.ok) {
+              const j = await s.json()
+              if (j && (j.time1 || j.frequency)) hasSettings = true
+            }
+          } catch {}
+
+          if (!hasSettings) {
+            // First-time onboarding: progress the local step state too
+            onNext({ goals, customGoals });
+            // Only ask once when not configured
+            const enable = window.confirm(
+              'Daily Check‑ins\n\nTrack how you are going 1–3 times a day. This helps AI understand your progress and improves future reports.\n\nEnable now? (You can change this later in Settings)'
+            );
+            if (enable) {
+              const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+              const t1 = window.prompt('Lunch reminder time (HH:MM)', '12:30') || '12:30';
+              const t2 = window.prompt('Evening reminder time (HH:MM)', '18:30') || '18:30';
+              const t3 = window.prompt('Bedtime reminder time (HH:MM)', '21:30') || '21:30';
+              await fetch('/api/checkins/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ time1: t1, time2: t2, time3: t3, timezone: tz, frequency: 3 })
+              }).catch(() => {});
+            }
+          } // else: returning user, do not advance step here
+          // Compute newly added names compared to previous selection
+          const currentNames = allIssues.map(i => i.name.trim())
+          const previousNames = await previousPromise
+          const prevSet = new Set(previousNames.map((n: string) => n.toLowerCase()))
+          const newlyAdded = currentNames.filter(n => !prevSet.has(n.toLowerCase()))
+          const query = newlyAdded.length ? ('?new=' + encodeURIComponent(newlyAdded.join('|'))) : ''
+          // Navigate instantly; avoid intermediate step-5 flash by replacing instead of normal navigation
+          window.location.replace('/check-in' + query);
+          return
+        }
+      } catch (e) {
+        // Silently ignore; onboarding should not break
+        console.warn('check-ins prompt error', e);
       }
-    } catch (e) {
-      // Silently ignore; onboarding should not break
-      console.warn('check-ins prompt error', e);
-    }
-    // Fallback if feature is disabled or an error occurred
-    // Fire-and-forget: snapshot selected issues for Insights fallback when check-ins are disabled
-    try {
-      const currentNames = [...goals, ...customGoals].map((n: string) => n.trim()).filter(Boolean)
-      if (currentNames.length) {
-        fetch('/api/user-data', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ goals: currentNames })
-        }).catch(() => {})
-      }
-    } catch {}
-    onNext({ goals, customGoals });
+      // Fallback if feature is disabled or an error occurred
+      // Fire-and-forget: snapshot selected issues for Insights fallback when check-ins are disabled
+      try {
+        const currentNames = [...goals, ...customGoals].map((n: string) => n.trim()).filter(Boolean)
+        if (currentNames.length) {
+          fetch('/api/user-data', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ goals: currentNames })
+          }).catch(() => {})
+        }
+      } catch {}
+      onNext({ goals, customGoals });
+    };
+
+    requestNavigation(() => {
+      proceed();
+    }, triggerPopup);
   };
 
   const handleBack = () => {
@@ -1902,7 +1918,7 @@ function HealthSituationsStep({ onNext, onBack, initial }: { onNext: (data: any)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
-  const { shouldBlockNavigation, acknowledgeUnsavedChanges } = useUnsavedNavigationAllowance(hasUnsavedChanges);
+  const { shouldBlockNavigation, allowUnsavedNavigation, acknowledgeUnsavedChanges, requestNavigation } = useUnsavedNavigationAllowance(hasUnsavedChanges);
 
   // Track changes from initial values
   useEffect(() => {
@@ -1918,7 +1934,7 @@ function HealthSituationsStep({ onNext, onBack, initial }: { onNext: (data: any)
   // Prevent browser navigation when there are unsaved changes
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (hasUnsavedChanges) {
+      if (shouldBlockNavigation) {
         e.preventDefault();
         e.returnValue = 'You have unsaved changes. Please update your insights before leaving.';
         return e.returnValue;
@@ -1927,7 +1943,7 @@ function HealthSituationsStep({ onNext, onBack, initial }: { onNext: (data: any)
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [hasUnsavedChanges]);
+  }, [shouldBlockNavigation]);
 
   // Handle Update Insights button click
   const handleUpdateInsights = async () => {
@@ -1963,42 +1979,33 @@ function HealthSituationsStep({ onNext, onBack, initial }: { onNext: (data: any)
     }
   };
 
-  const handleNext = () => {
-    if (shouldBlockNavigation) {
-      if (!showUpdatePopup) {
-        setShowUpdatePopup(true);
-      }
-      return;
+  const triggerPopup = () => {
+    if (!showUpdatePopup) {
+      setShowUpdatePopup(true);
     }
-    const healthSituationsData = { 
-      healthIssues: healthIssues.trim(), 
-      healthProblems: healthProblems.trim(),
-      additionalInfo: additionalInfo.trim(),
-      skipped 
-    };
-    // Pass data in the correct format expected by the API
-    onNext({ healthSituations: healthSituationsData });
+  };
+
+  const handleNext = () => {
+    requestNavigation(() => {
+      const healthSituationsData = { 
+        healthIssues: healthIssues.trim(), 
+        healthProblems: healthProblems.trim(),
+        additionalInfo: additionalInfo.trim(),
+        skipped 
+      };
+      onNext({ healthSituations: healthSituationsData });
+    }, triggerPopup);
   };
 
   const handleBack = () => {
-    if (shouldBlockNavigation) {
-      if (!showUpdatePopup) {
-        setShowUpdatePopup(true);
-      }
-      return;
-    }
-    onBack();
+    requestNavigation(onBack, triggerPopup);
   };
 
   const handleSkip = () => {
-    if (shouldBlockNavigation) {
-      if (!showUpdatePopup) {
-        setShowUpdatePopup(true);
-      }
-      return;
-    }
-    setSkipped(true);
-    onNext({ healthSituations: { skipped: true, healthIssues: '', healthProblems: '', additionalInfo: '' } });
+    requestNavigation(() => {
+      setSkipped(true);
+      onNext({ healthSituations: { skipped: true, healthIssues: '', healthProblems: '', additionalInfo: '' } });
+    }, triggerPopup);
   };
 
   return (
@@ -2143,6 +2150,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
   const [imageQualityWarning, setImageQualityWarning] = useState<{front?: string, back?: string}>({});
+  const { shouldBlockNavigation, allowUnsavedNavigation, acknowledgeUnsavedChanges, requestNavigation } = useUnsavedNavigationAllowance(hasUnsavedChanges);
   const { shouldBlockNavigation, acknowledgeUnsavedChanges } = useUnsavedNavigationAllowance(hasUnsavedChanges);
   
   // Populate form fields when editing starts
@@ -2291,7 +2299,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
   // Prevent browser navigation when there are unsaved changes
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (hasUnsavedChanges) {
+      if (shouldBlockNavigation) {
         e.preventDefault();
         e.returnValue = 'You have unsaved changes. Please update your insights before leaving.';
         return e.returnValue;
@@ -2300,7 +2308,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [hasUnsavedChanges]);
+  }, [shouldBlockNavigation]);
 
   // Check for existing interaction analysis
   useEffect(() => {
@@ -2526,26 +2534,20 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
   };
   
   // Handle navigation with unsaved changes check
-  const handleNext = () => {
-    if (shouldBlockNavigation) {
-      // Show popup if it's not already showing
-      if (!showUpdatePopup) {
-        setShowUpdatePopup(true);
-      }
-      return;
+  const triggerPopup = () => {
+    if (!showUpdatePopup) {
+      setShowUpdatePopup(true);
     }
-    onNext({ supplements: supplementsToSave && supplementsToSave.length ? supplementsToSave : supplements });
+  };
+
+  const handleNext = () => {
+    requestNavigation(() => {
+      onNext({ supplements: supplementsToSave && supplementsToSave.length ? supplementsToSave : supplements });
+    }, triggerPopup);
   };
   
   const handleBack = () => {
-    if (shouldBlockNavigation) {
-      // Show popup if it's not already showing
-      if (!showUpdatePopup) {
-        setShowUpdatePopup(true);
-      }
-      return;
-    }
-    onBack();
+    requestNavigation(onBack, triggerPopup);
   };
 
   const clearForm = () => {
@@ -3163,7 +3165,7 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
   const [imageQualityWarning, setImageQualityWarning] = useState<{front?: string, back?: string}>({});
-  const { shouldBlockNavigation, acknowledgeUnsavedChanges } = useUnsavedNavigationAllowance(hasUnsavedChanges);
+  const { shouldBlockNavigation, allowUnsavedNavigation, acknowledgeUnsavedChanges, requestNavigation } = useUnsavedNavigationAllowance(hasUnsavedChanges);
   
   // Populate form fields when editing starts
   useEffect(() => {
@@ -3311,7 +3313,7 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
   // Prevent browser navigation when there are unsaved changes
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (hasUnsavedChanges) {
+      if (shouldBlockNavigation) {
         e.preventDefault();
         e.returnValue = 'You have unsaved changes. Please update your insights before leaving.';
         return e.returnValue;
@@ -3320,7 +3322,7 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [hasUnsavedChanges]);
+  }, [shouldBlockNavigation]);
 
   // Check for existing interaction analysis
   useEffect(() => {
@@ -3511,26 +3513,20 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
   };
   
   // Handle navigation with unsaved changes check
-  const handleNext = () => {
-    if (shouldBlockNavigation) {
-      // Show popup if it's not already showing
-      if (!showUpdatePopup) {
-        setShowUpdatePopup(true);
-      }
-      return;
+  const triggerPopup = () => {
+    if (!showUpdatePopup) {
+      setShowUpdatePopup(true);
     }
-    onNext({ medications: medicationsToSave && medicationsToSave.length ? medicationsToSave : medications });
+  };
+
+  const handleNext = () => {
+    requestNavigation(() => {
+      onNext({ medications: medicationsToSave && medicationsToSave.length ? medicationsToSave : medications });
+    }, triggerPopup);
   };
   
   const handleBack = () => {
-    if (shouldBlockNavigation) {
-      // Show popup if it's not already showing
-      if (!showUpdatePopup) {
-        setShowUpdatePopup(true);
-      }
-      return;
-    }
-    onBack();
+    requestNavigation(onBack, triggerPopup);
   };
 
   const clearMedForm = () => {
@@ -4113,7 +4109,7 @@ function BloodResultsStep({ onNext, onBack, initial }: { onNext: (data: any) => 
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
-  const { shouldBlockNavigation, acknowledgeUnsavedChanges } = useUnsavedNavigationAllowance(hasUnsavedChanges);
+  const { shouldBlockNavigation, allowUnsavedNavigation, acknowledgeUnsavedChanges, requestNavigation } = useUnsavedNavigationAllowance(hasUnsavedChanges);
 
   // Track changes from initial values
   useEffect(() => {
@@ -4131,7 +4127,7 @@ function BloodResultsStep({ onNext, onBack, initial }: { onNext: (data: any) => 
   // Prevent browser navigation when there are unsaved changes
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (hasUnsavedChanges) {
+      if (shouldBlockNavigation) {
         e.preventDefault();
         e.returnValue = 'You have unsaved changes. Please update your insights before leaving.';
         return e.returnValue;
@@ -4140,7 +4136,7 @@ function BloodResultsStep({ onNext, onBack, initial }: { onNext: (data: any) => 
 
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [hasUnsavedChanges]);
+  }, [shouldBlockNavigation]);
 
   // Handle Update Insights button click
   const handleUpdateInsights = async () => {
@@ -4194,43 +4190,34 @@ function BloodResultsStep({ onNext, onBack, initial }: { onNext: (data: any) => 
     }
   };
 
-  const handleNext = () => {
-    if (shouldBlockNavigation) {
-      if (!showUpdatePopup) {
-        setShowUpdatePopup(true);
-      }
-      return;
+  const triggerPopup = () => {
+    if (!showUpdatePopup) {
+      setShowUpdatePopup(true);
     }
-    const bloodResultsData = {
-      uploadMethod,
-      documents: documents.filter(f => f != null).map(f => f.name),
-      images: images.filter(f => f != null).map(f => f.name),
-      notes: notes.trim(),
-      skipped
-    };
-    // Pass data in the correct format expected by the API
-    onNext({ bloodResults: bloodResultsData });
+  };
+
+  const handleNext = () => {
+    requestNavigation(() => {
+      const bloodResultsData = {
+        uploadMethod,
+        documents: documents.filter(f => f != null).map(f => f.name),
+        images: images.filter(f => f != null).map(f => f.name),
+        notes: notes.trim(),
+        skipped
+      };
+      onNext({ bloodResults: bloodResultsData });
+    }, triggerPopup);
   };
 
   const handleBack = () => {
-    if (shouldBlockNavigation) {
-      if (!showUpdatePopup) {
-        setShowUpdatePopup(true);
-      }
-      return;
-    }
-    onBack();
+    requestNavigation(onBack, triggerPopup);
   };
 
   const handleSkip = () => {
-    if (shouldBlockNavigation) {
-      if (!showUpdatePopup) {
-        setShowUpdatePopup(true);
-      }
-      return;
-    }
-    setSkipped(true);
-    onNext({ bloodResults: { skipped: true, uploadMethod: 'documents', documents: [], images: [], notes: '' } });
+    requestNavigation(() => {
+      setSkipped(true);
+      onNext({ bloodResults: { skipped: true, uploadMethod: 'documents', documents: [], images: [], notes: '' } });
+    }, triggerPopup);
   };
 
   return (
