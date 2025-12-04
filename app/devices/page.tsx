@@ -628,7 +628,7 @@ export default function DevicesPage() {
                 <button
                   onClick={handleConnectFitbit}
                   disabled={fitbitLoading}
-                  className="w-full px-4 py-3 bg-helfi-green text-white rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium flex items-center justify-center gap-2"
+                  className="w-full sm:w-auto px-4 py-2 bg-helfi-green text-white rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium flex items-center justify-center gap-2"
                 >
                   {fitbitLoading ? (
                     <>
@@ -759,7 +759,7 @@ export default function DevicesPage() {
                 <button
                   onClick={handleConnectGarmin}
                   disabled={garminLoading}
-                  className="w-full px-4 py-3 bg-helfi-green text-white rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium flex items-center justify-center gap-2"
+                  className="w-full sm:w-auto px-4 py-2 bg-helfi-green text-white rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium flex items-center justify-center gap-2"
                 >
                   {garminLoading ? (
                     <>
