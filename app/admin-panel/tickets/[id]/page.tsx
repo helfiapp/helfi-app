@@ -293,7 +293,7 @@ export default function TicketPage() {
             <div className="h-6 w-px bg-gray-300"></div>
             <div className="flex items-center space-x-3">
               <Image
-                src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/HELFI_TRANSPARENT_rmssry.png"
+                src="/mobile-assets/LOGOS/helfi-01-01.png"
                 alt="Helfi Logo"
                 width={32}
                 height={32}

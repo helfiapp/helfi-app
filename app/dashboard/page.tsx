@@ -390,7 +390,7 @@ export default function Dashboard() {
           <div className="md:hidden flex items-center justify-between mb-3">
             <Link href="/" className="w-20 h-20 cursor-pointer hover:opacity-80 transition-opacity">
               <Image
-                src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/HELFI_TRANSPARENT_rmssry.png"
+                src="/mobile-assets/LOGOS/helfi-01-01.png"
                 alt="Helfi Logo"
                 width={72}
                 height={72}
@@ -475,7 +475,7 @@ export default function Dashboard() {
             <div className="flex items-center">
             <Link href="/" className="w-20 h-20 md:w-24 md:h-24 cursor-pointer hover:opacity-80 transition-opacity">
               <Image
-                src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/HELFI_TRANSPARENT_rmssry.png"
+                src="/mobile-assets/LOGOS/helfi-01-01.png"
                 alt="Helfi Logo"
                 width={96}
                 height={96}

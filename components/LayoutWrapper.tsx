@@ -15,7 +15,7 @@ function DesktopSidebar() {
         <div className="flex items-center flex-shrink-0 px-4">
           <img
             className="h-12 w-auto"
-            src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/HELFI_TRANSPARENT_rmssry.png"
+            src="/mobile-assets/LOGOS/helfi-01-06.png"
             alt="Helfi"
           />
         </div>

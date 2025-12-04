@@ -143,7 +143,7 @@ export default function SplashPage() {
               className="w-28 h-28 md:w-40 md:h-40 cursor-pointer hover:opacity-80 transition-opacity"
             >
               <Image
-                src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/HELFI_TRANSPARENT_rmssry.png"
+                src="/mobile-assets/LOGOS/helfi-01-01.png"
                 alt="Helfi Logo"
                 width={160}
                 height={160}

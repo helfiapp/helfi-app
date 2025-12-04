@@ -1483,7 +1483,7 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
         <div className="max-w-md w-full bg-white rounded-lg shadow-md p-8">
           <div className="text-center mb-8">
             <Image
-              src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/HELFI_TRANSPARENT_rmssry.png"
+              src="/mobile-assets/LOGOS/helfi-01-01.png"
               alt="Helfi Logo"
               width={80}
               height={80}
@@ -1557,7 +1557,7 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center">
             <Image
-              src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/HELFI_TRANSPARENT_rmssry.png"
+              src="/mobile-assets/LOGOS/helfi-01-01.png"
               alt="Helfi Logo"
               width={40}
               height={40}

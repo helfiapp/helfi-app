@@ -117,7 +117,7 @@ export default function FAQPage() {
           <div className="flex items-center">
             <Link href="/" className="w-16 h-16 md:w-20 md:h-20 cursor-pointer hover:opacity-80 transition-opacity">
               <Image
-                src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/HELFI_TRANSPARENT_rmssry.png"
+                src="/mobile-assets/LOGOS/helfi-01-01.png"
                 alt="Helfi Logo"
                 width={80}
                 height={80}

@@ -248,7 +248,7 @@ export default function SignIn() {
           <div className="flex justify-center">
             <Link href="/" className="relative w-24 h-24">
               <Image
-                src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749261152/HELFI_TRANSPARENT_rmssry.png"
+                src="/mobile-assets/LOGOS/helfi-01-01.png"
                 alt="Helfi Logo"
                 fill
                 className="object-contain"

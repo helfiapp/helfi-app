@@ -19,7 +19,7 @@ self.addEventListener('push', (event) => {
     event.waitUntil(
       self.registration.showNotification(data.title || 'Helfi', {
         body: data.body || '',
-        icon: '/logo.svg',
+        icon: '/icons/app-192.png',
         data,
       }),
     );
@@ -28,7 +28,7 @@ self.addEventListener('push', (event) => {
     event.waitUntil(
       self.registration.showNotification('Daily check-in', {
         body: 'How were your selected health issues today? Tap to rate.',
-        icon: '/logo.svg',
+        icon: '/icons/app-192.png',
       }),
     );
   }
@@ -53,5 +53,4 @@ self.addEventListener('notificationclick', (event) => {
       }),
   );
 });
-
 
