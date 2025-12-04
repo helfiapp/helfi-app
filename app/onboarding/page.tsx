@@ -20,12 +20,14 @@ function UpdateInsightsPopup({
   isOpen, 
   onClose, 
   onUpdateInsights, 
-  isGenerating 
+  isGenerating,
+  onAddMore,
 }: { 
   isOpen: boolean
   onClose: () => void
   onUpdateInsights: () => void
   isGenerating: boolean
+  onAddMore?: () => void
 }) {
   if (!isOpen) return null;
 
@@ -71,7 +73,13 @@ function UpdateInsightsPopup({
             )}
           </button>
           <button
-            onClick={onClose}
+            onClick={() => {
+              if (onAddMore) {
+                onAddMore();
+              } else {
+                onClose();
+              }
+            }}
             disabled={isGenerating}
             className="w-full px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
             type="button"
@@ -96,6 +104,26 @@ const steps = [
   'aiInsights',
   'review',
 ];
+
+// Track when the user chooses to continue without running Update Insights so navigation isn't blocked
+function useUnsavedNavigationAllowance(hasUnsavedChanges: boolean) {
+  const [allowUnsavedNavigation, setAllowUnsavedNavigation] = useState(false);
+
+  useEffect(() => {
+    if (!hasUnsavedChanges && allowUnsavedNavigation) {
+      setAllowUnsavedNavigation(false);
+    }
+  }, [hasUnsavedChanges, allowUnsavedNavigation]);
+
+  const acknowledgeUnsavedChanges = useCallback(() => {
+    setAllowUnsavedNavigation(true);
+  }, []);
+
+  return {
+    shouldBlockNavigation: hasUnsavedChanges && !allowUnsavedNavigation,
+    acknowledgeUnsavedChanges,
+  };
+}
 
 // Navigation Button Components
 function RefreshButton() {
@@ -253,6 +281,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
+  const { shouldBlockNavigation, acknowledgeUnsavedChanges } = useUnsavedNavigationAllowance(hasUnsavedChanges);
 
   const parseNumber = (value: string): number | null => {
     if (!value) return null;
@@ -461,7 +490,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
   };
 
   const handleNextWithGuard = () => {
-    if (hasUnsavedChanges) {
+    if (shouldBlockNavigation) {
       if (!showUpdatePopup) {
         setShowUpdatePopup(true);
       }
@@ -471,7 +500,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
   };
 
   const handleBackWithGuard = () => {
-    if (hasUnsavedChanges) {
+    if (shouldBlockNavigation) {
       if (!showUpdatePopup) {
         setShowUpdatePopup(true);
       }
@@ -825,6 +854,10 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
         onClose={() => {
           setShowUpdatePopup(false);
         }}
+        onAddMore={() => {
+          acknowledgeUnsavedChanges();
+          setShowUpdatePopup(false);
+        }}
         onUpdateInsights={handleUpdateInsights}
         isGenerating={isGeneratingInsights}
       />
@@ -842,6 +875,7 @@ function ExerciseStep({ onNext, onBack, initial }: { onNext: (data: any) => void
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
+  const { shouldBlockNavigation, acknowledgeUnsavedChanges } = useUnsavedNavigationAllowance(hasUnsavedChanges);
 
   const handleDurationChange = (type: string, value: string) => {
     setExerciseDurations((prev) => {
@@ -925,7 +959,7 @@ function ExerciseStep({ onNext, onBack, initial }: { onNext: (data: any) => void
 
   // Handle navigation with unsaved changes check
   const handleNext = () => {
-    if (hasUnsavedChanges) {
+    if (shouldBlockNavigation) {
       if (!showUpdatePopup) {
         setShowUpdatePopup(true);
       }
@@ -939,7 +973,7 @@ function ExerciseStep({ onNext, onBack, initial }: { onNext: (data: any) => void
   };
 
   const handleBack = () => {
-    if (hasUnsavedChanges) {
+    if (shouldBlockNavigation) {
       if (!showUpdatePopup) {
         setShowUpdatePopup(true);
       }
@@ -1276,7 +1310,7 @@ function ExerciseStep({ onNext, onBack, initial }: { onNext: (data: any) => void
             <button 
               className="text-gray-600 hover:text-gray-900 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors"
               onClick={() => {
-                if (hasUnsavedChanges) {
+                if (shouldBlockNavigation) {
                   setShowUpdatePopup(true);
                   return;
                 }
@@ -1303,6 +1337,10 @@ function ExerciseStep({ onNext, onBack, initial }: { onNext: (data: any) => void
       <UpdateInsightsPopup
         isOpen={showUpdatePopup}
         onClose={() => {
+          setShowUpdatePopup(false);
+        }}
+        onAddMore={() => {
+          acknowledgeUnsavedChanges();
           setShowUpdatePopup(false);
         }}
         onUpdateInsights={handleUpdateInsights}
@@ -1336,6 +1374,7 @@ function HealthGoalsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
+  const { shouldBlockNavigation, acknowledgeUnsavedChanges } = useUnsavedNavigationAllowance(hasUnsavedChanges);
 
   // Track changes from initial values
   useEffect(() => {
@@ -1509,7 +1548,7 @@ function HealthGoalsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
 
   const handleNext = async () => {
     // Check for unsaved changes first
-    if (hasUnsavedChanges) {
+    if (shouldBlockNavigation) {
       if (!showUpdatePopup) {
         setShowUpdatePopup(true);
       }
@@ -1612,7 +1651,7 @@ function HealthGoalsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
   };
 
   const handleBack = () => {
-    if (hasUnsavedChanges) {
+    if (shouldBlockNavigation) {
       if (!showUpdatePopup) {
         setShowUpdatePopup(true);
       }
@@ -1819,7 +1858,7 @@ function HealthGoalsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
             <button 
               className="text-gray-600 hover:text-gray-900 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors"
               onClick={() => {
-                if (hasUnsavedChanges) {
+                if (shouldBlockNavigation) {
                   setShowUpdatePopup(true);
                   return;
                 }
@@ -1844,6 +1883,10 @@ function HealthGoalsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
         onClose={() => {
           setShowUpdatePopup(false);
         }}
+        onAddMore={() => {
+          acknowledgeUnsavedChanges();
+          setShowUpdatePopup(false);
+        }}
         onUpdateInsights={handleUpdateInsights}
         isGenerating={isGeneratingInsights}
       />
@@ -1859,6 +1902,7 @@ function HealthSituationsStep({ onNext, onBack, initial }: { onNext: (data: any)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
+  const { shouldBlockNavigation, acknowledgeUnsavedChanges } = useUnsavedNavigationAllowance(hasUnsavedChanges);
 
   // Track changes from initial values
   useEffect(() => {
@@ -1920,7 +1964,7 @@ function HealthSituationsStep({ onNext, onBack, initial }: { onNext: (data: any)
   };
 
   const handleNext = () => {
-    if (hasUnsavedChanges) {
+    if (shouldBlockNavigation) {
       if (!showUpdatePopup) {
         setShowUpdatePopup(true);
       }
@@ -1937,7 +1981,7 @@ function HealthSituationsStep({ onNext, onBack, initial }: { onNext: (data: any)
   };
 
   const handleBack = () => {
-    if (hasUnsavedChanges) {
+    if (shouldBlockNavigation) {
       if (!showUpdatePopup) {
         setShowUpdatePopup(true);
       }
@@ -1947,7 +1991,7 @@ function HealthSituationsStep({ onNext, onBack, initial }: { onNext: (data: any)
   };
 
   const handleSkip = () => {
-    if (hasUnsavedChanges) {
+    if (shouldBlockNavigation) {
       if (!showUpdatePopup) {
         setShowUpdatePopup(true);
       }
@@ -2053,6 +2097,10 @@ function HealthSituationsStep({ onNext, onBack, initial }: { onNext: (data: any)
         onClose={() => {
           setShowUpdatePopup(false);
         }}
+        onAddMore={() => {
+          acknowledgeUnsavedChanges();
+          setShowUpdatePopup(false);
+        }}
         onUpdateInsights={handleUpdateInsights}
         isGenerating={isGeneratingInsights}
       />
@@ -2095,6 +2143,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
   const [imageQualityWarning, setImageQualityWarning] = useState<{front?: string, back?: string}>({});
+  const { shouldBlockNavigation, acknowledgeUnsavedChanges } = useUnsavedNavigationAllowance(hasUnsavedChanges);
   
   // Populate form fields when editing starts
   useEffect(() => {
@@ -2478,7 +2527,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
   
   // Handle navigation with unsaved changes check
   const handleNext = () => {
-    if (hasUnsavedChanges) {
+    if (shouldBlockNavigation) {
       // Show popup if it's not already showing
       if (!showUpdatePopup) {
         setShowUpdatePopup(true);
@@ -2489,7 +2538,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
   };
   
   const handleBack = () => {
-    if (hasUnsavedChanges) {
+    if (shouldBlockNavigation) {
       // Show popup if it's not already showing
       if (!showUpdatePopup) {
         setShowUpdatePopup(true);
@@ -3059,6 +3108,10 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
           // When "Add More" is clicked, just close the popup
           setShowUpdatePopup(false);
         }}
+        onAddMore={() => {
+          acknowledgeUnsavedChanges();
+          setShowUpdatePopup(false);
+        }}
         onUpdateInsights={handleUpdateInsights}
         isGenerating={isGeneratingInsights}
       />
@@ -3458,7 +3511,7 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
   
   // Handle navigation with unsaved changes check
   const handleNext = () => {
-    if (hasUnsavedChanges) {
+    if (shouldBlockNavigation) {
       // Show popup if it's not already showing
       if (!showUpdatePopup) {
         setShowUpdatePopup(true);
@@ -3469,7 +3522,7 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
   };
   
   const handleBack = () => {
-    if (hasUnsavedChanges) {
+    if (shouldBlockNavigation) {
       // Show popup if it's not already showing
       if (!showUpdatePopup) {
         setShowUpdatePopup(true);
@@ -4039,6 +4092,10 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
           // When "Add More" is clicked, just close the popup
           setShowUpdatePopup(false);
         }}
+        onAddMore={() => {
+          acknowledgeUnsavedChanges();
+          setShowUpdatePopup(false);
+        }}
         onUpdateInsights={handleUpdateInsights}
         isGenerating={isGeneratingInsights}
       />
@@ -4055,6 +4112,7 @@ function BloodResultsStep({ onNext, onBack, initial }: { onNext: (data: any) => 
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
+  const { shouldBlockNavigation, acknowledgeUnsavedChanges } = useUnsavedNavigationAllowance(hasUnsavedChanges);
 
   // Track changes from initial values
   useEffect(() => {
@@ -4136,7 +4194,7 @@ function BloodResultsStep({ onNext, onBack, initial }: { onNext: (data: any) => 
   };
 
   const handleNext = () => {
-    if (hasUnsavedChanges) {
+    if (shouldBlockNavigation) {
       if (!showUpdatePopup) {
         setShowUpdatePopup(true);
       }
@@ -4154,7 +4212,7 @@ function BloodResultsStep({ onNext, onBack, initial }: { onNext: (data: any) => 
   };
 
   const handleBack = () => {
-    if (hasUnsavedChanges) {
+    if (shouldBlockNavigation) {
       if (!showUpdatePopup) {
         setShowUpdatePopup(true);
       }
@@ -4164,7 +4222,7 @@ function BloodResultsStep({ onNext, onBack, initial }: { onNext: (data: any) => 
   };
 
   const handleSkip = () => {
-    if (hasUnsavedChanges) {
+    if (shouldBlockNavigation) {
       if (!showUpdatePopup) {
         setShowUpdatePopup(true);
       }
@@ -4360,6 +4418,10 @@ function BloodResultsStep({ onNext, onBack, initial }: { onNext: (data: any) => 
       <UpdateInsightsPopup
         isOpen={showUpdatePopup}
         onClose={() => {
+          setShowUpdatePopup(false);
+        }}
+        onAddMore={() => {
+          acknowledgeUnsavedChanges();
           setShowUpdatePopup(false);
         }}
         onUpdateInsights={handleUpdateInsights}
