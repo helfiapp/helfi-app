@@ -109,15 +109,27 @@ const steps = [
 function useUnsavedNavigationAllowance(hasUnsavedChanges: boolean) {
   const [allowUnsavedNavigation, setAllowUnsavedNavigation] = useState(false);
   const pendingActionRef = useRef<(() => void) | null>(null);
+  const allowUnsavedNavigationRef = useRef(allowUnsavedNavigation);
+  const hasUnsavedChangesRef = useRef(hasUnsavedChanges);
+
+  useEffect(() => {
+    allowUnsavedNavigationRef.current = allowUnsavedNavigation;
+  }, [allowUnsavedNavigation]);
+
+  useEffect(() => {
+    hasUnsavedChangesRef.current = hasUnsavedChanges;
+  }, [hasUnsavedChanges]);
 
   useEffect(() => {
     if (!hasUnsavedChanges && allowUnsavedNavigation) {
       setAllowUnsavedNavigation(false);
+      allowUnsavedNavigationRef.current = false;
       pendingActionRef.current = null;
     }
   }, [hasUnsavedChanges, allowUnsavedNavigation]);
 
   const acknowledgeUnsavedChanges = useCallback(() => {
+    allowUnsavedNavigationRef.current = true;
     setAllowUnsavedNavigation(true);
     const pending = pendingActionRef.current;
     pendingActionRef.current = null;
@@ -138,11 +150,21 @@ function useUnsavedNavigationAllowance(hasUnsavedChanges: boolean) {
     [hasUnsavedChanges, allowUnsavedNavigation],
   );
 
+  const beforeUnloadHandler = useCallback((e: BeforeUnloadEvent) => {
+    if (hasUnsavedChangesRef.current && !allowUnsavedNavigationRef.current) {
+      e.preventDefault();
+      e.returnValue = 'You have unsaved changes. Please update your insights before leaving.';
+      return e.returnValue;
+    }
+    return undefined;
+  }, []);
+
   return {
     shouldBlockNavigation: hasUnsavedChanges && !allowUnsavedNavigation,
     allowUnsavedNavigation,
     acknowledgeUnsavedChanges,
     requestNavigation,
+    beforeUnloadHandler,
   };
 }
 
@@ -302,7 +324,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
-  const { shouldBlockNavigation, allowUnsavedNavigation, acknowledgeUnsavedChanges, requestNavigation } = useUnsavedNavigationAllowance(hasUnsavedChanges);
+  const { shouldBlockNavigation, allowUnsavedNavigation, acknowledgeUnsavedChanges, requestNavigation, beforeUnloadHandler } = useUnsavedNavigationAllowance(hasUnsavedChanges);
 
   const parseNumber = (value: string): number | null => {
     if (!value) return null;
@@ -428,18 +450,9 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
 
   // Warn if the user tries to close the tab or browser with unsaved changes
   useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (shouldBlockNavigation) {
-        e.preventDefault();
-        e.returnValue =
-          'You have unsaved changes. Please update your insights before leaving.';
-        return e.returnValue;
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [shouldBlockNavigation]);
+    window.addEventListener('beforeunload', beforeUnloadHandler);
+    return () => window.removeEventListener('beforeunload', beforeUnloadHandler);
+  }, [beforeUnloadHandler]);
 
   // Expose unsaved state globally so the header "Go To Dashboard" link can respect it
   useEffect(() => {
@@ -894,7 +907,7 @@ function ExerciseStep({ onNext, onBack, initial }: { onNext: (data: any) => void
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
-  const { shouldBlockNavigation, allowUnsavedNavigation, acknowledgeUnsavedChanges, requestNavigation } = useUnsavedNavigationAllowance(hasUnsavedChanges);
+  const { shouldBlockNavigation, allowUnsavedNavigation, acknowledgeUnsavedChanges, requestNavigation, beforeUnloadHandler } = useUnsavedNavigationAllowance(hasUnsavedChanges);
 
   const handleDurationChange = (type: string, value: string) => {
     setExerciseDurations((prev) => {
@@ -933,17 +946,9 @@ function ExerciseStep({ onNext, onBack, initial }: { onNext: (data: any) => void
 
   // Prevent browser navigation when there are unsaved changes
   useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (shouldBlockNavigation) {
-        e.preventDefault();
-        e.returnValue = 'You have unsaved changes. Please update your insights before leaving.';
-        return e.returnValue;
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [shouldBlockNavigation]);
+    window.addEventListener('beforeunload', beforeUnloadHandler);
+    return () => window.removeEventListener('beforeunload', beforeUnloadHandler);
+  }, [beforeUnloadHandler]);
 
   // Handle Update Insights button click
   const handleUpdateInsights = async () => {
@@ -1387,7 +1392,7 @@ function HealthGoalsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
-  const { shouldBlockNavigation, allowUnsavedNavigation, acknowledgeUnsavedChanges, requestNavigation } = useUnsavedNavigationAllowance(hasUnsavedChanges);
+  const { shouldBlockNavigation, allowUnsavedNavigation, acknowledgeUnsavedChanges, requestNavigation, beforeUnloadHandler } = useUnsavedNavigationAllowance(hasUnsavedChanges);
 
   // Track changes from initial values
   useEffect(() => {
@@ -1400,17 +1405,9 @@ function HealthGoalsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
 
   // Prevent browser navigation when there are unsaved changes
   useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (shouldBlockNavigation) {
-        e.preventDefault();
-        e.returnValue = 'You have unsaved changes. Please update your insights before leaving.';
-        return e.returnValue;
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [shouldBlockNavigation]);
+    window.addEventListener('beforeunload', beforeUnloadHandler);
+    return () => window.removeEventListener('beforeunload', beforeUnloadHandler);
+  }, [beforeUnloadHandler]);
 
   // Handle Update Insights button click
   const handleUpdateInsights = async () => {
@@ -1566,6 +1563,10 @@ function HealthGoalsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
       }
     };
 
+    const navigateToNextStep = () => {
+      onNext({ goals, customGoals });
+    };
+
     const proceed = async () => {
       try {
         if (process.env.NEXT_PUBLIC_CHECKINS_ENABLED === 'true') {
@@ -1615,7 +1616,7 @@ function HealthGoalsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
 
           if (!hasSettings) {
             // First-time onboarding: progress the local step state too
-            onNext({ goals, customGoals });
+            navigateToNextStep();
             // Only ask once when not configured
             const enable = window.confirm(
               'Daily Check‑ins\n\nTrack how you are going 1–3 times a day. This helps AI understand your progress and improves future reports.\n\nEnable now? (You can change this later in Settings)'
@@ -1658,8 +1659,13 @@ function HealthGoalsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
           }).catch(() => {})
         }
       } catch {}
-      onNext({ goals, customGoals });
+      navigateToNextStep();
     };
+
+    if (hasUnsavedChanges) {
+      requestNavigation(navigateToNextStep, triggerPopup);
+      return;
+    }
 
     requestNavigation(() => {
       proceed();
@@ -1918,7 +1924,7 @@ function HealthSituationsStep({ onNext, onBack, initial }: { onNext: (data: any)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
-  const { shouldBlockNavigation, allowUnsavedNavigation, acknowledgeUnsavedChanges, requestNavigation } = useUnsavedNavigationAllowance(hasUnsavedChanges);
+  const { shouldBlockNavigation, allowUnsavedNavigation, acknowledgeUnsavedChanges, requestNavigation, beforeUnloadHandler } = useUnsavedNavigationAllowance(hasUnsavedChanges);
 
   // Track changes from initial values
   useEffect(() => {
@@ -1933,17 +1939,9 @@ function HealthSituationsStep({ onNext, onBack, initial }: { onNext: (data: any)
 
   // Prevent browser navigation when there are unsaved changes
   useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (shouldBlockNavigation) {
-        e.preventDefault();
-        e.returnValue = 'You have unsaved changes. Please update your insights before leaving.';
-        return e.returnValue;
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [shouldBlockNavigation]);
+    window.addEventListener('beforeunload', beforeUnloadHandler);
+    return () => window.removeEventListener('beforeunload', beforeUnloadHandler);
+  }, [beforeUnloadHandler]);
 
   // Handle Update Insights button click
   const handleUpdateInsights = async () => {
@@ -2150,7 +2148,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
   const [imageQualityWarning, setImageQualityWarning] = useState<{front?: string, back?: string}>({});
-  const { shouldBlockNavigation, allowUnsavedNavigation, acknowledgeUnsavedChanges, requestNavigation } = useUnsavedNavigationAllowance(hasUnsavedChanges);
+  const { shouldBlockNavigation, allowUnsavedNavigation, acknowledgeUnsavedChanges, requestNavigation, beforeUnloadHandler } = useUnsavedNavigationAllowance(hasUnsavedChanges);
   
   // Populate form fields when editing starts
   useEffect(() => {
@@ -2297,17 +2295,9 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
 
   // Prevent browser navigation when there are unsaved changes
   useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (shouldBlockNavigation) {
-        e.preventDefault();
-        e.returnValue = 'You have unsaved changes. Please update your insights before leaving.';
-        return e.returnValue;
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [shouldBlockNavigation]);
+    window.addEventListener('beforeunload', beforeUnloadHandler);
+    return () => window.removeEventListener('beforeunload', beforeUnloadHandler);
+  }, [beforeUnloadHandler]);
 
   // Check for existing interaction analysis
   useEffect(() => {
@@ -3164,7 +3154,7 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
   const [imageQualityWarning, setImageQualityWarning] = useState<{front?: string, back?: string}>({});
-  const { shouldBlockNavigation, allowUnsavedNavigation, acknowledgeUnsavedChanges, requestNavigation } = useUnsavedNavigationAllowance(hasUnsavedChanges);
+  const { shouldBlockNavigation, allowUnsavedNavigation, acknowledgeUnsavedChanges, requestNavigation, beforeUnloadHandler } = useUnsavedNavigationAllowance(hasUnsavedChanges);
   
   // Populate form fields when editing starts
   useEffect(() => {
@@ -3311,17 +3301,9 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
 
   // Prevent browser navigation when there are unsaved changes
   useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (shouldBlockNavigation) {
-        e.preventDefault();
-        e.returnValue = 'You have unsaved changes. Please update your insights before leaving.';
-        return e.returnValue;
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [shouldBlockNavigation]);
+    window.addEventListener('beforeunload', beforeUnloadHandler);
+    return () => window.removeEventListener('beforeunload', beforeUnloadHandler);
+  }, [beforeUnloadHandler]);
 
   // Check for existing interaction analysis
   useEffect(() => {
@@ -4108,7 +4090,7 @@ function BloodResultsStep({ onNext, onBack, initial }: { onNext: (data: any) => 
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
-  const { shouldBlockNavigation, allowUnsavedNavigation, acknowledgeUnsavedChanges, requestNavigation } = useUnsavedNavigationAllowance(hasUnsavedChanges);
+  const { shouldBlockNavigation, allowUnsavedNavigation, acknowledgeUnsavedChanges, requestNavigation, beforeUnloadHandler } = useUnsavedNavigationAllowance(hasUnsavedChanges);
 
   // Track changes from initial values
   useEffect(() => {
@@ -4125,17 +4107,9 @@ function BloodResultsStep({ onNext, onBack, initial }: { onNext: (data: any) => 
 
   // Prevent browser navigation when there are unsaved changes
   useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (shouldBlockNavigation) {
-        e.preventDefault();
-        e.returnValue = 'You have unsaved changes. Please update your insights before leaving.';
-        return e.returnValue;
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [shouldBlockNavigation]);
+    window.addEventListener('beforeunload', beforeUnloadHandler);
+    return () => window.removeEventListener('beforeunload', beforeUnloadHandler);
+  }, [beforeUnloadHandler]);
 
   // Handle Update Insights button click
   const handleUpdateInsights = async () => {
