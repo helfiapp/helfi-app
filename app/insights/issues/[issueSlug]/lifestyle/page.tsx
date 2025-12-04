@@ -9,15 +9,10 @@ interface IssueLifestylePageProps {
 }
 
 export default async function IssueLifestylePage({ params }: IssueLifestylePageProps) {
+  // Lifestyle has been folded into Overview; redirect to Overview for this issue
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) {
     redirect('/auth/signin')
   }
-
-  const result = await getIssueSection(session.user.id, params.issueSlug, 'lifestyle')
-  if (!result) {
-    notFound()
-  }
-
-  return <SectionRenderer issueSlug={params.issueSlug} section="lifestyle" initialResult={result} />
+  redirect(`/insights/issues/${params.issueSlug}/overview`)
 }

@@ -54,7 +54,6 @@ export default async function IssueOverviewPage({ params }: IssueOverviewPagePro
     labs: 'Track bloodwork targets and know when to upload or re-test.',
     nutrition: 'See how logged meals support this issue and what to tweak next.',
     exercise: 'Understand training patterns and recommended adjustments.',
-    lifestyle: 'Sleep, stress, and daily habits that influence this issue.',
   }
 
   const sectionsToPrefetch = ISSUE_SECTION_ORDER.filter((s) => s !== 'overview')

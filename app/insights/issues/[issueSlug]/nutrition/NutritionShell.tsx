@@ -62,7 +62,8 @@ interface NutritionContextValue {
   result: IssueSectionResult
   loading: boolean
   error: string | null
-  handleGenerate: (mode: 'daily' | 'weekly' | 'custom', range?: { from?: string; to?: string }) => Promise<void>
+  handleGenerate: () => Promise<void>
+  isRefreshing: boolean
   issueSlug: string
   extras: NutritionExtras
 }
@@ -87,6 +88,7 @@ export default function NutritionShell({ children, initialResult, issueSlug }: N
   const [result, setResult] = useState<IssueSectionResult | null>(initialResult)
   const [loading, setLoading] = useState(!initialResult)
   const [error, setError] = useState<string | null>(null)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const segments = useSelectedLayoutSegments()
   const activeTab = (segments?.[0] as TabKey | undefined) ?? 'working'
 
@@ -158,9 +160,41 @@ export default function NutritionShell({ children, initialResult, issueSlug }: N
     }
   }, [result, loading, issueSlug])
 
-  async function handleGenerate(mode: 'daily' | 'weekly' | 'custom', range?: { from?: string; to?: string }) {
-    // This function is kept for backward compatibility but is no longer used
-    // Insights are now updated via Update button on health data pages
+  async function handleGenerate() {
+    setIsRefreshing(true)
+    setError(null)
+    try {
+      await fetch('/api/insights/regenerate-targeted', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ changeTypes: ['food'] }),
+      })
+
+      const fetchLatest = async () => {
+        const res = await fetch(`/api/insights/issues/${issueSlug}/sections/nutrition`)
+        if (!res.ok) throw new Error('Failed to load nutrition insights')
+        const data = await res.json()
+        setResult(data)
+        return data
+      }
+
+      for (let attempt = 0; attempt < 4; attempt++) {
+        try {
+          const data = await fetchLatest()
+          const meta = (data as any)?._meta
+          const needsUpdate = meta?.needsUpdate === true || meta?.status === 'generating'
+          if (!needsUpdate) break
+        } catch (err) {
+          if (attempt === 3) throw err
+        }
+        await new Promise((resolve) => setTimeout(resolve, 1500))
+      }
+    } catch (err) {
+      setError((err as Error).message || 'Failed to refresh nutrition insights')
+    } finally {
+      setIsRefreshing(false)
+      setLoading(false)
+    }
   }
 
   const extras = useMemo<NutritionExtras>(() => {
@@ -206,10 +240,11 @@ export default function NutritionShell({ children, initialResult, issueSlug }: N
       loading,
       error,
       handleGenerate,
+      isRefreshing,
       issueSlug,
       extras,
     }
-  }, [result, loading, error, issueSlug, extras])
+  }, [result, loading, error, issueSlug, extras, isRefreshing])
 
   if (!result && loading) {
     return (
@@ -290,7 +325,30 @@ export default function NutritionShell({ children, initialResult, issueSlug }: N
                 Generated {new Date(result.generatedAt).toLocaleString()} • Confidence {(result.confidence * 100).toFixed(0)}%
               </p>
             </div>
+            <div className="flex flex-col items-start gap-2">
+              <button
+                onClick={handleGenerate}
+                disabled={isRefreshing}
+                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                  isRefreshing ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-helfi-green text-white hover:bg-helfi-green/90'
+                }`}
+              >
+                {isRefreshing ? 'Refreshing…' : 'Generate Nutrition Insights'}
+              </button>
+              <p className="text-xs text-gray-500">Runs only on new/changed food diary entries.</p>
+            </div>
           </div>
+          {(isRefreshing || loading) && (
+            <div className="mt-4">
+              <ProgressBar />
+              <p className="text-sm text-gray-600 mt-2">Updating nutrition insights...</p>
+            </div>
+          )}
+          {error && (
+            <div className="mt-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">
+              {error}
+            </div>
+          )}
         </section>
 
         <nav className="space-y-2">

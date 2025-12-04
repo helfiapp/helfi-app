@@ -29,7 +29,15 @@ export interface InsightMetadata {
 
 export interface DataChangeEvent {
   userId: string
-  changeType: 'supplements' | 'medications' | 'food' | 'exercise' | 'health_goals' | 'profile' | 'blood_results'
+  changeType:
+    | 'supplements'
+    | 'medications'
+    | 'food'
+    | 'exercise'
+    | 'health_goals'
+    | 'health_situations'
+    | 'profile'
+    | 'blood_results'
   timestamp: Date
 }
 
@@ -57,7 +65,8 @@ export function getAffectedSections(changeType: DataChangeEvent['changeType']): 
     medications: ['medications', 'interactions'],
     food: ['nutrition'],
     exercise: ['exercise'],
-    health_goals: ['overview', 'lifestyle'], // Goals affect multiple sections
+    health_goals: ['overview'], // Goals affect overview
+    health_situations: ['overview'],
     profile: ['overview'], // Weight/height/bodytype affect overview
     blood_results: ['labs'],
   }

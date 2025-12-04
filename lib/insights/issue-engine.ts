@@ -22,7 +22,6 @@ export const ISSUE_SECTION_ORDER: IssueSectionKey[] = [
   'interactions',
   'labs',
   'nutrition',
-  'lifestyle',
 ]
 
 export type DataNeedStatus = 'missing' | 'in-progress' | 'complete'

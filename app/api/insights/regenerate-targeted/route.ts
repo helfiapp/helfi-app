@@ -9,6 +9,7 @@ const VALID_CHANGE_TYPES = [
   'food',
   'exercise',
   'health_goals',
+  'health_situations',
   'profile',
   'blood_results',
 ] as const

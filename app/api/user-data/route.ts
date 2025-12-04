@@ -1010,11 +1010,14 @@ export async function POST(request: NextRequest) {
       const isFullOnboarding = !!(data.gender && data.weight && data.height && 
         (data.goals?.length || data.supplements?.length || data.medications?.length))
 
-      const changedTypes: Array<'supplements' | 'medications' | 'food' | 'exercise' | 'health_goals' | 'profile' | 'blood_results'> = []
+      const changedTypes: Array<
+        'supplements' | 'medications' | 'food' | 'exercise' | 'health_goals' | 'health_situations' | 'profile' | 'blood_results'
+      > = []
       if (!isFullOnboarding) {
         if (data.supplements) changedTypes.push('supplements')
         if (data.medications) changedTypes.push('medications')
         if (data.goals) changedTypes.push('health_goals')
+        if (data.healthSituations) changedTypes.push('health_situations')
         const profileFieldsUpdated = Boolean(
           data.gender ||
             data.weight ||

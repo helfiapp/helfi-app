@@ -1,170 +1,15 @@
 'use client'
 
-import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import type { IssueSummary, IssueSectionKey } from '@/lib/insights/issue-engine'
 import { ISSUE_SECTION_ORDER } from '@/lib/insights/issue-engine'
-import UsageMeter from '@/components/UsageMeter'
-import FeatureUsageDisplay from '@/components/FeatureUsageDisplay'
 
 interface IssueOverviewClientProps {
   issue: IssueSummary
   issueSlug: string
 }
 
-// Progress bar that tracks regeneration of all sections
-function AllSectionsProgressBar({ issueSlug, sections, onComplete }: { 
-  issueSlug: string
-  sections: IssueSectionKey[]
-  onComplete: () => void 
-}) {
-  const [progress, setProgress] = useState(0)
-  const [completedSections, setCompletedSections] = useState<Set<string>>(new Set())
-  const [status, setStatus] = useState<'starting' | 'generating' | 'complete'>('starting')
-  const [startTime] = useState(Date.now())
-  
-  useEffect(() => {
-    let pollInterval: NodeJS.Timeout | null = null
-    let timeoutId: NodeJS.Timeout | null = null
-    let isComplete = false
-    
-    const pollStatus = async () => {
-      try {
-        // Lightweight poll against the consolidated status endpoint to avoid
-        // triggering expensive per-section generation while the job is running.
-        const response = await fetch(`/api/insights/issues/${issueSlug}/status`)
-        if (!response.ok) throw new Error('Failed to load regeneration status')
-        const data = await response.json()
-        const statusMap: Record<string, { status?: string; needsUpdate?: boolean }> = data.statuses || {}
-        const statuses = sections.map((section) => {
-          const entry = statusMap[section] || {}
-          return { section, status: entry.status || 'unknown', needsUpdate: entry.needsUpdate ?? true }
-        })
-        const freshCount = statuses.filter(s => s.status === 'fresh').length
-        const generatingCount = statuses.filter(s => s.status === 'generating' || s.status === 'stale').length
-        
-        // Calculate progress based on completed sections (primary metric)
-        const sectionProgress = (freshCount / sections.length) * 100
-        
-        // Also factor in elapsed time for smoother progress updates
-        const elapsed = Date.now() - startTime
-        const elapsedSeconds = elapsed / 1000
-        
-        // Faster time-based progress estimate (quick path should be much faster - 10-30 seconds)
-        let timeBasedProgress = 0
-        if (elapsedSeconds < 5) {
-          timeBasedProgress = (elapsedSeconds / 5) * 30 // 0-30% in first 5 seconds
-        } else if (elapsedSeconds < 15) {
-          timeBasedProgress = 30 + ((elapsedSeconds - 5) / 10) * 50 // 30-80% in next 10 seconds
-        } else if (elapsedSeconds < 30) {
-          timeBasedProgress = 80 + ((elapsedSeconds - 15) / 15) * 15 // 80-95% in next 15 seconds
-        } else {
-          timeBasedProgress = 95 // Cap at 95% until all complete
-        }
-        
-        // Use section-based progress as primary, but show time-based progress if higher (for smoother updates)
-        // This ensures progress bar moves even while waiting for status updates
-        const finalProgress = freshCount === sections.length ? 100 : Math.max(sectionProgress, Math.min(timeBasedProgress, 95))
-        
-        setProgress(finalProgress)
-        
-        // Track completed sections
-        const newCompleted = new Set<string>()
-        statuses.forEach(({ section, status }) => {
-          if (status === 'fresh') {
-            newCompleted.add(section)
-          }
-        })
-        setCompletedSections(newCompleted)
-        
-        // Check if all sections are complete
-        if (freshCount === sections.length) {
-          setStatus('complete')
-          isComplete = true
-          if (pollInterval) clearInterval(pollInterval)
-          if (timeoutId) clearTimeout(timeoutId)
-          setTimeout(() => {
-            onComplete()
-          }, 500)
-          return
-        } else if (generatingCount > 0 || freshCount > 0) {
-          setStatus('generating')
-        }
-      } catch (error) {
-        console.error('Error polling status:', error)
-      }
-    }
-    
-    // Start polling immediately, then every 2 seconds
-    pollStatus()
-    pollInterval = setInterval(pollStatus, 2000)
-    
-    // Safety timeout: if still not complete after 4 minutes, assume complete
-    timeoutId = setTimeout(() => {
-      if (!isComplete) {
-        console.warn('Regeneration timeout - assuming complete')
-        setStatus('complete')
-        setProgress(100)
-        if (pollInterval) clearInterval(pollInterval)
-        setTimeout(() => {
-          onComplete()
-        }, 500)
-      }
-    }, 240000) // 4 minutes max for all sections
-    
-    return () => {
-      if (pollInterval) clearInterval(pollInterval)
-      if (timeoutId) clearTimeout(timeoutId)
-    }
-  }, [issueSlug, sections, startTime, onComplete])
-  
-  const completedCount = completedSections.size
-  const totalCount = sections.length
-  
-  return (
-    <div className="w-full">
-      <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden mb-2">
-        <div 
-          className="bg-helfi-green h-2 rounded-full transition-all duration-500 ease-out"
-          style={{ width: `${Math.min(progress, 100)}%` }}
-        ></div>
-      </div>
-      <p className="text-xs text-gray-600">
-        {status === 'complete' 
-          ? `✓ Regeneration complete! All ${totalCount} sections updated.` 
-          : `Regenerating all insights... This may take 1-2 minutes. (${completedCount}/${totalCount} sections complete)`}
-      </p>
-    </div>
-  )
-}
-
 export default function IssueOverviewClient({ issue, issueSlug }: IssueOverviewClientProps) {
-  const [isRegenerating, setIsRegenerating] = useState(false)
-  const [needsRegeneration, setNeedsRegeneration] = useState<boolean | null>(null)
-  const [isCheckingStatus, setIsCheckingStatus] = useState(true)
-  const [usageMeterRefresh, setUsageMeterRefresh] = useState(0)
-  
-  // Check if insights need regeneration on component mount
-  useEffect(() => {
-    async function checkStatus() {
-      try {
-        const response = await fetch(`/api/insights/issues/${issueSlug}/status`)
-        if (response.ok) {
-          const data = await response.json()
-          setNeedsRegeneration(data.needsRegeneration ?? true)
-        } else {
-          setNeedsRegeneration(true)
-        }
-      } catch (error) {
-        console.error('Error checking insights status:', error)
-        setNeedsRegeneration(true)
-      } finally {
-        setIsCheckingStatus(false)
-      }
-    }
-    checkStatus()
-  }, [issueSlug])
-  
   const sectionDescriptions: Record<string, string> = {
     overview: 'Snapshot of recent trends, blockers, and next actions for this issue.',
     supplements: 'Review current regimen, identify gaps, and spot potential additions.',
@@ -173,104 +18,22 @@ export default function IssueOverviewClient({ issue, issueSlug }: IssueOverviewC
     labs: 'Track bloodwork targets and know when to upload or re-test.',
     nutrition: 'See how logged meals support this issue and what to tweak next.',
     exercise: 'Understand training patterns and recommended adjustments.',
-    lifestyle: 'Sleep, stress, and daily habits that influence this issue.',
   }
 
   const navigationOrder = ISSUE_SECTION_ORDER.filter((section) => section !== 'overview') as IssueSectionKey[]
-  
-  async function handleRegenerateAll() {
-    try {
-      setIsRegenerating(true)
-      
-      // Start regeneration for all sections (non-blocking)
-      const response = await fetch(`/api/insights/issues/${issueSlug}/regenerate-all`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      })
-      
-      if (!response.ok) {
-        throw new Error('Unable to start regeneration right now.')
-      }
-
-      // Refresh credit + usage meters (regeneration uses credits)
-      setUsageMeterRefresh((v) => v + 1)
-      try { window.dispatchEvent(new Event('credits:refresh')) } catch {}
-      
-      // Progress bar will poll and call handleRegenerationComplete when done
-    } catch (err) {
-      console.error('Error starting regeneration:', err)
-      setIsRegenerating(false)
-    }
-  }
-  
-  function handleRegenerationComplete() {
-    setIsRegenerating(false)
-    setNeedsRegeneration(false)
-    setUsageMeterRefresh((v) => v + 1)
-    try { window.dispatchEvent(new Event('credits:refresh')) } catch {}
-    window.location.reload()
-  }
-
-  const showRegenerateButton = needsRegeneration === true
 
   return (
     <div className="space-y-6">
-      {/* Regenerate All Button - Only show if insights are stale/missing */}
-      {showRegenerateButton && (
-        <section className="bg-white border border-gray-200 rounded-2xl shadow-sm p-6">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div className="flex-1">
-            <h2 className="text-lg font-semibold text-gray-900 mb-1">Regenerate All Insights</h2>
-            <p className="text-sm text-gray-600">
-              Your health data has changed. Refresh all sections for {issue.name} with your latest data. This may take 1-2 minutes.
-            </p>
-            <p className="text-sm text-gray-600 mt-2">
-              Regenerating uses your AI credits (typical cost: 2 credits per run). Track your remaining credits and monthly regeneration usage below.
-            </p>
-            <UsageMeter inline={true} refreshTrigger={usageMeterRefresh} className="max-w-md" />
-            <FeatureUsageDisplay
-              featureName="insightsGeneration"
-              featureLabel="Insights Regeneration"
-              refreshTrigger={usageMeterRefresh}
-            />
-          </div>
-          <div className="flex-shrink-0">
-            {isRegenerating ? (
-              <div className="w-full max-w-md">
-                <AllSectionsProgressBar 
-                  issueSlug={issueSlug} 
-                  sections={navigationOrder}
-                  onComplete={handleRegenerationComplete}
-                />
-              </div>
-            ) : (
-              <button
-                onClick={handleRegenerateAll}
-                className="px-6 py-3 bg-helfi-green hover:bg-helfi-green/90 text-white rounded-lg text-sm font-medium transition-colors"
-              >
-                🔄 Regenerate All Sections
-              </button>
-            )}
-          </div>
+      <section className="bg-emerald-50 border border-emerald-200 rounded-2xl shadow-sm p-4">
+        <div className="flex items-center gap-2">
+          <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <p className="text-sm text-emerald-700">
+            Insights refresh automatically when you click “Update Insights” in Health Setup. Open any section below to view the latest guidance.
+          </p>
         </div>
       </section>
-      )}
-      
-      {/* Status message when insights are fresh */}
-      {!isCheckingStatus && !showRegenerateButton && (
-        <section className="bg-emerald-50 border border-emerald-200 rounded-2xl shadow-sm p-4">
-          <div className="flex items-center gap-2">
-            <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <p className="text-sm text-emerald-700">
-              All insights are up to date with your latest health data.
-            </p>
-          </div>
-        </section>
-      )}
 
       {/* Section Links */}
       <section className="bg-white border border-gray-200 rounded-2xl shadow-sm">

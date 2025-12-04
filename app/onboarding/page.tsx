@@ -111,6 +111,7 @@ type InsightChangeType =
   | 'food'
   | 'exercise'
   | 'health_goals'
+  | 'health_situations'
   | 'profile'
   | 'blood_results';
 
@@ -1988,7 +1989,7 @@ function HealthSituationsStep({ onNext, onBack, initial }: { onNext: (data: any)
       
       if (response.ok) {
         setHasUnsavedChanges(false);
-        triggerTargetedInsightsRefresh(['blood_results']);
+        triggerTargetedInsightsRefresh(['health_situations']);
         setTimeout(() => {
           setShowUpdatePopup(false);
           setIsGeneratingInsights(false);
