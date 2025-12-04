@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
+import MobileMoreMenu from '@/components/MobileMoreMenu'
 import PageHeader from '@/components/PageHeader'
 import FitbitSummary from '@/components/devices/FitbitSummary'
 import FitbitCharts from '@/components/devices/FitbitCharts'
