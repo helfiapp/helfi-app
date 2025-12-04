@@ -31,6 +31,7 @@ export default function Dashboard() {
   const [savingInterest, setSavingInterest] = useState<string | null>(null)
   const [fitbitConnected, setFitbitConnected] = useState(false)
   const [fitbitLoading, setFitbitLoading] = useState(false)
+  const [garminConnected, setGarminConnected] = useState(false)
   const popupRef = useRef<Window | null>(null)
   const checkIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -118,6 +119,8 @@ export default function Dashboard() {
             
             // Check Fitbit connection status
             checkFitbitStatus()
+            // Check Garmin connection status
+            checkGarminStatus()
             
             // Load profile image from database and cache it
             if (result.data.profileImage) {
@@ -254,6 +257,21 @@ export default function Dashboard() {
       return false
     } catch (error) {
       console.error('Error checking Fitbit status:', error)
+      return false
+    }
+  }
+
+  const checkGarminStatus = async () => {
+    try {
+      const response = await fetch('/api/garmin/status')
+      if (response.ok) {
+        const data = await response.json()
+        setGarminConnected(!!data.connected)
+        return !!data.connected
+      }
+      return false
+    } catch (error) {
+      console.error('Error checking Garmin status:', error)
       return false
     }
   }
@@ -675,17 +693,25 @@ export default function Dashboard() {
                       </div>
                       <button onClick={() => toggleInterest('appleWatch')} className={`mt-3 w-full text-center text-[13px] px-3.5 py-2 rounded-full ${deviceInterest.appleWatch ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>{deviceInterest.appleWatch ? 'Interested ✓' : "I'm interested"}</button>
                     </div>
-                    {/* Garmin */}
-                    <div className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="text-2xl">💪</div>
-                        <div>
-                          <div className="text-[15px] font-medium text-gray-900">Garmin</div>
-                          <div className="text-[12px] text-gray-500">Training metrics</div>
-                        </div>
+                  {/* Garmin */}
+                  <div className="px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="text-2xl">💪</div>
+                      <div>
+                        <div className="text-[15px] font-medium text-gray-900">Garmin</div>
+                        <div className="text-[12px] text-gray-500">Training metrics</div>
                       </div>
-                      <button onClick={() => toggleInterest('garmin')} className={`mt-3 w-full text-center text-[13px] px-3.5 py-2 rounded-full ${deviceInterest.garmin ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`} disabled={!!savingInterest}>{deviceInterest.garmin ? 'Interested ✓' : "I'm interested"}</button>
                     </div>
+                    {garminConnected ? (
+                      <Link href="/devices" className="mt-3 w-full text-center text-[13px] px-3.5 py-2 rounded-full bg-emerald-600 text-white block">
+                        Connected ✓
+                      </Link>
+                    ) : (
+                      <Link href="/devices" className="mt-3 w-full text-center text-[13px] px-3.5 py-2 rounded-full bg-helfi-green text-white block hover:bg-green-600 transition-colors">
+                        Connect Garmin
+                      </Link>
+                    )}
+                  </div>
                     {/* Samsung Health */}
                     <div className="px-4 py-3">
                       <div className="flex items-center gap-3">
@@ -780,19 +806,28 @@ export default function Dashboard() {
                   </div>
 
                   {/* Garmin */}
-                  <div className={`bg-white p-4 rounded-2xl border ${deviceInterest.garmin ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-gray-100'} shadow-sm transition-colors`}>
+                  <div className={`bg-white p-4 rounded-2xl border ${garminConnected ? 'border-emerald-300 ring-1 ring-emerald-200' : 'border-gray-100'} shadow-sm transition-colors`}>
                     <div className="text-center">
                       <div className="text-2xl mb-1">💪</div>
-                      <div className="text-xs font-medium text-gray-700 mb-2">Garmin</div>
-                      <button
-                        onClick={() => toggleInterest('garmin')}
-                        className={`w-full inline-flex items-center justify-center text-[12px] px-3.5 py-1.5 rounded-full ${
-                          deviceInterest.garmin ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
-                        disabled={!!savingInterest}
-                      >
-                        {deviceInterest.garmin ? 'Interested ✓' : "I'm interested"}
-                      </button>
+                      <div className="text-xs font-medium text-gray-700 mb-2 flex items-center justify-center gap-1">
+                        Garmin
+                        {garminConnected && <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>}
+                      </div>
+                      {garminConnected ? (
+                        <Link
+                          href="/devices"
+                          className="w-full inline-flex items-center justify-center text-[12px] px-3.5 py-1.5 rounded-full bg-emerald-600 text-white"
+                        >
+                          Connected ✓
+                        </Link>
+                      ) : (
+                        <Link
+                          href="/devices"
+                          className="w-full inline-flex items-center justify-center text-[12px] px-3.5 py-1.5 rounded-full bg-helfi-green text-white hover:bg-green-600 transition-colors"
+                        >
+                          Connect Garmin
+                        </Link>
+                      )}
                     </div>
                   </div>
 
