@@ -1,3 +1,45 @@
+## Handover: Make Insights Refreshes charge accurate, per-run costs
+
+Goal
+- When a user clicks “Update Insights” in Health Setup or “Generate Nutrition Insights”, charge credits based on actual OpenAI tokens used for that refresh (no flat rate), applying the usual profit margin. Avoid touching other flows (food analyzer, medical scans, symptom analysis, etc.).
+
+Current state
+- AI calls already log tokens/cost to `AIUsageLog` via `runChatCompletionWithLogging` (see `lib/ai-usage-logger.ts`, `lib/insights/llm.ts`).
+- The new targeted refreshes (Health Setup Update Insights, Nutrition Generate) DO NOT currently deduct credits. The old “Regenerate All” flow uses a fixed `INSIGHTS_GENERATION` credit cost (2 credits) but is being de-emphasized.
+- Credit pricing guidance below targets ~65% margin on subscriptions and ~75% on top-ups. See “AI Costs & Credit Guidance” section that follows.
+
+Proposal (keep everything else intact)
+1) Tag each refresh with a run ID:
+   - When user clicks Update Insights (any Health Setup step) or Generate Nutrition Insights, create a runId (UUID) and pass it through the backend calls that trigger insights generation.
+   - In insights generation (the LLM calls in `lib/insights/llm.ts`), include `{ runId, feature: 'insights:targeted' }` in the logging context so `AIUsageLog` rows have that runId.
+2) After generation finishes, total the real cost:
+   - New endpoint (or use the same handler) to sum `AIUsageLog.costCents` WHERE runId = ?. This gives actual OpenAI cost for that refresh.
+3) Convert to credits with margin:
+   - Use current revenue/credit: subs ~$0.0143/credit, top-ups ~$0.0200/credit (from below).
+   - To hit ~65% margin (subs): credits = ceil((cost / 0.35) / 0.0143).
+   - To hit ~75% margin (top-ups): credits = ceil((cost / 0.25) / 0.0200).
+   - If user has both balances, follow existing wallet precedence; store the charged credits.
+   - Record a feature usage entry (e.g., `insightsTargeted`) so the meter updates. DO NOT change other feature costs (food analyzer, medical scans, etc.).
+4) Display to user:
+   - On the buttons (“Update Insights”, “Generate Nutrition Insights”), show a small “Credits will be charged after generation based on actual AI usage” note.
+   - After run completes, show “Charged X credits” (using the calculated amount) and refresh the credit meter.
+5) Safety/guard rails:
+   - Do not change existing fixed costs (CREDIT_COSTS) used by other features.
+   - Do not enable background auto-regeneration; keep it on-demand only.
+   - Keep Insights routes otherwise intact; only add runId plumbing + post-run billing.
+   - Use `AIUsageLog` in the prod DB (Neon) as documented below; do not swap DB strings.
+
+Open questions for the next agent (confirm with user if needed)
+- If a run fails or times out: charge 0 credits. Only charge on success.
+- Rounding: use ceil to avoid undercharging; document the exact credit calculation used.
+- Capping: if a single run is huge, cap the charge or prompt before charging? (Ask user.)
+
+Implementation sketch
+- Frontend: generate runId at click, send to backend when triggering insights refresh.
+- Backend: propagate runId to insights generation calls (through `getIssueSection`/LLM layer), ensure `runChatCompletionWithLogging` logs runId and feature.
+- After generation: sum `AIUsageLog` by runId, compute credits, charge via `CreditManager`, log feature usage, and return charged amount to the client.
+- Show the charged amount in UI and refresh the credit meter event.
+
 ## AI Costs & Credit Guidance (Production)
 
 **Database for costs:** `helfi-main-database` (Neon), connection string:  
