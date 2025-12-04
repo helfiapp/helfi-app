@@ -2151,7 +2151,6 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
   const [imageQualityWarning, setImageQualityWarning] = useState<{front?: string, back?: string}>({});
   const { shouldBlockNavigation, allowUnsavedNavigation, acknowledgeUnsavedChanges, requestNavigation } = useUnsavedNavigationAllowance(hasUnsavedChanges);
-  const { shouldBlockNavigation, acknowledgeUnsavedChanges } = useUnsavedNavigationAllowance(hasUnsavedChanges);
   
   // Populate form fields when editing starts
   useEffect(() => {
