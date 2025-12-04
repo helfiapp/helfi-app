@@ -189,6 +189,28 @@ the user.
 
 ---
 
+## 3. Branding Assets (Logos & Icons)
+
+**Source of truth:**
+- Logos: `public/mobile-assets/LOGOS/helfi-01-01.*` (standard), `helfi-01-06.*` (white-on-dark).  
+- Favicon/PWA base: `public/mobile-assets/FAVICONS/FAVICON-01.svg` (use this SVG for all generated icons).
+
+**Protected outputs (must stay consistent):**
+- `public/icons/app-192.png`, `public/icons/app-512.png`, `public/icons/app-1024.png`
+- `public/icons/admin-192.png`, `public/icons/admin-512.png`
+- `public/apple-touch-icon.png`
+- `public/favicon.ico`
+- `public/logo.svg`
+- Icon references in `app/layout.tsx` (manifest + icons array)
+
+**Guard rails:**
+- Do **not** downscale from raster PNGs; regenerate from `FAVICON-01.svg` to avoid blur.  
+- Dark backgrounds (e.g., sidebar) must use `helfi-01-06.*`; light backgrounds use `helfi-01-01.*`.  
+- If branding changes are needed, update **all** outputs above in one sweep (PWA icons, apple-touch, favicon, logo.svg, manifests) and confirm with the user.  
+- Service worker notifications should continue using the packaged icon (`/icons/app-192.png`) unless the user approves a different path.
+
+---
+
 ## 3. Food Diary Entry Loading & Date Filtering
 
 **Protected files:**
