@@ -6,7 +6,7 @@ Goal
 Current state
 - AI calls already log tokens/cost to `AIUsageLog` via `runChatCompletionWithLogging` (see `lib/ai-usage-logger.ts`, `lib/insights/llm.ts`).
 - The new targeted refreshes (Health Setup Update Insights, Nutrition Generate) DO NOT currently deduct credits. The old “Regenerate All” flow uses a fixed `INSIGHTS_GENERATION` credit cost (2 credits) but is being de-emphasized.
-- Credit pricing guidance below targets ~65% margin on subscriptions and ~75% on top-ups. See “AI Costs & Credit Guidance” section that follows.
+- Credit pricing guidance below targets ~60% margin on subscriptions and ~70% on top-ups. See “AI Costs & Credit Guidance” section that follows.
 
 Proposal (keep everything else intact)
 1) Tag each refresh with a run ID:
@@ -16,8 +16,8 @@ Proposal (keep everything else intact)
    - New endpoint (or use the same handler) to sum `AIUsageLog.costCents` WHERE runId = ?. This gives actual OpenAI cost for that refresh.
 3) Convert to credits with margin:
    - Use current revenue/credit: subs ~$0.0143/credit, top-ups ~$0.0200/credit (from below).
-   - To hit ~65% margin (subs): credits = ceil((cost / 0.35) / 0.0143).
-   - To hit ~75% margin (top-ups): credits = ceil((cost / 0.25) / 0.0200).
+   - To hit ~60% margin (subs): credits = ceil((cost / 0.40) / 0.0143).
+   - To hit ~70% margin (top-ups): credits = ceil((cost / 0.30) / 0.0200).
    - If user has both balances, follow existing wallet precedence; store the charged credits.
    - Record a feature usage entry (e.g., `insightsTargeted`) so the meter updates. DO NOT change other feature costs (food analyzer, medical scans, etc.).
 4) Display to user:
@@ -58,18 +58,18 @@ Rounded per-call costs:
 - Top-ups: \$5 → 250 credits ⇒ \$0.0200 revenue per credit.
 
 ### Credit charges to hit target margins
-Use these per-feature credit deductions. They already bake in ~65% margin on subscriptions and ~75% on top-ups with the current credit values.
-- Food analysis: **15 credits**
+Use these per-feature credit deductions. They target ~60% margin on subscriptions and ~70% on top-ups with the current credit values.
+- Food analysis: **13 credits**
 - Symptom analysis: **6 credits**
-- Medical image analysis: **8 credits**
-- Insights generate flows: **8 credits**
+- Medical image analysis: **7 credits**
+- Insights generate flows: **7 credits**
 - Light chat-style: **2 credits**
 
 Sanity check (example, subscriptions at \$0.0143/credit):
-- Food analysis at 15 credits ⇒ revenue ≈ \$0.214; cost ≈ \$0.074; margin ≈ 65%.
-- Symptom analysis at 6 credits ⇒ revenue ≈ \$0.086; cost ≈ \$0.030; margin ≈ 65%.
-- Medical image at 8 credits ⇒ revenue ≈ \$0.114; cost ≈ \$0.038; margin ≈ 67%.
-- Insights generate at 8 credits ⇒ revenue ≈ \$0.114; cost ≈ \$0.040; margin ≈ 65%.
+- Food analysis at 13 credits ⇒ revenue ≈ \$0.185; cost ≈ \$0.074; margin ≈ 60%.
+- Symptom analysis at 6 credits ⇒ revenue ≈ \$0.086; cost ≈ \$0.030; margin ≈ 65% (above target, still acceptable).
+- Medical image at 7 credits ⇒ revenue ≈ \$0.100; cost ≈ \$0.038; margin ≈ 62%.
+- Insights generate at 7 credits ⇒ revenue ≈ \$0.100; cost ≈ \$0.040; margin ≈ 60%.
 - Light chat at 2 credits ⇒ revenue ≈ \$0.029; cost ≈ \$0.010; margin ≈ 65%.
 
 ### Where AI is used (OpenAI-backed routes)
@@ -108,8 +108,8 @@ const { PrismaClient } = require('@prisma/client'); const prisma = new PrismaCli
 NODE
 ```
 3) If costs shift, recompute credits:  
-   - Subscription target 65% margin: credits = ceil((cost / 0.35) / \$0.0143)  
-   - Top-up target 75% margin: credits = ceil((cost / 0.25) / \$0.0200)  
+   - Subscription target 60% margin: credits = ceil((cost / 0.40) / \$0.0143)  
+   - Top-up target 70% margin: credits = ceil((cost / 0.30) / \$0.0200)  
    - Then round to a sensible small integer (like the values above).
 
 ### Critical reminders

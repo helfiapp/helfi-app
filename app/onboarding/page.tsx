@@ -49,6 +49,9 @@ function UpdateInsightsPopup({
           <p className="text-sm text-gray-600 mb-4">
             You've changed your health information. Would you like to update your insights now? This will regenerate AI insights, update Talk to AI, and refresh all AI-powered sections with your latest data.
           </p>
+          <p className="text-xs text-gray-500 mb-3">
+            Credits will be charged after generation based on actual AI usage.
+          </p>
           {isGenerating && (
             <div className="mb-4">
               <InsightsProgressBar isGenerating={true} message="Generating insights..." />
@@ -115,17 +118,45 @@ type InsightChangeType =
   | 'profile'
   | 'blood_results';
 
-async function triggerTargetedInsightsRefresh(changeTypes: InsightChangeType[]) {
+async function triggerTargetedInsightsRefresh(changeTypes: InsightChangeType[], options: { silent?: boolean } = {}) {
   const unique = Array.from(new Set(changeTypes || [])).filter(Boolean) as InsightChangeType[];
-  if (!unique.length) return;
+  if (!unique.length) return null;
+  const runId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `run_${Math.random().toString(36).slice(2)}`;
   try {
-    await fetch('/api/insights/regenerate-targeted', {
+    const res = await fetch('/api/insights/regenerate-targeted', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ changeTypes: unique }),
+      body: JSON.stringify({ changeTypes: unique, runId }),
     });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data?.success) {
+      if (!options.silent) {
+        alert(data?.message || 'Failed to update insights. Please try again.');
+      }
+      return null;
+    }
+    const charged = typeof data.chargedCredits === 'number' ? data.chargedCredits : 0;
+    const costDollars = typeof data.costCents === 'number' ? (data.costCents / 100).toFixed(2) : null;
+    if (!options.silent) {
+      const msg = charged > 0
+        ? `Charged ${charged} credits${costDollars ? ` (AI cost ~$${costDollars})` : ''} for this insights update.`
+        : 'Insights updated without any AI charges.';
+      alert(msg);
+    }
+    try {
+      window.dispatchEvent(new Event('credits:refresh'));
+    } catch {
+      // non-blocking
+    }
+    return data;
   } catch (error) {
     console.warn('Failed to trigger targeted insights regeneration', error);
+    if (!options.silent) {
+      alert('Failed to update insights. Please try again.');
+    }
+    return null;
   }
 }
 
@@ -532,18 +563,15 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
 
       if (response.ok) {
         setHasUnsavedChanges(false);
-        triggerTargetedInsightsRefresh(['profile']);
-        setTimeout(() => {
-          setShowUpdatePopup(false);
-          setIsGeneratingInsights(false);
-        }, 2000);
+        await triggerTargetedInsightsRefresh(['profile']);
+        setShowUpdatePopup(false);
       } else {
         alert('Failed to update insights. Please try again.');
-        setIsGeneratingInsights(false);
       }
     } catch (error) {
       console.error('Error updating insights:', error);
       alert('Failed to update insights. Please try again.');
+    } finally {
       setIsGeneratingInsights(false);
     }
   };
@@ -991,18 +1019,15 @@ function ExerciseStep({ onNext, onBack, initial }: { onNext: (data: any) => void
       
       if (response.ok) {
         setHasUnsavedChanges(false);
-        triggerTargetedInsightsRefresh(['exercise']);
-        setTimeout(() => {
-          setShowUpdatePopup(false);
-          setIsGeneratingInsights(false);
-        }, 2000);
+        await triggerTargetedInsightsRefresh(['exercise']);
+        setShowUpdatePopup(false);
       } else {
         alert('Failed to update insights. Please try again.');
-        setIsGeneratingInsights(false);
       }
     } catch (error) {
       console.error('Error updating insights:', error);
       alert('Failed to update insights. Please try again.');
+    } finally {
       setIsGeneratingInsights(false);
     }
   };
@@ -1440,11 +1465,11 @@ function HealthGoalsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
     setIsGeneratingInsights(true);
     try {
       const allIssues = [...goals, ...customGoals].map((name: string) => ({ name }));
-      const currentNames = allIssues.map(i => i.name.trim()).filter(Boolean);
-      
-      // Save goals to both endpoints
-      await Promise.all([
-        fetch('/api/user-data', {
+    const currentNames = allIssues.map(i => i.name.trim()).filter(Boolean);
+    
+    // Save goals to both endpoints
+    await Promise.all([
+      fetch('/api/user-data', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ goals: currentNames })
@@ -1457,14 +1482,12 @@ function HealthGoalsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
       ]);
       
       setHasUnsavedChanges(false);
-      triggerTargetedInsightsRefresh(['health_goals']);
-      setTimeout(() => {
-        setShowUpdatePopup(false);
-        setIsGeneratingInsights(false);
-      }, 2000);
+      await triggerTargetedInsightsRefresh(['health_goals']);
+      setShowUpdatePopup(false);
     } catch (error) {
       console.error('Error updating insights:', error);
       alert('Failed to update insights. Please try again.');
+    } finally {
       setIsGeneratingInsights(false);
     }
   };
@@ -1989,18 +2012,15 @@ function HealthSituationsStep({ onNext, onBack, initial }: { onNext: (data: any)
       
       if (response.ok) {
         setHasUnsavedChanges(false);
-        triggerTargetedInsightsRefresh(['health_situations']);
-        setTimeout(() => {
-          setShowUpdatePopup(false);
-          setIsGeneratingInsights(false);
-        }, 2000);
+        await triggerTargetedInsightsRefresh(['health_situations']);
+        setShowUpdatePopup(false);
       } else {
         alert('Failed to update insights. Please try again.');
-        setIsGeneratingInsights(false);
       }
     } catch (error) {
       console.error('Error updating insights:', error);
       alert('Failed to update insights. Please try again.');
+    } finally {
       setIsGeneratingInsights(false);
     }
   };
@@ -2533,20 +2553,16 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
         // Update local state
         setSupplements(supplementsToSave);
         setHasUnsavedChanges(false);
-        triggerTargetedInsightsRefresh(['supplements']);
+        await triggerTargetedInsightsRefresh(['supplements']);
         
-        // Close popup after a short delay to show progress
-        setTimeout(() => {
-          setShowUpdatePopup(false);
-          setIsGeneratingInsights(false);
-        }, 2000);
+        setShowUpdatePopup(false);
       } else {
         alert('Failed to update insights. Please try again.');
-        setIsGeneratingInsights(false);
       }
     } catch (error) {
       console.error('Error updating insights:', error);
       alert('Failed to update insights. Please try again.');
+    } finally {
       setIsGeneratingInsights(false);
     }
   };
@@ -3505,20 +3521,16 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
         // Update local state
         setMedications(medicationsToSave);
         setHasUnsavedChanges(false);
-        triggerTargetedInsightsRefresh(['medications']);
+        await triggerTargetedInsightsRefresh(['medications']);
         
-        // Close popup after a short delay to show progress
-        setTimeout(() => {
-          setShowUpdatePopup(false);
-          setIsGeneratingInsights(false);
-        }, 2000);
+        setShowUpdatePopup(false);
       } else {
         alert('Failed to update insights. Please try again.');
-        setIsGeneratingInsights(false);
       }
     } catch (error) {
       console.error('Error updating insights:', error);
       alert('Failed to update insights. Please try again.');
+    } finally {
       setIsGeneratingInsights(false);
     }
   };
@@ -4161,17 +4173,15 @@ function BloodResultsStep({ onNext, onBack, initial }: { onNext: (data: any) => 
       
       if (response.ok) {
         setHasUnsavedChanges(false);
-        setTimeout(() => {
-          setShowUpdatePopup(false);
-          setIsGeneratingInsights(false);
-        }, 2000);
+        await triggerTargetedInsightsRefresh(['blood_results']);
+        setShowUpdatePopup(false);
       } else {
         alert('Failed to update insights. Please try again.');
-        setIsGeneratingInsights(false);
       }
     } catch (error) {
       console.error('Error updating insights:', error);
       alert('Failed to update insights. Please try again.');
+    } finally {
       setIsGeneratingInsights(false);
     }
   };

@@ -89,6 +89,7 @@ export default function NutritionShell({ children, initialResult, issueSlug }: N
   const [loading, setLoading] = useState(!initialResult)
   const [error, setError] = useState<string | null>(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [chargeNotice, setChargeNotice] = useState<string | null>(null)
   const segments = useSelectedLayoutSegments()
   const activeTab = (segments?.[0] as TabKey | undefined) ?? 'working'
 
@@ -163,31 +164,43 @@ export default function NutritionShell({ children, initialResult, issueSlug }: N
   async function handleGenerate() {
     setIsRefreshing(true)
     setError(null)
+    setChargeNotice(null)
     try {
-      await fetch('/api/insights/regenerate-targeted', {
+      const runId =
+        typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : `run_${Math.random().toString(36).slice(2)}`
+
+      const regenResponse = await fetch('/api/insights/regenerate-targeted', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ changeTypes: ['food'] }),
+        body: JSON.stringify({ changeTypes: ['food'], runId }),
       })
-
-      const fetchLatest = async () => {
-        const res = await fetch(`/api/insights/issues/${issueSlug}/sections/nutrition`)
-        if (!res.ok) throw new Error('Failed to load nutrition insights')
-        const data = await res.json()
-        setResult(data)
-        return data
+      const regenData = await regenResponse.json().catch(() => null)
+      if (!regenResponse.ok || !regenData?.success) {
+        throw new Error(regenData?.message || 'Failed to refresh nutrition insights')
       }
 
-      for (let attempt = 0; attempt < 4; attempt++) {
-        try {
-          const data = await fetchLatest()
-          const meta = (data as any)?._meta
-          const needsUpdate = meta?.needsUpdate === true || meta?.status === 'generating'
-          if (!needsUpdate) break
-        } catch (err) {
-          if (attempt === 3) throw err
-        }
-        await new Promise((resolve) => setTimeout(resolve, 1500))
+      const res = await fetch(`/api/insights/issues/${issueSlug}/sections/nutrition`)
+      if (!res.ok) throw new Error('Failed to load nutrition insights')
+      const data = await res.json()
+      setResult(data)
+
+      if (typeof regenData.chargedCredits === 'number') {
+        const costPart =
+          typeof regenData.costCents === 'number'
+            ? ` (AI cost ~$${(regenData.costCents / 100).toFixed(2)})`
+            : ''
+        setChargeNotice(
+          regenData.chargedCredits > 0
+            ? `Charged ${regenData.chargedCredits} credits${costPart}.`
+            : 'Insights updated without any AI charges.'
+        )
+      }
+      try {
+        window.dispatchEvent(new Event('credits:refresh'))
+      } catch {
+        // non-blocking
       }
     } catch (err) {
       setError((err as Error).message || 'Failed to refresh nutrition insights')
@@ -339,7 +352,13 @@ export default function NutritionShell({ children, initialResult, issueSlug }: N
               >
                 {isRefreshing ? 'Refreshing…' : 'Generate Nutrition Insights'}
               </button>
+              <p className="text-xs text-gray-500">Credits will be charged after generation based on actual AI usage.</p>
               <p className="text-xs text-gray-500">Runs only on new/changed food diary entries.</p>
+              {chargeNotice && (
+                <p className="text-sm text-gray-700 bg-gray-100 border border-gray-200 rounded-md px-3 py-2">
+                  {chargeNotice}
+                </p>
+              )}
             </div>
           </div>
           {(isRefreshing || loading) && (

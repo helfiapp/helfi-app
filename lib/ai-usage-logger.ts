@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { chatCompletionWithCost } from './metered-openai'
+import { getRunContext } from './run-context'
 
 export type UsageContext = {
   feature: string
@@ -8,6 +9,7 @@ export type UsageContext = {
   issueSlug?: string | null
   scanId?: string | null
   endpoint?: string | null
+  runId?: string | null
 }
 
 export type ImageMeta = {
@@ -26,6 +28,7 @@ export type UsageLogInput = UsageContext & {
   errorMessage?: string | null
   detail?: string | null
   image?: ImageMeta | null
+  runId?: string | null
 }
 
 export async function logAiUsageEvent(entry: UsageLogInput) {
@@ -50,6 +53,7 @@ export async function logAiUsageEvent(entry: UsageLogInput) {
         success: entry.success ?? true,
         errorMessage: entry.errorMessage || null,
         detail: entry.detail || null,
+        runId: entry.runId || null,
       },
     })
   } catch (err) {
@@ -74,6 +78,7 @@ export async function logAIUsage(entry: {
     userLabel: entry.context.userLabel,
     scanId: entry.context.scanId,
     endpoint: entry.context.endpoint,
+    runId: entry.context.runId,
     model: entry.model,
     promptTokens: entry.promptTokens,
     completionTokens: entry.completionTokens,
@@ -93,11 +98,17 @@ export async function runChatCompletionWithLogging(
     successDetail?: string | null
   }
 ) {
+  const asyncContext = getRunContext()
+  const mergedContext: UsageContext = {
+    ...context,
+    feature: context.feature || asyncContext?.feature || 'unknown',
+    runId: context.runId ?? asyncContext?.runId ?? null,
+  }
   try {
     const { completion, costCents, promptTokens, completionTokens } = await chatCompletionWithCost(openai, params)
     const model = (completion as any)?.model || params?.model || 'unknown'
     logAiUsageEvent({
-      ...context,
+      ...mergedContext,
       model,
       promptTokens,
       completionTokens,
@@ -110,7 +121,7 @@ export async function runChatCompletionWithLogging(
   } catch (err: any) {
     const model = params?.model || 'unknown'
     logAiUsageEvent({
-      ...context,
+      ...mergedContext,
       model,
       promptTokens: 0,
       completionTokens: 0,

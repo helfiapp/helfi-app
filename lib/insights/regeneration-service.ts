@@ -16,6 +16,7 @@
 
 import { prisma } from '@/lib/prisma'
 import { precomputeIssueSectionsForUser } from './issue-engine'
+import { withRunContext, type RunContext } from '../run-context'
 import type { IssueSectionKey } from './issue-engine'
 
 export interface InsightMetadata {
@@ -347,7 +348,8 @@ export async function triggerBackgroundRegeneration(event: DataChangeEvent): Pro
  */
 export async function triggerManualSectionRegeneration(
   userId: string,
-  changeTypes: DataChangeEvent['changeType'][]
+  changeTypes: DataChangeEvent['changeType'][],
+  options: { inline?: boolean; runContext?: RunContext | null } = {}
 ): Promise<IssueSectionKey[]> {
   const requestedTypes = Array.isArray(changeTypes) ? changeTypes : []
   const affectedSections = Array.from(
@@ -360,51 +362,72 @@ export async function triggerManualSectionRegeneration(
     return []
   }
 
-  try {
+  const runTask = async () => {
     await markSectionsStale(userId, affectedSections)
+    try {
+      await ensureMetadataTable()
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        include: { healthGoals: true },
+      })
 
-    setImmediate(async () => {
-      try {
-        await ensureMetadataTable()
-        const user = await prisma.user.findUnique({
-          where: { id: userId },
-          include: { healthGoals: true },
-        })
+      if (!user) return
 
-        if (!user) return
+      const issueNames = user.healthGoals
+        .filter((g) => !g.name.startsWith('__'))
+        .map((g) => g.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'))
 
-        const issueNames = user.healthGoals
-          .filter((g) => !g.name.startsWith('__'))
-          .map((g) => g.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'))
-
-        // Mark as generating
-        for (const issueSlug of issueNames) {
-          for (const section of affectedSections) {
-            await prisma.$queryRawUnsafe(
-              `UPDATE "InsightsMetadata" SET "status" = 'generating', "updatedAt" = NOW() 
-               WHERE "userId" = $1 AND "issueSlug" = $2 AND "section" = $3`,
-              userId,
-              issueSlug,
-              section
-            )
-          }
+      // Mark as generating
+      for (const issueSlug of issueNames) {
+        for (const section of affectedSections) {
+          await prisma.$queryRawUnsafe(
+            `UPDATE "InsightsMetadata" SET "status" = 'generating', "updatedAt" = NOW() 
+             WHERE "userId" = $1 AND "issueSlug" = $2 AND "section" = $3`,
+            userId,
+            issueSlug,
+            section
+          )
         }
-
-        await precomputeIssueSectionsForUser(userId, { concurrency: 2, sectionsFilter: affectedSections })
-
-        for (const issueSlug of issueNames) {
-          for (const section of affectedSections) {
-            await updateMetadataAfterGeneration(userId, issueSlug, section)
-          }
-        }
-        console.log(`[manual-regeneration] Completed sections: ${affectedSections.join(', ')} for user ${userId}`)
-      } catch (error) {
-        console.error('[manual-regeneration] Failed to regenerate sections', error)
-        try {
-          await markSectionsStale(userId, affectedSections)
-        } catch {}
       }
-    })
+
+      await precomputeIssueSectionsForUser(userId, { concurrency: 2, sectionsFilter: affectedSections })
+
+      for (const issueSlug of issueNames) {
+        for (const section of affectedSections) {
+          await updateMetadataAfterGeneration(userId, issueSlug, section)
+        }
+      }
+      console.log(`[manual-regeneration] Completed sections: ${affectedSections.join(', ')} for user ${userId}`)
+    } catch (error) {
+      console.error('[manual-regeneration] Failed to regenerate sections', error)
+      try {
+        await markSectionsStale(userId, affectedSections)
+      } catch {}
+      throw error
+    }
+  }
+
+  try {
+    if (options.inline) {
+      if (options.runContext) {
+        await withRunContext(options.runContext, runTask)
+      } else {
+        await runTask()
+      }
+    } else {
+      setImmediate(() => {
+        const runner = async () => {
+          if (options.runContext) {
+            await withRunContext(options.runContext, runTask)
+          } else {
+            await runTask()
+          }
+        }
+        runner().catch((error) => {
+          console.error('[manual-regeneration] Background regeneration failed', error)
+        })
+      })
+    }
   } catch (error) {
     console.error('[manual-regeneration] Failed to start regeneration', error)
   }

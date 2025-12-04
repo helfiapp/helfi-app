@@ -292,6 +292,55 @@ export class CreditManager {
     return toCharge <= 0;
   }
 
+  /**
+   * Charge subscription (monthly wallet) credits and top-ups separately.
+   * This preserves the correct margin when different wallets have different
+   * credit valuations (e.g., subscription vs. top-up pricing).
+   */
+  async chargeSplitCredits(subscriptionCredits: number, topUpCredits: number): Promise<boolean> {
+    const sub = Math.max(0, Math.round(subscriptionCredits || 0));
+    const top = Math.max(0, Math.round(topUpCredits || 0));
+    if (sub === 0 && top === 0) return true;
+
+    await this.ensureMonthlyReset();
+    const status = await this.getWalletStatus();
+    const monthlyRemaining = Math.max(0, status.monthlyRemainingCents || 0);
+    const topUpsAvailable =
+      (status.topUps || []).reduce((sum, t) => sum + Math.max(0, t.availableCents || 0), 0) || 0;
+
+    // Guard rails: do not silently dip into top-ups for the subscription portion
+    if (sub > monthlyRemaining) return false;
+    if (top > topUpsAvailable) return false;
+
+    if (sub > 0) {
+      const okSub = await this.chargeCents(sub);
+      if (!okSub) return false;
+    }
+
+    if (top > 0) {
+      let remainingTopUp = top;
+      const now = new Date();
+      const topUps = await prisma.creditTopUp.findMany({
+        where: { userId: this.userId, expiresAt: { gt: now } },
+        orderBy: { expiresAt: 'asc' },
+      });
+      for (const tu of topUps) {
+        const available = Math.max(0, tu.amountCents - tu.usedCents);
+        if (available <= 0) continue;
+        const consume = Math.min(available, remainingTopUp);
+        await prisma.creditTopUp.update({
+          where: { id: tu.id },
+          data: { usedCents: tu.usedCents + consume },
+        });
+        remainingTopUp -= consume;
+        if (remainingTopUp <= 0) break;
+      }
+      if (remainingTopUp > 0) return false;
+    }
+
+    return true;
+  }
+
   // Check if user has enough credits for a feature
   async checkCredits(featureType: FeatureType): Promise<CreditStatus> {
     const user = await prisma.user.findUnique({

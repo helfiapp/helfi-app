@@ -214,6 +214,9 @@ model AIUsageEvent {
   success           Boolean   @default(true)
   errorMessage      String?
   detail            String?
+  runId             String?
+
+  @@index([runId])
 }
 
 // Fitbit Data Sync - stores synced data from Fitbit API

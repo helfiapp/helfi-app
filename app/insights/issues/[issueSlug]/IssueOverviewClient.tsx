@@ -2,7 +2,16 @@
 
 import Link from 'next/link'
 import type { IssueSummary, IssueSectionKey } from '@/lib/insights/issue-engine'
-import { ISSUE_SECTION_ORDER } from '@/lib/insights/issue-engine'
+
+const SECTION_ORDER: IssueSectionKey[] = [
+  'overview',
+  'exercise',
+  'supplements',
+  'medications',
+  'interactions',
+  'labs',
+  'nutrition',
+]
 
 interface IssueOverviewClientProps {
   issue: IssueSummary
@@ -20,7 +29,7 @@ export default function IssueOverviewClient({ issue, issueSlug }: IssueOverviewC
     exercise: 'Understand training patterns and recommended adjustments.',
   }
 
-  const navigationOrder = ISSUE_SECTION_ORDER.filter((section) => section !== 'overview') as IssueSectionKey[]
+  const navigationOrder = SECTION_ORDER.filter((section) => section !== 'overview') as IssueSectionKey[]
 
   return (
     <div className="space-y-6">
