@@ -11,8 +11,6 @@ import type { RunContext } from '@/lib/run-context'
 // Allow longer runtime so the full regeneration completes without a gateway timeout
 export const maxDuration = 120
 
-const RESPONSE_TIMEOUT_MS = 25000
-
 const VALID_CHANGE_TYPES = [
   'supplements',
   'medications',
@@ -114,18 +112,10 @@ export async function POST(request: NextRequest) {
     }
 
     const runContext: RunContext = { runId, feature: 'insights:targeted' }
-    const regenPromise = triggerManualSectionRegeneration(session.user.id, changeTypes, {
+    const sections = await triggerManualSectionRegeneration(session.user.id, changeTypes, {
       inline: true,
       runContext,
     })
-    let sections: string[] = []
-    const regenResult = await Promise.race([
-      regenPromise.then((s) => {
-        sections = s
-        return 'done' as const
-      }),
-      new Promise<'timeout'>((resolve) => setTimeout(() => resolve('timeout'), RESPONSE_TIMEOUT_MS)),
-    ])
     const affected = changeTypes.reduce<string[]>((acc, type) => {
       const mapped = getAffectedSections(type)
       mapped.forEach((s) => acc.push(s))
@@ -201,34 +191,6 @@ export async function POST(request: NextRequest) {
           topUpCreditsCharged: plan.topUpCredits,
         },
       }
-    }
-
-    if (regenResult === 'timeout') {
-      setImmediate(() => {
-        regenPromise
-          .then(() => finalizeCharge())
-          .then((result) => {
-            if (!result?.success) {
-              console.warn('[insights.regenerate-targeted] Background charge failed', result)
-            }
-          })
-          .catch((error) => {
-            console.error('[insights.regenerate-targeted] Background regeneration failed', error)
-          })
-      })
-
-      return NextResponse.json(
-        {
-          success: true,
-          message: 'Still generating in the background. We will finish and charge once complete.',
-          changeTypes: Array.from(new Set(changeTypes)),
-          sectionsTriggered: sections,
-          affectedSections: Array.from(new Set(affected)),
-          runId,
-          background: true,
-        },
-        { status: 202 }
-      )
     }
 
     const chargeResult = await finalizeCharge()
