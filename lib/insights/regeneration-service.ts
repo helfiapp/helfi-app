@@ -66,9 +66,10 @@ export function getAffectedSections(changeType: DataChangeEvent['changeType']): 
     medications: ['medications', 'interactions'],
     food: ['nutrition'],
     exercise: ['exercise'],
-    health_goals: ['overview'], // Goals affect overview
-    health_situations: ['overview'],
-    profile: ['overview'], // Weight/height/bodytype affect overview
+    // Goals, situations, and profile tweaks should refresh all LLM-backed sections so we always hit the model
+    health_goals: ['overview', 'supplements', 'medications', 'exercise', 'nutrition', 'lifestyle', 'labs'],
+    health_situations: ['overview', 'supplements', 'medications', 'exercise', 'nutrition', 'lifestyle', 'labs'],
+    profile: ['overview', 'supplements', 'medications', 'exercise', 'nutrition', 'lifestyle', 'labs'], // Weight/height/bodytype affect everything
     blood_results: ['labs'],
   }
   return mapping[changeType] || []
