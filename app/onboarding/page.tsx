@@ -5719,6 +5719,14 @@ export default function Onboarding() {
           setAllowAutosave(true);
         }
       }
+      const durableRaw = localStorage.getItem('onboarding:durableForm');
+      if (durableRaw) {
+        const parsed = JSON.parse(durableRaw);
+        if (parsed && typeof parsed === 'object') {
+          setForm((prev: any) => ({ ...prev, ...parsed }));
+          setAllowAutosave(true);
+        }
+      }
     } catch (e) {
       console.warn('Warm form cache read failed', e);
     }
@@ -5729,6 +5737,7 @@ export default function Onboarding() {
     if (typeof window === 'undefined') return;
     try {
       sessionStorage.setItem('onboarding:warmForm', JSON.stringify(form));
+      localStorage.setItem('onboarding:durableForm', JSON.stringify(form));
     } catch (e) {
       console.warn('Warm form cache write failed', e);
     }
