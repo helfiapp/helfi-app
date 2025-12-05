@@ -273,7 +273,7 @@ function OnboardingNav() {
   );
 }
 
-function GenderStep({ onNext, initial, initialAgreed }: { onNext: (data: any) => void, initial?: string, initialAgreed?: boolean }) {
+function GenderStep({ onNext, initial, initialAgreed, onPartialSave }: { onNext: (data: any) => void, initial?: string, initialAgreed?: boolean, onPartialSave?: (data: any) => void }) {
   const [gender, setGender] = useState('');
   const [agreed, setAgreed] = useState(false);
   
@@ -304,6 +304,16 @@ function GenderStep({ onNext, initial, initialAgreed }: { onNext: (data: any) =>
     setAgreed(checked);
     localStorage.setItem('helfi-terms-agreed', checked.toString());
   };
+
+  // Persist gender/consent selections immediately so navigating away retains them
+  useEffect(() => {
+    if (onPartialSave) {
+      onPartialSave({
+        gender: gender || initial || '',
+        termsAccepted: agreed,
+      });
+    }
+  }, [gender, agreed, initial, onPartialSave]);
   
   return (
     <div className="max-w-md mx-auto">
@@ -361,7 +371,7 @@ function GenderStep({ onNext, initial, initialAgreed }: { onNext: (data: any) =>
   );
 }
 
-const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { onNext: (data: any) => void, onBack: () => void, initial?: any }) {
+const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPartialSave }: { onNext: (data: any) => void, onBack: () => void, initial?: any, onPartialSave?: (data: any) => void }) {
   const [weight, setWeight] = useState(initial?.weight || '');
   const [birthdate, setBirthdate] = useState(initial?.birthdate || '');
   const [birthYear, setBirthYear] = useState('');
@@ -568,12 +578,13 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
     return () => window.removeEventListener('message', handler);
   }, []);
 
+  const birthdateFromParts = React.useMemo(
+    () =>
+      birthYear && birthMonth && birthDay ? `${birthYear}-${birthMonth}-${birthDay}` : birthdate,
+    [birthYear, birthMonth, birthDay, birthdate],
+  );
+
   const buildPayload = () => {
-    // Derive birthdate from dropdown parts to avoid any timing/race issues
-    const birthdateFromParts =
-      birthYear && birthMonth && birthDay
-        ? `${birthYear}-${birthMonth}-${birthDay}`
-        : birthdate
     return {
       weight,
       birthdate: birthdateFromParts,
@@ -684,6 +695,33 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
   const handleBodyTypeChange = useCallback((type: string) => {
     setBodyType(type);
   }, []);
+  // Persist physical info as the user fills it out so moving between steps keeps data
+  useEffect(() => {
+    if (!onPartialSave) return;
+    const payload = {
+      weight,
+      birthdate: birthdateFromParts || '',
+      height: unit === 'metric' ? height : `${feet}'${inches}"`,
+      feet,
+      inches,
+      bodyType,
+      goalChoice,
+      goalIntensity,
+      unit,
+    };
+    onPartialSave(payload);
+  }, [
+    weight,
+    birthdateFromParts,
+    height,
+    feet,
+    inches,
+    bodyType,
+    goalChoice,
+    goalIntensity,
+    unit,
+    onPartialSave,
+  ]);
 
   const bodyTypeDescriptions = {
     ectomorph: "Naturally lean and thin, with difficulty gaining weight and muscle. Fast metabolism.",
@@ -1002,7 +1040,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
   );
 });
 
-function ExerciseStep({ onNext, onBack, initial }: { onNext: (data: any) => void, onBack: () => void, initial?: any }) {
+function ExerciseStep({ onNext, onBack, initial, onPartialSave }: { onNext: (data: any) => void, onBack: () => void, initial?: any, onPartialSave?: (data: any) => void }) {
   const [exerciseFrequency, setExerciseFrequency] = useState(initial?.exerciseFrequency || '');
   const [exerciseTypes, setExerciseTypes] = useState<string[]>(initial?.exerciseTypes || []);
   const [exerciseDurations, setExerciseDurations] = useState<Record<string, string>>(
@@ -1090,6 +1128,17 @@ function ExerciseStep({ onNext, onBack, initial }: { onNext: (data: any) => void
       setShowUpdatePopup(true);
     }
   };
+
+  // Persist exercise selections as they change so leaving/returning keeps the state
+  useEffect(() => {
+    if (!onPartialSave) return;
+    const payload = {
+      exerciseFrequency: exerciseFrequency || '',
+      exerciseTypes: exerciseTypes || [],
+      exerciseDurations,
+    };
+    onPartialSave(payload);
+  }, [exerciseFrequency, exerciseTypes, exerciseDurations, onPartialSave]);
 
   const handleNext = () => {
     requestNavigation(() => {
@@ -1471,7 +1520,7 @@ function ExerciseStep({ onNext, onBack, initial }: { onNext: (data: any) => void
   );
 }
 
-function HealthGoalsStep({ onNext, onBack, initial }: { onNext: (data: any) => void, onBack: () => void, initial?: any }) {
+function HealthGoalsStep({ onNext, onBack, initial, onPartialSave }: { onNext: (data: any) => void, onBack: () => void, initial?: any, onPartialSave?: (data: any) => void }) {
   const defaultGoals = [
     'Acne', 'Allergies', 'Anxiety', 'Asthma', 'Bloating', 'Bowel Movements', 'Brain Fog', 'Cold Sores', 'Constipation', 'Depression', 'Diarrhea', 'Digestion', 'Dry Skin', 'Eczema', 'Energy', 'Erection Quality', 'Eye Irritation', 'Fatigue', 'Gas', 'Hair Loss', 'Headaches', 'Heartburn', 'IBS Flare', 'Insomnia', 'Irritability', 'Itchy Skin', 'Joint Pain', 'Libido', 'Mood', 'Muscle Cramps', 'Nausea', 'PMS Symptoms', 'Rashes', 'Sleep Quality', 'Stress', 'Urinary Frequency', 'Weight Fluctuation'
   ];
@@ -1505,6 +1554,15 @@ function HealthGoalsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
     const customGoalsChanged = JSON.stringify(customGoals.sort()) !== JSON.stringify(initialCustomGoals.sort());
     setHasUnsavedChanges((goalsChanged || customGoalsChanged) && (goals.length > 0 || customGoals.length > 0));
   }, [goals, customGoals, initial]);
+
+  // Persist goals as they change so selections stick across navigation
+  useEffect(() => {
+    if (!onPartialSave) return;
+    onPartialSave({
+      goals,
+      customGoals,
+    });
+  }, [goals, customGoals, onPartialSave]);
 
   // Prevent browser navigation when there are unsaved changes
   useEffect(() => {
@@ -2018,7 +2076,7 @@ function HealthGoalsStep({ onNext, onBack, initial }: { onNext: (data: any) => v
   );
 }
 
-function HealthSituationsStep({ onNext, onBack, initial }: { onNext: (data: any) => void, onBack: () => void, initial?: any }) {
+function HealthSituationsStep({ onNext, onBack, initial, onPartialSave }: { onNext: (data: any) => void, onBack: () => void, initial?: any, onPartialSave?: (data: any) => void }) {
   const [healthIssues, setHealthIssues] = useState(initial?.healthSituations?.healthIssues || initial?.healthIssues || '');
   const [healthProblems, setHealthProblems] = useState(initial?.healthSituations?.healthProblems || initial?.healthProblems || '');
   const [additionalInfo, setAdditionalInfo] = useState(initial?.healthSituations?.additionalInfo || initial?.additionalInfo || '');
@@ -2038,6 +2096,18 @@ function HealthSituationsStep({ onNext, onBack, initial }: { onNext: (data: any)
                        additionalInfo.trim() !== initialInfo.trim();
     setHasUnsavedChanges(hasChanged && !skipped && (healthIssues.trim() || healthProblems.trim() || additionalInfo.trim()));
   }, [healthIssues, healthProblems, additionalInfo, skipped, initial]);
+
+  useEffect(() => {
+    if (!onPartialSave) return;
+    onPartialSave({
+      healthSituations: {
+        healthIssues: healthIssues.trim(),
+        healthProblems: healthProblems.trim(),
+        additionalInfo: additionalInfo.trim(),
+        skipped,
+      },
+    });
+  }, [healthIssues, healthProblems, additionalInfo, skipped, onPartialSave]);
 
   // Prevent browser navigation when there are unsaved changes
   useEffect(() => {
@@ -2213,7 +2283,7 @@ function HealthSituationsStep({ onNext, onBack, initial }: { onNext: (data: any)
   );
 }
 
-function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { onNext: (data: any) => void, onBack: () => void, initial?: any, onNavigateToAnalysis?: (data?: any) => void }) {
+function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPartialSave }: { onNext: (data: any) => void, onBack: () => void, initial?: any, onNavigateToAnalysis?: (data?: any) => void, onPartialSave?: (data: any) => void }) {
   const [supplements, setSupplements] = useState(initial?.supplements || []);
   
   // Fix data loading race condition - update supplements when initial data loads
@@ -2222,6 +2292,11 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
       setSupplements(initial.supplements);
     }
   }, [initial?.supplements]);
+  useEffect(() => {
+    if (onPartialSave) {
+      onPartialSave({ supplements });
+    }
+  }, [supplements, onPartialSave]);
   
   const [name, setName] = useState('');
   const [dosage, setDosage] = useState('');
@@ -5530,6 +5605,7 @@ export default function Onboarding() {
   const [isNavigating, setIsNavigating] = useState(false);
   const [profileImage, setProfileImage] = useState<string>('');
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const formRef = useRef<any>({});
   const [showFirstTimeModal, setShowFirstTimeModal] = useState(false);
   // Track if the user has dismissed the first-time modal during this visit,
   // so they can actually complete the intake instead of being stuck.
@@ -5623,6 +5699,10 @@ export default function Onboarding() {
       console.error('Error loading user data:', error);
     }
   };
+  // Keep a ref of the latest form for partial saves
+  useEffect(() => {
+    formRef.current = form;
+  }, [form]);
 
   // If user is clearly new or incomplete, show the health-setup modal whenever
   // they arrive on this page, but allow them to dismiss it for the current visit
@@ -5670,6 +5750,17 @@ export default function Onboarding() {
       }
     }, 1000); // Save after 1 second of inactivity
   }, []);
+
+  const persistForm = useCallback(
+    (partial: any) => {
+      setForm((prev: any) => {
+        const next = { ...prev, ...partial };
+        debouncedSave(next);
+        return next;
+      });
+    },
+    [debouncedSave],
+  );
 
   useEffect(() => {
     const scrollToTop = () => {
@@ -6100,12 +6191,12 @@ export default function Onboarding() {
 
         {/* Content */}
         <div className="flex-1 px-4 py-2 pb-20">
-          {step === 0 && <GenderStep onNext={handleNext} initial={form.gender} initialAgreed={form.termsAccepted} />}
-          {step === 1 && <PhysicalStep onNext={handleNext} onBack={handleBack} initial={form} />}
-          {step === 2 && <ExerciseStep onNext={handleNext} onBack={handleBack} initial={form} />}
-          {step === 3 && <HealthGoalsStep onNext={handleNext} onBack={handleBack} initial={form} />}
-          {step === 4 && <HealthSituationsStep onNext={handleNext} onBack={handleBack} initial={form} />}
-          {step === 5 && <SupplementsStep onNext={handleNext} onBack={handleBack} initial={form} onNavigateToAnalysis={(data?: any) => {
+          {step === 0 && <GenderStep onNext={handleNext} initial={form.gender} initialAgreed={form.termsAccepted} onPartialSave={persistForm} />}
+          {step === 1 && <PhysicalStep onNext={handleNext} onBack={handleBack} initial={form} onPartialSave={persistForm} />}
+          {step === 2 && <ExerciseStep onNext={handleNext} onBack={handleBack} initial={form} onPartialSave={persistForm} />}
+          {step === 3 && <HealthGoalsStep onNext={handleNext} onBack={handleBack} initial={form} onPartialSave={persistForm} />}
+          {step === 4 && <HealthSituationsStep onNext={handleNext} onBack={handleBack} initial={form} onPartialSave={persistForm} />}
+          {step === 5 && <SupplementsStep onNext={handleNext} onBack={handleBack} initial={form} onPartialSave={persistForm} onNavigateToAnalysis={(data?: any) => {
             // REAL FIX: Use flushSync to ensure state updates complete before navigation
             if (data) {
               flushSync(() => {
