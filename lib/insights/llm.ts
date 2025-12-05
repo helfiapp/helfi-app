@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { runChatCompletionWithLogging } from '../ai-usage-logger'
+import { getRunContext } from '../run-context'
 
 const CACHE_TTL_MS = 1000 * 60 * 30
 const INSIGHTS_LLM_ENABLED = process.env.ENABLE_INSIGHTS_LLM === 'true'
@@ -29,10 +30,16 @@ function getOpenAIClient() {
   return _openai
 }
 
-async function createCompletion(params: any, context: { feature: string; userId?: string | null; issueSlug?: string | null } = { feature: 'insights:unknown' }) {
+async function createCompletion(
+  params: any,
+  context: { feature: string; userId?: string | null; issueSlug?: string | null; runId?: string | null } = {
+    feature: 'insights:unknown',
+  }
+) {
   const openai = getOpenAIClient()
   if (!openai) return null
-  return runChatCompletionWithLogging(openai, params, context)
+  const runId = getRunContext()?.runId ?? null
+  return runChatCompletionWithLogging(openai, params, { ...context, runId })
 }
 
 const DEFAULT_INSIGHTS_MODEL = process.env.OPENAI_INSIGHTS_MODEL ?? 'gpt-4o-mini'
@@ -494,8 +501,9 @@ async function classifyCandidatesForSection(params: {
   trace: string
   userId?: string | null
   issueSlug?: string | null
+  runId?: string | null
 }): Promise<ClassifiedItem[] | null> {
-  const { issueName, mode, items, trace, userId, issueSlug } = params
+  const { issueName, mode, items, trace, userId, issueSlug, runId } = params
   if (!items.length) return []
   try {
     const system = 'You are a precise classifier. For each item, assign a canonicalType and whether it is in-domain for the requested section. Output strict JSON.'
@@ -515,7 +523,7 @@ Items:\n${JSON.stringify(items, null, 2)}`
         { role: 'system', content: system },
         { role: 'user', content: user },
       ],
-    }, { feature: `insights:classify:${mode}`, userId, issueSlug })
+    }, { feature: `insights:classify:${mode}`, userId, issueSlug, runId })
     console.timeEnd(`${trace}:classify`)
 
     const content = response.choices?.[0]?.message?.content
@@ -554,8 +562,9 @@ async function rewriteCandidatesToDomain(params: {
   trace: string
   userId?: string | null
   issueSlug?: string | null
+  runId?: string | null
 }): Promise<Array<{ name: string; reason: string }> | null> {
-  const { issueName, mode, bucket, expectedType, items, attempts = 2, trace, userId, issueSlug } = params
+  const { issueName, mode, bucket, expectedType, items, attempts = 2, trace, userId, issueSlug, runId } = params
   if (!items.length) return []
   const openai = getOpenAIClient()
   if (!openai) return null
@@ -571,16 +580,16 @@ async function rewriteCandidatesToDomain(params: {
         max_tokens: 600,
         response_format: { type: 'json_object' },
         messages: [
-          { role: 'system', content: 'Rewrite items into the requested domain. Output strict JSON only.' },
-          {
-            role: 'user',
-            content:
-              `For issue "${issueName}", SECTION: ${mode}. Some ${bucket} items are out-of-domain. Rewrite each into domain-conforming items that are strictly of type ${typeText}. Keep mechanisms relevant to ${issueName}. Return JSON {"items": Array<{"name": string, "reason": string}>}.
+        { role: 'system', content: 'Rewrite items into the requested domain. Output strict JSON only.' },
+        {
+          role: 'user',
+          content:
+            `For issue "${issueName}", SECTION: ${mode}. Some ${bucket} items are out-of-domain. Rewrite each into domain-conforming items that are strictly of type ${typeText}. Keep mechanisms relevant to ${issueName}. Return JSON {"items": Array<{"name": string, "reason": string}>}.
 
 Items to rewrite:\n${JSON.stringify(items, null, 2)}`,
-          },
-        ],
-      }, { feature: `insights:rewrite:${mode}`, userId, issueSlug })
+        },
+      ],
+      }, { feature: `insights:rewrite:${mode}`, userId, issueSlug, runId })
       console.timeEnd(`${trace}:rewrite-${bucket}#${tries}`)
       const content = response.choices?.[0]?.message?.content
       if (!content) continue
@@ -615,8 +624,9 @@ async function fillMissingItemsForSection(params: {
   trace: string
   userId?: string | null
   issueSlug?: string | null
+  runId?: string | null
 }): Promise<Array<{ name: string; reason: string; protocol?: string | null }> | null> {
-  const { issueName, mode, bucket, expectedType, needed, disallowNames, trace, userId, issueSlug } = params
+  const { issueName, mode, bucket, expectedType, needed, disallowNames, trace, userId, issueSlug, runId } = params
   if (needed <= 0) return []
   const openai = getOpenAIClient()
   if (!openai) return null
@@ -651,7 +661,7 @@ ${diversityHint}`
         { role: 'system', content: 'You generate concise, clinically-relevant items. Output strict JSON only.' },
         { role: 'user', content: prompt },
       ],
-    }, { feature: `insights:fill-missing:${mode}`, userId, issueSlug })
+    }, { feature: `insights:fill-missing:${mode}`, userId, issueSlug, runId })
     console.timeEnd(`${trace}:fill-${bucket}`)
     const content = response.choices?.[0]?.message?.content
     if (!content) return null
@@ -1079,6 +1089,7 @@ export async function generateSectionInsightsFromLLM(
   const minAvoid = options.minAvoid ?? 4
   const maxRetries = options.maxRetries ?? 3
   const disableCache = options.disableCache ?? false
+  const runId = getRunContext()?.runId ?? null
 
   const userContext = JSON.stringify(
     {
@@ -1148,7 +1159,7 @@ export async function generateSectionInsightsFromLLM(
           },
           { role: 'user', content: prompt },
         ],
-      }, { feature: `insights:generate:${input.mode}`, userId, issueSlug })
+      }, { feature: `insights:generate:${input.mode}`, userId, issueSlug, runId })
       console.timeEnd(`[insights.gen:${input.mode}]`)
       const elapsed = Date.now() - g0
       generateMs += elapsed
@@ -1256,6 +1267,9 @@ export async function generateSectionInsightsFromLLM(
       mode: input.mode,
       items: itemsForClassification,
       trace,
+      runId,
+      userId,
+      issueSlug,
     })
     classifyMs += Date.now() - c0
     const typeMap = new Map<string, CanonicalType>()
@@ -1297,6 +1311,7 @@ export async function generateSectionInsightsFromLLM(
         trace,
         userId,
         issueSlug,
+        runId,
       })
       rewriteMs += Date.now() - rw0
       if (rewritten?.length) {
@@ -1306,6 +1321,7 @@ export async function generateSectionInsightsFromLLM(
           mode: input.mode,
           items: rewritten.map((m) => ({ name: m.name, reason: m.reason })),
           trace,
+          runId,
           userId,
           issueSlug,
         })
@@ -1331,6 +1347,7 @@ export async function generateSectionInsightsFromLLM(
         trace,
         userId,
         issueSlug,
+        runId,
       })
       rewriteMs += Date.now() - rw1
       if (rewritten?.length) {
@@ -1340,6 +1357,7 @@ export async function generateSectionInsightsFromLLM(
           mode: input.mode,
           items: rewritten.map((m) => ({ name: m.name, reason: m.reason })),
           trace,
+          runId,
           userId,
           issueSlug,
         })
@@ -1378,6 +1396,7 @@ export async function generateSectionInsightsFromLLM(
           trace,
           userId,
           issueSlug,
+          runId,
         })
         fillMs += Date.now() - f0
         attempts += 1
@@ -1389,6 +1408,7 @@ export async function generateSectionInsightsFromLLM(
           mode: input.mode,
           items: more.map((m) => ({ name: m.name, reason: m.reason })),
           trace,
+          runId,
           userId,
           issueSlug,
         })
