@@ -5606,6 +5606,7 @@ export default function Onboarding() {
   const [profileImage, setProfileImage] = useState<string>('');
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const formRef = useRef<any>({});
+  const [allowAutosave, setAllowAutosave] = useState(false);
   const [showFirstTimeModal, setShowFirstTimeModal] = useState(false);
   // Track if the user has dismissed the first-time modal during this visit,
   // so they can actually complete the intake instead of being stuck.
@@ -5697,6 +5698,8 @@ export default function Onboarding() {
       }
     } catch (error) {
       console.error('Error loading user data:', error);
+    } finally {
+      setAllowAutosave(true);
     }
   };
   // Keep a ref of the latest form for partial saves
@@ -5713,6 +5716,7 @@ export default function Onboarding() {
         const parsed = JSON.parse(raw);
         if (parsed && typeof parsed === 'object') {
           setForm((prev: any) => ({ ...prev, ...parsed }));
+          setAllowAutosave(true);
         }
       }
     } catch (e) {
@@ -5729,6 +5733,12 @@ export default function Onboarding() {
       console.warn('Warm form cache write failed', e);
     }
   }, [form]);
+
+  // Once autosave is allowed (after data load), push current form to backend to avoid blanks
+  useEffect(() => {
+    if (!allowAutosave) return;
+    debouncedSave(form);
+  }, [allowAutosave, debouncedSave, form]);
 
   // If user is clearly new or incomplete, show the health-setup modal whenever
   // they arrive on this page, but allow them to dismiss it for the current visit
@@ -5781,11 +5791,13 @@ export default function Onboarding() {
     (partial: any) => {
       setForm((prev: any) => {
         const next = { ...prev, ...partial };
-        debouncedSave(next);
+        if (allowAutosave) {
+          debouncedSave(next);
+        }
         return next;
       });
     },
-    [debouncedSave],
+    [debouncedSave, allowAutosave],
   );
 
   useEffect(() => {
