@@ -5734,12 +5734,6 @@ export default function Onboarding() {
     }
   }, [form]);
 
-  // Once autosave is allowed (after data load), push current form to backend to avoid blanks
-  useEffect(() => {
-    if (!allowAutosave) return;
-    debouncedSave(form);
-  }, [allowAutosave, debouncedSave, form]);
-
   // If user is clearly new or incomplete, show the health-setup modal whenever
   // they arrive on this page, but allow them to dismiss it for the current visit
   // so they can actually complete the steps.
@@ -5799,6 +5793,12 @@ export default function Onboarding() {
     },
     [debouncedSave, allowAutosave],
   );
+
+  // Once autosave is allowed (after data load), push current form to backend to avoid blanks
+  useEffect(() => {
+    if (!allowAutosave) return;
+    debouncedSave(form);
+  }, [allowAutosave, debouncedSave, form]);
 
   useEffect(() => {
     const scrollToTop = () => {
