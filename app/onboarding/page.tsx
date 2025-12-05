@@ -226,9 +226,14 @@ async function triggerTargetedInsightsRefresh(changeTypes: InsightChangeType[], 
     const topUpCredits = typeof data.topUpCreditsCharged === 'number' ? data.topUpCreditsCharged : 0;
     const usageEvents = typeof data.usageEvents === 'number' ? data.usageEvents : null;
     if (!options.silent) {
-      const msg = charged > 0
-        ? `Charged ${charged} credits${costDollars ? ` (AI cost ~$${costDollars})` : ''} for this insights update.${subscriptionCredits || topUpCredits ? ` [Sub: ${subscriptionCredits}, Top-up: ${topUpCredits}]` : ''}${usageEvents != null ? ` • LLM calls: ${usageEvents}` : ''}`
-        : 'Insights updated without any AI charges.';
+      let msg = '';
+      if (data.background) {
+        msg = 'Still finishing up. Insights will refresh shortly and credits will update once done.';
+      } else {
+        msg = charged > 0
+          ? `Charged ${charged} credits${costDollars ? ` (AI cost ~$${costDollars})` : ''} for this insights update.${subscriptionCredits || topUpCredits ? ` [Sub: ${subscriptionCredits}, Top-up: ${topUpCredits}]` : ''}${usageEvents != null ? ` • LLM calls: ${usageEvents}` : ''}`
+          : 'Insights updated without any AI charges.';
+      }
       alert(msg);
     }
     try {

@@ -11,6 +11,8 @@ import type { RunContext } from '@/lib/run-context'
 // Allow longer runtime so the full regeneration completes without a gateway timeout
 export const maxDuration = 120
 
+const RESPONSE_TIMEOUT_MS = 20000
+
 const VALID_CHANGE_TYPES = [
   'supplements',
   'medications',
@@ -112,10 +114,22 @@ export async function POST(request: NextRequest) {
     }
 
     const runContext: RunContext = { runId, feature: 'insights:targeted' }
-    const sections = await triggerManualSectionRegeneration(session.user.id, changeTypes, {
+    console.log('[insights.regenerate-targeted] start', { runId, userId: session.user.id, changeTypes })
+
+    const regenPromise = triggerManualSectionRegeneration(session.user.id, changeTypes, {
       inline: true,
       runContext,
     })
+
+    let sections: string[] = []
+    const regenResult = await Promise.race([
+      regenPromise.then((s) => {
+        sections = s
+        return 'done' as const
+      }),
+      new Promise<'timeout'>((resolve) => setTimeout(() => resolve('timeout'), RESPONSE_TIMEOUT_MS)),
+    ])
+
     const affected = changeTypes.reduce<string[]>((acc, type) => {
       const mapped = getAffectedSections(type)
       mapped.forEach((s) => acc.push(s))
@@ -193,8 +207,36 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    if (regenResult === 'timeout') {
+      console.warn('[insights.regenerate-targeted] timeout, continuing in background', { runId, userId: session.user.id })
+      regenPromise
+        .then(async () => {
+          const chargeResult = await finalizeCharge()
+          if (!chargeResult.success) {
+            console.warn('[insights.regenerate-targeted] charge failed after timeout', { runId, chargeResult })
+          }
+        })
+        .catch((error) => {
+          console.error('[insights.regenerate-targeted] background regeneration failed', { runId, error })
+        })
+
+      return NextResponse.json(
+        {
+          success: true,
+          message: 'Still finishing in the background. Insights will refresh shortly.',
+          changeTypes: Array.from(new Set(changeTypes)),
+          sectionsTriggered: sections,
+          affectedSections: Array.from(new Set(affected)),
+          runId,
+          background: true,
+        },
+        { status: 202 }
+      )
+    }
+
     const chargeResult = await finalizeCharge()
     if (!chargeResult.success) {
+      console.warn('[insights.regenerate-targeted] charge failed', { runId, chargeResult })
       return NextResponse.json(chargeResult.body, { status: chargeResult.status })
     }
 
