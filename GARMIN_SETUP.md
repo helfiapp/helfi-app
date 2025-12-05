@@ -5,6 +5,11 @@ This guide wires the Garmin Health/Connect evaluation API into Helfi so users ca
 ---
 ## Handoff Summary (Dec 5, 2025) – Garmin OAuth still failing
 
+**Update (Dec 6, 2025)**  
+- Identified why `request_token` was failing: we were calling the Wellness API base (`https://healthapi.garmin.com/wellness-api/rest/request_token`), which expects a user access token and returns `401 {"errorMessage":"oauth_token (UserAccessToken) missing"}`.  
+- Code now uses a dedicated OAuth base (default `https://connectapi.garmin.com/oauth-service/oauth`) for `request_token` and `access_token`, while keeping the Wellness base for registration/webhooks.  
+- New env var: `GARMIN_OAUTH_BASE_URL` (set in Vercel + `.env.local`). Use `connectapi.garmin.com/...` for production/eval; switch to `connectapitest.garmin.com/...` if Garmin confirms this key is test-only.
+
 **Current blocker**  
 Popup shows `{"error":"Failed to start Garmin authorization"}`. This means the Garmin request_token step is failing (likely 401/403 from Garmin). I added logging to surface the exact Garmin response in server logs.
 
@@ -23,6 +28,7 @@ Popup shows `{"error":"Failed to start Garmin authorization"}`. This means the G
   - `GARMIN_CONSUMER_KEY` set
   - `GARMIN_CONSUMER_SECRET` set
   - `GARMIN_REDIRECT_URI = https://helfi.ai/api/auth/garmin/callback`
+  - `GARMIN_OAUTH_BASE_URL = https://connectapi.garmin.com/oauth-service/oauth` (override to `connectapitest...` if needed)
   - `GARMIN_API_BASE_URL = https://healthapi.garmin.com/wellness-api/rest`
 
 - Deployments:
@@ -37,8 +43,8 @@ Popup shows `{"error":"Failed to start Garmin authorization"}`. This means the G
 1) Reproduce “Connect Garmin” on production; check server logs for the exact Garmin response from request_token. The logging should print status/body to the server console.
 2) If Garmin returns 401/403:
    - Triple-check in the Garmin portal that the redirect URL is exactly `https://helfi.ai/api/auth/garmin/callback` (no trailing slash/typo).
-   - Ensure we’re in Evaluation keys hitting the Evaluation base URL (already set).
-   - If needed, regenerate Client Secret in Garmin portal and update Vercel env + redeploy.
+   - Ensure we’re in Evaluation keys hitting the Evaluation base URL (already set). OAuth calls now target `GARMIN_OAUTH_BASE_URL`; change to `https://connectapitest.garmin.com/oauth-service/oauth` if Garmin confirms we must use the test host.
+   - If request_token still shows auth errors, regenerate Client Secret in Garmin portal and update Vercel env + redeploy.
 3) If request_token succeeds but access_token fails, check callback handling and token secret storage in `GarminRequestToken` table.
 4) Add a small admin view/log viewer for `GarminWebhookLog` / recent errors if needed.
 
@@ -63,6 +69,8 @@ Add to `.env.local` and Vercel (Production + Preview):
 GARMIN_CONSUMER_KEY=xxxx
 GARMIN_CONSUMER_SECRET=xxxx
 GARMIN_REDIRECT_URI=https://helfi.ai/api/auth/garmin/callback
+# OAuth base (use connectapitest.garmin.com if Garmin tells us to stay on test)
+GARMIN_OAUTH_BASE_URL=https://connectapi.garmin.com/oauth-service/oauth
 # Optional: override the evaluation base URL if Garmin changes it
 GARMIN_API_BASE_URL=https://healthapi.garmin.com/wellness-api/rest
 ```
@@ -72,6 +80,7 @@ Use the helper script (defaults to the known Vercel token in the repo):
 ```bash
 GARMIN_CONSUMER_KEY=xxxx \
 GARMIN_CONSUMER_SECRET=xxxx \
+GARMIN_OAUTH_BASE_URL=https://connectapi.garmin.com/oauth-service/oauth \
 node scripts/add-garmin-env-to-vercel.js
 ```
 This upserts the four variables across Production/Preview/Development on the `helfi-app` project.

@@ -1,7 +1,8 @@
 import OAuth from 'oauth-1.0a'
 import crypto from 'crypto'
 
-const DEFAULT_GARMIN_BASE_URL = 'https://healthapi.garmin.com/wellness-api/rest'
+const DEFAULT_GARMIN_API_BASE_URL = 'https://healthapi.garmin.com/wellness-api/rest'
+const DEFAULT_GARMIN_OAUTH_BASE_URL = 'https://connectapi.garmin.com/oauth-service/oauth'
 
 export type GarminTokenPair = {
   oauthToken: string
@@ -12,8 +13,12 @@ export type GarminAccessToken = GarminTokenPair & {
   garminUserId?: string | null
 }
 
-function getGarminBaseUrl() {
-  return process.env.GARMIN_API_BASE_URL || DEFAULT_GARMIN_BASE_URL
+function getGarminApiBaseUrl() {
+  return process.env.GARMIN_API_BASE_URL || DEFAULT_GARMIN_API_BASE_URL
+}
+
+function getGarminOAuthBaseUrl() {
+  return process.env.GARMIN_OAUTH_BASE_URL || DEFAULT_GARMIN_OAUTH_BASE_URL
 }
 
 function getOAuthClient() {
@@ -60,7 +65,7 @@ export function parseOAuthHeader(header: string | null) {
 
 export async function requestGarminRequestToken(callbackUrl: string): Promise<GarminTokenPair> {
   const oauth = getOAuthClient()
-  const baseUrl = getGarminBaseUrl()
+  const baseUrl = getGarminOAuthBaseUrl()
 
   const data = { oauth_callback: callbackUrl }
   const requestData = {
@@ -106,7 +111,7 @@ export async function exchangeGarminAccessToken(
   verifier: string
 ): Promise<GarminAccessToken> {
   const oauth = getOAuthClient()
-  const baseUrl = getGarminBaseUrl()
+  const baseUrl = getGarminOAuthBaseUrl()
   const token = { key: oauthToken, secret: oauthTokenSecret }
   const data = { oauth_verifier: verifier }
 
@@ -154,7 +159,7 @@ export async function registerGarminUser(
   uploadStartTimestampMs: number
 ) {
   const oauth = getOAuthClient()
-  const baseUrl = getGarminBaseUrl()
+  const baseUrl = getGarminApiBaseUrl()
   const data = { uploadStartTimestamp: `${uploadStartTimestampMs}` }
   const token = { key: accessToken, secret: accessTokenSecret }
 
@@ -178,7 +183,7 @@ export async function registerGarminUser(
 
 export async function deregisterGarminUser(accessToken: string, accessTokenSecret: string) {
   const oauth = getOAuthClient()
-  const baseUrl = getGarminBaseUrl()
+  const baseUrl = getGarminApiBaseUrl()
   const data = {} as Record<string, string>
   const token = { key: accessToken, secret: accessTokenSecret }
 
