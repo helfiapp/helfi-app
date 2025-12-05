@@ -371,7 +371,7 @@ function GenderStep({ onNext, initial, initialAgreed, onPartialSave }: { onNext:
   );
 }
 
-const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPartialSave }: { onNext: (data: any) => void, onBack: () => void, initial?: any, onPartialSave?: (data: any) => void }) {
+const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPartialSave, onUnsavedChange, onInsightsSaved }: { onNext: (data: any) => void, onBack: () => void, initial?: any, onPartialSave?: (data: any) => void, onUnsavedChange?: () => void, onInsightsSaved?: () => void }) {
   const initialSnapshotRef = useRef<any>(null);
   const [weight, setWeight] = useState(initial?.weight || '');
   const [birthdate, setBirthdate] = useState(initial?.birthdate || '');
@@ -542,6 +542,9 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
       !!(weight || height || feet || inches || bodyType || goalChoice || birthdate);
 
     setHasUnsavedChanges(changed && hasAny);
+    if ((changed && hasAny) && onUnsavedChange) {
+      onUnsavedChange();
+    }
   }, [weight, height, feet, inches, bodyType, goalChoice, goalIntensity, birthdate, initial]);
 
   // Warn if the user tries to close the tab or browser with unsaved changes
@@ -622,6 +625,8 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
 
       if (response.ok) {
         setHasUnsavedChanges(false);
+        if (onInsightsSaved) setHasUnsavedChanges(false);
+        if (onInsightsSaved) onInsightsSaved();
         updateUserData(buildPayload());
         await triggerTargetedInsightsRefresh(['profile']);
         setShowUpdatePopup(false);
@@ -1041,11 +1046,30 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
         onUpdateInsights={handleUpdateInsights}
         isGenerating={isGeneratingInsights}
       />
+      <UpdateInsightsPopup
+        isOpen={showGlobalUpdatePopup}
+        onClose={() => setShowGlobalUpdatePopup(false)}
+        onAddMore={() => {
+          setShowGlobalUpdatePopup(false);
+        }}
+        onUpdateInsights={async () => {
+          setIsGeneratingInsights(true);
+          try {
+            await debouncedSave(form);
+            await triggerTargetedInsightsRefresh(['profile', 'exercise', 'health_goals', 'health_situations']);
+            setHasGlobalUnsavedChanges(false);
+            setShowGlobalUpdatePopup(false);
+          } finally {
+            setIsGeneratingInsights(false);
+          }
+        }}
+        isGenerating={isGeneratingInsights}
+      />
     </div>
   );
 });
 
-function ExerciseStep({ onNext, onBack, initial, onPartialSave }: { onNext: (data: any) => void, onBack: () => void, initial?: any, onPartialSave?: (data: any) => void }) {
+function ExerciseStep({ onNext, onBack, initial, onPartialSave, onUnsavedChange, onInsightsSaved }: { onNext: (data: any) => void, onBack: () => void, initial?: any, onPartialSave?: (data: any) => void, onUnsavedChange?: () => void, onInsightsSaved?: () => void }) {
   const initialSnapshotRef = useRef<any>(null);
   const [exerciseFrequency, setExerciseFrequency] = useState(initial?.exerciseFrequency || '');
   const [exerciseTypes, setExerciseTypes] = useState<string[]>(initial?.exerciseTypes || []);
@@ -1095,6 +1119,9 @@ function ExerciseStep({ onNext, onBack, initial, onPartialSave }: { onNext: (dat
       JSON.stringify(exerciseTypes.sort()) !== JSON.stringify(initialTypes.sort()) ||
       JSON.stringify(exerciseDurations) !== JSON.stringify(initialDurations);
     setHasUnsavedChanges(hasChanged && (exerciseFrequency || exerciseTypes.length > 0));
+    if (hasChanged && onUnsavedChange) {
+      onUnsavedChange();
+    }
   }, [exerciseFrequency, exerciseTypes, exerciseDurations, initial]);
 
   // Prevent browser navigation when there are unsaved changes
@@ -1119,6 +1146,7 @@ function ExerciseStep({ onNext, onBack, initial, onPartialSave }: { onNext: (dat
       
       if (response.ok) {
         setHasUnsavedChanges(false);
+        if (onInsightsSaved) onInsightsSaved();
         await triggerTargetedInsightsRefresh(['exercise']);
         setShowUpdatePopup(false);
       } else {
@@ -1530,7 +1558,7 @@ function ExerciseStep({ onNext, onBack, initial, onPartialSave }: { onNext: (dat
   );
 }
 
-function HealthGoalsStep({ onNext, onBack, initial, onPartialSave }: { onNext: (data: any) => void, onBack: () => void, initial?: any, onPartialSave?: (data: any) => void }) {
+function HealthGoalsStep({ onNext, onBack, initial, onPartialSave, onUnsavedChange, onInsightsSaved }: { onNext: (data: any) => void, onBack: () => void, initial?: any, onPartialSave?: (data: any) => void, onUnsavedChange?: () => void, onInsightsSaved?: () => void }) {
   const initialSnapshotRef = useRef<any>(null);
   const defaultGoals = [
     'Acne', 'Allergies', 'Anxiety', 'Asthma', 'Bloating', 'Bowel Movements', 'Brain Fog', 'Cold Sores', 'Constipation', 'Depression', 'Diarrhea', 'Digestion', 'Dry Skin', 'Eczema', 'Energy', 'Erection Quality', 'Eye Irritation', 'Fatigue', 'Gas', 'Hair Loss', 'Headaches', 'Heartburn', 'IBS Flare', 'Insomnia', 'Irritability', 'Itchy Skin', 'Joint Pain', 'Libido', 'Mood', 'Muscle Cramps', 'Nausea', 'PMS Symptoms', 'Rashes', 'Sleep Quality', 'Stress', 'Urinary Frequency', 'Weight Fluctuation'
@@ -1568,6 +1596,9 @@ function HealthGoalsStep({ onNext, onBack, initial, onPartialSave }: { onNext: (
     const goalsChanged = JSON.stringify(goals.sort()) !== JSON.stringify(initialGoals.sort());
     const customGoalsChanged = JSON.stringify(customGoals.sort()) !== JSON.stringify(initialCustomGoals.sort());
     setHasUnsavedChanges((goalsChanged || customGoalsChanged) && (goals.length > 0 || customGoals.length > 0));
+    if ((goalsChanged || customGoalsChanged) && onUnsavedChange) {
+      onUnsavedChange();
+    }
   }, [goals, customGoals, initial]);
 
   // Persist goals as they change so selections stick across navigation
@@ -1607,6 +1638,7 @@ function HealthGoalsStep({ onNext, onBack, initial, onPartialSave }: { onNext: (
       ]);
       
       setHasUnsavedChanges(false);
+      if (onInsightsSaved) onInsightsSaved();
       await triggerTargetedInsightsRefresh(['health_goals']);
       setShowUpdatePopup(false);
     } catch (error) {
@@ -2091,7 +2123,7 @@ function HealthGoalsStep({ onNext, onBack, initial, onPartialSave }: { onNext: (
   );
 }
 
-function HealthSituationsStep({ onNext, onBack, initial, onPartialSave }: { onNext: (data: any) => void, onBack: () => void, initial?: any, onPartialSave?: (data: any) => void }) {
+function HealthSituationsStep({ onNext, onBack, initial, onPartialSave, onUnsavedChange, onInsightsSaved }: { onNext: (data: any) => void, onBack: () => void, initial?: any, onPartialSave?: (data: any) => void, onUnsavedChange?: () => void, onInsightsSaved?: () => void }) {
   const initialSnapshotRef = useRef<any>(null);
   const [healthIssues, setHealthIssues] = useState(initial?.healthSituations?.healthIssues || initial?.healthIssues || '');
   const [healthProblems, setHealthProblems] = useState(initial?.healthSituations?.healthProblems || initial?.healthProblems || '');
@@ -2115,6 +2147,9 @@ function HealthSituationsStep({ onNext, onBack, initial, onPartialSave }: { onNe
                        healthProblems.trim() !== initialProblems.trim() || 
                        additionalInfo.trim() !== initialInfo.trim();
     setHasUnsavedChanges(hasChanged && !skipped && (healthIssues.trim() || healthProblems.trim() || additionalInfo.trim()));
+    if (hasChanged && !skipped && (healthIssues.trim() || healthProblems.trim() || additionalInfo.trim()) && onUnsavedChange) {
+      onUnsavedChange();
+    }
   }, [healthIssues, healthProblems, additionalInfo, skipped, initial]);
 
   useEffect(() => {
@@ -2154,6 +2189,7 @@ function HealthSituationsStep({ onNext, onBack, initial, onPartialSave }: { onNe
       
       if (response.ok) {
         setHasUnsavedChanges(false);
+        if (onInsightsSaved) onInsightsSaved();
         await triggerTargetedInsightsRefresh(['health_situations']);
         setShowUpdatePopup(false);
       } else {
@@ -5628,6 +5664,8 @@ export default function Onboarding() {
   const formRef = useRef<any>({});
   const [allowAutosave, setAllowAutosave] = useState(false);
   const [showFirstTimeModal, setShowFirstTimeModal] = useState(false);
+  const [hasGlobalUnsavedChanges, setHasGlobalUnsavedChanges] = useState(false);
+  const [showGlobalUpdatePopup, setShowGlobalUpdatePopup] = useState(false);
   // Track if the user has dismissed the first-time modal during this visit,
   // so they can actually complete the intake instead of being stuck.
   const [firstTimeModalDismissed, setFirstTimeModalDismissed] = useState(false);
@@ -5816,6 +5854,7 @@ export default function Onboarding() {
         const next = { ...prev, ...partial };
         if (allowAutosave) {
           debouncedSave(next);
+          setHasGlobalUnsavedChanges(true);
         }
         return next;
       });
@@ -5851,6 +5890,9 @@ export default function Onboarding() {
         setIsNavigating(false);
         setIsLoading(false);
       }
+      if (event?.data?.type === 'OPEN_PHYSICAL_UPDATE_POPUP') {
+        setShowGlobalUpdatePopup(true);
+      }
     };
     window.addEventListener('message', handler);
     return () => window.removeEventListener('message', handler);
@@ -5869,6 +5911,7 @@ export default function Onboarding() {
       
       // Keep shared user data context in sync so calorie targets/macros recalc immediately
       updateUserData(updatedForm);
+      setHasGlobalUnsavedChanges(true);
       
       // Re-enabled debounced save with safer mechanism
       debouncedSave(updatedForm);
@@ -6021,17 +6064,16 @@ export default function Onboarding() {
               title="back button to Dashboard"
               onClick={(e) => {
                 try {
-                  // If we're on the Physical step and there are unsaved changes,
-                  // show the Update Insights popup instead of navigating away.
                   const hasPhysicalUnsaved =
                     step === 1 &&
                     (window as any).__helfiOnboardingPhysicalHasUnsavedChanges;
-                  if (hasPhysicalUnsaved) {
+                  if (hasPhysicalUnsaved || hasGlobalUnsavedChanges) {
                     e.preventDefault();
                     window.postMessage(
                       { type: 'OPEN_PHYSICAL_UPDATE_POPUP' },
                       '*'
                     );
+                    setShowGlobalUpdatePopup(true);
                   }
                 } catch {
                   // If anything goes wrong, fall back to normal navigation
@@ -6259,10 +6301,10 @@ export default function Onboarding() {
         {/* Content */}
         <div className="flex-1 px-4 py-2 pb-20">
           {step === 0 && <GenderStep onNext={handleNext} initial={form.gender} initialAgreed={form.termsAccepted} onPartialSave={persistForm} />}
-          {step === 1 && <PhysicalStep onNext={handleNext} onBack={handleBack} initial={form} onPartialSave={persistForm} />}
-          {step === 2 && <ExerciseStep onNext={handleNext} onBack={handleBack} initial={form} onPartialSave={persistForm} />}
-          {step === 3 && <HealthGoalsStep onNext={handleNext} onBack={handleBack} initial={form} onPartialSave={persistForm} />}
-          {step === 4 && <HealthSituationsStep onNext={handleNext} onBack={handleBack} initial={form} onPartialSave={persistForm} />}
+          {step === 1 && <PhysicalStep onNext={handleNext} onBack={handleBack} initial={form} onPartialSave={persistForm} onUnsavedChange={() => setHasGlobalUnsavedChanges(true)} onInsightsSaved={() => setHasGlobalUnsavedChanges(false)} />}
+          {step === 2 && <ExerciseStep onNext={handleNext} onBack={handleBack} initial={form} onPartialSave={persistForm} onUnsavedChange={() => setHasGlobalUnsavedChanges(true)} onInsightsSaved={() => setHasGlobalUnsavedChanges(false)} />}
+          {step === 3 && <HealthGoalsStep onNext={handleNext} onBack={handleBack} initial={form} onPartialSave={persistForm} onUnsavedChange={() => setHasGlobalUnsavedChanges(true)} onInsightsSaved={() => setHasGlobalUnsavedChanges(false)} />}
+          {step === 4 && <HealthSituationsStep onNext={handleNext} onBack={handleBack} initial={form} onPartialSave={persistForm} onUnsavedChange={() => setHasGlobalUnsavedChanges(true)} onInsightsSaved={() => setHasGlobalUnsavedChanges(false)} />}
           {step === 5 && <SupplementsStep onNext={handleNext} onBack={handleBack} initial={form} onPartialSave={persistForm} onNavigateToAnalysis={(data?: any) => {
             // REAL FIX: Use flushSync to ensure state updates complete before navigation
             if (data) {
