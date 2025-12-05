@@ -372,6 +372,7 @@ function GenderStep({ onNext, initial, initialAgreed, onPartialSave }: { onNext:
 }
 
 const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPartialSave }: { onNext: (data: any) => void, onBack: () => void, initial?: any, onPartialSave?: (data: any) => void }) {
+  const initialSnapshotRef = useRef<any>(null);
   const [weight, setWeight] = useState(initial?.weight || '');
   const [birthdate, setBirthdate] = useState(initial?.birthdate || '');
   const [birthYear, setBirthYear] = useState('');
@@ -427,6 +428,9 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
   // but avoid overwriting any values the user has already edited on this step.
   useEffect(() => {
     if (!initial) return;
+    if (!initialSnapshotRef.current && Object.keys(initial || {}).length > 0) {
+      initialSnapshotRef.current = initial;
+    }
 
     if (!weight && initial.weight) {
       setWeight(initial.weight);
@@ -514,14 +518,15 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
 
   // Track when basic profile values differ from what we initially loaded
   useEffect(() => {
-    const initialWeight = initial?.weight || '';
-    const initialHeight = initial?.height || '';
-    const initialFeet = initial?.feet || '';
-    const initialInches = initial?.inches || '';
-    const initialBodyType = initial?.bodyType || '';
-    const initialGoalChoice = initial?.goalChoice || '';
-    const initialGoalIntensity = initial?.goalIntensity || 'standard';
-    const initialBirthdate = initial?.birthdate || '';
+    const baseline = initialSnapshotRef.current || initial || {};
+    const initialWeight = baseline?.weight || '';
+    const initialHeight = baseline?.height || '';
+    const initialFeet = baseline?.feet || '';
+    const initialInches = baseline?.inches || '';
+    const initialBodyType = baseline?.bodyType || '';
+    const initialGoalChoice = baseline?.goalChoice || '';
+    const initialGoalIntensity = baseline?.goalIntensity || 'standard';
+    const initialBirthdate = baseline?.birthdate || '';
 
     const changed =
       (weight || '') !== (initialWeight || '') ||
@@ -1041,6 +1046,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
 });
 
 function ExerciseStep({ onNext, onBack, initial, onPartialSave }: { onNext: (data: any) => void, onBack: () => void, initial?: any, onPartialSave?: (data: any) => void }) {
+  const initialSnapshotRef = useRef<any>(null);
   const [exerciseFrequency, setExerciseFrequency] = useState(initial?.exerciseFrequency || '');
   const [exerciseTypes, setExerciseTypes] = useState<string[]>(initial?.exerciseTypes || []);
   const [exerciseDurations, setExerciseDurations] = useState<Record<string, string>>(
@@ -1077,9 +1083,13 @@ function ExerciseStep({ onNext, onBack, initial, onPartialSave }: { onNext: (dat
 
   // Track changes from initial values
   useEffect(() => {
-    const initialFrequency = initial?.exerciseFrequency || '';
-    const initialTypes = initial?.exerciseTypes || [];
-    const initialDurations = initial?.exerciseDurations || {};
+    if (!initialSnapshotRef.current && initial && Object.keys(initial || {}).length > 0) {
+      initialSnapshotRef.current = initial;
+    }
+    const baseline = initialSnapshotRef.current || initial || {};
+    const initialFrequency = baseline?.exerciseFrequency || '';
+    const initialTypes = baseline?.exerciseTypes || [];
+    const initialDurations = baseline?.exerciseDurations || {};
     const hasChanged =
       exerciseFrequency !== initialFrequency ||
       JSON.stringify(exerciseTypes.sort()) !== JSON.stringify(initialTypes.sort()) ||
@@ -1521,6 +1531,7 @@ function ExerciseStep({ onNext, onBack, initial, onPartialSave }: { onNext: (dat
 }
 
 function HealthGoalsStep({ onNext, onBack, initial, onPartialSave }: { onNext: (data: any) => void, onBack: () => void, initial?: any, onPartialSave?: (data: any) => void }) {
+  const initialSnapshotRef = useRef<any>(null);
   const defaultGoals = [
     'Acne', 'Allergies', 'Anxiety', 'Asthma', 'Bloating', 'Bowel Movements', 'Brain Fog', 'Cold Sores', 'Constipation', 'Depression', 'Diarrhea', 'Digestion', 'Dry Skin', 'Eczema', 'Energy', 'Erection Quality', 'Eye Irritation', 'Fatigue', 'Gas', 'Hair Loss', 'Headaches', 'Heartburn', 'IBS Flare', 'Insomnia', 'Irritability', 'Itchy Skin', 'Joint Pain', 'Libido', 'Mood', 'Muscle Cramps', 'Nausea', 'PMS Symptoms', 'Rashes', 'Sleep Quality', 'Stress', 'Urinary Frequency', 'Weight Fluctuation'
   ];
@@ -1548,8 +1559,12 @@ function HealthGoalsStep({ onNext, onBack, initial, onPartialSave }: { onNext: (
 
   // Track changes from initial values
   useEffect(() => {
-    const initialGoals = initial?.goals || [];
-    const initialCustomGoals = initial?.customGoals || [];
+    if (!initialSnapshotRef.current && initial && Object.keys(initial || {}).length > 0) {
+      initialSnapshotRef.current = initial;
+    }
+    const baseline = initialSnapshotRef.current || initial || {};
+    const initialGoals = baseline?.goals || [];
+    const initialCustomGoals = baseline?.customGoals || [];
     const goalsChanged = JSON.stringify(goals.sort()) !== JSON.stringify(initialGoals.sort());
     const customGoalsChanged = JSON.stringify(customGoals.sort()) !== JSON.stringify(initialCustomGoals.sort());
     setHasUnsavedChanges((goalsChanged || customGoalsChanged) && (goals.length > 0 || customGoals.length > 0));
@@ -2077,6 +2092,7 @@ function HealthGoalsStep({ onNext, onBack, initial, onPartialSave }: { onNext: (
 }
 
 function HealthSituationsStep({ onNext, onBack, initial, onPartialSave }: { onNext: (data: any) => void, onBack: () => void, initial?: any, onPartialSave?: (data: any) => void }) {
+  const initialSnapshotRef = useRef<any>(null);
   const [healthIssues, setHealthIssues] = useState(initial?.healthSituations?.healthIssues || initial?.healthIssues || '');
   const [healthProblems, setHealthProblems] = useState(initial?.healthSituations?.healthProblems || initial?.healthProblems || '');
   const [additionalInfo, setAdditionalInfo] = useState(initial?.healthSituations?.additionalInfo || initial?.additionalInfo || '');
@@ -2088,9 +2104,13 @@ function HealthSituationsStep({ onNext, onBack, initial, onPartialSave }: { onNe
 
   // Track changes from initial values
   useEffect(() => {
-    const initialIssues = initial?.healthSituations?.healthIssues || initial?.healthIssues || '';
-    const initialProblems = initial?.healthSituations?.healthProblems || initial?.healthProblems || '';
-    const initialInfo = initial?.healthSituations?.additionalInfo || initial?.additionalInfo || '';
+    if (!initialSnapshotRef.current && initial && Object.keys(initial || {}).length > 0) {
+      initialSnapshotRef.current = initial;
+    }
+    const baseline = initialSnapshotRef.current || initial || {};
+    const initialIssues = baseline?.healthSituations?.healthIssues || baseline?.healthIssues || '';
+    const initialProblems = baseline?.healthSituations?.healthProblems || baseline?.healthProblems || '';
+    const initialInfo = baseline?.healthSituations?.additionalInfo || baseline?.additionalInfo || '';
     const hasChanged = healthIssues.trim() !== initialIssues.trim() || 
                        healthProblems.trim() !== initialProblems.trim() || 
                        additionalInfo.trim() !== initialInfo.trim();
