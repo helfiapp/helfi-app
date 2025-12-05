@@ -45,7 +45,10 @@ export async function GET(request: NextRequest) {
     const authUrl = `https://connect.garmin.com/oauthConfirm?oauth_token=${encodeURIComponent(token.oauthToken)}`
     return NextResponse.redirect(authUrl)
   } catch (error) {
-    console.error('❌ Garmin authorization init failed:', error)
+    console.error('❌ Garmin authorization init failed:', {
+      message: (error as Error)?.message,
+      stack: (error as Error)?.stack,
+    })
     return NextResponse.json({ error: 'Failed to start Garmin authorization' }, { status: 500 })
   }
 }
