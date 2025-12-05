@@ -3067,7 +3067,7 @@ async function buildExerciseSection(
       userId: context.userId,
       mode: 'exercise',
     },
-    { minWorking, minSuggested: 4, minAvoid: 4, maxRetries }
+    { minWorking, minSuggested: 4, minAvoid: 4, maxRetries, disableCache: _options.forceRefresh }
   )
   console.timeEnd(`[insights.llm] exercise:${issue.slug}`)
 
@@ -3474,7 +3474,7 @@ async function buildSupplementsSection(
       userId: context.userId,
       mode: 'supplements',
     },
-    { minWorking: Math.min(3, Math.max(0, normalizedSupplements.length)), minSuggested: 4, minAvoid: 4 }
+    { minWorking: Math.min(3, Math.max(0, normalizedSupplements.length)), minSuggested: 4, minAvoid: 4, disableCache: _options.forceRefresh }
   )
   console.timeEnd(`[insights.llm] supplements:${issue.slug}`)
   
@@ -3946,7 +3946,7 @@ async function buildMedicationsSection(
       userId: context.userId,
       mode: 'medications',
     },
-    { minWorking: normalizedMeds.length > 0 ? 1 : 0, minSuggested: 4, minAvoid: 4 }
+    { minWorking: normalizedMeds.length > 0 ? 1 : 0, minSuggested: 4, minAvoid: 4, disableCache: _options.forceRefresh }
   )
   console.timeEnd(`[insights.llm] medications:${issue.slug}`)
 
@@ -4426,7 +4426,7 @@ async function buildLabsSection(
       userId: context.userId,
       mode: 'labs',
     },
-    { minWorking: labItems.length > 0 ? 1 : 0, minSuggested: 4, minAvoid: 4 }
+    { minWorking: labItems.length > 0 ? 1 : 0, minSuggested: 4, minAvoid: 4, disableCache: _options.forceRefresh }
   )
   console.timeEnd(`[insights.llm] labs:${issue.slug}`)
 
@@ -4632,7 +4632,7 @@ async function buildNutritionSection(
       userId: context.userId,
       mode: 'nutrition',
     },
-    { minWorking: hasLoggedFoods ? 1 : 0, minSuggested: 4, minAvoid: 4 }
+    { minWorking: hasLoggedFoods ? 1 : 0, minSuggested: 4, minAvoid: 4, disableCache: _options.forceRefresh }
   )
   console.timeEnd(`[insights.llm] nutrition:${issue.slug}`)
 
@@ -4945,7 +4945,7 @@ async function buildLifestyleSection(
       userId: context.userId,
       mode: 'lifestyle',
     },
-    { minWorking: lifestyleItems.length > 0 ? 1 : 0, minSuggested: 4, minAvoid: 4 }
+    { minWorking: lifestyleItems.length > 0 ? 1 : 0, minSuggested: 4, minAvoid: 4, disableCache: _options.forceRefresh }
   )
   console.timeEnd(`[insights.llm] lifestyle:${issue.slug}`)
 

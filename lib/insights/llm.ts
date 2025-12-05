@@ -111,6 +111,7 @@ interface LLMOptions {
   minSuggested?: number
   minAvoid?: number
   maxRetries?: number
+  disableCache?: boolean
 }
 
 type CanonicalType = 'food' | 'supplement' | 'exercise' | 'medication' | 'other'
@@ -1077,6 +1078,7 @@ export async function generateSectionInsightsFromLLM(
   const minSuggested = options.minSuggested ?? 4
   const minAvoid = options.minAvoid ?? 4
   const maxRetries = options.maxRetries ?? 3
+  const disableCache = options.disableCache ?? false
 
   const userContext = JSON.stringify(
     {
@@ -1105,9 +1107,9 @@ export async function generateSectionInsightsFromLLM(
     minAvoid,
   })
 
-  const cached = insightCache.get(cacheKey)
+  const cached = disableCache ? null : insightCache.get(cacheKey)
   const nowTs = Date.now()
-  if (cached && cached.expiresAt > nowTs) {
+  if (!disableCache && cached && cached.expiresAt > nowTs) {
     return cached.result
   }
 
@@ -1430,7 +1432,7 @@ export async function generateSectionInsightsFromLLM(
     avoid: final.avoid.length,
   })
 
-  if (validated) {
+  if (validated && !disableCache) {
     insightCache.set(cacheKey, {
       expiresAt: Date.now() + CACHE_TTL_MS,
       result: final,
