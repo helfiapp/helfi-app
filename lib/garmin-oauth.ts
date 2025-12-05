@@ -82,7 +82,11 @@ export async function requestGarminRequestToken(callbackUrl: string): Promise<Ga
 
   const body = await response.text()
   if (!response.ok) {
-    throw new Error(`Garmin request_token failed (${response.status}): ${body}`)
+    console.error('❌ Garmin request_token error', {
+      status: response.status,
+      body,
+    })
+    throw new Error(`Garmin request_token failed (${response.status})`)
   }
 
   const parsed = parseOAuthResponse(body)
@@ -125,7 +129,11 @@ export async function exchangeGarminAccessToken(
 
   const body = await response.text()
   if (!response.ok) {
-    throw new Error(`Garmin access_token failed (${response.status}): ${body}`)
+    console.error('❌ Garmin access_token error', {
+      status: response.status,
+      body,
+    })
+    throw new Error(`Garmin access_token failed (${response.status})`)
   }
 
   const parsed = parseOAuthResponse(body)
