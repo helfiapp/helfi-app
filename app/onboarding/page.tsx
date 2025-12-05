@@ -536,17 +536,24 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
     return () => window.removeEventListener('message', handler);
   }, []);
 
-  const buildPayload = () => ({
-    weight,
-    birthdate,
-    height: unit === 'metric' ? height : `${feet}'${inches}"`,
-    feet,
-    inches,
-    bodyType,
-    goalChoice,
-    goalIntensity,
-    unit,
-  });
+  const buildPayload = () => {
+    // Derive birthdate from dropdown parts to avoid any timing/race issues
+    const birthdateFromParts =
+      birthYear && birthMonth && birthDay
+        ? `${birthYear}-${birthMonth}-${birthDay}`
+        : birthdate
+    return {
+      weight,
+      birthdate: birthdateFromParts,
+      height: unit === 'metric' ? height : `${feet}'${inches}"`,
+      feet,
+      inches,
+      bodyType,
+      goalChoice,
+      goalIntensity,
+      unit,
+    }
+  };
 
   const handleNext = useCallback(() => {
     onNext(buildPayload());
