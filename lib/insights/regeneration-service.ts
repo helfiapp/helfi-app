@@ -318,7 +318,7 @@ export async function triggerBackgroundRegeneration(event: DataChangeEvent): Pro
         }
 
         // Run precomputation with concurrency control
-        await precomputeIssueSectionsForUser(userId, { concurrency: 2, sectionsFilter: affectedSections })
+        await precomputeIssueSectionsForUser(userId, { concurrency: 4, sectionsFilter: affectedSections })
 
         // Update metadata to mark as fresh
         for (const issueSlug of issueNames) {
@@ -391,7 +391,7 @@ export async function triggerManualSectionRegeneration(
         }
       }
 
-      await precomputeIssueSectionsForUser(userId, { concurrency: 2, sectionsFilter: affectedSections })
+      await precomputeIssueSectionsForUser(userId, { concurrency: 4, sectionsFilter: affectedSections })
 
       for (const issueSlug of issueNames) {
         for (const section of affectedSections) {
