@@ -5688,7 +5688,7 @@ export default function Onboarding() {
         const userData = await response.json();
         console.log('Loaded user data from database:', userData);
         if (userData && userData.data && Object.keys(userData.data).length > 0) {
-          setForm(userData.data);
+          setForm((prev: any) => ({ ...prev, ...userData.data }));
           // Load profile image from the same API response
           if (userData.data.profileImage) {
             setProfileImage(userData.data.profileImage);
@@ -5702,6 +5702,32 @@ export default function Onboarding() {
   // Keep a ref of the latest form for partial saves
   useEffect(() => {
     formRef.current = form;
+  }, [form]);
+
+  // Warm cache: load last known form instantly on mount
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const raw = sessionStorage.getItem('onboarding:warmForm');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') {
+          setForm((prev: any) => ({ ...prev, ...parsed }));
+        }
+      }
+    } catch (e) {
+      console.warn('Warm form cache read failed', e);
+    }
+  }, []);
+
+  // Persist warm cache on every form change for instant reloads
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      sessionStorage.setItem('onboarding:warmForm', JSON.stringify(form));
+    } catch (e) {
+      console.warn('Warm form cache write failed', e);
+    }
   }, [form]);
 
   // If user is clearly new or incomplete, show the health-setup modal whenever
