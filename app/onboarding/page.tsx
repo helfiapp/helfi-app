@@ -1046,25 +1046,6 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
         onUpdateInsights={handleUpdateInsights}
         isGenerating={isGeneratingInsights}
       />
-      <UpdateInsightsPopup
-        isOpen={showGlobalUpdatePopup}
-        onClose={() => setShowGlobalUpdatePopup(false)}
-        onAddMore={() => {
-          setShowGlobalUpdatePopup(false);
-        }}
-        onUpdateInsights={async () => {
-          setIsGeneratingInsights(true);
-          try {
-            await debouncedSave(form);
-            await triggerTargetedInsightsRefresh(['profile', 'exercise', 'health_goals', 'health_situations']);
-            setHasGlobalUnsavedChanges(false);
-            setShowGlobalUpdatePopup(false);
-          } finally {
-            setIsGeneratingInsights(false);
-          }
-        }}
-        isGenerating={isGeneratingInsights}
-      />
     </div>
   );
 });
@@ -5666,6 +5647,7 @@ export default function Onboarding() {
   const [showFirstTimeModal, setShowFirstTimeModal] = useState(false);
   const [hasGlobalUnsavedChanges, setHasGlobalUnsavedChanges] = useState(false);
   const [showGlobalUpdatePopup, setShowGlobalUpdatePopup] = useState(false);
+  const [isGlobalGenerating, setIsGlobalGenerating] = useState(false);
   // Track if the user has dismissed the first-time modal during this visit,
   // so they can actually complete the intake instead of being stuck.
   const [firstTimeModalDismissed, setFirstTimeModalDismissed] = useState(false);
@@ -6376,6 +6358,26 @@ export default function Onboarding() {
           {step === 9 && <AIInsightsStep onNext={handleNext} onBack={handleBack} initial={form} />}
           {step === 10 && <ReviewStep onBack={handleBack} data={form} />}
         </div>
+
+        <UpdateInsightsPopup
+          isOpen={showGlobalUpdatePopup}
+          onClose={() => setShowGlobalUpdatePopup(false)}
+          onAddMore={() => {
+            setShowGlobalUpdatePopup(false);
+          }}
+          onUpdateInsights={async () => {
+            setIsGlobalGenerating(true);
+            try {
+              await debouncedSave(form);
+              await triggerTargetedInsightsRefresh(['profile', 'exercise', 'health_goals', 'health_situations']);
+              setHasGlobalUnsavedChanges(false);
+              setShowGlobalUpdatePopup(false);
+            } finally {
+              setIsGlobalGenerating(false);
+            }
+          }}
+          isGenerating={isGlobalGenerating}
+        />
 
         {/* Mobile Bottom Navigation */}
         <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-2 z-40">
