@@ -2,6 +2,52 @@
 
 This guide wires the Garmin Health/Connect evaluation API into Helfi so users can link their Garmin account, register for push data, and deliver webhooks into the app.
 
+---
+## Handoff Summary (Dec 5, 2025) – Garmin OAuth still failing
+
+**Current blocker**  
+Popup shows `{"error":"Failed to start Garmin authorization"}`. This means the Garmin request_token step is failing (likely 401/403 from Garmin). I added logging to surface the exact Garmin response in server logs.
+
+**What’s already verified**
+- Garmin app settings (portal):
+  - Client ID: `f8a0108f-8414-4d83-b5f2-c29a50fd629d`
+  - Client Secret: `pV5ZlzN0Z5yhdxxdqhJTPDeR8v/OseWjf1iQkYIXVHU`
+  - Redirect: `https://helfi.ai/api/auth/garmin/callback`
+  - Product: Connect Developer - Evaluation
+  - Status: Approved/Enabled
+  - Logo: https://helfi.ai/mobile-assets/garmin-icon.png
+  - APIs: Health API; endpoints set to https://helfi.ai/api/garmin/webhook (COMMON and all HEALTH toggled enabled, on-hold unchecked)
+  - API Configuration: Daily Health Stats, Activity, Women’s Health (optional), Historical Data Export ON; Courses/Training outbound not needed.
+
+- Vercel env (Production/Preview/Dev) checked with token:
+  - `GARMIN_CONSUMER_KEY` set
+  - `GARMIN_CONSUMER_SECRET` set
+  - `GARMIN_REDIRECT_URI = https://helfi.ai/api/auth/garmin/callback`
+  - `GARMIN_API_BASE_URL = https://healthapi.garmin.com/wellness-api/rest`
+
+- Deployments:
+  - Added logging in authorize step and request/access token helpers.
+  - Latest deploy: `helfi-7ljqqfouf-louie-veleskis-projects.vercel.app` (commit `01de920f...`).
+
+**Code changes made for debugging**
+- `lib/garmin-oauth.ts`: now logs status/body for request_token and access_token failures.
+- `app/api/auth/garmin/authorize/route.ts`: logs error details when request_token fails.
+
+**Next steps for the next agent**
+1) Reproduce “Connect Garmin” on production; check server logs for the exact Garmin response from request_token. The logging should print status/body to the server console.
+2) If Garmin returns 401/403:
+   - Triple-check in the Garmin portal that the redirect URL is exactly `https://helfi.ai/api/auth/garmin/callback` (no trailing slash/typo).
+   - Ensure we’re in Evaluation keys hitting the Evaluation base URL (already set).
+   - If needed, regenerate Client Secret in Garmin portal and update Vercel env + redeploy.
+3) If request_token succeeds but access_token fails, check callback handling and token secret storage in `GarminRequestToken` table.
+4) Add a small admin view/log viewer for `GarminWebhookLog` / recent errors if needed.
+
+**Known unaffected items**
+- Fitbit integration and other devices remain unchanged.
+- PWA/icon issues are unrelated to Garmin changes.
+
+---
+
 ## Credentials You Need
 - Garmin Developer Portal (evaluation): https://developerportal.garmin.com
 - Login/user: `louie@helfi.ai` (create the first password from the email you received)
