@@ -11,6 +11,8 @@ import type { RunContext } from '@/lib/run-context'
 // Allow longer runtime so the full regeneration completes without a gateway timeout
 export const maxDuration = 120
 
+const RESPONSE_TIMEOUT_MS = 25000
+
 const VALID_CHANGE_TYPES = [
   'supplements',
   'medications',
@@ -112,78 +114,129 @@ export async function POST(request: NextRequest) {
     }
 
     const runContext: RunContext = { runId, feature: 'insights:targeted' }
-    const sections = await triggerManualSectionRegeneration(session.user.id, changeTypes, {
+    const regenPromise = triggerManualSectionRegeneration(session.user.id, changeTypes, {
       inline: true,
       runContext,
     })
+    let sections: string[] = []
+    const regenResult = await Promise.race([
+      regenPromise.then((s) => {
+        sections = s
+        return 'done' as const
+      }),
+      new Promise<'timeout'>((resolve) => setTimeout(() => resolve('timeout'), RESPONSE_TIMEOUT_MS)),
+    ])
     const affected = changeTypes.reduce<string[]>((acc, type) => {
       const mapped = getAffectedSections(type)
       mapped.forEach((s) => acc.push(s))
       return acc
     }, [])
 
-    // Sum actual AI cost for this run
-    const { costCents, count } = await getRunCostCents(runId, session.user.id)
-    const cm = new CreditManager(session.user.id)
-    const walletStatus = await cm.getWalletStatus()
-    const plan = calculateChargePlan(costCents, walletStatus)
+    const finalizeCharge = async () => {
+      const { costCents, count } = await getRunCostCents(runId, session.user.id)
+      const cm = new CreditManager(session.user.id)
+      const walletStatus = await cm.getWalletStatus()
+      const plan = calculateChargePlan(costCents, walletStatus)
 
-    if (!plan.canAfford) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: 'Not enough credits to cover this insights refresh.',
-          runId,
-          sectionsTriggered: sections,
-          affectedSections: Array.from(new Set(affected)),
-          costCents,
-          usageEvents: count,
-        },
-        { status: 402 }
-      )
-    }
-
-    let chargedCredits = 0
-    if (plan.totalCredits > 0) {
-      const chargedOk = await cm.chargeSplitCredits(plan.subscriptionCredits, plan.topUpCredits)
-      if (!chargedOk) {
-        return NextResponse.json(
-          {
+      if (!plan.canAfford) {
+        return {
+          success: false as const,
+          status: 402 as const,
+          body: {
             success: false,
-            message: 'Unable to charge credits for this insights refresh.',
+            message: 'Not enough credits to cover this insights refresh.',
             runId,
             sectionsTriggered: sections,
             affectedSections: Array.from(new Set(affected)),
             costCents,
             usageEvents: count,
           },
-          { status: 402 }
-        )
+        }
       }
-      chargedCredits = plan.totalCredits
-      await prisma.user.update({
-        where: { id: session.user.id },
-        data: {
-          monthlyInsightsGenerationUsed: { increment: 1 },
-        } as any,
-      })
+
+      let chargedCredits = 0
+      if (plan.totalCredits > 0) {
+        const chargedOk = await cm.chargeSplitCredits(plan.subscriptionCredits, plan.topUpCredits)
+        if (!chargedOk) {
+          return {
+            success: false as const,
+            status: 402 as const,
+            body: {
+              success: false,
+              message: 'Unable to charge credits for this insights refresh.',
+              runId,
+              sectionsTriggered: sections,
+              affectedSections: Array.from(new Set(affected)),
+              costCents,
+              usageEvents: count,
+            },
+          }
+        }
+        chargedCredits = plan.totalCredits
+        await prisma.user.update({
+          where: { id: session.user.id },
+          data: {
+            monthlyInsightsGenerationUsed: { increment: 1 },
+          } as any,
+        })
+      }
+
+      return {
+        success: true as const,
+        status: 200 as const,
+        body: {
+          success: true,
+          message:
+            chargedCredits > 0
+              ? `Charged ${chargedCredits} credits based on actual AI usage.`
+              : 'Targeted insights regeneration completed.',
+          changeTypes: Array.from(new Set(changeTypes)),
+          sectionsTriggered: sections,
+          affectedSections: Array.from(new Set(affected)),
+          runId,
+          costCents,
+          usageEvents: count,
+          chargedCredits,
+          subscriptionCreditsCharged: plan.subscriptionCredits,
+          topUpCreditsCharged: plan.topUpCredits,
+        },
+      }
     }
 
-    return NextResponse.json({
-      success: true,
-      message: chargedCredits > 0
-        ? `Charged ${chargedCredits} credits based on actual AI usage.`
-        : 'Targeted insights regeneration completed.',
-      changeTypes: Array.from(new Set(changeTypes)),
-      sectionsTriggered: sections,
-      affectedSections: Array.from(new Set(affected)),
-      runId,
-      costCents,
-      usageEvents: count,
-      chargedCredits,
-      subscriptionCreditsCharged: plan.subscriptionCredits,
-      topUpCreditsCharged: plan.topUpCredits,
-    }, { status: 200 })
+    if (regenResult === 'timeout') {
+      setImmediate(() => {
+        regenPromise
+          .then(() => finalizeCharge())
+          .then((result) => {
+            if (!result?.success) {
+              console.warn('[insights.regenerate-targeted] Background charge failed', result)
+            }
+          })
+          .catch((error) => {
+            console.error('[insights.regenerate-targeted] Background regeneration failed', error)
+          })
+      })
+
+      return NextResponse.json(
+        {
+          success: true,
+          message: 'Still generating in the background. We will finish and charge once complete.',
+          changeTypes: Array.from(new Set(changeTypes)),
+          sectionsTriggered: sections,
+          affectedSections: Array.from(new Set(affected)),
+          runId,
+          background: true,
+        },
+        { status: 202 }
+      )
+    }
+
+    const chargeResult = await finalizeCharge()
+    if (!chargeResult.success) {
+      return NextResponse.json(chargeResult.body, { status: chargeResult.status })
+    }
+
+    return NextResponse.json(chargeResult.body, { status: 200 })
   } catch (error) {
     console.error('[insights.regenerate-targeted] Failed to trigger regeneration', error)
     return NextResponse.json({ error: 'Failed to start regeneration' }, { status: 500 })

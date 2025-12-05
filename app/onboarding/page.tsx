@@ -223,10 +223,14 @@ async function triggerTargetedInsightsRefresh(changeTypes: InsightChangeType[], 
     const charged = typeof data.chargedCredits === 'number' ? data.chargedCredits : 0;
     const costDollars = typeof data.costCents === 'number' ? (data.costCents / 100).toFixed(2) : null;
     if (!options.silent) {
-      const msg = charged > 0
-        ? `Charged ${charged} credits${costDollars ? ` (AI cost ~$${costDollars})` : ''} for this insights update.`
-        : 'Insights updated without any AI charges.';
-      alert(msg);
+      if (data.background) {
+        alert('Still finishing up in the background. Insights will refresh shortly.');
+      } else {
+        const msg = charged > 0
+          ? `Charged ${charged} credits${costDollars ? ` (AI cost ~$${costDollars})` : ''} for this insights update.`
+          : 'Insights updated without any AI charges.';
+        alert(msg);
+      }
     }
     try {
       window.dispatchEvent(new Event('credits:refresh'));
