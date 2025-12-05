@@ -1844,96 +1844,26 @@ function HealthGoalsStep({ onNext, onBack, initial, onPartialSave, onUnsavedChan
 
     const proceed = async () => {
       try {
-        if (process.env.NEXT_PUBLIC_CHECKINS_ENABLED === 'true') {
-          const allIssues = [...goals, ...customGoals].map((name: string) => ({ name }));
-          // Fire-and-forget: snapshot selected issues for Insights fallback
-          try {
-            const currentNames = allIssues.map(i => i.name.trim()).filter(Boolean)
-            if (currentNames.length) {
-              fetch('/api/user-data', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ goals: currentNames })
-              }).catch(() => {})
-            }
-          } catch {}
-          // Kick off previous list load in parallel to minimize latency
-          const previousPromise = (async () => {
-            try {
-              const prevRes = await fetch('/api/checkins/issues', { cache: 'no-store' as any })
-              if (prevRes.ok) {
-                const prevJson = await prevRes.json()
-                return Array.isArray(prevJson?.issues)
-                  ? prevJson.issues.map((i: any) => String(i.name || '').trim()).filter(Boolean)
-                  : []
-              }
-            } catch {}
-            return [] as string[]
-          })()
-
-          if (allIssues.length) {
-            // Save current issues; only await this (single request) then navigate
-            await fetch('/api/checkins/issues', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ issues: allIssues })
-            }).catch(() => {});
-          }
-          // If settings already exist, skip prompts entirely
-          let hasSettings = false
-          try {
-            const s = await fetch('/api/checkins/settings', { cache: 'no-store' as any })
-            if (s.ok) {
-              const j = await s.json()
-              if (j && (j.time1 || j.frequency)) hasSettings = true
-            }
-          } catch {}
-
-          if (!hasSettings) {
-            // First-time onboarding: progress the local step state too
-            navigateToNextStep();
-            // Only ask once when not configured
-            const enable = window.confirm(
-              'Daily Check‑ins\n\nTrack how you are going 1–3 times a day. This helps AI understand your progress and improves future reports.\n\nEnable now? (You can change this later in Settings)'
-            );
-            if (enable) {
-              const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-              const t1 = window.prompt('Lunch reminder time (HH:MM)', '12:30') || '12:30';
-              const t2 = window.prompt('Evening reminder time (HH:MM)', '18:30') || '18:30';
-              const t3 = window.prompt('Bedtime reminder time (HH:MM)', '21:30') || '21:30';
-              await fetch('/api/checkins/settings', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ time1: t1, time2: t2, time3: t3, timezone: tz, frequency: 3 })
-              }).catch(() => {});
-            }
-          } // else: returning user, do not advance step here
-          // Compute newly added names compared to previous selection
-          const currentNames = allIssues.map(i => i.name.trim())
-          const previousNames = await previousPromise
-          const prevSet = new Set(previousNames.map((n: string) => n.toLowerCase()))
-          const newlyAdded = currentNames.filter(n => !prevSet.has(n.toLowerCase()))
-          const query = newlyAdded.length ? ('?new=' + encodeURIComponent(newlyAdded.join('|'))) : ''
-          // Navigate instantly; avoid intermediate step-5 flash by replacing instead of normal navigation
-          window.location.replace('/check-in' + query);
-          return
-        }
-      } catch (e) {
-        // Silently ignore; onboarding should not break
-        console.warn('check-ins prompt error', e);
-      }
-      // Fallback if feature is disabled or an error occurred
-      // Fire-and-forget: snapshot selected issues for Insights fallback when check-ins are disabled
-      try {
         const currentNames = [...goals, ...customGoals].map((n: string) => n.trim()).filter(Boolean)
         if (currentNames.length) {
+          // Save goals for insights and check-ins without leaving onboarding
           fetch('/api/user-data', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ goals: currentNames })
           }).catch(() => {})
+          if (process.env.NEXT_PUBLIC_CHECKINS_ENABLED === 'true') {
+            fetch('/api/checkins/issues', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ issues: currentNames.map((name) => ({ name })) })
+            }).catch(() => {})
+          }
         }
-      } catch {}
+      } catch (e) {
+        // Silently ignore; onboarding should not break
+        console.warn('check-ins save error', e);
+      }
       navigateToNextStep();
     };
 
