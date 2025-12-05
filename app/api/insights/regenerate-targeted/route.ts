@@ -8,6 +8,9 @@ import { prisma } from '@/lib/prisma'
 import { getRunCostCents } from '@/lib/ai-usage-runs'
 import type { RunContext } from '@/lib/run-context'
 
+// Allow longer runtime so the full regeneration completes without a gateway timeout
+export const maxDuration = 120
+
 const VALID_CHANGE_TYPES = [
   'supplements',
   'medications',

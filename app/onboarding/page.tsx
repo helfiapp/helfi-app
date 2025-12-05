@@ -118,6 +118,89 @@ type InsightChangeType =
   | 'profile'
   | 'blood_results';
 
+function normalizeForComparison(value: any): any {
+  if (Array.isArray(value)) {
+    return [...value]
+      .map((item) => normalizeForComparison(item))
+      .sort((a, b) => {
+        const aStr = JSON.stringify(a) || '';
+        const bStr = JSON.stringify(b) || '';
+        return aStr.localeCompare(bStr);
+      });
+  }
+  if (value && typeof value === 'object') {
+    return Object.keys(value)
+      .sort()
+      .reduce((acc: Record<string, any>, key) => {
+        acc[key] = normalizeForComparison((value as any)[key]);
+        return acc;
+      }, {});
+  }
+  return value ?? null;
+}
+
+function pickFields(source: any, fields: string[]) {
+  const result: Record<string, any> = {};
+  for (const field of fields) {
+    if (source && Object.prototype.hasOwnProperty.call(source, field)) {
+      result[field] = source[field];
+    }
+  }
+  return result;
+}
+
+function detectChangedInsightTypes(baselineJson: string, currentForm: any): InsightChangeType[] {
+  let baseline: any = {};
+  try {
+    baseline = baselineJson ? JSON.parse(baselineJson) : {};
+  } catch {
+    baseline = {};
+  }
+  const current = currentForm || {};
+  const hasChanged = (a: any, b: any) =>
+    JSON.stringify(normalizeForComparison(a)) !== JSON.stringify(normalizeForComparison(b));
+
+  const changeTypes: InsightChangeType[] = [];
+
+  if (
+    hasChanged(
+      pickFields(baseline, ['gender', 'weight', 'height', 'bodyType', 'birthdate', 'unit', 'goalChoice', 'goalIntensity', 'profileInfo']),
+      pickFields(current, ['gender', 'weight', 'height', 'bodyType', 'birthdate', 'unit', 'goalChoice', 'goalIntensity', 'profileInfo']),
+    )
+  ) {
+    changeTypes.push('profile');
+  }
+
+  if (hasChanged(
+    pickFields(baseline, ['exerciseFrequency', 'exerciseTypes']),
+    pickFields(current, ['exerciseFrequency', 'exerciseTypes']),
+  )) {
+    changeTypes.push('exercise');
+  }
+
+  if (hasChanged(baseline?.goals, current?.goals)) {
+    changeTypes.push('health_goals');
+  }
+
+  if (hasChanged(baseline?.healthSituations, current?.healthSituations)) {
+    changeTypes.push('health_situations');
+  }
+
+  if (hasChanged(baseline?.supplements, current?.supplements)) {
+    changeTypes.push('supplements');
+  }
+
+  if (hasChanged(baseline?.medications, current?.medications)) {
+    changeTypes.push('medications');
+  }
+
+  if (hasChanged(baseline?.bloodResults, current?.bloodResults)) {
+    changeTypes.push('blood_results');
+  }
+
+  return Array.from(new Set(changeTypes));
+}
+
 async function triggerTargetedInsightsRefresh(changeTypes: InsightChangeType[], options: { silent?: boolean } = {}) {
   const unique = Array.from(new Set(changeTypes || [])).filter(Boolean) as InsightChangeType[];
   if (!unique.length) return null;
@@ -4616,15 +4699,15 @@ function AIInsightsStep({ onNext, onBack, initial }: { onNext: (data: any) => vo
 
 function ReviewStep({ onBack, data }: { onBack: () => void, data: any }) {
   const [isProcessing, setIsProcessing] = useState(false);
-  const [progress, setProgress] = useState(0);
   const [statusText, setStatusText] = useState('');
+  const [progressStage, setProgressStage] = useState<'idle' | 'saving' | 'redirecting'>('idle');
 
   const handleConfirmBegin = async () => {
     if (isProcessing) return; // Prevent double clicks
     
     setIsProcessing(true);
-    setProgress(0);
-    setStatusText('Initializing...');
+    setProgressStage('saving');
+    setStatusText('Saving your latest answers...');
     
     try {
       // 🔍 PERFORMANCE MEASUREMENT START
@@ -4632,15 +4715,6 @@ function ReviewStep({ onBack, data }: { onBack: () => void, data: any }) {
       console.time('⏱️ Total Onboarding Completion Time');
       console.time('⏱️ API Request Duration');
       const startTime = Date.now();
-      
-      // Simulate progress stages with smooth animation
-      const updateProgress = async (percent: number, status: string) => {
-        setProgress(percent);
-        setStatusText(status);
-        await new Promise(resolve => setTimeout(resolve, 150)); // Small delay for smooth animation
-      };
-
-      await updateProgress(5, 'Preparing your data...');
       
       console.log('📤 Starting onboarding data save to database...');
       console.log('📊 Data being saved:', {
@@ -4655,20 +4729,12 @@ function ReviewStep({ onBack, data }: { onBack: () => void, data: any }) {
         totalDataSize: JSON.stringify(data).length + ' characters'
       });
       
-      await updateProgress(15, 'Validating health profile...');
-      
       // Start the API request
       const response = await fetch('/api/user-data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
       });
-      
-      // Progress updates during API processing
-      setTimeout(() => updateProgress(35, 'Saving your profile...'), 1000);
-      setTimeout(() => updateProgress(55, 'Processing health goals...'), 3000);
-      setTimeout(() => updateProgress(75, 'Storing supplements & medications...'), 5000);
-      setTimeout(() => updateProgress(90, 'Finalizing your data...'), 8000);
       
       const apiDuration = Date.now() - startTime;
       console.timeEnd('⏱️ API Request Duration');
@@ -4680,19 +4746,10 @@ function ReviewStep({ onBack, data }: { onBack: () => void, data: any }) {
       });
       
       if (response.ok) {
-        await updateProgress(90, 'Generating your personalized insights...');
         console.log('✅ Onboarding data saved to database successfully');
-        console.log('🚀 Starting insights generation...');
-        
-        // Wait for insights generation (up to 30 seconds)
-        // The API already generates insights, but we show progress here
-        await new Promise(resolve => setTimeout(resolve, 2000)); // Show "Generating insights" for at least 2 seconds
-        
-        await updateProgress(100, 'Welcome to Helfi! 🎉');
-        console.log('🔄 Starting redirect to dashboard...');
-        
-        // Brief moment to show completion
-        await new Promise(resolve => setTimeout(resolve, 800));
+        setProgressStage('redirecting');
+        setStatusText('Finishing up and sending you to your dashboard...');
+        await new Promise(resolve => setTimeout(resolve, 400));
 
         const redirectStart = Date.now();
         window.location.href = '/dashboard';
@@ -4703,7 +4760,7 @@ function ReviewStep({ onBack, data }: { onBack: () => void, data: any }) {
         console.timeEnd('⏱️ Total Onboarding Completion Time');
         console.error('❌ Failed to save onboarding data to database:', response.status, response.statusText);
         setIsProcessing(false);
-        setProgress(0);
+        setProgressStage('idle');
         setStatusText('');
         alert('Failed to save your data. Please try again or contact support.');
       }
@@ -4711,7 +4768,7 @@ function ReviewStep({ onBack, data }: { onBack: () => void, data: any }) {
       console.timeEnd('⏱️ Total Onboarding Completion Time');
       console.error('💥 Error saving onboarding data:', error);
       setIsProcessing(false);
-      setProgress(0);
+      setProgressStage('idle');
       setStatusText('');
       alert('Failed to save your data. Please check your connection and try again.');
     }
@@ -4766,46 +4823,16 @@ function ReviewStep({ onBack, data }: { onBack: () => void, data: any }) {
       {/* Modern Loading Progress Bar */}
       {isProcessing && (
         <div className="mb-6 p-5 bg-gradient-to-br from-blue-50 to-green-50 rounded-xl border border-blue-200 shadow-lg">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-3">
             <span className="text-lg font-semibold text-gray-800">Processing your health data</span>
-            <span className="text-lg font-bold text-blue-600">{progress}%</span>
-          </div>
-          
-          {/* Modern Progress Bar with Gradient */}
-          <div className="w-full bg-gray-200 rounded-full h-4 mb-4 overflow-hidden shadow-inner">
-            <div 
-              className="h-full rounded-full transition-all duration-500 ease-out relative overflow-hidden"
-              style={{ 
-                width: `${progress}%`,
-                background: progress === 100 
-                  ? 'linear-gradient(90deg, #10b981, #059669, #34d399)' 
-                  : 'linear-gradient(90deg, #3b82f6, #1d4ed8, #2563eb)',
-                boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.1)'
-              }}
-            >
-              {/* Animated shimmer effect */}
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent opacity-30 transform -skew-x-12 animate-pulse"></div>
-            </div>
-          </div>
-          
-          {/* Status Text with Icon */}
-          <div className="flex items-center text-base text-gray-700">
-            <div className="flex items-center mr-3">
-              {progress === 100 ? (
-                <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-              ) : (
-                <div className="w-3 h-3 bg-blue-500 rounded-full animate-bounce"></div>
-              )}
-            </div>
-            <span className="font-medium">{statusText}</span>
+            <span className="text-sm text-gray-600">{statusText || 'Working...'}</span>
           </div>
 
-          {/* Time estimate */}
-          <div className="mt-3 text-sm text-gray-500">
-            {progress < 50 && "This may take up to 15 seconds..."}
-            {progress >= 50 && progress < 90 && "Almost there! Just a few more seconds..."}
-            {progress >= 90 && progress < 100 && "Finishing up..."}
-            {progress === 100 && "Complete! Redirecting to your dashboard..."}
+          <InsightsProgressBar isGenerating message={statusText || 'Working...'} />
+
+          <div className="mt-3 text-sm text-gray-600">
+            {progressStage === 'saving' && 'Saving your latest answers...'}
+            {progressStage === 'redirecting' && 'Wrapping up and sending you to your dashboard...'}
           </div>
         </div>
       )}
@@ -5653,6 +5680,13 @@ export default function Onboarding() {
   const [firstTimeModalDismissed, setFirstTimeModalDismissed] = useState(false);
   const [usageMeterRefresh, setUsageMeterRefresh] = useState(0);
   const formBaselineRef = useRef<string>(''); // canonical snapshot to detect real edits
+  const syncFormBaseline = useCallback(() => {
+    try {
+      formBaselineRef.current = JSON.stringify(formRef.current || {});
+    } catch {
+      formBaselineRef.current = '';
+    }
+  }, []);
 
   const stepNames = [
     'Gender',
@@ -5742,18 +5776,23 @@ export default function Onboarding() {
     } finally {
       setAllowAutosave(true);
       // Establish a clean baseline after the initial load so navigation guard only triggers on new edits
-      try {
-        formBaselineRef.current = JSON.stringify(formRef.current || {});
-        setHasGlobalUnsavedChanges(false);
-      } catch {
-        formBaselineRef.current = '';
-      }
+      syncFormBaseline();
+      setHasGlobalUnsavedChanges(false);
     }
   };
   // Keep a ref of the latest form for partial saves
   useEffect(() => {
     formRef.current = form;
   }, [form]);
+
+  // Initialize baseline once the form has loaded real data
+  useEffect(() => {
+    const baselineEmpty = !formBaselineRef.current || formBaselineRef.current === '{}';
+    const hasMeaningfulData = form && Object.keys(form || {}).length > 0;
+    if (baselineEmpty && hasMeaningfulData) {
+      syncFormBaseline();
+    }
+  }, [form, syncFormBaseline]);
 
   // Warm cache: load last known form instantly on mount
   useEffect(() => {
@@ -6315,10 +6354,10 @@ export default function Onboarding() {
         {/* Content */}
         <div className="flex-1 px-4 py-2 pb-20">
           {step === 0 && <GenderStep onNext={handleNext} initial={form.gender} initialAgreed={form.termsAccepted} onPartialSave={persistForm} />}
-          {step === 1 && <PhysicalStep onNext={handleNext} onBack={handleBack} initial={form} onPartialSave={persistForm} onUnsavedChange={() => setHasGlobalUnsavedChanges(true)} onInsightsSaved={() => setHasGlobalUnsavedChanges(false)} />}
-          {step === 2 && <ExerciseStep onNext={handleNext} onBack={handleBack} initial={form} onPartialSave={persistForm} onUnsavedChange={() => setHasGlobalUnsavedChanges(true)} onInsightsSaved={() => setHasGlobalUnsavedChanges(false)} />}
-          {step === 3 && <HealthGoalsStep onNext={handleNext} onBack={handleBack} initial={form} onPartialSave={persistForm} onUnsavedChange={() => setHasGlobalUnsavedChanges(true)} onInsightsSaved={() => setHasGlobalUnsavedChanges(false)} />}
-          {step === 4 && <HealthSituationsStep onNext={handleNext} onBack={handleBack} initial={form} onPartialSave={persistForm} onUnsavedChange={() => setHasGlobalUnsavedChanges(true)} onInsightsSaved={() => setHasGlobalUnsavedChanges(false)} />}
+          {step === 1 && <PhysicalStep onNext={handleNext} onBack={handleBack} initial={form} onPartialSave={persistForm} onUnsavedChange={() => setHasGlobalUnsavedChanges(true)} onInsightsSaved={() => { setHasGlobalUnsavedChanges(false); syncFormBaseline(); }} />}
+          {step === 2 && <ExerciseStep onNext={handleNext} onBack={handleBack} initial={form} onPartialSave={persistForm} onUnsavedChange={() => setHasGlobalUnsavedChanges(true)} onInsightsSaved={() => { setHasGlobalUnsavedChanges(false); syncFormBaseline(); }} />}
+          {step === 3 && <HealthGoalsStep onNext={handleNext} onBack={handleBack} initial={form} onPartialSave={persistForm} onUnsavedChange={() => setHasGlobalUnsavedChanges(true)} onInsightsSaved={() => { setHasGlobalUnsavedChanges(false); syncFormBaseline(); }} />}
+          {step === 4 && <HealthSituationsStep onNext={handleNext} onBack={handleBack} initial={form} onPartialSave={persistForm} onUnsavedChange={() => setHasGlobalUnsavedChanges(true)} onInsightsSaved={() => { setHasGlobalUnsavedChanges(false); syncFormBaseline(); }} />}
           {step === 5 && <SupplementsStep onNext={handleNext} onBack={handleBack} initial={form} onPartialSave={persistForm} onNavigateToAnalysis={(data?: any) => {
             // REAL FIX: Use flushSync to ensure state updates complete before navigation
             if (data) {
@@ -6400,15 +6439,39 @@ export default function Onboarding() {
           onUpdateInsights={async () => {
             setIsGlobalGenerating(true);
             try {
-              await debouncedSave(form);
-              await triggerTargetedInsightsRefresh(['profile', 'exercise', 'health_goals', 'health_situations']);
-              setHasGlobalUnsavedChanges(false);
-              try {
-                formBaselineRef.current = JSON.stringify(formRef.current || {});
-              } catch {
-                formBaselineRef.current = '';
+              const changeTypes = detectChangedInsightTypes(formBaselineRef.current, formRef.current || form);
+              if (!changeTypes.length) {
+                setHasGlobalUnsavedChanges(false);
+                syncFormBaseline();
+                setShowGlobalUpdatePopup(false);
+                return;
               }
+
+              const payload = formRef.current || form;
+              const saveResponse = await fetch('/api/user-data', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+              });
+
+              if (!saveResponse.ok) {
+                alert('Failed to save your changes. Please try again.');
+                return;
+              }
+
+              updateUserData(payload);
+
+              const regen = await triggerTargetedInsightsRefresh(changeTypes);
+              if (!regen) {
+                alert('Failed to update insights. Please try again.');
+                return;
+              }
+              setHasGlobalUnsavedChanges(false);
+              syncFormBaseline();
               setShowGlobalUpdatePopup(false);
+            } catch (error) {
+              console.warn('Global insights update failed', error);
+              alert('Failed to update insights. Please try again.');
             } finally {
               setIsGlobalGenerating(false);
             }
