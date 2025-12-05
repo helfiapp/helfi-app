@@ -550,7 +550,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
 
   const handleNext = useCallback(() => {
     onNext(buildPayload());
-  }, [weight, birthdate, height, feet, inches, bodyType, unit, onNext]);
+  }, [weight, birthdate, height, feet, inches, bodyType, unit, goalChoice, goalIntensity, onNext]);
 
   const handleUpdateInsights = async () => {
     setIsGeneratingInsights(true);
