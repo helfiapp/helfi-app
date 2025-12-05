@@ -352,7 +352,7 @@ export async function POST(request: NextRequest) {
     console.log('✅ POST /api/food-log - Found user:', { userId, email: userEmail })
 
     const body = await request.json()
-    const { description, nutrition, imageUrl, items, localDate, meal, category } = body || {}
+    const { description, nutrition, imageUrl, items, localDate, meal, category, createdAt } = body || {}
 
     const normalizedMeal = normalizeMealCategory(meal ?? category)
     const storedCategory = normalizedMeal ?? (typeof category === 'string' ? category.trim() : null)
@@ -389,6 +389,26 @@ export async function POST(request: NextRequest) {
       })
     }
     
+    // Optional createdAt override so the saved timestamp matches the intended local day/time
+    let normalizedCreatedAt: Date | null = null
+    if (createdAt) {
+      try {
+        const candidate =
+          createdAt instanceof Date
+            ? createdAt
+            : typeof createdAt === 'number'
+            ? new Date(createdAt)
+            : new Date(createdAt)
+        if (!isNaN(candidate.getTime())) {
+          normalizedCreatedAt = candidate
+        } else {
+          console.warn('⚠️ POST /api/food-log - Invalid createdAt, ignoring:', createdAt)
+        }
+      } catch (e) {
+        console.warn('⚠️ POST /api/food-log - Failed to parse createdAt override, ignoring:', e)
+      }
+    }
+
     console.log('📦 POST /api/food-log - Request body:', {
       hasDescription: !!description,
       descriptionLength: description?.toString().length || 0,
@@ -401,6 +421,7 @@ export async function POST(request: NextRequest) {
       normalizedLocalDate: normalizedLocalDate || 'NULL',
       localDateType: typeof localDate,
       normalizedMeal,
+      normalizedCreatedAt: normalizedCreatedAt ? normalizedCreatedAt.toISOString() : 'server default',
     })
     
     const name = (description || '')
@@ -433,6 +454,7 @@ export async function POST(request: NextRequest) {
         localDate: normalizedLocalDate,
         meal: normalizedMeal,
         category: storedCategory,
+        createdAt: normalizedCreatedAt || undefined,
       },
     })
 

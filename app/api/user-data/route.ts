@@ -249,15 +249,15 @@ export async function GET(request: NextRequest) {
     try {
       const storedPrimaryGoal = user.healthGoals.find((goal: any) => goal.name === '__PRIMARY_GOAL__');
       if (storedPrimaryGoal?.category) {
-        const parsed = JSON.parse(storedPrimaryGoal.category);
-        primaryGoalData = {
-          goalChoice: typeof parsed.goalChoice === 'string' ? parsed.goalChoice : '',
-          goalIntensity: typeof parsed.goalIntensity === 'string' ? parsed.goalIntensity : '',
-        };
-      }
-    } catch (e) {
-      console.log('No primary goal data found in storage');
+      const parsed = JSON.parse(storedPrimaryGoal.category);
+      primaryGoalData = {
+        goalChoice: typeof parsed.goalChoice === 'string' ? parsed.goalChoice : '',
+        goalIntensity: typeof parsed.goalIntensity === 'string' ? parsed.goalIntensity.toLowerCase() : '',
+      };
     }
+  } catch (e) {
+    console.log('No primary goal data found in storage');
+  }
 
     // Transform to onboarding format
     let selectedGoals: string[] = []
@@ -313,7 +313,7 @@ export async function GET(request: NextRequest) {
       deviceInterest: deviceInterestData,
       termsAccepted: (user as any).termsAccepted === true,
       goalChoice: primaryGoalData.goalChoice || '',
-      goalIntensity: primaryGoalData.goalIntensity || 'standard',
+      goalIntensity: (primaryGoalData.goalIntensity || 'standard').toString().toLowerCase(),
     }
 
     // Fallback: if primary goal still missing, use the first non-hidden health goal as a soft default
@@ -461,7 +461,7 @@ export async function POST(request: NextRequest) {
         const parsed = JSON.parse(storedPrimaryGoal.category)
         existingPrimaryGoalData = {
           goalChoice: typeof parsed.goalChoice === 'string' ? parsed.goalChoice : '',
-          goalIntensity: typeof parsed.goalIntensity === 'string' ? parsed.goalIntensity : '',
+          goalIntensity: typeof parsed.goalIntensity === 'string' ? parsed.goalIntensity.toLowerCase() : '',
         }
       }
     } catch (error) {
@@ -620,7 +620,9 @@ export async function POST(request: NextRequest) {
       const incomingGoalChoice =
         typeof data.goalChoice === 'string' ? data.goalChoice : existingPrimaryGoalData.goalChoice || ''
       const incomingGoalIntensity =
-        typeof data.goalIntensity === 'string' ? data.goalIntensity : existingPrimaryGoalData.goalIntensity || 'standard'
+        typeof data.goalIntensity === 'string'
+          ? data.goalIntensity.toLowerCase()
+          : (existingPrimaryGoalData.goalIntensity || 'standard').toLowerCase()
 
       if (incomingGoalChoice || incomingGoalIntensity) {
         await prisma.healthGoal.deleteMany({

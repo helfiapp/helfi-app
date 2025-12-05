@@ -115,6 +115,27 @@ const buildTodayIso = () => {
   return `${y}-${m}-${day}`
 }
 
+const alignTimestampToLocalDate = (rawCreatedAt: any, localDate?: string | null) => {
+  const base = rawCreatedAt ? new Date(rawCreatedAt) : new Date()
+  const safeBase = Number.isFinite(base.getTime()) ? base : new Date()
+  if (typeof localDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(localDate)) {
+    const [y, m, d] = localDate.split('-').map((v) => parseInt(v, 10))
+    if (Number.isFinite(y) && Number.isFinite(m) && Number.isFinite(d)) {
+      const anchored = new Date(
+        y,
+        (m || 1) - 1,
+        d || 1,
+        safeBase.getHours(),
+        safeBase.getMinutes(),
+        safeBase.getSeconds(),
+        safeBase.getMilliseconds(),
+      )
+      return anchored.toISOString()
+    }
+  }
+  return safeBase.toISOString()
+}
+
 const BARCODE_REGION_ID = 'food-barcode-reader'
 
 type WarmDiaryState = {
@@ -1941,7 +1962,7 @@ const applyStructuredItems = (
     if (!entry) return entry
     const rawCat = entry.meal ?? entry.category ?? (entry as any)?.mealType ?? (entry as any)?.persistedCategory
     const normalizedCategory = normalizeCategory(rawCat)
-    const createdAtIso =
+    const rawCreatedAtIso =
       entry?.createdAt ||
       (typeof entry?.id === 'number' ? new Date(entry.id).toISOString() : undefined) ||
       new Date().toISOString()
@@ -1965,9 +1986,8 @@ const applyStructuredItems = (
       return buildTodayIso()
     }
     const localDate = deriveLocalDate()
-    const displayTime =
-      entry?.time ||
-      new Date(createdAtIso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    const createdAtIso = alignTimestampToLocalDate(rawCreatedAtIso, localDate)
+    const displayTime = new Date(createdAtIso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     return {
       ...entry,
       meal: normalizedCategory,
@@ -2226,19 +2246,7 @@ const applyStructuredItems = (
               const json = await res.json();
               const logs = Array.isArray(json.logs) ? json.logs : [];
 
-              const mappedFromDb = logs.map((l: any) => ({
-                id: new Date(l.createdAt).getTime(),
-                dbId: l.id,
-                description: l.description || l.name,
-                time: new Date(l.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                method: l.imageUrl ? 'photo' : 'text',
-                photo: l.imageUrl || null,
-                nutrition: l.nutrients || null,
-                items: (l as any).items || (l.nutrients as any)?.items || null,
-                meal: normalizeCategory((l as any)?.meal || (l as any)?.category || (l as any)?.mealType),
-                category: normalizeCategory((l as any)?.meal || (l as any)?.category || (l as any)?.mealType),
-                localDate: (l as any).localDate || selectedDate,
-              }))
+              const mappedFromDb = mapLogsToEntries(logs, selectedDate)
 
               // Always prefer authoritative DB rows for this date to avoid stale categories
               if (mappedFromDb.length > 0) {
@@ -2269,36 +2277,28 @@ const applyStructuredItems = (
               const enrichedCached = deduped.map((cachedEntry: any) => {
                 const cachedId = typeof cachedEntry.id === 'number' ? cachedEntry.id : Number(cachedEntry.id);
                 // Find matching database entry by timestamp
-                const dbEntry = logs.find((l: any) => {
-                  const logId = new Date(l.createdAt).getTime();
+                const dbEntry = mappedFromDb.find((l: any) => {
+                  const logId = typeof l.id === 'number' ? l.id : Number(l.id);
                   return logId === cachedId;
                 });
                 // If we found a match and cached entry doesn't have dbId, add it
                 if (dbEntry && !cachedEntry.dbId) {
-                  return { ...cachedEntry, dbId: dbEntry.id };
+                  return { ...cachedEntry, dbId: dbEntry.dbId || dbEntry.id };
                 }
                 return cachedEntry;
               });
 
-              const missingEntries = logs.filter((l: any) => {
-                const logId = new Date(l.createdAt).getTime();
+              const missingEntries = mappedFromDb.filter((l: any) => {
+                const logId = typeof l.id === 'number' ? l.id : Number(l.id);
                 return !cachedIdsForMissing.has(logId);
               });
 
               if (missingEntries.length > 0 || enrichedCached.some((e: any, i: number) => e.dbId !== deduped[i]?.dbId)) {
                 console.log('⚠️ Found entries in database that were missing from cache:', missingEntries.length);
                 const mappedMissing = missingEntries.map((l: any) => ({
-                  id: new Date(l.createdAt).getTime(),
-                  dbId: l.id,
-                  description: l.description || l.name,
-                  time: new Date(l.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                  method: l.imageUrl ? 'photo' : 'text',
-                  photo: l.imageUrl || null,
-                  nutrition: l.nutrients || null,
-                  items: (l as any).items || (l.nutrients as any)?.items || null,
-                  meal: normalizeCategory((l as any)?.meal || (l as any)?.category || (l as any)?.mealType),
-                  category: normalizeCategory((l as any)?.meal || (l as any)?.category || (l as any)?.mealType),
-                  localDate: (l as any).localDate || selectedDate,
+                  ...l,
+                  dbId: l.dbId || l.id,
+                  localDate: l.localDate || selectedDate,
                 }));
                 
                 // Merge missing entries with enriched cached entries
@@ -2340,20 +2340,7 @@ const applyStructuredItems = (
             if (res.ok) {
               const json = await res.json();
               const logs = Array.isArray(json.logs) ? json.logs : [];
-              const mapped = logs.map((l: any) => ({
-                id: new Date(l.createdAt).getTime(),
-                dbId: l.id,
-                description: l.description || l.name,
-                time: new Date(l.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                method: l.imageUrl ? 'photo' : 'text',
-                photo: l.imageUrl || null,
-                nutrition: l.nutrients || null,
-                items: (l as any).items || (l.nutrients as any)?.items || null,
-                meal: normalizeCategory((l as any)?.meal || (l as any)?.category || (l as any)?.mealType),
-                category: normalizeCategory((l as any)?.meal || (l as any)?.category || (l as any)?.mealType),
-                // Prefer explicit localDate from the server when present
-                localDate: (l as any).localDate || selectedDate,
-              }));
+              const mapped = mapLogsToEntries(logs, selectedDate);
               if (mapped.length > 0) {
                 // Update the appropriate state based on whether we're viewing today or a past date
                 if (isViewingToday) {
@@ -2654,7 +2641,10 @@ const applyStructuredItems = (
     logs.map((l: any) => {
       const rawCat = (l as any)?.meal || (l as any)?.category || (l as any)?.mealType
       const category = normalizeCategory(rawCat)
-      const createdAtIso = l.createdAt ? new Date(l.createdAt).toISOString() : new Date().toISOString()
+      const createdAtIso = alignTimestampToLocalDate(
+        l.createdAt ? new Date(l.createdAt).toISOString() : new Date().toISOString(),
+        (l as any).localDate || fallbackDate,
+      )
       return {
         id: new Date(createdAtIso).getTime(), // UI key and sorting by timestamp
         dbId: l.id, // actual database id for delete operations
@@ -2800,6 +2790,10 @@ const applyStructuredItems = (
             category: normalizeCategory(latest?.meal || latest?.category || latest?.mealType),
             // Always pin to the calendar date the user was viewing when they saved
             localDate: targetLocalDate,
+            createdAt: alignTimestampToLocalDate(
+              latest?.createdAt || new Date().toISOString(),
+              targetLocalDate,
+            ),
           }
           setLastHistoryPayload(payload)
 
@@ -3499,12 +3493,13 @@ Please add nutritional information manually if needed.`);
     const finalDescription = (baseFromAi || baseFromItems || description || '').trim();
     
     const category = normalizeCategory(selectedAddCategory)
-    const nowIso = new Date().toISOString()
+    const createdAtIso = alignTimestampToLocalDate(new Date().toISOString(), selectedDate)
+    const displayTime = new Date(createdAtIso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     const newEntry = {
-      id: Date.now(),
+      id: new Date(createdAtIso).getTime(),
       localDate: selectedDate, // pin to the date the user is viewing when saving
       description: finalDescription,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      time: displayTime,
       method,
       photo: method === 'photo' ? photoPreview : null,
       nutrition: nutrition || analyzedNutrition,
@@ -3513,7 +3508,7 @@ Please add nutritional information manually if needed.`);
       meal: category,
       category,
       persistedCategory: category,
-      createdAt: nowIso,
+      createdAt: createdAtIso,
     };
     
     // Prevent duplicates: check if entry with same ID already exists
@@ -4041,7 +4036,8 @@ Please add nutritional information manually if needed.`);
 
   const insertBarcodeFoodIntoDiary = async (food: any, code?: string) => {
     const category = normalizeCategory(selectedAddCategory)
-    const nowIso = new Date().toISOString()
+    const createdAtIso = alignTimestampToLocalDate(new Date().toISOString(), selectedDate)
+    const displayTime = new Date(createdAtIso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     const item = buildBarcodeIngredientItem(food, code)
     const normalizedItems = normalizeDiscreteServingsWithLabel([item])
     const items = normalizedItems.length > 0 ? normalizedItems : [item]
@@ -4062,10 +4058,10 @@ Please add nutritional information manually if needed.`);
       [food?.name, food?.brand].filter(Boolean).join(' – ') ||
       'Scanned food'
     const entry = {
-      id: Date.now(),
+      id: new Date(createdAtIso).getTime(),
       localDate: selectedDate,
       description,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      time: displayTime,
       method: 'text',
       photo: null,
       nutrition: totals,
@@ -4074,7 +4070,7 @@ Please add nutritional information manually if needed.`);
       meal: category,
       category,
       persistedCategory: category,
-      createdAt: nowIso,
+      createdAt: createdAtIso,
     }
     const updated = dedupeEntries([entry, ...todaysFoods], { fallbackDate: selectedDate })
     setTodaysFoods(updated)
@@ -4427,7 +4423,8 @@ Please add nutritional information manually if needed.`);
   const insertMealIntoDiary = async (source: any, targetCategory?: typeof MEAL_CATEGORY_ORDER[number]) => {
     if (!source) return
     const category = normalizeCategory(targetCategory || selectedAddCategory)
-    const nowIso = new Date().toISOString()
+    const createdAtIso = alignTimestampToLocalDate(new Date().toISOString(), selectedDate)
+    const displayTime = new Date(createdAtIso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     const description = normalizeMealLabel(
       source?.description || source?.label || source?.favorite?.label || 'Meal',
     )
@@ -4439,10 +4436,10 @@ Please add nutritional information manually if needed.`);
       source?.entry?.items ||
       (Array.isArray(source?.favorite?.items) ? JSON.parse(JSON.stringify(source.favorite.items)) : null)
     const newEntry = {
-      id: Date.now(),
+      id: new Date(createdAtIso).getTime(),
       localDate: selectedDate,
       description,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      time: displayTime,
       method: source?.method || 'text',
       photo: source?.photo || source?.entry?.photo || null,
       nutrition: totals,
@@ -4451,7 +4448,7 @@ Please add nutritional information manually if needed.`);
       meal: category,
       category,
       persistedCategory: category,
-      createdAt: nowIso,
+      createdAt: createdAtIso,
     }
     const updated = dedupeEntries([newEntry, ...todaysFoods], { fallbackDate: selectedDate })
     setTodaysFoods(updated)
@@ -4523,7 +4520,7 @@ Please add nutritional information manually if needed.`);
   const insertFavoriteIntoDiary = async (favorite: any, targetCategory?: typeof MEAL_CATEGORY_ORDER[number]) => {
     if (!favorite) return
     const category = normalizeCategory(targetCategory || selectedAddCategory)
-    const createdAtIso = new Date().toISOString()
+    const createdAtIso = alignTimestampToLocalDate(new Date().toISOString(), selectedDate)
     const clonedItems =
       favorite.items && Array.isArray(favorite.items) && favorite.items.length > 0
         ? JSON.parse(JSON.stringify(favorite.items))
@@ -4534,10 +4531,10 @@ Please add nutritional information manually if needed.`);
     // row text (which only shows the first line) stays unchanged.
     const descriptionWithMeta = `${baseDescription}\n(favorite-copy-${Date.now()})`
     const entry = {
-      id: Date.now(),
+      id: new Date(createdAtIso).getTime(),
       localDate: selectedDate,
       description: descriptionWithMeta,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      time: new Date(createdAtIso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       method: favorite.method || 'text',
       photo: favorite.photo || null,
       nutrition: favorite.nutrition || favorite.total || null,
@@ -4628,21 +4625,24 @@ Please add nutritional information manually if needed.`);
     const baseDescription = source.description || source.label || 'Duplicated meal'
     const duplicateMetaTag = `(duplicate-${mode}-${Date.now()})`
     const descriptionWithMeta = `${baseDescription}\n${duplicateMetaTag}`
+    const createdAtIso = alignTimestampToLocalDate(new Date().toISOString(), targetDate)
+    const displayTime = new Date(createdAtIso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     const clonedItems =
       source.items && Array.isArray(source.items) && source.items.length > 0
         ? JSON.parse(JSON.stringify(source.items))
         : null
     const copiedEntry = {
       ...source,
-      id: Date.now(),
+      id: new Date(createdAtIso).getTime(),
       dbId: undefined,
       localDate: targetDate,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      time: displayTime,
       meal: category,
       category,
       persistedCategory: category,
       items: clonedItems,
       description: descriptionWithMeta,
+      createdAt: createdAtIso,
     }
     setSelectedAddCategory(category as typeof MEAL_CATEGORY_ORDER[number])
     const normalizedHistory = Array.isArray(historyFoods) ? historyFoods : []

@@ -97,7 +97,10 @@ function parseExerciseDurations(
 
 function goalAdjustmentFactor(goalChoice?: string | null, intensity?: 'mild' | 'standard' | 'aggressive' | null): number {
   const choice = (goalChoice || '').toLowerCase()
-  const level = intensity || 'standard'
+  const level: 'mild' | 'standard' | 'aggressive' =
+    typeof intensity === 'string'
+      ? (intensity.toLowerCase() as 'mild' | 'standard' | 'aggressive')
+      : 'standard'
   const byLevel = (base: number) => {
     if (level === 'mild') return base * 0.7
     if (level === 'aggressive') return base * 1.2

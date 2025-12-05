@@ -379,13 +379,39 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
+  const [showValidationError, setShowValidationError] = useState(false);
   const { shouldBlockNavigation, allowUnsavedNavigation, acknowledgeUnsavedChanges, requestNavigation, beforeUnloadHandler } = useUnsavedNavigationAllowance(hasUnsavedChanges);
+  const { updateUserData } = useUserData();
 
   const parseNumber = (value: string): number | null => {
     if (!value) return null;
     const n = Number(value);
     return Number.isFinite(n) ? n : null;
   };
+
+  const weightNumber = parseNumber(weight);
+  const heightNumber = parseNumber(height);
+  const feetNumber = parseNumber(feet);
+  const inchesNumber = parseNumber(inches);
+  const hasValidWeight = weightNumber != null && weightNumber > 0;
+  const hasValidHeight =
+    unit === 'metric'
+      ? heightNumber != null && heightNumber > 0
+      : ((feetNumber != null && feetNumber > 0) || (inchesNumber != null && inchesNumber > 0));
+  const hasBirthdate = !!(birthYear && birthMonth && birthDay);
+  const hasGoalChoice = !!goalChoice;
+  const hasGoalIntensity = !!goalIntensity;
+  const hasBodyType = !!bodyType;
+  const genderValue = (initial?.gender || '').toString().toLowerCase();
+  const hasGender = genderValue === 'male' || genderValue === 'female';
+  const isStepComplete =
+    hasValidWeight &&
+    hasValidHeight &&
+    hasBirthdate &&
+    hasGoalChoice &&
+    hasGoalIntensity &&
+    hasBodyType &&
+    hasGender;
 
   // Keep local state in sync when initial data loads or changes,
   // but avoid overwriting any values the user has already edited on this step.
@@ -509,6 +535,12 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
     return () => window.removeEventListener('beforeunload', beforeUnloadHandler);
   }, [beforeUnloadHandler]);
 
+  useEffect(() => {
+    if (showValidationError && isStepComplete) {
+      setShowValidationError(false);
+    }
+  }, [showValidationError, isStepComplete]);
+
   // Expose unsaved state globally so the header "Go To Dashboard" link can respect it
   useEffect(() => {
     try {
@@ -560,6 +592,10 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
   }, [weight, birthdate, height, feet, inches, bodyType, unit, goalChoice, goalIntensity, onNext]);
 
   const handleUpdateInsights = async () => {
+    if (!isStepComplete) {
+      setShowValidationError(true);
+      return;
+    }
     setIsGeneratingInsights(true);
     try {
       const response = await fetch('/api/user-data', {
@@ -570,6 +606,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
 
       if (response.ok) {
         setHasUnsavedChanges(false);
+        updateUserData(buildPayload());
         await triggerTargetedInsightsRefresh(['profile']);
         setShowUpdatePopup(false);
       } else {
@@ -590,6 +627,10 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
   };
 
   const handleNextWithGuard = () => {
+    if (!isStepComplete) {
+      setShowValidationError(true);
+      return;
+    }
     requestNavigation(handleNext, triggerPopup);
   };
 
@@ -910,31 +951,35 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial }: { o
           </div>
         </div>
       )}
+      {showValidationError && !isStepComplete && (
+        <div className="mb-4 p-3 rounded-lg border border-red-200 bg-red-50 text-sm text-red-700">
+          Please fill weight, birthdate, height, gender, body type, goal, and intensity before continuing.
+          {!hasGender && (
+            <div className="mt-1 text-red-600">
+              Use the Back button to select your gender on the previous step.
+            </div>
+          )}
+        </div>
+      )}
       <div className="flex justify-between">
         <button className="border border-green-600 text-green-600 px-6 py-3 rounded-lg hover:bg-green-600 hover:text-white transition-colors" onClick={handleBackWithGuard}>Back</button>
         <div className="flex space-x-3">
         <button 
-          className="text-gray-600 hover:text-gray-900 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors"
-          onClick={() =>
-            requestNavigation(
-              () =>
-                onNext({
-                  weight: weight || '0',
-                  height: height || '0',
-                  feet: feet || '0',
-                  inches: inches || '0',
-                  bodyType: bodyType || 'not specified',
-                  unit,
-                  birthdate: birthdate || '',
-                }),
-              triggerPopup,
-            )
-          }
+          className="text-gray-600 hover:text-gray-900 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+          disabled={!isStepComplete}
+          onClick={() => {
+            if (!isStepComplete) {
+              setShowValidationError(true);
+              return;
+            }
+            handleNextWithGuard();
+          }}
         >
           Skip
         </button>
           <button 
-            className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors" 
+            className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed" 
+            disabled={!isStepComplete}
             onClick={handleNextWithGuard}
           >
             Next
@@ -5465,7 +5510,7 @@ function InteractionAnalysisStep({ onNext, onBack, initial, onAnalysisSettled }:
 
 export default function Onboarding() {
   const { data: session, status } = useSession();
-  const { profileImage: providerProfileImage } = useUserData();
+  const { profileImage: providerProfileImage, updateUserData } = useUserData();
   
   // ⚠️ HEALTH SETUP GUARD RAIL
   // This onboarding component is part of a carefully tuned flow:
@@ -5663,6 +5708,9 @@ export default function Onboarding() {
     try {
       const updatedForm = { ...form, ...data };
       setForm(updatedForm);
+      
+      // Keep shared user data context in sync so calorie targets/macros recalc immediately
+      updateUserData(updatedForm);
       
       // Re-enabled debounced save with safer mechanism
       debouncedSave(updatedForm);
