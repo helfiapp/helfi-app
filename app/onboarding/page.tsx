@@ -5652,6 +5652,7 @@ export default function Onboarding() {
   // so they can actually complete the intake instead of being stuck.
   const [firstTimeModalDismissed, setFirstTimeModalDismissed] = useState(false);
   const [usageMeterRefresh, setUsageMeterRefresh] = useState(0);
+  const formBaselineRef = useRef<string>(''); // canonical snapshot to detect real edits
 
   const stepNames = [
     'Gender',
@@ -5740,6 +5741,13 @@ export default function Onboarding() {
       console.error('Error loading user data:', error);
     } finally {
       setAllowAutosave(true);
+      // Establish a clean baseline after the initial load so navigation guard only triggers on new edits
+      try {
+        formBaselineRef.current = JSON.stringify(formRef.current || {});
+        setHasGlobalUnsavedChanges(false);
+      } catch {
+        formBaselineRef.current = '';
+      }
     }
   };
   // Keep a ref of the latest form for partial saves
@@ -5836,7 +5844,14 @@ export default function Onboarding() {
         const next = { ...prev, ...partial };
         if (allowAutosave) {
           debouncedSave(next);
-          setHasGlobalUnsavedChanges(true);
+          // Mark dirty only if current form differs from baseline
+          try {
+            if (formBaselineRef.current && JSON.stringify(next) !== formBaselineRef.current) {
+              setHasGlobalUnsavedChanges(true);
+            }
+          } catch {
+            setHasGlobalUnsavedChanges(true);
+          }
         }
         return next;
       });
@@ -5893,7 +5908,14 @@ export default function Onboarding() {
       
       // Keep shared user data context in sync so calorie targets/macros recalc immediately
       updateUserData(updatedForm);
-      setHasGlobalUnsavedChanges(true);
+      try {
+        const canonical = JSON.stringify(updatedForm);
+        if (!formBaselineRef.current || canonical !== formBaselineRef.current) {
+          setHasGlobalUnsavedChanges(true);
+        }
+      } catch {
+        setHasGlobalUnsavedChanges(true);
+      }
       
       // Re-enabled debounced save with safer mechanism
       debouncedSave(updatedForm);
@@ -6046,10 +6068,20 @@ export default function Onboarding() {
               title="back button to Dashboard"
               onClick={(e) => {
                 try {
+                  const hasRealChanges = (() => {
+                    try {
+                      return (
+                        !!formBaselineRef.current &&
+                        JSON.stringify(formRef.current || {}) !== formBaselineRef.current
+                      );
+                    } catch {
+                      return hasGlobalUnsavedChanges;
+                    }
+                  })();
                   const hasPhysicalUnsaved =
                     step === 1 &&
                     (window as any).__helfiOnboardingPhysicalHasUnsavedChanges;
-                  if (hasPhysicalUnsaved || hasGlobalUnsavedChanges) {
+                  if (hasPhysicalUnsaved || (hasGlobalUnsavedChanges && hasRealChanges)) {
                     e.preventDefault();
                     window.postMessage(
                       { type: 'OPEN_PHYSICAL_UPDATE_POPUP' },
@@ -6371,6 +6403,11 @@ export default function Onboarding() {
               await debouncedSave(form);
               await triggerTargetedInsightsRefresh(['profile', 'exercise', 'health_goals', 'health_situations']);
               setHasGlobalUnsavedChanges(false);
+              try {
+                formBaselineRef.current = JSON.stringify(formRef.current || {});
+              } catch {
+                formBaselineRef.current = '';
+              }
               setShowGlobalUpdatePopup(false);
             } finally {
               setIsGlobalGenerating(false);
