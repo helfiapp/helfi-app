@@ -5012,6 +5012,29 @@ Please add nutritional information manually if needed.`);
         }
       }
       if (!deleted) {
+        // Nuclear option: delete by description/category across the sweep dates.
+        try {
+          const payload = {
+            description: entry?.description || entry?.name || '',
+            category: entryCategory,
+            dates: sweepDates,
+          }
+          const res = await fetch('/api/food-log/delete-by-description', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          })
+          if (res.ok) {
+            const json = await res.json().catch(() => ({} as any))
+            deleted = !!json?.deleted && json.deleted > 0
+          } else {
+            console.warn('Description delete failed', res.status, res.statusText)
+          }
+        } catch (err) {
+          console.warn('Description-based delete failed', err)
+        }
+      }
+      if (!deleted) {
         console.warn('Delete did not confirm; entry may reappear after refresh.')
       }
     }
