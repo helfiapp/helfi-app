@@ -4901,8 +4901,11 @@ Please add nutritional information manually if needed.`);
 
     // Remove from local state instantly and keep the delete cached so DB refreshes don't re-add it
     const updatedFoods = todaysFoods.filter((food: any) => {
-      const sameId = food.id === entryId;
-      const sameDb = dbId && (food as any).dbId === dbId;
+      const sameId =
+        entryId !== null &&
+        entryId !== undefined &&
+        String(food.id ?? '') === String(entryId)
+      const sameDb = dbId && String((food as any).dbId ?? '') === String(dbId);
       return !sameId && !sameDb;
     });
     setTodaysFoods(updatedFoods);
@@ -4946,6 +4949,14 @@ Please add nutritional information manually if needed.`);
             }
           });
         } else {
+          // If we lack dbId but have a stable entryId, try deleting by id directly.
+          if (entryId) {
+            await fetch('/api/food-log/delete', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id: entryId }),
+            }).catch(() => {})
+          }
           // Fallback: try to find a matching server entry by description/category and delete it
           try {
             const tz = new Date().getTimezoneOffset();
