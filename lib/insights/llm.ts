@@ -34,6 +34,17 @@ function getOpenAIClient() {
   return _openai
 }
 
+export function getInsightsLlmStatus() {
+  const raw = (process.env.ENABLE_INSIGHTS_LLM || '').toLowerCase().trim()
+  const enabled = raw === 'true' || raw === '1' || raw === 'yes'
+  const apiKeyPresent = typeof process.env.OPENAI_API_KEY === 'string' && process.env.OPENAI_API_KEY.trim().length > 0
+  return {
+    enabled,
+    apiKeyPresent,
+    model: DEFAULT_INSIGHTS_MODEL,
+  }
+}
+
 async function createCompletion(
   params: any,
   context: { feature: string; userId?: string | null; issueSlug?: string | null; runId?: string | null } = {

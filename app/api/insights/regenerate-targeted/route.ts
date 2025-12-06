@@ -7,6 +7,7 @@ import { CreditManager } from '@/lib/credit-system'
 import { prisma } from '@/lib/prisma'
 import { getRunCostCents } from '@/lib/ai-usage-runs'
 import type { RunContext } from '@/lib/run-context'
+import { getInsightsLlmStatus } from '@/lib/insights/llm'
 
 // Allow longer runtime so the full regeneration completes without a gateway timeout
 export const maxDuration = 120
@@ -126,14 +127,17 @@ export async function POST(request: NextRequest) {
     })
 
     if (changeTypes.length === 0) {
+      const llmStatus = getInsightsLlmStatus()
       return NextResponse.json({
         success: false,
         message: 'No valid change types provided; nothing to regenerate.',
         sectionsTriggered: [],
+        llmStatus,
       }, { status: 400 })
     }
 
     const runContext: RunContext = { runId, feature: 'insights:targeted' }
+    const llmStatus = getInsightsLlmStatus()
     console.log('[insights.regenerate-targeted] start', {
       runId,
       userId: session.user.id,
@@ -278,6 +282,7 @@ export async function POST(request: NextRequest) {
         affectedSections: affectedUnique,
         runId,
         background: true,
+        llmStatus,
       },
       { status: 202 }
     )
