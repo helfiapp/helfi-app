@@ -201,9 +201,75 @@ function detectChangedInsightTypes(baselineJson: string, currentForm: any): Insi
   return Array.from(new Set(changeTypes));
 }
 
-async function triggerTargetedInsightsRefresh(changeTypes: InsightChangeType[], options: { silent?: boolean } = {}) {
+// Global state for background regen status (shown in UI)
+let globalRegenStatusCallback: ((status: { isRegenerating: boolean; message?: string }) => void) | null = null;
+
+function setGlobalRegenStatusCallback(cb: ((status: { isRegenerating: boolean; message?: string }) => void) | null) {
+  globalRegenStatusCallback = cb;
+}
+
+function showGlobalRegenStatus(isRegenerating: boolean, message?: string) {
+  if (globalRegenStatusCallback) {
+    globalRegenStatusCallback({ isRegenerating, message });
+  }
+}
+
+// Fire-and-forget version: starts regen in background, returns immediately
+function fireAndForgetInsightsRegen(changeTypes: InsightChangeType[]) {
+  const unique = Array.from(new Set(changeTypes || [])).filter(Boolean) as InsightChangeType[];
+  if (!unique.length) return;
+  
+  const runId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `run_${Math.random().toString(36).slice(2)}`;
+  
+  // Show background status
+  showGlobalRegenStatus(true, 'Updating insights in background...');
+  
+  // Fire the request but don't await it
+  fetch('/api/insights/regenerate-targeted', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ changeTypes: unique, runId }),
+  })
+    .then(async (res) => {
+      const data = await res.json().catch(() => null);
+      if (res.ok && data?.success) {
+        // Refresh credits when done
+        try {
+          window.dispatchEvent(new Event('credits:refresh'));
+        } catch {}
+        
+        if (data.background) {
+          // Still processing in background on server
+          showGlobalRegenStatus(true, 'Insights still updating...');
+          // Clear status after a delay
+          setTimeout(() => showGlobalRegenStatus(false), 5000);
+        } else {
+          // Completed successfully
+          showGlobalRegenStatus(false);
+        }
+      } else {
+        console.warn('Background insights regen failed:', data?.message);
+        showGlobalRegenStatus(false);
+      }
+    })
+    .catch((error) => {
+      console.warn('Background insights regen error:', error);
+      showGlobalRegenStatus(false);
+    });
+}
+
+async function triggerTargetedInsightsRefresh(changeTypes: InsightChangeType[], options: { silent?: boolean; fireAndForget?: boolean } = {}) {
   const unique = Array.from(new Set(changeTypes || [])).filter(Boolean) as InsightChangeType[];
   if (!unique.length) return null;
+  
+  // Fire-and-forget mode: start regen and return immediately
+  if (options.fireAndForget) {
+    fireAndForgetInsightsRegen(unique);
+    return { success: true, background: true, message: 'Insights updating in background' };
+  }
+  
   const runId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
     ? crypto.randomUUID()
     : `run_${Math.random().toString(36).slice(2)}`;
@@ -712,6 +778,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     }
     setIsGeneratingInsights(true);
     try {
+      // Step 1: Save data immediately - this is the priority
       const response = await fetch('/api/user-data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -719,18 +786,23 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
       });
 
       if (response.ok) {
+        // Data saved successfully - update local state immediately
         setHasUnsavedChanges(false);
-        if (onInsightsSaved) setHasUnsavedChanges(false);
         if (onInsightsSaved) onInsightsSaved();
         updateUserData(buildPayload());
-        await triggerTargetedInsightsRefresh(['profile']);
+        
+        // Step 2: Fire regen in background WITHOUT waiting
+        // This prevents timeouts from blocking the UI
+        fireAndForgetInsightsRegen(['profile']);
+        
+        // Step 3: Close popup immediately - user sees instant success
         setShowUpdatePopup(false);
       } else {
-        alert('Failed to update insights. Please try again.');
+        alert('Failed to save your changes. Please try again.');
       }
     } catch (error) {
-      console.error('Error updating insights:', error);
-      alert('Failed to update insights. Please try again.');
+      console.error('Error saving data:', error);
+      alert('Failed to save your changes. Please try again.');
     } finally {
       setIsGeneratingInsights(false);
     }
@@ -1210,6 +1282,7 @@ function ExerciseStep({ onNext, onBack, initial, onPartialSave, onUnsavedChange,
   const handleUpdateInsights = async () => {
     setIsGeneratingInsights(true);
     try {
+      // Step 1: Save data immediately
       const response = await fetch('/api/user-data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1221,16 +1294,21 @@ function ExerciseStep({ onNext, onBack, initial, onPartialSave, onUnsavedChange,
       });
       
       if (response.ok) {
+        // Data saved successfully
         setHasUnsavedChanges(false);
         if (onInsightsSaved) onInsightsSaved();
-        await triggerTargetedInsightsRefresh(['exercise']);
+        
+        // Step 2: Fire regen in background WITHOUT waiting
+        fireAndForgetInsightsRegen(['exercise']);
+        
+        // Step 3: Close popup immediately
         setShowUpdatePopup(false);
       } else {
-        alert('Failed to update insights. Please try again.');
+        alert('Failed to save your changes. Please try again.');
       }
     } catch (error) {
-      console.error('Error updating insights:', error);
-      alert('Failed to update insights. Please try again.');
+      console.error('Error saving data:', error);
+      alert('Failed to save your changes. Please try again.');
     } finally {
       setIsGeneratingInsights(false);
     }
@@ -1713,13 +1791,18 @@ function HealthGoalsStep({ onNext, onBack, initial, onPartialSave, onUnsavedChan
         })
       ]);
       
+      // Data saved successfully
       setHasUnsavedChanges(false);
       if (onInsightsSaved) onInsightsSaved();
-      await triggerTargetedInsightsRefresh(['health_goals']);
+      
+      // Fire regen in background WITHOUT waiting
+      fireAndForgetInsightsRegen(['health_goals']);
+      
+      // Close popup immediately
       setShowUpdatePopup(false);
     } catch (error) {
-      console.error('Error updating insights:', error);
-      alert('Failed to update insights. Please try again.');
+      console.error('Error saving data:', error);
+      alert('Failed to save your changes. Please try again.');
     } finally {
       setIsGeneratingInsights(false);
     }
@@ -2194,16 +2277,21 @@ function HealthSituationsStep({ onNext, onBack, initial, onPartialSave, onUnsave
       });
       
       if (response.ok) {
+        // Data saved successfully
         setHasUnsavedChanges(false);
         if (onInsightsSaved) onInsightsSaved();
-        await triggerTargetedInsightsRefresh(['health_situations']);
+        
+        // Fire regen in background WITHOUT waiting
+        fireAndForgetInsightsRegen(['health_situations']);
+        
+        // Close popup immediately
         setShowUpdatePopup(false);
       } else {
-        alert('Failed to update insights. Please try again.');
+        alert('Failed to save your changes. Please try again.');
       }
     } catch (error) {
-      console.error('Error updating insights:', error);
-      alert('Failed to update insights. Please try again.');
+      console.error('Error saving data:', error);
+      alert('Failed to save your changes. Please try again.');
     } finally {
       setIsGeneratingInsights(false);
     }
@@ -2732,6 +2820,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
     setIsGeneratingInsights(true);
     try {
       // Save supplements to database
+      // Step 1: Save supplements immediately
       const response = await fetch('/api/user-data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2739,18 +2828,21 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
       });
       
       if (response.ok) {
-        // Update local state
+        // Data saved successfully - update local state
         setSupplements(supplementsToSave);
         setHasUnsavedChanges(false);
-        await triggerTargetedInsightsRefresh(['supplements']);
         
+        // Step 2: Fire regen in background WITHOUT waiting
+        fireAndForgetInsightsRegen(['supplements']);
+        
+        // Step 3: Close popup immediately
         setShowUpdatePopup(false);
       } else {
-        alert('Failed to update insights. Please try again.');
+        alert('Failed to save your changes. Please try again.');
       }
     } catch (error) {
-      console.error('Error updating insights:', error);
-      alert('Failed to update insights. Please try again.');
+      console.error('Error saving data:', error);
+      alert('Failed to save your changes. Please try again.');
     } finally {
       setIsGeneratingInsights(false);
     }
@@ -3700,6 +3792,7 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
     setIsGeneratingInsights(true);
     try {
       // Save medications to database
+      // Step 1: Save medications immediately
       const response = await fetch('/api/user-data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -3707,18 +3800,21 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
       });
       
       if (response.ok) {
-        // Update local state
+        // Data saved successfully - update local state
         setMedications(medicationsToSave);
         setHasUnsavedChanges(false);
-        await triggerTargetedInsightsRefresh(['medications']);
         
+        // Step 2: Fire regen in background WITHOUT waiting
+        fireAndForgetInsightsRegen(['medications']);
+        
+        // Step 3: Close popup immediately
         setShowUpdatePopup(false);
       } else {
-        alert('Failed to update insights. Please try again.');
+        alert('Failed to save your changes. Please try again.');
       }
     } catch (error) {
-      console.error('Error updating insights:', error);
-      alert('Failed to update insights. Please try again.');
+      console.error('Error saving data:', error);
+      alert('Failed to save your changes. Please try again.');
     } finally {
       setIsGeneratingInsights(false);
     }
@@ -4361,15 +4457,20 @@ function BloodResultsStep({ onNext, onBack, initial }: { onNext: (data: any) => 
       });
       
       if (response.ok) {
+        // Data saved successfully
         setHasUnsavedChanges(false);
-        await triggerTargetedInsightsRefresh(['blood_results']);
+        
+        // Fire regen in background WITHOUT waiting
+        fireAndForgetInsightsRegen(['blood_results']);
+        
+        // Close popup immediately
         setShowUpdatePopup(false);
       } else {
-        alert('Failed to update insights. Please try again.');
+        alert('Failed to save your changes. Please try again.');
       }
     } catch (error) {
-      console.error('Error updating insights:', error);
-      alert('Failed to update insights. Please try again.');
+      console.error('Error saving data:', error);
+      alert('Failed to save your changes. Please try again.');
     } finally {
       setIsGeneratingInsights(false);
     }
@@ -5629,6 +5730,15 @@ export default function Onboarding() {
       formBaselineRef.current = '';
     }
   }, []);
+  
+  // Background regen status indicator
+  const [backgroundRegenStatus, setBackgroundRegenStatus] = useState<{ isRegenerating: boolean; message?: string }>({ isRegenerating: false });
+  
+  // Register the global callback for background regen status
+  useEffect(() => {
+    setGlobalRegenStatusCallback(setBackgroundRegenStatus);
+    return () => setGlobalRegenStatusCallback(null);
+  }, []);
 
   const stepNames = [
     'Gender',
@@ -6389,6 +6499,7 @@ export default function Onboarding() {
                 return;
               }
 
+              // Step 1: Save data immediately
               const payload = formRef.current || form;
               const saveResponse = await fetch('/api/user-data', {
                 method: 'POST',
@@ -6401,19 +6512,19 @@ export default function Onboarding() {
                 return;
               }
 
+              // Data saved successfully
               updateUserData(payload);
 
-              const regen = await triggerTargetedInsightsRefresh(changeTypes);
-              if (!regen) {
-                alert('Failed to update insights. Please try again.');
-                return;
-              }
+              // Step 2: Fire regen in background WITHOUT waiting
+              fireAndForgetInsightsRegen(changeTypes);
+              
+              // Step 3: Close popup immediately - data is saved, regen is in background
               setHasGlobalUnsavedChanges(false);
               syncFormBaseline();
               setShowGlobalUpdatePopup(false);
             } catch (error) {
-              console.warn('Global insights update failed', error);
-              alert('Failed to update insights. Please try again.');
+              console.warn('Error saving data:', error);
+              alert('Failed to save your changes. Please try again.');
             } finally {
               setIsGlobalGenerating(false);
             }
@@ -6496,6 +6607,19 @@ export default function Onboarding() {
                   Reset Page
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Background Regen Status Indicator */}
+        {backgroundRegenStatus.isRegenerating && (
+          <div className="fixed bottom-20 md:bottom-4 left-1/2 transform -translate-x-1/2 z-50 animate-in fade-in duration-300">
+            <div className="bg-gray-900 text-white px-4 py-2 rounded-full shadow-lg flex items-center space-x-2">
+              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <span className="text-sm font-medium">{backgroundRegenStatus.message || 'Updating insights...'}</span>
             </div>
           </div>
         )}
