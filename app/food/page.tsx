@@ -4974,46 +4974,37 @@ Please add nutritional information manually if needed.`);
         try {
           const tz = new Date().getTimezoneOffset()
           const targetDate = entry.localDate || selectedDate
-          const res = await fetch(`/api/food-log?date=${targetDate}&tz=${tz}`)
-          if (res.ok) {
-            const json = await res.json()
-            const logs = Array.isArray(json.logs) ? json.logs : []
-            const match = logs.find((l: any) => {
-              const cat = normalizeCategory(l?.meal || l?.category || l?.mealType)
-              const descMatch =
-                normalizedDescription(l?.description || l?.name) === normalizedDescription(entry?.description)
-              return cat === entryCategory && descMatch
-            })
-            if (match?.id) {
-              deleted = await tryDeleteById(match.id)
-            }
-          }
-          // As a last resort, try yesterday/tomorrow to catch timezone-misaligned localDate
-          if (!deleted) {
-            const dates = [1, -1]
-            for (const delta of dates) {
-              if (deleted) break
-              try {
-                const d = new Date(targetDate || new Date().toISOString())
-                d.setDate(d.getDate() + delta)
-                const alt = d.toISOString().slice(0, 10)
-                const resAlt = await fetch(`/api/food-log?date=${alt}&tz=${tz}`)
-                if (resAlt.ok) {
-                  const jsonAlt = await resAlt.json()
-                  const logsAlt = Array.isArray(jsonAlt.logs) ? jsonAlt.logs : []
-                  const matchAlt = logsAlt.find((l: any) => {
-                    const cat = normalizeCategory(l?.meal || l?.category || l?.mealType)
-                    const descMatch =
-                      normalizedDescription(l?.description || l?.name) === normalizedDescription(entry?.description)
-                    return cat === entryCategory && descMatch
-                  })
-                  if (matchAlt?.id) {
-                    deleted = await tryDeleteById(matchAlt.id)
+          const sweepDates: string[] = []
+          if (targetDate) sweepDates.push(targetDate)
+          const base = targetDate ? new Date(targetDate) : new Date()
+          ;[1, -1].forEach((delta) => {
+            const d = new Date(base)
+            d.setDate(d.getDate() + delta)
+            sweepDates.push(d.toISOString().slice(0, 10))
+          })
+
+          for (const day of sweepDates) {
+            if (deleted) break
+            try {
+              const res = await fetch(`/api/food-log?date=${day}&tz=${tz}`)
+              if (res.ok) {
+                const json = await res.json()
+                const logs = Array.isArray(json.logs) ? json.logs : []
+                const matches = logs.filter((l: any) => {
+                  const cat = normalizeCategory(l?.meal || l?.category || l?.mealType)
+                  const descMatch =
+                    normalizedDescription(l?.description || l?.name) ===
+                    normalizedDescription(entry?.description)
+                  return cat === entryCategory && descMatch
+                })
+                for (const m of matches) {
+                  if (await tryDeleteById(m.id)) {
+                    deleted = true
                   }
                 }
-              } catch (errAlt) {
-                console.warn('Alt-date delete lookup failed', errAlt)
               }
+            } catch (errAlt) {
+              console.warn('Delete sweep lookup failed', { day, err: errAlt })
             }
           }
         } catch (err) {
