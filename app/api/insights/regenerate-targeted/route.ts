@@ -206,6 +206,16 @@ export async function POST(request: NextRequest) {
           })
         }
 
+      console.log('[insights.regenerate-targeted] charge summary (profile)', {
+        runId,
+        userId: session.user.id,
+        changeTypes: Array.from(new Set(effectiveChangeTypes)),
+        costCents,
+        usageEvents: count,
+        chargedCredits,
+        sectionsTriggered: sectionsForCharge,
+      })
+
         return {
           success: true as const,
           status: 200 as const,
@@ -339,6 +349,15 @@ export async function POST(request: NextRequest) {
           } as any,
         })
       }
+
+      console.log('[insights.regenerate-targeted] charge summary', {
+        runId,
+        userId: session.user.id,
+        changeTypes: Array.from(new Set(effectiveChangeTypes)),
+        costCents,
+        usageEvents: count,
+        chargedCredits,
+      })
 
       return {
         success: true as const,
