@@ -1809,8 +1809,8 @@ function HealthGoalsStep({ onNext, onBack, initial, onPartialSave, onUnsavedChan
         const prevSet = new Set(prevGoals.map((g) => g.trim()).filter(Boolean));
         const currSet = new Set(currentNames);
         const changed: string[] = [];
-        for (const g of currSet) if (!prevSet.has(g)) changed.push(g);
-        for (const g of prevSet) if (!currSet.has(g)) changed.push(g);
+        for (const g of Array.from(currSet)) if (!prevSet.has(g)) changed.push(g);
+        for (const g of Array.from(prevSet)) if (!currSet.has(g)) changed.push(g);
         return Array.from(new Set(changed));
       } catch {
         return currentNames; // fallback: assume all changed
