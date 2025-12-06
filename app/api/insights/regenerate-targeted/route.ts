@@ -211,13 +211,11 @@ export async function POST(request: NextRequest) {
             affectedSections: affectedUnique,
             costCents,
             usageEvents: count,
-          promptTokens,
-          completionTokens,
+            promptTokens,
+            completionTokens,
             llmStatus,
-          modelPrice,
-          markupMultiplier,
-          modelPrice,
-          markupMultiplier,
+            modelPrice,
+            markupMultiplier,
           },
         }
       }
@@ -237,8 +235,8 @@ export async function POST(request: NextRequest) {
               affectedSections: affectedUnique,
               costCents,
               usageEvents: count,
-          promptTokens,
-          completionTokens,
+              promptTokens,
+              completionTokens,
             },
           }
         }
