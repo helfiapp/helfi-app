@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { normalizeMealCategory } from '../food-log/route'
+import { normalizeMealCategory } from '../route'
 
 // Danger zone endpoint: delete matching food logs by description + category for the authenticated user.
 // Used as a last-resort cleaner when client-side deletes fail due to mismatched IDs or dates.

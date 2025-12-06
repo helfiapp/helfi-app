@@ -6,7 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { triggerBackgroundRegeneration } from '@/lib/insights/regeneration-service'
 import { Prisma } from '@prisma/client'
 
-const normalizeMealCategory = (raw: any): string | null => {
+export const normalizeMealCategory = (raw: any): string | null => {
   const value = typeof raw === 'string' ? raw.toLowerCase() : ''
   if (/breakfast/.test(value)) return 'breakfast'
   if (/lunch/.test(value)) return 'lunch'
