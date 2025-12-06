@@ -53,8 +53,17 @@ export type TokenUsage = {
   totalTokens?: number;
 };
 
+function normalizeModelKey(model: string): string {
+  const m = (model || '').toLowerCase();
+  if (m.includes('gpt-4o-mini')) return 'gpt-4o-mini';
+  if (m.includes('gpt-4o')) return 'gpt-4o';
+  if (m.includes('gpt-4')) return 'gpt-4';
+  if (m.includes('gpt-3.5')) return 'gpt-3.5-turbo';
+  return m;
+}
+
 export function getModelPrices(model: string): ModelPrices {
-  const key = model in DEFAULT_PRICES ? model : model.toLowerCase();
+  const key = model in DEFAULT_PRICES ? model : normalizeModelKey(model);
   return DEFAULT_PRICES[key] || DEFAULT_PRICES['gpt-4o'];
 }
 

@@ -1133,7 +1133,7 @@ export async function generateSectionInsightsFromLLM(
   const minAvoid = options.minAvoid ?? 4
   const costSaver = getRunContext()?.feature === 'insights:targeted'
   const maxRetries = costSaver ? 1 : options.maxRetries ?? 3
-  const maxTokens = costSaver ? 320 : 650
+  const maxTokens = costSaver ? 200 : 650
   const disableCache = options.disableCache ?? false
   const runId = getRunContext()?.runId ?? null
 
