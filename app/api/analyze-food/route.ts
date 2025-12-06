@@ -16,7 +16,7 @@ import crypto from 'crypto';
 import { consumeRateLimit } from '@/lib/rate-limit';
 
 // Bump this when changing curated nutrition to invalidate old cached images.
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute
 const RATE_LIMIT_MAX_REQUESTS = 3;   // stop runaway loops quickly
 
@@ -277,6 +277,55 @@ const looksLikeSingleGenericItem = (items: any[] | null | undefined): boolean =>
   const genericNames = ['meal', 'food', 'entry'];
   const hasMinimalDetail = !servingSize || servingSize === '1 serving';
   return genericNames.includes(name) || hasMinimalDetail;
+};
+
+const splitAnalysisIntoComponents = (analysis: string | null | undefined): string[] => {
+  if (!analysis) return [];
+  const cleaned = analysis.replace(/\s+/g, ' ').trim();
+  if (!cleaned) return [];
+  const parts = cleaned
+    .split(/(?:,| and | with | plus | & )/gi)
+    .map((p) => p.trim())
+    .filter((p) => p.length >= 3);
+  const unique: string[] = [];
+  for (const p of parts) {
+    const lower = p.toLowerCase();
+    if (!unique.some((u) => u.toLowerCase() === lower)) {
+      unique.push(p);
+    }
+    if (unique.length >= 4) break;
+  }
+  return unique;
+};
+
+const buildMultiComponentFallback = (
+  analysis: string | null | undefined,
+  total: any | null | undefined,
+): { items: any[]; total: any | null } => {
+  const baseNames = splitAnalysisIntoComponents(analysis);
+  while (baseNames.length < 2) {
+    baseNames.push(baseNames.length === 0 ? 'Component 1' : `Component ${baseNames.length + 1}`);
+  }
+  const count = baseNames.length;
+  const pick = (key: keyof typeof total) => {
+    const val = total && typeof total[key] === 'number' ? Number(total[key]) : null;
+    return Number.isFinite(val) && val !== null ? Math.max(0, val) / count : null;
+  };
+  const items = baseNames.map((name) => ({
+    name,
+    brand: null,
+    serving_size: '1 serving',
+    servings: 1,
+    calories: pick('calories'),
+    protein_g: pick('protein_g'),
+    carbs_g: pick('carbs_g'),
+    fat_g: pick('fat_g'),
+    fiber_g: pick('fiber_g') ?? 0,
+    sugar_g: pick('sugar_g') ?? 0,
+  }));
+  const synthesizedTotal =
+    total && typeof total === 'object' ? total : computeTotalsFromItems(items) || null;
+  return { items, total: synthesizedTotal };
 };
 
 // Initialize OpenAI client only when API key is available
@@ -1065,27 +1114,48 @@ CRITICAL REQUIREMENTS:
           console.warn('ITEMS_JSON extractor follow-up failed (non-fatal):', e);
         }
 
-        // If we still have no items, build a single editable item from the nutrition line
+        // If we still have no items, synthesize multiple editable items so cards stay separate.
         if (!resp.items || resp.items.length === 0) {
           const caloriesMatch = analysis.match(/calories\s*[:\-]?\s*(\d+)/i);
           const proteinMatch = analysis.match(/protein\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*g/i);
           const carbsMatch = analysis.match(/carbs?\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*g/i);
           const fatMatch = analysis.match(/fat\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*g/i);
-          const fallbackItem = {
-            name: 'Meal',
-            brand: null,
-            serving_size: '1 serving',
-            servings: 1,
-            calories: caloriesMatch ? Number(caloriesMatch[1]) : null,
-            protein_g: proteinMatch ? Number(proteinMatch[1]) : null,
-            carbs_g: carbsMatch ? Number(carbsMatch[1]) : null,
-            fat_g: fatMatch ? Number(fatMatch[1]) : null,
-            fiber_g: 0,
-            sugar_g: 0,
-          };
-          resp.items = [fallbackItem];
-          resp.total = resp.total || computeTotalsFromItems(resp.items) || null;
-          console.log('ℹ️ Using fallback single-item card to keep editor usable');
+          const baseTotal =
+            resp.total ||
+            computeTotalsFromItems([
+              {
+                calories: caloriesMatch ? Number(caloriesMatch[1]) : null,
+                protein_g: proteinMatch ? Number(proteinMatch[1]) : null,
+                carbs_g: carbsMatch ? Number(carbsMatch[1]) : null,
+                fat_g: fatMatch ? Number(fatMatch[1]) : null,
+                fiber_g: 0,
+                sugar_g: 0,
+              },
+            ]) ||
+            null;
+
+          if (preferMultiDetect && !packagedMode) {
+            const fallback = buildMultiComponentFallback(analysis, baseTotal);
+            resp.items = fallback.items;
+            resp.total = fallback.total;
+            console.log('ℹ️ Using multi-item fallback to avoid single-card UI');
+          } else {
+            const fallbackItem = {
+              name: 'Meal',
+              brand: null,
+              serving_size: '1 serving',
+              servings: 1,
+              calories: caloriesMatch ? Number(caloriesMatch[1]) : null,
+              protein_g: proteinMatch ? Number(proteinMatch[1]) : null,
+              carbs_g: carbsMatch ? Number(carbsMatch[1]) : null,
+              fat_g: fatMatch ? Number(fatMatch[1]) : null,
+              fiber_g: 0,
+              sugar_g: 0,
+            };
+            resp.items = [fallbackItem];
+            resp.total = baseTotal || computeTotalsFromItems(resp.items) || null;
+            console.log('ℹ️ Using fallback single-item card to keep editor usable (packaged/explicit single)');
+          }
         }
       }
     }
@@ -1163,6 +1233,18 @@ CRITICAL REQUIREMENTS:
       } else if (!resp.total) {
         resp.total = computeTotalsFromItems(resp.items);
       }
+    }
+
+    // Enforce multi-item output for meal analyses (non-packaged) so the UI never shows a single card.
+    if (
+      preferMultiDetect &&
+      !packagedMode &&
+      (!resp.items || resp.items.length === 0 || looksLikeSingleGenericItem(resp.items))
+    ) {
+      const fallback = buildMultiComponentFallback(analysis, resp.total);
+      resp.items = fallback.items;
+      resp.total = fallback.total || resp.total || null;
+      console.warn('✅ Enforced multi-item fallback to prevent single-card UI for meals.');
     }
 
     // Packaged mode: fill missing macros from FatSecret without overriding existing values.
