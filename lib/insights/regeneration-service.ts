@@ -375,7 +375,7 @@ export async function triggerBackgroundRegeneration(event: DataChangeEvent): Pro
 export async function triggerManualSectionRegeneration(
   userId: string,
   changeTypes: DataChangeEvent['changeType'][],
-  options: { inline?: boolean; runContext?: RunContext | null; preferQuick?: boolean } = {}
+  options: { inline?: boolean; runContext?: RunContext | null; preferQuick?: boolean; slugs?: string[] } = {}
 ): Promise<IssueSectionKey[]> {
   const requestedTypes = Array.isArray(changeTypes) ? changeTypes : []
   const changeTypesForLog = requestedTypes
@@ -414,7 +414,11 @@ export async function triggerManualSectionRegeneration(
         runContext: options.runContext,
       })
 
-      const targetSlugs = issueNames.length ? issueNames : ['general-health']
+      const providedSlugs =
+        Array.isArray(options.slugs) && options.slugs.length
+          ? Array.from(new Set(options.slugs.map((s) => String(s || '').trim()).filter(Boolean)))
+          : []
+      const targetSlugs = providedSlugs.length ? providedSlugs : issueNames.length ? issueNames : ['general-health']
 
       const buildContextForPhase = (phase: 'quick' | 'full'): RunContext | null => {
         if (!options.runContext) return null

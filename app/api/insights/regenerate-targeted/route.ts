@@ -290,6 +290,7 @@ export async function POST(request: NextRequest) {
         inline: true,
         runContext,
         preferQuick: preferQuickProfile,
+        slugs: changeTypes.includes('health_goals') && Array.isArray(body?.goalSlugs) ? body.goalSlugs : undefined,
       })
     } catch (error) {
       console.error('[insights.regenerate-targeted] regeneration failed', { runId, error })

@@ -215,13 +215,18 @@ function showGlobalRegenStatus(isRegenerating: boolean, message?: string) {
 }
 
 // Fire-and-forget version: starts regen in background, returns immediately
-function fireAndForgetInsightsRegen(changeTypes: InsightChangeType[]) {
+function slugifyGoal(name: string) {
+  return (name || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-')
+}
+
+function fireAndForgetInsightsRegen(changeTypes: InsightChangeType[], goalNames?: string[]) {
   const unique = Array.from(new Set(changeTypes || [])).filter(Boolean) as InsightChangeType[];
   if (!unique.length) return;
   
   const runId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
     ? crypto.randomUUID()
     : `run_${Math.random().toString(36).slice(2)}`;
+  const goalSlugs = Array.isArray(goalNames) ? Array.from(new Set(goalNames.map(slugifyGoal).filter(Boolean))) : undefined;
   
   // Show background status
   showGlobalRegenStatus(true, 'Updating insights in background...');
@@ -230,7 +235,7 @@ function fireAndForgetInsightsRegen(changeTypes: InsightChangeType[]) {
   fetch('/api/insights/regenerate-targeted', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ changeTypes: unique, runId }),
+    body: JSON.stringify({ changeTypes: unique, runId, goalSlugs }),
   })
     .then(async (res) => {
       const data = await res.json().catch(() => null);
@@ -260,13 +265,20 @@ function fireAndForgetInsightsRegen(changeTypes: InsightChangeType[]) {
     });
 }
 
-async function triggerTargetedInsightsRefresh(changeTypes: InsightChangeType[], options: { silent?: boolean; fireAndForget?: boolean } = {}) {
+async function triggerTargetedInsightsRefresh(
+  changeTypes: InsightChangeType[],
+  options: { silent?: boolean; fireAndForget?: boolean; goalNames?: string[] } = {}
+) {
   const unique = Array.from(new Set(changeTypes || [])).filter(Boolean) as InsightChangeType[];
   if (!unique.length) return null;
+  const goalSlugs =
+    Array.isArray(options.goalNames) && options.goalNames.length
+      ? Array.from(new Set(options.goalNames.map(slugifyGoal).filter(Boolean)))
+      : undefined;
   
   // Fire-and-forget mode: start regen and return immediately
   if (options.fireAndForget) {
-    fireAndForgetInsightsRegen(unique);
+    fireAndForgetInsightsRegen(unique, options.goalNames);
     return { success: true, background: true, message: 'Insights updating in background' };
   }
   
@@ -277,7 +289,7 @@ async function triggerTargetedInsightsRefresh(changeTypes: InsightChangeType[], 
     const res = await fetch('/api/insights/regenerate-targeted', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ changeTypes: unique, runId }),
+      body: JSON.stringify({ changeTypes: unique, runId, goalSlugs }),
     });
     const data = await res.json().catch(() => null);
     if (!res.ok || !data?.success) {
@@ -1790,6 +1802,21 @@ function HealthGoalsStep({ onNext, onBack, initial, onPartialSave, onUnsavedChan
     try {
       const allIssues = [...goals, ...customGoals].map((name: string) => ({ name }));
     const currentNames = allIssues.map(i => i.name.trim()).filter(Boolean);
+    const addedOrRemoved = (() => {
+      // Baseline comes from formBaselineRef (stringified). Use it to detect goal diffs.
+      try {
+        const baseline = formBaselineRef.current ? JSON.parse(formBaselineRef.current) : {};
+        const prevGoals: string[] = Array.isArray(baseline.goals) ? baseline.goals : [];
+        const prevSet = new Set(prevGoals.map((g) => g.trim()).filter(Boolean));
+        const currSet = new Set(currentNames);
+        const changed: string[] = [];
+        for (const g of currSet) if (!prevSet.has(g)) changed.push(g);
+        for (const g of prevSet) if (!currSet.has(g)) changed.push(g);
+        return Array.from(new Set(changed));
+      } catch {
+        return currentNames; // fallback: assume all changed
+      }
+    })();
     
     // Save goals to both endpoints
     await Promise.all([
@@ -1810,7 +1837,7 @@ function HealthGoalsStep({ onNext, onBack, initial, onPartialSave, onUnsavedChan
       if (onInsightsSaved) onInsightsSaved();
       
       // Fire regen in background WITHOUT waiting
-      fireAndForgetInsightsRegen(['health_goals']);
+      fireAndForgetInsightsRegen(['health_goals'], addedOrRemoved);
       
       // Close popup immediately
       setShowUpdatePopup(false);
