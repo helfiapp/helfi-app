@@ -11,8 +11,8 @@ import type { RunContext } from '@/lib/run-context'
 // Allow longer runtime so the full regeneration completes without a gateway timeout
 export const maxDuration = 120
 
-// Allow even more time so runs finish inline (avoid "background" fallback)
-const RESPONSE_TIMEOUT_MS = 120000
+// Allow ample time but still below hard platform limits
+const RESPONSE_TIMEOUT_MS = 90000
 
 const VALID_CHANGE_TYPES = [
   'supplements',
@@ -120,9 +120,13 @@ export async function POST(request: NextRequest) {
     }
 
     const runContext: RunContext = { runId, feature: 'insights:targeted' }
-    console.log('[insights.regenerate-targeted] start', { runId, userId: session.user.id, changeTypes })
+    console.log('[insights.regenerate-targeted] start', {
+      runId,
+      userId: session.user.id,
+      changeTypes: effectiveChangeTypes,
+    })
 
-    const regenPromise = triggerManualSectionRegeneration(session.user.id, changeTypes, {
+    const regenPromise = triggerManualSectionRegeneration(session.user.id, effectiveChangeTypes, {
       inline: true,
       runContext,
     })
@@ -136,7 +140,7 @@ export async function POST(request: NextRequest) {
       new Promise<'timeout'>((resolve) => setTimeout(() => resolve('timeout'), RESPONSE_TIMEOUT_MS)),
     ])
 
-    const affected = changeTypes.reduce<string[]>((acc, type) => {
+    const affected = effectiveChangeTypes.reduce<string[]>((acc, type) => {
       const mapped = getAffectedSections(type)
       mapped.forEach((s) => acc.push(s))
       return acc
@@ -200,7 +204,7 @@ export async function POST(request: NextRequest) {
             chargedCredits > 0
               ? `Charged ${chargedCredits} credits based on actual AI usage.`
               : 'Targeted insights regeneration completed.',
-          changeTypes: Array.from(new Set(changeTypes)),
+          changeTypes: Array.from(new Set(effectiveChangeTypes)),
           sectionsTriggered: sections,
           affectedSections: Array.from(new Set(affected)),
           runId,
@@ -230,7 +234,7 @@ export async function POST(request: NextRequest) {
         {
           success: true,
           message: 'Still finishing in the background. Insights will refresh shortly.',
-          changeTypes: Array.from(new Set(changeTypes)),
+          changeTypes: Array.from(new Set(effectiveChangeTypes)),
           sectionsTriggered: sections,
           affectedSections: Array.from(new Set(affected)),
           runId,
