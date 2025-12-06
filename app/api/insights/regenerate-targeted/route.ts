@@ -142,16 +142,18 @@ export async function POST(request: NextRequest) {
 
     const preferQuickProfile = effectiveChangeTypes.length === 1 && effectiveChangeTypes[0] === 'profile'
 
-    const regenSections = await triggerManualSectionRegeneration(session.user.id, effectiveChangeTypes, {
-      inline: true,
+    // Kick off the heavy run in the background to avoid frontend timeouts.
+    // We still use the same runId so AI usage is captured and credits charge when done.
+    const heavyPromise = triggerManualSectionRegeneration(session.user.id, effectiveChangeTypes, {
+      inline: false,
       runContext,
       preferQuick: preferQuickProfile,
     }).catch((error) => {
-      console.error('[insights.regenerate-targeted] regeneration failed', { runId, error })
+      console.error('[insights.regenerate-targeted] background regeneration failed', { runId, error })
       throw error
     })
 
-    const sections = regenSections || []
+    const sections: string[] = []
     const affected = effectiveChangeTypes.reduce<string[]>((acc, type) => {
       const mapped = getAffectedSections(type)
       mapped.forEach((s) => acc.push(s))
@@ -250,13 +252,31 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const chargeResult = await finalizeCharge()
-    if (!chargeResult.success) {
-      console.warn('[insights.regenerate-targeted] charge failed', { runId, chargeResult })
-      return NextResponse.json(chargeResult.body, { status: chargeResult.status })
-    }
+    // Finalize charging after the heavy run completes (background)
+    heavyPromise
+      .then((sectionsForCharge) => finalizeCharge(sectionsForCharge || sections))
+      .then((chargeResult) => {
+        if (!chargeResult.success) {
+          console.warn('[insights.regenerate-targeted] charge failed (background)', { runId, chargeResult })
+        }
+      })
+      .catch((error) => {
+        console.error('[insights.regenerate-targeted] background finalize charge failed', { runId, error })
+      })
 
-    return NextResponse.json(chargeResult.body, { status: 200 })
+    // Respond immediately to avoid 504s; background promise will charge when done.
+    return NextResponse.json(
+      {
+        success: true,
+        message: 'Finishing in the background. Credits will update when complete.',
+        changeTypes: Array.from(new Set(effectiveChangeTypes)),
+        sectionsTriggered: sections,
+        affectedSections: Array.from(new Set(affected)),
+        runId,
+        background: true,
+      },
+      { status: 202 }
+    )
   } catch (error) {
     console.error('[insights.regenerate-targeted] Failed to trigger regeneration', error)
     return NextResponse.json({ error: 'Failed to start regeneration' }, { status: 500 })
