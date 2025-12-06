@@ -4964,6 +4964,7 @@ Please add nutritional information manually if needed.`);
 
     const ensureRemoteDelete = async () => {
       let deleted = false
+      const sweepDates: string[] = []
       if (dbId) {
         deleted = await tryDeleteById(dbId)
       }
@@ -4974,7 +4975,6 @@ Please add nutritional information manually if needed.`);
         try {
           const tz = new Date().getTimezoneOffset()
           const targetDate = entry.localDate || selectedDate
-          const sweepDates: string[] = []
           if (targetDate) sweepDates.push(targetDate)
           const base = targetDate ? new Date(targetDate) : new Date()
           ;[1, -1].forEach((delta) => {
