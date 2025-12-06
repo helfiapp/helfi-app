@@ -1664,11 +1664,22 @@ const applyStructuredItems = (
   const stripGenericPlateItems = (items: any[], analysis: string | null | undefined) => {
     if (!Array.isArray(items) || items.length <= 1) return items
     const analysisTrimmed = (analysis || '').trim().toLowerCase()
+    const looksSummary = (name: string) => {
+      const n = name.trim().toLowerCase()
+      if (!n) return false
+      if (n.startsWith('the image shows')) return true
+      if (analysisTrimmed && n === analysisTrimmed) return true
+      const summaryKeywords = ['plate', 'platter', 'dish', 'bowl', 'meal']
+      const hasSummaryKeyword = summaryKeywords.some((k) => n.includes(k))
+      const hasListDelimiters = n.includes(',') || n.includes(' and ') || n.includes(' with ')
+      const longPhrase = n.split(/\s+/).length >= 7
+      const mentionsBurgerWith = n.includes('burger with')
+      return hasSummaryKeyword || (hasListDelimiters && longPhrase) || mentionsBurgerWith
+    }
     return items.filter((item) => {
       const name = String(item?.name || '').trim().toLowerCase()
       if (!name) return true
-      if (name.startsWith('the image shows')) return false
-      if (analysisTrimmed && name === analysisTrimmed) return false
+      if (looksSummary(name)) return false
       return true
     })
   }
