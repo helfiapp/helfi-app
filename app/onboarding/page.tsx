@@ -1803,9 +1803,8 @@ function HealthGoalsStep({ onNext, onBack, initial, onPartialSave, onUnsavedChan
       const allIssues = [...goals, ...customGoals].map((name: string) => ({ name }));
     const currentNames = allIssues.map(i => i.name.trim()).filter(Boolean);
     const addedOrRemoved = (() => {
-      // Baseline comes from formBaselineRef (stringified). Use it to detect goal diffs.
       try {
-        const baseline = formBaselineRef.current ? JSON.parse(formBaselineRef.current) : {};
+        const baseline = initialSnapshotRef.current || initial || {};
         const prevGoals: string[] = Array.isArray(baseline.goals) ? baseline.goals : [];
         const prevSet = new Set(prevGoals.map((g) => g.trim()).filter(Boolean));
         const currSet = new Set(currentNames);
