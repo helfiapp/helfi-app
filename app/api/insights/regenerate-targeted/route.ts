@@ -160,7 +160,8 @@ export async function POST(request: NextRequest) {
       return acc
     }, [])
 
-    const finalizeCharge = async () => {
+    const finalizeCharge = async (overrideSections?: string[]) => {
+      const sectionsForCharge = Array.isArray(overrideSections) && overrideSections.length ? overrideSections : sections
       const { costCents, count } = await getRunCostCents(runId, session.user.id)
       const cm = new CreditManager(session.user.id)
       const walletStatus = await cm.getWalletStatus()
@@ -174,7 +175,7 @@ export async function POST(request: NextRequest) {
             success: false,
             message: 'Not enough credits to cover this insights refresh.',
             runId,
-            sectionsTriggered: sections,
+            sectionsTriggered: sectionsForCharge,
             affectedSections: Array.from(new Set(affected)),
             costCents,
             usageEvents: count,
@@ -193,7 +194,7 @@ export async function POST(request: NextRequest) {
               success: false,
               message: 'Unable to charge credits for this insights refresh.',
               runId,
-              sectionsTriggered: sections,
+              sectionsTriggered: sectionsForCharge,
               affectedSections: Array.from(new Set(affected)),
               costCents,
               usageEvents: count,
@@ -226,7 +227,7 @@ export async function POST(request: NextRequest) {
           costCents,
           usageEvents: count,
           chargedCredits,
-          sectionsTriggered: sections,
+          sectionsTriggered: sectionsForCharge,
         })
       }
 
@@ -240,7 +241,7 @@ export async function POST(request: NextRequest) {
               ? `Charged ${chargedCredits} credits based on actual AI usage.`
               : 'Targeted insights regeneration completed.',
           changeTypes: Array.from(new Set(effectiveChangeTypes)),
-          sectionsTriggered: sections,
+          sectionsTriggered: sectionsForCharge,
           affectedSections: Array.from(new Set(affected)),
           runId,
           costCents,
