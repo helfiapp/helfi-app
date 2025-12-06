@@ -4930,14 +4930,30 @@ Please add nutritional information manually if needed.`);
     const tryDeleteById = async (id: string | number | null | undefined) => {
       if (!id) return false
       try {
+        const body = JSON.stringify({ id })
         const res = await fetch('/api/food-log/delete', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id }),
+          body,
         })
         if (!res.ok) {
           console.error('Delete API failed', { status: res.status, statusText: res.statusText })
-          return false
+          // Legacy fallback (DELETE verb) to catch older server paths
+          try {
+            const legacy = await fetch('/api/food-log', {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              body,
+            })
+            if (!legacy.ok) {
+              console.error('Legacy DELETE failed', { status: legacy.status, statusText: legacy.statusText })
+              return false
+            }
+            return true
+          } catch (legacyErr) {
+            console.error('Legacy DELETE error', legacyErr)
+            return false
+          }
         }
         return true
       } catch (err) {
@@ -4957,7 +4973,8 @@ Please add nutritional information manually if needed.`);
       if (!deleted) {
         try {
           const tz = new Date().getTimezoneOffset()
-          const res = await fetch(`/api/food-log?date=${entry.localDate || selectedDate}&tz=${tz}`)
+          const targetDate = entry.localDate || selectedDate
+          const res = await fetch(`/api/food-log?date=${targetDate}&tz=${tz}`)
           if (res.ok) {
             const json = await res.json()
             const logs = Array.isArray(json.logs) ? json.logs : []
@@ -4969,6 +4986,34 @@ Please add nutritional information manually if needed.`);
             })
             if (match?.id) {
               deleted = await tryDeleteById(match.id)
+            }
+          }
+          // As a last resort, try yesterday/tomorrow to catch timezone-misaligned localDate
+          if (!deleted) {
+            const dates = [1, -1]
+            for (const delta of dates) {
+              if (deleted) break
+              try {
+                const d = new Date(targetDate || new Date().toISOString())
+                d.setDate(d.getDate() + delta)
+                const alt = d.toISOString().slice(0, 10)
+                const resAlt = await fetch(`/api/food-log?date=${alt}&tz=${tz}`)
+                if (resAlt.ok) {
+                  const jsonAlt = await resAlt.json()
+                  const logsAlt = Array.isArray(jsonAlt.logs) ? jsonAlt.logs : []
+                  const matchAlt = logsAlt.find((l: any) => {
+                    const cat = normalizeCategory(l?.meal || l?.category || l?.mealType)
+                    const descMatch =
+                      normalizedDescription(l?.description || l?.name) === normalizedDescription(entry?.description)
+                    return cat === entryCategory && descMatch
+                  })
+                  if (matchAlt?.id) {
+                    deleted = await tryDeleteById(matchAlt.id)
+                  }
+                }
+              } catch (errAlt) {
+                console.warn('Alt-date delete lookup failed', errAlt)
+              }
             }
           }
         } catch (err) {
