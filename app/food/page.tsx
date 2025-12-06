@@ -5051,11 +5051,15 @@ Please add nutritional information manually if needed.`);
         await refreshEntriesFromServer()
         // Keep server snapshot in sync so stale cards don't reappear
         try {
-          await fetch('/api/user-data', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ todaysFoods: updatedFoods, appendHistory: false }),
-          })
+          if (updatedFoods.length === 0) {
+            await fetch('/api/user-data/clear-todays-foods', { method: 'POST' })
+          } else {
+            await fetch('/api/user-data', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ todaysFoods: updatedFoods, appendHistory: false }),
+            })
+          }
         } catch (syncErr) {
           console.warn('Failed to sync todaysFoods snapshot after delete', syncErr)
         }
