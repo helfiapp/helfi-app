@@ -111,6 +111,34 @@ export async function POST(request: NextRequest) {
         ? body.runId
         : randomUUID()
 
+    // Ensure the user has at least one real health goal; otherwise nothing to regenerate
+    const goals = await prisma.healthGoal.findMany({
+      where: {
+        userId: session.user.id,
+        name: { not: { startsWith: '__' } },
+      },
+      select: { name: true },
+      take: 5,
+    })
+    if (!goals.length) {
+      console.warn('[insights.regenerate-targeted] no health goals; skipping regeneration', {
+        runId,
+        userId: session.user.id,
+        changeTypes: effectiveChangeTypes,
+      })
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'Add at least one health goal to regenerate insights.',
+          runId,
+          sectionsTriggered: [],
+          affectedSections: [],
+          background: false,
+        },
+        { status: 400 }
+      )
+    }
+
     if (changeTypes.length === 0) {
       return NextResponse.json({
         success: false,
