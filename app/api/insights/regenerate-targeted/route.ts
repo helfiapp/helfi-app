@@ -367,14 +367,26 @@ export async function POST(request: NextRequest) {
         })
       }
 
-      console.log('[insights.regenerate-targeted] charge summary', {
-        runId,
-        userId: session.user.id,
-        changeTypes: Array.from(new Set(effectiveChangeTypes)),
-        costCents,
-        usageEvents: count,
-        chargedCredits,
-      })
+      if (costCents === 0 || count === 0) {
+        console.warn('[insights.regenerate-targeted] zero cost/usage for run', {
+          runId,
+          userId: session.user.id,
+          changeTypes: Array.from(new Set(effectiveChangeTypes)),
+          costCents,
+          usageEvents: count,
+          sectionsTriggered: sections,
+        })
+      } else {
+        console.log('[insights.regenerate-targeted] charge summary (general)', {
+          runId,
+          userId: session.user.id,
+          changeTypes: Array.from(new Set(effectiveChangeTypes)),
+          costCents,
+          usageEvents: count,
+          chargedCredits,
+          sectionsTriggered: sections,
+        })
+      }
 
       return {
         success: true as const,

@@ -381,6 +381,16 @@ export async function triggerManualSectionRegeneration(
         .filter((g) => !g.name.startsWith('__'))
         .map((g) => g.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'))
 
+      console.log('[manual-regeneration] start', {
+        userId,
+        changeTypes: requestedTypes,
+        affectedSections,
+        issues: issueNames,
+        inline: options.inline === true,
+        preferQuick: options.preferQuick === true,
+        runContext: options.runContext,
+      })
+
       // Mark as generating
       for (const issueSlug of issueNames) {
         for (const section of affectedSections) {
@@ -405,9 +415,25 @@ export async function triggerManualSectionRegeneration(
           await updateMetadataAfterGeneration(userId, issueSlug, section)
         }
       }
-      console.log(`[manual-regeneration] Completed sections: ${affectedSections.join(', ')} for user ${userId}`)
+      console.log('[manual-regeneration] complete', {
+        userId,
+        changeTypes: requestedTypes,
+        affectedSections,
+        issues: issueNames,
+        inline: options.inline === true,
+        preferQuick: options.preferQuick === true,
+        runContext: options.runContext,
+      })
     } catch (error) {
-      console.error('[manual-regeneration] Failed to regenerate sections', error)
+      console.error('[manual-regeneration] Failed to regenerate sections', {
+        userId,
+        changeTypes: requestedTypes,
+        affectedSections,
+        inline: options.inline === true,
+        preferQuick: options.preferQuick === true,
+        runContext: options.runContext,
+        error,
+      })
       try {
         await markSectionsStale(userId, affectedSections)
       } catch {}
