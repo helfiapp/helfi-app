@@ -4896,19 +4896,18 @@ Please add nutritional information manually if needed.`);
     if (!entry) return
     const dbId = (entry as any)?.dbId
     const entryCategory = normalizeCategory(entry?.meal || entry?.category || entry?.mealType)
-    const entryId = entry.id;
+    const entryId = entry.id
     const entryKey = entryId !== null && entryId !== undefined ? entryId.toString() : ''
 
-    // Remove from local state instantly and keep the delete cached so DB refreshes don't re-add it
     const updatedFoods = todaysFoods.filter((food: any) => {
       const sameId =
         entryId !== null &&
         entryId !== undefined &&
         String(food.id ?? '') === String(entryId)
-      const sameDb = dbId && String((food as any).dbId ?? '') === String(dbId);
-      return !sameId && !sameDb;
-    });
-    setTodaysFoods(updatedFoods);
+      const sameDb = dbId && String((food as any).dbId ?? '') === String(dbId)
+      return !sameId && !sameDb
+    })
+    setTodaysFoods(updatedFoods)
     triggerHaptic(10)
     setEntrySwipeOffsets((prev) => {
       if (!entryKey) return prev
@@ -4919,78 +4918,75 @@ Please add nutritional information manually if needed.`);
     setSwipeMenuEntry((prev) => (prev === entryKey ? null : prev))
     deletedEntryKeysRef.current.add(buildDeleteKey(entry))
     setDeletedEntryNonce((n) => n + 1)
-    // Persist in background so UI stays instant
-    ;(async () => {
-      try {
-        await saveFoodEntries(updatedFoods, { appendHistory: false, suppressToast: true });
-        await refreshEntriesFromServer();
-      } catch (err) {
-        console.warn('Delete sync failed', err)
-      }
-    })()
-    // If this was the last entry in the category, collapse that panel
-    const stillHasCategory = updatedFoods.some((f) => normalizeCategory(f.meal || f.category || f.mealType) === entryCategory)
+
+    const stillHasCategory = updatedFoods.some(
+      (f) => normalizeCategory(f.meal || f.category || f.mealType) === entryCategory,
+    )
     if (!stillHasCategory) {
       setExpandedCategories((prev) => ({ ...prev, [entryCategory]: false }))
     }
-    setShowEntryOptions(null);
+    setShowEntryOptions(null)
 
-    // Persist in background so UI stays instant
-    ;(async () => {
+    const tryDeleteById = async (id: string | number | null | undefined) => {
+      if (!id) return false
       try {
-        if (dbId) {
-          await fetch('/api/food-log/delete', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: dbId }),
-          }).then(async (r) => {
-            if (!r.ok) {
-              throw new Error('delete_failed')
-            }
-          });
-        } else {
-          // If we lack dbId but have a stable entryId, try deleting by id directly.
-          if (entryId) {
-            await fetch('/api/food-log/delete', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ id: entryId }),
-            }).catch(() => {})
-          }
-          // Fallback: try to find a matching server entry by description/category and delete it
-          try {
-            const tz = new Date().getTimezoneOffset();
-            const res = await fetch(`/api/food-log?date=${entry.localDate || selectedDate}&tz=${tz}`);
-            if (res.ok) {
-              const json = await res.json();
-              const logs = Array.isArray(json.logs) ? json.logs : [];
-              const match = logs.find((l: any) => {
-                const cat = normalizeCategory(l?.meal || l?.category || l?.mealType)
-                const descMatch =
-                  normalizedDescription(l?.description || l?.name) === normalizedDescription(entry?.description)
-                return cat === entryCategory && descMatch
-              })
-              if (match?.id) {
-                await fetch('/api/food-log/delete', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ id: match.id }),
-                }).catch(() => {})
-              }
-            }
-          } catch (err) {
-            console.warn('Best-effort server delete fallback failed', err)
-          }
+        const res = await fetch('/api/food-log/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id }),
+        })
+        if (!res.ok) {
+          console.error('Delete API failed', { status: res.status, statusText: res.statusText })
+          return false
         }
-      } catch (error) {
-        console.error('Failed to delete entry from database:', error);
-      } finally {
+        return true
+      } catch (err) {
+        console.error('Delete API error', err)
+        return false
+      }
+    }
+
+    const ensureRemoteDelete = async () => {
+      let deleted = false
+      if (dbId) {
+        deleted = await tryDeleteById(dbId)
+      }
+      if (!deleted && entryId) {
+        deleted = await tryDeleteById(entryId)
+      }
+      if (!deleted) {
         try {
-          await saveFoodEntries(updatedFoods, { appendHistory: false, suppressToast: true });
-          await refreshEntriesFromServer();
+          const tz = new Date().getTimezoneOffset()
+          const res = await fetch(`/api/food-log?date=${entry.localDate || selectedDate}&tz=${tz}`)
+          if (res.ok) {
+            const json = await res.json()
+            const logs = Array.isArray(json.logs) ? json.logs : []
+            const match = logs.find((l: any) => {
+              const cat = normalizeCategory(l?.meal || l?.category || l?.mealType)
+              const descMatch =
+                normalizedDescription(l?.description || l?.name) === normalizedDescription(entry?.description)
+              return cat === entryCategory && descMatch
+            })
+            if (match?.id) {
+              deleted = await tryDeleteById(match.id)
+            }
+          }
         } catch (err) {
-          console.warn('Delete sync failed', err)
+          console.warn('Best-effort server delete fallback failed', err)
         }
+      }
+      if (!deleted) {
+        console.warn('Delete did not confirm; entry may reappear after refresh.')
+      }
+    }
+
+    ;(async () => {
+      await ensureRemoteDelete()
+      try {
+        await saveFoodEntries(updatedFoods, { appendHistory: false, suppressToast: true })
+        await refreshEntriesFromServer()
+      } catch (err) {
+        console.warn('Delete sync failed', err)
       }
     })()
   };
