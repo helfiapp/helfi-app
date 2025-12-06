@@ -6,6 +6,7 @@ import { triggerManualSectionRegeneration, getAffectedSections } from '@/lib/ins
 import { CreditManager } from '@/lib/credit-system'
 import { prisma } from '@/lib/prisma'
 import { getRunCostCents } from '@/lib/ai-usage-runs'
+import { getBillingMarkupMultiplier, getModelPriceInfo } from '@/lib/cost-meter'
 import type { RunContext } from '@/lib/run-context'
 import { getInsightsLlmStatus } from '@/lib/insights/llm'
 
@@ -166,6 +167,8 @@ export async function POST(request: NextRequest) {
       const sectionsForCharge =
         Array.isArray(overrideSections) && overrideSections.length ? overrideSections : (sections.length ? sections : affectedUnique)
       const { costCents, count, promptTokens, completionTokens } = await getRunCostCents(runId, session.user.id)
+      const modelPrice = getModelPriceInfo(llmStatus.model)
+      const markupMultiplier = getBillingMarkupMultiplier()
       const cm = new CreditManager(session.user.id)
       const walletStatus = await cm.getWalletStatus()
       const plan = calculateChargePlan(costCents, walletStatus)
@@ -211,6 +214,10 @@ export async function POST(request: NextRequest) {
           promptTokens,
           completionTokens,
             llmStatus,
+          modelPrice,
+          markupMultiplier,
+          modelPrice,
+          markupMultiplier,
           },
         }
       }
@@ -274,6 +281,8 @@ export async function POST(request: NextRequest) {
           chargedCredits,
           subscriptionCreditsCharged: plan.subscriptionCredits,
           topUpCreditsCharged: plan.topUpCredits,
+          modelPrice,
+          markupMultiplier,
         },
       }
     }

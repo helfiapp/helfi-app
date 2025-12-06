@@ -1133,6 +1133,7 @@ export async function generateSectionInsightsFromLLM(
   const minAvoid = options.minAvoid ?? 4
   const costSaver = getRunContext()?.feature === 'insights:targeted'
   const maxRetries = costSaver ? 1 : options.maxRetries ?? 3
+  const maxTokens = costSaver ? 320 : 650
   const disableCache = options.disableCache ?? false
   const runId = getRunContext()?.runId ?? null
 
@@ -1201,7 +1202,7 @@ export async function generateSectionInsightsFromLLM(
       const response: any = await runChatCompletionWithLogging(openai, {
         model: DEFAULT_INSIGHTS_MODEL,
         temperature: 0.05,
-        max_tokens: 650,
+        max_tokens: maxTokens,
         response_format: { type: 'json_object' },
         messages: [
           {

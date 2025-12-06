@@ -58,6 +58,14 @@ export function getModelPrices(model: string): ModelPrices {
   return DEFAULT_PRICES[key] || DEFAULT_PRICES['gpt-4o'];
 }
 
+export function getBillingMarkupMultiplier() {
+  return BILLING_MARKUP_MULTIPLIER;
+}
+
+export function getModelPriceInfo(model: string): ModelPrices {
+  return getModelPrices(model);
+}
+
 // Raw OpenAI cost (no markup). Useful for reporting true spend against the vendor bill.
 export function openaiCostCentsForTokens(model: string, usage: TokenUsage): number {
   const { inputCentsPer1k, outputCentsPer1k } = getModelPrices(model);
