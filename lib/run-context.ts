@@ -3,6 +3,12 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 export type RunContext = {
   runId?: string | null
   feature?: string | null
+  meta?: {
+    userId?: string | null
+    changeTypes?: string[]
+    sections?: string[]
+    phase?: 'quick' | 'full'
+  }
 }
 
 const runContextStore = new AsyncLocalStorage<RunContext>()

@@ -136,7 +136,15 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    const runContext: RunContext = { runId, feature: 'insights:targeted' }
+    const runContext: RunContext = {
+      runId,
+      feature: 'insights:targeted',
+      meta: {
+        userId: session.user.id,
+        changeTypes: Array.from(new Set(effectiveChangeTypes)),
+        sections: affectedUnique,
+      },
+    }
     const llmStatus = getInsightsLlmStatus()
     console.log('[insights.regenerate-targeted] start', {
       runId,
@@ -145,17 +153,6 @@ export async function POST(request: NextRequest) {
     })
 
     const preferQuickProfile = effectiveChangeTypes.length === 1 && effectiveChangeTypes[0] === 'profile'
-
-    // Kick off the heavy run in the background to avoid frontend timeouts.
-    // We still use the same runId so AI usage is captured and credits charge when done.
-    const heavyPromise = triggerManualSectionRegeneration(session.user.id, effectiveChangeTypes, {
-      inline: false,
-      runContext,
-      preferQuick: preferQuickProfile,
-    }).catch((error) => {
-      console.error('[insights.regenerate-targeted] background regeneration failed', { runId, error })
-      throw error
-    })
 
     let sections: string[] = []
     const affected = effectiveChangeTypes.reduce<string[]>((acc, type) => {
@@ -189,6 +186,31 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      if (costCents === 0 || count === 0) {
+        console.error('[insights.regenerate-targeted] zero cost/usage recorded – failing run', {
+          runId,
+          userId: session.user.id,
+          changeTypes: Array.from(new Set(effectiveChangeTypes)),
+          costCents,
+          usageEvents: count,
+          sectionsTriggered: sectionsForCharge,
+        })
+        return {
+          success: false as const,
+          status: 500 as const,
+          body: {
+            success: false,
+            message: 'Insights update failed because no AI usage was recorded. Please retry.',
+            runId,
+            sectionsTriggered: sectionsForCharge,
+            affectedSections: affectedUnique,
+            costCents,
+            usageEvents: count,
+            llmStatus,
+          },
+        }
+      }
+
       let chargedCredits = 0
       if (plan.totalCredits > 0) {
         const chargedOk = await cm.chargeSplitCredits(plan.subscriptionCredits, plan.topUpCredits)
@@ -216,26 +238,15 @@ export async function POST(request: NextRequest) {
         })
       }
 
-      if (costCents === 0 || count === 0) {
-        console.warn('[insights.regenerate-targeted] zero cost/usage for run', {
-          runId,
-          userId: session.user.id,
-          changeTypes: Array.from(new Set(effectiveChangeTypes)),
-          costCents,
-          usageEvents: count,
-          sectionsTriggered: sections,
-        })
-      } else {
-        console.log('[insights.regenerate-targeted] charge summary', {
-          runId,
-          userId: session.user.id,
-          changeTypes: Array.from(new Set(effectiveChangeTypes)),
-          costCents,
-          usageEvents: count,
-          chargedCredits,
-          sectionsTriggered: sectionsForCharge,
-        })
-      }
+      console.log('[insights.regenerate-targeted] charge summary', {
+        runId,
+        userId: session.user.id,
+        changeTypes: Array.from(new Set(effectiveChangeTypes)),
+        costCents,
+        usageEvents: count,
+        chargedCredits,
+        sectionsTriggered: sectionsForCharge,
+      })
 
       return {
         success: true as const,
@@ -259,32 +270,37 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Finalize charging after the heavy run completes (background)
-    heavyPromise
-      .then((sectionsForCharge) => finalizeCharge(sectionsForCharge || sections))
-      .then((chargeResult) => {
-        if (!chargeResult.success) {
-          console.warn('[insights.regenerate-targeted] charge failed (background)', { runId, chargeResult })
-        }
+    try {
+      sections = await triggerManualSectionRegeneration(session.user.id, effectiveChangeTypes, {
+        inline: true,
+        runContext,
+        preferQuick: preferQuickProfile,
       })
-      .catch((error) => {
-        console.error('[insights.regenerate-targeted] background finalize charge failed', { runId, error })
-      })
+    } catch (error) {
+      console.error('[insights.regenerate-targeted] regeneration failed', { runId, error })
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'Failed to regenerate insights. Please retry.',
+          runId,
+          llmStatus,
+        },
+        { status: 500 }
+      )
+    }
 
-    // Respond immediately to avoid 504s; background promise will charge when done.
-    const sectionsForResponse = sections.length ? sections : affectedUnique
+    const chargeResult = await finalizeCharge(sections)
+    if (!chargeResult.success) {
+      return NextResponse.json(chargeResult.body, { status: chargeResult.status })
+    }
+
     return NextResponse.json(
       {
-        success: true,
-        message: 'Finishing in the background. Credits will update when complete.',
-        changeTypes: Array.from(new Set(effectiveChangeTypes)),
-        sectionsTriggered: sectionsForResponse,
-        affectedSections: affectedUnique,
-        runId,
-        background: true,
+        ...chargeResult.body,
+        background: false,
         llmStatus,
       },
-      { status: 202 }
+      { status: chargeResult.status }
     )
   } catch (error) {
     console.error('[insights.regenerate-targeted] Failed to trigger regeneration', error)

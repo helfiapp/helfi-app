@@ -416,6 +416,29 @@ export async function triggerManualSectionRegeneration(
 
       const targetSlugs = issueNames.length ? issueNames : ['general-health']
 
+      const buildContextForPhase = (phase: 'quick' | 'full'): RunContext | null => {
+        if (!options.runContext) return null
+        return {
+          ...options.runContext,
+          meta: {
+            ...(options.runContext.meta || {}),
+            userId,
+            changeTypes: requestedTypes,
+            sections: affectedSections,
+            phase,
+          },
+        }
+      }
+
+      const runWithScopedContext = async (phase: 'quick' | 'full', runner: () => Promise<void>) => {
+        const ctx = buildContextForPhase(phase)
+        if (ctx) {
+          await withRunContext(ctx, runner)
+        } else {
+          await runner()
+        }
+      }
+
       // Mark as generating (best-effort; fallback slug may not exist in DB)
       for (const issueSlug of targetSlugs) {
         for (const section of affectedSections) {
@@ -429,11 +452,47 @@ export async function triggerManualSectionRegeneration(
         }
       }
 
-      const precomputeFn = options.preferQuick
-        ? precomputeQuickSectionsForUser
-        : precomputeIssueSectionsForUser
+      if (options.preferQuick) {
+        console.log('[manual-regeneration] quick precompute start', {
+          userId,
+          changeTypes: requestedTypes,
+          sections: affectedSections,
+          issues: targetSlugs,
+        })
+        await runWithScopedContext('quick', () =>
+          precomputeQuickSectionsForUser(userId, {
+            concurrency: 4,
+            sectionsFilter: affectedSections,
+            slugs: targetSlugs,
+          })
+        )
+        console.log('[manual-regeneration] quick precompute complete', {
+          userId,
+          changeTypes: requestedTypes,
+          sections: affectedSections,
+          issues: targetSlugs,
+        })
+      }
 
-      await precomputeFn(userId, { concurrency: 4, sectionsFilter: affectedSections, slugs: targetSlugs })
+      console.log('[manual-regeneration] full precompute start', {
+        userId,
+        changeTypes: requestedTypes,
+        sections: affectedSections,
+        issues: targetSlugs,
+      })
+      await runWithScopedContext('full', () =>
+        precomputeIssueSectionsForUser(userId, {
+          concurrency: 4,
+          sectionsFilter: affectedSections,
+          slugs: targetSlugs,
+        })
+      )
+      console.log('[manual-regeneration] full precompute complete', {
+        userId,
+        changeTypes: requestedTypes,
+        sections: affectedSections,
+        issues: targetSlugs,
+      })
 
       for (const issueSlug of targetSlugs) {
         for (const section of affectedSections) {

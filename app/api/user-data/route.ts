@@ -618,7 +618,7 @@ export async function POST(request: NextRequest) {
     // 3.25. Handle primary goal + intensity (Step 2) - store as special health goal
     try {
       const incomingGoalChoice =
-        typeof data.goalChoice === 'string' ? data.goalChoice : existingPrimaryGoalData.goalChoice || ''
+        typeof data.goalChoice === 'string' ? data.goalChoice.trim() : existingPrimaryGoalData.goalChoice || ''
       const incomingGoalIntensity =
         typeof data.goalIntensity === 'string'
           ? data.goalIntensity.toLowerCase()
@@ -632,6 +632,10 @@ export async function POST(request: NextRequest) {
           }
         })
 
+        console.log('POST /api/user-data - Persisting primary goal selection', {
+          goalChoice: incomingGoalChoice,
+          goalIntensity: incomingGoalIntensity || 'standard',
+        })
         await prisma.healthGoal.create({
           data: {
             userId: user.id,

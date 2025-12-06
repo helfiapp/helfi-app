@@ -45,6 +45,21 @@ export function getInsightsLlmStatus() {
   }
 }
 
+function logLlmEvent(reason: string, extra: Record<string, unknown> = {}) {
+  const ctx = getRunContext()
+  const meta = ctx?.meta
+  const payload = {
+    runId: ctx?.runId ?? null,
+    feature: ctx?.feature ?? 'insights:unknown',
+    userId: meta?.userId ?? extra.userId ?? null,
+    changeTypes: meta?.changeTypes,
+    sections: meta?.sections,
+    phase: meta?.phase ?? 'full',
+    ...extra,
+  }
+  console.log('[insights.llm]', reason, payload)
+}
+
 async function createCompletion(
   params: any,
   context: { feature: string; userId?: string | null; issueSlug?: string | null; runId?: string | null } = {
@@ -52,8 +67,22 @@ async function createCompletion(
   }
 ) {
   const openai = getOpenAIClient()
-  if (!openai) return null
-  const runId = getRunContext()?.runId ?? null
+  const runCtx = getRunContext()
+  const runId = runCtx?.runId ?? null
+  if (!openai) {
+    logLlmEvent('skipped:llm-unavailable', {
+      userId: context.userId ?? runCtx?.meta?.userId ?? null,
+      issueSlug: context.issueSlug ?? null,
+      reason: 'missing-openai-or-flag-disabled',
+    })
+    return null
+  }
+
+  logLlmEvent('llm-call:start', {
+    userId: context.userId ?? runCtx?.meta?.userId ?? null,
+    issueSlug: context.issueSlug ?? null,
+    model: params?.model,
+  })
   return runChatCompletionWithLogging(openai, params, { ...context, runId })
 }
 
@@ -1136,8 +1165,15 @@ export async function generateSectionInsightsFromLLM(
   const cached = disableCache ? null : insightCache.get(cacheKey)
   const nowTs = Date.now()
   if (!disableCache && cached && cached.expiresAt > nowTs) {
+    logLlmEvent('cache-hit', {
+      userId,
+      issueSlug,
+      mode: input.mode,
+      cacheExpiresAt: new Date(cached.expiresAt).toISOString(),
+    })
     return cached.result
   }
+  logLlmEvent('cache-miss', { userId, issueSlug, mode: input.mode })
 
   let generateMs = 0
   let classifyMs = 0

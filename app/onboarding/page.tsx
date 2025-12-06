@@ -340,6 +340,7 @@ function useUnsavedNavigationAllowance(hasUnsavedChanges: boolean) {
       setAllowUnsavedNavigation(false);
       allowUnsavedNavigationRef.current = false;
       pendingActionRef.current = null;
+      console.log('[onboarding.guard] Re-armed due to new edits; navigation will be blocked until Update Insights runs.');
     }
     prevHasUnsavedChangesRef.current = hasUnsavedChanges;
   }, [hasUnsavedChanges]);
@@ -367,6 +368,7 @@ function useUnsavedNavigationAllowance(hasUnsavedChanges: boolean) {
       if (hasUnsavedChanges && !allowUnsavedNavigation) {
         pendingActionRef.current = action;
         triggerPopup();
+        console.log('[onboarding.guard] Blocking navigation and showing Update Insights prompt because unsaved changes are present.');
         return;
       }
       action();
@@ -773,8 +775,8 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
       feet,
       inches,
       bodyType,
-      goalChoice,
-      goalIntensity,
+      goalChoice: goalChoice?.trim(),
+      goalIntensity: goalIntensity,
       unit,
     }
   };
