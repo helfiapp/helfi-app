@@ -414,8 +414,10 @@ export async function triggerManualSectionRegeneration(
         runContext: options.runContext,
       })
 
-      // Mark as generating
-      for (const issueSlug of issueNames) {
+      const targetSlugs = issueNames.length ? issueNames : ['general-health']
+
+      // Mark as generating (best-effort; fallback slug may not exist in DB)
+      for (const issueSlug of targetSlugs) {
         for (const section of affectedSections) {
           await prisma.$queryRawUnsafe(
             `UPDATE "InsightsMetadata" SET "status" = 'generating', "updatedAt" = NOW() 
@@ -431,9 +433,9 @@ export async function triggerManualSectionRegeneration(
         ? precomputeQuickSectionsForUser
         : precomputeIssueSectionsForUser
 
-      await precomputeFn(userId, { concurrency: 4, sectionsFilter: affectedSections })
+      await precomputeFn(userId, { concurrency: 4, sectionsFilter: affectedSections, slugs: targetSlugs })
 
-      for (const issueSlug of issueNames) {
+      for (const issueSlug of targetSlugs) {
         for (const section of affectedSections) {
           await updateMetadataAfterGeneration(userId, issueSlug, section)
         }

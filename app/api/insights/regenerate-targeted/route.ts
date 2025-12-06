@@ -153,15 +153,17 @@ export async function POST(request: NextRequest) {
       throw error
     })
 
-    const sections: string[] = []
+    let sections: string[] = []
     const affected = effectiveChangeTypes.reduce<string[]>((acc, type) => {
       const mapped = getAffectedSections(type)
       mapped.forEach((s) => acc.push(s))
       return acc
     }, [])
+    const affectedUnique = Array.from(new Set(affected))
 
     const finalizeCharge = async (overrideSections?: string[]) => {
-      const sectionsForCharge = Array.isArray(overrideSections) && overrideSections.length ? overrideSections : sections
+      const sectionsForCharge =
+        Array.isArray(overrideSections) && overrideSections.length ? overrideSections : (sections.length ? sections : affectedUnique)
       const { costCents, count } = await getRunCostCents(runId, session.user.id)
       const cm = new CreditManager(session.user.id)
       const walletStatus = await cm.getWalletStatus()
@@ -176,7 +178,7 @@ export async function POST(request: NextRequest) {
             message: 'Not enough credits to cover this insights refresh.',
             runId,
             sectionsTriggered: sectionsForCharge,
-            affectedSections: Array.from(new Set(affected)),
+            affectedSections: affectedUnique,
             costCents,
             usageEvents: count,
           },
@@ -195,7 +197,7 @@ export async function POST(request: NextRequest) {
               message: 'Unable to charge credits for this insights refresh.',
               runId,
               sectionsTriggered: sectionsForCharge,
-              affectedSections: Array.from(new Set(affected)),
+              affectedSections: affectedUnique,
               costCents,
               usageEvents: count,
             },
@@ -242,7 +244,7 @@ export async function POST(request: NextRequest) {
               : 'Targeted insights regeneration completed.',
           changeTypes: Array.from(new Set(effectiveChangeTypes)),
           sectionsTriggered: sectionsForCharge,
-          affectedSections: Array.from(new Set(affected)),
+          affectedSections: affectedUnique,
           runId,
           costCents,
           usageEvents: count,
@@ -266,13 +268,14 @@ export async function POST(request: NextRequest) {
       })
 
     // Respond immediately to avoid 504s; background promise will charge when done.
+    const sectionsForResponse = sections.length ? sections : affectedUnique
     return NextResponse.json(
       {
         success: true,
         message: 'Finishing in the background. Credits will update when complete.',
         changeTypes: Array.from(new Set(effectiveChangeTypes)),
-        sectionsTriggered: sections,
-        affectedSections: Array.from(new Set(affected)),
+        sectionsTriggered: sectionsForResponse,
+        affectedSections: affectedUnique,
         runId,
         background: true,
       },
