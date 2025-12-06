@@ -323,6 +323,7 @@ function useUnsavedNavigationAllowance(hasUnsavedChanges: boolean) {
   const pendingActionRef = useRef<(() => void) | null>(null);
   const allowUnsavedNavigationRef = useRef(allowUnsavedNavigation);
   const hasUnsavedChangesRef = useRef(hasUnsavedChanges);
+  const prevHasUnsavedChangesRef = useRef(hasUnsavedChanges);
 
   useEffect(() => {
     allowUnsavedNavigationRef.current = allowUnsavedNavigation;
@@ -330,6 +331,17 @@ function useUnsavedNavigationAllowance(hasUnsavedChanges: boolean) {
 
   useEffect(() => {
     hasUnsavedChangesRef.current = hasUnsavedChanges;
+  }, [hasUnsavedChanges]);
+
+  // If new changes appear after we previously allowed navigation, re-lock navigation
+  useEffect(() => {
+    const prev = prevHasUnsavedChangesRef.current;
+    if (hasUnsavedChanges && !prev && allowUnsavedNavigationRef.current) {
+      setAllowUnsavedNavigation(false);
+      allowUnsavedNavigationRef.current = false;
+      pendingActionRef.current = null;
+    }
+    prevHasUnsavedChangesRef.current = hasUnsavedChanges;
   }, [hasUnsavedChanges]);
 
   useEffect(() => {
