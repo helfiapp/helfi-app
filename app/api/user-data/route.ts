@@ -470,6 +470,11 @@ export async function POST(request: NextRequest) {
 
     const normalizedBirthdate =
       typeof data.birthdate === 'string' ? data.birthdate.trim() : ''
+    const effectiveBirthdate =
+      normalizedBirthdate ||
+      (existingProfileInfoData && typeof existingProfileInfoData.dateOfBirth === 'string'
+        ? existingProfileInfoData.dateOfBirth
+        : '')
     const birthdateChanged = Boolean(
       normalizedBirthdate &&
         normalizedBirthdate !== (existingProfileInfoData?.dateOfBirth || '')
@@ -958,6 +963,11 @@ export async function POST(request: NextRequest) {
 
       if (shouldUpdateProfileInfo && profileInfoPayload) {
         console.log('POST /api/user-data - Handling profileInfo data:', profileInfoPayload)
+        if (effectiveBirthdate) {
+          profileInfoPayload.dateOfBirth = effectiveBirthdate
+        } else if (!profileInfoPayload.dateOfBirth && existingProfileInfoData?.dateOfBirth) {
+          profileInfoPayload.dateOfBirth = existingProfileInfoData.dateOfBirth
+        }
         
         // Update basic User fields if available in profileInfo
         const profileUpdateData: any = {}

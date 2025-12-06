@@ -452,7 +452,10 @@ export async function triggerManualSectionRegeneration(
         }
       }
 
-      if (options.preferQuick) {
+      // IMPORTANT: When a runContext is provided (manual/targeted regen),
+      // avoid double LLM passes. Skip the quick pass and run the full pass once.
+      const shouldSkipQuick = Boolean(options.runContext)
+      if (options.preferQuick && !shouldSkipQuick) {
         console.log('[manual-regeneration] quick precompute start', {
           userId,
           changeTypes: requestedTypes,
@@ -467,6 +470,13 @@ export async function triggerManualSectionRegeneration(
           })
         )
         console.log('[manual-regeneration] quick precompute complete', {
+          userId,
+          changeTypes: requestedTypes,
+          sections: affectedSections,
+          issues: targetSlugs,
+        })
+      } else if (options.preferQuick && shouldSkipQuick) {
+        console.log('[manual-regeneration] quick precompute skipped (runContext present to avoid double charges)', {
           userId,
           changeTypes: requestedTypes,
           sections: affectedSections,
