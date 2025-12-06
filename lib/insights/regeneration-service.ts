@@ -209,9 +209,31 @@ async function markSectionsStale(userId: string, sections: IssueSectionKey[]): P
     if (!user) return
 
     // Extract issue slugs from health goals (simplified - in real system would be more robust)
-    const issueNames = user.healthGoals
+    let issueNames = user.healthGoals
       .filter((g) => !g.name.startsWith('__'))
       .map((g) => g.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'))
+
+    // Fallback: if no healthGoals on the user record, try CheckinIssues (selected issues)
+    if (!issueNames.length) {
+      try {
+        const rows: Array<{ name: string }> = await prisma.$queryRawUnsafe(
+          'SELECT name FROM "CheckinIssues" WHERE "userId" = $1',
+          userId
+        )
+        issueNames = rows
+          .map((r) => r.name || '')
+          .filter((name) => name && !name.startsWith('__'))
+          .map((name) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-'))
+      } catch (e) {
+        console.warn('[manual-regeneration] fallback issues lookup failed', { userId, error: e })
+      }
+    }
+
+    // If still no issues, bail early to avoid a no-op regen that never charges
+    if (!issueNames.length) {
+      console.warn('[manual-regeneration] no issues/goals to regenerate for user', { userId })
+      return
+    }
 
     // Mark each section for each issue as stale
     for (const issueSlug of issueNames) {
@@ -356,6 +378,7 @@ export async function triggerManualSectionRegeneration(
   options: { inline?: boolean; runContext?: RunContext | null; preferQuick?: boolean } = {}
 ): Promise<IssueSectionKey[]> {
   const requestedTypes = Array.isArray(changeTypes) ? changeTypes : []
+  const changeTypesForLog = requestedTypes
   const affectedSections = Array.from(
     new Set(
       requestedTypes.flatMap((type) => getAffectedSections(type)).filter(Boolean)
