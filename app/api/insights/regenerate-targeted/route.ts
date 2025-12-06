@@ -128,26 +128,157 @@ export async function POST(request: NextRequest) {
 
     const preferQuickProfile = effectiveChangeTypes.length === 1 && effectiveChangeTypes[0] === 'profile'
 
-    // Fast inline (quick) pass for profile to avoid long waits
-    const quickPromise = triggerManualSectionRegeneration(session.user.id, effectiveChangeTypes, {
+    if (preferQuickProfile) {
+      // Profile-only: return fast, run heavy in background, charge when heavy finishes
+      const quickPromise = triggerManualSectionRegeneration(session.user.id, effectiveChangeTypes, {
+        inline: true,
+        runContext,
+        preferQuick: true,
+      })
+
+      const fullPromise = triggerManualSectionRegeneration(session.user.id, effectiveChangeTypes, {
+        inline: false,
+        runContext,
+        preferQuick: false,
+      })
+
+      const affected = effectiveChangeTypes.reduce<string[]>((acc, type) => {
+        const mapped = getAffectedSections(type)
+        mapped.forEach((s) => acc.push(s))
+        return acc
+      }, [])
+
+      let sections: string[] = []
+      const regenResult = await Promise.race([
+        quickPromise.then((s) => {
+          sections = s
+          return 'done' as const
+        }),
+        new Promise<'timeout'>((resolve) => setTimeout(() => resolve('timeout'), RESPONSE_TIMEOUT_MS)),
+      ])
+
+      const finalizeCharge = async (sectionsForCharge: string[]) => {
+        const { costCents, count } = await getRunCostCents(runId, session.user.id)
+        const cm = new CreditManager(session.user.id)
+        const walletStatus = await cm.getWalletStatus()
+        const plan = calculateChargePlan(costCents, walletStatus)
+
+        if (!plan.canAfford) {
+          return {
+            success: false as const,
+            status: 402 as const,
+            body: {
+              success: false,
+              message: 'Not enough credits to cover this insights refresh.',
+              runId,
+              sectionsTriggered: sectionsForCharge,
+              affectedSections: Array.from(new Set(affected)),
+              costCents,
+              usageEvents: count,
+            },
+          }
+        }
+
+        let chargedCredits = 0
+        if (plan.totalCredits > 0) {
+          const chargedOk = await cm.chargeSplitCredits(plan.subscriptionCredits, plan.topUpCredits)
+          if (!chargedOk) {
+            return {
+              success: false as const,
+              status: 402 as const,
+              body: {
+                success: false,
+                message: 'Unable to charge credits for this insights refresh.',
+                runId,
+                sectionsTriggered: sections,
+                affectedSections: Array.from(new Set(affected)),
+                costCents,
+                usageEvents: count,
+              },
+            }
+          }
+          chargedCredits = plan.totalCredits
+          await prisma.user.update({
+            where: { id: session.user.id },
+            data: {
+              monthlyInsightsGenerationUsed: { increment: 1 },
+            } as any,
+          })
+        }
+
+        return {
+          success: true as const,
+          status: 200 as const,
+          body: {
+            success: true,
+            message:
+              chargedCredits > 0
+                ? `Charged ${chargedCredits} credits based on actual AI usage.`
+                : 'Targeted insights regeneration completed.',
+            changeTypes: Array.from(new Set(effectiveChangeTypes)),
+            sectionsTriggered: sections,
+            affectedSections: Array.from(new Set(affected)),
+            runId,
+            costCents,
+            usageEvents: count,
+            chargedCredits,
+            subscriptionCreditsCharged: plan.subscriptionCredits,
+            topUpCreditsCharged: plan.topUpCredits,
+          },
+        }
+      }
+
+      // Charge after the full (heavy) promise completes, in the background
+      fullPromise
+        .then((sectionsForCharge) => finalizeCharge(sectionsForCharge || sections))
+        .then((chargeResult) => {
+          if (!chargeResult.success) {
+            console.warn('[insights.regenerate-targeted] charge failed (profile full)', { runId, chargeResult })
+          }
+        })
+        .catch((error) => {
+          console.error('[insights.regenerate-targeted] background profile regeneration failed', { runId, error })
+        })
+
+      // Respond quickly; background will finish and charge
+      if (regenResult === 'timeout') {
+        return NextResponse.json(
+          {
+            success: true,
+            message: 'Still finishing in the background. Insights will refresh shortly.',
+            changeTypes: Array.from(new Set(effectiveChangeTypes)),
+            sectionsTriggered: sections,
+            affectedSections: Array.from(new Set(affected)),
+            runId,
+            background: true,
+          },
+          { status: 202 }
+        )
+      }
+
+      return NextResponse.json(
+        {
+          success: true,
+          message: 'Finishing profile update in the background. Credits will update when complete.',
+          changeTypes: Array.from(new Set(effectiveChangeTypes)),
+          sectionsTriggered: sections,
+          affectedSections: Array.from(new Set(affected)),
+          runId,
+          background: true,
+        },
+        { status: 202 }
+      )
+    }
+
+    const regenPromise = triggerManualSectionRegeneration(session.user.id, effectiveChangeTypes, {
       inline: true,
       runContext,
-      preferQuick: preferQuickProfile,
+      preferQuick: false,
     })
-
-    // Full pass for profile runs in the background to ensure real insight text + charges
-    const fullPromise =
-      preferQuickProfile
-        ? triggerManualSectionRegeneration(session.user.id, effectiveChangeTypes, {
-            inline: false,
-            runContext,
-            preferQuick: false,
-          })
-        : null
 
     let sections: string[] = []
     const regenResult = await Promise.race([
-      quickPromise.then((s) => {
+      regenPromise.then((s) => {
         sections = s
         return 'done' as const
       }),
@@ -219,7 +350,7 @@ export async function POST(request: NextRequest) {
               ? `Charged ${chargedCredits} credits based on actual AI usage.`
               : 'Targeted insights regeneration completed.',
           changeTypes: Array.from(new Set(effectiveChangeTypes)),
-          sectionsTriggered: sections,
+            sectionsTriggered: sections,
           affectedSections: Array.from(new Set(affected)),
           runId,
           costCents,
@@ -231,8 +362,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Decide which promise should drive charging: full (if present) else quick
-    const chargeSourcePromise = fullPromise ?? quickPromise
+    // Decide which promise should drive charging (non-profile path just uses regenPromise)
+    const chargeSourcePromise = regenPromise
 
     const runAndCharge = async () => {
       try {

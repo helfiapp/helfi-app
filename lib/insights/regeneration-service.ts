@@ -423,16 +423,25 @@ export async function triggerManualSectionRegeneration(
         await runTask()
       }
     } else {
-      setImmediate(() => {
-        const runner = async () => {
-          if (options.runContext) {
-            await withRunContext(options.runContext, runTask)
-          } else {
-            await runTask()
+      // When inline is false, return a promise that resolves when the background run finishes
+      return await new Promise<IssueSectionKey[]>((resolve, reject) => {
+        setImmediate(() => {
+          const runner = async () => {
+            try {
+              if (options.runContext) {
+                await withRunContext(options.runContext, runTask)
+              } else {
+                await runTask()
+              }
+              resolve(affectedSections)
+            } catch (error) {
+              reject(error)
+            }
           }
-        }
-        runner().catch((error) => {
-          console.error('[manual-regeneration] Background regeneration failed', error)
+          runner().catch((error) => {
+            console.error('[manual-regeneration] Background regeneration failed', error)
+            reject(error)
+          })
         })
       })
     }
