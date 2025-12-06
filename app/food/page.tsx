@@ -4918,6 +4918,11 @@ Please add nutritional information manually if needed.`);
     setSwipeMenuEntry((prev) => (prev === entryKey ? null : prev))
     deletedEntryKeysRef.current.add(buildDeleteKey(entry))
     setDeletedEntryNonce((n) => n + 1)
+    // Prevent resurrecting from oversized/stale warm cache
+    try {
+      localStorage?.removeItem('foodDiary:warmState')
+      sessionStorage?.removeItem('foodDiary:warmState')
+    } catch {}
 
     const stillHasCategory = updatedFoods.some(
       (f) => normalizeCategory(f.meal || f.category || f.mealType) === entryCategory,
