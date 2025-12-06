@@ -172,8 +172,8 @@ function detectChangedInsightTypes(baselineJson: string, currentForm: any): Insi
   }
 
   if (hasChanged(
-    pickFields(baseline, ['exerciseFrequency', 'exerciseTypes']),
-    pickFields(current, ['exerciseFrequency', 'exerciseTypes']),
+    pickFields(baseline, ['exerciseFrequency', 'exerciseTypes', 'exerciseDurations']),
+    pickFields(current, ['exerciseFrequency', 'exerciseTypes', 'exerciseDurations']),
   )) {
     changeTypes.push('exercise');
   }
