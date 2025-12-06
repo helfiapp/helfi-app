@@ -500,7 +500,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     unit === 'metric'
       ? heightNumber != null && heightNumber > 0
       : ((feetNumber != null && feetNumber > 0) || (inchesNumber != null && inchesNumber > 0));
-  const hasBirthdate = !!(birthYear && birthMonth && birthDay);
+  const hasBirthdate = !!(birthYear && birthMonth && birthDay) || !!(birthdate || initial?.birthdate);
   const hasGoalChoice = !!goalChoice;
   const hasGoalIntensity = !!goalIntensity;
   const hasBodyType = !!bodyType;
@@ -521,6 +521,10 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     if (!initial) return;
     if (!initialSnapshotRef.current && Object.keys(initial || {}).length > 0) {
       initialSnapshotRef.current = initial;
+    }
+
+    if (!birthdate && typeof initial.birthdate === 'string' && initial.birthdate.trim().length >= 8) {
+      setBirthdate(initial.birthdate);
     }
 
     if (!weight && initial.weight) {
@@ -686,7 +690,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
   const buildPayload = () => {
     return {
       weight,
-      birthdate: birthdateFromParts,
+      birthdate: birthdateFromParts || birthdate || initial?.birthdate || '',
       height: unit === 'metric' ? height : `${feet}'${inches}"`,
       feet,
       inches,
