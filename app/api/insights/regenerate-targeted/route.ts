@@ -128,15 +128,26 @@ export async function POST(request: NextRequest) {
 
     const preferQuickProfile = effectiveChangeTypes.length === 1 && effectiveChangeTypes[0] === 'profile'
 
-    const regenPromise = triggerManualSectionRegeneration(session.user.id, effectiveChangeTypes, {
+    // Fast inline (quick) pass for profile to avoid long waits
+    const quickPromise = triggerManualSectionRegeneration(session.user.id, effectiveChangeTypes, {
       inline: true,
       runContext,
       preferQuick: preferQuickProfile,
     })
 
+    // Full pass for profile runs in the background to ensure real insight text + charges
+    const fullPromise =
+      preferQuickProfile
+        ? triggerManualSectionRegeneration(session.user.id, effectiveChangeTypes, {
+            inline: false,
+            runContext,
+            preferQuick: false,
+          })
+        : null
+
     let sections: string[] = []
     const regenResult = await Promise.race([
-      regenPromise.then((s) => {
+      quickPromise.then((s) => {
         sections = s
         return 'done' as const
       }),
@@ -220,18 +231,25 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Decide which promise should drive charging: full (if present) else quick
+    const chargeSourcePromise = fullPromise ?? quickPromise
+
+    const runAndCharge = async () => {
+      try {
+        await chargeSourcePromise
+      } catch (error) {
+        console.error('[insights.regenerate-targeted] regeneration failed before charge', { runId, error })
+        throw error
+      }
+      return finalizeCharge()
+    }
+
     if (regenResult === 'timeout') {
       console.warn('[insights.regenerate-targeted] timeout, continuing in background', { runId, userId: session.user.id })
-      regenPromise
-        .then(async () => {
-          const chargeResult = await finalizeCharge()
-          if (!chargeResult.success) {
-            console.warn('[insights.regenerate-targeted] charge failed after timeout', { runId, chargeResult })
-          }
-        })
-        .catch((error) => {
-          console.error('[insights.regenerate-targeted] background regeneration failed', { runId, error })
-        })
+      // Complete regen and charge in background
+      runAndCharge().catch((error) => {
+        console.error('[insights.regenerate-targeted] background regeneration failed', { runId, error })
+      })
 
       return NextResponse.json(
         {
@@ -247,7 +265,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const chargeResult = await finalizeCharge()
+    const chargeResult = await runAndCharge()
     if (!chargeResult.success) {
       console.warn('[insights.regenerate-targeted] charge failed', { runId, chargeResult })
       return NextResponse.json(chargeResult.body, { status: chargeResult.status })
