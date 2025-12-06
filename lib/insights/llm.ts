@@ -1131,7 +1131,8 @@ export async function generateSectionInsightsFromLLM(
   const minWorking = options.minWorking ?? (focusItems.length > 0 ? 1 : 0)
   const minSuggested = options.minSuggested ?? 4
   const minAvoid = options.minAvoid ?? 4
-  const maxRetries = options.maxRetries ?? 3
+  const costSaver = getRunContext()?.feature === 'insights:targeted'
+  const maxRetries = costSaver ? 1 : options.maxRetries ?? 3
   const disableCache = options.disableCache ?? false
   const runId = getRunContext()?.runId ?? null
 
@@ -1256,7 +1257,7 @@ export async function generateSectionInsightsFromLLM(
       if (!bestCandidate || score > bestCandidate.score) {
         bestCandidate = { result: data, score, metMinimums: meets }
       }
-      if (meets) {
+      if (meets || costSaver) {
         break
       }
       
@@ -1274,7 +1275,7 @@ export async function generateSectionInsightsFromLLM(
   // Stage 2: classification + fill-missing over the best candidate (with one repair attempt if needed)
   const trace = `[insights:${input.mode}:${Math.random().toString(36).slice(2, 8)}]`
   let base: SectionLLMResult | null = bestCandidate?.result ?? null
-  if (base && !bestCandidate?.metMinimums) {
+  if (base && !bestCandidate?.metMinimums && !costSaver) {
     const r0 = Date.now()
     const repaired = await repairLLMOutput({
       mode: input.mode,
@@ -1350,7 +1351,7 @@ export async function generateSectionInsightsFromLLM(
     })
 
     // Rewrite out-of-domain candidates into the correct domain, then re-classify
-    if (droppedSuggested.length) {
+    if (droppedSuggested.length && !costSaver) {
       const rw0 = Date.now()
       const rewritten = await rewriteCandidatesToDomain({
         issueName: input.issueName,
@@ -1386,7 +1387,7 @@ export async function generateSectionInsightsFromLLM(
         suggested = uniqueByName([...suggested, ...filtered])
       }
     }
-    if (droppedAvoid.length) {
+    if (droppedAvoid.length && !costSaver) {
       const rw1 = Date.now()
       const rewritten = await rewriteCandidatesToDomain({
         issueName: input.issueName,
@@ -1429,7 +1430,7 @@ export async function generateSectionInsightsFromLLM(
       // eslint-disable-next-line no-constant-condition
       while (true) {
         const need = bucket === 'suggested' ? Math.max(0, minSuggested - suggested.length) : Math.max(0, minAvoid - avoid.length)
-        if (need <= 0 || attempts >= 3) break
+        if (need <= 0 || attempts >= (costSaver ? 1 : 3)) break
         const disallow = [
           ...suggested.map((s) => s.name),
           ...avoid.map((a) => a.name),
