@@ -165,7 +165,7 @@ export async function POST(request: NextRequest) {
     const finalizeCharge = async (overrideSections?: string[]) => {
       const sectionsForCharge =
         Array.isArray(overrideSections) && overrideSections.length ? overrideSections : (sections.length ? sections : affectedUnique)
-      const { costCents, count } = await getRunCostCents(runId, session.user.id)
+      const { costCents, count, promptTokens, completionTokens } = await getRunCostCents(runId, session.user.id)
       const cm = new CreditManager(session.user.id)
       const walletStatus = await cm.getWalletStatus()
       const plan = calculateChargePlan(costCents, walletStatus)
@@ -182,6 +182,8 @@ export async function POST(request: NextRequest) {
             affectedSections: affectedUnique,
             costCents,
             usageEvents: count,
+          promptTokens,
+          completionTokens,
           },
         }
       }
@@ -206,6 +208,8 @@ export async function POST(request: NextRequest) {
             affectedSections: affectedUnique,
             costCents,
             usageEvents: count,
+          promptTokens,
+          completionTokens,
             llmStatus,
           },
         }
@@ -226,6 +230,8 @@ export async function POST(request: NextRequest) {
               affectedSections: affectedUnique,
               costCents,
               usageEvents: count,
+          promptTokens,
+          completionTokens,
             },
           }
         }
@@ -263,6 +269,8 @@ export async function POST(request: NextRequest) {
           runId,
           costCents,
           usageEvents: count,
+          promptTokens,
+          completionTokens,
           chargedCredits,
           subscriptionCreditsCharged: plan.subscriptionCredits,
           topUpCreditsCharged: plan.topUpCredits,
