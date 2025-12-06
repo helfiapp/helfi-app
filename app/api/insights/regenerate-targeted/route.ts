@@ -136,6 +136,14 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
+    let sections: string[] = []
+    const affected = effectiveChangeTypes.reduce<string[]>((acc, type) => {
+      const mapped = getAffectedSections(type)
+      mapped.forEach((s) => acc.push(s))
+      return acc
+    }, [])
+    const affectedUnique = Array.from(new Set(affected))
+
     const runContext: RunContext = {
       runId,
       feature: 'insights:targeted',
@@ -153,14 +161,6 @@ export async function POST(request: NextRequest) {
     })
 
     const preferQuickProfile = effectiveChangeTypes.length === 1 && effectiveChangeTypes[0] === 'profile'
-
-    let sections: string[] = []
-    const affected = effectiveChangeTypes.reduce<string[]>((acc, type) => {
-      const mapped = getAffectedSections(type)
-      mapped.forEach((s) => acc.push(s))
-      return acc
-    }, [])
-    const affectedUnique = Array.from(new Set(affected))
 
     const finalizeCharge = async (overrideSections?: string[]) => {
       const sectionsForCharge =
