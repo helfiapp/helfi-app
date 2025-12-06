@@ -1661,6 +1661,18 @@ const applyStructuredItems = (
   const normalizedItems =
     enrichedItems.length > 0 ? normalizeDiscreteServingsWithLabel(enrichedItems) : []
 
+  const stripGenericPlateItems = (items: any[], analysis: string | null | undefined) => {
+    if (!Array.isArray(items) || items.length <= 1) return items
+    const analysisTrimmed = (analysis || '').trim().toLowerCase()
+    return items.filter((item) => {
+      const name = String(item?.name || '').trim().toLowerCase()
+      if (!name) return true
+      if (name.startsWith('the image shows')) return false
+      if (analysisTrimmed && name === analysisTrimmed) return false
+      return true
+    })
+  }
+
   // Guard rail: never wipe existing cards if a new analysis yields nothing.
   // Prefer, in order:
   // 1) Fresh normalized items from the latest analysis
@@ -1675,7 +1687,8 @@ const applyStructuredItems = (
   const fallbackExistingItems =
     existingItemsFromState.length > 0 ? existingItemsFromState : existingItemsFromEditingEntry
 
-  const itemsToUse = normalizedItems.length > 0 ? normalizedItems : fallbackExistingItems
+  const filteredItems = stripGenericPlateItems(normalizedItems, analysisText)
+  const itemsToUse = filteredItems.length > 0 ? filteredItems : fallbackExistingItems
 
   setAnalyzedItems(itemsToUse)
 
