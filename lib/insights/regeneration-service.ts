@@ -15,7 +15,7 @@
  */
 
 import { prisma } from '@/lib/prisma'
-import { precomputeIssueSectionsForUser } from './issue-engine'
+import { precomputeIssueSectionsForUser, precomputeQuickSectionsForUser } from './issue-engine'
 import { withRunContext, type RunContext } from '../run-context'
 import type { IssueSectionKey } from './issue-engine'
 
@@ -353,7 +353,7 @@ export async function triggerBackgroundRegeneration(event: DataChangeEvent): Pro
 export async function triggerManualSectionRegeneration(
   userId: string,
   changeTypes: DataChangeEvent['changeType'][],
-  options: { inline?: boolean; runContext?: RunContext | null } = {}
+  options: { inline?: boolean; runContext?: RunContext | null; preferQuick?: boolean } = {}
 ): Promise<IssueSectionKey[]> {
   const requestedTypes = Array.isArray(changeTypes) ? changeTypes : []
   const affectedSections = Array.from(
@@ -394,7 +394,11 @@ export async function triggerManualSectionRegeneration(
         }
       }
 
-      await precomputeIssueSectionsForUser(userId, { concurrency: 4, sectionsFilter: affectedSections })
+      const precomputeFn = options.preferQuick
+        ? precomputeQuickSectionsForUser
+        : precomputeIssueSectionsForUser
+
+      await precomputeFn(userId, { concurrency: 4, sectionsFilter: affectedSections })
 
       for (const issueSlug of issueNames) {
         for (const section of affectedSections) {

@@ -11,8 +11,8 @@ import type { RunContext } from '@/lib/run-context'
 // Allow longer runtime so the full regeneration completes without a gateway timeout
 export const maxDuration = 120
 
-// Allow ample time but still below hard platform limits
-const RESPONSE_TIMEOUT_MS = 90000
+// Respond quickly; we’ll keep the heavy work in background when needed
+const RESPONSE_TIMEOUT_MS = 15000
 
 const VALID_CHANGE_TYPES = [
   'supplements',
@@ -126,9 +126,12 @@ export async function POST(request: NextRequest) {
       changeTypes: effectiveChangeTypes,
     })
 
+    const preferQuickProfile = effectiveChangeTypes.length === 1 && effectiveChangeTypes[0] === 'profile'
+
     const regenPromise = triggerManualSectionRegeneration(session.user.id, effectiveChangeTypes, {
       inline: true,
       runContext,
+      preferQuick: preferQuickProfile,
     })
 
     let sections: string[] = []
