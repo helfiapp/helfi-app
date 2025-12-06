@@ -69,7 +69,9 @@ export function getAffectedSections(changeType: DataChangeEvent['changeType']): 
     // Goals and situations keep the full sweep; profile updates are pared back to finish inline
     health_goals: ['overview', 'supplements', 'medications', 'exercise', 'nutrition', 'lifestyle', 'labs'],
     health_situations: ['overview', 'supplements', 'medications', 'exercise', 'nutrition', 'lifestyle', 'labs'],
-    profile: ['overview', 'nutrition', 'exercise', 'lifestyle'], // keep core sections fast so Update Insights completes inline
+    // Keep profile minimal to avoid timeouts
+    profile: ['overview', 'nutrition', 'exercise', 'lifestyle'],
+    // Keep labs isolated to avoid long runs when only blood results change
     blood_results: ['labs'],
   }
   return mapping[changeType] || []

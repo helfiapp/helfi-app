@@ -101,6 +101,11 @@ export async function POST(request: NextRequest) {
       ? changeTypesInput.filter((t): t is ChangeType => VALID_CHANGE_TYPES.includes(t as ChangeType))
       : []
 
+    // If the client didn’t specify, default to a minimal set so we never fan out accidentally.
+    // NOTE: This should rarely happen because the client always sends changeTypes, but this keeps
+    // the call bounded to avoid long-running jobs/504s.
+    const effectiveChangeTypes = changeTypes.length ? changeTypes : (['profile'] as ChangeType[])
+
     const runId: string =
       typeof body?.runId === 'string' && body.runId.trim().length > 0
         ? body.runId
