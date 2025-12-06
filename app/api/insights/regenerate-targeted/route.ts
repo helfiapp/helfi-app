@@ -11,7 +11,8 @@ import type { RunContext } from '@/lib/run-context'
 // Allow longer runtime so the full regeneration completes without a gateway timeout
 export const maxDuration = 120
 
-const RESPONSE_TIMEOUT_MS = 20000
+// Allow more time so most runs finish inline (users see immediate success/credits deduction)
+const RESPONSE_TIMEOUT_MS = 60000
 
 const VALID_CHANGE_TYPES = [
   'supplements',
