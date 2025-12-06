@@ -3,7 +3,10 @@ import { runChatCompletionWithLogging } from '../ai-usage-logger'
 import { getRunContext } from '../run-context'
 
 const CACHE_TTL_MS = 1000 * 60 * 30
-const INSIGHTS_LLM_ENABLED = process.env.ENABLE_INSIGHTS_LLM === 'true'
+const INSIGHTS_LLM_ENABLED = (() => {
+  const raw = (process.env.ENABLE_INSIGHTS_LLM || '').toLowerCase().trim()
+  return raw === 'true' || raw === '1' || raw === 'yes'
+})()
 
 const insightCache = new Map<
   string,
@@ -21,6 +24,7 @@ function getOpenAIClient() {
   if (_openai) return _openai
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) {
+    console.warn('[insights.llm] Missing OPENAI_API_KEY; LLM calls will be skipped')
     return null
   }
 
