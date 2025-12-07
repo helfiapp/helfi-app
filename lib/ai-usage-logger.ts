@@ -24,6 +24,7 @@ export type UsageLogInput = UsageContext & {
   promptTokens: number
   completionTokens: number
   costCents: number
+  callDetail?: string | null
   success?: boolean
   errorMessage?: string | null
   detail?: string | null
@@ -45,6 +46,7 @@ export async function logAiUsageEvent(entry: UsageLogInput) {
         completionTokens: Number(entry.completionTokens || 0),
         totalTokens,
         costCents: Number(entry.costCents || 0),
+        detail: entry.callDetail || entry.detail || null,
         imageWidth: entry.image?.width ?? null,
         imageHeight: entry.image?.height ?? null,
         imageBytes: entry.image?.bytes ?? null,
@@ -96,6 +98,7 @@ export async function runChatCompletionWithLogging(
   extras?: {
     image?: ImageMeta | null
     successDetail?: string | null
+    callDetail?: string | null
   }
 ) {
   const asyncContext = getRunContext()
@@ -115,6 +118,7 @@ export async function runChatCompletionWithLogging(
       costCents,
       image: extras?.image ?? null,
       detail: extras?.successDetail ?? null,
+      callDetail: extras?.callDetail ?? null,
       success: true,
     }).catch(() => {})
     return completion

@@ -83,7 +83,12 @@ async function createCompletion(
     issueSlug: context.issueSlug ?? null,
     model: params?.model,
   })
-  return runChatCompletionWithLogging(openai, params, { ...context, runId })
+  return runChatCompletionWithLogging(
+    openai,
+    params,
+    { ...context, runId },
+    { callDetail: `${context.feature || 'insights:unknown'}:${params?.model || ''}` }
+  )
 }
 
 const DEFAULT_INSIGHTS_MODEL = process.env.OPENAI_INSIGHTS_MODEL ?? 'gpt-4o-mini'
