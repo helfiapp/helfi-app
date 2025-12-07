@@ -885,7 +885,7 @@ function buildDataNeed(goalName: string, category: string | null | undefined): I
           ? 'You can skip for now, but labs unlock deeper tracking.'
           : 'Add your latest bloodwork to personalise lab insights.',
         actionLabel: hasData ? 'Update labs' : 'Add labs',
-        href: '/insights/issues/labs',
+        href: '/onboarding?step=9', // labs upload step in Health Setup
         status: hasData ? 'in-progress' : skipped ? 'in-progress' : 'missing',
       }
     }
@@ -913,7 +913,7 @@ function buildDataNeed(goalName: string, category: string | null | undefined): I
           ? 'Supplement backup saved. Keep it updated for quick restores.'
           : 'Save a master list of supplements so we can track changes easily.',
         actionLabel: hasData ? 'Update list' : 'Add supplements',
-        href: '/insights/issues/supplements',
+        href: '/onboarding?step=1',
         status: hasData ? 'in-progress' : 'missing',
       }
     }
@@ -926,7 +926,7 @@ function buildDataNeed(goalName: string, category: string | null | undefined): I
           ? 'Emergency protocol saved. Revisit to keep it current.'
           : 'Outline a go-to plan for missed doses or travel days.',
         actionLabel: hasData ? 'Review plan' : 'Create plan',
-        href: '/insights/issues/supplements',
+        href: '/onboarding?step=1',
         status: hasData ? 'in-progress' : 'missing',
       }
     }

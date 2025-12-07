@@ -248,7 +248,21 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
 
         <section className="space-y-4">
           <h2 className="text-lg font-semibold text-gray-900">Deep-dive workspaces</h2>
-          <div className="grid gap-4 md:grid-cols-2">
+          {/* Mobile: tab-style pills with horizontal scroll */}
+          <div className="flex gap-2 overflow-x-auto pb-2 md:hidden">
+            {deepDiveSections.map((section) => (
+              <Link
+                key={section.key}
+                href={section.href}
+                className="shrink-0 rounded-full border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-800 transition-colors hover:border-helfi-green/70 hover:text-helfi-green"
+                onClick={triggerHaptic}
+              >
+                {section.title}
+              </Link>
+            ))}
+          </div>
+          {/* Desktop: keep grid cards */}
+          <div className="hidden md:grid gap-4 md:grid-cols-2">
             {deepDiveSections.map((section) => (
               <Link
                 key={section.key}
@@ -319,16 +333,9 @@ function StatusBadge({ issue }: { issue: IssueSummary }) {
 }
 
 function resolveNeedHref(need: InsightDataNeed, firstIssueSlug?: string) {
-  if (!firstIssueSlug) {
-    return need.href
-  }
-  switch (need.key) {
-    case 'blood-results':
-      return `/insights/issues/${firstIssueSlug}/labs`
-    case 'supplements-backup':
-    case 'supplements-emergency':
-      return `/insights/issues/${firstIssueSlug}/supplements`
-    default:
-      return need.href
-  }
+  // Health-setup related needs should always go to Health Setup pages.
+  if (need.key === 'blood-results') return '/onboarding?step=9'
+  if (need.key === 'health-situations') return '/onboarding?step=health-situations'
+  if (need.key === 'supplements-backup' || need.key === 'supplements-emergency') return '/onboarding?step=1'
+  return need.href
 }
