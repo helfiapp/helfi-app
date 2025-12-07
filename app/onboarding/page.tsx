@@ -1220,18 +1220,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
           </button>
         </div>
       </div>
-      <UpdateInsightsPopup
-        isOpen={showUpdatePopup}
-        onClose={() => {
-          setShowUpdatePopup(false);
-        }}
-        onAddMore={() => {
-          acknowledgeUnsavedChanges();
-          setShowUpdatePopup(false);
-        }}
-        onUpdateInsights={handleUpdateInsights}
-        isGenerating={isGeneratingInsights}
-      />
+      {/* No Update Insights prompt on review; do not block exit here */}
     </div>
   );
 });
@@ -4778,6 +4767,16 @@ function ReviewStep({ onBack, data }: { onBack: () => void, data: any }) {
   const [statusText, setStatusText] = useState('');
   const [progressStage, setProgressStage] = useState<'idle' | 'saving' | 'redirecting'>('idle');
 
+  const uniq = (items: any[] = []) => {
+    const seen = new Set<string>();
+    return items.filter((item) => {
+      const key = JSON.stringify(item || {});
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  };
+
   const handleConfirmBegin = async () => {
     if (isProcessing) return; // Prevent double clicks
     
@@ -4877,8 +4876,34 @@ function ReviewStep({ onBack, data }: { onBack: () => void, data: any }) {
             )}
           </div>
         )}
-        <div><b>Supplements:</b> {(data.supplements || []).map((s: any) => `${s.name} (${s.dosage}, ${Array.isArray(s.timing) ? s.timing.join(', ') : s.timing})`).join('; ')}</div>
-        <div><b>Medications:</b> {(data.medications || []).map((m: any) => `${m.name} (${m.dosage}, ${Array.isArray(m.timing) ? m.timing.join(', ') : m.timing})`).join('; ')}</div>
+        <div className="mt-3">
+          <div><b>Supplements:</b></div>
+          <ul className="list-disc ml-5 text-sm space-y-1 break-words">
+            {uniq(data.supplements || []).map((s: any, idx: number) => (
+              <li key={`supp-${idx}`} className="leading-relaxed">
+                {s.name}
+                {s.dosage ? ` (${s.dosage}` : ''}
+                {s.timing ? `${s.dosage ? ', ' : ' ('}${Array.isArray(s.timing) ? s.timing.join(', ') : s.timing}` : ''}
+                {s.dosage || s.timing ? ')' : ''}
+              </li>
+            ))}
+            {!(data.supplements || []).length && <li className="text-gray-500">None provided</li>}
+          </ul>
+        </div>
+        <div className="mt-3">
+          <div><b>Medications:</b></div>
+          <ul className="list-disc ml-5 text-sm space-y-1 break-words">
+            {uniq(data.medications || []).map((m: any, idx: number) => (
+              <li key={`med-${idx}`} className="leading-relaxed">
+                {m.name}
+                {m.dosage ? ` (${m.dosage}` : ''}
+                {m.timing ? `${m.dosage ? ', ' : ' ('}${Array.isArray(m.timing) ? m.timing.join(', ') : m.timing}` : ''}
+                {m.dosage || m.timing ? ')' : ''}
+              </li>
+            ))}
+            {!(data.medications || []).length && <li className="text-gray-500">None provided</li>}
+          </ul>
+        </div>
         {data.bloodResults && !data.bloodResults.skipped && (
           <div className="mt-4 p-3 bg-green-50 rounded-lg">
             <div><b>Blood Results:</b></div>
@@ -6194,10 +6219,8 @@ export default function Onboarding() {
                 try {
                   const hasRealChanges = (() => {
                     try {
-                      return (
-                        !!formBaselineRef.current &&
-                        JSON.stringify(formRef.current || {}) !== formBaselineRef.current
-                      );
+                      if (!formBaselineRef.current) return false;
+                      return JSON.stringify(formRef.current || {}) !== formBaselineRef.current;
                     } catch {
                       return hasGlobalUnsavedChanges;
                     }
