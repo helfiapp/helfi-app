@@ -1670,7 +1670,15 @@ const applyStructuredItems = (
       if (gramsPerServing || mlPerServing || hasCustom) return it
       const estimate = estimateGramsPerServing(it)
       if (!estimate) return it
-      return { ...it, customGramsPerServing: estimate }
+      const next = { ...it, customGramsPerServing: estimate }
+      // Seed weight input so the user sees a default value immediately.
+      const hasWeightAmount =
+        Number.isFinite((next as any)?.weightAmount) && Number(next.weightAmount) > 0
+      if (!hasWeightAmount) {
+        next.weightAmount = Math.round(estimate * 100) / 100
+        if (!next.weightUnit) next.weightUnit = 'g'
+      }
+      return next
     })
 
   const estimatedItems = normalizedItems.length > 0 ? addEstimatedServingWeights(normalizedItems) : []
