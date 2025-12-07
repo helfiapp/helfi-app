@@ -12,10 +12,9 @@ export type IssueSectionKey =
   | 'interactions'
   | 'labs'
   | 'nutrition'
-  | 'lifestyle'
 
-// Active sections shown/generated for insights. Overview, Exercise, and Interactions are intentionally removed.
-export const ISSUE_SECTION_ORDER: IssueSectionKey[] = ['supplements', 'medications', 'labs', 'nutrition', 'lifestyle']
+// Active sections shown/generated for insights. Overview, Exercise, Interactions, and Lifestyle are intentionally removed.
+export const ISSUE_SECTION_ORDER: IssueSectionKey[] = ['supplements', 'medications', 'labs', 'nutrition']
 
 export type DataNeedStatus = 'missing' | 'in-progress' | 'complete'
 

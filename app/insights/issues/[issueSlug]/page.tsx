@@ -51,7 +51,6 @@ export default async function IssueOverviewPage({ params }: IssueOverviewPagePro
     medications: 'Track prescriptions, capture timing, and see what is actually helping.',
     labs: 'Track bloodwork targets and know when to upload or re-test.',
     nutrition: 'See how logged meals support this issue and what to tweak next.',
-    lifestyle: 'See habits that most impact this issue.',
   }
 
   const sectionsToPrefetch = ISSUE_SECTION_ORDER

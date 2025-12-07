@@ -67,9 +67,9 @@ export function getAffectedSections(changeType: DataChangeEvent['changeType']): 
     medications: ['medications'], // interactions disabled per user request
     food: ['nutrition'], // nutrition only runs via food diary changes
     exercise: [], // exercise insights removed
-    // Goals/situations touch only lifestyle now (no overview/nutrition fan-out)
-    health_goals: ['lifestyle'],
-    health_situations: ['lifestyle'],
+    // Goals/situations no longer fan out to lifestyle (section removed)
+    health_goals: [],
+    health_situations: [],
     // Profile changes should not fan out across goals; no sections triggered
     profile: [],
     // Labs stay isolated and only run when labs are uploaded/changed

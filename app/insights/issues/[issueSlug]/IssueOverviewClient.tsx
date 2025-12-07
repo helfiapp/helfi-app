@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import type { IssueSummary, IssueSectionKey } from '@/lib/insights/issue-engine'
 
-const SECTION_ORDER: IssueSectionKey[] = ['supplements', 'medications', 'labs', 'nutrition', 'lifestyle']
+const SECTION_ORDER: IssueSectionKey[] = ['supplements', 'medications', 'labs', 'nutrition']
 
 interface IssueOverviewClientProps {
   issue: IssueSummary
@@ -16,7 +16,6 @@ export default function IssueOverviewClient({ issue, issueSlug }: IssueOverviewC
     medications: 'Track prescriptions, capture timing, and see what is actually helping.',
     labs: 'Track bloodwork targets and know when to upload or re-test.',
     nutrition: 'See how logged meals support this issue and what to tweak next.',
-    lifestyle: 'See habits that most impact this issue.',
   }
 
   const navigationOrder = SECTION_ORDER as IssueSectionKey[]
