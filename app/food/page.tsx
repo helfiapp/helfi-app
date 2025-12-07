@@ -1661,6 +1661,20 @@ const applyStructuredItems = (
   const normalizedItems =
     enrichedItems.length > 0 ? normalizeDiscreteServingsWithLabel(enrichedItems) : []
 
+  const addEstimatedServingWeights = (items: any[]) =>
+    items.map((it) => {
+      const { gramsPerServing, mlPerServing } = parseServingSizeInfo(it)
+      const hasCustom =
+        Number.isFinite((it as any)?.customGramsPerServing) ||
+        Number.isFinite((it as any)?.customMlPerServing)
+      if (gramsPerServing || mlPerServing || hasCustom) return it
+      const estimate = estimateGramsPerServing(it)
+      if (!estimate) return it
+      return { ...it, customGramsPerServing: estimate }
+    })
+
+  const estimatedItems = normalizedItems.length > 0 ? addEstimatedServingWeights(normalizedItems) : []
+
   const stripGenericPlateItems = (items: any[], analysis: string | null | undefined) => {
     if (!Array.isArray(items) || items.length <= 1) return items
     const analysisTrimmed = (analysis || '').trim().toLowerCase()
@@ -1698,7 +1712,7 @@ const applyStructuredItems = (
   const fallbackExistingItems =
     existingItemsFromState.length > 0 ? existingItemsFromState : existingItemsFromEditingEntry
 
-  const filteredItems = stripGenericPlateItems(normalizedItems, analysisText)
+  const filteredItems = stripGenericPlateItems(estimatedItems, analysisText)
   const itemsToUse = filteredItems.length > 0 ? filteredItems : fallbackExistingItems
 
   setAnalyzedItems(itemsToUse)
@@ -1762,7 +1776,7 @@ const applyStructuredItems = (
     setAnalyzedTotal(null)
   }
 
-  return { items: normalizedItems, total: totalsToUse }
+  return { items: itemsToUse, total: totalsToUse }
 }
 
   const clampNumber = (value: any, min: number, max: number) => {
@@ -1813,10 +1827,15 @@ const applyStructuredItems = (
       itemsCopy[index].portionMode = value === 'weight' ? 'weight' : 'servings'
       if (itemsCopy[index].portionMode === 'weight') {
         const info = parseServingSizeInfo(itemsCopy[index])
+        const customSeed =
+          itemsCopy[index].weightUnit === 'ml'
+            ? itemsCopy[index].customMlPerServing
+            : itemsCopy[index].customGramsPerServing
         const seed =
           (itemsCopy[index].weightUnit === 'ml' ? info.mlPerServing : info.gramsPerServing) ||
           info.gramsPerServing ||
           info.mlPerServing ||
+          customSeed ||
           null
         if (seed) {
           itemsCopy[index].weightAmount = Math.round(seed * 100) / 100
@@ -3127,6 +3146,50 @@ const applyStructuredItems = (
       mlPerServing: mlPerServing && mlPerServing > 0 ? mlPerServing : null,
       ozPerServing: ozPerServing && ozPerServing > 0 ? ozPerServing : null,
     }
+  }
+
+  // Estimate grams per serving when no explicit weight/volume is available.
+  const estimateGramsPerServing = (item: any): number | null => {
+    const { gramsPerServing, mlPerServing } = parseServingSizeInfo(item)
+    const hasKnownWeight = (gramsPerServing && gramsPerServing > 0) || (mlPerServing && mlPerServing > 0)
+    if (hasKnownWeight) return gramsPerServing ?? mlPerServing ?? null
+
+    const calories = Number(item?.calories)
+    const protein = Number(item?.protein_g)
+    const carbs = Number(item?.carbs_g)
+    const fat = Number(item?.fat_g)
+    const fiber = Number(item?.fiber_g)
+
+    const safe = (v: number) => (Number.isFinite(v) && v > 0 ? v : 0)
+    const macroGrams = safe(protein) + safe(carbs) + safe(fat) + safe(fiber)
+    const fatEnergy = safe(fat) * 9
+    const otherEnergy = (safe(protein) + safe(carbs)) * 4
+    const macroEnergy = fatEnergy + otherEnergy
+    const fatRatio = macroEnergy > 0 ? fatEnergy / macroEnergy : 0
+
+    let estimated: number | null = null
+
+    if (Number.isFinite(calories) && calories > 0) {
+      // Typical foods cluster around 1.8–2.5 kcal/g depending on fat content.
+      let energyDensity = 2.1
+      if (fatRatio > 0.6) energyDensity = 2.5
+      else if (fatRatio > 0.4) energyDensity = 2.3
+      else energyDensity = 2.0
+      estimated = calories / energyDensity
+    }
+
+    if (estimated !== null && macroGrams > 0) {
+      // Do not let estimate drop below macro mass (with a small buffer for water/other mass).
+      estimated = Math.max(estimated, macroGrams * 1.1)
+    } else if (estimated === null && macroGrams > 0) {
+      // If calories missing but macros exist, assume moderate density to avoid zero weight.
+      estimated = macroGrams * 1.8
+    }
+
+    if (!estimated || !Number.isFinite(estimated)) return null
+
+    const clamped = Math.min(Math.max(estimated, 5), 1200) // 5g–1200g sane bounds
+    return Math.round(clamped * 100) / 100
   }
 
   const effectiveServings = (item: any) => {
@@ -6539,6 +6602,7 @@ Please add nutritional information manually if needed.`);
                                       <input
                                         type="number"
                                         inputMode="decimal"
+                                        enterKeyHint="done"
                                         min={0}
                                         step={1}
                                         value={formatNumberInputValue(weightAmount ?? (weightUnit === 'ml' ? mlPerServing || '' : gramsPerServing || ''))}
@@ -6566,6 +6630,10 @@ Please add nutritional information manually if needed.`);
                                           ? `1 serving ≈ ${Math.round(gramsPerServing * 100) / 100} g`
                                           : mlPerServing
                                           ? `1 serving ≈ ${Math.round(mlPerServing * 100) / 100} mL`
+                                          : item.customGramsPerServing
+                                          ? `1 serving ≈ ${Math.round(item.customGramsPerServing * 100) / 100} g`
+                                          : item.customMlPerServing
+                                          ? `1 serving ≈ ${Math.round(item.customMlPerServing * 100) / 100} mL`
                                           : null}
                                       </div>
                                     )}
@@ -6575,6 +6643,7 @@ Please add nutritional information manually if needed.`);
                                         <input
                                           type="number"
                                           inputMode="decimal"
+                                          enterKeyHint="done"
                                           min={0}
                                           step={weightUnit === 'oz' ? 0.1 : 1}
                                           value={formatNumberInputValue(
