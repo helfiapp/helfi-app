@@ -218,8 +218,6 @@ export async function buildSystemPrompt(userId: string, slug: string, section: I
       ? 'CRITICAL: Review profile.recentFood. Analyze each logged food/meal by understanding its nutritional profile and physiological effects, but ALWAYS reference items by the exact name stored in the profile. Tie each mention to why it helps this issue.'
       : section === 'exercise'
       ? 'CRITICAL: Review profile and any exercise-related context. For logged exercises, analyze their physiological effects but ALWAYS reference items by the exact name stored in the profile. Tie each mention to why it helps this issue.'
-      : section === 'lifestyle'
-      ? 'CRITICAL: Review profile and any lifestyle-related context. Analyze logged habits/patterns by understanding their mechanisms, but ALWAYS reference items by the exact name/description stored in the profile. Tie each mention to why it helps this issue.'
       : section === 'labs'
       ? 'CRITICAL: Review profile and any lab-related context. Analyze logged tests by understanding what biomarkers they measure, but ALWAYS reference items by the exact test name stored in the profile. Tie each mention to why it helps this issue.'
       : '',
