@@ -55,7 +55,6 @@ export async function logAiUsageEvent(entry: UsageLogInput) {
         endpoint: entry.endpoint || null,
         success: entry.success ?? true,
         errorMessage: entry.errorMessage || null,
-        detail: entry.detail || null,
         runId: entry.runId || null,
       },
     })
