@@ -3,15 +3,7 @@
 import Link from 'next/link'
 import type { IssueSummary, IssueSectionKey } from '@/lib/insights/issue-engine'
 
-const SECTION_ORDER: IssueSectionKey[] = [
-  'overview',
-  'exercise',
-  'supplements',
-  'medications',
-  'interactions',
-  'labs',
-  'nutrition',
-]
+const SECTION_ORDER: IssueSectionKey[] = ['supplements', 'medications', 'labs', 'nutrition', 'lifestyle']
 
 interface IssueOverviewClientProps {
   issue: IssueSummary
@@ -20,16 +12,14 @@ interface IssueOverviewClientProps {
 
 export default function IssueOverviewClient({ issue, issueSlug }: IssueOverviewClientProps) {
   const sectionDescriptions: Record<string, string> = {
-    overview: 'Snapshot of recent trends, blockers, and next actions for this issue.',
     supplements: 'Review current regimen, identify gaps, and spot potential additions.',
     medications: 'Track prescriptions, capture timing, and see what is actually helping.',
-    interactions: 'Check supplement and medication combinations for timing or safety flags.',
     labs: 'Track bloodwork targets and know when to upload or re-test.',
     nutrition: 'See how logged meals support this issue and what to tweak next.',
-    exercise: 'Understand training patterns and recommended adjustments.',
+    lifestyle: 'See habits that most impact this issue.',
   }
 
-  const navigationOrder = SECTION_ORDER.filter((section) => section !== 'overview') as IssueSectionKey[]
+  const navigationOrder = SECTION_ORDER as IssueSectionKey[]
 
   return (
     <div className="space-y-6">
@@ -46,18 +36,6 @@ export default function IssueOverviewClient({ issue, issueSlug }: IssueOverviewC
 
       {/* Section Links */}
       <section className="bg-white border border-gray-200 rounded-2xl shadow-sm">
-        <Link
-          href={`/insights/issues/${issueSlug}/overview`}
-          className="block px-5 py-4 border-b last:border-b-0 hover:bg-gray-50 transition-colors"
-        >
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">Overview report</h2>
-              <p className="text-sm text-gray-600 mt-1">Generate a full summary across all data points for {issue.name}.</p>
-            </div>
-            <span className="text-2xl text-gray-400">›</span>
-          </div>
-        </Link>
         {navigationOrder.map((section) => (
           <Link
             key={section}
@@ -67,7 +45,7 @@ export default function IssueOverviewClient({ issue, issueSlug }: IssueOverviewC
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 capitalize">
-                  {section === 'interactions' ? 'Supplements × Medications' : section}
+                  {section}
                 </h3>
                 <p className="text-sm text-gray-600 mt-1">
                   {sectionDescriptions[section] || 'Open detailed insights for this area.'}

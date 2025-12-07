@@ -1,6 +1,16 @@
 # 🛡️ Health Setup & Insights Protection
 
-**⚠️ CRITICAL: Do NOT change the health setup / insights gating flow without explicit user approval.**
+## 🚦 Handover (Dec 6, 2025 – Melbourne) – Read before touching anything
+- ✅ **Pop-up guard rails (Update Insights / Add More):** The unsaved-change guard must fire **only** when the current onboarding form differs from the loaded baseline. Baseline is captured after initial load and reset after a successful Update Insights run. Do **not** reintroduce an always-dirty flag; navigation (including “Go to Dashboard”) must be allowed when no edits exist.
+- ✅ **Durable + warm cache** for onboarding fields (birthdate included) stays enabled; autosave begins only after data load to avoid wiping birthdate.
+- ✅ **Background auto-regens** are OFF (do not enable `ENABLE_INSIGHTS_BACKGROUND_REGEN` without explicit approval). “Update Insights” uses `/api/insights/regenerate-targeted` only.
+- ✅ **Insights LLM** is enabled (`ENABLE_INSIGHTS_LLM=true`).
+- 🚩 **Current live issue:** targeted regen intermittently returns `504 Gateway Timeout` (seen 6 Dec 2025 on Hair Loss). Do not claim success until sections show fresh data. When debugging, capture the `runId` and full response from `POST /api/insights/regenerate-targeted`.
+- 🚩 **Imperative task:** Implement per-step regeneration to always call the model (no cache reuse) and charge tokens every time for that step’s change types—no extra approval needed, but keep all guard rails intact.
+- ✅ **Section loading UX:** Section pages use indeterminate shimmer instead of misleading percentage bars.
+- ✅ **Deployment protocol:** Follow `AGENT_START_HERE.md` for deployments. You have full Vercel access via token—use the Vercel dashboard/logs to resolve deployment errors and only report completion when the deployment is `READY` (rerun and redeploy if it shows `ERROR`).
+
+**⚠️ CRITICAL:** Do NOT change the health setup / insights gating flow or the guarded navigation without explicit user approval.
 
 This document defines the *approved* behaviour for:
 - Health Setup onboarding
@@ -167,5 +177,3 @@ You **must**:
    - Insights gating (locked vs unlocked).
 
 If you are unsure, **do not change this flow.** Ask the user first.
-
-

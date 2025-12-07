@@ -145,6 +145,25 @@ export async function POST(request: NextRequest) {
     }, [])
     const affectedUnique = Array.from(new Set(affected))
 
+    if (affectedUnique.length === 0) {
+      console.log('[insights.regenerate-targeted] no sections triggered for change types', {
+        runId,
+        userId: session.user.id,
+        changeTypes: effectiveChangeTypes,
+      })
+      return NextResponse.json(
+        {
+          success: true,
+          message: 'No insight sections need regeneration for these changes.',
+          runId,
+          sectionsTriggered: [],
+          affectedSections: [],
+          llmStatus,
+        },
+        { status: 200 }
+      )
+    }
+
     const runContext: RunContext = {
       runId,
       feature: 'insights:targeted',

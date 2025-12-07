@@ -62,17 +62,17 @@ function createDataFingerprint(data: any): string {
  */
 export function getAffectedSections(changeType: DataChangeEvent['changeType']): IssueSectionKey[] {
   const mapping: Record<DataChangeEvent['changeType'], IssueSectionKey[]> = {
-    // Narrowed to just the sections a user expects to change, to keep runtime fast.
-    supplements: ['supplements'], // show the new/changed supplement in Supplements analysis
-    medications: ['medications', 'interactions'], // interactions are relevant to meds changes
-    food: ['nutrition'],
-    exercise: ['exercise'],
-    // Goals/situations lightly touch overall plan; keep scope small
-    health_goals: ['overview', 'nutrition', 'lifestyle'],
-    health_situations: ['overview', 'nutrition', 'lifestyle'],
-    // Profile (weight/height/goal/body type/birthdate) should only update the core targets
-    profile: ['overview', 'nutrition'],
-    // Labs stay isolated
+    // Narrowed to just the sections a user expects to change, to keep runtime fast and scoped.
+    supplements: ['supplements'], // only when supplements change
+    medications: ['medications'], // interactions disabled per user request
+    food: ['nutrition'], // nutrition only runs via food diary changes
+    exercise: [], // exercise insights removed
+    // Goals/situations touch only lifestyle now (no overview/nutrition fan-out)
+    health_goals: ['lifestyle'],
+    health_situations: ['lifestyle'],
+    // Profile changes should not fan out across goals; no sections triggered
+    profile: [],
+    // Labs stay isolated and only run when labs are uploaded/changed
     blood_results: ['labs'],
   }
   return mapping[changeType] || []

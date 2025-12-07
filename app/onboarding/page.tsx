@@ -171,13 +171,6 @@ function detectChangedInsightTypes(baselineJson: string, currentForm: any): Insi
     changeTypes.push('profile');
   }
 
-  if (hasChanged(
-    pickFields(baseline, ['exerciseFrequency', 'exerciseTypes', 'exerciseDurations']),
-    pickFields(current, ['exerciseFrequency', 'exerciseTypes', 'exerciseDurations']),
-  )) {
-    changeTypes.push('exercise');
-  }
-
   if (hasChanged(baseline?.goals, current?.goals)) {
     changeTypes.push('health_goals');
   }
@@ -1324,10 +1317,7 @@ function ExerciseStep({ onNext, onBack, initial, onPartialSave, onUnsavedChange,
         setHasUnsavedChanges(false);
         if (onInsightsSaved) onInsightsSaved();
         
-        // Step 2: Fire regen in background WITHOUT waiting
-        fireAndForgetInsightsRegen(['exercise']);
-        
-        // Step 3: Close popup immediately
+        // Step 2: Close popup immediately (exercise insights are disabled)
         setShowUpdatePopup(false);
       } else {
         alert('Failed to save your changes. Please try again.');
@@ -1376,7 +1366,10 @@ function ExerciseStep({ onNext, onBack, initial, onPartialSave, onUnsavedChange,
     <div className="max-w-md mx-auto">
       <div className="bg-white rounded-lg shadow-sm p-6">
         <h2 className="text-2xl font-bold mb-4">How often do you exercise?</h2>
-        <p className="mb-6 text-gray-600">This helps us understand your activity level for better recommendations.</p>
+        <p className="mb-2 text-gray-600">This helps us understand your activity level for better recommendations.</p>
+        <p className="mb-6 text-gray-600">
+          Note: Exercise insights are only relevant when a health device is connected; we don’t generate an Exercise insight section otherwise.
+        </p>
         
         <div className="mb-6">
           <select 

@@ -4,6 +4,8 @@
 
 ## Mandatory Pre-Deployment Checklist
 
+0. ✅ **Use Vercel access**: You have full Vercel access via token. Inspect deployments/logs in Vercel, and do not report “done” until the deployment is `READY`. If you see `ERROR`, open the Vercel deployment logs, fix the issue, redeploy, and re-check until green.
+
 Before pushing ANY code changes to GitHub, you MUST:
 
 1. ✅ **Verify Deployment Status**: After pushing code, ALWAYS check deployment status before claiming changes are live

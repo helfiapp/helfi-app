@@ -14,15 +14,8 @@ export type IssueSectionKey =
   | 'nutrition'
   | 'lifestyle'
 
-export const ISSUE_SECTION_ORDER: IssueSectionKey[] = [
-  'overview',
-  'exercise',
-  'supplements',
-  'medications',
-  'interactions',
-  'labs',
-  'nutrition',
-]
+// Active sections shown/generated for insights. Overview, Exercise, and Interactions are intentionally removed.
+export const ISSUE_SECTION_ORDER: IssueSectionKey[] = ['supplements', 'medications', 'labs', 'nutrition', 'lifestyle']
 
 export type DataNeedStatus = 'missing' | 'in-progress' | 'complete'
 
@@ -1107,7 +1100,7 @@ export async function precomputeIssueSectionsForUser(
 
   if (!targetSlugs.length) return
 
-  const defaultSections = ISSUE_SECTION_ORDER.filter((section) => section !== 'overview')
+  const defaultSections = ISSUE_SECTION_ORDER
   let targetSections = options.sections && options.sections.length
     ? Array.from(new Set(options.sections))
     : defaultSections
@@ -1153,9 +1146,9 @@ export async function precomputeQuickSectionsForUser(
 
   if (!targetSlugs.length) return
 
-  const defaultSections = ISSUE_SECTION_ORDER.filter((section) => section !== 'overview' && section !== 'interactions')
+  const defaultSections = ISSUE_SECTION_ORDER
   let targetSections = options.sections && options.sections.length
-    ? Array.from(new Set(options.sections)).filter((s) => s !== 'overview' && s !== 'interactions')
+    ? Array.from(new Set(options.sections)).filter((s) => ISSUE_SECTION_ORDER.includes(s))
     : defaultSections
 
   if (!targetSections.length) return

@@ -47,16 +47,14 @@ export default async function IssueOverviewPage({ params }: IssueOverviewPagePro
   const issue = summaries.find((item) => item.slug === params.issueSlug) ?? fallbackIssue(params.issueSlug)
 
   const sectionDescriptions: Record<string, string> = {
-    overview: 'Snapshot of recent trends, blockers, and next actions for this issue.',
     supplements: 'Review current regimen, identify gaps, and spot potential additions.',
     medications: 'Track prescriptions, capture timing, and see what is actually helping.',
-    interactions: 'Check supplement and medication combinations for timing or safety flags.',
     labs: 'Track bloodwork targets and know when to upload or re-test.',
     nutrition: 'See how logged meals support this issue and what to tweak next.',
-    exercise: 'Understand training patterns and recommended adjustments.',
+    lifestyle: 'See habits that most impact this issue.',
   }
 
-  const sectionsToPrefetch = ISSUE_SECTION_ORDER.filter((s) => s !== 'overview')
+  const sectionsToPrefetch = ISSUE_SECTION_ORDER
 
   return (
     <div className="space-y-6">
