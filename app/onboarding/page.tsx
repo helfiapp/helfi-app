@@ -229,7 +229,7 @@ function fireAndForgetInsightsRegen(changeTypes: InsightChangeType[], goalNames?
   const goalSlugs = Array.isArray(goalNames) ? Array.from(new Set(goalNames.map(slugifyGoal).filter(Boolean))) : undefined;
   
   // Show background status
-  showGlobalRegenStatus(true, 'Updating insights in background...');
+  showGlobalRegenStatus(true, 'Updating insights in background… it’s safe to navigate elsewhere.');
   
   // Fire the request but don't await it
   fetch('/api/insights/regenerate-targeted', {
