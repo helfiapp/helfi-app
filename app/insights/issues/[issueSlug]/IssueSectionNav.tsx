@@ -17,6 +17,7 @@ const LABELS: Record<IssueSectionKey, string> = {
   interactions: 'Supplements × Meds',
   labs: 'Labs & Bloodwork',
   nutrition: 'Nutrition & Food',
+  lifestyle: 'Lifestyle',
 }
 
 export default function IssueSectionNav({ issueSlug, sections }: IssueSectionNavProps) {
