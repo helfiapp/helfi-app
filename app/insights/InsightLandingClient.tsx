@@ -207,76 +207,7 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
           </section>
         )}
 
-        {actionableNeeds.length > 0 && (
-          <section className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900">Unlock more insights</h2>
-              <span className="text-xs uppercase tracking-wide text-gray-500">Complete these to add richer data</span>
-            </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              {actionableNeeds.map((need) => (
-                <Link
-                  key={need.key}
-                  href={resolveNeedHref(need, primaryIssueSlug)}
-                  className="bg-white border border-gray-200 rounded-2xl p-5 flex flex-col gap-3 transition-colors hover:border-helfi-green/60 hover:shadow-sm"
-                  onClick={triggerHaptic}
-                >
-                  <div className="text-sm font-semibold uppercase tracking-wide text-gray-500">{formatNeedStatus(need.status)}</div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900">{need.title}</h3>
-                    <p className="mt-1 text-sm text-gray-600 leading-relaxed">{need.description}</p>
-                  </div>
-                  <span className="text-sm font-semibold text-helfi-green">{need.actionLabel} →</span>
-                </Link>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {completedNeeds.length > 0 && (
-          <section className="space-y-3">
-            <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Already covered</h2>
-            <div className="flex flex-wrap gap-2">
-              {completedNeeds.map((need) => (
-                <span key={need.key} className="inline-flex items-center gap-2 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 px-3 py-1 text-xs font-semibold">
-                  ✅ {need.title}
-                </span>
-              ))}
-            </div>
-          </section>
-        )}
-
-        <section className="space-y-4">
-          <h2 className="text-lg font-semibold text-gray-900">Deep-dive workspaces</h2>
-          {/* Mobile: tab-style pills with horizontal scroll */}
-          <div className="flex gap-2 overflow-x-auto pb-2 md:hidden">
-            {deepDiveSections.map((section) => (
-              <Link
-                key={section.key}
-                href={section.href}
-                className="shrink-0 rounded-full border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-800 transition-colors hover:border-helfi-green/70 hover:text-helfi-green"
-                onClick={triggerHaptic}
-              >
-                {section.title}
-              </Link>
-            ))}
-          </div>
-          {/* Desktop: keep grid cards */}
-          <div className="hidden md:grid gap-4 md:grid-cols-2">
-            {deepDiveSections.map((section) => (
-              <Link
-                key={section.key}
-                href={section.href}
-                className="bg-white border border-gray-200 rounded-2xl p-5 transition-colors hover:border-helfi-green/60 hover:shadow-sm"
-                onClick={triggerHaptic}
-              >
-                <h3 className="text-lg font-semibold text-gray-900">{section.title}</h3>
-                <p className="mt-1 text-sm text-gray-600 leading-relaxed">{section.description}</p>
-                <span className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-helfi-green">Open workspace →</span>
-              </Link>
-            ))}
-          </div>
-        </section>
+        {/* Unlock / Deep-dive sections removed per request */}
       </main>
 
         <InsightsBottomNav />
