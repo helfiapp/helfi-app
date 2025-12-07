@@ -127,8 +127,9 @@ export async function POST(request: NextRequest) {
       changeTypes: effectiveChangeTypes,
     })
 
+    const llmStatus = getInsightsLlmStatus()
+
     if (changeTypes.length === 0) {
-      const llmStatus = getInsightsLlmStatus()
       return NextResponse.json({
         success: false,
         message: 'No valid change types provided; nothing to regenerate.',
@@ -173,7 +174,6 @@ export async function POST(request: NextRequest) {
         sections: affectedUnique,
       },
     }
-    const llmStatus = getInsightsLlmStatus()
     console.log('[insights.regenerate-targeted] start', {
       runId,
       userId: session.user.id,
