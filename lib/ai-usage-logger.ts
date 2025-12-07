@@ -46,6 +46,7 @@ export async function logAiUsageEvent(entry: UsageLogInput) {
         completionTokens: Number(entry.completionTokens || 0),
         totalTokens,
         costCents: Number(entry.costCents || 0),
+        // Store per-call detail (model/feature) while preserving any existing detail
         detail: entry.callDetail || entry.detail || null,
         imageWidth: entry.image?.width ?? null,
         imageHeight: entry.image?.height ?? null,
