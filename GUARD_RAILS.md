@@ -11,6 +11,12 @@ protected areas listed below.
 
 ---
 
+## 0. Update Insights / Add More flow (Jan 2026 – Locked)
+- Navigation guard now tracks unsaved changes across onboarding steps and forces the “Update Insights / Add more” prompt before leaving (including Go to Dashboard). Do NOT remove or loosen this guard.
+- Warm + durable caching keeps onboarding fields (including birthdate) loaded immediately; do not strip this cache.
+- Leave the current per-step targeted update buttons as-is; do not change when the popup appears or how it blocks navigation.
+- Pending request for the next agent (do not implement without explicit user approval): force per-step insights regeneration to always call the model and charge tokens (no cache reuse). Only the edited step’s change type should be regenerated; do NOT switch to full “regen all sections,” and keep the current guards/prompt behaviour intact.
+
 ## 1. Email & Waitlist Protection (summary)
 
 **Primary reference:** `WAITLIST_EMAIL_PROTECTION.md`
@@ -399,6 +405,16 @@ The green “+” buttons for each Food Diary category (Breakfast, Lunch, Dinner
 - Do **not** change this to “tap outside to close” or any other behaviour.
 - The “Other/+” panel must remain scrollable so all options are reachable on mobile.
 - **Auto-scroll is required on mobile:** when a category “+” is opened, scroll that category row into view (without covering or moving the “+”) so the entire add panel is visible. Do not remove or alter this scroll behavior.
+
+### 3.7 Food Diary Deletes & Snapshot Sync (Dec 2025 – Locked)
+- Deletion must also clear/sync the “today’s foods” snapshot so stale cards cannot reappear:
+  - Keep `/api/user-data/clear-todays-foods` intact; do not remove or bypass it.
+  - In `app/food/page.tsx`, after deleting an entry, continue posting the updated (or empty) `todaysFoods` to `/api/user-data` (or call the clear endpoint when empty). Do **not** remove this server-sync step.
+  - Do not reintroduce local-only deletes that skip the server snapshot; fixes were for entries resurrecting after refresh.
+
+### 3.8 Ingredient Card Summary Filtering (Dec 2025 – Locked)
+- In `app/food/page.tsx`, keep the guard that strips generic “plate/meal” summary items when multiple ingredients exist (e.g., “The image shows…”, long “burger with …” phrases). Do not remove or relax this filter without approval.
+- Ingredient cards for multi-item meals must remain one per distinct ingredient; do not reintroduce plate-level summary cards into the list.
 
 ---
 
