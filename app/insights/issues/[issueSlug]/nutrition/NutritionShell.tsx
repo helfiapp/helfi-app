@@ -17,10 +17,17 @@ function ProgressBar() {
 
 type TabKey = 'working' | 'suggested' | 'avoid'
 
+type NutritionSuggestionRun = {
+  generatedAt: string
+  suggestedFocus: Array<{ title: string; reason: string }>
+  avoidFoods: Array<{ name: string; reason: string }>
+}
+
 type NutritionExtras = {
   workingFocus?: Array<{ title: string; reason: string; example: string }>
   suggestedFocus?: Array<{ title: string; reason: string }>
   avoidFoods?: Array<{ name: string; reason: string }>
+  suggestionRuns?: NutritionSuggestionRun[]
   totalLogged?: number
 }
 
@@ -182,14 +189,29 @@ export default function NutritionShell({ children, initialResult, issueSlug }: N
         workingFocus: [],
         suggestedFocus: [],
         avoidFoods: [],
+        suggestionRuns: [],
         totalLogged: 0,
       }
     }
     const raw = (result.extras ?? {}) as NutritionExtras
+
+    // Build grouped runs; fall back to a single run if no history is present
+    const suggestionRuns: NutritionSuggestionRun[] =
+      (Array.isArray(raw.suggestionRuns) ? raw.suggestionRuns : []).length
+        ? (raw.suggestionRuns as NutritionSuggestionRun[])
+        : [
+            {
+              generatedAt: result.generatedAt,
+              suggestedFocus: raw.suggestedFocus ?? [],
+              avoidFoods: raw.avoidFoods ?? [],
+            },
+          ]
+
     return {
       workingFocus: raw.workingFocus ?? [],
       suggestedFocus: raw.suggestedFocus ?? [],
       avoidFoods: raw.avoidFoods ?? [],
+      suggestionRuns,
       totalLogged: raw.totalLogged ?? 0,
     }
   }, [result])

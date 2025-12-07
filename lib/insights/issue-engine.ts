@@ -4873,6 +4873,40 @@ async function buildNutritionSection(
         },
       ]
 
+  // Preserve prior nutrition suggestions instead of overwriting.
+  // Read cached nutrition result (latest mode) and merge runs by timestamp.
+  let previousRuns: Array<{ generatedAt: string; suggestedFocus: typeof suggestedFocus; avoidFoods: typeof avoidFoods }> = []
+  try {
+    const cached = await readSectionCache(context.userId, issue.slug, 'nutrition', 'latest', encodeRange(undefined))
+    if (cached?.result?.extras) {
+      const extras = cached.result.extras as Record<string, unknown>
+      const cachedRuns = extras['suggestionRuns'] as typeof previousRuns | undefined
+      if (Array.isArray(cachedRuns) && cachedRuns.length) {
+        previousRuns = cachedRuns
+      } else {
+        // Seed from legacy fields if runs array not present
+        const legacySuggested = (extras['suggestedFocus'] as typeof suggestedFocus | undefined) ?? []
+        const legacyAvoid = (extras['avoidFoods'] as typeof avoidFoods | undefined) ?? []
+        if (legacySuggested.length || legacyAvoid.length) {
+          previousRuns = [
+            {
+              generatedAt: cached.result.generatedAt ?? new Date().toISOString(),
+              suggestedFocus: legacySuggested,
+              avoidFoods: legacyAvoid,
+            },
+          ]
+        }
+      }
+    }
+  } catch {
+    // Non-blocking: if cache read fails, we still return new run
+  }
+
+  const newRun = { generatedAt: now, suggestedFocus, avoidFoods }
+  const suggestionRuns = [newRun, ...previousRuns]
+  const flattenedSuggested = suggestionRuns.flatMap((r) => r.suggestedFocus)
+  const flattenedAvoid = suggestionRuns.flatMap((r) => r.avoidFoods)
+
   return {
     issue,
     section: 'nutrition',
@@ -4888,8 +4922,11 @@ async function buildNutritionSection(
     recommendations,
     extras: {
       workingFocus,
-      suggestedFocus,
-      avoidFoods,
+      // Keep legacy flat arrays for backward compatibility
+      suggestedFocus: flattenedSuggested,
+      avoidFoods: flattenedAvoid,
+      // New: grouped runs with timestamps to avoid losing history
+      suggestionRuns,
       totalLogged: foods.length,
       hasLoggedFoods,
       hasRecentFoodData,
