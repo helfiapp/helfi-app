@@ -240,6 +240,10 @@ export async function GET(request: NextRequest) {
           }
         }
       }
+      // Fallback: if stored profile info missing DOB but user has one, surface it
+      if (!profileInfoData.dateOfBirth && (user as any).dateOfBirth) {
+        profileInfoData.dateOfBirth = (user as any).dateOfBirth;
+      }
     } catch (e) {
       console.log('No profile info data found in storage');
     }
@@ -959,6 +963,11 @@ export async function POST(request: NextRequest) {
           profileInfoPayload.dateOfBirth = normalizedBirthdate
           shouldUpdateProfileInfo = true
         }
+      }
+
+      if (effectiveBirthdate && profileInfoPayload && !profileInfoPayload.dateOfBirth) {
+        profileInfoPayload.dateOfBirth = effectiveBirthdate
+        shouldUpdateProfileInfo = true
       }
 
       if (shouldUpdateProfileInfo && profileInfoPayload) {
