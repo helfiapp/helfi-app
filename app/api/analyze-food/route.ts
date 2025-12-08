@@ -546,13 +546,17 @@ Calories: 485, Protein: 45g, Carbs: 45g, Fat: 8g"
 Pay close attention to portion size words like small, medium, large, or specific measurements. For meals, sum all components. Calculate nutrition accordingly. End your response with the nutrition line exactly once as shown.
 ${wantStructured ? `
 After your explanation and the one-line totals above, also include a compact JSON block between <ITEMS_JSON> and </ITEMS_JSON> with this exact shape for any detected foods:
-<ITEMS_JSON>{"items":[{"name":"string","brand":"string or null","serving_size":"string (e.g., '1 slice', '40g', '1 cup (8 oz)')","servings":1,"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"sugar_g":0}],"total":{"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"sugar_g":0}}</ITEMS_JSON>
+<ITEMS_JSON>{"items":[{"name":"string","brand":"string or null","serving_size":"string (e.g., '1 slice', '2 patties', '40g', '1 cup (8 oz)')","servings":1,"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"sugar_g":0,"isGuess":false}],"total":{"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"sugar_g":0}}</ITEMS_JSON>
 
 CRITICAL REQUIREMENTS:
 - For packaged foods: ALWAYS extract the brand name if visible (e.g., "Burgen", "Heinz", "Nestle"). Set to null if not visible or not applicable.
 - For packaged foods: ALWAYS extract the serving size from the label (e.g., "1 slice", "2 cookies", "100g", "1 cup"). This is the DEFAULT serving size per package.
 - Set "servings" to 1 as the default (user can adjust this in the UI).
 - For multi-item meals: Create separate items for each distinct food component.
+- **BE COMPREHENSIVE: Include ALL likely components even if you're not 100% certain.**
+- **Set "isGuess": true for any item you're including but aren't completely confident about.**
+- **Set "isGuess": false only for items you can clearly identify with high confidence.**
+- **For discrete items like patties, count them in serving_size (e.g., "2 patties" or "3 patties") and set servings to match the count.**
 - Nutrition values should be PER SERVING (not total) for each item.
 - The "total" object should sum all items multiplied by their servings.
 ` : ''}`
@@ -634,11 +638,14 @@ CRITICAL FOR MEALS WITH MULTIPLE COMPONENTS:
 
 - For complex meals, be thorough: don't miss side dishes, condiments, dressings, or toppings
 - Estimate portions realistically based on what's visible in the image
-- If unsure about a component, estimate conservatively but include it in your totals
+- **BE DARING: If you think you see something (even with low confidence), include it as a separate item with isGuess: true**
+- **For burgers specifically: ALWAYS include bun, patties (count them!), cheese, bacon (if visible), lettuce, tomato, and sauces/condiments as separate items**
+- If unsure about a component, estimate conservatively but include it in your totals - the user can easily delete guessed items
 - For mixed dishes (salads, soups, stews), break down the main ingredients and sum them
 
-COMMON MEAL PATTERNS TO RECOGNIZE (DO NOT MISS):
-- Burgers/wraps/sandwiches/tacos: bun/wrap + protein + cheese + sauces + salad/veg
+COMMON MEAL PATTERNS TO RECOGNIZE (DO NOT MISS - BE COMPREHENSIVE):
+- **Burgers: ALWAYS include bun + patties (count each patty separately) + cheese + bacon (if visible) + lettuce + tomato + sauces/condiments (ketchup, mayo, mustard, etc.)**
+- Wraps/sandwiches/tacos: wrap/bread + protein + cheese + sauces + salad/veg
 - Bowls/salads: base (rice/greens) + protein + toppings + dressing/sauce
 - Plates: protein + starch (rice/pasta/potato/bread) + vegetables + sauces
 - Pizzas/flatbreads: base + cheese + toppings (count visible slices as portion)
@@ -730,10 +737,15 @@ COMMON MEAL COMPONENTS:
 - Soup (chicken noodle, 1 cup): ~75 calories, 4g protein, 7g carbs, 3g fat
 
 **ACCURACY REQUIREMENTS:**
+- **For burgers: Two beef patties (4-6oz each) should total 400-700 calories for the patties alone. A complete burger with bun + 2 patties + cheese + bacon + condiments should total 900-1100 calories.**
 - A typical burger with bun + 6oz patty + cheese + bacon should total 600-900 calories, NOT 40-50 calories
 - Always cross-check your totals: if a meal looks substantial, the calories should reflect that
 - If your calculated total seems too low, re-check each component's nutrition values
 - Use standard serving sizes and realistic nutrition databases
+- **When counting discrete items (patties, slices, nuggets), use realistic per-item values:**
+  - Beef patty (4oz cooked): 200-300 calories per patty
+  - Cheese slice: 80-120 calories per slice
+  - Bacon slice (cooked): 40-50 calories per slice
 
 OUTPUT REQUIREMENTS:
 - Keep explanation to 2-3 sentences
@@ -764,13 +776,17 @@ Calories: 780, Protein: 47g, Carbs: 29g, Fat: 49g"
 Estimate portion size carefully from the image and calculate nutrition accordingly using REALISTIC values. For meals, sum all components. End your response with the nutrition line exactly once as shown.
 ${wantStructured ? `
 After your explanation and the one-line totals above, also include a compact JSON block between <ITEMS_JSON> and </ITEMS_JSON> with this exact shape for any detected foods:
-<ITEMS_JSON>{"items":[{"name":"string","brand":"string or null","serving_size":"string (e.g., '1 slice', '40g', '1 cup (8 oz)')","servings":1,"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"sugar_g":0}],"total":{"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"sugar_g":0}}</ITEMS_JSON>
+<ITEMS_JSON>{"items":[{"name":"string","brand":"string or null","serving_size":"string (e.g., '1 slice', '2 patties', '40g', '1 cup (8 oz)')","servings":1,"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"sugar_g":0,"isGuess":false}],"total":{"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"sugar_g":0}}</ITEMS_JSON>
 
 CRITICAL REQUIREMENTS:
 - For packaged foods: ALWAYS extract the brand name if visible (e.g., "Burgen", "Heinz", "Nestle"). Set to null if not visible or not applicable.
 - For packaged foods: ALWAYS extract the serving size from the label (e.g., "1 slice", "2 cookies", "100g", "1 cup"). This is the DEFAULT serving size per package.
 - Set "servings" to 1 as the default (user can adjust this in the UI).
 - For multi-item meals: Create separate items for each distinct food component.
+- **BE COMPREHENSIVE: Include ALL visible components (bun, patties, cheese, bacon, lettuce, tomato, sauces, condiments, etc.) even if you're not 100% certain.**
+- **Set "isGuess": true for any item you're including but aren't completely confident about (e.g., condiments that might be hidden, salad that might be present).**
+- **Set "isGuess": false only for items you can clearly see and identify with high confidence.**
+- **For discrete items like patties, count them in serving_size (e.g., "2 patties" or "3 patties") and set servings to match the count.**
 - Nutrition values should be PER SERVING (not total) for each item.
 - The "total" object should sum all items multiplied by their servings.
 ` : ''}`

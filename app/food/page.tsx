@@ -6463,8 +6463,15 @@ Please add nutritional information manually if needed.`);
                             {/* Header row with basic info and actions */}
                             <div className={`flex items-start justify-between ${isMultiIngredient && !isExpanded ? 'mb-1' : 'mb-2'}`}>
                               <div className="flex-1">
-                                <div className="font-semibold text-gray-900 text-base">
-                                  {item.name || 'Unknown Food'}
+                                <div className="flex items-center gap-2">
+                                  <div className="font-semibold text-gray-900 text-base">
+                                    {item.name || 'Unknown Food'}
+                                  </div>
+                                  {item.isGuess && (
+                                    <span className="px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-800 rounded-full border border-amber-200">
+                                      AI guess
+                                    </span>
+                                  )}
                                 </div>
                                 {(!isMultiIngredient || isExpanded) && (
                                   <>
@@ -6617,6 +6624,43 @@ Please add nutritional information manually if needed.`);
                                         ? `1 serving = ${servingSizeLabel}`
                                         : 'Serving size not specified'}
                                     </div>
+                                    {/* Pieces control for discrete items */}
+                                    {servingUnitMeta && isDiscreteUnitLabel(servingUnitMeta.unitLabel) && servingUnitMeta.quantity > 0 && (
+                                      <div className="flex items-center gap-3 mt-2">
+                                        <span className="text-sm text-gray-600">Pieces:</span>
+                                        <div className="flex items-center gap-2">
+                                          <button
+                                            onClick={() => {
+                                              const current = analyzedItems[index]?.servings || 1
+                                              const piecesPerServing = servingUnitMeta.quantity
+                                              const currentPieces = Math.round(current * piecesPerServing)
+                                              const newPieces = Math.max(0, currentPieces - 1)
+                                              const newServings = newPieces / piecesPerServing
+                                              updateItemField(index, 'servings', newServings)
+                                            }}
+                                            className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-medium transition-colors"
+                                          >
+                                            -
+                                          </button>
+                                          <div className="w-20 px-2 py-1 border border-gray-300 rounded-lg text-base font-semibold text-gray-900 text-center bg-gray-50">
+                                            {Math.round(servingsCount * servingUnitMeta.quantity)}
+                                          </div>
+                                          <button
+                                            onClick={() => {
+                                              const current = analyzedItems[index]?.servings || 1
+                                              const piecesPerServing = servingUnitMeta.quantity
+                                              const currentPieces = Math.round(current * piecesPerServing)
+                                              const newPieces = currentPieces + 1
+                                              const newServings = newPieces / piecesPerServing
+                                              updateItemField(index, 'servings', newServings)
+                                            }}
+                                            className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-medium transition-colors"
+                                          >
+                                            +
+                                          </button>
+                                        </div>
+                                      </div>
+                                    )}
                                     {gramsPerServing && (
                                       <div className="text-xs text-gray-500">
                                         Total amount ≈ {Math.round(gramsPerServing * servingsCount)} g
