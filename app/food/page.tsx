@@ -629,22 +629,34 @@ const isDiscreteUnitLabel = (label: string) => {
   ]
   if (nonDiscreteUnits.some(u => l === u || l.endsWith(' ' + u))) return false
   const discreteKeywords = [
-    'egg','slice','cookie','piece','patty','wing','nugget','meatball','stick','bar','biscuit','pancake','scoop',
+    'egg','slice','cookie','piece','patty','pattie','wing','nugget','meatball','stick','bar','biscuit','pancake','scoop',
     'cracker','crackers','chip','chips'
   ]
   return discreteKeywords.some(k => l.includes(k))
 }
 
-// Extract pieces-per-serving for discrete items from serving_size or name
+// Extract pieces-per-serving for discrete items from serving_size or name (supports digit or word numbers)
 const getPiecesPerServing = (item: any): number | null => {
   const source = `${item?.serving_size || ''} ${item?.name || ''}`.trim().toLowerCase()
   if (!source) return null
   if (!isDiscreteUnitLabel(source)) return null
+
   const numberMatch = source.match(/(\d+(?:\.\d+)?)/)
   if (numberMatch) {
     const n = parseFloat(numberMatch[1])
     if (Number.isFinite(n) && n > 0) return n
   }
+
+  const wordMatch = source.match(/\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b/i)
+  if (wordMatch) {
+    const map: Record<string, number> = {
+      one: 1, two: 2, three: 3, four: 4, five: 5, six: 6,
+      seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12,
+    }
+    const n = map[wordMatch[1].toLowerCase()]
+    if (n) return n
+  }
+
   const servings = Number.isFinite(Number(item?.servings)) ? Number(item.servings) : null
   if (servings && servings > 1) return servings
   return null
@@ -1748,6 +1760,29 @@ const applyStructuredItems = (
     finalTotalValue: finalTotal ? JSON.stringify(finalTotal) : 'null',
   })
 
+// Get base weight per 1 serving in the item's current weightUnit (defaults to grams)
+const getBaseWeightPerServing = (item: any): number | null => {
+  const info = parseServingSizeInfo(item)
+  const unit = item?.weightUnit === 'ml' ? 'ml' : item?.weightUnit === 'oz' ? 'oz' : 'g'
+  if (unit === 'ml') {
+    if (Number.isFinite(item?.customMlPerServing)) return Number(item.customMlPerServing)
+    if (info.mlPerServing && info.mlPerServing > 0) return info.mlPerServing
+    if (info.gramsPerServing && info.gramsPerServing > 0) return info.gramsPerServing // assume ~1g/mL fallback
+  } else {
+    if (Number.isFinite(item?.customGramsPerServing)) return Number(item.customGramsPerServing)
+    if (info.gramsPerServing && info.gramsPerServing > 0) return info.gramsPerServing
+    if (unit === 'oz' && info.mlPerServing && info.mlPerServing > 0) return info.mlPerServing / 28.3495
+  }
+  // Fallback: infer from current weightAmount and servings if present
+  const servings = Number.isFinite(Number(item?.servings)) ? Number(item.servings) : null
+  const weightAmount = Number.isFinite(Number(item?.weightAmount)) ? Number(item.weightAmount) : null
+  if (servings && servings > 0 && weightAmount && weightAmount > 0) {
+    const per = weightAmount / servings
+    if (per > 0) return per
+  }
+  return null
+}
+
   // Priority order for totals (updated):
   // 1. Recalculated from enriched items (so the circle always matches the cards the user sees)
   // 2. API-provided total (if item-based recalculation is missing or clearly zero)
@@ -1848,6 +1883,15 @@ const applyStructuredItems = (
       const clamped = clampNumber(value, 0, 20)
       const rounded = Math.round(clamped * 100) / 100
       itemsCopy[index].servings = rounded
+    // Keep weight in sync if we know per-serving weight
+    const baseWeight = getBaseWeightPerServing(itemsCopy[index])
+    if (baseWeight && baseWeight > 0) {
+      const unit = itemsCopy[index]?.weightUnit === 'ml' ? 'ml' : itemsCopy[index]?.weightUnit === 'oz' ? 'oz' : 'g'
+      const multiplier = unit === 'oz' ? 1 : 1 // baseWeight already in chosen unit from helper
+      const computed = baseWeight * rounded * multiplier
+      const precision = unit === 'oz' ? 100 : 1000
+      itemsCopy[index].weightAmount = Math.round(computed * precision) / precision
+    }
     } else if (field === 'portionMode') {
       itemsCopy[index].portionMode = value === 'weight' ? 'weight' : 'servings'
       if (itemsCopy[index].portionMode === 'weight') {
