@@ -2782,6 +2782,11 @@ const applyStructuredItems = (
         latest && typeof latest?.localDate === 'string' && latest.localDate.length >= 8
           ? latest.localDate
           : selectedDate
+      // Anchor createdAt to the selected/target local date to avoid drift across adjacent days.
+      const anchoredCreatedAt = alignTimestampToLocalDate(
+        latest?.createdAt || new Date().toISOString(),
+        targetLocalDate,
+      )
 
       console.log('📝 saveFoodEntries called:', {
         entryCount: dedupedFoods.length,
@@ -2841,10 +2846,7 @@ const applyStructuredItems = (
             category: normalizeCategory(latest?.meal || latest?.category || latest?.mealType),
             // Always pin to the calendar date the user was viewing when they saved
             localDate: targetLocalDate,
-            createdAt: alignTimestampToLocalDate(
-              latest?.createdAt || new Date().toISOString(),
-              targetLocalDate,
-            ),
+            createdAt: anchoredCreatedAt,
           }
           setLastHistoryPayload(payload)
 
