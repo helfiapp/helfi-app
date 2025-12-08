@@ -5074,10 +5074,10 @@ Please add nutritional information manually if needed.`);
       if (!deleted) {
         try {
           const tz = new Date().getTimezoneOffset()
-          const targetDate = entry.localDate || selectedDate
+          const targetDate = dateKeyForEntry(entry) || entry.localDate || selectedDate
           if (targetDate) sweepDates.push(targetDate)
           const base = targetDate ? new Date(targetDate) : new Date()
-          ;[1, -1].forEach((delta) => {
+          ;[1, -1, 2, -2].forEach((delta) => {
             const d = new Date(base)
             d.setDate(d.getDate() + delta)
             sweepDates.push(d.toISOString().slice(0, 10))
@@ -5115,7 +5115,7 @@ Please add nutritional information manually if needed.`);
         // Nuclear option: delete by description/category across the sweep dates.
         try {
           const payload = {
-            description: entry?.description || entry?.name || '',
+            description: normalizedDescription(entry?.description || entry?.name || ''),
             category: entryCategory,
             dates: sweepDates,
           }
