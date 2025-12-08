@@ -659,6 +659,11 @@ const getPiecesPerServing = (item: any): number | null => {
 
   const servings = Number.isFinite(Number(item?.servings)) ? Number(item.servings) : null
   if (servings && servings > 1) return servings
+  // Fallback to explicit pieces hint if present
+  const explicitPieces = Number.isFinite(Number((item as any)?.piecesPerServing))
+    ? Number((item as any).piecesPerServing)
+    : null
+  if (explicitPieces && explicitPieces > 0) return explicitPieces
   return null
 }
 
@@ -1894,6 +1899,12 @@ const applyStructuredItems = (
         const clamped = clampNumber(value, 0, 5000)
         const rounded = Math.round(clamped * 100) / 100
         itemsCopy[index].weightAmount = rounded
+      // If we know per-serving weight, keep servings in sync when weight changes.
+      const baseWeight = getBaseWeightPerServing(itemsCopy[index])
+      if (baseWeight && baseWeight > 0) {
+        const derivedServings = Math.max(0, rounded / baseWeight)
+        itemsCopy[index].servings = Math.round(derivedServings * 100) / 100
+      }
       }
     } else if (field === 'weightUnit') {
       const previousUnit = itemsCopy[index].weightUnit === 'ml' ? 'ml' : itemsCopy[index].weightUnit === 'oz' ? 'oz' : 'g'
@@ -3200,14 +3211,23 @@ const applyStructuredItems = (
   const getBaseWeightPerServing = (item: any): number | null => {
     const info = parseServingSizeInfo(item)
     const unit = item?.weightUnit === 'ml' ? 'ml' : item?.weightUnit === 'oz' ? 'oz' : 'g'
+    const estimatedGrams = estimateGramsPerServing(item)
     if (unit === 'ml') {
       if (Number.isFinite(item?.customMlPerServing)) return Number(item.customMlPerServing)
       if (info.mlPerServing && info.mlPerServing > 0) return info.mlPerServing
       if (info.gramsPerServing && info.gramsPerServing > 0) return info.gramsPerServing // assume ~1g/mL fallback
+      if (estimatedGrams && estimatedGrams > 0) return estimatedGrams
+    } else if (unit === 'oz') {
+      if (Number.isFinite(item?.customGramsPerServing)) return Number(item.customGramsPerServing) / 28.3495
+      if (info.gramsPerServing && info.gramsPerServing > 0) return info.gramsPerServing / 28.3495
+      if (info.mlPerServing && info.mlPerServing > 0) return info.mlPerServing / 28.3495
+      if (estimatedGrams && estimatedGrams > 0) return estimatedGrams / 28.3495
     } else {
+      // grams
       if (Number.isFinite(item?.customGramsPerServing)) return Number(item.customGramsPerServing)
       if (info.gramsPerServing && info.gramsPerServing > 0) return info.gramsPerServing
-      if (unit === 'oz' && info.mlPerServing && info.mlPerServing > 0) return info.mlPerServing / 28.3495
+      if (info.mlPerServing && info.mlPerServing > 0) return info.mlPerServing // assume ~1g/mL fallback
+      if (estimatedGrams && estimatedGrams > 0) return estimatedGrams
     }
     // Fallback: infer from current weightAmount and servings if present
     const servings = Number.isFinite(Number(item?.servings)) ? Number(item.servings) : null
@@ -6201,9 +6221,9 @@ Please add nutritional information manually if needed.`);
                             <Image
                               src={photoPreview}
                               alt="Analyzed food"
-                              width={420}
-                              height={315}
-                              className="w-full aspect-[4/3] object-cover transition-transform duration-200 group-hover:scale-[1.01]"
+                              width={300}
+                              height={300}
+                              className="w-full max-w-sm aspect-square object-cover transition-transform duration-200 group-hover:scale-[1.01]"
                             />
                             {/* Subtle dark overlay on hover */}
                             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
@@ -6511,8 +6531,8 @@ Please add nutritional information manually if needed.`);
                         const piecesPerServing =
                           getPiecesPerServing(item) ||
                           (servingUnitMeta &&
-                          isDiscreteUnitLabel(servingUnitMeta.unitLabel) &&
-                          servingUnitMeta.quantity > 0
+                            isDiscreteUnitLabel(servingUnitMeta.unitLabel) &&
+                            servingUnitMeta.quantity > 0
                             ? servingUnitMeta.quantity
                             : null)
                         const servingsStep =
