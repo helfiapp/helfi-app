@@ -690,24 +690,26 @@ const normalizeDiscreteServingsWithLabel = (items: any[]) => {
     const rule = DISCRETE_SERVING_RULES.find((r) =>
       r.keywords.some((kw) => labelSource.includes(kw)),
     )
-    if (!rule) return next
+    const rule = DISCRETE_SERVING_RULES.find((r) =>
+      r.keywords.some((kw) => labelSource.includes(kw)),
+    )
 
     const meta = parseServingUnitMetadata(item?.serving_size || item?.name || '')
     const qty = meta?.quantity
     const unitLabel = meta?.unitLabel || meta?.unitLabelSingular || ''
     const currentServings = Number.isFinite(Number(next.servings)) ? Number(next.servings) : 1
 
-    if (!qty || qty <= 1.001) return next
-    if (currentServings > 1.05) return next
-    if (!isDiscreteUnitLabel(unitLabel)) return next
+    const shouldTreatAsDiscrete =
+      !!qty && qty > 1.001 && currentServings <= 1.05 && isDiscreteUnitLabel(unitLabel)
+    if (!shouldTreatAsDiscrete) return next
 
     const calories = Number(next.calories)
     const protein = Number(next.protein_g)
-    const caloriesLow = !Number.isFinite(calories) || calories <= rule.caloriesPerUnitFloor * qty
+    const floorCalories = rule ? rule.caloriesPerUnitFloor : 40
+    const floorProtein = rule ? rule.proteinPerUnitFloor ?? 3 : 3
+    const caloriesLow = !Number.isFinite(calories) || calories <= floorCalories * qty
     const proteinLow =
-      rule.proteinPerUnitFloor === undefined
-        ? true
-        : !Number.isFinite(protein) || protein <= rule.proteinPerUnitFloor * qty
+      floorProtein === undefined ? true : !Number.isFinite(protein) || protein <= floorProtein * qty
 
     if (caloriesLow && proteinLow) {
       const fields: Array<keyof typeof next> = [

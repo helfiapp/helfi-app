@@ -638,7 +638,7 @@ CRITICAL FOR MEALS WITH MULTIPLE COMPONENTS:
 - For mixed dishes (salads, soups, stews), break down the main ingredients and sum them
 
 COMMON MEAL PATTERNS TO RECOGNIZE (DO NOT MISS):
-- Burgers/wraps/sandwiches/tacos: bun/wrap + protein + cheese + sauces + salad/veg. If a burger, COUNT visible patties, COUNT cheese slices, COUNT bacon rashers, and include lettuce/tomato/onion/pickles and sauces if visible. Do not downscale calories for a multi-patty burger.
+- Burgers/wraps/sandwiches/tacos: bun/wrap + protein + cheese + sauces + salad/veg. If a burger, COUNT visible patties, COUNT cheese slices, COUNT bacon rashers, and include lettuce/tomato/onion/pickles and sauces if visible. Do not downscale calories for a multi-patty burger. Count discrete items (slices/pieces/patties/nuggets/wings/cookies) and set servings to the visible count when confident.
 - Bowls/salads: base (rice/greens) + protein + toppings + dressing/sauce
 - Plates: protein + starch (rice/pasta/potato/bread) + vegetables + sauces
 - Pizzas/flatbreads: base + cheese + toppings (count visible slices as portion)
