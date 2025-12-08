@@ -4993,6 +4993,7 @@ Please add nutritional information manually if needed.`);
     const entryCategory = normalizeCategory(entry?.meal || entry?.category || entry?.mealType)
     const entryId = entry.id
     const entryKey = entryId !== null && entryId !== undefined ? entryId.toString() : ''
+    const descKey = `desc:${entryCategory}|${normalizedDescription(entry?.description || entry?.name || '')}`
 
     const updatedFoods = todaysFoods.filter((food: any) => {
       const sameId =
@@ -5012,6 +5013,10 @@ Please add nutritional information manually if needed.`);
     })
     setSwipeMenuEntry((prev) => (prev === entryKey ? null : prev))
     deletedEntryKeysRef.current.add(buildDeleteKey(entry))
+    deletedEntryKeysRef.current.add(descKey)
+    if (dbId) {
+      deletedEntryKeysRef.current.add(`db:${dbId}`)
+    }
     setDeletedEntryNonce((n) => n + 1)
     // Prevent resurrecting from oversized/stale warm cache
     try {
