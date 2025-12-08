@@ -88,6 +88,15 @@ const computeTotalsFromItems = (items: any[]): any | null => {
   };
 };
 
+// Normalize isGuess flag across items
+const normalizeGuessFlags = (items: any[]): any[] =>
+  Array.isArray(items)
+    ? items.map((item) => ({
+        ...item,
+        isGuess: item?.isGuess === true,
+      }))
+    : [];
+
 // When in packaged mode, try to fill missing/zero macros from FatSecret without overwriting existing values.
 const enrichPackagedItemsWithFatSecret = async (items: any[]): Promise<{ items: any[]; total: any | null }> => {
   const enriched: any[] = [];
@@ -214,6 +223,8 @@ const harmonizeDiscretePortionItems = (items: any[]): { items: any[]; total: any
 
   const EGG_KEYWORDS = ['egg', 'eggs', 'scrambled egg', 'scrambled eggs', 'omelette', 'omelet'];
   const BACON_KEYWORDS = ['bacon', 'rasher', 'rashers', 'bacon strip', 'bacon strips'];
+  const PATTY_KEYWORDS = ['patty', 'pattie', 'patties', 'burger patty', 'beef patty'];
+  const CHEESE_KEYWORDS = ['cheese', 'cheddar', 'mozzarella', 'slice of cheese', 'cheese slice'];
 
   for (const item of cloned) {
     const name = (item?.name || '') as string;
@@ -255,10 +266,183 @@ const harmonizeDiscretePortionItems = (items: any[]): { items: any[]; total: any
         }
       }
     }
+
+    // Patties: label says "3 patties" etc., but calories look like a single patty.
+    if (containsAny(labelSource, PATTY_KEYWORDS)) {
+      if (calories > 0 && calories <= 320) {
+        const currentServings = Number(item?.servings ?? 1);
+        if (!Number.isFinite(currentServings) || currentServings <= 1.5) {
+          item.servings = count;
+          if (calories <= 180) item.calories = 250;
+          if (!Number.isFinite(item.protein_g) || item.protein_g < 18) item.protein_g = 22;
+          if (!Number.isFinite(item.fat_g) || item.fat_g < 12) item.fat_g = 18;
+          continue;
+        }
+      }
+    }
+
+    // Cheese slices: scale if multiple slices are mentioned but macros look like a single slice.
+    if (containsAny(labelSource, CHEESE_KEYWORDS)) {
+      if (calories > 0 && calories <= 160) {
+        const currentServings = Number(item?.servings ?? 1);
+        if (!Number.isFinite(currentServings) || currentServings <= 1.5) {
+          item.servings = count;
+          if (calories <= 70) item.calories = 100;
+          if (!Number.isFinite(item.protein_g) || item.protein_g < 5) item.protein_g = 6;
+          if (!Number.isFinite(item.fat_g) || item.fat_g < 7) item.fat_g = 9;
+          continue;
+        }
+      }
+    }
   }
 
   const total = computeTotalsFromItems(cloned);
   return { items: cloned, total };
+};
+
+// Burger-specific heuristics: ensure core components exist and have realistic macros.
+const ensureBurgerComponents = (items: any[] | null, analysis: string | null | undefined): { items: any[]; total: any | null } => {
+  const base = Array.isArray(items) ? normalizeGuessFlags(items) : [];
+  const text = (analysis || '').toLowerCase();
+  const names = base.map((it) => String(it?.name || '').toLowerCase());
+  const looksLikeBurger =
+    text.includes('burger') ||
+    names.some((n) => n.includes('burger') || n.includes('patty') || n.includes('bun'));
+
+  if (!looksLikeBurger) {
+    return { items: base, total: computeTotalsFromItems(base) };
+  }
+
+  const hasKeyword = (keywords: string[]) =>
+    base.some((it) => {
+      const n = String(it?.name || '').toLowerCase();
+      return keywords.some((k) => n.includes(k));
+    });
+
+  const ensureItem = (keywords: string[], createItem: () => any) => {
+    if (!hasKeyword(keywords)) {
+      base.push({ ...createItem(), isGuess: true });
+    }
+  };
+
+  // Normalize patties: ensure at least 2 and realistic per-patty macros
+  base.forEach((it) => {
+    const n = String(it?.name || '').toLowerCase();
+    if (n.includes('patty')) {
+      const servings = Number.isFinite(Number(it.servings)) ? Number(it.servings) : 1;
+      const adjustedServings = servings < 2 ? 2 : servings;
+      it.servings = adjustedServings;
+      const perCalories = adjustedServings > 0 ? Number(it.calories || 0) / adjustedServings : Number(it.calories || 0);
+      if (!Number.isFinite(perCalories) || perCalories < 180) {
+        it.calories = Math.round(Math.max(perCalories || 0, 200) * adjustedServings || 250 * adjustedServings);
+      }
+      const perProtein = adjustedServings > 0 ? Number(it.protein_g || 0) / adjustedServings : Number(it.protein_g || 0);
+      if (!Number.isFinite(perProtein) || perProtein < 18) {
+        it.protein_g = Math.round(Math.max(perProtein || 0, 20) * adjustedServings * 10) / 10;
+      }
+      const perFat = adjustedServings > 0 ? Number(it.fat_g || 0) / adjustedServings : Number(it.fat_g || 0);
+      if (!Number.isFinite(perFat) || perFat < 12) {
+        it.fat_g = Math.round(Math.max(perFat || 0, 14) * adjustedServings * 10) / 10;
+      }
+      if (!it.serving_size) {
+        it.serving_size = '1 patty (4–6 oz)';
+      }
+    }
+  });
+
+  ensureItem(['patty', 'pattie'], () => ({
+    name: 'Beef patty',
+    brand: null,
+    serving_size: '1 patty (4–6 oz)',
+    servings: 2,
+    calories: 250,
+    protein_g: 22,
+    carbs_g: 0,
+    fat_g: 18,
+    fiber_g: 0,
+    sugar_g: 0,
+  }));
+
+  ensureItem(['bun'], () => ({
+    name: 'Burger bun',
+    brand: null,
+    serving_size: '1 bun',
+    servings: 1,
+    calories: 150,
+    protein_g: 5,
+    carbs_g: 28,
+    fat_g: 3,
+    fiber_g: 1,
+    sugar_g: 3,
+  }));
+
+  ensureItem(['cheese'], () => ({
+    name: 'Cheddar cheese slice',
+    brand: null,
+    serving_size: '1 slice',
+    servings: 2,
+    calories: 100,
+    protein_g: 6,
+    carbs_g: 1,
+    fat_g: 9,
+    fiber_g: 0,
+    sugar_g: 0,
+  }));
+
+  ensureItem(['bacon'], () => ({
+    name: 'Bacon slice',
+    brand: null,
+    serving_size: '1 slice',
+    servings: 2,
+    calories: 45,
+    protein_g: 3,
+    carbs_g: 0,
+    fat_g: 3.5,
+    fiber_g: 0,
+    sugar_g: 0,
+  }));
+
+  ensureItem(['lettuce'], () => ({
+    name: 'Lettuce',
+    brand: null,
+    serving_size: '1 leaf',
+    servings: 1,
+    calories: 5,
+    protein_g: 0.5,
+    carbs_g: 1,
+    fat_g: 0,
+    fiber_g: 0.5,
+    sugar_g: 0,
+  }));
+
+  ensureItem(['tomato'], () => ({
+    name: 'Tomato',
+    brand: null,
+    serving_size: '2 slices',
+    servings: 1,
+    calories: 10,
+    protein_g: 0.5,
+    carbs_g: 2,
+    fat_g: 0,
+    fiber_g: 0.5,
+    sugar_g: 1.5,
+  }));
+
+  ensureItem(['sauce', 'mayo', 'mayonnaise', 'ketchup', 'mustard'], () => ({
+    name: 'Burger sauce',
+    brand: null,
+    serving_size: '1 tbsp',
+    servings: 1,
+    calories: 100,
+    protein_g: 0,
+    carbs_g: 1,
+    fat_g: 11,
+    fiber_g: 0,
+    sugar_g: 1,
+  }));
+
+  const total = computeTotalsFromItems(base);
+  return { items: base, total };
 };
 
 // In-memory cache for repeated photo analyses (keyed by image hash).
@@ -1234,6 +1418,11 @@ CRITICAL REQUIREMENTS:
     if (resp.items && resp.items.length > 0 && !resp.total) {
       resp.total = computeTotalsFromItems(resp.items);
     }
+
+    // Burger-specific enrichment: ensure core components and realistic per-item macros.
+    const burgerEnriched = ensureBurgerComponents(resp.items || [], resp.analysis);
+    resp.items = burgerEnriched.items;
+    resp.total = burgerEnriched.total || resp.total;
 
     // Final safety pass: if the AI has described a discrete portion like
     // "3 large eggs" or "4 slices of bacon" but provided calories/macros that

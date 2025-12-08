@@ -635,6 +635,21 @@ const isDiscreteUnitLabel = (label: string) => {
   return discreteKeywords.some(k => l.includes(k))
 }
 
+// Extract pieces-per-serving for discrete items from serving_size or name
+const getPiecesPerServing = (item: any): number | null => {
+  const source = `${item?.serving_size || ''} ${item?.name || ''}`.trim().toLowerCase()
+  if (!source) return null
+  if (!isDiscreteUnitLabel(source)) return null
+  const numberMatch = source.match(/(\d+(?:\.\d+)?)/)
+  if (numberMatch) {
+    const n = parseFloat(numberMatch[1])
+    if (Number.isFinite(n) && n > 0) return n
+  }
+  const servings = Number.isFinite(Number(item?.servings)) ? Number(item.servings) : null
+  if (servings && servings > 1) return servings
+  return null
+}
+
 const isVolumeBasedUnitLabel = (label: string) => {
   const l = (label || '').toLowerCase().trim()
   if (!l) return false
@@ -6430,7 +6445,7 @@ Please add nutritional information manually if needed.`);
                           const m = name.match(/\(([^)]+)\)/)
                           return m && m[1] ? m[1].trim() : ''
                         })()
-                        const servingUnitMeta = parseServingUnitMetadata(servingSizeLabel || '')
+                        const servingUnitMeta = parseServingUnitMetadata(servingSizeLabel || item?.name || '')
                         const servingInfo = parseServingSizeInfo({ serving_size: servingSizeLabel })
                         const gramsPerServing = servingInfo.gramsPerServing
                         const mlPerServing = servingInfo.mlPerServing
@@ -6448,6 +6463,20 @@ Please add nutritional information manually if needed.`);
                           portionMode === 'weight' && weightAmount
                             ? `${formatNumberInputValue(weightAmount)} ${weightUnit}`
                             : formattedServings
+
+                        const piecesPerServing =
+                          getPiecesPerServing(item) ||
+                          (servingUnitMeta &&
+                          isDiscreteUnitLabel(servingUnitMeta.unitLabel) &&
+                          servingUnitMeta.quantity > 0
+                            ? servingUnitMeta.quantity
+                            : null)
+                        const servingsStep =
+                          piecesPerServing && piecesPerServing > 0 ? 1 / piecesPerServing : 0.25
+                        const pieceCount =
+                          piecesPerServing && servingsCount >= 0
+                            ? Math.max(0, Math.round(servingsCount * piecesPerServing * 1000) / 1000)
+                            : null
 
                         const isMultiIngredient = analyzedItems.length > 1
                         const isExpanded = !isMultiIngredient || expandedItemIndex === index
@@ -6570,10 +6599,7 @@ Please add nutritional information manually if needed.`);
                                         <button
                                           onClick={() => {
                                             const current = analyzedItems[index]?.servings || 1
-                                            const step =
-                                              servingUnitMeta && isDiscreteUnitLabel(servingUnitMeta.unitLabel) && servingUnitMeta.quantity > 0
-                                                ? 1 / servingUnitMeta.quantity
-                                                : 0.25
+                                            const step = servingsStep
                                             const snapToStep = (val: number) => {
                                               if (!step || step <= 0) return val
                                               const snapped = Math.round(val / step)
@@ -6589,11 +6615,7 @@ Please add nutritional information manually if needed.`);
                                         <input
                                           type="number"
                                           min={0}
-                                          step={
-                                            servingUnitMeta && isDiscreteUnitLabel(servingUnitMeta.unitLabel)
-                                              ? Math.max(1 / servingUnitMeta.quantity, 0.01)
-                                              : 0.25
-                                          }
+                                          step={servingsStep > 0 ? Math.max(servingsStep, 0.01) : 0.25}
                                           value={formatNumberInputValue(item.servings ?? 1)}
                                           onChange={(e) => updateItemField(index, 'servings', e.target.value)}
                                           className="w-20 px-2 py-1 border border-gray-300 rounded-lg text-base font-semibold text-gray-900 text-center focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
@@ -6601,10 +6623,7 @@ Please add nutritional information manually if needed.`);
                                         <button
                                           onClick={() => {
                                             const current = analyzedItems[index]?.servings || 1
-                                            const step =
-                                              servingUnitMeta && isDiscreteUnitLabel(servingUnitMeta.unitLabel) && servingUnitMeta.quantity > 0
-                                                ? 1 / servingUnitMeta.quantity
-                                                : 0.25
+                                            const step = servingsStep
                                             const snapToStep = (val: number) => {
                                               if (!step || step <= 0) return val
                                               const snapped = Math.round(val / step)
@@ -6625,14 +6644,13 @@ Please add nutritional information manually if needed.`);
                                         : 'Serving size not specified'}
                                     </div>
                                     {/* Pieces control for discrete items */}
-                                    {servingUnitMeta && isDiscreteUnitLabel(servingUnitMeta.unitLabel) && servingUnitMeta.quantity > 0 && (
+                                    {piecesPerServing && piecesPerServing > 0 && (
                                       <div className="flex items-center gap-3 mt-2">
                                         <span className="text-sm text-gray-600">Pieces:</span>
                                         <div className="flex items-center gap-2">
                                           <button
                                             onClick={() => {
                                               const current = analyzedItems[index]?.servings || 1
-                                              const piecesPerServing = servingUnitMeta.quantity
                                               const currentPieces = Math.round(current * piecesPerServing)
                                               const newPieces = Math.max(0, currentPieces - 1)
                                               const newServings = newPieces / piecesPerServing
@@ -6643,12 +6661,11 @@ Please add nutritional information manually if needed.`);
                                             -
                                           </button>
                                           <div className="w-20 px-2 py-1 border border-gray-300 rounded-lg text-base font-semibold text-gray-900 text-center bg-gray-50">
-                                            {Math.round(servingsCount * servingUnitMeta.quantity)}
+                                            {pieceCount !== null ? Math.round(pieceCount) : Math.round(servingsCount * piecesPerServing)}
                                           </div>
                                           <button
                                             onClick={() => {
                                               const current = analyzedItems[index]?.servings || 1
-                                              const piecesPerServing = servingUnitMeta.quantity
                                               const currentPieces = Math.round(current * piecesPerServing)
                                               const newPieces = currentPieces + 1
                                               const newServings = newPieces / piecesPerServing
