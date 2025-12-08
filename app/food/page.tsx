@@ -6638,6 +6638,46 @@ Please add nutritional information manually if needed.`);
                                         ? `1 serving = ${servingSizeLabel}`
                                         : 'Serving size not specified'}
                                     </div>
+                                    {servingUnitMeta && isDiscreteUnitLabel(servingUnitMeta.unitLabel) && servingUnitMeta.quantity > 0 && (
+                                      <div className="mt-1 flex items-center gap-3 text-sm text-gray-700">
+                                        <span>Pieces:</span>
+                                        <div className="flex items-center gap-2">
+                                          <button
+                                            onClick={() => {
+                                              const currentServings = analyzedItems[index]?.servings || 1
+                                              const currentPieces = currentServings * servingUnitMeta.quantity
+                                              const nextPieces = Math.max(0, Math.round((currentPieces - 1) * 1000) / 1000)
+                                              const nextServings = Math.max(
+                                                0,
+                                                Math.round((nextPieces / servingUnitMeta.quantity) * 10000) / 10000,
+                                              )
+                                              updateItemField(index, 'servings', nextServings)
+                                            }}
+                                            className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-medium transition-colors"
+                                          >
+                                            -
+                                          </button>
+                                          <div className="px-2 py-1 border border-gray-300 rounded-lg text-base font-semibold text-gray-900 min-w-[48px] text-center">
+                                            {formatNumberInputValue((analyzedItems[index]?.servings || 1) * servingUnitMeta.quantity)}
+                                          </div>
+                                          <button
+                                            onClick={() => {
+                                              const currentServings = analyzedItems[index]?.servings || 1
+                                              const currentPieces = currentServings * servingUnitMeta.quantity
+                                              const nextPieces = Math.max(0, Math.round((currentPieces + 1) * 1000) / 1000)
+                                              const nextServings = Math.max(
+                                                0,
+                                                Math.round((nextPieces / servingUnitMeta.quantity) * 10000) / 10000,
+                                              )
+                                              updateItemField(index, 'servings', nextServings)
+                                            }}
+                                            className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-medium transition-colors"
+                                          >
+                                            +
+                                          </button>
+                                        </div>
+                                      </div>
+                                    )}
                                     {gramsPerServing && (
                                       <div className="text-xs text-gray-500">
                                         Total amount ≈ {Math.round(gramsPerServing * servingsCount)} g
