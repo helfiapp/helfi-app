@@ -638,7 +638,7 @@ CRITICAL FOR MEALS WITH MULTIPLE COMPONENTS:
 - For mixed dishes (salads, soups, stews), break down the main ingredients and sum them
 
 COMMON MEAL PATTERNS TO RECOGNIZE (DO NOT MISS):
-- Burgers/wraps/sandwiches/tacos: bun/wrap + protein + cheese + sauces + salad/veg. If a burger, COUNT visible patties, COUNT cheese slices, COUNT bacon rashers, and include lettuce/tomato/onion/pickles and sauces if visible. Do not downscale calories for a multi-patty burger.
+- Burgers/wraps/sandwiches/tacos: bun/wrap + protein + cheese + sauces + salad/veg
 - Bowls/salads: base (rice/greens) + protein + toppings + dressing/sauce
 - Plates: protein + starch (rice/pasta/potato/bread) + vegetables + sauces
 - Pizzas/flatbreads: base + cheese + toppings (count visible slices as portion)
@@ -665,7 +665,6 @@ CRITICAL STRUCTURED OUTPUT RULES:
 - Use household measures and add ounce equivalents in parentheses where appropriate (e.g., "1 cup (8 oz)").
 - For discrete items like bacon or bread slices, count visible slices and use that count for servings.
 - **CRITICAL: Use REALISTIC nutrition values based on standard food databases (USDA, nutrition labels, etc.). Do NOT underestimate calories or macros.**
-- **COUNT COMPONENTS:** If multiple patties/cheese/bacon are visible, set servings to that count and scale macros accordingly. Do not collapse a double/triple burger into a single-patty estimate.
 
 REALISTIC NUTRITION REFERENCE VALUES (use these as guidance for accurate analysis):
 
