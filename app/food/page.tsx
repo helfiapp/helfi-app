@@ -662,29 +662,6 @@ const getPiecesPerServing = (item: any): number | null => {
   return null
 }
 
-// Get base weight per 1 serving in the item's current weightUnit (defaults to grams)
-const getBaseWeightPerServing = (item: any): number | null => {
-  const info = parseServingSizeInfo(item)
-  const unit = item?.weightUnit === 'ml' ? 'ml' : item?.weightUnit === 'oz' ? 'oz' : 'g'
-  if (unit === 'ml') {
-    if (Number.isFinite(item?.customMlPerServing)) return Number(item.customMlPerServing)
-    if (info.mlPerServing && info.mlPerServing > 0) return info.mlPerServing
-    if (info.gramsPerServing && info.gramsPerServing > 0) return info.gramsPerServing // assume ~1g/mL fallback
-  } else {
-    if (Number.isFinite(item?.customGramsPerServing)) return Number(item.customGramsPerServing)
-    if (info.gramsPerServing && info.gramsPerServing > 0) return info.gramsPerServing
-    if (unit === 'oz' && info.mlPerServing && info.mlPerServing > 0) return info.mlPerServing / 28.3495
-  }
-  // Fallback: infer from current weightAmount and servings if present
-  const servings = Number.isFinite(Number(item?.servings)) ? Number(item.servings) : null
-  const weightAmount = Number.isFinite(Number(item?.weightAmount)) ? Number(item.weightAmount) : null
-  if (servings && servings > 0 && weightAmount && weightAmount > 0) {
-    const per = weightAmount / servings
-    if (per > 0) return per
-  }
-  return null
-}
-
 const isVolumeBasedUnitLabel = (label: string) => {
   const l = (label || '').toLowerCase().trim()
   if (!l) return false
@@ -3217,6 +3194,29 @@ const applyStructuredItems = (
       mlPerServing: mlPerServing && mlPerServing > 0 ? mlPerServing : null,
       ozPerServing: ozPerServing && ozPerServing > 0 ? ozPerServing : null,
     }
+  }
+
+  // Get base weight per 1 serving in the item's current weightUnit (defaults to grams)
+  const getBaseWeightPerServing = (item: any): number | null => {
+    const info = parseServingSizeInfo(item)
+    const unit = item?.weightUnit === 'ml' ? 'ml' : item?.weightUnit === 'oz' ? 'oz' : 'g'
+    if (unit === 'ml') {
+      if (Number.isFinite(item?.customMlPerServing)) return Number(item.customMlPerServing)
+      if (info.mlPerServing && info.mlPerServing > 0) return info.mlPerServing
+      if (info.gramsPerServing && info.gramsPerServing > 0) return info.gramsPerServing // assume ~1g/mL fallback
+    } else {
+      if (Number.isFinite(item?.customGramsPerServing)) return Number(item.customGramsPerServing)
+      if (info.gramsPerServing && info.gramsPerServing > 0) return info.gramsPerServing
+      if (unit === 'oz' && info.mlPerServing && info.mlPerServing > 0) return info.mlPerServing / 28.3495
+    }
+    // Fallback: infer from current weightAmount and servings if present
+    const servings = Number.isFinite(Number(item?.servings)) ? Number(item.servings) : null
+    const weightAmount = Number.isFinite(Number(item?.weightAmount)) ? Number(item.weightAmount) : null
+    if (servings && servings > 0 && weightAmount && weightAmount > 0) {
+      const per = weightAmount / servings
+      if (per > 0) return per
+    }
+    return null
   }
 
   // Estimate grams per serving when no explicit weight/volume is available.
