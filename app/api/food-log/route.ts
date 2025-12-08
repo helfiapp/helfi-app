@@ -271,6 +271,26 @@ export async function GET(request: NextRequest) {
         }))
       );
     }
+
+    // Auto-heal: if an entry matches this requested date by createdAt but its stored localDate differs,
+    // correct the localDate so it stops leaking across adjacent days in future queries.
+    try {
+      const mismatchIds = uniqueLogs
+        .filter((l) => l.localDate !== validatedDateStr)
+        .map((l) => l.id as string);
+      if (mismatchIds.length > 0) {
+        prisma.foodLog
+          .updateMany({
+            where: { id: { in: mismatchIds } },
+            data: { localDate: validatedDateStr },
+          })
+          .catch((err) =>
+            console.warn('⚠️ GET /api/food-log - Failed to auto-heal localDate for ids', mismatchIds, err),
+          );
+      }
+    } catch (healErr) {
+      console.warn('⚠️ GET /api/food-log - Auto-heal localDate guard failed', healErr);
+    }
     
     console.log(`✅ GET /api/food-log - Success: Returning ${uniqueLogs.length} entries for date ${validatedDateStr}`);
     return NextResponse.json({ success: true, logs: uniqueLogs })
