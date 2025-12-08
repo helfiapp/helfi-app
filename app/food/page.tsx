@@ -661,6 +661,15 @@ const DISCRETE_SERVING_RULES = [
 
 const normalizeDiscreteServingsWithLabel = (items: any[]) => {
   if (!Array.isArray(items)) return []
+  const stripLeadingCount = (label: string) => {
+    const numberWords = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'double', 'triple']
+    if (/^\s*\d+(\.\d+)?\s+/i.test(label)) return label.replace(/^\s*\d+(\.\d+)?\s+/i, '').trim()
+    for (const word of numberWords) {
+      const re = new RegExp(`^\\s*${word}\\s+`, 'i')
+      if (re.test(label)) return label.replace(re, '').trim()
+    }
+    return label.trim()
+  }
   return items.map((item) => {
     const next = { ...item }
     const labelSource = `${item?.name || ''} ${item?.serving_size || ''}`.toLowerCase()
@@ -706,6 +715,9 @@ const normalizeDiscreteServingsWithLabel = (items: any[]) => {
       // Keep servings at 1 to avoid “3 servings of 3 eggs” confusion; macros now
       // represent the whole labeled portion.
       next.servings = Number.isFinite(currentServings) ? currentServings : 1
+      if (typeof next.name === 'string' && next.name) {
+        next.name = stripLeadingCount(next.name)
+      }
     }
 
     return next
