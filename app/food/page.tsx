@@ -667,6 +667,19 @@ const getPiecesPerServing = (item: any): number | null => {
   return null
 }
 
+// Fallback estimated grams per single serving when no weight info exists
+const defaultGramsForItem = (item: any): number | null => {
+  const name = String(item?.name || '').toLowerCase()
+  if (!name) return null
+  if (name.includes('patty')) return 115 // ~4 oz patty
+  if (name.includes('bacon')) return 15 // one slice cooked
+  if (name.includes('cheese')) return 25 // one slice
+  if (name.includes('tomato')) return 50 // a couple slices
+  if (name.includes('lettuce')) return 10
+  if (name.includes('bun')) return 75
+  return null
+}
+
 const isVolumeBasedUnitLabel = (label: string) => {
   const l = (label || '').toLowerCase().trim()
   if (!l) return false
@@ -1865,15 +1878,14 @@ const applyStructuredItems = (
       const clamped = clampNumber(value, 0, 20)
       const rounded = Math.round(clamped * 100) / 100
       itemsCopy[index].servings = rounded
-    // Keep weight in sync if we know per-serving weight
-    const baseWeight = getBaseWeightPerServing(itemsCopy[index])
-    if (baseWeight && baseWeight > 0) {
-      const unit = itemsCopy[index]?.weightUnit === 'ml' ? 'ml' : itemsCopy[index]?.weightUnit === 'oz' ? 'oz' : 'g'
-      const multiplier = unit === 'oz' ? 1 : 1 // baseWeight already in chosen unit from helper
-      const computed = baseWeight * rounded * multiplier
-      const precision = unit === 'oz' ? 100 : 1000
-      itemsCopy[index].weightAmount = Math.round(computed * precision) / precision
-    }
+      // Keep weight in sync if we know per-serving weight
+      const baseWeight = getBaseWeightPerServing(itemsCopy[index])
+      if (baseWeight && baseWeight > 0) {
+        const unit = itemsCopy[index]?.weightUnit === 'ml' ? 'ml' : itemsCopy[index]?.weightUnit === 'oz' ? 'oz' : 'g'
+        const computed = baseWeight * rounded
+        const precision = unit === 'oz' ? 100 : 1000
+        itemsCopy[index].weightAmount = Math.round(computed * precision) / precision
+      }
     } else if (field === 'portionMode') {
       itemsCopy[index].portionMode = value === 'weight' ? 'weight' : 'servings'
       if (itemsCopy[index].portionMode === 'weight') {
@@ -3212,20 +3224,24 @@ const applyStructuredItems = (
     const info = parseServingSizeInfo(item)
     const unit = item?.weightUnit === 'ml' ? 'ml' : item?.weightUnit === 'oz' ? 'oz' : 'g'
     const estimatedGrams = estimateGramsPerServing(item)
+    const fallbackDefault = defaultGramsForItem(item)
     if (unit === 'ml') {
       if (Number.isFinite(item?.customMlPerServing)) return Number(item.customMlPerServing)
       if (info.mlPerServing && info.mlPerServing > 0) return info.mlPerServing
       if (info.gramsPerServing && info.gramsPerServing > 0) return info.gramsPerServing // assume ~1g/mL fallback
+      if (fallbackDefault && fallbackDefault > 0) return fallbackDefault
       if (estimatedGrams && estimatedGrams > 0) return estimatedGrams
     } else if (unit === 'oz') {
       if (Number.isFinite(item?.customGramsPerServing)) return Number(item.customGramsPerServing) / 28.3495
       if (info.gramsPerServing && info.gramsPerServing > 0) return info.gramsPerServing / 28.3495
       if (info.mlPerServing && info.mlPerServing > 0) return info.mlPerServing / 28.3495
+      if (fallbackDefault && fallbackDefault > 0) return fallbackDefault / 28.3495
       if (estimatedGrams && estimatedGrams > 0) return estimatedGrams / 28.3495
     } else {
       // grams
       if (Number.isFinite(item?.customGramsPerServing)) return Number(item.customGramsPerServing)
       if (info.gramsPerServing && info.gramsPerServing > 0) return info.gramsPerServing
+      if (fallbackDefault && fallbackDefault > 0) return fallbackDefault
       if (info.mlPerServing && info.mlPerServing > 0) return info.mlPerServing // assume ~1g/mL fallback
       if (estimatedGrams && estimatedGrams > 0) return estimatedGrams
     }
