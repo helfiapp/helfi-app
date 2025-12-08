@@ -412,6 +412,55 @@ The green “+” buttons for each Food Diary category (Breakfast, Lunch, Dinner
   - In `app/food/page.tsx`, after deleting an entry, continue posting the updated (or empty) `todaysFoods` to `/api/user-data` (or call the clear endpoint when empty). Do **not** remove this server-sync step.
   - Do not reintroduce local-only deletes that skip the server snapshot; fixes were for entries resurrecting after refresh.
 
+#### 3.7.1 Persistent/Sticky Entry Playbook (Dec 2025 incident)
+- Root cause observed: entries saved with mismatched `localDate` vs `createdAt` leak across adjacent days; client warm cache can keep showing the card even after server delete.
+- Protections in place (do not remove):
+  - Saves anchor both `createdAt` and `localDate` to the selected date.
+  - GET `/api/food-log` auto-heals: if `createdAt` matches the requested day but `localDate` differs, it rewrites `localDate` to the correct day.
+  - Delete sweep: tries ID first, then description+category across multiple dates (entry date, localDate, selected date, today, ±1, ±2) with a deduped list.
+- If a “stuck” entry appears:
+  1) Run a server-signed delete using the browser console (logged-in session):
+     - Fetch matching rows and delete by id, then run description delete across the affected dates. Example:
+       ```js
+       (async () => {
+         const desc = 'A burger with a sesame seed bun, two beef patties, cheese, bacon, lettuce, tomato, and mayonnaise.';
+         const category = 'dinner';
+         const dates = ['2025-12-06','2025-12-07','2025-12-08']; // adjust as needed
+         const tz = new Date().getTimezoneOffset();
+         const all = [];
+         for (const date of dates) {
+           const res = await fetch(`/api/food-log?date=${date}&tz=${tz}`);
+           const json = await res.json();
+           (json.logs || []).forEach(l => all.push({date, id: l.id, localDate: l.localDate, createdAt: l.createdAt, meal: l.meal || l.category, desc: l.description?.slice(0,120)}));
+         }
+         const matches = all.filter(l => (l.desc || '').toLowerCase().includes('burger with a sesame seed bun') && (l.meal || '').toLowerCase() === category);
+         console.log('Matches found:', matches);
+         for (const m of matches) {
+           const r = await fetch('/api/food-log/delete', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ id: m.id }) });
+           console.log('delete by id', m.id, m.date, r.status, await r.text());
+         }
+         const sweep = await fetch('/api/food-log/delete-by-description', {
+           method: 'POST',
+           headers: { 'Content-Type': 'application/json' },
+           body: JSON.stringify({ description: desc, category, dates }),
+         });
+         console.log('delete-by-description', sweep.status, await sweep.text());
+         for (const date of dates) {
+           const res = await fetch(`/api/food-log?date=${date}&tz=${tz}`);
+           const json = await res.json();
+           console.log('After delete check', date, (json.logs || []).length, json.logs || []);
+         }
+       })();
+       ```
+  2) Clear client warm/durable cache and reload to drop stale cards:
+     ```js
+     localStorage.removeItem('foodDiary:warmState');
+     sessionStorage.removeItem('foodDiary:warmState');
+     location.reload();
+     ```
+  3) Re-check the affected dates (same script as above) and confirm zero rows.
+- Do not weaken any of the protections above (anchored saves, auto-heal, multi-date delete sweep, cache clear + reload).
+
 ### 3.8 Ingredient Card Summary Filtering (Dec 2025 – Locked)
 - In `app/food/page.tsx`, keep the guard that strips generic “plate/meal” summary items when multiple ingredients exist (e.g., “The image shows…”, long “burger with …” phrases). Do not remove or relax this filter without approval.
 - Ingredient cards for multi-item meals must remain one per distinct ingredient; do not reintroduce plate-level summary cards into the list.
