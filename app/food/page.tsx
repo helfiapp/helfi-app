@@ -4996,6 +4996,18 @@ Please add nutritional information manually if needed.`);
     const entryId = entry.id
     const entryKey = entryId !== null && entryId !== undefined ? entryId.toString() : ''
     const descKey = `desc:${entryCategory}|${normalizedDescription(entry?.description || entry?.name || '')}`
+    const autoDates = Array.from(
+      new Set(
+        [
+          dateKeyForEntry(entry),
+          entry?.localDate,
+          selectedDate,
+          todayIso,
+        ]
+          .filter(Boolean)
+          .map(String),
+      ),
+    )
 
     const updatedFoods = todaysFoods.filter((food: any) => {
       const sameId =
@@ -5081,9 +5093,8 @@ Please add nutritional information manually if needed.`);
       if (!deleted) {
         try {
           const tz = new Date().getTimezoneOffset()
-          const targetDate = dateKeyForEntry(entry) || entry.localDate || selectedDate
-          if (targetDate) sweepDates.push(targetDate)
-          const base = targetDate ? new Date(targetDate) : new Date()
+          autoDates.forEach((d) => sweepDates.push(d))
+          const base = autoDates[0] ? new Date(autoDates[0]) : new Date()
           ;[1, -1, 2, -2].forEach((delta) => {
             const d = new Date(base)
             d.setDate(d.getDate() + delta)
@@ -5124,7 +5135,7 @@ Please add nutritional information manually if needed.`);
           const payload = {
             description: normalizedDescription(entry?.description || entry?.name || ''),
             category: entryCategory,
-            dates: sweepDates,
+            dates: Array.from(new Set(sweepDates)).slice(0, 12),
           }
           const res = await fetch('/api/food-log/delete-by-description', {
             method: 'POST',
