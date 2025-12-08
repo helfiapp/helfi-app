@@ -1690,6 +1690,8 @@ const applyStructuredItems = (
       const n = name.trim().toLowerCase()
       if (!n) return false
       if (n.startsWith('the image shows')) return true
+      if (n.startsWith('this image shows')) return true
+      if (n.includes('image shows')) return true
       if (analysisTrimmed && n === analysisTrimmed) return true
       const summaryKeywords = ['plate', 'platter', 'dish', 'bowl', 'meal']
       const hasSummaryKeyword = summaryKeywords.some((k) => n.includes(k))
