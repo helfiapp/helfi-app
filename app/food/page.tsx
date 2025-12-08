@@ -657,18 +657,6 @@ const DISCRETE_SERVING_RULES = [
     caloriesPerUnitFloor: 35,
     proteinPerUnitFloor: 2,
   },
-  {
-    key: 'patty',
-    keywords: ['patty', 'patties', 'beef patty', 'beef patties'],
-    caloriesPerUnitFloor: 180,
-    proteinPerUnitFloor: 15,
-  },
-  {
-    key: 'cheese',
-    keywords: ['cheese slice', 'cheese slices', 'slice of cheese', 'slices of cheese'],
-    caloriesPerUnitFloor: 80,
-    proteinPerUnitFloor: 5,
-  },
 ]
 
 const normalizeDiscreteServingsWithLabel = (items: any[]) => {
@@ -724,8 +712,9 @@ const normalizeDiscreteServingsWithLabel = (items: any[]) => {
           next[f] = (Number(v) || 0) * qty
         }
       })
-      // Set servings to the counted quantity so UI matches the item label.
-      next.servings = qty
+      // Keep servings at 1 to avoid “3 servings of 3 eggs” confusion; macros now
+      // represent the whole labeled portion.
+      next.servings = Number.isFinite(currentServings) ? currentServings : 1
       if (typeof next.name === 'string' && next.name) {
         next.name = stripLeadingCount(next.name)
       }
