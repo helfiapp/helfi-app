@@ -690,6 +690,10 @@ const normalizeDiscreteServingsWithLabel = (items: any[]) => {
     const rule = DISCRETE_SERVING_RULES.find((r) =>
       r.keywords.some((kw) => labelSource.includes(kw)),
     )
+    const rule = DISCRETE_SERVING_RULES.find((r) =>
+      r.keywords.some((kw) => labelSource.includes(kw)),
+    )
+
     const meta = parseServingUnitMetadata(item?.serving_size || item?.name || '')
     const qty = meta?.quantity
     const unitLabel = meta?.unitLabel || meta?.unitLabelSingular || ''
