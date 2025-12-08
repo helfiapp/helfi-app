@@ -3925,18 +3925,25 @@ Please add nutritional information manually if needed.`);
     const rect = row.getBoundingClientRect()
     const viewportHeight = window.innerHeight || 0
     const viewportWidth = window.innerWidth || 0
-    const maxHeight = Math.max(300, Math.min(480, viewportHeight - 40))
-    let top = rect.bottom + 8
-    const overflowBottom = top + maxHeight - (viewportHeight - 12)
-    if (overflowBottom > 0) {
-      top = Math.max(12, top - overflowBottom)
-      // If still too low and there's room above, anchor above the button
-      if (top < 12 && rect.top - 8 - maxHeight > 12) {
-        top = rect.top - 8 - maxHeight
+
+    // Keep the menu anchored just above the "+" button so the button stays visible to toggle off.
+    const maxHeight = Math.max(300, Math.min(420, viewportHeight - 40))
+    const width = Math.min(rect.width, 360)
+    const left = Math.max(
+      12,
+      Math.min(rect.left + rect.width / 2 - width / 2, viewportWidth - width - 12),
+    )
+
+    // Prefer above; if not enough space, place below without covering the button.
+    let top = rect.top - 8 - maxHeight
+    if (top < 12) {
+      top = rect.bottom + 8
+      const overflowBottom = top + maxHeight - (viewportHeight - 12)
+      if (overflowBottom > 0) {
+        top = Math.max(12, top - overflowBottom)
       }
     }
-    const width = Math.min(rect.width, viewportWidth - 24)
-    const left = Math.max(12, Math.min(rect.left, viewportWidth - width - 12))
+
     setPhotoOptionsPosition({ top, left, width, maxHeight })
   }
 
