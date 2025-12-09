@@ -30,7 +30,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useUserData } from '@/components/providers/UserDataProvider'
-import { FoodDiaryNav, FoodDiaryTab, FoodNavMode } from '@/components/food/FoodDiaryNav'
+import MobileMoreMenu from '@/components/MobileMoreMenu'
 import UsageMeter from '@/components/UsageMeter'
 import FeatureUsageDisplay from '@/components/FeatureUsageDisplay'
 import CreditPurchaseModal from '@/components/CreditPurchaseModal'
@@ -715,29 +715,6 @@ const quickParseServingSize = (servingSize: string | null | undefined) => {
   }
 }
 
-// Full serving size parser used throughout the diary; colocated near quick parser to avoid TDZ issues
-const parseServingSizeInfo = (item: any) => {
-  const raw = (item?.serving_size && String(item.serving_size)) || ''
-  const gramsMatch = raw.match(/(\d+(?:\.\d+)?)\s*g\b/i)
-  const mlMatch = raw.match(/(\d+(?:\.\d+)?)\s*ml\b/i)
-  const ozMatch = raw.match(/(\d+(?:\.\d+)?)\s*(oz|ounce|ounces)\b/i)
-  const gramsPerServing = gramsMatch ? parseFloat(gramsMatch[1]) : null
-  const mlPerServing = mlMatch ? parseFloat(mlMatch[1]) : null
-  const ozPerServing = ozMatch ? parseFloat(ozMatch[1]) : null
-  const gramsFromOz = ozPerServing ? ozPerServing * 28.3495 : null
-  return {
-    label: raw,
-    gramsPerServing:
-      gramsPerServing && gramsPerServing > 0
-        ? gramsPerServing
-        : gramsFromOz && gramsFromOz > 0
-        ? gramsFromOz
-        : null,
-    mlPerServing: mlPerServing && mlPerServing > 0 ? mlPerServing : null,
-    ozPerServing: ozPerServing && ozPerServing > 0 ? ozPerServing : null,
-  }
-}
-
 const normalizeDiscreteItem = (item: any) => {
   const normalizedName = replaceWordNumbers(String(item?.name || ''))
   const normalizedServingSize = replaceWordNumbers(String(item?.serving_size || ''))
@@ -1353,7 +1330,6 @@ export default function FoodDiary() {
   const selectPhotoInputRef = useRef<HTMLInputElement | null>(null)
   const summaryCarouselRef = useRef<HTMLDivElement | null>(null)
   const pageTopRef = useRef<HTMLDivElement | null>(null)
-  const energySummaryRef = useRef<HTMLDivElement | null>(null)
 
   const [foodImagesLoading, setFoodImagesLoading] = useState<{[key: string]: boolean}>({})
   const [expandedEntries, setExpandedEntries] = useState<{[key: string]: boolean}>({})
@@ -1421,8 +1397,6 @@ export default function FoodDiary() {
   const [hasPaidAccess, setHasPaidAccess] = useState<boolean>(false)
   const [energyUnit, setEnergyUnit] = useState<'kcal' | 'kJ'>('kcal')
   const [volumeUnit, setVolumeUnit] = useState<'oz' | 'ml'>('oz')
-  const [foodNavMode, setFoodNavMode] = useState<FoodNavMode>('food')
-  const [activeFoodTab, setActiveFoodTab] = useState<FoodDiaryTab>('diary')
   const [macroPopup, setMacroPopup] = useState<{
     title: string
     energyLabel?: string
@@ -3300,6 +3274,28 @@ const applyStructuredItems = (
     }
   }
 
+  const parseServingSizeInfo = (item: any) => {
+    const raw = (item?.serving_size && String(item.serving_size)) || ''
+    const gramsMatch = raw.match(/(\d+(?:\.\d+)?)\s*g\b/i)
+    const mlMatch = raw.match(/(\d+(?:\.\d+)?)\s*ml\b/i)
+    const ozMatch = raw.match(/(\d+(?:\.\d+)?)\s*(oz|ounce|ounces)\b/i)
+    const gramsPerServing = gramsMatch ? parseFloat(gramsMatch[1]) : null
+    const mlPerServing = mlMatch ? parseFloat(mlMatch[1]) : null
+    const ozPerServing = ozMatch ? parseFloat(ozMatch[1]) : null
+    const gramsFromOz = ozPerServing ? ozPerServing * 28.3495 : null
+    return {
+      label: raw,
+      gramsPerServing:
+        gramsPerServing && gramsPerServing > 0
+          ? gramsPerServing
+          : gramsFromOz && gramsFromOz > 0
+          ? gramsFromOz
+          : null,
+      mlPerServing: mlPerServing && mlPerServing > 0 ? mlPerServing : null,
+      ozPerServing: ozPerServing && ozPerServing > 0 ? ozPerServing : null,
+    }
+  }
+
   // Get base weight per 1 serving in the item's current weightUnit (defaults to grams)
   const getBaseWeightPerServing = (item: any): number | null => {
     const info = parseServingSizeInfo(item)
@@ -4082,34 +4078,6 @@ Please add nutritional information manually if needed.`);
   const showQuickToast = (message: string) => {
     setQuickToast(message)
     setTimeout(() => setQuickToast(null), 1400)
-  }
-
-  const scrollToDiaryTop = (behavior: ScrollBehavior = 'smooth') => {
-    if (pageTopRef.current) {
-      pageTopRef.current.scrollIntoView({ behavior, block: 'start' })
-      return
-    }
-    if (typeof window !== 'undefined') {
-      window.scrollTo({ top: 0, behavior })
-    }
-  }
-
-  const scrollToEnergySummary = () => {
-    if (energySummaryRef.current) {
-      energySummaryRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      return
-    }
-    scrollToDiaryTop('smooth')
-  }
-
-  const handleSelectFoodTab = (tab: FoodDiaryTab) => {
-    setActiveFoodTab(tab)
-    if (tab === 'diary') {
-      scrollToDiaryTop('smooth')
-      setFoodNavMode('food')
-    } else if (tab === 'favourites') {
-      showQuickToast('Favourites view is coming soon')
-    }
   }
 
   const showCameraSettingsHelp = () => {
@@ -5713,18 +5681,6 @@ Please add nutritional information manually if needed.`);
         </div>
       </nav>
       
-      {/* Food Diary nav (desktop) */}
-      <div className="hidden md:block bg-white border-b border-gray-200 px-4 py-2">
-        <div className="max-w-7xl mx-auto">
-          <FoodDiaryNav
-            mode="food"
-            activeFoodTab={activeFoodTab}
-            onSelectFoodTab={handleSelectFoodTab}
-            variant="desktop"
-          />
-        </div>
-      </div>
-
       {/* Date selector */}
       <div className="bg-white border-b border-gray-200 px-4 py-4">
         <div className="max-w-7xl mx-auto">
@@ -7734,7 +7690,7 @@ Please add nutritional information manually if needed.`);
         <div className="overflow-visible space-y-6">
           {/* Daily Totals Row - only show on main diary view, not while editing an entry */}
           {!editingEntry && dedupeEntries(isViewingToday ? todaysFoods : (historyFoods || []), { fallbackDate: selectedDate }).length > 0 && (
-            <div ref={energySummaryRef} className="mb-4">
+            <div className="mb-4">
               {(() => {
                 const source = dedupeEntries(isViewingToday ? todaysFoods : (historyFoods || []), { fallbackDate: selectedDate })
 
@@ -9166,16 +9122,45 @@ Please add nutritional information manually if needed.`);
         creditInfo={creditInfo}
       />
 
-      {/* Mobile Bottom Navigation - Food/App modes */}
+      {/* Mobile Bottom Navigation - with pressed, ripple and active states */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-2 z-40">
-        <FoodDiaryNav
-          mode={foodNavMode}
-          activeFoodTab={activeFoodTab}
-          onSelectFoodTab={handleSelectFoodTab}
-          onModeChange={setFoodNavMode}
-          showModeToggle
-          variant="mobile"
-        />
+        <div className="flex items-center justify-around">
+          <Link href="/dashboard" className="pressable ripple flex flex-col items-center py-2 px-1 min-w-0 flex-1" onClick={() => { try { const reduced = window.matchMedia('(prefers-reduced-motion: reduce)')?.matches; const pref = localStorage.getItem('hapticsEnabled'); const enabled = pref === null ? true : pref === 'true'; if (enabled && !reduced && 'vibrate' in navigator) navigator.vibrate(10) } catch {} }}>
+            <div className={`icon ${pathname === '/dashboard' ? 'text-helfi-green' : 'text-gray-400'}`}>
+              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/>
+              </svg>
+            </div>
+            <span className={`label text-xs mt-1 truncate ${pathname === '/dashboard' ? 'text-helfi-green font-bold' : 'text-gray-400 font-medium'}`}>Dashboard</span>
+          </Link>
+
+          <Link href="/insights" className="pressable ripple flex flex-col items-center py-2 px-1 min-w-0 flex-1" onClick={() => { try { const reduced = window.matchMedia('(prefers-reduced-motion: reduce)')?.matches; const pref = localStorage.getItem('hapticsEnabled'); const enabled = pref === null ? true : pref === 'true'; if (enabled && !reduced && 'vibrate' in navigator) navigator.vibrate(10) } catch {} }}>
+            <div className={`icon ${pathname === '/insights' ? 'text-helfi-green' : 'text-gray-400'}`}>
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+              </svg>
+            </div>
+            <span className={`label text-xs mt-1 truncate ${pathname === '/insights' ? 'text-helfi-green font-bold' : 'text-gray-400 font-medium'}`}>Insights</span>
+          </Link>
+
+          <Link href="/food" className="pressable ripple flex flex-col items-center py-2 px-1 min-w-0 flex-1" onClick={() => { try { const reduced = window.matchMedia('(prefers-reduced-motion: reduce)')?.matches; const pref = localStorage.getItem('hapticsEnabled'); const enabled = pref === null ? true : pref === 'true'; if (enabled && !reduced && 'vibrate' in navigator) navigator.vibrate(10) } catch {} }}>
+            <div className={`icon ${pathname === '/food' ? 'text-helfi-green' : 'text-gray-400'}`}>
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              </svg>
+            </div>
+            <span className={`label text-xs mt-1 truncate ${pathname === '/food' ? 'text-helfi-green font-bold' : 'text-gray-400 font-medium'}`}>Food</span>
+          </Link>
+
+          <MobileMoreMenu />
+
+          <Link href="/settings" className="pressable ripple flex flex-col items-center py-2 px-1 min-w-0 flex-1" onClick={() => { try { const reduced = window.matchMedia('(prefers-reduced-motion: reduce)')?.matches; const pref = localStorage.getItem('hapticsEnabled'); const enabled = pref === null ? true : pref === 'true'; if (enabled && !reduced && 'vibrate' in navigator) navigator.vibrate(10) } catch {} }}>
+            <div className={`icon ${pathname === '/settings' ? 'text-helfi-green' : 'text-gray-400'}`}>
+              <Cog6ToothIcon className="w-6 h-6 flex-shrink-0" style={{ minWidth: '24px', minHeight: '24px' }} />
+            </div>
+            <span className={`label text-xs mt-1 truncate ${pathname === '/settings' ? 'text-helfi-green font-bold' : 'text-gray-400 font-medium'}`}>Settings</span>
+          </Link>
+        </div>
       </nav>
       </div>
     </div>
