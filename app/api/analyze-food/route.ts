@@ -93,6 +93,36 @@ const computeTotalsFromItems = (items: any[]): any | null => {
   };
 };
 
+// Quick sanity checks for structured items
+const summarizeItemsForLog = (items: any[]) =>
+  Array.isArray(items)
+    ? items.slice(0, 6).map((it) => ({
+        name: it?.name,
+        calories: it?.calories,
+        protein_g: it?.protein_g,
+        carbs_g: it?.carbs_g,
+        fat_g: it?.fat_g,
+        isGuess: it?.isGuess === true,
+      }))
+    : [];
+
+const isRealisticItem = (item: any): boolean => {
+  const cal = Number(item?.calories ?? 0);
+  const protein = Number(item?.protein_g ?? 0);
+  const fat = Number(item?.fat_g ?? 0);
+  const carbs = Number(item?.carbs_g ?? 0);
+  const hasAnyMacro = Number.isFinite(protein) && protein > 0.2 || Number.isFinite(fat) && fat > 0.2 || Number.isFinite(carbs) && carbs > 0.2;
+  const caloriesReasonable = Number.isFinite(cal) && cal > 5 && cal < 2000;
+  return caloriesReasonable && hasAnyMacro;
+};
+
+const validateStructuredItems = (items: any[]): boolean => {
+  if (!Array.isArray(items) || items.length === 0) return false;
+  const realisticCount = items.filter(isRealisticItem).length;
+  // Accept single realistic item (single-food meal) or multi-item meals with at least two realistic items
+  return realisticCount >= 1;
+};
+
 // Normalize isGuess flag across items
 const normalizeGuessFlags = (items: any[]): any[] =>
   Array.isArray(items)
@@ -190,6 +220,66 @@ const enrichPackagedItemsWithFatSecret = async (items: any[]): Promise<{ items: 
   return {
     items: enriched,
     total: changed ? computeTotalsFromItems(enriched) : null,
+  };
+};
+
+// Lightweight enrichment for struggling items using FatSecret without overriding decent AI values.
+// Only runs when calories are missing/zero OR all macros are missing/zero.
+const enrichItemsWithFatSecretIfMissing = async (items: any[]): Promise<{ items: any[]; total: any | null; changed: boolean }> => {
+  if (!Array.isArray(items) || items.length === 0) {
+    return { items, total: null, changed: false };
+  }
+
+  const enriched: any[] = [];
+  let changed = false;
+
+  for (const item of items) {
+    const next = { ...item };
+    const query = [item.brand, item.name].filter(Boolean).join(' ').trim();
+    const calories = Number(item?.calories ?? 0);
+    const protein = Number(item?.protein_g ?? 0);
+    const carbs = Number(item?.carbs_g ?? 0);
+    const fat = Number(item?.fat_g ?? 0);
+    const macrosMissing =
+      (!Number.isFinite(calories) || calories === 0) &&
+      (!Number.isFinite(protein) || protein === 0) &&
+      (!Number.isFinite(carbs) || carbs === 0) &&
+      (!Number.isFinite(fat) || fat === 0);
+    const caloriesMissingOrZero = !Number.isFinite(calories) || calories === 0;
+
+    // Only attempt enrichment when we truly lack data
+    if (!query || (!macrosMissing && !caloriesMissingOrZero)) {
+      enriched.push(next);
+      continue;
+    }
+
+    try {
+      const fsResults = await searchFatSecretFoods(query, { pageSize: 1 });
+      const candidate = fsResults?.[0];
+      if (candidate) {
+        const maybe = (key: keyof typeof candidate, fallback: any) =>
+          candidate[key] !== null && candidate[key] !== undefined ? candidate[key] : fallback;
+
+        if (caloriesMissingOrZero) next.calories = maybe('calories', next.calories);
+        if (!Number.isFinite(protein) || protein === 0) next.protein_g = maybe('protein_g', next.protein_g);
+        if (!Number.isFinite(carbs) || carbs === 0) next.carbs_g = maybe('carbs_g', next.carbs_g);
+        if (!Number.isFinite(fat) || fat === 0) next.fat_g = maybe('fat_g', next.fat_g);
+        if (!next.serving_size && candidate.serving_size) next.serving_size = candidate.serving_size;
+
+        // Do not override non-zero values; only fill missing/zero
+        changed = true;
+      }
+    } catch (err) {
+      console.warn('FatSecret enrichment (missing macros) failed (non-fatal)', err);
+    }
+
+    enriched.push(next);
+  }
+
+  return {
+    items: enriched,
+    total: changed ? computeTotalsFromItems(enriched) : null,
+    changed,
   };
 };
 
@@ -929,6 +1019,7 @@ CRITICAL FOR MEALS WITH MULTIPLE COMPONENTS:
 - **Include breads/rolls/bagels/plate-side carbs when any part is visible; use isGuess: true if uncertain.**
 - **For burgers specifically: ALWAYS include bun, patties (count them!), cheese, bacon (if visible), lettuce, tomato, and sauces/condiments as separate items**
 - If unsure about a component, estimate conservatively but include it in your totals - the user can easily delete guessed items
+- **Never omit a plausible ingredient just because macros are uncertain — include the card and flag it with isGuess: true.**
 - For mixed dishes (salads, soups, stews), break down the main ingredients and sum them
 
 COMMON MEAL PATTERNS TO RECOGNIZE (DO NOT MISS - BE COMPREHENSIVE):
@@ -960,6 +1051,7 @@ CRITICAL STRUCTURED OUTPUT RULES:
 - Use household measures and add ounce equivalents in parentheses where appropriate (e.g., "1 cup (8 oz)").
 - For discrete items like bacon or bread slices, count visible slices and use that count for servings.
 - **CRITICAL: Use REALISTIC nutrition values based on standard food databases (USDA, nutrition labels, etc.). Do NOT underestimate calories or macros.**
+- **Self-check before finalizing:** Sum all item macros and ensure they roughly match the headline Calories/Protein/Carbs/Fat line. If they don’t, adjust per-item macros (not the total) so the sum is realistic. Burgers with bun + 2 patties + cheese + bacon should land roughly 900–1100 kcal; a single patty ~200–300 kcal, cheese slice ~80–120 kcal, bacon slice ~40–50 kcal.
 
 REALISTIC NUTRITION REFERENCE VALUES (use these as guidance for accurate analysis):
 
@@ -1034,6 +1126,7 @@ COMMON MEAL COMPONENTS:
   - Beef patty (4oz cooked): 200-300 calories per patty
   - Cheese slice: 80-120 calories per slice
   - Bacon slice (cooked): 40-50 calories per slice
+  - If you are unsure, keep the item and mark isGuess: true rather than omitting it.
 
 OUTPUT REQUIREMENTS:
 - Keep explanation to 2-3 sentences
@@ -1329,6 +1422,8 @@ CRITICAL REQUIREMENTS:
       success: true,
       analysis: analysis.trim(),
     };
+    let itemsSource: string = 'none';
+    let itemsQuality: 'valid' | 'weak' | 'none' = 'none';
     if (wantStructured) {
       try {
         const m = analysis.match(/<ITEMS_JSON>([\s\S]*?)<\/ITEMS_JSON>/i);
@@ -1350,6 +1445,8 @@ CRITICAL REQUIREMENTS:
               // Use the parsed items/total directly; do not overwrite them with fallback/default items
               resp.items = parsedItems;
               resp.total = parsedTotal || computeTotalsFromItems(parsedItems) || null;
+              itemsSource = 'items_json';
+              itemsQuality = validateStructuredItems(parsedItems) ? 'valid' : 'weak';
             }
           }
           // Always strip the ITEMS_JSON block to avoid UI artifacts, even if parsing failed
@@ -1411,6 +1508,8 @@ CRITICAL REQUIREMENTS:
             if (items.length > 0) {
               resp.items = items;
               resp.total = total || computeTotalsFromItems(items) || resp.total || null;
+                itemsSource = itemsSource === 'none' ? 'text_extractor' : `${itemsSource}+text_extractor`;
+                itemsQuality = validateStructuredItems(items) ? 'valid' : 'weak';
               console.log('✅ Structured items extracted via follow-up call:', {
                 itemCount: items.length,
               });
@@ -1513,6 +1612,8 @@ CRITICAL REQUIREMENTS:
           if (items.length > 1 || (items.length === 1 && !looksLikeSingleGenericItem(items))) {
             resp.items = items;
             resp.total = total || computeTotalsFromItems(items) || resp.total || null;
+            itemsSource = itemsSource === 'none' ? 'multi_followup' : `${itemsSource}+multi_followup`;
+            itemsQuality = validateStructuredItems(items) ? 'valid' : 'weak';
             console.log('✅ Multi-item follow-up produced structured items:', items.length);
           }
         }
@@ -1558,12 +1659,15 @@ CRITICAL REQUIREMENTS:
     if (
       preferMultiDetect &&
       !packagedMode &&
-      (!resp.items || resp.items.length === 0 || looksLikeSingleGenericItem(resp.items))
+      (!resp.items || resp.items.length === 0 || (!validateStructuredItems(resp.items) || looksLikeSingleGenericItem(resp.items)))
     ) {
       const fallback = buildMultiComponentFallback(analysis, resp.total);
-      resp.items = fallback.items;
+      // Mark all fallback items as guesses to avoid presenting them as authoritative
+      resp.items = fallback.items.map((it) => ({ ...it, isGuess: true, calories: null, protein_g: null, carbs_g: null, fat_g: null }));
       resp.total = fallback.total || resp.total || null;
-      console.warn('✅ Enforced multi-item fallback to prevent single-card UI for meals.');
+      itemsSource = itemsSource === 'none' ? 'multi_fallback' : `${itemsSource}+multi_fallback`;
+      itemsQuality = 'weak';
+      console.warn('✅ Enforced multi-item fallback to prevent single-card UI for meals (macros left blank to avoid equal-split).');
     }
 
     // Packaged mode: fill missing macros from FatSecret without overriding existing values.
@@ -1572,6 +1676,27 @@ CRITICAL REQUIREMENTS:
       if (enriched.total) {
         resp.items = enriched.items;
         resp.total = enriched.total;
+      }
+    }
+
+    // General (non-packaged) enrichment when macros are missing/zero
+    if (resp.items && Array.isArray(resp.items) && resp.items.length > 0) {
+      const needsEnrichment = resp.items.some(
+        (it: any) =>
+          (!Number.isFinite(Number(it?.calories)) || Number(it?.calories) === 0) ||
+          ((!Number.isFinite(Number(it?.protein_g)) || Number(it?.protein_g) === 0) &&
+            (!Number.isFinite(Number(it?.carbs_g)) || Number(it?.carbs_g) === 0) &&
+            (!Number.isFinite(Number(it?.fat_g)) || Number(it?.fat_g) === 0)),
+      );
+      if (needsEnrichment) {
+        const enriched = await enrichItemsWithFatSecretIfMissing(resp.items);
+        if (enriched.changed) {
+          resp.items = enriched.items;
+          resp.total = enriched.total || resp.total || computeTotalsFromItems(enriched.items);
+          itemsSource = `${itemsSource}+fatsecret_enrich`;
+          itemsQuality = validateStructuredItems(resp.items) ? 'valid' : itemsQuality;
+          console.log('ℹ️ Applied FatSecret enrichment for missing macros.');
+        }
       }
     }
 
@@ -1610,6 +1735,22 @@ CRITICAL REQUIREMENTS:
         return NextResponse.json({ error: 'Billing error' }, { status: 402 });
       }
     }
+
+    const finalSummary = {
+      itemsSource,
+      itemsQuality,
+      itemCount: Array.isArray(resp.items) ? resp.items.length : 0,
+      totalPreview: resp.total
+        ? {
+            calories: (resp.total as any)?.calories,
+            protein_g: (resp.total as any)?.protein_g,
+            carbs_g: (resp.total as any)?.carbs_g,
+            fat_g: (resp.total as any)?.fat_g,
+          }
+        : null,
+      itemsPreview: summarizeItemsForLog(resp.items || []),
+    };
+    console.log('[FOOD_DEBUG] structured summary', finalSummary);
 
     // Log AI usage for the main Food Analyzer (fire-and-forget).
     // Use the primary analysis tokens and the total combined cost (analysis + follow-ups).
