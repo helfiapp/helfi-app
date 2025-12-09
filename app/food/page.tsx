@@ -1953,19 +1953,26 @@ const applyStructuredItems = (
     } else if (field === 'portionMode') {
       itemsCopy[index].portionMode = value === 'weight' ? 'weight' : 'servings'
       if (itemsCopy[index].portionMode === 'weight') {
-        const info = parseServingSizeInfo(itemsCopy[index])
-        const customSeed =
-          itemsCopy[index].weightUnit === 'ml'
-            ? itemsCopy[index].customMlPerServing
-            : itemsCopy[index].customGramsPerServing
-        const seed =
-          (itemsCopy[index].weightUnit === 'ml' ? info.mlPerServing : info.gramsPerServing) ||
-          info.gramsPerServing ||
-          info.mlPerServing ||
-          customSeed ||
-          null
-        if (seed) {
-          itemsCopy[index].weightAmount = Math.round(seed * 100) / 100
+        const base = getBaseWeightPerServing(itemsCopy[index])
+        const servings = Number.isFinite(itemsCopy[index].servings) ? Number(itemsCopy[index].servings) : 1
+        if (base && base > 0) {
+          const computed = base * Math.max(0, servings || 1)
+          itemsCopy[index].weightAmount = Math.round(computed * 100) / 100
+        } else {
+          const info = parseServingSizeInfo(itemsCopy[index])
+          const customSeed =
+            itemsCopy[index].weightUnit === 'ml'
+              ? itemsCopy[index].customMlPerServing
+              : itemsCopy[index].customGramsPerServing
+          const seed =
+            (itemsCopy[index].weightUnit === 'ml' ? info.mlPerServing : info.gramsPerServing) ||
+            info.gramsPerServing ||
+            info.mlPerServing ||
+            customSeed ||
+            null
+          if (seed) {
+            itemsCopy[index].weightAmount = Math.round(seed * 100) / 100
+          }
         }
       }
     } else if (field === 'weightAmount') {
