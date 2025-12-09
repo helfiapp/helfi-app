@@ -97,6 +97,38 @@ const normalizeGuessFlags = (items: any[]): any[] =>
       }))
     : [];
 
+const replaceWordNumbers = (text: string) => {
+  if (!text) return text;
+  const map: Record<string, string> = {
+    one: '1',
+    two: '2',
+    three: '3',
+    four: '4',
+    five: '5',
+    six: '6',
+    seven: '7',
+    eight: '8',
+    nine: '9',
+    ten: '10',
+    eleven: '11',
+    twelve: '12',
+  };
+  return String(text).replace(/\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b/gi, (m) => {
+    const repl = map[m.toLowerCase()];
+    return repl || m;
+  });
+};
+
+const normalizeDiscreteCounts = (items: any[]): any[] =>
+  Array.isArray(items)
+    ? items.map((item) => ({
+        ...item,
+        name: replaceWordNumbers(item?.name || ''),
+        serving_size: replaceWordNumbers(item?.serving_size || item?.servingSize || ''),
+        isGuess: item?.isGuess === true,
+      }))
+    : [];
+
 // When in packaged mode, try to fill missing/zero macros from FatSecret without overwriting existing values.
 const enrichPackagedItemsWithFatSecret = async (items: any[]): Promise<{ items: any[]; total: any | null }> => {
   const enriched: any[] = [];
@@ -1423,6 +1455,14 @@ CRITICAL REQUIREMENTS:
     const burgerEnriched = ensureBurgerComponents(resp.items || [], resp.analysis);
     resp.items = burgerEnriched.items;
     resp.total = burgerEnriched.total || resp.total;
+
+    // Normalize guess flags and discrete counts (convert word numbers to numerals).
+    if (resp.items && Array.isArray(resp.items)) {
+      resp.items = normalizeDiscreteCounts(normalizeGuessFlags(resp.items));
+      if (!resp.total || Object.keys(resp.total || {}).length === 0) {
+        resp.total = computeTotalsFromItems(resp.items);
+      }
+    }
 
     // Final safety pass: if the AI has described a discrete portion like
     // "3 large eggs" or "4 slices of bacon" but provided calories/macros that
