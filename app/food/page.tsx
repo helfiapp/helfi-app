@@ -667,6 +667,47 @@ const getPiecesPerServing = (item: any): number | null => {
   return null
 }
 
+const replaceWordNumbers = (text: string) => {
+  const map: Record<string, string> = {
+    one: '1',
+    two: '2',
+    three: '3',
+    four: '4',
+    five: '5',
+    six: '6',
+    seven: '7',
+    eight: '8',
+    nine: '9',
+    ten: '10',
+    eleven: '11',
+    twelve: '12',
+  }
+  return text.replace(/\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b/gi, (m) =>
+    map[m.toLowerCase()] || m,
+  )
+}
+
+const normalizeDiscreteItem = (item: any) => {
+  const normalizedName = replaceWordNumbers(String(item?.name || ''))
+  const normalizedServingSize = replaceWordNumbers(String(item?.serving_size || ''))
+  const working: any = { ...item, name: normalizedName, serving_size: normalizedServingSize }
+  const piecesPerServing =
+    getPiecesPerServing(working) ||
+    (isDiscreteUnitLabel(normalizedName) ? 1 : null)
+  if (piecesPerServing && piecesPerServing > 0) {
+    working.piecesPerServing = piecesPerServing
+  }
+  const { gramsPerServing, mlPerServing } = parseServingSizeInfo(working)
+  const hasWeightInfo = (gramsPerServing && gramsPerServing > 0) || (mlPerServing && mlPerServing > 0)
+  const defaultWeight = defaultGramsForItem(working)
+  if (!hasWeightInfo && defaultWeight && !working.customGramsPerServing && working.weightUnit !== 'ml') {
+    // Per-serving weight should reflect the described serving (which may already include multiple pieces)
+    const multiplier = piecesPerServing && piecesPerServing > 0 ? piecesPerServing : 1
+    working.customGramsPerServing = defaultWeight * multiplier
+  }
+  return working
+}
+
 // Fallback estimated grams per single serving when no weight info exists
 const defaultGramsForItem = (item: any): number | null => {
   const name = String(item?.name || '').toLowerCase()
@@ -1768,7 +1809,8 @@ const applyStructuredItems = (
     existingItemsFromState.length > 0 ? existingItemsFromState : existingItemsFromEditingEntry
 
   const filteredItems = stripGenericPlateItems(estimatedItems, analysisText)
-  const itemsToUse = filteredItems.length > 0 ? filteredItems : fallbackExistingItems
+  const itemsToUseRaw = filteredItems.length > 0 ? filteredItems : fallbackExistingItems
+  const itemsToUse = itemsToUseRaw.map(normalizeDiscreteItem)
 
   setAnalyzedItems(itemsToUse)
 
