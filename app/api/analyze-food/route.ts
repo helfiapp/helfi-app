@@ -939,6 +939,8 @@ CRITICAL FOR MEALS WITH MULTIPLE COMPONENTS:
 - For complex meals, be thorough: don't miss side dishes, condiments, dressings, or toppings
 - Estimate portions realistically based on what's visible in the image
 - **BE DARING: If you think you see something (even with low confidence), include it as a separate item with isGuess: true**
+- **Scan edges/corners and include any plausible side items even if only partially visible; mark low-confidence ones as isGuess: true rather than skipping.**
+- **Include breads/rolls/bagels/plate-side carbs when any part is visible; use isGuess: true if uncertain.**
 - **For burgers specifically: ALWAYS include bun, patties (count them!), cheese, bacon (if visible), lettuce, tomato, and sauces/condiments as separate items**
 - If unsure about a component, estimate conservatively but include it in your totals - the user can easily delete guessed items
 - For mixed dishes (salads, soups, stews), break down the main ingredients and sum them
