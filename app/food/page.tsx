@@ -687,6 +687,28 @@ const replaceWordNumbers = (text: string) => {
   )
 }
 
+// Lightweight serving size parser for early normalization (uses only local regex; avoids forward-reference issues)
+const quickParseServingSize = (servingSize: string | null | undefined) => {
+  const raw = (servingSize && String(servingSize)) || ''
+  const gramsMatch = raw.match(/(\d+(?:\.\d+)?)\s*g\b/i)
+  const mlMatch = raw.match(/(\d+(?:\.\d+)?)\s*ml\b/i)
+  const ozMatch = raw.match(/(\d+(?:\.\d+)?)\s*(oz|ounce|ounces)\b/i)
+  const gramsPerServing = gramsMatch ? parseFloat(gramsMatch[1]) : null
+  const mlPerServing = mlMatch ? parseFloat(mlMatch[1]) : null
+  const ozPerServing = ozMatch ? parseFloat(ozMatch[1]) : null
+  const gramsFromOz = ozPerServing ? ozPerServing * 28.3495 : null
+  return {
+    gramsPerServing:
+      gramsPerServing && gramsPerServing > 0
+        ? gramsPerServing
+        : gramsFromOz && gramsFromOz > 0
+        ? gramsFromOz
+        : null,
+    mlPerServing: mlPerServing && mlPerServing > 0 ? mlPerServing : null,
+    ozPerServing: ozPerServing && ozPerServing > 0 ? ozPerServing : null,
+  }
+}
+
 const normalizeDiscreteItem = (item: any) => {
   const normalizedName = replaceWordNumbers(String(item?.name || ''))
   const normalizedServingSize = replaceWordNumbers(String(item?.serving_size || ''))
@@ -697,7 +719,7 @@ const normalizeDiscreteItem = (item: any) => {
   if (piecesPerServing && piecesPerServing > 0) {
     working.piecesPerServing = piecesPerServing
   }
-  const { gramsPerServing, mlPerServing } = parseServingSizeInfo(working)
+  const { gramsPerServing, mlPerServing } = quickParseServingSize(working?.serving_size)
   const hasWeightInfo = (gramsPerServing && gramsPerServing > 0) || (mlPerServing && mlPerServing > 0)
   const defaultWeight = defaultGramsForItem(working)
   if (!hasWeightInfo && defaultWeight && !working.customGramsPerServing && working.weightUnit !== 'ml') {
