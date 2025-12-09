@@ -470,6 +470,7 @@ The green “+” buttons for each Food Diary category (Breakfast, Lunch, Dinner
 - Do NOT change servings/pieces/weight sync logic. Servings and pieces must stay in lockstep, and weight must derive from per-serving weight (including `piecesPerServing` defaults). If you switch portion modes, weight must seed from the current servings; changing weight must back-calculate servings/pieces.
 - Do NOT weaken per-piece defaults for patties/cheese/bacon/eggs (115g ~250 kcal patty; realistic slice weights). Do NOT drop `piecesPerServing` seeding or numeric normalization of counts.
 - Do NOT change the discrete steps (servings step = 1 / piecesPerServing) or make pieces non-integer.
+- Do NOT loosen the “be daring” guessing rule in the analyze-food prompt: it must keep scanning edges/corners and include plausible side items (e.g., breads/rolls/bagels) as `isGuess: true` when uncertain. This applies to all meals, not just burgers.
 - Do NOT enlarge the analyzed photo on desktop; keep the compact square preview sizing. Category “+” menu must remain visible/not covered.
 - Any change requires explicit written approval from the user and must be tested live with the burger photo flow: pieces default to the detected count, servings step 1/N, weight sync both directions, realistic kcal/grams.
 
