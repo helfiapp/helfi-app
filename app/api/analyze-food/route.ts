@@ -902,20 +902,6 @@ CRITICAL REQUIREMENTS:
         imageHash
       });
 
-      // Cache check: if we've already analyzed this exact image, return the cached result
-      const cacheKey = `${CACHE_VERSION}:${imageHash}`;
-      const cached = imageAnalysisCache.get(cacheKey);
-      if (cached) {
-        console.log('♻️ Returning cached analysis for image hash', cacheKey);
-        return NextResponse.json({
-          success: true,
-          analysis: cached.analysis,
-          items: cached.items,
-          total: cached.total,
-          cached: true,
-        });
-      }
-
       // For image analysis, request structured items and multi-detect by default
       wantStructured = true;
       preferMultiDetect = true;
@@ -1637,20 +1623,6 @@ CRITICAL REQUIREMENTS:
       endpoint: '/api/analyze-food',
       success: true,
     }).catch(() => {});
-
-    // Cache successful image analyses to keep repeat results stable
-    if (imageHash) {
-      try {
-        const cacheKey = `${CACHE_VERSION}:${imageHash}`;
-        imageAnalysisCache.set(cacheKey, {
-          analysis: resp.analysis,
-          items: Array.isArray(resp.items) ? resp.items : null,
-          total: resp.total ?? null,
-        });
-      } catch (err) {
-        console.warn('Failed to cache image analysis (non-fatal):', err);
-      }
-    }
 
     return NextResponse.json(resp);
 
