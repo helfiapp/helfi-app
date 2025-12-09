@@ -1344,10 +1344,12 @@ CRITICAL REQUIREMENTS:
             .trim();
           const parsed = parseItemsJsonRelaxed(cleanedBlock);
           if (parsed && typeof parsed === 'object') {
-            resp.items = Array.isArray(parsed.items) ? parsed.items : [];
-            resp.total = typeof parsed.total === 'object' ? parsed.total : null;
-            if ((!resp.total || Object.keys(resp.total).length === 0) && resp.items.length > 0) {
-              resp.total = computeTotalsFromItems(resp.items);
+            const parsedItems = Array.isArray(parsed.items) ? parsed.items : [];
+            const parsedTotal = typeof parsed.total === 'object' ? parsed.total : null;
+            if (parsedItems.length > 0) {
+              // Use the parsed items/total directly; do not overwrite them with fallback/default items
+              resp.items = parsedItems;
+              resp.total = parsedTotal || computeTotalsFromItems(parsedItems) || null;
             }
           }
           // Always strip the ITEMS_JSON block to avoid UI artifacts, even if parsing failed
@@ -1651,7 +1653,7 @@ CRITICAL REQUIREMENTS:
               sugar_g: (resp.total as any)?.sugar_g,
             }
           : null,
-      });
+        });
     } catch (logErr) {
       console.warn('[FOOD_DEBUG] log error', logErr);
     }
