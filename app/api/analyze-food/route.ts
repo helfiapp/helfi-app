@@ -5,6 +5,11 @@ import { NextRequest, NextResponse } from 'next/server';
  *   Calories: <number>, Protein: <g>, Carbs: <g>, Fat: <g>
  * If you modify prompts or response shapes, ensure this exact line remains present.
  * A server-side fallback below appends this line when missing.
+ *
+ * ⚠️ GUARD RAIL (GUARD_RAILS.md §3.9):
+ * - Do NOT weaken burger/patty/cheese/bacon/egg per-piece defaults or the
+ *   `piecesPerServing` seeding / numeric normalization.
+ * - Do NOT change portion sync expectations without explicit user approval.
  */
 import { getServerSession } from 'next-auth';
 import { getToken } from 'next-auth/jwt';

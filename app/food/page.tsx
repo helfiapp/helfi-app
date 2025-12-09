@@ -16,6 +16,12 @@ import { Cog6ToothIcon, UserIcon } from '@heroicons/react/24/outline'
  *   Calories: N, Protein: Ng, Carbs: Ng, Fat: Ng
  * The API enforces this and also has a fallback extractor.
  * If you change regexes or presentation, TEST that all four values still render.
+ *
+ * ⚠️ Additional lock (GUARD_RAILS.md §3.9):
+ * - Do NOT change servings/pieces/weight sync or `piecesPerServing` defaults.
+ * - Do NOT weaken patty/cheese/bacon/egg per-piece macros/weights.
+ * - Keep the analyzed photo compact on desktop; keep category “+” visible.
+ * Any change requires explicit written approval from the user.
  */
 
 import React, { useState, useEffect, useMemo, useRef } from 'react'
