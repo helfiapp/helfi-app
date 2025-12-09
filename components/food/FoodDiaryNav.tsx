@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import React from 'react'
 
-export type FoodDiaryTab = 'diary' | 'favourites' | 'add' | 'targets' | 'more'
+export type FoodDiaryTab = 'diary' | 'favourites'
 export type FoodNavMode = 'food' | 'app'
 
 interface FoodDiaryNavProps {
@@ -35,7 +35,7 @@ const foodTabs: Array<{ key: FoodDiaryTab; label: string; icon: React.ReactNode 
     label: 'Diary',
     icon: (
       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v12m6-6H6" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7h18M3 12h12M3 17h9" />
       </svg>
     ),
   },
@@ -45,33 +45,6 @@ const foodTabs: Array<{ key: FoodDiaryTab; label: string; icon: React.ReactNode 
     icon: (
       <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
         <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
-      </svg>
-    ),
-  },
-  {
-    key: 'add',
-    label: 'Add',
-    icon: (
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v12m6-6H6" />
-      </svg>
-    ),
-  },
-  {
-    key: 'targets',
-    label: 'Targets',
-    icon: (
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.75a6 6 0 100 10.5 6 6 0 000-10.5zm0 0V12l3 1.5" />
-      </svg>
-    ),
-  },
-  {
-    key: 'more',
-    label: 'More',
-    icon: (
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.75a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 6a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm0 6a1.5 1.5 0 110-3 1.5 1.5 0 010 3z" />
       </svg>
     ),
   },
@@ -138,8 +111,8 @@ export function FoodDiaryNav({
   const isAppMode = mode === 'app'
   const containerLayout =
     variant === 'desktop'
-      ? 'justify-start gap-2 md:gap-3'
-      : 'justify-around'
+      ? 'justify-start gap-3'
+      : 'justify-around gap-4'
 
   const renderFoodTab = (tab: (typeof foodTabs)[number]) => {
     const isActive = activeFoodTab === tab.key

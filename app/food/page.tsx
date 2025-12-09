@@ -4104,26 +4104,11 @@ Please add nutritional information manually if needed.`);
 
   const handleSelectFoodTab = (tab: FoodDiaryTab) => {
     setActiveFoodTab(tab)
-    switch (tab) {
-      case 'diary':
-        scrollToDiaryTop('smooth')
-        setFoodNavMode('food')
-        break
-      case 'favourites':
-        showQuickToast('Favourites view is coming soon')
-        break
-      case 'add':
-        setFoodNavMode('food')
-        handleCategoryPlusClick('snacks')
-        break
-      case 'targets':
-        scrollToEnergySummary()
-        break
-      case 'more':
-        showQuickToast('Food tools coming soon')
-        break
-      default:
-        break
+    if (tab === 'diary') {
+      scrollToDiaryTop('smooth')
+      setFoodNavMode('food')
+    } else if (tab === 'favourites') {
+      showQuickToast('Favourites view is coming soon')
     }
   }
 
