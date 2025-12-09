@@ -6602,10 +6602,13 @@ Please add nutritional information manually if needed.`);
                             : null)
                         const servingsStep =
                           piecesPerServing && piecesPerServing > 0 ? 1 / piecesPerServing : 0.25
-                        const pieceCount =
+                        let pieceCount =
                           piecesPerServing && servingsCount >= 0
                             ? Math.max(0, Math.round(servingsCount * piecesPerServing * 1000) / 1000)
                             : null
+                        if (pieceCount === null && piecesPerServing && piecesPerServing > 0) {
+                          pieceCount = piecesPerServing
+                        }
 
                         const isMultiIngredient = analyzedItems.length > 1
                         const isExpanded = !isMultiIngredient || expandedItemIndex === index
