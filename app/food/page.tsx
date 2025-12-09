@@ -3288,26 +3288,30 @@ const applyStructuredItems = (
     const info = parseServingSizeInfo(item)
     const unit = item?.weightUnit === 'ml' ? 'ml' : item?.weightUnit === 'oz' ? 'oz' : 'g'
     const estimatedGrams = estimateGramsPerServing(item)
+    const piecesMultiplier =
+      Number.isFinite(Number((item as any)?.piecesPerServing)) && Number((item as any).piecesPerServing) > 0
+        ? Number((item as any).piecesPerServing)
+        : 1
     const fallbackDefault = defaultGramsForItem(item)
     if (unit === 'ml') {
       if (Number.isFinite(item?.customMlPerServing)) return Number(item.customMlPerServing)
       if (info.mlPerServing && info.mlPerServing > 0) return info.mlPerServing
       if (info.gramsPerServing && info.gramsPerServing > 0) return info.gramsPerServing // assume ~1g/mL fallback
-      if (fallbackDefault && fallbackDefault > 0) return fallbackDefault
-      if (estimatedGrams && estimatedGrams > 0) return estimatedGrams
+      if (fallbackDefault && fallbackDefault > 0) return fallbackDefault * piecesMultiplier
+      if (estimatedGrams && estimatedGrams > 0) return estimatedGrams * piecesMultiplier
     } else if (unit === 'oz') {
       if (Number.isFinite(item?.customGramsPerServing)) return Number(item.customGramsPerServing) / 28.3495
       if (info.gramsPerServing && info.gramsPerServing > 0) return info.gramsPerServing / 28.3495
       if (info.mlPerServing && info.mlPerServing > 0) return info.mlPerServing / 28.3495
-      if (fallbackDefault && fallbackDefault > 0) return fallbackDefault / 28.3495
-      if (estimatedGrams && estimatedGrams > 0) return estimatedGrams / 28.3495
+      if (fallbackDefault && fallbackDefault > 0) return (fallbackDefault * piecesMultiplier) / 28.3495
+      if (estimatedGrams && estimatedGrams > 0) return (estimatedGrams * piecesMultiplier) / 28.3495
     } else {
       // grams
       if (Number.isFinite(item?.customGramsPerServing)) return Number(item.customGramsPerServing)
       if (info.gramsPerServing && info.gramsPerServing > 0) return info.gramsPerServing
-      if (fallbackDefault && fallbackDefault > 0) return fallbackDefault
+      if (fallbackDefault && fallbackDefault > 0) return fallbackDefault * piecesMultiplier
       if (info.mlPerServing && info.mlPerServing > 0) return info.mlPerServing // assume ~1g/mL fallback
-      if (estimatedGrams && estimatedGrams > 0) return estimatedGrams
+      if (estimatedGrams && estimatedGrams > 0) return estimatedGrams * piecesMultiplier
     }
     // Fallback: infer from current weightAmount and servings if present
     const servings = Number.isFinite(Number(item?.servings)) ? Number(item.servings) : null
