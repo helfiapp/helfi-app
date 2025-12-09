@@ -119,6 +119,15 @@ const replaceWordNumbers = (text: string) => {
   });
 };
 
+const parseCountFromText = (text: string): number | null => {
+  if (!text) return null;
+  const normalized = replaceWordNumbers(String(text).toLowerCase());
+  const match = normalized.match(/(\d+(?:\.\d+)?)/);
+  if (!match) return null;
+  const n = parseFloat(match[1]);
+  return Number.isFinite(n) && n > 0 ? n : null;
+};
+
 const normalizeDiscreteCounts = (items: any[]): any[] =>
   Array.isArray(items)
     ? items.map((item) => ({
@@ -236,18 +245,6 @@ const harmonizeDiscretePortionItems = (items: any[]): { items: any[]; total: any
 
   const cloned = items.map((item) => ({ ...item }));
 
-  const parseCountFromLabel = (label: string): number | null => {
-    if (!label) return null;
-    const lower = String(label).toLowerCase();
-    // Match patterns like:
-    // "approximately 3 large eggs", "about 4 slices", "3 rashers of bacon"
-    const m = lower.match(/(?:about|approximately|approx\.?|around)?\s*(\d+(?:\.\d+)?)/);
-    if (!m) return null;
-    const n = parseFloat(m[1]);
-    if (!Number.isFinite(n) || n <= 1) return null;
-    return n;
-  };
-
   const containsAny = (text: string, keywords: string[]): boolean => {
     const lower = text.toLowerCase();
     return keywords.some((k) => lower.includes(k));
@@ -257,73 +254,126 @@ const harmonizeDiscretePortionItems = (items: any[]): { items: any[]; total: any
   const BACON_KEYWORDS = ['bacon', 'rasher', 'rashers', 'bacon strip', 'bacon strips'];
   const PATTY_KEYWORDS = ['patty', 'pattie', 'patties', 'burger patty', 'beef patty'];
   const CHEESE_KEYWORDS = ['cheese', 'cheddar', 'mozzarella', 'slice of cheese', 'cheese slice'];
+  const DISCRETE_DEFAULTS: Array<{
+    key: 'patty' | 'bacon' | 'cheese' | 'egg';
+    keywords: string[];
+    gramsPerPiece: number;
+    caloriesPerPiece: number;
+    proteinPerPiece?: number;
+    fatPerPiece?: number;
+  }> = [
+    {
+      key: 'patty',
+      keywords: PATTY_KEYWORDS,
+      gramsPerPiece: 115,
+      caloriesPerPiece: 250,
+      proteinPerPiece: 22,
+      fatPerPiece: 18,
+    },
+    {
+      key: 'bacon',
+      keywords: BACON_KEYWORDS,
+      gramsPerPiece: 15,
+      caloriesPerPiece: 45,
+      proteinPerPiece: 3,
+      fatPerPiece: 3.5,
+    },
+    {
+      key: 'cheese',
+      keywords: CHEESE_KEYWORDS,
+      gramsPerPiece: 25,
+      caloriesPerPiece: 100,
+      proteinPerPiece: 6,
+      fatPerPiece: 9,
+    },
+    {
+      key: 'egg',
+      keywords: EGG_KEYWORDS,
+      gramsPerPiece: 50,
+      caloriesPerPiece: 70,
+      proteinPerPiece: 6,
+      fatPerPiece: 5,
+    },
+  ];
 
   for (const item of cloned) {
     const name = (item?.name || '') as string;
     const servingSize = (item?.serving_size || '') as string;
-    const labelSource = `${name} ${servingSize}`.trim();
-    const count = parseCountFromLabel(servingSize || name);
-    if (!count || count <= 1) continue;
+    const labelSource = replaceWordNumbers(`${name} ${servingSize}`.trim());
+    const detectedCount = parseCountFromText(labelSource);
 
-    const calories = Number(item?.calories ?? 0);
-    const protein = Number(item?.protein_g ?? 0);
-    const carbs = Number(item?.carbs_g ?? 0);
-    const fat = Number(item?.fat_g ?? 0);
-    const fiber = Number(item?.fiber_g ?? 0);
-    const sugar = Number(item?.sugar_g ?? 0);
+    const defaults = DISCRETE_DEFAULTS.find((d) => containsAny(labelSource, d.keywords));
+    if (!defaults && !detectedCount) continue;
 
-    if (!Number.isFinite(calories) || calories <= 0) continue;
+    const existingPieces =
+      Number.isFinite(Number((item as any).piecesPerServing)) && Number(item.piecesPerServing) > 0
+        ? Number(item.piecesPerServing)
+        : null;
+    const existingServings =
+      Number.isFinite(Number(item?.servings)) && Number(item.servings) > 0 ? Number(item.servings) : 1;
 
-    // Eggs: label says "3 large eggs" etc, but calories ~= one egg (~70).
-    if (containsAny(labelSource, EGG_KEYWORDS)) {
-      // Treat values as per-egg if calories look like a single egg and we
-      // haven't already set a higher servings count. We then update the
-      // servings field so the UI and totals multiply correctly.
-      if (calories > 0 && calories <= 120) {
-        const currentServings = Number(item?.servings ?? 1);
-        if (!Number.isFinite(currentServings) || currentServings <= 1.5) {
-          item.servings = count;
-          continue;
-        }
-      }
+    let piecesPerServing = detectedCount && detectedCount > 0 ? detectedCount : existingPieces;
+    if (!piecesPerServing || piecesPerServing <= 0) {
+      piecesPerServing = defaults?.key === 'patty' ? 2 : 1;
     }
 
-    // Bacon: label says "about 4 slices" etc, but calories ~= one slice (~40).
-    if (containsAny(labelSource, BACON_KEYWORDS)) {
-      if (calories > 0 && calories <= 60) {
-        const currentServings = Number(item?.servings ?? 1);
-        if (!Number.isFinite(currentServings) || currentServings <= 1.5) {
-          item.servings = count;
-          continue;
-        }
-      }
+    let totalPieces =
+      (existingServings && piecesPerServing ? existingServings * piecesPerServing : piecesPerServing) || 1;
+    if (detectedCount && detectedCount > totalPieces) {
+      totalPieces = detectedCount;
     }
+    if (totalPieces <= 0) totalPieces = 1;
 
-    // Patties: label says "3 patties" etc., but calories look like a single patty.
-    if (containsAny(labelSource, PATTY_KEYWORDS)) {
-      if (calories > 0 && calories <= 320) {
-        const currentServings = Number(item?.servings ?? 1);
-        if (!Number.isFinite(currentServings) || currentServings <= 1.5) {
-          item.servings = count;
-          if (calories <= 180) item.calories = 250;
-          if (!Number.isFinite(item.protein_g) || item.protein_g < 18) item.protein_g = 22;
-          if (!Number.isFinite(item.fat_g) || item.fat_g < 12) item.fat_g = 18;
-          continue;
-        }
+    const normalizedServings = Math.max(1, totalPieces / piecesPerServing);
+    item.servings = Math.round(normalizedServings * 1000) / 1000;
+    (item as any).piecesPerServing = piecesPerServing;
+
+    if (defaults) {
+      // Seed serving_size with a discrete hint when missing so the UI picks up pieces.
+      if (!item.serving_size || String(item.serving_size).trim().length === 0) {
+        const label =
+          defaults.key === 'patty'
+            ? `${piecesPerServing} patty${piecesPerServing > 1 ? 'ies' : 'y'} (4–6 oz)`
+            : defaults.key === 'bacon'
+            ? `${piecesPerServing} slice${piecesPerServing > 1 ? 's' : ''} bacon`
+            : defaults.key === 'cheese'
+            ? `${piecesPerServing} cheese slice${piecesPerServing > 1 ? 's' : ''}`
+            : `${piecesPerServing} piece${piecesPerServing > 1 ? 's' : ''}`;
+        item.serving_size = label;
       }
-    }
 
-    // Cheese slices: scale if multiple slices are mentioned but macros look like a single slice.
-    if (containsAny(labelSource, CHEESE_KEYWORDS)) {
-      if (calories > 0 && calories <= 160) {
-        const currentServings = Number(item?.servings ?? 1);
-        if (!Number.isFinite(currentServings) || currentServings <= 1.5) {
-          item.servings = count;
-          if (calories <= 70) item.calories = 100;
-          if (!Number.isFinite(item.protein_g) || item.protein_g < 5) item.protein_g = 6;
-          if (!Number.isFinite(item.fat_g) || item.fat_g < 7) item.fat_g = 9;
-          continue;
-        }
+      const totalPiecesForMacros = Math.max(totalPieces, piecesPerServing * item.servings);
+      const calories = Number(item?.calories ?? 0);
+      const protein = Number(item?.protein_g ?? 0);
+      const fat = Number(item?.fat_g ?? 0);
+
+      const perPieceCalories =
+        totalPiecesForMacros > 0 && Number.isFinite(calories) ? calories / totalPiecesForMacros : 0;
+      const perPieceProtein =
+        totalPiecesForMacros > 0 && Number.isFinite(protein) ? protein / totalPiecesForMacros : 0;
+      const perPieceFat = totalPiecesForMacros > 0 && Number.isFinite(fat) ? fat / totalPiecesForMacros : 0;
+
+      if (!Number.isFinite(calories) || perPieceCalories < defaults.caloriesPerPiece * 0.9) {
+        item.calories = Math.round(defaults.caloriesPerPiece * totalPiecesForMacros);
+      }
+      if (
+        defaults.proteinPerPiece !== undefined &&
+        (!Number.isFinite(protein) || perPieceProtein < defaults.proteinPerPiece * 0.9)
+      ) {
+        item.protein_g = Math.round(defaults.proteinPerPiece * totalPiecesForMacros * 10) / 10;
+      }
+      if (
+        defaults.fatPerPiece !== undefined &&
+        (!Number.isFinite(fat) || perPieceFat < defaults.fatPerPiece * 0.9)
+      ) {
+        item.fat_g = Math.round(defaults.fatPerPiece * totalPiecesForMacros * 10) / 10;
+      }
+
+      if (
+        !item.customGramsPerServing &&
+        (!item.serving_size || !String(item.serving_size).toLowerCase().includes('g'))
+      ) {
+        item.customGramsPerServing = defaults.gramsPerPiece * piecesPerServing;
       }
     }
   }
@@ -357,42 +407,67 @@ const ensureBurgerComponents = (items: any[] | null, analysis: string | null | u
     }
   };
 
-  // Normalize patties: ensure at least 2 and realistic per-patty macros
+  // Normalize patties to the detected count (or default 2) with realistic per-piece macros and weight hints.
   base.forEach((it) => {
     const n = String(it?.name || '').toLowerCase();
-    if (n.includes('patty')) {
-      const servings = Number.isFinite(Number(it.servings)) ? Number(it.servings) : 1;
-      const adjustedServings = servings < 2 ? 2 : servings;
-      it.servings = adjustedServings;
-      const perCalories = adjustedServings > 0 ? Number(it.calories || 0) / adjustedServings : Number(it.calories || 0);
-      if (!Number.isFinite(perCalories) || perCalories < 180) {
-        it.calories = Math.round(Math.max(perCalories || 0, 200) * adjustedServings || 250 * adjustedServings);
-      }
-      const perProtein = adjustedServings > 0 ? Number(it.protein_g || 0) / adjustedServings : Number(it.protein_g || 0);
-      if (!Number.isFinite(perProtein) || perProtein < 18) {
-        it.protein_g = Math.round(Math.max(perProtein || 0, 20) * adjustedServings * 10) / 10;
-      }
-      const perFat = adjustedServings > 0 ? Number(it.fat_g || 0) / adjustedServings : Number(it.fat_g || 0);
-      if (!Number.isFinite(perFat) || perFat < 12) {
-        it.fat_g = Math.round(Math.max(perFat || 0, 14) * adjustedServings * 10) / 10;
-      }
-      if (!it.serving_size) {
-        it.serving_size = '1 patty (4–6 oz)';
-      }
+    if (!n.includes('patty')) return;
+
+    const detectedCount = parseCountFromText(`${it?.name || ''} ${it?.serving_size || ''}`) || null;
+    const existingPieces =
+      Number.isFinite(Number((it as any).piecesPerServing)) && Number((it as any).piecesPerServing) > 0
+        ? Number((it as any).piecesPerServing)
+        : null;
+    const piecesPerServing = detectedCount && detectedCount > 0 ? detectedCount : existingPieces || 2;
+    const existingServings =
+      Number.isFinite(Number(it.servings)) && Number(it.servings) > 0 ? Number(it.servings) : 1;
+    const totalPieces = Math.max(
+      piecesPerServing * existingServings,
+      detectedCount || 0,
+      piecesPerServing,
+      2,
+    );
+    const normalizedServings = Math.max(1, Math.round((totalPieces / piecesPerServing) * 1000) / 1000);
+
+    (it as any).piecesPerServing = piecesPerServing;
+    it.servings = normalizedServings;
+
+    const perPieceCalories =
+      totalPieces > 0 && Number.isFinite(Number(it.calories)) ? Number(it.calories) / totalPieces : 0;
+    const perPieceProtein =
+      totalPieces > 0 && Number.isFinite(Number(it.protein_g)) ? Number(it.protein_g) / totalPieces : 0;
+    const perPieceFat =
+      totalPieces > 0 && Number.isFinite(Number(it.fat_g)) ? Number(it.fat_g) / totalPieces : 0;
+
+    if (!Number.isFinite(perPieceCalories) || perPieceCalories < 200) {
+      it.calories = Math.round(250 * totalPieces);
+    }
+    if (!Number.isFinite(perPieceProtein) || perPieceProtein < 18) {
+      it.protein_g = Math.round(22 * totalPieces * 10) / 10;
+    }
+    if (!Number.isFinite(perPieceFat) || perPieceFat < 12) {
+      it.fat_g = Math.round(18 * totalPieces * 10) / 10;
+    }
+    if (!it.serving_size) {
+      it.serving_size = `${piecesPerServing} patty${piecesPerServing > 1 ? 'ies' : 'y'} (4–6 oz)`;
+    }
+    if (!it.customGramsPerServing) {
+      it.customGramsPerServing = piecesPerServing * 115;
     }
   });
 
   ensureItem(['patty', 'pattie'], () => ({
     name: 'Beef patty',
     brand: null,
-    serving_size: '1 patty (4–6 oz)',
-    servings: 2,
-    calories: 250,
-    protein_g: 22,
+    serving_size: '2 patties (4–6 oz each)',
+    piecesPerServing: 2,
+    servings: 1,
+    calories: 500,
+    protein_g: 44,
     carbs_g: 0,
-    fat_g: 18,
+    fat_g: 36,
     fiber_g: 0,
     sugar_g: 0,
+    customGramsPerServing: 230,
   }));
 
   ensureItem(['bun'], () => ({
@@ -411,27 +486,31 @@ const ensureBurgerComponents = (items: any[] | null, analysis: string | null | u
   ensureItem(['cheese'], () => ({
     name: 'Cheddar cheese slice',
     brand: null,
-    serving_size: '1 slice',
-    servings: 2,
-    calories: 100,
-    protein_g: 6,
+    serving_size: '2 slices',
+    piecesPerServing: 2,
+    servings: 1,
+    calories: 200,
+    protein_g: 12,
     carbs_g: 1,
-    fat_g: 9,
+    fat_g: 18,
     fiber_g: 0,
     sugar_g: 0,
+    customGramsPerServing: 50,
   }));
 
   ensureItem(['bacon'], () => ({
     name: 'Bacon slice',
     brand: null,
-    serving_size: '1 slice',
-    servings: 2,
-    calories: 45,
-    protein_g: 3,
+    serving_size: '2 slices',
+    piecesPerServing: 2,
+    servings: 1,
+    calories: 90,
+    protein_g: 6,
     carbs_g: 0,
-    fat_g: 3.5,
+    fat_g: 7,
     fiber_g: 0,
     sugar_g: 0,
+    customGramsPerServing: 30,
   }));
 
   ensureItem(['lettuce'], () => ({

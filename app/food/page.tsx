@@ -638,6 +638,10 @@ const isDiscreteUnitLabel = (label: string) => {
 // Extract pieces-per-serving for discrete items from serving_size or name (supports digit or word numbers)
 const getPiecesPerServing = (item: any): number | null => {
   const source = `${item?.serving_size || ''} ${item?.name || ''}`.trim().toLowerCase()
+  const explicitPieces = Number.isFinite(Number((item as any)?.piecesPerServing))
+    ? Number((item as any).piecesPerServing)
+    : null
+  if (explicitPieces && explicitPieces > 0) return explicitPieces
   if (!source) return null
   if (!isDiscreteUnitLabel(source)) return null
 
@@ -660,10 +664,6 @@ const getPiecesPerServing = (item: any): number | null => {
   const servings = Number.isFinite(Number(item?.servings)) ? Number(item.servings) : null
   if (servings && servings > 1) return servings
   // Fallback to explicit pieces hint if present
-  const explicitPieces = Number.isFinite(Number((item as any)?.piecesPerServing))
-    ? Number((item as any).piecesPerServing)
-    : null
-  if (explicitPieces && explicitPieces > 0) return explicitPieces
   return null
 }
 
@@ -6175,7 +6175,7 @@ Please add nutritional information manually if needed.`);
                     }`}
                   >
                     <div
-                      className={`relative w-full ${editingEntry ? 'cursor-pointer group' : ''}`}
+                      className={`relative w-full max-w-sm mx-auto ${editingEntry ? 'cursor-pointer group' : ''}`}
                       onClick={() => {
                         if (editingEntry && editPhotoInputRef.current) {
                           editPhotoInputRef.current.click()
@@ -6191,8 +6191,8 @@ Please add nutritional information manually if needed.`);
                         src={photoPreview}
                         alt="Analyzed food"
                         width={300}
-                        height={200}
-                        className={`w-full aspect-[4/3] object-cover rounded-xl transition-opacity duration-300 ${
+                        height={300}
+                        className={`w-full max-w-sm aspect-square object-cover rounded-xl transition-opacity duration-300 ${
                           foodImagesLoading[photoPreview] ? 'opacity-0' : 'opacity-100'
                         }`}
                         loading="eager"
