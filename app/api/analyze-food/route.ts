@@ -1624,6 +1624,38 @@ CRITICAL REQUIREMENTS:
       success: true,
     }).catch(() => {});
 
+    // Debug: log raw items/total for diagnostics (no PII; limited preview)
+    try {
+      console.log('[FOOD_DEBUG] raw response preview', {
+        itemCount: Array.isArray(resp.items) ? resp.items.length : 0,
+        itemsPreview: Array.isArray(resp.items)
+          ? resp.items.slice(0, 5).map((it: any) => ({
+              name: it?.name,
+              serving_size: it?.serving_size,
+              calories: it?.calories,
+              protein_g: it?.protein_g,
+              carbs_g: it?.carbs_g,
+              fat_g: it?.fat_g,
+              fiber_g: it?.fiber_g,
+              sugar_g: it?.sugar_g,
+              isGuess: it?.isGuess,
+            }))
+          : null,
+        totalPreview: resp.total
+          ? {
+              calories: (resp.total as any)?.calories,
+              protein_g: (resp.total as any)?.protein_g,
+              carbs_g: (resp.total as any)?.carbs_g,
+              fat_g: (resp.total as any)?.fat_g,
+              fiber_g: (resp.total as any)?.fiber_g,
+              sugar_g: (resp.total as any)?.sugar_g,
+            }
+          : null,
+      });
+    } catch (logErr) {
+      console.warn('[FOOD_DEBUG] log error', logErr);
+    }
+
     return NextResponse.json(resp);
 
   } catch (error) {
