@@ -739,22 +739,14 @@ const normalizeDiscreteItem = (item: any) => {
   // For discrete items, keep base servings at 1 so the input matches the label; pieces captures the count.
   const isDiscrete = isDiscreteUnitLabel(normalizedServingSize) || isDiscreteUnitLabel(normalizedName)
   if (isDiscrete) {
-    // Preserve explicit servings if already set, otherwise clamp to 1.
-    const hasExplicitServings =
+    const incomingServings =
       Number.isFinite(Number(working?.servings)) && Number(working.servings) > 0
-    working.servings = hasExplicitServings ? Number(working.servings) : 1
-    // If piecesPerServing detected from the label, keep it; otherwise, if servings > 1 and no pieces were set,
-    // migrate that count into pieces so the user still sees the detected number of eggs/slices.
-    if (!piecesPerServing || piecesPerServing <= 0) {
-      const fromServings =
-        Number.isFinite(Number(working?.servings)) && Number(working.servings) > 1
-          ? Number(working.servings)
-          : null
-      if (fromServings) {
-        working.piecesPerServing = fromServings
-        working.servings = 1
-      }
+        ? Number(working.servings)
+        : 1
+    if ((!working.piecesPerServing || working.piecesPerServing <= 0) && incomingServings > 1) {
+      working.piecesPerServing = incomingServings
     }
+    working.servings = 1
   }
 
   const { gramsPerServing, mlPerServing } = quickParseServingSize(working?.serving_size)
