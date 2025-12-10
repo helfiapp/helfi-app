@@ -123,6 +123,28 @@ const validateStructuredItems = (items: any[]): boolean => {
   return realisticCount >= 1;
 };
 
+// Pull likely components from the AI's prose description to add missing guessed items.
+const inferComponentsFromAnalysis = (analysis: string | null | undefined): string[] => {
+  if (!analysis) return [];
+  const lower = analysis.toLowerCase();
+  const withIdx = lower.indexOf(' with ');
+  if (withIdx === -1) return [];
+  const afterWith = analysis.slice(withIdx + 6);
+  const firstSentence = afterWith.split(/[.]/)[0] || afterWith;
+  const parts = firstSentence
+    .split(/,| and | & /i)
+    .map((p) => p.trim())
+    .filter((p) => p.length >= 3 && p.split(/\s+/).length <= 6);
+  const unique: string[] = [];
+  for (const p of parts) {
+    const lowerPart = p.toLowerCase();
+    if (!unique.some((u) => u.toLowerCase() === lowerPart)) {
+      unique.push(p);
+    }
+  }
+  return unique.slice(0, 8);
+};
+
 // Normalize isGuess flag across items
 const normalizeGuessFlags = (items: any[]): any[] =>
   Array.isArray(items)
@@ -1632,6 +1654,42 @@ CRITICAL REQUIREMENTS:
     const burgerEnriched = ensureBurgerComponents(resp.items || [], resp.analysis);
     resp.items = burgerEnriched.items;
     resp.total = burgerEnriched.total || resp.total;
+
+    // If the analysis text lists components we didn't get items for, add guessed items (macros blank).
+    if (preferMultiDetect && analysis) {
+      const inferred = inferComponentsFromAnalysis(analysis);
+      if (inferred.length > 0) {
+        const existingNames = new Set(
+          Array.isArray(resp.items)
+            ? resp.items.map((it: any) => String(it?.name || '').trim().toLowerCase()).filter(Boolean)
+            : [],
+        );
+        const additions: any[] = [];
+        for (const name of inferred) {
+          const key = name.toLowerCase();
+          if (existingNames.has(key)) continue;
+          additions.push({
+            name,
+            brand: null,
+            serving_size: '1 serving',
+            servings: 1,
+            calories: null,
+            protein_g: null,
+            carbs_g: null,
+            fat_g: null,
+            fiber_g: null,
+            sugar_g: null,
+            isGuess: true,
+          });
+          existingNames.add(key);
+        }
+        if (additions.length > 0) {
+          resp.items = Array.isArray(resp.items) ? [...resp.items, ...additions] : additions;
+          itemsSource = `${itemsSource}+description_inferred`;
+          itemsQuality = validateStructuredItems(resp.items) ? 'valid' : 'weak';
+        }
+      }
+    }
 
     // Normalize guess flags and discrete counts (convert word numbers to numerals).
     if (resp.items && Array.isArray(resp.items)) {
