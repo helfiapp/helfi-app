@@ -712,12 +712,13 @@ const replaceWordNumbers = (text: string) => {
 
 const parseCountFromFreeText = (text: string | null | undefined): number | null => {
   if (!text) return null
-  const numeric = text.match(/(\d+(?:\.\d+)?)/)
+  const normalized = replaceWordNumbers(String(text))
+  const numeric = normalized.match(/(\d+(?:\.\d+)?)/)
   if (numeric) {
     const n = parseFloat(numeric[1])
     if (Number.isFinite(n) && n > 0) return n
   }
-  const wordMatch = text.match(/\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b/i)
+  const wordMatch = normalized.match(/\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b/i)
   if (wordMatch) {
     const map: Record<string, number> = {
       one: 1,
