@@ -706,12 +706,14 @@ const buildMultiComponentFallback = (
     brand: null,
     serving_size: '1 serving',
     servings: 1,
-    calories: pick('calories'),
-    protein_g: pick('protein_g'),
-    carbs_g: pick('carbs_g'),
-    fat_g: pick('fat_g'),
-    fiber_g: pick('fiber_g') ?? 0,
-    sugar_g: pick('sugar_g') ?? 0,
+    // Leave macros blank so the UI does not equal-split totals; mark as guesses.
+    calories: null,
+    protein_g: null,
+    carbs_g: null,
+    fat_g: null,
+    fiber_g: null,
+    sugar_g: null,
+    isGuess: true,
   }));
   const synthesizedTotal =
     total && typeof total === 'object' ? total : computeTotalsFromItems(items) || null;
