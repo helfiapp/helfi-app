@@ -693,6 +693,16 @@ const replaceWordNumbers = (text: string) => {
   )
 }
 
+// Detect bogus macro-only item names like "6g of protein" or "3g carbs" with no food keyword.
+const isMacroOnlyName = (nameRaw: string) => {
+  const name = (nameRaw || '').trim().toLowerCase()
+  if (!name) return false
+  const macroPattern = /(^|\s)(\d+(?:\.\d+)?\s*g\s*(of\s*)?)?(protein|carb|carbs|fat|fats|fiber|fibre|sugar)s?($|\s)/
+  if (!macroPattern.test(name)) return false
+  const foodHints = ['egg', 'chicken', 'beef', 'pork', 'lamb', 'fish', 'salmon', 'tuna', 'potato', 'rice', 'bread', 'bun', 'bar', 'shake', 'yogurt', 'milk', 'cheese', 'bacon', 'sausage']
+  return !foodHints.some((k) => name.includes(k))
+}
+
 // Lightweight serving size parser for early normalization (uses only local regex; avoids forward-reference issues)
 const quickParseServingSize = (servingSize: string | null | undefined) => {
   const raw = (servingSize && String(servingSize)) || ''
@@ -1801,7 +1811,10 @@ const applyStructuredItems = (
   const estimatedItems = normalizedItems.length > 0 ? addEstimatedServingWeights(normalizedItems) : []
 
   const stripGenericPlateItems = (items: any[], analysis: string | null | undefined) => {
-    if (!Array.isArray(items) || items.length <= 1) return items
+    if (!Array.isArray(items)) return []
+    const filteredMacroOnly = items.filter((item) => !isMacroOnlyName(String(item?.name || '')))
+    if (filteredMacroOnly.length === 0) return items
+    if (filteredMacroOnly.length <= 1) return filteredMacroOnly
     const analysisTrimmed = (analysis || '').trim().toLowerCase()
     const looksSummary = (name: string) => {
       const n = name.trim().toLowerCase()
@@ -1817,7 +1830,7 @@ const applyStructuredItems = (
       const mentionsBurgerWith = n.includes('burger with')
       return hasSummaryKeyword || (hasListDelimiters && longPhrase) || mentionsBurgerWith
     }
-    return items.filter((item) => {
+    return filteredMacroOnly.filter((item) => {
       const name = String(item?.name || '').trim().toLowerCase()
       if (!name) return true
       if (looksSummary(name)) return false
