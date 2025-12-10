@@ -791,7 +791,6 @@ const normalizeDiscreteServingsWithLabel = (items: any[]) => {
     const currentServings = Number.isFinite(Number(next.servings)) ? Number(next.servings) : 1
 
     if (!qty || qty <= 1.001) return next
-    if (currentServings > 1.05) return next
     if (!isDiscreteUnitLabel(unitLabel)) return next
 
     const calories = Number(next.calories)
@@ -818,8 +817,8 @@ const normalizeDiscreteServingsWithLabel = (items: any[]) => {
         }
       })
       // Keep servings at 1 to avoid “3 servings of 3 eggs” confusion; macros now
-      // represent the whole labeled portion.
-      next.servings = Number.isFinite(currentServings) ? currentServings : 1
+      // represent the whole labeled portion (pieces captured separately).
+      next.servings = 1
     }
 
     return next
