@@ -735,6 +735,13 @@ const normalizeDiscreteItem = (item: any) => {
   if (piecesPerServing && piecesPerServing > 0) {
     working.piecesPerServing = piecesPerServing
   }
+
+  // For discrete items, keep base servings at 1 so the input matches the label; pieces captures the count.
+  const isDiscrete = isDiscreteUnitLabel(normalizedServingSize) || isDiscreteUnitLabel(normalizedName)
+  if (isDiscrete) {
+    working.servings = 1
+  }
+
   const { gramsPerServing, mlPerServing } = quickParseServingSize(working?.serving_size)
   const hasWeightInfo = (gramsPerServing && gramsPerServing > 0) || (mlPerServing && mlPerServing > 0)
   const defaultWeight = defaultGramsForItem(working)
