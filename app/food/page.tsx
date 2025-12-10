@@ -820,6 +820,10 @@ const normalizeDiscreteServingsWithLabel = (items: any[]) => {
       // represent the whole labeled portion (pieces captured separately).
       next.servings = 1
     }
+    // Even when macros are already realistic, keep servings at 1 for discrete items; pieces capture the count.
+    if (qty > 1 && isDiscreteUnitLabel(unitLabel)) {
+      next.servings = 1
+    }
 
     return next
   })
@@ -3382,6 +3386,15 @@ const applyStructuredItems = (
   const effectiveServings = (item: any) => {
     const mode = item?.portionMode === 'weight' ? 'weight' : 'servings'
     const baseServings = item?.servings && Number.isFinite(item.servings) && item.servings > 0 ? item.servings : 1
+    const piecesCount =
+      Number.isFinite(Number((item as any)?.piecesPerServing)) && Number((item as any).piecesPerServing) > 0
+        ? Number((item as any).piecesPerServing)
+        : null
+
+    // For discrete items, keep servings at the labeled base but scale totals by pieces.
+    if (mode !== 'weight' && piecesCount && piecesCount > 1) {
+      return baseServings * piecesCount
+    }
 
     if (mode !== 'weight') return baseServings
 
