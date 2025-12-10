@@ -772,6 +772,16 @@ const quickParseServingSize = (servingSize: string | null | undefined) => {
   }
 }
 
+// When a serving label says "1 medium (200g)" but piecesPerServing is 6, scale per-serving
+// weight to cover all pieces unless the label already declares multiple units.
+const piecesMultiplierForServing = (item: any) => {
+  const pieces = Number((item as any)?.piecesPerServing)
+  if (!Number.isFinite(pieces) || pieces <= 1) return 1
+  const meta = parseServingUnitMetadata(String(item?.serving_size || item?.name || ''))
+  const declaredQty = meta && Number.isFinite(meta.quantity) && meta.quantity > 0 ? Number(meta.quantity) : 1
+  return declaredQty <= 1 ? pieces : 1
+}
+
 const normalizeDiscreteItem = (item: any) => {
   const normalizedName = replaceWordNumbers(String(item?.name || ''))
   const normalizedServingSize = replaceWordNumbers(String(item?.serving_size || ''))
@@ -3414,30 +3424,27 @@ const applyStructuredItems = (
     const info = parseServingSizeInfo(item)
     const unit = item?.weightUnit === 'ml' ? 'ml' : item?.weightUnit === 'oz' ? 'oz' : 'g'
     const estimatedGrams = estimateGramsPerServing(item)
-    const piecesMultiplier =
-      Number.isFinite(Number((item as any)?.piecesPerServing)) && Number((item as any).piecesPerServing) > 0
-        ? Number((item as any).piecesPerServing)
-        : 1
+    const piecesMultiplier = piecesMultiplierForServing(item)
     const fallbackDefault = defaultGramsForItem(item)
     if (unit === 'ml') {
       if (Number.isFinite(item?.customMlPerServing)) return Number(item.customMlPerServing)
-      if (info.mlPerServing && info.mlPerServing > 0) return info.mlPerServing
-      if (info.gramsPerServing && info.gramsPerServing > 0) return info.gramsPerServing // assume ~1g/mL fallback
-      if (fallbackDefault && fallbackDefault > 0) return fallbackDefault * piecesMultiplier
-      if (estimatedGrams && estimatedGrams > 0) return estimatedGrams * piecesMultiplier
+      if (info.mlPerServing && info.mlPerServing > 0) return info.mlPerServing * piecesMultiplier
+      if (info.gramsPerServing && info.gramsPerServing > 0) return info.gramsPerServing * piecesMultiplier // assume ~1g/mL fallback
+      if (fallbackDefault && fallbackDefault > 0) return fallbackDefault * Math.max(1, piecesMultiplier)
+      if (estimatedGrams && estimatedGrams > 0) return estimatedGrams * Math.max(1, piecesMultiplier)
     } else if (unit === 'oz') {
       if (Number.isFinite(item?.customGramsPerServing)) return Number(item.customGramsPerServing) / 28.3495
-      if (info.gramsPerServing && info.gramsPerServing > 0) return info.gramsPerServing / 28.3495
-      if (info.mlPerServing && info.mlPerServing > 0) return info.mlPerServing / 28.3495
-      if (fallbackDefault && fallbackDefault > 0) return (fallbackDefault * piecesMultiplier) / 28.3495
-      if (estimatedGrams && estimatedGrams > 0) return (estimatedGrams * piecesMultiplier) / 28.3495
+      if (info.gramsPerServing && info.gramsPerServing > 0) return (info.gramsPerServing * piecesMultiplier) / 28.3495
+      if (info.mlPerServing && info.mlPerServing > 0) return (info.mlPerServing * piecesMultiplier) / 28.3495
+      if (fallbackDefault && fallbackDefault > 0) return (fallbackDefault * Math.max(1, piecesMultiplier)) / 28.3495
+      if (estimatedGrams && estimatedGrams > 0) return (estimatedGrams * Math.max(1, piecesMultiplier)) / 28.3495
     } else {
       // grams
       if (Number.isFinite(item?.customGramsPerServing)) return Number(item.customGramsPerServing)
-      if (info.gramsPerServing && info.gramsPerServing > 0) return info.gramsPerServing
-      if (fallbackDefault && fallbackDefault > 0) return fallbackDefault * piecesMultiplier
-      if (info.mlPerServing && info.mlPerServing > 0) return info.mlPerServing // assume ~1g/mL fallback
-      if (estimatedGrams && estimatedGrams > 0) return estimatedGrams * piecesMultiplier
+      if (info.gramsPerServing && info.gramsPerServing > 0) return info.gramsPerServing * piecesMultiplier
+      if (fallbackDefault && fallbackDefault > 0) return fallbackDefault * Math.max(1, piecesMultiplier)
+      if (info.mlPerServing && info.mlPerServing > 0) return info.mlPerServing * piecesMultiplier // assume ~1g/mL fallback
+      if (estimatedGrams && estimatedGrams > 0) return estimatedGrams * Math.max(1, piecesMultiplier)
     }
     // Fallback: infer from current weightAmount and servings if present
     const servings = Number.isFinite(Number(item?.servings)) ? Number(item.servings) : null
@@ -3453,7 +3460,11 @@ const applyStructuredItems = (
   const estimateGramsPerServing = (item: any): number | null => {
     const { gramsPerServing, mlPerServing } = parseServingSizeInfo(item)
     const hasKnownWeight = (gramsPerServing && gramsPerServing > 0) || (mlPerServing && mlPerServing > 0)
-    if (hasKnownWeight) return gramsPerServing ?? mlPerServing ?? null
+    if (hasKnownWeight) {
+      const base = gramsPerServing ?? mlPerServing ?? null
+      const multiplier = piecesMultiplierForServing(item)
+      return base && base > 0 ? base * multiplier : base
+    }
 
     const calories = Number(item?.calories)
     const protein = Number(item?.protein_g)
@@ -6707,14 +6718,15 @@ Please add nutritional information manually if needed.`);
                         </button>
                       </div>
                       {analyzedItems.map((item: any, index: number) => {
-                        const servingsCount = effectiveServings(item);
-                        const totalCalories = Math.round((item.calories || 0) * servingsCount);
-                        const totalProtein = Math.round(((item.protein_g || 0) * servingsCount) * 10) / 10;
-                        const totalCarbs = Math.round(((item.carbs_g || 0) * servingsCount) * 10) / 10;
-                        const totalFat = Math.round(((item.fat_g || 0) * servingsCount) * 10) / 10;
-                        const totalFiber = Math.round(((item.fiber_g ?? 0) * servingsCount) * 10) / 10;
-                        const totalSugar = Math.round(((item.sugar_g ?? 0) * servingsCount) * 10) / 10;
-                        const formattedServings = `${formatServingsDisplay(servingsCount)} serving${Math.abs(servingsCount - 1) < 0.001 ? '' : 's'}`;
+                        const servingsCount = effectiveServings(item)
+                        const totalCalories = Math.round((item.calories || 0) * servingsCount)
+                        const totalProtein = Math.round(((item.protein_g || 0) * servingsCount) * 10) / 10
+                        const totalCarbs = Math.round(((item.carbs_g || 0) * servingsCount) * 10) / 10
+                        const totalFat = Math.round(((item.fat_g || 0) * servingsCount) * 10) / 10
+                        const totalFiber = Math.round(((item.fiber_g ?? 0) * servingsCount) * 10) / 10
+                        const totalSugar = Math.round(((item.sugar_g ?? 0) * servingsCount) * 10) / 10
+                        const formattedServings = `${formatServingsDisplay(servingsCount)} serving${Math.abs(servingsCount - 1) < 0.001 ? '' : 's'}`
+                        const baseWeightPerServing = getBaseWeightPerServing(item)
 
                         const totalsByField: Record<string, number | null> = {
                           calories: totalCalories,
@@ -6723,7 +6735,7 @@ Please add nutritional information manually if needed.`);
                           fat_g: totalFat,
                           fiber_g: totalFiber,
                           sugar_g: totalSugar,
-                        };
+                        }
                         // Prefer an explicit serving_size from the item; if missing, try to
                         // derive one from the name in parentheses, e.g. "Grilled Salmon (6 oz)"
                         const servingSizeLabel = (() => {
@@ -6737,6 +6749,10 @@ Please add nutritional information manually if needed.`);
                         const servingInfo = parseServingSizeInfo({ serving_size: servingSizeLabel })
                         const gramsPerServing = servingInfo.gramsPerServing
                         const mlPerServing = servingInfo.mlPerServing
+                        const declaredQty =
+                          servingUnitMeta && Number.isFinite(servingUnitMeta.quantity) && servingUnitMeta.quantity > 0
+                            ? Number(servingUnitMeta.quantity)
+                            : 1
                         const portionMode = item?.portionMode === 'weight' ? 'weight' : 'servings'
                         const weightUnit = item?.weightUnit === 'ml' ? 'ml' : item?.weightUnit === 'oz' ? 'oz' : 'g'
                         const weightAmount =
@@ -6759,6 +6775,8 @@ Please add nutritional information manually if needed.`);
                             servingUnitMeta.quantity > 0
                             ? servingUnitMeta.quantity
                             : null)
+                        const piecesDisplayMultiplier =
+                          piecesPerServing && piecesPerServing > 1 && declaredQty <= 1 ? piecesPerServing : null
                         const servingsStep =
                           piecesPerServing && piecesPerServing > 0 ? 1 / piecesPerServing : 0.25
                         const pieceCount =
@@ -6780,6 +6798,15 @@ Please add nutritional information manually if needed.`);
                           piecesPerServing && piecesPerServing > 1
                             ? `${formatNumberInputValue(piecesPerServing)} ${cleanBaseName}`.trim()
                             : cleanBaseName
+                        const servingSizeDisplayLabel = (() => {
+                          if (piecesDisplayMultiplier && servingSizeLabel) {
+                            const withoutLeadingOne = servingSizeLabel.replace(/^\s*1\s+/, '').trim()
+                            const baseLabel = withoutLeadingOne || servingSizeLabel
+                            const suffix = servingSizeLabel.includes('(') ? ' each' : ''
+                            return `${formatNumberInputValue(piecesDisplayMultiplier)} ${baseLabel}${suffix}`.trim()
+                          }
+                          return servingSizeLabel
+                        })()
 
                         const isMultiIngredient = analyzedItems.length > 1
                         const isExpanded = !isMultiIngredient || expandedItemIndex === index
@@ -6811,7 +6838,7 @@ Please add nutritional information manually if needed.`);
                                       <div className="text-sm text-gray-600 mt-0.5">Brand: {item.brand}</div>
                                     )}
                                     <div className="text-sm text-gray-500 mt-1">
-                                      Serving size: {formatServingSizeDisplay(servingSizeLabel || '', item)}
+                                      Serving size: {formatServingSizeDisplay(servingSizeDisplayLabel || '', item)}
                                     </div>
                                   </>
                                 )}
@@ -6942,8 +6969,8 @@ Please add nutritional information manually if needed.`);
                                       </div>
                                     </div>
                                     <div className="text-xs text-gray-500">
-                                      {servingSizeLabel
-                                        ? `1 serving = ${servingSizeLabel}`
+                                      {servingSizeDisplayLabel
+                                        ? `1 serving = ${servingSizeDisplayLabel}`
                                         : 'Serving size not specified'}
                                     </div>
                                     {/* Pieces control for discrete items */}
@@ -6981,9 +7008,9 @@ Please add nutritional information manually if needed.`);
                                         </div>
                                       </div>
                                     )}
-                                    {gramsPerServing && (
+                                    {baseWeightPerServing && (
                                       <div className="text-xs text-gray-500">
-                                        Total amount ≈ {Math.round(gramsPerServing * servingsCount)} g
+                                        Total amount ≈ {Math.round(baseWeightPerServing * servingsCount)} g
                                       </div>
                                     )}
                                   </>
@@ -6997,7 +7024,7 @@ Please add nutritional information manually if needed.`);
                                         enterKeyHint="done"
                                         min={0}
                                         step={1}
-                                        value={formatNumberInputValue(weightAmount ?? (weightUnit === 'ml' ? mlPerServing || '' : gramsPerServing || ''))}
+                                        value={formatNumberInputValue(weightAmount ?? baseWeightPerServing ?? (weightUnit === 'ml' ? mlPerServing || '' : gramsPerServing || ''))}
                                         onFocus={handleNumericFocus}
                                         onBlur={handleNumericBlur}
                                         onKeyDown={handleNumericKeyDown}
@@ -7016,10 +7043,10 @@ Please add nutritional information manually if needed.`);
                                     </div>
                                     {(gramsPerServing || mlPerServing || item.customGramsPerServing || item.customMlPerServing) && (
                                       <div className="text-xs text-gray-500">
-                                        {servingSizeLabel
-                                          ? `1 serving = ${servingSizeLabel}`
-                                          : gramsPerServing
-                                          ? `1 serving ≈ ${Math.round(gramsPerServing * 100) / 100} g`
+                                        {servingSizeDisplayLabel
+                                          ? `1 serving = ${servingSizeDisplayLabel}`
+                                          : baseWeightPerServing
+                                          ? `1 serving ≈ ${Math.round(baseWeightPerServing * 100) / 100} g`
                                           : mlPerServing
                                           ? `1 serving ≈ ${Math.round(mlPerServing * 100) / 100} mL`
                                           : item.customGramsPerServing
