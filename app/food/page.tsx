@@ -638,8 +638,12 @@ const isDiscreteUnitLabel = (label: string) => {
   ]
   if (nonDiscreteUnits.some(u => l === u || l.endsWith(' ' + u))) return false
   const discreteKeywords = [
-    'egg','slice','cookie','piece','patty','pattie','wing','nugget','meatball','stick','bar','biscuit','pancake','scoop',
-    'cracker','crackers','chip','chips'
+  'egg','slice','cookie','piece','patty','pattie','wing','nugget','meatball','stick','bar','biscuit','pancake','scoop',
+  'cracker','crackers','chip','chips',
+  // whole-vegetable / whole-fruit pieces
+  'zucchini','zucchinis','courgette','courgettes',
+  'carrot','carrots','cucumber','cucumbers',
+  'banana','bananas','apple','apples','tomato','tomatoes'
   ]
   return discreteKeywords.some(k => l.includes(k))
 }
@@ -651,6 +655,10 @@ const getPiecesPerServing = (item: any): number | null => {
     ? Number((item as any).piecesPerServing)
     : null
   if (explicitPieces && explicitPieces > 0) return explicitPieces
+
+  // Fallback to pieces count if provided (backend may set pieces but not piecesPerServing)
+  const explicitPiecesField = Number.isFinite(Number((item as any)?.pieces)) ? Number((item as any).pieces) : null
+  if (explicitPiecesField && explicitPiecesField > 0) return explicitPiecesField
   if (!source) return null
   if (!isDiscreteUnitLabel(source)) return null
 
@@ -771,10 +779,20 @@ const normalizeDiscreteItem = (item: any) => {
       Number.isFinite(Number(working?.servings)) && Number(working.servings) > 0
         ? Number(working.servings)
         : 1
+    const fallbackPieces =
+      Number.isFinite(Number(working?.pieces)) && Number(working.pieces) > 0 ? Number(working.pieces) : null
     if ((!working.piecesPerServing || working.piecesPerServing <= 0) && incomingServings > 1) {
       working.piecesPerServing = incomingServings
     }
+    if (!working.piecesPerServing && fallbackPieces) {
+      working.piecesPerServing = fallbackPieces
+    }
+    // Clamp base servings to 1; pieces capture the count
     working.servings = 1
+    // Keep pieces aligned with piecesPerServing
+    if (working.piecesPerServing && (!working.pieces || working.pieces <= 0)) {
+      working.pieces = working.piecesPerServing
+    }
   }
 
   const { gramsPerServing, mlPerServing } = quickParseServingSize(working?.serving_size)
