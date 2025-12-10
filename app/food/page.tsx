@@ -693,6 +693,35 @@ const replaceWordNumbers = (text: string) => {
   )
 }
 
+const parseCountFromFreeText = (text: string | null | undefined): number | null => {
+  if (!text) return null
+  const numeric = text.match(/(\d+(?:\.\d+)?)/)
+  if (numeric) {
+    const n = parseFloat(numeric[1])
+    if (Number.isFinite(n) && n > 0) return n
+  }
+  const wordMatch = text.match(/\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b/i)
+  if (wordMatch) {
+    const map: Record<string, number> = {
+      one: 1,
+      two: 2,
+      three: 3,
+      four: 4,
+      five: 5,
+      six: 6,
+      seven: 7,
+      eight: 8,
+      nine: 9,
+      ten: 10,
+      eleven: 11,
+      twelve: 12,
+    }
+    const n = map[wordMatch[1].toLowerCase()]
+    if (n) return n
+  }
+  return null
+}
+
 // Detect bogus macro-only item names like "6g of protein" or "3g carbs" with no food keyword.
 const isMacroOnlyName = (nameRaw: string) => {
   const name = (nameRaw || '').trim().toLowerCase()
@@ -1871,7 +1900,23 @@ const applyStructuredItems = (
 
   const filteredItems = stripGenericPlateItems(estimatedItems, analysisText)
   const itemsToUseRaw = filteredItems.length > 0 ? filteredItems : fallbackExistingItems
-  const itemsToUse = itemsToUseRaw.map(normalizeDiscreteItem)
+  const inferredCount = parseCountFromFreeText(analysisText || '')
+  const itemsToUse = itemsToUseRaw.map((it) => {
+    const next = normalizeDiscreteItem(it)
+    const looksEgg =
+      String(next?.name || '').toLowerCase().includes('egg') ||
+      String(next?.serving_size || '').toLowerCase().includes('egg')
+    if (
+      looksEgg &&
+      (!next.piecesPerServing || next.piecesPerServing <= 0) &&
+      inferredCount &&
+      inferredCount > 1
+    ) {
+      next.piecesPerServing = inferredCount
+      next.servings = 1
+    }
+    return next
+  })
 
   setAnalyzedItems(itemsToUse)
 
