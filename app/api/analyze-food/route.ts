@@ -119,6 +119,43 @@ const chooseCanonicalTotal = (items: any[] | null | undefined, incomingTotal: an
   return sumFromItems || incomingTotal || null;
 };
 
+const EGG_KEYWORDS = ['egg', 'eggs', 'fried egg', 'boiled egg', 'scrambled egg', 'omelette', 'omelet'];
+
+const enforceEggCountFromAnalysis = (items: any[] | null | undefined, analysis: string | null | undefined) => {
+  if (!items || !Array.isArray(items) || items.length === 0) return items;
+  const text = (analysis || '').toLowerCase();
+  const inferredCount = parseCountFromText(text);
+  if (!inferredCount || inferredCount < 2) return items;
+
+  const looksLikeEgg = (name: string) => {
+    const lower = name.toLowerCase();
+    return EGG_KEYWORDS.some((k) => lower.includes(k));
+  };
+
+  const next = [...items];
+  const first = { ...next[0] };
+  if (!looksLikeEgg(String(first.name || '')) && !looksLikeEgg(String(first.serving_size || ''))) {
+    return items;
+  }
+
+  const factor = inferredCount / Math.max(Number(first.servings) || 1, 1);
+  const scaleField = (v: any) => (Number.isFinite(Number(v)) ? Math.round(Number(v) * factor * 10) / 10 : null);
+
+  first.serving_size = `${inferredCount} eggs`;
+  first.servings = 1;
+  (first as any).pieces = inferredCount;
+  (first as any).piecesPerServing = inferredCount;
+  first.calories = scaleField(first.calories);
+  first.protein_g = scaleField(first.protein_g);
+  first.carbs_g = scaleField(first.carbs_g);
+  first.fat_g = scaleField(first.fat_g);
+  if (first.fiber_g !== null && first.fiber_g !== undefined) first.fiber_g = scaleField(first.fiber_g);
+  if (first.sugar_g !== null && first.sugar_g !== undefined) first.sugar_g = scaleField(first.sugar_g);
+
+  next[0] = first;
+  return next;
+};
+
 // Quick sanity checks for structured items
 const summarizeItemsForLog = (items: any[]) =>
   Array.isArray(items)
@@ -718,13 +755,6 @@ const ensureBurgerComponents = (items: any[] | null, analysis: string | null | u
   const total = computeTotalsFromItems(base);
   return { items: base, total };
 };
-
-// In-memory cache for repeated photo analyses (keyed by image hash).
-// Avoids re-calling the model and keeps macros consistent for the same photo.
-const imageAnalysisCache = new Map<
-  string,
-  { analysis: string; items: any[] | null; total: any | null }
->();
 
 // Detect when the AI returned a generic single card instead of per-component items
 const looksLikeSingleGenericItem = (items: any[] | null | undefined): boolean => {
@@ -1769,6 +1799,13 @@ CRITICAL REQUIREMENTS:
       } else if (!resp.total) {
         resp.total = computeTotalsFromItems(resp.items);
       }
+    }
+
+    // Egg-specific enforcement: if analysis text says "two eggs" (or any number >=2),
+    // force the payload to that count, with pieces/serving_size updated and macros scaled.
+    resp.items = enforceEggCountFromAnalysis(resp.items, analysis);
+    if (resp.items && (!resp.total || !isPlausibleTotal(resp.total))) {
+      resp.total = computeTotalsFromItems(resp.items);
     }
 
     // Enforce multi-item output for meal analyses (non-packaged) so the UI never shows a single card.
