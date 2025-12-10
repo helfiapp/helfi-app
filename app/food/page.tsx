@@ -96,7 +96,10 @@ const buildMealSummaryFromItems = (items: any[] | null | undefined) => {
   const summaryParts = items.map((item) => {
     const pieces: string[] = []
     const servings = Number(item?.servings)
-    if (Number.isFinite(servings) && Math.abs(servings - 1) > 0.001) {
+    const piecesCount = Number((item as any)?.piecesPerServing) || Number((item as any)?.pieces)
+    if (Number.isFinite(piecesCount) && piecesCount > 1) {
+      pieces.push(`${Math.round(piecesCount)}`)
+    } else if (Number.isFinite(servings) && Math.abs(servings - 1) > 0.001) {
       pieces.push(`${formatServingsDisplay(servings)}×`)
     }
     if (item?.brand) {
@@ -666,10 +669,6 @@ const getPiecesPerServing = (item: any): number | null => {
     const n = map[wordMatch[1].toLowerCase()]
     if (n) return n
   }
-
-  const servings = Number.isFinite(Number(item?.servings)) ? Number(item.servings) : null
-  if (servings && servings > 1) return servings
-  // Fallback to explicit pieces hint if present
   return null
 }
 
@@ -1831,8 +1830,9 @@ const applyStructuredItems = (
   const curatedEnriched =
     finalItems.length > 0 ? enrichItemsFromCuratedUsda(finalItems) : []
   const enrichedItems = curatedEnriched.length > 0 ? enrichItemsFromStarter(curatedEnriched) : []
-  const normalizedItems =
-    enrichedItems.length > 0 ? normalizeDiscreteServingsWithLabel(enrichedItems) : []
+  // The backend now returns correct discrete counts (piecesPerServing, servings=1).
+  // Do NOT re-normalize discrete servings here, or we risk doubling pieces.
+  const normalizedItems = enrichedItems
 
   const addEstimatedServingWeights = (items: any[]) =>
     items.map((it) => {
@@ -3461,15 +3461,6 @@ const applyStructuredItems = (
   const effectiveServings = (item: any) => {
     const mode = item?.portionMode === 'weight' ? 'weight' : 'servings'
     const baseServings = item?.servings && Number.isFinite(item.servings) && item.servings > 0 ? item.servings : 1
-    const piecesCount =
-      Number.isFinite(Number((item as any)?.piecesPerServing)) && Number((item as any).piecesPerServing) > 0
-        ? Number((item as any).piecesPerServing)
-        : null
-
-    // For discrete items, keep servings at the labeled base but scale totals by pieces.
-    if (mode !== 'weight' && piecesCount && piecesCount > 1) {
-      return baseServings * piecesCount
-    }
 
     if (mode !== 'weight') return baseServings
 
@@ -6728,13 +6719,7 @@ Please add nutritional information manually if needed.`);
                             : null)
                         const servingsStep =
                           piecesPerServing && piecesPerServing > 0 ? 1 / piecesPerServing : 0.25
-                        let pieceCount =
-                          piecesPerServing && servingsCount >= 0
-                            ? Math.max(0, Math.round(servingsCount * piecesPerServing * 1000) / 1000)
-                            : null
-                        if (pieceCount === null && piecesPerServing && piecesPerServing > 0) {
-                          pieceCount = piecesPerServing
-                        }
+                        const pieceCount = piecesPerServing && piecesPerServing > 0 ? piecesPerServing : null
 
                         const isMultiIngredient = analyzedItems.length > 1
                         const isExpanded = !isMultiIngredient || expandedItemIndex === index
