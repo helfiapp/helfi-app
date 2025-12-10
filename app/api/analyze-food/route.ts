@@ -123,6 +123,26 @@ const validateStructuredItems = (items: any[]): boolean => {
   return realisticCount >= 1;
 };
 
+// Very small heuristic map to seed guessed macros when the AI misses structured items.
+const estimatedGuessMacrosForName = (nameRaw: string) => {
+  const name = (nameRaw || '').toLowerCase();
+  // Defaults are conservative single-portion estimates.
+  if (name.includes('chicken')) return { calories: 220, protein_g: 32, carbs_g: 0, fat_g: 8 };
+  if (name.includes('beef') || name.includes('steak')) return { calories: 250, protein_g: 30, carbs_g: 0, fat_g: 14 };
+  if (name.includes('pork')) return { calories: 240, protein_g: 27, carbs_g: 0, fat_g: 14 };
+  if (name.includes('salmon') || name.includes('fish')) return { calories: 220, protein_g: 25, carbs_g: 0, fat_g: 13 };
+  if (name.includes('potato')) return { calories: 150, protein_g: 3, carbs_g: 32, fat_g: 3 };
+  if (name.includes('sweet potato')) return { calories: 140, protein_g: 3, carbs_g: 33, fat_g: 0.5 };
+  if (name.includes('peas')) return { calories: 70, protein_g: 4, carbs_g: 12, fat_g: 0.5 };
+  if (name.includes('broccoli')) return { calories: 35, protein_g: 2.5, carbs_g: 7, fat_g: 0.5 };
+  if (name.includes('carrot')) return { calories: 45, protein_g: 1, carbs_g: 10, fat_g: 0.2 };
+  if (name.includes('mushroom')) return { calories: 20, protein_g: 3, carbs_g: 3, fat_g: 0.3 };
+  if (name.includes('rice')) return { calories: 200, protein_g: 4, carbs_g: 44, fat_g: 0.5 };
+  if (name.includes('bread') || name.includes('bun')) return { calories: 150, protein_g: 5, carbs_g: 28, fat_g: 3 };
+  // Fallback generic side.
+  return { calories: 90, protein_g: 2, carbs_g: 12, fat_g: 3 };
+};
+
 // Pull likely components from the AI's prose description to add missing guessed items.
 const inferComponentsFromAnalysis = (analysis: string | null | undefined): string[] => {
   if (!analysis) return [];
@@ -1668,15 +1688,16 @@ CRITICAL REQUIREMENTS:
         for (const name of inferred) {
           const key = name.toLowerCase();
           if (existingNames.has(key)) continue;
+          const guess = estimatedGuessMacrosForName(name);
           additions.push({
             name,
             brand: null,
             serving_size: '1 serving',
             servings: 1,
-            calories: null,
-            protein_g: null,
-            carbs_g: null,
-            fat_g: null,
+            calories: guess.calories,
+            protein_g: guess.protein_g,
+            carbs_g: guess.carbs_g,
+            fat_g: guess.fat_g,
             fiber_g: null,
             sugar_g: null,
             isGuess: true,
