@@ -648,17 +648,27 @@ const isDiscreteUnitLabel = (label: string) => {
   return discreteKeywords.some(k => l.includes(k))
 }
 
+const getExplicitPieces = (item: any): number | null => {
+  const candidates = [
+    (item as any)?.piecesPerServing,
+    (item as any)?.pieces_per_serving,
+    (item as any)?.pieces,
+    (item as any)?.pieceCount,
+    (item as any)?.piece_count,
+  ]
+  for (const candidate of candidates) {
+    const n = Number(candidate)
+    if (Number.isFinite(n) && n > 0) return n
+  }
+  return null
+}
+
 // Extract pieces-per-serving for discrete items from serving_size or name (supports digit or word numbers)
 const getPiecesPerServing = (item: any): number | null => {
   const source = `${item?.serving_size || ''} ${item?.name || ''}`.trim().toLowerCase()
-  const explicitPieces = Number.isFinite(Number((item as any)?.piecesPerServing))
-    ? Number((item as any).piecesPerServing)
-    : null
+  const explicitPieces = getExplicitPieces(item)
   if (explicitPieces && explicitPieces > 0) return explicitPieces
 
-  // Fallback to pieces count if provided (backend may set pieces but not piecesPerServing)
-  const explicitPiecesField = Number.isFinite(Number((item as any)?.pieces)) ? Number((item as any).pieces) : null
-  if (explicitPiecesField && explicitPiecesField > 0) return explicitPiecesField
   if (!source) return null
   if (!isDiscreteUnitLabel(source)) return null
 
@@ -773,14 +783,18 @@ const normalizeDiscreteItem = (item: any) => {
   }
 
   // For discrete items, keep base servings at 1 so the input matches the label; pieces captures the count.
-  const isDiscrete = isDiscreteUnitLabel(normalizedServingSize) || isDiscreteUnitLabel(normalizedName)
+  const isDiscrete =
+    (piecesPerServing && piecesPerServing > 0) ||
+    isDiscreteUnitLabel(normalizedServingSize) ||
+    isDiscreteUnitLabel(normalizedName)
   if (isDiscrete) {
     const incomingServings =
       Number.isFinite(Number(working?.servings)) && Number(working.servings) > 0
         ? Number(working.servings)
         : 1
     const fallbackPieces =
-      Number.isFinite(Number(working?.pieces)) && Number(working.pieces) > 0 ? Number(working.pieces) : null
+      getExplicitPieces(working) ??
+      (Number.isFinite(Number(working?.pieces)) && Number(working.pieces) > 0 ? Number(working.pieces) : null)
     if ((!working.piecesPerServing || working.piecesPerServing <= 0) && incomingServings > 1) {
       working.piecesPerServing = incomingServings
     }
