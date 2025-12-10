@@ -6719,7 +6719,10 @@ Please add nutritional information manually if needed.`);
                             : null)
                         const servingsStep =
                           piecesPerServing && piecesPerServing > 0 ? 1 / piecesPerServing : 0.25
-                        const pieceCount = piecesPerServing && piecesPerServing > 0 ? piecesPerServing : null
+                        const pieceCount =
+                          piecesPerServing && piecesPerServing > 0
+                            ? Math.max(0, Math.round(servingsCount * piecesPerServing * 1000) / 1000)
+                            : null
 
                         const cleanBaseName = (() => {
                           const raw = String(item.name || 'Unknown Food')
