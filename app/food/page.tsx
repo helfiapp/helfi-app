@@ -1935,15 +1935,15 @@ const applyStructuredItems = (
   const inferredCount = parseCountFromFreeText(analysisText || '')
   const itemsToUse = itemsToUseRaw.map((it: any) => {
     const next = normalizeDiscreteItem(it)
-    // Apply analysis-text inferred count to ANY discrete item missing piecesPerServing
-    // (previously was eggs-only; now includes carrots, zucchinis, bananas, etc.)
+    // Apply analysis-text inferred count to discrete items when it beats the current piecesPerServing
+    // (previously was eggs-only; now overrides serving_size "1 medium" defaults for produce, etc.)
     const itemLabel = `${String(next?.name || '')} ${String(next?.serving_size || '')}`.toLowerCase()
     const isDiscrete = isDiscreteUnitLabel(itemLabel)
     if (
       isDiscrete &&
-      (!next.piecesPerServing || next.piecesPerServing <= 0) &&
       inferredCount &&
-      inferredCount > 1
+      inferredCount > 1 &&
+      inferredCount > (next.piecesPerServing || 1)
     ) {
       next.piecesPerServing = inferredCount
       next.pieces = inferredCount
