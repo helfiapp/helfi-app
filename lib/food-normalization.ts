@@ -116,7 +116,10 @@ const inferPiecesFromLabel = (name?: string | null, servingSize?: string | null)
   return null
 }
 
-export const normalizeDiscreteItemCounts = (item: any): { item: any; changed: boolean; debug?: any } => {
+export const normalizeDiscreteItemCounts = (
+  item: any,
+  options?: { analysisText?: string | null },
+): { item: any; changed: boolean; debug?: any } => {
   if (!item || typeof item !== 'object') return { item, changed: false }
 
   const next = { ...item }
@@ -133,14 +136,22 @@ export const normalizeDiscreteItemCounts = (item: any): { item: any; changed: bo
       ? Number((next as any).piecesPerServing)
       : null
   const inferredPieces = inferPiecesFromLabel(next.name, next.serving_size || (next as any).servingSize)
+  const inferredFromAnalysis = options?.analysisText ? parseCountFromText(options.analysisText) : null
 
-  let piecesPerServing = existingPiecesPerServing || inferredPieces || null
+  let piecesPerServing = existingPiecesPerServing || inferredPieces || inferredFromAnalysis || null
   let servings = initialServings
   let changed = false
 
   // Plan rule: single discrete item with servings > 1 but no pieces → set piecesPerServing = servings, clamp servings = 1
   if (servings > 1 && !piecesPerServing) {
     piecesPerServing = servings
+    servings = 1
+    changed = true
+  }
+
+  // If analysis text suggests a larger count than the label, prefer the analysis hint.
+  if (inferredFromAnalysis && (!piecesPerServing || inferredFromAnalysis > piecesPerServing)) {
+    piecesPerServing = inferredFromAnalysis
     servings = 1
     changed = true
   }
@@ -177,7 +188,10 @@ export const normalizeDiscreteItemCounts = (item: any): { item: any; changed: bo
   }
 }
 
-export const normalizeDiscreteItems = (items: any[]): { items: any[]; changed: boolean; debug: any[] } => {
+export const normalizeDiscreteItems = (
+  items: any[],
+  options?: { analysisText?: string | null },
+): { items: any[]; changed: boolean; debug: any[] } => {
   if (!Array.isArray(items) || items.length === 0) return { items, changed: false, debug: [] }
 
   const normalized: any[] = []
@@ -185,7 +199,7 @@ export const normalizeDiscreteItems = (items: any[]): { items: any[]; changed: b
   let changed = false
 
   for (const item of items) {
-    const { item: next, changed: itemChanged, debug: d } = normalizeDiscreteItemCounts(item)
+    const { item: next, changed: itemChanged, debug: d } = normalizeDiscreteItemCounts(item, options)
     normalized.push(next)
     if (itemChanged) changed = true
     if (d) debug.push(d)

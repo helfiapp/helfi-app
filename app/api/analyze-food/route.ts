@@ -1741,7 +1741,7 @@ CRITICAL REQUIREMENTS:
     // Normalize guess flags, discrete counts (pieces/servings), and convert word numbers to numerals.
     if (resp.items && Array.isArray(resp.items)) {
       resp.items = normalizeGuessFlags(resp.items);
-      const discreteNormalized = normalizeDiscreteItems(resp.items);
+      const discreteNormalized = normalizeDiscreteItems(resp.items, { analysisText: analysis });
       resp.items = discreteNormalized.items;
       if (discreteNormalized.changed && (!resp.total || Object.keys(resp.total || {}).length === 0)) {
         resp.total = computeTotalsFromItems(resp.items);

@@ -29,6 +29,30 @@ const tests: TestCase[] = [
     },
   },
   {
+    name: 'analysis text count seeds pieces when label is singular',
+    run: () => {
+      const normalized = normalizeDiscreteItems(
+        [
+          {
+            name: 'Fried egg',
+            serving_size: '1 egg',
+            servings: 1,
+            calories: 140,
+            protein_g: 12,
+            carbs_g: 0.5,
+            fat_g: 10,
+          },
+        ],
+        { analysisText: 'Two fried eggs on a plate' },
+      )
+      const item = normalized.items[0]
+      console.log('DEBUG item (analysis count test):', item)
+      assert(item.piecesPerServing === 2, `piecesPerServing should follow analysis text (2 eggs); got ${item.piecesPerServing}`)
+      assert(item.servings === 1, 'servings should stay at 1')
+      assert(item.pieces === 2, `pieces should seed from analysis count; got ${item.pieces}`)
+    },
+  },
+  {
     name: 'per-100g barcode entries scale by serving weight',
     run: () => {
       const { food } = normalizeBarcodeFood({
