@@ -6721,6 +6721,21 @@ Please add nutritional information manually if needed.`);
                           piecesPerServing && piecesPerServing > 0 ? 1 / piecesPerServing : 0.25
                         const pieceCount = piecesPerServing && piecesPerServing > 0 ? piecesPerServing : null
 
+                        const cleanBaseName = (() => {
+                          const raw = String(item.name || 'Unknown Food')
+                          const strippedNumeric = raw.replace(/^\s*\d+(\.\d+)?\s+/, '')
+                          const strippedWord = strippedNumeric.replace(
+                            /^\s*(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s+/i,
+                            '',
+                          )
+                          const trimmed = strippedWord.trim()
+                          return trimmed || 'Unknown Food'
+                        })()
+                        const displayName =
+                          piecesPerServing && piecesPerServing > 1
+                            ? `${formatNumberInputValue(piecesPerServing)} ${cleanBaseName}`.trim()
+                            : cleanBaseName
+
                         const isMultiIngredient = analyzedItems.length > 1
                         const isExpanded = !isMultiIngredient || expandedItemIndex === index
                         
@@ -6737,7 +6752,7 @@ Please add nutritional information manually if needed.`);
                               <div className="flex-1">
                                 <div className="flex items-center gap-2">
                                   <div className="font-semibold text-gray-900 text-base">
-                                    {item.name || 'Unknown Food'}
+                                    {displayName}
                                   </div>
                                   {item.isGuess && (
                                     <span className="px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-800 rounded-full border border-amber-200">
