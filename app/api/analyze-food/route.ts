@@ -19,6 +19,7 @@ import { searchFatSecretFoods } from '@/lib/food-data';
 import { CreditManager, CREDIT_COSTS } from '@/lib/credit-system';
 import crypto from 'crypto';
 import { consumeRateLimit } from '@/lib/rate-limit';
+import { normalizeDiscreteItems, summarizeDiscreteItemsForLog } from '@/lib/food-normalization';
 
 // Bump this when changing curated nutrition to invalidate old cached images.
 const CACHE_VERSION = 'v3';
@@ -91,6 +92,31 @@ const computeTotalsFromItems = (items: any[]): any | null => {
     fiber_g: totals.fiber_g > 0 ? round(totals.fiber_g) : null,
     sugar_g: totals.sugar_g > 0 ? round(totals.sugar_g) : null,
   };
+};
+
+const isPlausibleTotal = (total: any): boolean => {
+  if (!total || typeof total !== 'object') return false;
+  const calories = Number((total as any)?.calories);
+  if (!Number.isFinite(calories) || calories <= 0 || calories > 5000) return false;
+  return true;
+};
+
+const chooseCanonicalTotal = (items: any[] | null | undefined, incomingTotal: any | null | undefined) => {
+  const sumFromItems = computeTotalsFromItems(items || []);
+
+  if (incomingTotal && isPlausibleTotal(incomingTotal)) {
+    if (sumFromItems && isPlausibleTotal(sumFromItems)) {
+      const diff = Math.abs(Number((incomingTotal as any).calories) - Number((sumFromItems as any).calories));
+      const ratio = Number((sumFromItems as any).calories) > 0 ? diff / Number((sumFromItems as any).calories) : 0;
+      if (ratio <= 0.35) {
+        return incomingTotal;
+      }
+    } else {
+      return incomingTotal;
+    }
+  }
+
+  return sumFromItems || incomingTotal || null;
 };
 
 // Quick sanity checks for structured items
@@ -1712,9 +1738,18 @@ CRITICAL REQUIREMENTS:
       }
     }
 
-    // Normalize guess flags and discrete counts (convert word numbers to numerals).
+    // Normalize guess flags, discrete counts (pieces/servings), and convert word numbers to numerals.
     if (resp.items && Array.isArray(resp.items)) {
-      resp.items = normalizeDiscreteCounts(normalizeGuessFlags(resp.items));
+      resp.items = normalizeGuessFlags(resp.items);
+      const discreteNormalized = normalizeDiscreteItems(resp.items);
+      resp.items = discreteNormalized.items;
+      if (discreteNormalized.changed && (!resp.total || Object.keys(resp.total || {}).length === 0)) {
+        resp.total = computeTotalsFromItems(resp.items);
+      }
+      if (discreteNormalized.debug.length > 0) {
+        console.log('[FOOD_DEBUG] discrete normalization preview', discreteNormalized.debug.slice(0, 4));
+      }
+      resp.items = normalizeDiscreteCounts(resp.items);
       if (!resp.total || Object.keys(resp.total || {}).length === 0) {
         resp.total = computeTotalsFromItems(resp.items);
       }
@@ -1781,6 +1816,9 @@ CRITICAL REQUIREMENTS:
       }
     }
 
+    // Stabilize totals: prefer plausible incoming total when it roughly matches per-item sums; otherwise recompute from items.
+    resp.total = chooseCanonicalTotal(resp.items, resp.total);
+
     // Packaged mode: skip secondary OpenAI per-serving extraction to keep one API call per analysis.
     if (packagedMode && resp.items && Array.isArray(resp.items) && resp.items.length > 0 && imageDataUrl) {
       console.log('ℹ️ Packaged mode active; secondary per-serving OpenAI call disabled to reduce usage.');
@@ -1832,6 +1870,11 @@ CRITICAL REQUIREMENTS:
       itemsPreview: summarizeItemsForLog(resp.items || []),
     };
     console.log('[FOOD_DEBUG] structured summary', finalSummary);
+
+    const discreteLog = summarizeDiscreteItemsForLog(resp.items || []);
+    if (discreteLog.length > 0) {
+      console.log('[FOOD_DEBUG] discrete items', discreteLog);
+    }
 
     // Log AI usage for the main Food Analyzer (fire-and-forget).
     // Use the primary analysis tokens and the total combined cost (analysis + follow-ups).

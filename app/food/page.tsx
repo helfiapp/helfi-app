@@ -1901,7 +1901,7 @@ const applyStructuredItems = (
   const filteredItems = stripGenericPlateItems(estimatedItems, analysisText)
   const itemsToUseRaw = filteredItems.length > 0 ? filteredItems : fallbackExistingItems
   const inferredCount = parseCountFromFreeText(analysisText || '')
-  const itemsToUse = itemsToUseRaw.map((it) => {
+  const itemsToUse = itemsToUseRaw.map((it: any) => {
     const next = normalizeDiscreteItem(it)
     const looksEgg =
       String(next?.name || '').toLowerCase().includes('egg') ||
