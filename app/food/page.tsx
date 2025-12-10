@@ -1960,6 +1960,23 @@ const applyStructuredItems = (
       next.pieces = inferredCount
       next.servings = 1
     }
+    // If we have multiple pieces, re-seed weight using the combined estimate (previous seed may have been per-piece).
+    if (next.piecesPerServing && next.piecesPerServing > 1) {
+      const inferredWeight =
+        estimateGramsPerServing({
+          ...next,
+          customGramsPerServing: null,
+          customMlPerServing: null,
+          weightUnit: 'g',
+        }) || null
+      if (inferredWeight && inferredWeight > 0) {
+        next.customGramsPerServing = inferredWeight
+        if (!next.weightAmount || next.weightAmount < inferredWeight) {
+          next.weightAmount = Math.round(inferredWeight * 100) / 100
+          if (!next.weightUnit) next.weightUnit = 'g'
+        }
+      }
+    }
     return next
   })
 
