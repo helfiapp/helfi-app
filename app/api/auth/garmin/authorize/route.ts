@@ -49,10 +49,10 @@ export async function GET(request: NextRequest) {
     )
     return response
   } catch (error) {
-    console.error('❌ Garmin authorization init failed:', {
-      message: (error as Error)?.message,
-      stack: (error as Error)?.stack,
-    })
-    return NextResponse.json({ error: 'Failed to start Garmin authorization' }, { status: 500 })
+    console.error('❌ Garmin authorization init failed:', error)
+    return NextResponse.json(
+      { error: 'Failed to start Garmin authorization', detail: (error as Error)?.message },
+      { status: 500 }
+    )
   }
 }
