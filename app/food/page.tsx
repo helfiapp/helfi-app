@@ -5173,6 +5173,48 @@ Please add nutritional information manually if needed.`);
     }
   }
 
+  // Copy all entries for a given meal/category to today in one tap (used from the category add menu)
+  const copyCategoryEntriesToToday = async (categoryKey: typeof MEAL_CATEGORY_ORDER[number], entries: any[]) => {
+    if (!entries || entries.length === 0) {
+      showQuickToast(`No ${categoryLabel(categoryKey)} entries to copy`)
+      return
+    }
+    const category = normalizeCategory(categoryKey)
+    const targetDate = todayIso
+    const clones = entries.map((entry: any, idx: number) => {
+      const createdSource = entry?.createdAt || entry?.id || new Date().toISOString()
+      const anchored = alignTimestampToLocalDate(createdSource, targetDate)
+      const time = new Date(anchored).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      const clonedItems =
+        entry.items && Array.isArray(entry.items) && entry.items.length > 0
+          ? JSON.parse(JSON.stringify(entry.items))
+          : null
+      return {
+        ...entry,
+        id: new Date(anchored).getTime() + idx,
+        dbId: undefined,
+        localDate: targetDate,
+        createdAt: anchored,
+        time,
+        meal: category,
+        category,
+        persistedCategory: category,
+        items: clonedItems,
+      }
+    })
+    setSelectedAddCategory(categoryKey)
+    const deduped = dedupeEntries([...clones, ...todaysFoods], { fallbackDate: targetDate })
+    setTodaysFoods(deduped)
+    setExpandedCategories((prev) => ({ ...prev, [categoryKey]: true }))
+    showQuickToast(`Copied ${categoryLabel(categoryKey)} to today`)
+    try {
+      await saveFoodEntries(deduped)
+      await refreshEntriesFromServer()
+    } catch (err) {
+      console.warn('Copy category to today failed', err)
+    }
+  }
+
   const exitEditingSession = () => {
     resetAnalyzerPanel()
     setEditingEntry(null)
@@ -6125,17 +6167,41 @@ Please add nutritional information manually if needed.`);
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                       </svg>
                     </div>
-                    <div className="flex-1">
-                      <div className="text-base font-semibold text-gray-900">Manual Entry</div>
-                      <div className="text-xs text-gray-500">Type your food description</div>
-                    </div>
-                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            </div>
+                                      <div className="flex-1">
+                                        <div className="text-base font-semibold text-gray-900">Manual Entry</div>
+                                        <div className="text-xs text-gray-500">Type your food description</div>
+                                      </div>
+                                      <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                      </svg>
+                                    </button>
+                                    {selectedDate !== todayIso && entries.length > 0 && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setShowPhotoOptions(false);
+                                          setPhotoOptionsAnchor(null);
+                                          copyCategoryEntriesToToday(cat.key, entries);
+                                        }}
+                                        className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
+                                      >
+                                        <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center mr-3 text-emerald-600">
+                                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m-6-6h12" />
+                                          </svg>
+                                        </div>
+                                        <div className="flex-1">
+                                          <div className="text-base font-semibold text-gray-900">Copy {categoryLabel(cat.key)} to Today</div>
+                                          <div className="text-xs text-gray-500">Duplicate all {categoryLabel(cat.key)} entries onto today</div>
+                                        </div>
+                                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                        </svg>
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
           )}
         </div>
         )}
