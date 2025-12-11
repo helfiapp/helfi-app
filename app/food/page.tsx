@@ -1511,6 +1511,13 @@ export default function FoodDiary() {
   const [favorites, setFavorites] = useState<any[]>([])
   const isAddMenuOpen = showCategoryPicker || showPhotoOptions
 
+  // Always scope "today" entries to the currently selected calendar date so cached prior-day rows
+  // (e.g., from warm session storage) can't leak into the visible day.
+  const todaysFoodsForSelectedDate = useMemo(
+    () => filterEntriesForDate(todaysFoods, selectedDate),
+    [todaysFoods, selectedDate],
+  )
+
   const triggerHaptic = (duration: number = 12) => {
     try {
       const reduced = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches
@@ -2333,8 +2340,8 @@ const applyStructuredItems = (
   const normalizeDiaryList = (list: any[]) => (Array.isArray(list) ? list.map(normalizeDiaryEntry) : [])
 
   const sourceEntries = useMemo(
-    () => dedupeEntries(normalizeDiaryList(isViewingToday ? todaysFoods : (historyFoods || [])), { fallbackDate: selectedDate }),
-    [todaysFoods, historyFoods, isViewingToday, deletedEntryNonce, selectedDate],
+    () => dedupeEntries(normalizeDiaryList(isViewingToday ? todaysFoodsForSelectedDate : (historyFoods || [])), { fallbackDate: selectedDate }),
+    [todaysFoodsForSelectedDate, historyFoods, isViewingToday, deletedEntryNonce, selectedDate],
   )
 
   // Close dropdowns on outside click (exclude add-food menu to avoid accidental closes)
@@ -2401,7 +2408,7 @@ const applyStructuredItems = (
 
   // Auto-expand categories that have entries
   useEffect(() => {
-    const source = dedupeEntries(isViewingToday ? todaysFoods : (historyFoods || []), { fallbackDate: selectedDate })
+    const source = dedupeEntries(isViewingToday ? todaysFoodsForSelectedDate : (historyFoods || []), { fallbackDate: selectedDate })
     setExpandedCategories((prev) => {
       const next = { ...prev }
       let changed = false
@@ -2464,7 +2471,7 @@ const applyStructuredItems = (
     if (typeof window === 'undefined') return
     try {
       const snapshot = readPersistentDiarySnapshot() || { byDate: {} }
-      const sourceEntriesForDate = normalizeDiaryList(isViewingToday ? todaysFoods : (historyFoods || []))
+      const sourceEntriesForDate = normalizeDiaryList(isViewingToday ? todaysFoodsForSelectedDate : (historyFoods || []))
       const normalized = dedupeEntries(sourceEntriesForDate, { fallbackDate: selectedDate })
       snapshot.byDate[selectedDate] = {
         entries: normalized,
@@ -4036,7 +4043,7 @@ Please add nutritional information manually if needed.`);
       total: analyzedTotal || (editingEntry.total || null)
     };
 
-    const sourceFoods = isViewingToday ? todaysFoods : (historyFoods || [])
+    const sourceFoods = isViewingToday ? todaysFoodsForSelectedDate : (historyFoods || [])
     const updatedFoods = sourceFoods.map(food => 
       food.id === editingEntry.id ? updatedEntry : food
     );
@@ -7930,10 +7937,10 @@ Please add nutritional information manually if needed.`);
         ) : (
         <div className="overflow-visible space-y-6">
           {/* Daily Totals Row - only show on main diary view, not while editing an entry */}
-          {!editingEntry && dedupeEntries(isViewingToday ? todaysFoods : (historyFoods || []), { fallbackDate: selectedDate }).length > 0 && (
+          {!editingEntry && dedupeEntries(isViewingToday ? todaysFoodsForSelectedDate : (historyFoods || []), { fallbackDate: selectedDate }).length > 0 && (
             <div className="mb-4">
               {(() => {
-                const source = dedupeEntries(isViewingToday ? todaysFoods : (historyFoods || []), { fallbackDate: selectedDate })
+                const source = dedupeEntries(isViewingToday ? todaysFoodsForSelectedDate : (historyFoods || []), { fallbackDate: selectedDate })
 
                 const safeNumber = (value: any) => {
                   const num = Number(value)
