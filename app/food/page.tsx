@@ -1415,6 +1415,8 @@ export default function FoodDiary() {
   const usdaFallbackAttemptedRef = useRef(false)
   const usdaCacheRef = useRef<Map<string, any>>(new Map())
   
+  const [entryTime, setEntryTime] = useState<string>('')
+
   // New loading state
   const [foodDiaryLoaded, setFoodDiaryLoaded] = useState(() => {
     if (warmDiaryState) return true
@@ -4013,9 +4015,20 @@ Please add nutritional information manually if needed.`);
     const fallbackDescription = (editedDescription?.trim?.() || aiDescription || editingEntry.description || '').trim();
     const finalDescription = generatedSummary || fallbackDescription;
 
+    // Calculate new createdAt from entryTime + selectedDate
+    let newCreatedAt = editingEntry.createdAt;
+    if (entryTime) {
+      const [h, m] = entryTime.split(':').map(Number);
+      const [y, mon, d] = (editingEntry.localDate || selectedDate).split('-').map(Number);
+      // Create date in local timezone (browser's)
+      const date = new Date(y, mon - 1, d, h, m, 0, 0);
+      newCreatedAt = date.toISOString();
+    }
+
     const updatedEntry = {
       ...editingEntry,
       localDate: editingEntry.localDate || selectedDate,
+      createdAt: newCreatedAt,
       description: finalDescription,
       photo: photoPreview || editingEntry.photo,
       nutrition: analyzedNutrition || editingEntry.nutrition,
@@ -4049,6 +4062,7 @@ Please add nutritional information manually if needed.`);
             imageUrl: updatedEntry.photo,
             items: updatedEntry.items,
             localDate: updatedEntry.localDate || selectedDate,
+            createdAt: updatedEntry.createdAt,
             meal: updatedEntry.meal || updatedEntry.category,
             category: updatedEntry.category || updatedEntry.meal,
           }),
@@ -4134,6 +4148,7 @@ Please add nutritional information manually if needed.`);
     setShowAddFood(false)
     setShowPhotoOptions(false)
     setPhotoOptionsAnchor(null)
+    setEntryTime('')
   }
 
   const closeAddMenus = () => {
@@ -4175,6 +4190,33 @@ Please add nutritional information manually if needed.`);
 
     setPhotoOptionsPosition({ top, left, width, maxHeight })
   }
+
+  // Initialize entry time when editing starts
+  useEffect(() => {
+    if (editingEntry) {
+      // Try to determine the time from the entry
+      // Use createdAt if available, otherwise try to extract from localDate + default time
+      const ts = editingEntry.createdAt || editingEntry.time || (typeof editingEntry.id === 'number' ? editingEntry.id : null)
+      
+      if (ts) {
+        const date = new Date(ts)
+        if (!isNaN(date.getTime())) {
+          // Format as HH:mm for input type="time"
+          const hours = date.getHours().toString().padStart(2, '0')
+          const minutes = date.getMinutes().toString().padStart(2, '0')
+          setEntryTime(`${hours}:${minutes}`)
+        } else {
+          setEntryTime('')
+        }
+      } else {
+        // Default to current time if no timestamp
+        const now = new Date()
+        const hours = now.getHours().toString().padStart(2, '0')
+        const minutes = now.getMinutes().toString().padStart(2, '0')
+        setEntryTime(`${hours}:${minutes}`)
+      }
+    }
+  }, [editingEntry])
 
   // Guard rail: category "+" must act as a true toggle (tap to open, tap same "+" to close). Do not change to tap-outside-to-close.
   const handleCategoryPlusClick = (key: typeof MEAL_CATEGORY_ORDER[number]) => {
@@ -7474,6 +7516,18 @@ Please add nutritional information manually if needed.`);
                     </div>
                     
                     <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Time
+                        </label>
+                        <input
+                          type="time"
+                          value={entryTime}
+                          onChange={(e) => setEntryTime(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                        />
+                      </div>
+
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Food Name

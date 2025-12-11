@@ -562,7 +562,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { id, description, nutrition, imageUrl, items, localDate, meal, category } = body || {}
+    const { id, description, nutrition, imageUrl, items, localDate, meal, category, createdAt } = body || {}
 
     const logId = typeof id === 'string' && id.trim().length > 0 ? id.trim() : null
     if (!logId) {
@@ -605,6 +605,24 @@ export async function PUT(request: NextRequest) {
       .split('.')[0]
       .trim() || existing.name || 'Food item'
 
+    // Optional createdAt override
+    let normalizedCreatedAt: Date | undefined = undefined
+    if (createdAt) {
+      try {
+        const candidate =
+          createdAt instanceof Date
+            ? createdAt
+            : typeof createdAt === 'number'
+            ? new Date(createdAt)
+            : new Date(createdAt)
+        if (!isNaN(candidate.getTime())) {
+          normalizedCreatedAt = candidate
+        }
+      } catch (e) {
+        console.warn('⚠️ PUT /api/food-log - Failed to parse createdAt override, ignoring:', e)
+      }
+    }
+
     const updated = await prisma.foodLog.update({
       where: { id: logId as any },
       data: {
@@ -616,6 +634,7 @@ export async function PUT(request: NextRequest) {
         localDate: normalizedLocalDate,
         meal: normalizedMeal,
         category: storedCategory,
+        createdAt: normalizedCreatedAt,
       },
     })
 
