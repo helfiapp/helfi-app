@@ -1481,6 +1481,7 @@ export default function FoodDiary() {
   const [showSavedToast, setShowSavedToast] = useState<boolean>(false)
   const [selectedDate, setSelectedDate] = useState<string>(() => initialSelectedDate)
   const categoryRowRefs = useRef<Record<string, HTMLDivElement | null>>({})
+  const backfillAttemptedRef = useRef<Record<string, boolean>>({})
   const [historyFoods, setHistoryFoods] = useState<any[] | null>(() => {
     const warmHistory = warmDiaryState?.historyByDate?.[initialSelectedDate]
     if (Array.isArray(warmHistory)) return warmHistory
@@ -2665,7 +2666,7 @@ const applyStructuredItems = (
                   dbId: l.dbId || l.id,
                   localDate: l.localDate || selectedDate,
                 }));
-                
+
                 // Merge missing entries with enriched cached entries
                 const merged = [...mappedMissing, ...enrichedCached];
                 // Update the appropriate state based on whether we're viewing today or a past date
@@ -2674,7 +2675,7 @@ const applyStructuredItems = (
                 } else {
                   setHistoryFoods(merged);
                 }
-                
+
                 // Update cache with merged data (including dbId for future loads)
                 try {
                   fetch('/api/user-data', {
@@ -2683,6 +2684,33 @@ const applyStructuredItems = (
                     body: JSON.stringify({ todaysFoods: merged, appendHistory: false })
                   }).catch(() => {})
                 } catch {}
+              } else if (mappedFromDb.length === 0 && deduped.length > 0 && !backfillAttemptedRef.current[selectedDate]) {
+                // Safety net: if we have local entries but the server has none, backfill them into the history table.
+                backfillAttemptedRef.current[selectedDate] = true
+                try {
+                  await Promise.all(
+                    deduped.map(async (entry: any) => {
+                      const payload = {
+                        description: (entry?.description || '').toString(),
+                        nutrition: entry?.nutrition || null,
+                        imageUrl: entry?.photo || null,
+                        items: Array.isArray(entry?.items) && entry.items.length > 0 ? entry.items : null,
+                        meal: normalizeCategory(entry?.meal || entry?.category || entry?.mealType),
+                        category: normalizeCategory(entry?.meal || entry?.category || entry?.mealType),
+                        localDate: typeof entry?.localDate === 'string' && entry.localDate.length >= 8 ? entry.localDate : selectedDate,
+                        createdAt: alignTimestampToLocalDate(entry?.createdAt || entry?.id || new Date().toISOString(), entry?.localDate || selectedDate),
+                      }
+                      await fetch('/api/food-log', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload),
+                      })
+                    }),
+                  )
+                  await refreshEntriesFromServer()
+                } catch (backfillErr) {
+                  console.warn('Backfill to FoodLog failed', backfillErr)
+                }
               } else if (enrichedCached.length > 0) {
                 // Even if no missing entries, update with enriched dbIds
                 if (isViewingToday) {
