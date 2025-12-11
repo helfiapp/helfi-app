@@ -8360,11 +8360,7 @@ Please add nutritional information manually if needed.`);
 
               <div
                 className="space-y-3 -mx-4 sm:-mx-6 overflow-visible"
-                style={{
-                  ...(isMobile ? { marginLeft: 'calc(50% - 50vw)', marginRight: 'calc(50% - 50vw)' } : {}),
-                  // Prevent accidental clicks on entries while the add menu is open (avoids the blank page glitch).
-                  pointerEvents: isAddMenuOpen ? 'none' : undefined,
-                }}
+                style={isMobile ? { marginLeft: 'calc(50% - 50vw)', marginRight: 'calc(50% - 50vw)' } : undefined}
               >
                 {sourceEntries.length === 0 && (
                   <div className="text-sm text-gray-500 px-4 sm:px-6 pb-2">
@@ -8545,6 +8541,7 @@ Please add nutritional information manually if needed.`);
                       }
 
                       const handleRowPress = () => {
+                        if (isAddMenuOpen) return
                         if (isMobile && swipeClickBlockRef.current[entryKey]) return
                         closeSwipeMenus()
                         setShowEntryOptions(null)
