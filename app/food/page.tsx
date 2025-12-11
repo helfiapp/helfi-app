@@ -7281,7 +7281,7 @@ Please add nutritional information manually if needed.`);
                                 value={officialSearchQuery}
                                 onChange={(e) => setOfficialSearchQuery(e.target.value)}
                                 placeholder={'e.g., Carman\'s toasted muesli or \"oatmeal\"'}
-                                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm"
+                                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base"
                               />
                               <div className="flex gap-2">
                                 <button
@@ -8903,7 +8903,7 @@ Please add nutritional information manually if needed.`);
                   value={favoritesSearch}
                   onChange={(e) => setFavoritesSearch(e.target.value)}
                   placeholder="Search all foods..."
-                  className="w-full pl-10 pr-16 py-3 border border-gray-300 bg-white text-sm focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
+                  className="w-full pl-10 pr-16 py-3 border border-gray-300 bg-white text-base focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
                   style={{ borderRadius: 0 }}
                 />
                 <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -9090,7 +9090,7 @@ Please add nutritional information manually if needed.`);
                       }
                     }}
                     placeholder="Enter barcode number"
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-base focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
                   />
                   <button
                     type="button"
