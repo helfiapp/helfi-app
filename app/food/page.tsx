@@ -1618,7 +1618,10 @@ export default function FoodDiary() {
     if (entry?.id !== null && entry?.id !== undefined) return `id:${entry.id}`
     const cat = normalizeCategory(entry?.meal || entry?.category || entry?.mealType)
     const desc = (entry?.description || '').toString().toLowerCase().trim()
-    const loc = typeof entry?.localDate === 'string' ? entry.localDate : ''
+    const loc =
+      typeof entry?.localDate === 'string' && entry.localDate.length >= 8
+        ? entry.localDate
+        : dateKeyForEntry(entry) || ''
     const ts =
       typeof entry?.createdAt === 'string'
         ? entry.createdAt
@@ -2361,6 +2364,12 @@ const applyStructuredItems = (
     })
     return grouped
   }, [sourceEntries])
+
+  // Reset local delete markers when switching dates so previous-day deletes don't hide other days.
+  useEffect(() => {
+    deletedEntryKeysRef.current = new Set()
+    setDeletedEntryNonce((n) => n + 1)
+  }, [selectedDate])
 
   // Close dropdowns on outside click (exclude add-food menu to avoid accidental closes)
   useEffect(() => {
