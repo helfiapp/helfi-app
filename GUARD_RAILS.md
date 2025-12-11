@@ -474,6 +474,13 @@ The green “+” buttons for each Food Diary category (Breakfast, Lunch, Dinner
 - Do NOT enlarge the analyzed photo on desktop; keep the compact square preview sizing. Category “+” menu must remain visible/not covered.
 - Any change requires explicit written approval from the user and must be tested live with the burger photo flow: pieces default to the detected count, servings step 1/N, weight sync both directions, realistic kcal/grams.
 
+### 3.10 Discrete Produce Counts & Weight Seeding (Jan 2026 – Locked)
+- **Files:** `app/food/page.tsx` — especially `parseCountFromFreeText`, `piecesMultiplierForServing`, `estimateGramsPerServing`, `getBaseWeightPerServing`, `applyStructuredItems` (weight seeding block), UI serving/weight display around lines ~6700-7050.
+- Do NOT remove or weaken the rule that when `piecesPerServing > 1`, serving weight and display label must scale to *all* pieces (e.g., “6 medium (200g each)” and weight ≈ 6× per-piece grams). No reversion to per-piece weights or labels.
+- Do NOT bypass `piecesMultiplierForServing` or the weight reseed in `applyStructuredItems`; both must remain to override per-piece seeds from `serving_size` text like “1 medium (200g)”.
+- Do NOT change the serving/weight UI text that shows combined serving size and total amount for discrete items; pieces stay integer, servings stay 1 base.
+- Any modification to discrete counts, serving labels, or weight seeding requires explicit user approval and must be retested with multi-piece produce (e.g., 6 carrots/zucchinis) to confirm pieces, labels, and weights all reflect the full set.
+
 ---
 
 ## 4. Macros Progress Bars & Remaining Calories Ring (Locked)
