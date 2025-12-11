@@ -190,9 +190,10 @@ export class CreditManager {
       topUps.reduce((sum, t) => sum + t.amountCents, 0) || 0;
     const topUpsTotalUsed =
       topUps.reduce((sum, t) => sum + t.usedCents, 0) || 0;
+    const additionalAvailable = Math.max(0, (user as any).additionalCredits || 0);
 
     const monthlyRemaining = Math.max(0, monthlyCapCents - monthlyUsedCents);
-    const totalAvailable = monthlyRemaining + topUpsTotalAvailable;
+    const totalAvailable = monthlyRemaining + topUpsTotalAvailable + additionalAvailable;
     
     // Calculate percentUsed: if user has subscription, use monthly wallet; otherwise use top-ups
     let percentUsed = 0;
@@ -216,6 +217,7 @@ export class CreditManager {
         availableCents: Math.max(0, t.amountCents - t.usedCents),
         expiresAt: t.expiresAt,
       })),
+      additionalCreditsCents: additionalAvailable,
       totalAvailableCents: totalAvailable,
     };
   }
@@ -236,6 +238,7 @@ export class CreditManager {
     if (!user) throw new Error('User not found');
 
     const plan = user.subscription?.plan || null;
+    const additionalAvailable = Math.max(0, (user as any).additionalCredits || 0);
     
     // Use monthlyPriceCents if available, otherwise fall back to plan-based calculation
     let monthlyCapCents = 0;
@@ -258,7 +261,7 @@ export class CreditManager {
       orderBy: { expiresAt: 'asc' },
     });
     const topUpsAvailable = topUps.reduce((sum, t) => sum + Math.max(0, t.amountCents - t.usedCents), 0);
-    if (remainingMonthly + topUpsAvailable < costCents) {
+    if (remainingMonthly + additionalAvailable + topUpsAvailable < costCents) {
       return false;
     }
 
@@ -272,6 +275,22 @@ export class CreditManager {
         data: { walletMonthlyUsedCents: (monthlyUsedCents + fromMonthly) as any },
       });
       toCharge -= fromMonthly;
+    }
+
+    if (toCharge <= 0) return true;
+
+    // 1b) Consume manual additional credits (non-expiring)
+    const fromAdditional = Math.min(toCharge, additionalAvailable);
+    if (fromAdditional > 0) {
+      await prisma.user.update({
+        where: { id: this.userId },
+        data: {
+          additionalCredits: {
+            decrement: fromAdditional,
+          },
+        },
+      });
+      toCharge -= fromAdditional;
     }
 
     if (toCharge <= 0) return true;

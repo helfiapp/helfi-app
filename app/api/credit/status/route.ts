@@ -139,26 +139,27 @@ export async function GET(_req: NextRequest) {
     const now = new Date()
     const isPremium = user.subscription?.plan === 'PREMIUM'
 
-    // 3) Wallet‑style credits (subscription + top‑ups)
-    debugStage = 'wallet-calc'
-    const monthlyCapCents = monthlyCapFromSubscription(user.subscription)
-    const monthlyUsedCents = user.walletMonthlyUsedCents || 0
-    const monthlyRemainingCents = Math.max(0, monthlyCapCents - monthlyUsedCents)
+  // 3) Wallet‑style credits (subscription + top‑ups + manual additional credits)
+  debugStage = 'wallet-calc'
+  const monthlyCapCents = monthlyCapFromSubscription(user.subscription)
+  const monthlyUsedCents = user.walletMonthlyUsedCents || 0
+  const monthlyRemainingCents = Math.max(0, monthlyCapCents - monthlyUsedCents)
 
-    const activeTopUps = (user.creditTopUps || []).filter((t) => t.expiresAt > now)
-    const topUpsTotalAvailable = activeTopUps.reduce(
-      (sum, t) => sum + Math.max(0, t.amountCents - t.usedCents),
-      0
-    )
-    const topUpsTotalPurchased = activeTopUps.reduce((sum, t) => sum + t.amountCents, 0)
-    const topUpsTotalUsed = activeTopUps.reduce((sum, t) => sum + t.usedCents, 0)
+  const activeTopUps = (user.creditTopUps || []).filter((t) => t.expiresAt > now)
+  const topUpsTotalAvailable = activeTopUps.reduce(
+    (sum, t) => sum + Math.max(0, t.amountCents - t.usedCents),
+    0
+  )
+  const topUpsTotalPurchased = activeTopUps.reduce((sum, t) => sum + t.amountCents, 0)
+  const topUpsTotalUsed = activeTopUps.reduce((sum, t) => sum + t.usedCents, 0)
+  const additionalAvailable = Math.max(0, user.additionalCredits || 0)
 
-    const totalAvailableCents = monthlyRemainingCents + topUpsTotalAvailable
+  const totalAvailableCents = monthlyRemainingCents + topUpsTotalAvailable + additionalAvailable
 
-    let percentUsed = 0
-    if (monthlyCapCents > 0) {
-      percentUsed = Math.min(100, Math.floor((monthlyUsedCents / monthlyCapCents) * 100))
-    } else if (topUpsTotalPurchased > 0) {
+  let percentUsed = 0
+  if (monthlyCapCents > 0) {
+    percentUsed = Math.min(100, Math.floor((monthlyUsedCents / monthlyCapCents) * 100))
+  } else if (topUpsTotalPurchased > 0) {
       percentUsed = Math.min(100, Math.floor((topUpsTotalUsed / topUpsTotalPurchased) * 100))
     }
 
@@ -171,10 +172,10 @@ export async function GET(_req: NextRequest) {
     const additionalRemainingLegacy = user.additionalCredits || 0
     const legacyTotal = dailyRemainingLegacy + additionalRemainingLegacy
 
-    // For subscription / wallet users, show wallet credits.
-    // For non‑subscription users without wallet credits, fall back to legacy.
-    const hasWalletCredits = totalAvailableCents > 0
-    const showLegacy = !isPremium && !hasWalletCredits
+  // For subscription / wallet users, show wallet credits.
+  // For non‑subscription users without wallet credits, fall back to legacy.
+  const hasWalletCredits = totalAvailableCents > 0
+  const showLegacy = !isPremium && !hasWalletCredits
 
     const creditsTotal = showLegacy ? legacyTotal : totalAvailableCents
 
@@ -197,11 +198,12 @@ export async function GET(_req: NextRequest) {
         availableCents: Math.max(0, t.amountCents - t.usedCents),
         expiresAt: t.expiresAt,
       })),
+      additionalAvailableCents: additionalAvailable,
       totalAvailableCents,
       credits: {
         total: creditsTotal,
         dailyRemaining: showLegacy ? dailyRemainingLegacy : 0,
-        additionalRemaining: showLegacy ? additionalRemainingLegacy : 0,
+        additionalRemaining: additionalAvailable,
       },
     })
   } catch (err: any) {
