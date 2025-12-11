@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { assertGarminConfigured, parseOAuthHeader } from '@/lib/garmin-oauth'
+import { assertGarminConfigured, parseBearerToken, parseOAuthHeader } from '@/lib/garmin-oauth'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -15,6 +15,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   const rawBody = await request.text()
   const oauthHeader = request.headers.get('authorization')
   const oauthParams = parseOAuthHeader(oauthHeader)
+  const bearerToken = parseBearerToken(oauthHeader)
 
   try {
     assertGarminConfigured()
@@ -23,24 +24,17 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: 'Garmin not configured' }, { status: 500 })
   }
 
-  if (!oauthParams || !oauthParams.oauth_consumer_key) {
-    return NextResponse.json({ error: 'Missing OAuth signature' }, { status: 401 })
-  }
-
-  if (process.env.GARMIN_CONSUMER_KEY && oauthParams.oauth_consumer_key !== process.env.GARMIN_CONSUMER_KEY) {
-    return NextResponse.json({ error: 'Invalid consumer key' }, { status: 401 })
-  }
-
-  const oauthToken = oauthParams.oauth_token || null
+  const oauthToken = oauthParams?.oauth_token || null
+  const tokenToMatch = bearerToken || oauthToken || null
   let userId: string | null = null
 
-  if (oauthToken) {
+  if (tokenToMatch) {
     const account = await prisma.account.findFirst({
       where: {
         provider: 'garmin',
         OR: [
-          { access_token: oauthToken },
-          { providerAccountId: oauthToken },
+          { access_token: tokenToMatch },
+          { providerAccountId: tokenToMatch },
         ],
       },
     })

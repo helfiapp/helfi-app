@@ -1,13 +1,18 @@
 export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
+import crypto from 'crypto'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { assertGarminConfigured, requestGarminRequestToken } from '@/lib/garmin-oauth'
+import {
+  assertGarminConfigured,
+  buildGarminAuthorizeUrl,
+  generatePkcePair,
+} from '@/lib/garmin-oauth'
 
 /**
- * Initiate Garmin OAuth 1.0a flow
+ * Initiate Garmin OAuth 2.0 PKCE flow
  * GET /api/auth/garmin/authorize
  */
 export async function GET(request: NextRequest) {
@@ -23,26 +28,27 @@ export async function GET(request: NextRequest) {
       process.env.GARMIN_REDIRECT_URI ||
       new URL('/api/auth/garmin/callback', request.nextUrl.origin).toString()
 
-    const token = await requestGarminRequestToken(callbackUrl)
+    const { codeVerifier, codeChallenge } = generatePkcePair()
+    const state = crypto.randomUUID()
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000) // 15 minutes
 
-    // Persist the temporary request token/secret so we can verify on callback
+    // Persist the temporary verifier/state so we can verify on callback
     await prisma.garminRequestToken.upsert({
-      where: { oauthToken: token.oauthToken },
+      where: { oauthToken: state },
       update: {
         userId: session.user.id,
-        oauthTokenSecret: token.oauthTokenSecret,
+        oauthTokenSecret: codeVerifier,
         expiresAt,
       },
       create: {
         userId: session.user.id,
-        oauthToken: token.oauthToken,
-        oauthTokenSecret: token.oauthTokenSecret,
+        oauthToken: state,
+        oauthTokenSecret: codeVerifier,
         expiresAt,
       },
     })
 
-    const authUrl = `https://connect.garmin.com/oauthConfirm?oauth_token=${encodeURIComponent(token.oauthToken)}`
+    const authUrl = buildGarminAuthorizeUrl(codeChallenge, state, callbackUrl)
     return NextResponse.redirect(authUrl)
   } catch (error) {
     console.error('❌ Garmin authorization init failed:', {

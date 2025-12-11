@@ -6,6 +6,12 @@ This guide wires the Garmin Health/Connect evaluation API into Helfi so users ca
 ## Handoff Summary (Dec 5, 2025) – Garmin OAuth still failing
 
 **Update (Dec 6, 2025)**  
+- Switched the app code to Garmin’s OAuth2 PKCE flow per `OAuth2PKCE_2.pdf`.  
+- Defaults now point to `https://connect.garmin.com/oauth2Confirm` (authorize) and `https://diauth.garmin.com/di-oauth2-service/oauth/token` (token).  
+- Tokens are stored as bearer; we still call `POST /wellness-api/rest/user/registration` with bearer auth after connecting.  
+- Webhook handler now accepts Bearer auth (in addition to the legacy OAuth header) and logs payloads.
+
+**Update (Dec 6, 2025)**  
 - Identified why `request_token` was failing: we were calling the Wellness API base (`https://healthapi.garmin.com/wellness-api/rest/request_token`), which expects a user access token and returns `401 {"errorMessage":"oauth_token (UserAccessToken) missing"}`.  
 - Code now uses a dedicated OAuth base (default `https://connectapi.garmin.com/oauth-service/oauth`) for `request_token` and `access_token`, while keeping the Wellness base for registration/webhooks.  
 - New env var: `GARMIN_OAUTH_BASE_URL` (set in Vercel + `.env.local`). Use `connectapi.garmin.com/...` for production/eval; switch to `connectapitest.garmin.com/...` if Garmin confirms this key is test-only.
@@ -69,10 +75,10 @@ Add to `.env.local` and Vercel (Production + Preview):
 GARMIN_CONSUMER_KEY=xxxx
 GARMIN_CONSUMER_SECRET=xxxx
 GARMIN_REDIRECT_URI=https://helfi.ai/api/auth/garmin/callback
-# OAuth base (use connectapitest.garmin.com if Garmin tells us to stay on test)
-GARMIN_OAUTH_BASE_URL=https://connectapi.garmin.com/oauth-service/oauth
-# Optional: override the evaluation base URL if Garmin changes it
-GARMIN_API_BASE_URL=https://healthapi.garmin.com/wellness-api/rest
+# Optional overrides (defaults work for prod/eval unless Garmin specifies otherwise)
+GARMIN_OAUTH_AUTHORIZE_URL=https://connect.garmin.com/oauth2Confirm
+GARMIN_OAUTH_TOKEN_URL=https://diauth.garmin.com/di-oauth2-service/oauth/token
+GARMIN_API_BASE_URL=https://apis.garmin.com/wellness-api/rest
 ```
 
 ### Sync to Vercel

@@ -7,7 +7,8 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import {
   assertGarminConfigured,
-  exchangeGarminAccessToken,
+  exchangeGarminCodeForTokens,
+  fetchGarminUserId,
   registerGarminUser,
 } from '@/lib/garmin-oauth'
 
@@ -17,15 +18,15 @@ import {
  */
 export async function GET(request: NextRequest) {
   const url = new URL(request.url)
-  const oauthToken = url.searchParams.get('oauth_token')
-  const oauthVerifier = url.searchParams.get('oauth_verifier')
+  const code = url.searchParams.get('code')
+  const state = url.searchParams.get('state')
 
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) {
     return NextResponse.redirect(new URL('/devices?garmin_error=unauthorized', request.nextUrl.origin))
   }
 
-  if (!oauthToken || !oauthVerifier) {
+  if (!code || !state) {
     return NextResponse.redirect(new URL('/devices?garmin_error=missing_params', request.nextUrl.origin))
   }
 
@@ -33,18 +34,23 @@ export async function GET(request: NextRequest) {
     assertGarminConfigured()
 
     const requestToken = await prisma.garminRequestToken.findUnique({
-      where: { oauthToken },
+      where: { oauthToken: state },
     })
 
     if (!requestToken || requestToken.userId !== session.user.id) {
       return NextResponse.redirect(new URL('/devices?garmin_error=invalid_request_token', request.nextUrl.origin))
     }
 
-    const access = await exchangeGarminAccessToken(
-      oauthToken,
-      requestToken.oauthTokenSecret,
-      oauthVerifier
-    )
+    const callbackUrl =
+      process.env.GARMIN_REDIRECT_URI ||
+      new URL('/api/auth/garmin/callback', request.nextUrl.origin).toString()
+
+    const tokenResponse = await exchangeGarminCodeForTokens(code, requestToken.oauthTokenSecret, callbackUrl)
+    const expiresAt = tokenResponse.expires_in
+      ? Math.floor(Date.now() / 1000) + tokenResponse.expires_in
+      : null
+
+    const userInfo = await fetchGarminUserId(tokenResponse.access_token)
 
     // Store Garmin tokens on the Account table (provider = garmin)
     const existingAccount = await prisma.account.findFirst({
@@ -58,11 +64,12 @@ export async function GET(request: NextRequest) {
       await prisma.account.update({
         where: { id: existingAccount.id },
         data: {
-          providerAccountId: access.garminUserId || access.oauthToken,
-          access_token: access.oauthToken,
-          refresh_token: access.oauthTokenSecret, // store token secret here
-          token_type: 'oauth1',
-          scope: 'garmin_wellness',
+          providerAccountId: userInfo.userId || existingAccount.providerAccountId,
+          access_token: tokenResponse.access_token,
+          refresh_token: tokenResponse.refresh_token,
+          token_type: tokenResponse.token_type || 'bearer',
+          scope: tokenResponse.scope || existingAccount.scope,
+          expires_at: expiresAt ?? existingAccount.expires_at,
         },
       })
     } else {
@@ -71,24 +78,25 @@ export async function GET(request: NextRequest) {
           userId: session.user.id,
           type: 'oauth',
           provider: 'garmin',
-          providerAccountId: access.garminUserId || access.oauthToken,
-          access_token: access.oauthToken,
-          refresh_token: access.oauthTokenSecret,
-          token_type: 'oauth1',
-          scope: 'garmin_wellness',
+          providerAccountId: userInfo.userId || tokenResponse.access_token,
+          access_token: tokenResponse.access_token,
+          refresh_token: tokenResponse.refresh_token,
+          token_type: tokenResponse.token_type || 'bearer',
+          scope: tokenResponse.scope || 'garmin_wellness',
+          expires_at: expiresAt ?? undefined,
         },
       })
     }
 
     // Delete the short-lived request token
     await prisma.garminRequestToken.delete({
-      where: { oauthToken },
+      where: { oauthToken: state },
     })
 
     // Register the user for push notifications starting 30 days back
     const uploadStart = Date.now() - 30 * 24 * 60 * 60 * 1000
     try {
-      const registration = await registerGarminUser(access.oauthToken, access.oauthTokenSecret, uploadStart)
+      const registration = await registerGarminUser(tokenResponse.access_token, uploadStart)
       if (!registration.ok) {
         console.warn('⚠️ Garmin registration failed:', registration.status, await registration.text())
       }

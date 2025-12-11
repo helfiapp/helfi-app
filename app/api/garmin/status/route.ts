@@ -46,8 +46,8 @@ export async function DELETE() {
   }
 
   try {
-    if (account.access_token && account.refresh_token) {
-      const resp = await deregisterGarminUser(account.access_token, account.refresh_token)
+    if (account.access_token) {
+      const resp = await deregisterGarminUser(account.access_token)
       if (!resp.ok) {
         console.warn('⚠️ Failed to deregister Garmin user:', resp.status, await resp.text())
       }
