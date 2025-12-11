@@ -4,7 +4,6 @@ export const runtime = 'nodejs'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
 import {
   assertGarminConfigured,
   exchangeGarminCodeForTokens,
@@ -20,6 +19,7 @@ export async function GET(request: NextRequest) {
   const url = new URL(request.url)
   const code = url.searchParams.get('code')
   const state = url.searchParams.get('state')
+  const pkceCookie = request.cookies.get('garmin_pkce')?.value
 
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) {
@@ -33,11 +33,18 @@ export async function GET(request: NextRequest) {
   try {
     assertGarminConfigured()
 
-    const requestToken = await prisma.garminRequestToken.findUnique({
-      where: { oauthToken: state },
-    })
+    if (!pkceCookie) {
+      return NextResponse.redirect(new URL('/devices?garmin_error=invalid_request_token', request.nextUrl.origin))
+    }
 
-    if (!requestToken || requestToken.userId !== session.user.id) {
+    let parsedPkce: { state: string; codeVerifier: string; userId: string; exp: number } | null = null
+    try {
+      parsedPkce = JSON.parse(pkceCookie)
+    } catch {
+      parsedPkce = null
+    }
+
+    if (!parsedPkce || parsedPkce.state !== state || parsedPkce.userId !== session.user.id) {
       return NextResponse.redirect(new URL('/devices?garmin_error=invalid_request_token', request.nextUrl.origin))
     }
 
@@ -45,7 +52,7 @@ export async function GET(request: NextRequest) {
       process.env.GARMIN_REDIRECT_URI ||
       new URL('/api/auth/garmin/callback', request.nextUrl.origin).toString()
 
-    const tokenResponse = await exchangeGarminCodeForTokens(code, requestToken.oauthTokenSecret, callbackUrl)
+    const tokenResponse = await exchangeGarminCodeForTokens(code, parsedPkce.codeVerifier, callbackUrl)
     const expiresAt = tokenResponse.expires_in
       ? Math.floor(Date.now() / 1000) + tokenResponse.expires_in
       : null
@@ -88,11 +95,6 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Delete the short-lived request token
-    await prisma.garminRequestToken.delete({
-      where: { oauthToken: state },
-    })
-
     // Register the user for push notifications starting 30 days back
     const uploadStart = Date.now() - 30 * 24 * 60 * 60 * 1000
     try {
@@ -123,10 +125,12 @@ export async function GET(request: NextRequest) {
       </html>
     `
 
-    return new NextResponse(successHtml, {
+    const successResponse = new NextResponse(successHtml, {
       status: 200,
       headers: { 'Content-Type': 'text/html' },
     })
+    successResponse.cookies.set('garmin_pkce', '', { maxAge: 0, path: '/' })
+    return successResponse
   } catch (error) {
     console.error('❌ Garmin callback error:', error)
     return NextResponse.redirect(new URL('/devices?garmin_error=callback_failed', request.nextUrl.origin))

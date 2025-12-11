@@ -4,7 +4,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
 import {
   assertGarminConfigured,
   buildGarminAuthorizeUrl,
@@ -30,26 +29,25 @@ export async function GET(request: NextRequest) {
 
     const { codeVerifier, codeChallenge } = generatePkcePair()
     const state = crypto.randomUUID()
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000) // 15 minutes
-
-    // Persist the temporary verifier/state so we can verify on callback
-    await prisma.garminRequestToken.upsert({
-      where: { oauthToken: state },
-      update: {
-        userId: session.user.id,
-        oauthTokenSecret: codeVerifier,
-        expiresAt,
-      },
-      create: {
-        userId: session.user.id,
-        oauthToken: state,
-        oauthTokenSecret: codeVerifier,
-        expiresAt,
-      },
-    })
-
     const authUrl = buildGarminAuthorizeUrl(codeChallenge, state, callbackUrl)
-    return NextResponse.redirect(authUrl)
+    const response = NextResponse.redirect(authUrl)
+    response.cookies.set(
+      'garmin_pkce',
+      JSON.stringify({
+        state,
+        codeVerifier,
+        userId: session.user.id,
+        exp: Date.now() + 15 * 60 * 1000,
+      }),
+      {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 15 * 60,
+      }
+    )
+    return response
   } catch (error) {
     console.error('❌ Garmin authorization init failed:', {
       message: (error as Error)?.message,

@@ -7440,8 +7440,8 @@ Please add nutritional information manually if needed.`);
                   </div>
                 )}
                 {/* Action Buttons */}
-                <div className="space-y-3 px-1">
-                  <div className="mb-6">
+                <div className="space-y-3 px-1 pb-6">
+                  <div className="mb-6 mx-auto max-w-[95%]">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Change time entry
                     </label>
