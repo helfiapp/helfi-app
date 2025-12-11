@@ -7441,15 +7441,15 @@ Please add nutritional information manually if needed.`);
                 )}
                 {/* Action Buttons */}
                 <div className="space-y-3">
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Time
+                  <div className="mb-6">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Change time entry
                     </label>
                     <input
                       type="time"
                       value={entryTime}
                       onChange={(e) => setEntryTime(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base"
+                      className="w-full px-3 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base"
                     />
                   </div>
                   <button
