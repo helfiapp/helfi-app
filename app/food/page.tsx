@@ -5224,7 +5224,33 @@ Please add nutritional information manually if needed.`);
     setExpandedCategories((prev) => ({ ...prev, [categoryKey]: true }))
     showQuickToast(`Copied ${categoryLabel(categoryKey)} to today`)
     try {
-      await saveFoodEntries(deduped)
+      // Persist to user-data snapshot (without history append to avoid single-entry overwrite)
+      await saveFoodEntries(deduped, { appendHistory: false })
+
+      // Persist each cloned entry to FoodLog so refresh won't drop them
+      await Promise.all(
+        clones.map(async (clone) => {
+          try {
+            await fetch('/api/food-log', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                description: clone.description || '',
+                nutrition: clone.nutrition || null,
+                imageUrl: clone.photo || null,
+                items: Array.isArray(clone.items) && clone.items.length > 0 ? clone.items : null,
+                meal: clone.meal || clone.category,
+                category: clone.category || clone.meal,
+                localDate: clone.localDate,
+                createdAt: clone.createdAt,
+              }),
+            })
+          } catch (err) {
+            console.warn('Copy-to-today FoodLog save failed', err)
+          }
+        }),
+      )
+
       await refreshEntriesFromServer()
     } catch (err) {
       console.warn('Copy category to today failed', err)
