@@ -99,16 +99,20 @@ export async function GET(request: NextRequest) {
       take: limit
     })
     
-    // Calculate total available credits from CreditTopUp records
+    // Calculate total available credits from CreditTopUp records + non-expiring additional credits
     const usersWithCredits = users.map(user => {
       const now = new Date()
-      const availableCredits = user.creditTopUps
+      const topUpAvailable = user.creditTopUps
         .filter(topUp => topUp.expiresAt > now)
         .reduce((sum, topUp) => sum + Math.max(0, topUp.amountCents - topUp.usedCents), 0)
+      const additionalAvailable = Math.max(0, user.additionalCredits || 0)
+      const availableCredits = topUpAvailable + additionalAvailable
       
       return {
         ...user,
-        totalAvailableCredits: availableCredits // Total in cents (which equals credits)
+        totalAvailableCredits: availableCredits, // Total in cents (which equals credits)
+        additionalAvailableCredits: additionalAvailable,
+        topUpAvailableCredits: topUpAvailable,
       }
     })
 
