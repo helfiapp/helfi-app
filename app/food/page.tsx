@@ -6336,7 +6336,19 @@ Please add nutritional information manually if needed.`);
                       onClick={() => {
                         setPhotoFile(null);
                         setPhotoPreview(null);
-                        setShowAddFood(false);
+                        setShowAnalysisModeModal(false);
+                        setPendingPhotoPicker(false);
+                        setIsAnalyzing(false);
+                        setAnalysisPhase('idle');
+                        // Keep the edit panel visible when removing a photo during edit flows (e.g., Add Ingredient path)
+                        if (editingEntry) {
+                          setShowAddFood(true);
+                          setShowAiResult(true);
+                          setIsEditingDescription(false);
+                        } else {
+                          setShowAddFood(false);
+                          setShowAiResult(false);
+                        }
                       }}
                       className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors text-sm font-medium"
                     >
