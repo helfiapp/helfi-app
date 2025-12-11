@@ -5192,7 +5192,10 @@ Please add nutritional information manually if needed.`);
     const targetDate = todayIso
     const clones = entries.map((entry: any, idx: number) => {
       const createdSource = entry?.createdAt || entry?.id || new Date().toISOString()
-      const anchored = alignTimestampToLocalDate(createdSource, targetDate)
+      // Offset each entry slightly to avoid de-dupe collapsing them (description/time collisions).
+      const baseTs = new Date(createdSource).getTime()
+      const adjusted = Number.isFinite(baseTs) ? new Date(baseTs + idx * 60000).toISOString() : new Date().toISOString()
+      const anchored = alignTimestampToLocalDate(adjusted, targetDate)
       const time = new Date(anchored).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       const clonedItems =
         entry.items && Array.isArray(entry.items) && entry.items.length > 0
