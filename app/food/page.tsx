@@ -2345,6 +2345,15 @@ const applyStructuredItems = (
     () => dedupeEntries(normalizeDiaryList(isViewingToday ? todaysFoodsForSelectedDate : (historyFoods || [])), { fallbackDate: selectedDate }),
     [todaysFoodsForSelectedDate, historyFoods, isViewingToday, deletedEntryNonce, selectedDate],
   )
+  const entriesByCategory = useMemo(() => {
+    const grouped: Record<string, any[]> = {}
+    sourceEntries.forEach((entry) => {
+      const cat = normalizeCategory(entry?.meal || entry?.category || entry?.mealType)
+      grouped[cat] = grouped[cat] || []
+      grouped[cat].push(entry)
+    })
+    return grouped
+  }, [sourceEntries])
 
   // Close dropdowns on outside click (exclude add-food menu to avoid accidental closes)
   useEffect(() => {
@@ -6175,13 +6184,15 @@ Please add nutritional information manually if needed.`);
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                       </svg>
                                     </button>
-                                    {selectedDate !== todayIso && entries.length > 0 && (
+                                    {(() => {
+                                      const entriesForCopy = entriesByCategory[selectedAddCategory] || []
+                                      return selectedDate !== todayIso && entriesForCopy.length > 0 ? (
                                       <button
                                         type="button"
                                         onClick={() => {
                                           setShowPhotoOptions(false);
                                           setPhotoOptionsAnchor(null);
-                                          copyCategoryEntriesToToday(cat.key, entries);
+                                          copyCategoryEntriesToToday(selectedAddCategory, entriesForCopy);
                                         }}
                                         className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
                                       >
@@ -6191,14 +6202,15 @@ Please add nutritional information manually if needed.`);
                                           </svg>
                                         </div>
                                         <div className="flex-1">
-                                          <div className="text-base font-semibold text-gray-900">Copy {categoryLabel(cat.key)} to Today</div>
-                                          <div className="text-xs text-gray-500">Duplicate all {categoryLabel(cat.key)} entries onto today</div>
+                                          <div className="text-base font-semibold text-gray-900">Copy {categoryLabel(selectedAddCategory)} to Today</div>
+                                          <div className="text-xs text-gray-500">Duplicate all {categoryLabel(selectedAddCategory)} entries onto today</div>
                                         </div>
                                         <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                         </svg>
                                       </button>
-                                    )}
+                                      ) : null
+                                    })()}
                                   </div>
                                 </div>
                               </div>
@@ -8309,14 +8321,6 @@ Please add nutritional information manually if needed.`);
                       label: categoryLabel(key),
                     }))
 
-                    const grouped: Record<string, any[]> = {}
-                    sourceEntries.forEach((entry) => {
-                      const cat = normalizeCategory(entry?.meal || entry?.category || entry?.mealType)
-                      const target = mealCategories.find((c) => c.key === cat)?.key || 'uncategorized'
-                      if (!grouped[target]) grouped[target] = []
-                      grouped[target].push(entry)
-                    })
-
                     const renderEntryCard = (food: any) => {
                       const entryKey = food.id.toString()
                       const swipeOffset = entrySwipeOffsets[entryKey] || 0
@@ -8686,7 +8690,7 @@ Please add nutritional information manually if needed.`);
                     }
 
                     return mealCategories.map((cat) => {
-                      const entries = grouped[cat.key] || []
+                      const entries = entriesByCategory[cat.key] || []
                       const totals = entries.reduce(
                         (acc, entry) => {
                           const t = getEntryTotals(entry)
@@ -8813,7 +8817,7 @@ Please add nutritional information manually if needed.`);
                                         </div>
                                         <div className="flex-1">
                                           <div className="text-base font-semibold text-gray-900">Favorites</div>
-                                          <div className="text-xs text-gray-500">Insert a saved meal in {categoryLabel(cat.key)}</div>
+                                          <div className="text-xs text-gray-500">Insert a saved meal in {categoryLabel(selectedAddCategory)}</div>
                                         </div>
                                         <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -8860,19 +8864,46 @@ Please add nutritional information manually if needed.`);
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                           </svg>
                                         </div>
-                                        <div className="flex-1">
-                                          <div className="text-base font-semibold text-gray-900">Manual Entry</div>
-                                          <div className="text-xs text-gray-500">Type your food description</div>
-                                        </div>
-                                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                        </svg>
-                                      </button>
+                                      <div className="flex-1">
+                                        <div className="text-base font-semibold text-gray-900">Manual Entry</div>
+                                        <div className="text-xs text-gray-500">Type your food description</div>
+                                      </div>
+                                      <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                      </svg>
+                                    </button>
+                                    {(() => {
+                                      const entriesForCopy = entriesByCategory[selectedAddCategory] || []
+                                      return selectedDate !== todayIso && entriesForCopy.length > 0 ? (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setShowPhotoOptions(false);
+                                            setPhotoOptionsAnchor(null);
+                                            copyCategoryEntriesToToday(selectedAddCategory, entriesForCopy);
+                                          }}
+                                          className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
+                                        >
+                                          <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center mr-3 text-emerald-600">
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m-6-6h12" />
+                                            </svg>
+                                          </div>
+                                          <div className="flex-1">
+                                            <div className="text-base font-semibold text-gray-900">Copy {categoryLabel(selectedAddCategory)} to Today</div>
+                                            <div className="text-xs text-gray-500">Duplicate all {categoryLabel(selectedAddCategory)} entries onto today</div>
+                                          </div>
+                                          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                          </svg>
+                                        </button>
+                                      ) : null
+                                    })()}
 
-                                      <button
-                                        type="button"
-                                        onClick={() => {
-                                          setShowPhotoOptions(false);
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setShowPhotoOptions(false);
                                           setPhotoOptionsAnchor(null);
                                         }}
                                         className="w-full text-center px-4 py-3 text-sm text-gray-500 hover:bg-gray-50"
@@ -8949,7 +8980,7 @@ Please add nutritional information manually if needed.`);
                                         onClick={() => {
                                           setShowPhotoOptions(false);
                                           setPhotoOptionsAnchor(null);
-                                          setSelectedAddCategory(cat.key);
+                                          setSelectedAddCategory(selectedAddCategory);
                                           setShowBarcodeScanner(true);
                                           setBarcodeError(null);
                                           setBarcodeValue('');
