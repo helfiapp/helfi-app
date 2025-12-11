@@ -8102,7 +8102,7 @@ Please add nutritional information manually if needed.`);
                           // Slide 1: Separate used vs remaining rings
                           slides.push(
                             <div className="flex flex-col items-center order-1 md:order-2 w-full">
-                              <div className="grid grid-cols-2 gap-4 sm:gap-6 w-full">
+                              <div className="grid grid-cols-2 gap-4 sm:gap-6 w-full items-stretch">
                                 <TargetRing
                                   label="Remaining"
                                   valueLabel={
@@ -8127,7 +8127,7 @@ Please add nutritional information manually if needed.`);
                                 />
                               </div>
                               {targetInUnit !== null && (
-                                <div className="mt-3 text-[11px] text-gray-500 text-center">
+                                <div className="mt-3 text-[11px] text-gray-500 text-center col-span-2">
                                   Daily allowance:{' '}
                                   <span className="font-semibold">
                                     {Math.round(targetInUnit)} {energyUnit}
@@ -8211,7 +8211,7 @@ Please add nutritional information manually if needed.`);
                                     />
                                   ))}
                                 </div>
-                              )}
+                          )}
                             </>
                           )
                         })()
