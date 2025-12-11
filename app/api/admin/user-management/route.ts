@@ -396,7 +396,8 @@ export async function POST(request: NextRequest) {
 
       case 'add_credits':
         // Add credits using wallet-based system (CreditTopUp)
-        // Credits = cents (1 credit = 1 cent)
+        // Credits = cents (1 credit = 1 cent). Admin grants should reflect immediately in the meter,
+        // so we store them as non-expiring additionalCredits.
         const creditPackage = data?.creditPackage // e.g., '250', '500', '1000'
         const creditAmount = data?.creditAmount // Direct credit amount
         
@@ -421,17 +422,14 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ error: 'Invalid credit amount or package. Provide creditPackage (250/500/1000) or creditAmount (number)' }, { status: 400 })
         }
         
-        const expiresAt = new Date()
-        expiresAt.setMonth(expiresAt.getMonth() + 12) // Credits valid for 12 months
-        
-        await prisma.creditTopUp.create({
+        // Store as non-expiring additionalCredits so the meter and consumption see it immediately.
+        await prisma.user.update({
+          where: { id: userId },
           data: {
-            userId,
-            amountCents: centsAmount,
-            usedCents: 0,
-            expiresAt,
-            source: creditPackage ? `admin_grant_${creditPackage}_credits` : `admin_grant_${creditAmount}_credits`
-          }
+            additionalCredits: {
+              increment: centsAmount,
+            },
+          },
         })
         break
 
