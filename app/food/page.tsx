@@ -377,9 +377,10 @@ type RingProps = {
   valueLabel: string
   percent: number
   tone: 'primary' | 'target'
+  color?: string
 }
 
-function TargetRing({ label, valueLabel, percent, tone }: RingProps) {
+function TargetRing({ label, valueLabel, percent, tone, color }: RingProps) {
   const radius = typeof window !== 'undefined' && window.innerWidth < 640 ? 56 : 50
   const circumference = 2 * Math.PI * radius
   const clamped = Math.max(0, Math.min(percent, 1))
@@ -443,7 +444,7 @@ function TargetRing({ label, valueLabel, percent, tone }: RingProps) {
               cy={svgSize / 2}
               r={radius}
               strokeWidth={strokeWidth}
-              stroke="#22c55e"
+              stroke={color || '#22c55e'}
               fill="none"
               strokeDasharray={`${clamped * circumference} ${circumference}`}
               strokeDashoffset={0}
@@ -8028,10 +8029,10 @@ Please add nutritional information manually if needed.`);
                     : 0
                 const consumedInUnit = convertKcalToUnit(consumedKcal, energyUnit)
                 const targetInUnit = convertKcalToUnit(targetCalories, energyUnit)
-                const percentUsed =
-                  targetCalories && targetCalories > 0
-                    ? Math.min(1, consumedKcal / targetCalories)
-                    : 0
+                const remainingInUnit =
+                  targetInUnit !== null && consumedInUnit !== null
+                    ? Math.max(0, targetInUnit - consumedInUnit)
+                    : null
 
                 const sugarGrams = totals.sugar || 0
                 const carbGrams = totals.carbs || 0
@@ -8097,40 +8098,41 @@ Please add nutritional information manually if needed.`);
                         (() => {
                           const slides: JSX.Element[] = []
 
-                          // Slide 1: Remaining ring
+                          // Slide 1: Separate used vs remaining rings
                           slides.push(
-                            <div className="flex flex-col items-center order-1 md:order-2">
-                              <TargetRing
-                                label="Remaining"
-                                valueLabel={
-                                  targetInUnit !== null && consumedInUnit !== null
-                                    ? `${Math.max(
-                                        0,
-                                        Math.round(targetInUnit - consumedInUnit),
-                                      )} ${energyUnit}`
-                                    : '—'
-                                }
-                                percent={percentUsed || 0}
-                                tone="target"
-                              />
+                            <div className="flex flex-col items-center order-1 md:order-2 w-full">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full">
+                                <TargetRing
+                                  label="Remaining"
+                                  valueLabel={
+                                    remainingInUnit !== null
+                                      ? `${Math.round(remainingInUnit)} ${energyUnit}`
+                                      : '—'
+                                  }
+                                  percent={1}
+                                  tone="primary"
+                                  color="#22c55e"
+                                />
+                                <TargetRing
+                                  label="Used"
+                                  valueLabel={
+                                    consumedInUnit !== null
+                                      ? `${Math.max(0, Math.round(consumedInUnit))} ${energyUnit}`
+                                      : '—'
+                                  }
+                                  percent={1}
+                                  tone="primary"
+                                  color="#ef4444"
+                                />
+                              </div>
                               {targetInUnit !== null && (
-                                <div className="mt-1 text-[11px] text-gray-500">
+                                <div className="mt-3 text-[11px] text-gray-500 text-center">
                                   Daily allowance:{' '}
                                   <span className="font-semibold">
                                     {Math.round(targetInUnit)} {energyUnit}
                                   </span>
                                 </div>
                               )}
-                              <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-gray-600">
-                                <div className="flex items-center gap-1">
-                                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-red-500 shrink-0" />
-                                  <span>Used</span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
-                                  <span>Remaining</span>
-                                </div>
-                              </div>
                             </div>
                           )
 
