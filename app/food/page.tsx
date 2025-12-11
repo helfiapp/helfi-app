@@ -1259,15 +1259,16 @@ export default function FoodDiary() {
       : buildTodayIso()
   const entryMatchesDate = (entry: any, targetDate: string) => {
     if (!entry) return false
-    if (typeof entry?.localDate === 'string' && entry.localDate.length >= 8) {
-      return entry.localDate === targetDate
-    }
+    const localDate = typeof entry?.localDate === 'string' ? entry.localDate : null
+    if (localDate && localDate.length >= 8 && localDate === targetDate) return true
+
+    // Fallback: derive calendar date from createdAt/id/time even if localDate is present but wrong.
     const ts =
-      typeof entry?.id === 'number'
-        ? entry.id
-        : entry?.createdAt
+      typeof entry?.createdAt === 'string' || entry?.createdAt instanceof Date
         ? new Date(entry.createdAt).getTime()
-        : Number(entry?.id)
+        : typeof entry?.id === 'number'
+        ? entry.id
+        : Number(entry?.time) || Number(entry?.id)
     if (!Number.isFinite(ts)) return false
     const d = new Date(ts)
     const y = d.getFullYear()
@@ -8101,7 +8102,7 @@ Please add nutritional information manually if needed.`);
                           // Slide 1: Separate used vs remaining rings
                           slides.push(
                             <div className="flex flex-col items-center order-1 md:order-2 w-full">
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full">
+                              <div className="grid grid-cols-2 gap-4 sm:gap-6 w-full">
                                 <TargetRing
                                   label="Remaining"
                                   valueLabel={
