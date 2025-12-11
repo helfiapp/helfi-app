@@ -481,6 +481,13 @@ The green “+” buttons for each Food Diary category (Breakfast, Lunch, Dinner
 - Do NOT change the serving/weight UI text that shows combined serving size and total amount for discrete items; pieces stay integer, servings stay 1 base.
 - Any modification to discrete counts, serving labels, or weight seeding requires explicit user approval and must be retested with multi-piece produce (e.g., 6 carrots/zucchinis) to confirm pieces, labels, and weights all reflect the full set.
 
+### 3.11 Admin Credit Grants & Meter (Jan 2026 – Locked)
+- **Files:** `app/api/admin/user-management/route.ts`, `app/api/credit/status/route.ts`, `lib/credit-system.ts`, `components/UsageMeter.tsx`.
+- Admin “Add Credits” must post to `/api/admin/user-management` and increment `additionalCredits` directly (non-expiring). Do NOT revert to expiring top-ups for admin grants without explicit user approval.
+- `/api/credit/status` must always include `additionalAvailableCents` and add it to `totalAvailableCents`; meter/UI must reflect the sum of subscription remaining + active top-ups + additional credits. Do NOT drop additional credits from the meter.
+- Admin user list must surface `totalAvailableCredits` including additional credits (not just top-ups); do not change this aggregation without approval.
+- Any billing/credit change requires explicit user approval and retesting on a Premium account with admin-added credits to confirm the meter and admin modal both show the added amount immediately.
+
 ---
 
 ## 4. Macros Progress Bars & Remaining Calories Ring (Locked)
