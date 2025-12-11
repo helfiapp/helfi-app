@@ -8397,6 +8397,20 @@ Please add nutritional information manually if needed.`);
                         }
                       }
 
+                      const startEditEntry = () => {
+                        const runEdit = () => editFood(food)
+                        if (isAddMenuOpen) {
+                          closeAddMenus()
+                          if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+                            window.requestAnimationFrame(runEdit)
+                          } else {
+                            setTimeout(runEdit, 0)
+                          }
+                          return
+                        }
+                        runEdit()
+                      }
+
                       const actions = [
                         { label: 'Add to Favorites', onClick: () => handleAddToFavorites(food) },
                         {
@@ -8417,7 +8431,7 @@ Please add nutritional information manually if needed.`);
                               mode: 'copyToToday',
                             }),
                         },
-                        { label: 'Edit Entry', onClick: () => editFood(food) },
+                        { label: 'Edit Entry', onClick: startEditEntry },
                         {
                           label: 'Delete',
                           onClick: handleDeleteAction,
