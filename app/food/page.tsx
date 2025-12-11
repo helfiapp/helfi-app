@@ -5190,6 +5190,7 @@ Please add nutritional information manually if needed.`);
     }
     const category = normalizeCategory(categoryKey)
     const targetDate = todayIso
+    const metaStamp = Date.now()
     const clones = entries.map((entry: any, idx: number) => {
       const createdSource = entry?.createdAt || entry?.id || new Date().toISOString()
       // Offset each entry slightly to avoid de-dupe collapsing them (description/time collisions).
@@ -5197,6 +5198,8 @@ Please add nutritional information manually if needed.`);
       const adjusted = Number.isFinite(baseTs) ? new Date(baseTs + idx * 60000).toISOString() : new Date().toISOString()
       const anchored = alignTimestampToLocalDate(adjusted, targetDate)
       const time = new Date(anchored).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      const baseDescription = entry.description || entry.label || 'Duplicated meal'
+      const descriptionWithMeta = `${baseDescription}\n(copy-category-to-today-${metaStamp}-${idx})`
       const clonedItems =
         entry.items && Array.isArray(entry.items) && entry.items.length > 0
           ? JSON.parse(JSON.stringify(entry.items))
@@ -5212,6 +5215,7 @@ Please add nutritional information manually if needed.`);
         category,
         persistedCategory: category,
         items: clonedItems,
+        description: descriptionWithMeta,
       }
     })
     setSelectedAddCategory(categoryKey)
