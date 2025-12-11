@@ -7690,7 +7690,7 @@ Please add nutritional information manually if needed.`);
             )}
 
             {/* Manual Food Entry - Improved Structure */}
-            {!photoPreview && (
+            {!photoPreview && !editingEntry && (
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 sm:p-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-6">Manual Food Entry</h3>
                 
