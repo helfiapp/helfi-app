@@ -1618,7 +1618,14 @@ export default function FoodDiary() {
     if (entry?.id !== null && entry?.id !== undefined) return `id:${entry.id}`
     const cat = normalizeCategory(entry?.meal || entry?.category || entry?.mealType)
     const desc = (entry?.description || '').toString().toLowerCase().trim()
-    return `desc:${cat}|${desc}`
+    const loc = typeof entry?.localDate === 'string' ? entry.localDate : ''
+    const ts =
+      typeof entry?.createdAt === 'string'
+        ? entry.createdAt
+        : entry?.createdAt instanceof Date
+        ? entry.createdAt.toISOString()
+        : ''
+    return `desc:${cat}|${desc}|${loc}|${ts}`
   }
 
   const normalizedDescription = (desc: string | null | undefined) =>
@@ -5463,7 +5470,9 @@ Please add nutritional information manually if needed.`);
     const entryCategory = normalizeCategory(entry?.meal || entry?.category || entry?.mealType)
     const entryId = entry.id
     const entryKey = entryId !== null && entryId !== undefined ? entryId.toString() : ''
-    const descKey = `desc:${entryCategory}|${normalizedDescription(entry?.description || entry?.name || '')}`
+    const descKey = `desc:${entryCategory}|${normalizedDescription(entry?.description || entry?.name || '')}|${entry?.localDate || ''}|${
+      entry?.createdAt || ''
+    }`
     const autoDates = Array.from(
       new Set(
         [
