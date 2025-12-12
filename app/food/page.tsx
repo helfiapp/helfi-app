@@ -1337,6 +1337,44 @@ export default function FoodDiary() {
   }
   const compactTodaysFoodsForSnapshot = (entries: any[], fallbackDate: string) =>
     Array.isArray(entries) ? entries.map((e) => compactEntryForSnapshot(e, fallbackDate)) : []
+  const utcMsForIso = (iso: string) => {
+    if (typeof iso !== 'string') return NaN
+    const match = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+    if (!match) return NaN
+    const y = parseInt(match[1], 10)
+    const m = parseInt(match[2], 10)
+    const d = parseInt(match[3], 10)
+    if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return NaN
+    return Date.UTC(y, (m || 1) - 1, d || 1)
+  }
+  const SNAPSHOT_MAX_DAYS = 21
+  const SNAPSHOT_MAX_ENTRIES = 300
+  const limitSnapshotFoods = (entries: any[], fallbackDate: string) => {
+    const todayIsoForWindow = buildTodayIso()
+    const todayUtcMs = utcMsForIso(todayIsoForWindow)
+    const compacted = compactTodaysFoodsForSnapshot(entries, fallbackDate)
+    const filtered = compacted.filter((entry: any) => {
+      const localDate =
+        typeof entry?.localDate === 'string' && entry.localDate.length >= 8 ? entry.localDate : ''
+      if (!localDate) return false
+      // Always keep the currently viewed date so deletes/saves for that day stick.
+      if (localDate === fallbackDate) return true
+      if (!Number.isFinite(todayUtcMs)) return false
+      const entryUtcMs = utcMsForIso(localDate)
+      if (!Number.isFinite(entryUtcMs)) return false
+      const daysAgo = Math.floor((todayUtcMs - entryUtcMs) / (24 * 60 * 60 * 1000))
+      return daysAgo >= 0 && daysAgo <= SNAPSHOT_MAX_DAYS
+    })
+    filtered.sort((a: any, b: any) => {
+      const aTs = extractEntryTimestampMs(a)
+      const bTs = extractEntryTimestampMs(b)
+      if (!Number.isFinite(aTs) && !Number.isFinite(bTs)) return 0
+      if (!Number.isFinite(aTs)) return 1
+      if (!Number.isFinite(bTs)) return -1
+      return bTs - aTs
+    })
+    return filtered.slice(0, SNAPSHOT_MAX_ENTRIES)
+  }
   const entryMatchesDate = (entry: any, targetDate: string) => {
     if (!entry) return false
     const localDate =
@@ -2708,7 +2746,7 @@ const applyStructuredItems = (
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                      todaysFoods: compactTodaysFoodsForSnapshot(mappedFromDb, selectedDate),
+                      todaysFoods: limitSnapshotFoods(mappedFromDb, selectedDate),
                       appendHistory: false,
                     })
                   }).catch(() => {})
@@ -2766,7 +2804,7 @@ const applyStructuredItems = (
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                      todaysFoods: compactTodaysFoodsForSnapshot(merged, selectedDate),
+                      todaysFoods: limitSnapshotFoods(merged, selectedDate),
                       appendHistory: false,
                     })
                   }).catch(() => {})
@@ -2834,7 +2872,7 @@ const applyStructuredItems = (
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                      todaysFoods: compactTodaysFoodsForSnapshot(mapped, selectedDate),
+                      todaysFoods: limitSnapshotFoods(mapped, selectedDate),
                       appendHistory: false,
                     })
                   }).catch(() => {})
@@ -2869,7 +2907,7 @@ const applyStructuredItems = (
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                          todaysFoods: compactTodaysFoodsForSnapshot(byDate, selectedDate),
+                          todaysFoods: limitSnapshotFoods(byDate, selectedDate),
                           appendHistory: false,
                         })
                       }).catch(() => {})
@@ -2913,7 +2951,7 @@ const applyStructuredItems = (
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
-                    todaysFoods: compactTodaysFoodsForSnapshot(deduped, selectedDate),
+                    todaysFoods: limitSnapshotFoods(deduped, selectedDate),
                     appendHistory: false,
                   })
                 }).catch(() => {})
@@ -3249,7 +3287,7 @@ const applyStructuredItems = (
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            todaysFoods: compactTodaysFoodsForSnapshot(snapshotFoods, selectedDate), // Compact to avoid 413
+            todaysFoods: limitSnapshotFoods(snapshotFoods, selectedDate), // Limit window to avoid 413
             appendHistory: false, // Always false - we handle FoodLog separately
           }),
         }).then(async (userDataResponse) => {
@@ -5781,7 +5819,7 @@ Please add nutritional information manually if needed.`);
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                todaysFoods: compactTodaysFoodsForSnapshot(updatedFoods, selectedDate),
+                todaysFoods: limitSnapshotFoods(updatedFoods, selectedDate),
                 appendHistory: false,
               }),
             })
