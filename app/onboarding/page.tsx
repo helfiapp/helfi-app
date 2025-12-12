@@ -921,12 +921,12 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
   const allergyOptions = React.useMemo(
     () => [
       'Peanut',
+      'Gluten',
       'Tree nuts',
       'Dairy',
       'Egg',
       'Shellfish',
       'Fish',
-      'Gluten',
       'Wheat',
       'Soy',
       'Sesame',
