@@ -581,12 +581,37 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
   const [showValidationError, setShowValidationError] = useState(false);
   const { shouldBlockNavigation, allowUnsavedNavigation, acknowledgeUnsavedChanges, requestNavigation, beforeUnloadHandler } = useUnsavedNavigationAllowance(hasUnsavedChanges);
   const { updateUserData } = useUserData();
-  const queuedNavigationRef = useRef<(() => void) | null>(null);
 
   const parseNumber = (value: string): number | null => {
     if (!value) return null;
     const n = Number(value);
     return Number.isFinite(n) ? n : null;
+  };
+
+  const poundsToKg = (lbs: number) => lbs / 2.20462;
+  const feetInchesToCm = (ft: number, inch: number) => (ft * 12 + inch) * 2.54;
+
+  const getCurrentWeightKgRounded = () => {
+    const w = parseNumber(weight);
+    if (w == null) return null;
+    const kg = unit === 'metric' ? w : poundsToKg(w);
+    return Number.isFinite(kg) ? Math.round(kg) : null;
+  };
+
+  const getCurrentHeightCmRounded = () => {
+    if (unit === 'metric') {
+      const h = parseNumber(height);
+      return h != null && Number.isFinite(h) ? Math.round(h) : null;
+    }
+    const ft = parseNumber(feet) ?? 0;
+    const inch = parseNumber(inches) ?? 0;
+    const totalInches = ft * 12 + inch;
+    if (!(totalInches > 0)) {
+      const fallbackCm = parseNumber(height);
+      return fallbackCm != null && Number.isFinite(fallbackCm) ? Math.round(fallbackCm) : null;
+    }
+    const cm = feetInchesToCm(ft, inch);
+    return Number.isFinite(cm) ? Math.round(cm) : null;
   };
 
   const weightNumber = parseNumber(weight);
@@ -720,33 +745,49 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
   // Track when basic profile values differ from what we initially loaded
   useEffect(() => {
     const baseline = initialSnapshotRef.current || initial || {};
-    const initialWeight = baseline?.weight || '';
-    const initialHeight = baseline?.height || '';
-    const initialFeet = baseline?.feet || '';
-    const initialInches = baseline?.inches || '';
-    const initialBodyType = baseline?.bodyType || '';
-    const initialGoalChoice = baseline?.goalChoice || '';
-    const initialGoalIntensity = baseline?.goalIntensity || 'standard';
-    const initialBirthdate = baseline?.birthdate || '';
+    const initialWeightKg =
+      baseline?.weight === null || baseline?.weight === undefined || baseline?.weight === ''
+        ? null
+        : parseNumber(String(baseline.weight));
+    const initialHeightCm =
+      baseline?.height === null || baseline?.height === undefined || baseline?.height === ''
+        ? null
+        : parseNumber(String(baseline.height));
+    const initialBodyType = (baseline?.bodyType || '').toString();
+    const initialGoalChoice = (baseline?.goalChoice || '').toString();
+    const initialGoalIntensity = ((baseline?.goalIntensity || 'standard') as any).toString().toLowerCase();
+    const initialBirthdate = (baseline?.birthdate || '').toString();
     const initialAllergies: string[] = Array.isArray(baseline?.allergies) ? baseline.allergies : [];
-    const initialDiabetesType = baseline?.diabetesType || '';
+    const initialDiabetesType = (baseline?.diabetesType || '').toString();
 
     const normalizeArray = (list?: string[]) =>
       Array.isArray(list) ? list.map((v) => (v || '').toString().toLowerCase().trim()).filter(Boolean).sort() : [];
 
     const allergiesChanged =
       JSON.stringify(normalizeArray(allergies)) !== JSON.stringify(normalizeArray(initialAllergies));
+
+    const currentWeightKg = getCurrentWeightKgRounded();
+    const currentHeightCm = getCurrentHeightCmRounded();
+    const baselineWeightKg = initialWeightKg != null && Number.isFinite(initialWeightKg) ? Math.round(initialWeightKg) : null;
+    const baselineHeightCm = initialHeightCm != null && Number.isFinite(initialHeightCm) ? Math.round(initialHeightCm) : null;
+    const weightChanged =
+      (currentWeightKg == null && baselineWeightKg != null) ||
+      (currentWeightKg != null && baselineWeightKg == null) ||
+      (currentWeightKg != null && baselineWeightKg != null && currentWeightKg !== baselineWeightKg);
+    const heightChanged =
+      (currentHeightCm == null && baselineHeightCm != null) ||
+      (currentHeightCm != null && baselineHeightCm == null) ||
+      (currentHeightCm != null && baselineHeightCm != null && currentHeightCm !== baselineHeightCm);
+
     const changed =
-      (weight || '') !== (initialWeight || '') ||
-      (height || '') !== (initialHeight || '') ||
-      (feet || '') !== (initialFeet || '') ||
-      (inches || '') !== (initialInches || '') ||
-      (bodyType || '') !== (initialBodyType || '') ||
-      (goalChoice || '') !== (initialGoalChoice || '') ||
-      (goalIntensity || 'standard') !== (initialGoalIntensity || 'standard') ||
-      (birthdate || '') !== (initialBirthdate || '') ||
+      weightChanged ||
+      heightChanged ||
+      (bodyType || '').toString().toLowerCase().trim() !== (initialBodyType || '').toString().toLowerCase().trim() ||
+      (goalChoice || '').toString().toLowerCase().trim() !== (initialGoalChoice || '').toString().toLowerCase().trim() ||
+      (goalIntensity || 'standard').toString().toLowerCase() !== (initialGoalIntensity || 'standard').toString().toLowerCase() ||
+      (birthdate || '').toString().trim() !== (initialBirthdate || '').toString().trim() ||
       allergiesChanged ||
-      (diabetesType || '') !== (initialDiabetesType || '');
+      (diabetesType || '').toString().toLowerCase().trim() !== (initialDiabetesType || '').toString().toLowerCase().trim();
 
     const hasAny =
       !!(weight || height || feet || inches || bodyType || goalChoice || birthdate || allergies.length || diabetesType);
@@ -755,7 +796,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     if ((changed && hasAny) && onUnsavedChange) {
       onUnsavedChange();
     }
-  }, [weight, height, feet, inches, bodyType, goalChoice, goalIntensity, birthdate, allergies, diabetesType, initial]);
+  }, [weight, height, feet, inches, bodyType, goalChoice, goalIntensity, birthdate, allergies, diabetesType, initial, unit]);
 
   // Warn if the user tries to close the tab or browser with unsaved changes
   useEffect(() => {
@@ -803,10 +844,13 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
   );
 
   const buildPayload = () => {
+    const weightKgRounded = getCurrentWeightKgRounded();
+    const heightCmRounded = getCurrentHeightCmRounded();
     return {
-      weight,
+      // Persist canonical measurements so targets/insights stay consistent everywhere
+      weight: weightKgRounded != null ? String(weightKgRounded) : '',
       birthdate: birthdateFromParts || birthdate || initial?.birthdate || '',
-      height: unit === 'metric' ? height : `${feet}'${inches}"`,
+      height: heightCmRounded != null ? String(heightCmRounded) : '',
       feet,
       inches,
       bodyType,
@@ -818,9 +862,9 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     }
   };
 
-  const handleNext = useCallback(() => {
+  const handleNext = () => {
     onNext(buildPayload());
-  }, [weight, birthdate, height, feet, inches, bodyType, unit, goalChoice, goalIntensity, onNext]);
+  };
 
   const handleUpdateInsights = async () => {
     if (!isStepComplete) {
@@ -829,28 +873,29 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     }
     setIsGeneratingInsights(true);
     try {
+      const payload = buildPayload();
       // Step 1: Save data immediately - this is the priority
       const response = await fetch('/api/user-data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(buildPayload()),
+        body: JSON.stringify(payload),
       });
 
       if (response.ok) {
+        // Reset the baseline so the dirty-check reflects the newly saved values
+        initialSnapshotRef.current = {
+          ...(initialSnapshotRef.current || initial || {}),
+          ...payload,
+        };
+
         // Data saved successfully - update local state immediately
         setHasUnsavedChanges(false);
         if (onInsightsSaved) onInsightsSaved();
-        updateUserData(buildPayload());
-        acknowledgeUnsavedChanges(); // allow navigation without another prompt
+        updateUserData(payload);
+        acknowledgeUnsavedChanges(); // flush any pending guarded navigation (Next/Back)
         try {
           window.dispatchEvent(new Event('userData:refresh'));
         } catch {}
-        // If navigation was waiting on this save, continue it now
-        if (queuedNavigationRef.current) {
-          const fn = queuedNavigationRef.current;
-          queuedNavigationRef.current = null;
-          fn();
-        }
         
         // Step 2: Fire regen in background WITHOUT waiting
         // This prevents timeouts from blocking the UI
@@ -884,16 +929,8 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
       setShowValidationError(true);
       return;
     }
-    // Always route through the navigation guard so the Update Insights popup is shown
-    // when there are unsaved changes; when there are none, it will proceed immediately.
-    requestNavigation(() => {
-      if (hasUnsavedChanges) {
-        queuedNavigationRef.current = handleNext;
-        triggerPopup();
-        return;
-      }
-      handleNext();
-    }, triggerPopup);
+    // Route through the navigation guard so the Update Insights popup is shown when needed.
+    requestNavigation(handleNext, triggerPopup);
   };
 
   const handleBackWithGuard = () => {
@@ -1007,10 +1044,12 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
   // Persist physical info as the user fills it out so moving between steps keeps data
   useEffect(() => {
     if (!onPartialSave) return;
+    const weightKgRounded = getCurrentWeightKgRounded();
+    const heightCmRounded = getCurrentHeightCmRounded();
     const payload = {
-      weight,
+      weight: weightKgRounded != null ? String(weightKgRounded) : '',
       birthdate: birthdateFromParts || '',
-      height: unit === 'metric' ? height : `${feet}'${inches}"`,
+      height: heightCmRounded != null ? String(heightCmRounded) : '',
       feet,
       inches,
       bodyType,
@@ -1514,8 +1553,18 @@ function ExerciseStep({ onNext, onBack, initial, onPartialSave, onUnsavedChange,
       
       if (response.ok) {
         // Data saved successfully
+        initialSnapshotRef.current = {
+          ...(initialSnapshotRef.current || initial || {}),
+          exerciseFrequency: exerciseFrequency || '',
+          exerciseTypes: exerciseTypes || [],
+          exerciseDurations,
+        };
         setHasUnsavedChanges(false);
         if (onInsightsSaved) onInsightsSaved();
+        acknowledgeUnsavedChanges();
+        try {
+          window.dispatchEvent(new Event('userData:refresh'));
+        } catch {}
         
         // Step 2: Close popup immediately (exercise insights are disabled)
         setShowUpdatePopup(false);
@@ -2025,8 +2074,17 @@ function HealthGoalsStep({ onNext, onBack, initial, onPartialSave, onUnsavedChan
       ]);
       
       // Data saved successfully
+      initialSnapshotRef.current = {
+        ...(initialSnapshotRef.current || initial || {}),
+        goals: goals || [],
+        customGoals: customGoals || [],
+      };
       setHasUnsavedChanges(false);
       if (onInsightsSaved) onInsightsSaved();
+      acknowledgeUnsavedChanges();
+      try {
+        window.dispatchEvent(new Event('userData:refresh'));
+      } catch {}
       
       // Fire regen in background WITHOUT waiting
       fireAndForgetInsightsRegen(['health_goals'], addedOrRemoved);
@@ -2511,8 +2569,21 @@ function HealthSituationsStep({ onNext, onBack, initial, onPartialSave, onUnsave
       
       if (response.ok) {
         // Data saved successfully
+        initialSnapshotRef.current = {
+          ...(initialSnapshotRef.current || initial || {}),
+          healthSituations: {
+            healthIssues: healthIssues.trim(),
+            healthProblems: healthProblems.trim(),
+            additionalInfo: additionalInfo.trim(),
+            skipped: false,
+          },
+        };
         setHasUnsavedChanges(false);
         if (onInsightsSaved) onInsightsSaved();
+        acknowledgeUnsavedChanges();
+        try {
+          window.dispatchEvent(new Event('userData:refresh'));
+        } catch {}
         
         // Fire regen in background WITHOUT waiting
         fireAndForgetInsightsRegen(['health_situations']);
@@ -6781,6 +6852,9 @@ export default function Onboarding() {
 
               // Data saved successfully
               updateUserData(payload);
+          try {
+            window.dispatchEvent(new Event('userData:refresh'));
+          } catch {}
 
               // Step 2: Fire regen in background WITHOUT waiting
               fireAndForgetInsightsRegen(changeTypes);
