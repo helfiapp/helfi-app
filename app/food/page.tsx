@@ -1846,12 +1846,18 @@ export default function FoodDiary() {
     return `desc:${cat}|${desc}|${loc}|${ts}`
   }
 
-  const normalizedDescription = (desc: string | null | undefined) =>
-    (desc || '')
-      .toString()
+  const normalizedDescription = (desc: string | null | undefined) => {
+    const raw = (desc || '').toString()
+    // UI shows only the first line; treat hidden meta lines as non-semantic.
+    const firstLine = raw.split('\n')[0] || raw
+    return firstLine
       .replace(/\(favorite-copy-\d+\)/gi, '')
+      .replace(/\(duplicate-[^)]+\)/gi, '')
+      .replace(/\(copy-category-to-today-[^)]+\)/gi, '')
+      .replace(/\s+/g, ' ')
       .trim()
       .toLowerCase()
+  }
 
   // Stable delete key so resurrected entries with new db ids can still be suppressed.
   const stableDeleteKeyForEntry = (entry: any) => {
@@ -1973,21 +1979,20 @@ export default function FoodDiary() {
       const cat = normalizeCategory(entry?.meal || entry?.category || entry?.mealType)
       return cat !== 'uncategorized'
     }
-    const descKey = (desc: any) =>
-      (desc || '')
-        .toString()
-        .toLowerCase()
-        .replace(/\s+/g, ' ')
-        .trim()
-    const timeKey = (raw: any) => {
-      if (raw === null || raw === undefined) return ''
-      if (typeof raw === 'number' && Number.isFinite(raw)) {
-        return new Date(raw).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    const descKey = (desc: any) => normalizedDescription(desc)
+    const timeBucketKey = (entry: any) => {
+      const ts = extractEntryTimestampMs(entry)
+      if (Number.isFinite(ts)) {
+        // Minute bucket: prevents “tap spam” duplicates while still allowing
+        // the same meal at different times to show separately.
+        return String(Math.floor(ts / 60000))
       }
+      const raw = entry?.time
+      if (raw === null || raw === undefined) return ''
       return raw.toString().trim().toLowerCase()
     }
     const fallbackDate = options?.fallbackDate || ''
-    // First pass: drop obvious duplicates within the same category (same date+category+description+time+photo)
+    // First pass: drop obvious duplicates within the same category (same date+category+description+time-bucket)
     const seen = new Set<string>()
     const firstPass: any[] = []
     for (const entry of list) {
@@ -1997,15 +2002,14 @@ export default function FoodDiary() {
         dateKeyForEntry(entry) || fallbackDate,
         cat,
         descKey(entry?.description),
-        timeKey(entry?.time),
-        entry?.photo || '',
+        timeBucketKey(entry),
       ].join('|')
       if (!seen.has(key)) {
         seen.add(key)
         firstPass.push(entry)
       }
     }
-    // Second pass: within the same date+category+description+photo, prefer:
+    // Second pass: within the same date+category+description+time-bucket, prefer:
     // - entries that have a real category over uncategorized
     // - entries that have a real database id (`dbId`) over purely cached copies
     // - the most recent entry when both are equivalent
@@ -2017,7 +2021,7 @@ export default function FoodDiary() {
         dateKeyForEntry(entry) || fallbackDate,
         cat,
         descKey(entry?.description),
-        entry?.photo || '',
+        timeBucketKey(entry),
       ].join('|')
       const existing = preferred.get(key)
       const entryHasCat = hasRealCategory(entry)
@@ -3278,25 +3282,8 @@ const applyStructuredItems = (
           const logs = Array.isArray(json.logs) ? json.logs : []
 
           const mapped = mapLogsToEntries(logs, selectedDate)
-
-          // De‑duplicate any accidental duplicate rows (e.g. from multiple
-          // history append paths) so the user only sees one copy of each meal.
-          const seen = new Set<string>()
-          const deduped: any[] = []
-          for (const entry of mapped) {
-            const key = [
-              entry.localDate,
-              entry.description,
-              entry.time,
-              entry.photo || '',
-            ]
-              .join('|')
-              .toLowerCase()
-            if (!seen.has(key)) {
-              seen.add(key)
-              deduped.push(entry)
-            }
-          }
+          // Guard rail: route all loads through dedupeEntries + normalization.
+          const deduped = dedupeEntries(mapped, { fallbackDate: selectedDate })
 
           console.log(`✅ Setting historyFoods with ${deduped.length} entries for date ${selectedDate}`);
           setHistoryFoods(deduped)
@@ -4671,12 +4658,23 @@ Please add nutritional information manually if needed.`);
       }
     })
 
+    // If something is a Favorite, it should still be selectable from "All".
+    // Prefer the explicit favorite payload when present.
+    ;(favorites || []).forEach((fav: any) => {
+      const key = normalizeMealLabel(fav?.description || fav?.label || '').toLowerCase()
+      if (!key) return
+      if (!allByKey.has(key)) {
+        allByKey.set(key, { ...fav, sourceTag: 'Favorite' })
+      }
+    })
+
     const allMeals = Array.from(allByKey.values()).map((entry) => ({
       id: entry?.id || `all-${Math.random()}`,
       label: normalizeMealLabel(entry?.description || entry?.label || 'Meal'),
-      entry,
+      entry: (entry as any)?.items || (entry as any)?.nutrition || (entry as any)?.total ? entry : null,
+      favorite: (entry as any)?.sourceTag === 'Favorite' ? entry : null,
       createdAt: entry?.createdAt || entry?.id || Date.now(),
-      sourceTag: buildSourceTag(entry),
+      sourceTag: (entry as any)?.sourceTag === 'Favorite' ? 'Favorite' : buildSourceTag(entry),
       calories: sanitizeNutritionTotals(entry?.total || entry?.nutrition || null)?.calories ?? null,
       serving: entry?.items?.[0]?.serving_size || entry?.serving || entry?.items?.[0]?.servings || '',
     }))
@@ -5251,10 +5249,22 @@ Please add nutritional information manually if needed.`);
     const totals =
       sanitizeNutritionTotals(source?.nutrition || source?.total || source?.entry?.total || source?.entry?.nutrition) ||
       null
-    const items =
-      source?.items ||
-      source?.entry?.items ||
-      (Array.isArray(source?.favorite?.items) ? JSON.parse(JSON.stringify(source.favorite.items)) : null)
+    const items = (() => {
+      const candidate =
+        source?.items ||
+        source?.entry?.items ||
+        (Array.isArray(source?.favorite?.items) ? JSON.parse(JSON.stringify(source.favorite.items)) : null)
+      if (Array.isArray(candidate)) return candidate
+      if (typeof candidate === 'string') {
+        try {
+          const parsed = JSON.parse(candidate)
+          return Array.isArray(parsed) ? parsed : null
+        } catch {
+          return null
+        }
+      }
+      return null
+    })()
     const newEntry = {
       id: new Date(createdAtIso).getTime(),
       localDate: selectedDate,
@@ -5353,19 +5363,26 @@ Please add nutritional information manually if needed.`);
         ? JSON.parse(JSON.stringify(favorite.items))
         : null
     const baseDescription = favorite.description || favorite.label || 'Favorite meal'
-    // Append a hidden meta line so repeated favorites on the same day/category
-    // are treated as separate entries by the dedupe helper, while the visible
-    // row text (which only shows the first line) stays unchanged.
-    const descriptionWithMeta = `${baseDescription}\n(favorite-copy-${Date.now()})`
     const entry = {
       id: new Date(createdAtIso).getTime(),
       localDate: selectedDate,
-      description: descriptionWithMeta,
+      description: baseDescription,
       time: new Date(createdAtIso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       method: favorite.method || 'text',
       photo: favorite.photo || null,
       nutrition: favorite.nutrition || favorite.total || null,
-      items: clonedItems,
+      items: Array.isArray(clonedItems)
+        ? clonedItems
+        : typeof (favorite as any)?.items === 'string'
+        ? (() => {
+            try {
+              const parsed = JSON.parse(String((favorite as any).items))
+              return Array.isArray(parsed) ? parsed : null
+            } catch {
+              return null
+            }
+          })()
+        : null,
       total: favorite.total || favorite.nutrition || null,
       meal: category,
       category,
@@ -5424,8 +5441,6 @@ Please add nutritional information manually if needed.`);
     setShowEntryOptions(null)
     const category = normalizeCategory(targetCategory)
     const baseDescription = source.description || source.label || 'Duplicated meal'
-    const duplicateMetaTag = `(duplicate-${mode}-${Date.now()})`
-    const descriptionWithMeta = `${baseDescription}\n${duplicateMetaTag}`
     const createdAtIso = alignTimestampToLocalDate(new Date().toISOString(), targetDate)
     const displayTime = new Date(createdAtIso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     const clonedItems =
@@ -5442,7 +5457,7 @@ Please add nutritional information manually if needed.`);
       category,
       persistedCategory: category,
       items: clonedItems,
-      description: descriptionWithMeta,
+      description: baseDescription,
       createdAt: createdAtIso,
     }
     setSelectedAddCategory(category as typeof MEAL_CATEGORY_ORDER[number])
@@ -5510,7 +5525,6 @@ Please add nutritional information manually if needed.`);
       const anchored = alignTimestampToLocalDate(adjusted, targetDate)
       const time = new Date(anchored).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       const baseDescription = entry.description || entry.label || 'Duplicated meal'
-      const descriptionWithMeta = `${baseDescription}\n(copy-category-to-today-${metaStamp}-${idx})`
       const clonedItems =
         entry.items && Array.isArray(entry.items) && entry.items.length > 0
           ? JSON.parse(JSON.stringify(entry.items))
@@ -5526,7 +5540,7 @@ Please add nutritional information manually if needed.`);
         category,
         persistedCategory: category,
         items: clonedItems,
-        description: descriptionWithMeta,
+        description: baseDescription,
       }
     })
     setSelectedAddCategory(categoryKey)
@@ -9449,24 +9463,52 @@ Please add nutritional information manually if needed.`);
                         insertMealIntoDiary(item, selectedAddCategory)
                       }
                     }
+                    const favoriteId =
+                      item?.favorite?.id || (typeof item?.id === 'string' && item.id.startsWith('fav-') ? item.id : null)
+                    const canDeleteFavorite = Boolean(favoriteId && item.favorite)
                     return (
-                      <button
+                      <div
                         key={item.id}
-                        onClick={handleSelect}
-                        className="w-full text-left bg-white px-4 py-3 hover:bg-gray-50"
+                        className="w-full bg-white flex items-stretch"
                         style={{ borderRadius: 0 }}
                       >
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="text-sm font-semibold text-gray-900 truncate">{item.label}</div>
-                            <div className="text-xs text-gray-600 truncate">{serving}</div>
+                        <button
+                          onClick={handleSelect}
+                          className="flex-1 text-left px-4 py-3 hover:bg-gray-50"
+                          style={{ borderRadius: 0 }}
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="text-sm font-semibold text-gray-900 truncate">{item.label}</div>
+                              <div className="text-xs text-gray-600 truncate">{serving}</div>
+                            </div>
+                            <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                              {calories != null && (
+                                <span className="text-sm font-semibold text-gray-900">{calories} kcal</span>
+                              )}
+                              <span className="text-xs text-gray-500">{tag}</span>
+                            </div>
                           </div>
-                          <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                            {calories != null && <span className="text-sm font-semibold text-gray-900">{calories} kcal</span>}
-                            <span className="text-xs text-gray-500">{tag}</span>
-                          </div>
-                        </div>
-                      </button>
+                        </button>
+                        {canDeleteFavorite && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteFavorite(String(favoriteId))}
+                            className="px-3 flex items-center justify-center hover:bg-red-50 text-red-600"
+                            title="Remove from favorites"
+                            aria-label="Remove from favorites"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                              />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
                     )
                   })}
                 </div>
