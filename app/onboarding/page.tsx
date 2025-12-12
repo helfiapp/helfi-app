@@ -923,7 +923,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
       const response = await fetch('/api/user-data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(sanitizeUserDataPayload(payload)),
       });
 
       if (response.ok) {
@@ -1615,11 +1615,11 @@ function ExerciseStep({ onNext, onBack, initial, onPartialSave, onUnsavedChange,
       const response = await fetch('/api/user-data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify(sanitizeUserDataPayload({ 
           exerciseFrequency: exerciseFrequency || 'not specified',
           exerciseTypes: exerciseTypes || [],
           exerciseDurations,
-        })
+        }))
       });
       
       if (response.ok) {
@@ -2135,7 +2135,7 @@ function HealthGoalsStep({ onNext, onBack, initial, onPartialSave, onUnsavedChan
       fetch('/api/user-data', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ goals: currentNames })
+          body: JSON.stringify(sanitizeUserDataPayload({ goals: currentNames }))
         }),
         fetch('/api/checkins/issues', {
           method: 'POST',
@@ -2303,7 +2303,7 @@ function HealthGoalsStep({ onNext, onBack, initial, onPartialSave, onUnsavedChan
           fetch('/api/user-data', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ goals: currentNames })
+            body: JSON.stringify(sanitizeUserDataPayload({ goals: currentNames }))
           }).catch(() => {})
           if (process.env.NEXT_PUBLIC_CHECKINS_ENABLED === 'true') {
             fetch('/api/checkins/issues', {
@@ -2628,14 +2628,14 @@ function HealthSituationsStep({ onNext, onBack, initial, onPartialSave, onUnsave
       const response = await fetch('/api/user-data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify(sanitizeUserDataPayload({ 
           healthSituations: {
             healthIssues: healthIssues.trim(),
             healthProblems: healthProblems.trim(),
             additionalInfo: additionalInfo.trim(),
             skipped: false
           }
-        })
+        }))
       });
       
       if (response.ok) {
@@ -3164,7 +3164,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
           const response = await fetch('/api/user-data', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ supplements: updatedSupplements })
+            body: JSON.stringify(sanitizeUserDataPayload({ supplements: updatedSupplements }))
           });
           if (response.ok) {
             // Flag unsaved changes so we prompt on navigation
@@ -3199,7 +3199,7 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
       const response = await fetch('/api/user-data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ supplements: supplementsToSave })
+        body: JSON.stringify(sanitizeUserDataPayload({ supplements: supplementsToSave }))
       });
       
       if (response.ok) {
@@ -4136,7 +4136,7 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
           const response = await fetch('/api/user-data', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ medications: updatedMedications })
+            body: JSON.stringify(sanitizeUserDataPayload({ medications: updatedMedications }))
           });
           if (response.ok) {
             // After successful save, flag unsaved changes for navigation prompts
@@ -4171,7 +4171,7 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis }: { on
       const response = await fetch('/api/user-data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ medications: medicationsToSave })
+        body: JSON.stringify(sanitizeUserDataPayload({ medications: medicationsToSave }))
       });
       
       if (response.ok) {
@@ -4820,7 +4820,7 @@ function BloodResultsStep({ onNext, onBack, initial }: { onNext: (data: any) => 
       const response = await fetch('/api/user-data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify(sanitizeUserDataPayload({ 
           bloodResults: {
             uploadMethod,
             documents: documents.map(f => f.name),
@@ -4828,7 +4828,7 @@ function BloodResultsStep({ onNext, onBack, initial }: { onNext: (data: any) => 
             notes: notes.trim(),
             skipped: false
           }
-        })
+        }))
       });
       
       if (response.ok) {
@@ -5156,12 +5156,13 @@ function ReviewStep({ onBack, data }: { onBack: () => void, data: any }) {
         hasBloodResults: !!data.bloodResults,
         totalDataSize: JSON.stringify(data).length + ' characters'
       });
+      const payload = sanitizeUserDataPayload(data)
       
       // Start the API request
       const response = await fetch('/api/user-data', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
+        body: JSON.stringify(payload)
       });
       
       const apiDuration = Date.now() - startTime;
@@ -6321,6 +6322,13 @@ export default function Onboarding() {
     } catch {}
   }, [status, form, showFirstTimeModal, dataLoaded, firstTimeModalDismissed]);
 
+  const sanitizeUserDataPayload = (payload: any) => {
+    if (!payload || typeof payload !== 'object') return payload;
+    // Strip food diary and favorites fields so health-setup autosaves cannot overwrite them
+    const { todaysFoods, favorites, ...rest } = payload as any;
+    return rest;
+  };
+
   // Optimized debounced save function
   const debouncedSave = useCallback(async (data: any) => {
     // Clear existing timeout
@@ -6334,7 +6342,7 @@ export default function Onboarding() {
         const response = await fetch('/api/user-data', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data)
+          body: JSON.stringify(sanitizeUserDataPayload(data))
         });
         
         if (response.ok) {
@@ -6841,7 +6849,7 @@ export default function Onboarding() {
                     await fetch('/api/user-data', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify(updated)
+                      body: JSON.stringify(sanitizeUserDataPayload(updated))
                     });
                   } catch (e) {
                     console.warn('Supplements immediate save failed:', e);
@@ -6870,7 +6878,7 @@ export default function Onboarding() {
                     await fetch('/api/user-data', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify(updated)
+                      body: JSON.stringify(sanitizeUserDataPayload(updated))
                     });
                   } catch (e) {
                     console.warn('Medications immediate save failed:', e);
@@ -6914,7 +6922,7 @@ export default function Onboarding() {
             try {
               const changeTypes = detectChangedInsightTypes(formBaselineRef.current, formRef.current || form);
               // Step 1: Save data immediately
-              const payload = formRef.current || form;
+              const payload = sanitizeUserDataPayload(formRef.current || form);
               const saveResponse = await fetch('/api/user-data', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },

@@ -582,12 +582,12 @@ export async function POST(request: NextRequest) {
       if (data.goals && Array.isArray(data.goals) && data.goals.length > 0) {
         console.log('🎯 Processing', data.goals.length, 'health goals')
         
-        // Delete existing non-special goals
+        // Delete existing non-hidden goals (preserve hidden snapshot records like favorites/todaysFoods)
         const deleteResult = await prisma.healthGoal.deleteMany({
-          where: { 
+          where: {
             userId: user.id,
-            name: { notIn: ['__EXERCISE_DATA__', '__HEALTH_SITUATIONS_DATA__', '__SELECTED_ISSUES__', '__PRIMARY_GOAL__', '__ALLERGIES_DATA__'] }
-          }
+            NOT: { name: { startsWith: '__' } },
+          },
         })
         console.log('🗑️ Deleted', deleteResult.count, 'existing health goals')
         
@@ -1043,6 +1043,10 @@ export async function POST(request: NextRequest) {
     // 7. Handle favorites data for quick add flow
     try {
       if (data && Array.isArray((data as any).favorites)) {
+        const favoritesArray = (data as any).favorites
+        const favoritesCount = Array.isArray(favoritesArray) ? favoritesArray.length : 0
+        const referer = (request.headers.get('referer') || '').slice(0, 200)
+        console.log('AGENT_DEBUG favorites write', { favoritesCount, referer })
         await prisma.healthGoal.deleteMany({
           where: {
             userId: user.id,
@@ -1053,7 +1057,7 @@ export async function POST(request: NextRequest) {
           data: {
             userId: user.id,
             name: '__FOOD_FAVORITES__',
-            category: JSON.stringify({ favorites: (data as any).favorites }),
+            category: JSON.stringify({ favorites: favoritesArray }),
             currentRating: 0,
           }
         })
