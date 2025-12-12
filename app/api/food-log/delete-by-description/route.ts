@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
+import { getToken } from 'next-auth/jwt'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { normalizeMealCategory } from '../route'
@@ -8,11 +9,34 @@ import { normalizeMealCategory } from '../route'
 // Used as a last-resort cleaner when client-side deletes fail due to mismatched IDs or dates.
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.email) {
+    let session
+    let userEmail: string | null = null
+    try {
+      session = await getServerSession(authOptions)
+      userEmail = session?.user?.email ?? null
+    } catch (sessionError) {
+      console.error('POST /api/food-log/delete-by-description - getServerSession failed (will try JWT fallback):', sessionError)
+    }
+
+    if (!userEmail) {
+      try {
+        const token = await getToken({
+          req: request,
+          secret: process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET || 'helfi-secret-key-production-2024',
+        })
+        if (token?.email) {
+          userEmail = String(token.email)
+        }
+      } catch (tokenError) {
+        console.error('POST /api/food-log/delete-by-description - JWT fallback failed:', tokenError)
+      }
+    }
+
+    if (!userEmail) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
-    const user = await prisma.user.findUnique({ where: { email: session.user.email } })
+
+    const user = await prisma.user.findUnique({ where: { email: userEmail } })
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
@@ -68,4 +92,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to delete logs' }, { status: 500 })
   }
 }
-
