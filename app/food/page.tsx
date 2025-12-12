@@ -1281,6 +1281,13 @@ export default function FoodDiary() {
     if (!Number.isFinite(ts)) return ''
     return formatDateFromMs(ts)
   }
+  const safePhotoForSnapshot = (raw: any) => {
+    if (typeof raw !== 'string') return null
+    const trimmed = raw.trim()
+    // Only keep lightweight remote URLs; drop data URLs/base64 blobs that trigger 413s.
+    if (/^https?:\/\//i.test(trimmed)) return trimmed.slice(0, 500)
+    return null
+  }
   const compactItemForSnapshot = (item: any) => {
     if (!item || typeof item !== 'object') return item
     return {
@@ -1325,7 +1332,7 @@ export default function FoodDiary() {
       description,
       time: entry?.time,
       method: entry?.method,
-      photo: entry?.photo || null,
+      photo: safePhotoForSnapshot(entry?.photo),
       nutrition: entry?.nutrition || null,
       total: (entry as any)?.total || null,
       items,
@@ -1337,17 +1344,6 @@ export default function FoodDiary() {
   }
   const compactTodaysFoodsForSnapshot = (entries: any[], fallbackDate: string) =>
     Array.isArray(entries) ? entries.map((e) => compactEntryForSnapshot(e, fallbackDate)) : []
-  const utcMsForIso = (iso: string) => {
-    if (typeof iso !== 'string') return NaN
-    const match = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/)
-    if (!match) return NaN
-    const y = parseInt(match[1], 10)
-    const m = parseInt(match[2], 10)
-    const d = parseInt(match[3], 10)
-    if (!Number.isFinite(y) || !Number.isFinite(m) || !Number.isFinite(d)) return NaN
-    return Date.UTC(y, (m || 1) - 1, d || 1)
-  }
-  const SNAPSHOT_MAX_DAYS = 21
   const SNAPSHOT_MAX_ENTRIES = 300
   const limitSnapshotFoods = (entries: any[], fallbackDate: string) => {
     const compacted = compactTodaysFoodsForSnapshot(entries, fallbackDate)
@@ -1368,6 +1364,74 @@ export default function FoodDiary() {
       return bTs - aTs
     })
     return filtered.slice(0, SNAPSHOT_MAX_ENTRIES)
+  }
+  const minimalSnapshotFoods = (entries: any[], fallbackDate: string) =>
+    limitSnapshotFoods(
+      entries.map((entry) => ({
+        id: entry?.id,
+        dbId: (entry as any)?.dbId,
+        localDate:
+          (typeof entry?.localDate === 'string' && entry.localDate.length >= 8
+            ? entry.localDate
+            : fallbackDate) || fallbackDate,
+        description: typeof entry?.description === 'string' ? entry.description.slice(0, 200) : '',
+        meal: entry?.meal,
+        category: entry?.category,
+        persistedCategory: (entry as any)?.persistedCategory,
+        time: entry?.time,
+        createdAt: entry?.createdAt,
+        nutrition: entry?.nutrition || null,
+        total: (entry as any)?.total || null,
+      })),
+      fallbackDate,
+    )
+  const syncSnapshotToServer = async (entries: any[], fallbackDate: string) => {
+    const snapshotFoods = limitSnapshotFoods(entries, fallbackDate)
+    if (!snapshotFoods || snapshotFoods.length === 0) {
+      try {
+        await fetch('/api/user-data/clear-todays-foods', { method: 'POST' })
+      } catch (err) {
+        console.warn('Failed to clear todaysFoods snapshot', err)
+      }
+      return
+    }
+    try {
+      const res = await fetch('/api/user-data', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          todaysFoods: snapshotFoods,
+          appendHistory: false,
+        }),
+      })
+      if (res.status === 413) {
+        console.warn('Snapshot write hit 413, retrying with minimal payload')
+        try {
+          await fetch('/api/user-data/clear-todays-foods', { method: 'POST' })
+        } catch (clearErr) {
+          console.warn('Failed to clear oversized snapshot before retry', clearErr)
+        }
+        await fetch('/api/user-data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            todaysFoods: minimalSnapshotFoods(entries, fallbackDate),
+            appendHistory: false,
+          }),
+        }).catch((retryErr) => console.warn('Minimal snapshot retry failed', retryErr))
+      } else if (!res.ok) {
+        const errorText = await res.text().catch(() => '')
+        console.error('Failed to save todaysFoods snapshot', {
+          status: res.status,
+          statusText: res.statusText,
+          error: errorText,
+        })
+      }
+    } catch (userDataError) {
+      console.error('Error saving todaysFoods snapshot', userDataError)
+    }
   }
   const entryMatchesDate = (entry: any, targetDate: string) => {
     if (!entry) return false
@@ -1752,6 +1816,99 @@ export default function FoodDiary() {
       .trim()
       .toLowerCase()
 
+  // Stable delete key so resurrected entries with new db ids can still be suppressed.
+  const stableDeleteKeyForEntry = (entry: any) => {
+    if (!entry) return ''
+    const cat = normalizeCategory(entry?.meal || entry?.category || entry?.mealType)
+    const desc = normalizedDescription(entry?.description || entry?.name || '')
+    const date = dateKeyForEntry(entry)
+    if (!desc || !date) return ''
+    return `stable:${cat}|${desc}|${date}`
+  }
+
+  const tombstonesHydratedRef = useRef(false)
+  const hydrateDeletedTombstones = () => {
+    if (tombstonesHydratedRef.current) return
+    if (typeof window === 'undefined') return
+    tombstonesHydratedRef.current = true
+    try {
+      const raw = localStorage.getItem('foodDiary:deletedEntries')
+      const parsed = raw ? JSON.parse(raw) : []
+      const cutoff = Date.now() - 45 * 24 * 60 * 60 * 1000 // 45 days
+      const fresh = Array.isArray(parsed)
+        ? parsed.filter((t) => t && typeof t.key === 'string' && Number(t.ts) > cutoff)
+        : []
+      fresh.forEach((t) => deletedEntryKeysRef.current.add(String(t.key)))
+      localStorage.setItem('foodDiary:deletedEntries', JSON.stringify(fresh))
+    } catch (err) {
+      console.warn('Could not hydrate deleted entry tombstones', err)
+    }
+  }
+  hydrateDeletedTombstones()
+
+  const persistDeletedKeys = (keys: string[]) => {
+    const filtered = keys.filter(Boolean)
+    if (filtered.length === 0) return
+    filtered.forEach((k) => deletedEntryKeysRef.current.add(k))
+    if (typeof window === 'undefined') return
+    try {
+      const raw = localStorage.getItem('foodDiary:deletedEntries')
+      const parsed = raw ? JSON.parse(raw) : []
+      const cutoff = Date.now() - 45 * 24 * 60 * 60 * 1000
+      const current = Array.isArray(parsed)
+        ? parsed.filter((t) => t && typeof t.key === 'string' && Number(t.ts) > cutoff)
+        : []
+      const merged = [...current, ...filtered.map((k) => ({ key: k, ts: Date.now() }))]
+      const dedupedMap = new Map<string, { key: string; ts: number }>()
+      merged.forEach((item) => {
+        dedupedMap.set(item.key, item)
+      })
+      const deduped = Array.from(dedupedMap.values())
+      // keep the most recent 200 tombstones to avoid unbounded growth
+      const trimmed = deduped.slice(-200)
+      localStorage.setItem('foodDiary:deletedEntries', JSON.stringify(trimmed))
+    } catch (err) {
+      console.warn('Could not persist deleted entry tombstones', err)
+    }
+  }
+
+  const removeDeletedTombstonesForEntries = (entries: any[]) => {
+    if (!Array.isArray(entries) || entries.length === 0) return
+    const keysToRemove = new Set<string>()
+    entries.forEach((entry) => {
+      const stable = stableDeleteKeyForEntry(entry)
+      if (stable) keysToRemove.add(stable)
+      const dbKey = (entry as any)?.dbId ? `db:${(entry as any).dbId}` : ''
+      if (dbKey) keysToRemove.add(dbKey)
+      const idKey =
+        entry?.id !== null && entry?.id !== undefined ? `id:${entry.id}` : ''
+      if (idKey) keysToRemove.add(idKey)
+    })
+    if (keysToRemove.size === 0) return
+    keysToRemove.forEach((k) => deletedEntryKeysRef.current.delete(k))
+    if (typeof window === 'undefined') return
+    try {
+      const raw = localStorage.getItem('foodDiary:deletedEntries')
+      const parsed = raw ? JSON.parse(raw) : []
+      const filtered = Array.isArray(parsed)
+        ? parsed.filter((t) => t && !keysToRemove.has(String(t.key)))
+        : []
+      localStorage.setItem('foodDiary:deletedEntries', JSON.stringify(filtered))
+    } catch {}
+  }
+
+  const isEntryDeleted = (entry: any) => {
+    if (!entry) return false
+    const candidates = [
+      buildDeleteKey(entry),
+      stableDeleteKeyForEntry(entry),
+    ].filter(Boolean)
+    for (const key of candidates) {
+      if (deletedEntryKeysRef.current.has(key)) return true
+    }
+    return false
+  }
+
   // Normalized calendar date for de-dupe; falls back to timestamp so copies with missing localDate
   // collapse instead of rendering twice.
   const dateKeyForEntry = (entry: any) => {
@@ -1774,7 +1931,6 @@ export default function FoodDiary() {
   // Prevent duplicate rows from ever rendering (e.g., double writes or cached copies).
   const dedupeEntries = (list: any[], options?: { fallbackDate?: string }) => {
     if (!Array.isArray(list)) return []
-    const isDeleted = (entry: any) => deletedEntryKeysRef.current.has(buildDeleteKey(entry))
     // Prefer entries that have a real meal/category over uncategorized copies.
     const hasRealCategory = (entry: any) => {
       const cat = normalizeCategory(entry?.meal || entry?.category || entry?.mealType)
@@ -1798,7 +1954,7 @@ export default function FoodDiary() {
     const seen = new Set<string>()
     const firstPass: any[] = []
     for (const entry of list) {
-      if (isDeleted(entry)) continue
+      if (isEntryDeleted(entry)) continue
       const cat = normalizeCategory(entry?.meal || entry?.category || entry?.mealType)
       const key = [
         dateKeyForEntry(entry) || fallbackDate,
@@ -1818,7 +1974,7 @@ export default function FoodDiary() {
     // - the most recent entry when both are equivalent
     const preferred = new Map<string, any>()
     for (const entry of firstPass) {
-      if (isDeleted(entry)) continue
+      if (isEntryDeleted(entry)) continue
       const cat = normalizeCategory(entry?.meal || entry?.category || entry?.mealType)
       const key = [
         dateKeyForEntry(entry) || fallbackDate,
@@ -2744,16 +2900,7 @@ const applyStructuredItems = (
                 } else {
                   setHistoryFoods(mergedForDate)
                 }
-                try {
-                  fetch('/api/user-data', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      todaysFoods: limitSnapshotFoods(mergedForDate, selectedDate),
-                      appendHistory: false,
-                    })
-                  }).catch(() => {})
-                } catch {}
+                await syncSnapshotToServer(mergedForDate, selectedDate)
                 return
               }
 
@@ -2802,16 +2949,7 @@ const applyStructuredItems = (
                 }
 
                 // Update cache with merged data (including dbId for future loads)
-                try {
-                  fetch('/api/user-data', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      todaysFoods: limitSnapshotFoods(merged, selectedDate),
-                      appendHistory: false,
-                    })
-                  }).catch(() => {})
-                } catch {}
+                await syncSnapshotToServer(merged, selectedDate)
               } else if (mappedFromDb.length === 0 && deduped.length > 0 && !backfillAttemptedRef.current[selectedDate]) {
                 // Safety net: if we have local entries but the server has none, backfill them into the history table.
                 backfillAttemptedRef.current[selectedDate] = true
@@ -2846,6 +2984,7 @@ const applyStructuredItems = (
                 } else {
                   setHistoryFoods(enrichedCached);
                 }
+                await syncSnapshotToServer(enrichedCached, selectedDate)
               }
             }
           } catch (error) {
@@ -2870,16 +3009,7 @@ const applyStructuredItems = (
                   setHistoryFoods(mapped);
                 }
                 // Persist localDate back to user data for stability
-                try {
-                  fetch('/api/user-data', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      todaysFoods: limitSnapshotFoods(mapped, selectedDate),
-                      appendHistory: false,
-                    })
-                  }).catch(() => {})
-                } catch {}
+                await syncSnapshotToServer(mapped, selectedDate)
               } else {
                 // Secondary fallback: load from /api/user-data directly and pull todaysFoods
                 try {
@@ -2905,16 +3035,7 @@ const applyStructuredItems = (
                       setHistoryFoods(byDate);
                     }
                     // Persist localDate back to user data so future loads are stable
-                    try {
-                      fetch('/api/user-data', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          todaysFoods: limitSnapshotFoods(byDate, selectedDate),
-                          appendHistory: false,
-                        })
-                      }).catch(() => {})
-                    } catch {}
+                    await syncSnapshotToServer(byDate, selectedDate)
                   }
                 } catch {}
               }
@@ -2949,16 +3070,7 @@ const applyStructuredItems = (
                 setHistoryFoods(deduped);
               }
               // Persist localDate back to user data for stability
-              try {
-                fetch('/api/user-data', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    todaysFoods: limitSnapshotFoods(deduped, selectedDate),
-                    appendHistory: false,
-                  })
-                }).catch(() => {})
-              } catch {}
+              await syncSnapshotToServer(deduped, selectedDate)
             }
             // Mark as loaded after database load completes (even if no entries)
             setFoodDiaryLoaded(true);
@@ -3224,6 +3336,9 @@ const applyStructuredItems = (
     options?: { appendHistory?: boolean; suppressToast?: boolean },
   ) => {
     try {
+      // When the user intentionally saves, clear any tombstones for matching entries so
+      // re-adding the same meal on purpose is allowed.
+      removeDeletedTombstonesForEntries(updatedFoods)
       // 1) Deduplicate before updating context to prevent duplicates
       const seenIds = new Set<number>();
       const uniqueById = updatedFoods.filter((food: any) => {
@@ -3282,34 +3397,7 @@ const applyStructuredItems = (
       const snapshotFoods = dedupedFoods
 
       // 2) Persist today's foods snapshot (fast "today" view) via /api/user-data.
-      //    Fire-and-forget so UI isn't blocked; failures are logged.
-      try {
-        fetch('/api/user-data', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            todaysFoods: limitSnapshotFoods(snapshotFoods, selectedDate), // Limit window to avoid 413
-            appendHistory: false, // Always false - we handle FoodLog separately
-          }),
-        }).then(async (userDataResponse) => {
-          if (!userDataResponse.ok) {
-            const errorText = await userDataResponse.text()
-            console.error('❌ Failed to save todaysFoods snapshot:', {
-              status: userDataResponse.status,
-              statusText: userDataResponse.statusText,
-              error: errorText,
-            })
-          } else {
-            console.log('✅ Saved todaysFoods snapshot successfully')
-          }
-        }).catch((userDataError) => {
-          console.error('❌ Error saving todaysFoods snapshot:', userDataError)
-        })
-      } catch (userDataError) {
-        console.error('❌ Error launching todaysFoods snapshot:', userDataError)
-      }
+      await syncSnapshotToServer(snapshotFoods, selectedDate)
 
       // 3) For brand new entries, write directly into the permanent FoodLog history table.
       //    If the write fails, enqueue the payload locally and surface a retry button.
@@ -5644,9 +5732,13 @@ Please add nutritional information manually if needed.`);
     const entryCategory = normalizeCategory(entry?.meal || entry?.category || entry?.mealType)
     const entryId = entry.id
     const entryKey = entryId !== null && entryId !== undefined ? entryId.toString() : ''
-    const descKey = `desc:${entryCategory}|${normalizedDescription(entry?.description || entry?.name || '')}|${entry?.localDate || ''}|${
-      entry?.createdAt || ''
-    }`
+    const stableKey = stableDeleteKeyForEntry(entry)
+    const deletionKeys = new Set<string>()
+    const builtKey = buildDeleteKey(entry)
+    if (builtKey) deletionKeys.add(builtKey)
+    if (stableKey) deletionKeys.add(stableKey)
+    if (dbId) deletionKeys.add(`db:${dbId}`)
+    if (entryId !== null && entryId !== undefined) deletionKeys.add(`id:${entryId}`)
     const autoDates = Array.from(
       new Set(
         [
@@ -5677,11 +5769,7 @@ Please add nutritional information manually if needed.`);
       return next
     })
     setSwipeMenuEntry((prev) => (prev === entryKey ? null : prev))
-    deletedEntryKeysRef.current.add(buildDeleteKey(entry))
-    deletedEntryKeysRef.current.add(descKey)
-    if (dbId) {
-      deletedEntryKeysRef.current.add(`db:${dbId}`)
-    }
+    persistDeletedKeys(Array.from(deletionKeys))
     setDeletedEntryNonce((n) => n + 1)
     // Prevent resurrecting from oversized/stale warm cache
     try {
@@ -5815,18 +5903,7 @@ Please add nutritional information manually if needed.`);
         await refreshEntriesFromServer()
         // Keep server snapshot in sync so stale cards don't reappear
         try {
-          if (updatedFoods.length === 0) {
-            await fetch('/api/user-data/clear-todays-foods', { method: 'POST' })
-          } else {
-            await fetch('/api/user-data', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                todaysFoods: limitSnapshotFoods(updatedFoods, selectedDate),
-                appendHistory: false,
-              }),
-            })
-          }
+          await syncSnapshotToServer(updatedFoods, selectedDate)
         } catch (syncErr) {
           console.warn('Failed to sync todaysFoods snapshot after delete', syncErr)
         }
@@ -5850,7 +5927,10 @@ Please add nutritional information manually if needed.`);
         }
         return next
       });
-      deletedEntryKeysRef.current.add(`db:${dbId}`)
+      const stable = stableDeleteKeyForEntry(
+        (historyFoods || []).find((f: any) => f.dbId === dbId),
+      )
+      persistDeletedKeys([`db:${dbId}`, stable].filter(Boolean))
       setDeletedEntryNonce((n) => n + 1)
       // Call API to delete from DB
       triggerHaptic(10)

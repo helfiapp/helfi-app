@@ -173,33 +173,41 @@ export async function GET(request: NextRequest) {
     } catch (e) {
       console.log('No todays foods data found in storage');
     }
-    const normalizedTodaysFoods = Array.isArray(todaysFoods)
-      ? todaysFoods.map((entry: any) => {
-          const category = normalizeCategory(entry?.meal ?? entry?.category ?? entry?.mealType ?? entry?.persistedCategory)
-          const localDate =
-            typeof entry?.localDate === 'string' && entry.localDate.length >= 8
-              ? entry.localDate
-              : (() => {
-                  try {
-                    const ts = typeof entry?.id === 'number' ? entry.id : Number(entry?.id)
-                    if (Number.isFinite(ts)) {
-                      const d = new Date(ts)
-                      const y = d.getFullYear()
-                      const m = String(d.getMonth() + 1).padStart(2, '0')
-                      const day = String(d.getDate()).padStart(2, '0')
-                      return `${y}-${m}-${day}`
-                    }
-                  } catch {}
-                  return buildTodayIso()
-                })()
-          return {
-            ...entry,
-            meal: category,
-            category,
-            persistedCategory: entry?.persistedCategory ?? category,
-            localDate,
+    const deriveLocalDateFromEntry = (entry: any) => {
+      try {
+        const ts = typeof entry?.id === 'number' ? entry.id : Number(entry?.id)
+        if (Number.isFinite(ts)) {
+          const d = new Date(ts)
+          if (!Number.isNaN(d.getTime())) {
+            const y = d.getFullYear()
+            const m = String(d.getMonth() + 1).padStart(2, '0')
+            const day = String(d.getDate()).padStart(2, '0')
+            return `${y}-${m}-${day}`
           }
-        })
+        }
+      } catch {}
+      return ''
+    }
+    const normalizedTodaysFoods = Array.isArray(todaysFoods)
+      ? todaysFoods
+          .map((entry: any) => {
+            const category = normalizeCategory(entry?.meal ?? entry?.category ?? entry?.mealType ?? entry?.persistedCategory)
+            const explicitLocalDate =
+              typeof entry?.localDate === 'string' && entry.localDate.length >= 8
+                ? entry.localDate
+                : ''
+            const derivedLocalDate = deriveLocalDateFromEntry(entry)
+            const localDate = explicitLocalDate || derivedLocalDate
+            if (!localDate) return null
+            return {
+              ...entry,
+              meal: category,
+              category,
+              persistedCategory: entry?.persistedCategory ?? category,
+              localDate,
+            }
+          })
+          .filter(Boolean)
       : []
 
     // Get saved favorites
