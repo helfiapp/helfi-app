@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import Image from 'next/image'
 
 export default function AdminPanel() {
@@ -40,6 +40,8 @@ export default function AdminPanel() {
   const [isLoadingManagement, setIsLoadingManagement] = useState(false)
   const [selectedUser, setSelectedUser] = useState<any>(null)
   const [showUserModal, setShowUserModal] = useState(false)
+  const [actionInFlight, setActionInFlight] = useState<Record<string, boolean>>({})
+  const actionInFlightRef = useRef<Record<string, boolean>>({})
 
   // Email functionality states
   const [selectedEmails, setSelectedEmails] = useState<string[]>([])
@@ -421,6 +423,10 @@ export default function AdminPanel() {
   }
 
   const handleUserAction = async (action: string, userId: string, data?: any) => {
+    const key = `${action}:${userId}`
+    if (actionInFlightRef.current[key]) return
+    actionInFlightRef.current[key] = true
+    setActionInFlight((prev) => ({ ...prev, [key]: true }))
     try {
       const response = await fetch('/api/admin/user-management', {
         method: 'POST',
@@ -457,6 +463,13 @@ export default function AdminPanel() {
     } catch (error) {
       console.error('Error performing user action:', error)
       alert(`Action failed: ${error instanceof Error ? error.message : 'Please try again.'}`)
+    } finally {
+      delete actionInFlightRef.current[key]
+      setActionInFlight((prev) => {
+        const next = { ...prev }
+        delete next[key]
+        return next
+      })
     }
   }
 

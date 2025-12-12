@@ -3347,19 +3347,17 @@ const applyStructuredItems = (
       const json = await res.json();
       const logs = Array.isArray(json.logs) ? json.logs : [];
       const mapped = mapLogsToEntries(logs, selectedDate);
-      const serverDbIds = new Set<string>(
-        mapped
-          .map((e: any) => (e?.dbId ? String(e.dbId) : ''))
-          .filter((v: string) => v.length > 0),
-      )
       const localList = isViewingToday ? todaysFoodsForSelectedDate : Array.isArray(historyFoods) ? historyFoods : []
+      // IMPORTANT:
+      // Treat the server as authoritative for DB-backed rows. Only keep local entries that
+      // are NOT DB-backed (optimistic/pending), otherwise polling/focus-refresh can
+      // accumulate duplicates when `id` timestamps don't match the mapped server `createdAt`.
       const keptLocal = Array.isArray(localList)
         ? localList.filter((e: any) => {
-            const dbId = e?.dbId ? String(e.dbId) : ''
-            // If an entry is DB-backed, only keep it if the server still has it.
-            // This is what makes deletes on one device propagate to another.
-            if (dbId) return serverDbIds.has(dbId)
-            return true
+            if (!e) return false
+            if ((e as any)?.dbId) return false
+            if (isEntryDeleted(e)) return false
+            return entryMatchesDate(e, selectedDate)
           })
         : []
       const deduped = dedupeEntries([...mapped, ...keptLocal], { fallbackDate: selectedDate });
@@ -4179,10 +4177,10 @@ Meanwhile, you can describe your food manually:
 
   const analyzeManualFood = async () => {
     // Validation for single food
-    if (manualFoodType === 'single' && (!manualFoodName.trim() || !manualIngredients[0]?.weight?.trim())) return;
-    
+    if (manualFoodType === 'single' && !manualFoodName.trim()) return;
+
     // Validation for multiple ingredients
-    if (manualFoodType === 'multiple' && manualIngredients.every(ing => !ing.name.trim() || !ing.weight.trim())) return;
+    if (manualFoodType === 'multiple' && manualIngredients.every((ing) => !ing.name.trim())) return;
     
     setIsAnalyzing(true);
     setAnalysisPhase('analyzing');
@@ -4193,13 +4191,18 @@ Meanwhile, you can describe your food manually:
       let foodDescription = '';
       
       if (manualFoodType === 'single') {
-        const weight = manualIngredients[0]?.weight || '';
-        const unit = manualIngredients[0]?.unit || 'g';
-        foodDescription = `${manualFoodName}, ${weight} ${unit}`;
+        foodDescription = manualFoodName.trim();
       } else {
         // Build description from multiple ingredients
-        const validIngredients = manualIngredients.filter(ing => ing.name.trim() && ing.weight.trim());
-        foodDescription = validIngredients.map(ing => `${ing.name}, ${ing.weight} ${ing.unit}`).join('; ');
+        const validIngredients = manualIngredients.filter((ing) => ing.name.trim());
+        foodDescription = validIngredients
+          .map((ing) => {
+            const name = (ing.name || '').toString().trim()
+            const weight = (ing.weight || '').toString().trim()
+            const unit = (ing.unit || '').toString().trim()
+            return weight ? `${name}, ${weight} ${unit || 'g'}` : name
+          })
+          .join('; ');
       }
       
       console.log('🚀 PERFORMANCE: Analyzing text (faster than photo analysis)...');
@@ -8128,42 +8131,6 @@ Please add nutritional information manually if needed.`);
                         className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
                       />
                     </div>
-
-                    <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Weight/Portion
-                      </label>
-                      <input
-                        type="text"
-                        value={manualIngredients[0]?.weight || ''}
-                        onChange={(e) => updateIngredient(0, 'weight', e.target.value)}
-                        placeholder="e.g., 100, 6, 1"
-                        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
-                      />
-                    </div>
-
-                    <div className="mb-6">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Unit
-                      </label>
-                      <select
-                        value={manualIngredients[0]?.unit || 'g'}
-                        onChange={(e) => updateIngredient(0, 'unit', e.target.value)}
-                        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white transition-colors"
-                      >
-                        <option value="g">Grams</option>
-                        <option value="oz">Ounces</option>
-                        <option value="cup">Cups</option>
-                        <option value="tbsp">Tablespoon</option>
-                        <option value="tsp">Teaspoon</option>
-                        <option value="ml">Milliliters</option>
-                        <option value="piece">Piece</option>
-                        <option value="slice">Slice</option>
-                        <option value="medium">Medium</option>
-                        <option value="large">Large</option>
-                        <option value="small">Small</option>
-                      </select>
-                    </div>
                   </>
                 )}
 
@@ -8218,33 +8185,6 @@ Please add nutritional information manually if needed.`);
                               className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm"
                             />
                           </div>
-                          
-                          <div className="mb-3">
-                            <input
-                              type="text"
-                              value={ing.weight}
-                              onChange={(e) => updateIngredient(index, 'weight', e.target.value)}
-                              placeholder="Weight/Portion"
-                              className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-sm"
-                            />
-                          </div>
-                          
-                          <div>
-                            <select
-                              value={ing.unit}
-                              onChange={(e) => updateIngredient(index, 'unit', e.target.value)}
-                              className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white text-sm"
-                            >
-                              <option value="g">Grams</option>
-                              <option value="oz">Ounces</option>
-                              <option value="cup">Cups</option>
-                              <option value="tbsp">Tablespoon</option>
-                              <option value="tsp">Teaspoon</option>
-                              <option value="ml">Milliliters</option>
-                              <option value="piece">Piece</option>
-                              <option value="slice">Slice</option>
-                            </select>
-                          </div>
                         </div>
                       ))}
                       
@@ -8268,8 +8208,8 @@ Please add nutritional information manually if needed.`);
                   <button
                     onClick={analyzeManualFood}
                     disabled={
-                      (manualFoodType === 'single' && (!manualFoodName.trim() || !manualIngredients[0]?.weight?.trim())) ||
-                      (manualFoodType === 'multiple' && manualIngredients.every(ing => !ing.name.trim() || !ing.weight.trim())) ||
+                      (manualFoodType === 'single' && !manualFoodName.trim()) ||
+                      (manualFoodType === 'multiple' && manualIngredients.every((ing) => !ing.name.trim())) ||
                       isAnalyzing
                     }
                     className="flex-1 py-3 px-4 bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-colors duration-200 flex items-center justify-center"

@@ -102,29 +102,32 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
     return null
   }
 
-  // Calculate precise percent used when we know wallet cents (subscription case).
-  // Fallback to server-reported percentage when only top-ups are present.
-  const percentUsedPrecise =
+  // Credits (credits == cents) must reflect the sum of:
+  // - subscription remaining
+  // - active top-ups
+  // - non-expiring additional credits (admin grants)
+  const creditsRemaining = creditsTotal ?? Math.round(totalAvailableCents)
+  // We anchor percent remaining to the subscription cap when present, but never allow
+  // additional credits to incorrectly trigger "low credits" UI.
+  const percentRemainingPrecise =
     monthlyCapCents > 0
-      ? (monthlyUsedCents / Math.max(1, monthlyCapCents)) * 100
-      : (walletPercentUsed ?? 0)
-  const clampedUsed = Math.min(100, Math.max(0, percentUsedPrecise))
-  const percentRemainingPrecise = Math.max(0, 100 - clampedUsed)
-  // Non-inline variants show integer rounding to keep UI calm
-  const displayPercentUsed = Math.round(clampedUsed)
-  // Inline variant shows 0.1% precision so each analysis visibly reduces the meter
-  const displayPercentRemainingInline = Number(percentRemainingPrecise.toFixed(1))
-  
-  // Check if credits are low (5% or less remaining)
-  const isLowCredits = percentRemainingPrecise <= 5
+      ? (creditsRemaining / Math.max(1, monthlyCapCents)) * 100
+      : creditsRemaining > 0
+      ? 100
+      : 0
+  const clampedRemaining = Math.min(100, Math.max(0, percentRemainingPrecise))
+  // Inline variant shows 0.1% precision so each analysis visibly reduces the meter.
+  const displayPercentRemainingInline = Number(clampedRemaining.toFixed(1))
+  const displayPercentRemaining = Math.round(clampedRemaining)
+
+  // Low credits: show red when remaining is genuinely low.
+  const lowCreditsThreshold = Math.max(5, Math.ceil(monthlyCapCents > 0 ? monthlyCapCents * 0.05 : 0))
+  const isLowCredits = creditsRemaining <= lowCreditsThreshold
 
   if (inline) {
     // Inline version for AI feature pages - credits remaining with green bar (reverse fill)
-    const creditsDisplayInline = creditsTotal ?? Math.round(totalAvailableCents)
-    // Calculate percent remaining for bar display
-    const creditsRemainingPercent = monthlyCapCents > 0 
-      ? percentRemainingPrecise 
-      : (creditsDisplayInline > 0 ? 100 : 0) // If no cap, show full bar
+    const creditsDisplayInline = creditsRemaining
+    const creditsRemainingPercent = displayPercentRemainingInline
     
     return (
       <div className={`mt-2 ${className}`}>
@@ -143,7 +146,7 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
             style={{ width: `${Math.min(100, Math.max(0, creditsRemainingPercent))}%` }}
           />
         </div>
-        {isLowCredits && creditsDisplayInline !== null && creditsDisplayInline <= 5 && (
+        {creditsDisplayInline !== null && creditsDisplayInline <= 5 && (
           <div className="mt-2 bg-red-50 border border-red-200 rounded-lg p-2">
             <p className="text-xs text-red-800 font-medium mb-1">⚠️ Low Credits Warning</p>
             <p className="text-xs text-red-700 mb-2">
@@ -172,10 +175,8 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
 
   if (compact) {
     // Compact version for headers - credits remaining with green bar (reverse fill)
-    const creditsDisplay = creditsTotal ?? Math.round(totalAvailableCents) // fallback to cents if credits missing
-    const creditsRemainingPercent = monthlyCapCents > 0 
-      ? percentRemainingPrecise 
-      : (creditsDisplay > 0 ? 100 : 0) // If no cap, show full bar
+    const creditsDisplay = creditsRemaining
+    const creditsRemainingPercent = displayPercentRemaining
     
     return (
       <div className={`flex items-center gap-2 ${className}`}>
@@ -196,10 +197,8 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
   }
 
   // Full version for sidebar - credits remaining with green bar (reverse fill)
-  const creditsDisplay = creditsTotal ?? Math.round(totalAvailableCents) // fallback to cents if credits missing
-  const creditsRemainingPercent = monthlyCapCents > 0 
-    ? percentRemainingPrecise 
-    : (creditsDisplay > 0 ? 100 : 0) // If no cap, show full bar
+  const creditsDisplay = creditsRemaining
+  const creditsRemainingPercent = displayPercentRemaining
   
   return (
     <div className={`px-4 py-3 ${className}`}>
@@ -225,4 +224,3 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
     </div>
   )
 }
-
