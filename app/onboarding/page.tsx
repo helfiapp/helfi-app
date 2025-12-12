@@ -1905,11 +1905,6 @@ function ExerciseStep({ onNext, onBack, initial, onPartialSave, onUnsavedChange,
         }}
         onAddMore={() => {
           acknowledgeUnsavedChanges();
-          if (queuedNavigationRef.current) {
-            const fn = queuedNavigationRef.current;
-            queuedNavigationRef.current = null;
-            fn();
-          }
           setShowUpdatePopup(false);
         }}
         onUpdateInsights={handleUpdateInsights}
