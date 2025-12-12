@@ -1257,24 +1257,47 @@ export default function FoodDiary() {
     warmDiaryState?.selectedDate && warmDiaryState.selectedDate.length >= 8
       ? warmDiaryState.selectedDate
       : buildTodayIso()
-  const entryMatchesDate = (entry: any, targetDate: string) => {
-    if (!entry) return false
-    const localDate = typeof entry?.localDate === 'string' ? entry.localDate : null
-    if (localDate && localDate.length >= 8 && localDate === targetDate) return true
-
-    // Fallback: derive calendar date from createdAt/id/time even if localDate is present but wrong.
+  const formatDateFromMs = (ms: number) => {
+    const d = new Date(ms)
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${y}-${m}-${day}`
+  }
+  const extractEntryTimestampMs = (entry: any) => {
     const ts =
       typeof entry?.createdAt === 'string' || entry?.createdAt instanceof Date
         ? new Date(entry.createdAt).getTime()
         : typeof entry?.id === 'number'
         ? entry.id
         : Number(entry?.time) || Number(entry?.id)
-    if (!Number.isFinite(ts)) return false
-    const d = new Date(ts)
-    const y = d.getFullYear()
-    const m = String(d.getMonth() + 1).padStart(2, '0')
-    const day = String(d.getDate()).padStart(2, '0')
-    return `${y}-${m}-${day}` === targetDate
+    if (!Number.isFinite(ts)) return NaN
+    // Guard against small non-timestamp numbers producing bogus 1970 dates.
+    if (ts < 946684800000) return NaN
+    return ts
+  }
+  const deriveDateFromEntryTimestamp = (entry: any) => {
+    const ts = extractEntryTimestampMs(entry)
+    if (!Number.isFinite(ts)) return ''
+    return formatDateFromMs(ts)
+  }
+  const entryMatchesDate = (entry: any, targetDate: string) => {
+    if (!entry) return false
+    const localDate =
+      typeof entry?.localDate === 'string' && entry.localDate.length >= 8 ? entry.localDate : ''
+    const derivedDate = deriveDateFromEntryTimestamp(entry)
+
+    if (derivedDate) {
+      // If we have a trustworthy timestamp date and it conflicts with localDate, trust the timestamp
+      // to prevent cached prior-day rows leaking into a new day.
+      if (localDate && localDate !== derivedDate) {
+        return derivedDate === targetDate
+      }
+      if (derivedDate === targetDate) return true
+    }
+
+    if (localDate) return localDate === targetDate
+    return false
   }
   const filterEntriesForDate = (entries: any[] | null | undefined, targetDate: string) =>
     Array.isArray(entries) ? entries.filter((entry) => entryMatchesDate(entry, targetDate)) : []
@@ -2311,7 +2334,7 @@ const applyStructuredItems = (
     });
   })();
 
-  const normalizeDiaryEntry = (entry: any) => {
+  const normalizeDiaryEntry = (entry: any, fallbackDate: string) => {
     if (!entry) return entry
     const rawCat = entry.meal ?? entry.category ?? (entry as any)?.mealType ?? (entry as any)?.persistedCategory
     const normalizedCategory = normalizeCategory(rawCat)
@@ -2319,26 +2342,10 @@ const applyStructuredItems = (
       entry?.createdAt ||
       (typeof entry?.id === 'number' ? new Date(entry.id).toISOString() : undefined) ||
       new Date().toISOString()
-    const deriveLocalDate = () => {
-      if (typeof entry?.localDate === 'string' && entry.localDate.length >= 8) return entry.localDate
-      try {
-        const ts =
-          typeof entry?.id === 'number'
-            ? entry.id
-            : entry?.createdAt
-            ? new Date(entry.createdAt).getTime()
-            : Number(entry?.time)
-        if (Number.isFinite(ts)) {
-          const d = new Date(ts)
-          const y = d.getFullYear()
-          const m = String(d.getMonth() + 1).padStart(2, '0')
-          const day = String(d.getDate()).padStart(2, '0')
-          return `${y}-${m}-${day}`
-        }
-      } catch {}
-      return buildTodayIso()
-    }
-    const localDate = deriveLocalDate()
+    const explicitLocalDate =
+      typeof entry?.localDate === 'string' && entry.localDate.length >= 8 ? entry.localDate : ''
+    const derivedDate = deriveDateFromEntryTimestamp(entry)
+    const localDate = derivedDate || explicitLocalDate || fallbackDate
     const createdAtIso = alignTimestampToLocalDate(rawCreatedAtIso, localDate)
     const displayTime = new Date(createdAtIso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     return {
@@ -2352,10 +2359,15 @@ const applyStructuredItems = (
     }
   }
 
-  const normalizeDiaryList = (list: any[]) => (Array.isArray(list) ? list.map(normalizeDiaryEntry) : [])
+  const normalizeDiaryList = (list: any[], fallbackDate: string) =>
+    Array.isArray(list) ? list.map((entry) => normalizeDiaryEntry(entry, fallbackDate)) : []
 
   const sourceEntries = useMemo(
-    () => dedupeEntries(normalizeDiaryList(isViewingToday ? todaysFoodsForSelectedDate : (historyFoods || [])), { fallbackDate: selectedDate }),
+    () =>
+      dedupeEntries(
+        normalizeDiaryList(isViewingToday ? todaysFoodsForSelectedDate : (historyFoods || []), selectedDate),
+        { fallbackDate: selectedDate },
+      ),
     [todaysFoodsForSelectedDate, historyFoods, isViewingToday, deletedEntryNonce, selectedDate],
   )
   const entriesByCategory = useMemo(() => {
@@ -2460,7 +2472,9 @@ const applyStructuredItems = (
       const snapshot = readPersistentDiarySnapshot()
       const byDate = snapshot?.byDate?.[selectedDate]
       if (!byDate || !byDate.normalized || !Array.isArray(byDate.entries)) return
-      const normalized = dedupeEntries(normalizeDiaryList(byDate.entries), { fallbackDate: selectedDate })
+      const normalized = dedupeEntries(normalizeDiaryList(byDate.entries, selectedDate), {
+        fallbackDate: selectedDate,
+      })
       if (isViewingToday) {
         setTodaysFoods(normalized)
       } else {
@@ -2498,10 +2512,13 @@ const applyStructuredItems = (
 
   // Persist a durable snapshot per date to avoid reload flicker across navigations
   useEffect(() => {
-    if (typeof window === 'undefined') return
-    try {
-      const snapshot = readPersistentDiarySnapshot() || { byDate: {} }
-      const sourceEntriesForDate = normalizeDiaryList(isViewingToday ? todaysFoodsForSelectedDate : (historyFoods || []))
+      if (typeof window === 'undefined') return
+      try {
+        const snapshot = readPersistentDiarySnapshot() || { byDate: {} }
+      const sourceEntriesForDate = normalizeDiaryList(
+        isViewingToday ? todaysFoodsForSelectedDate : (historyFoods || []),
+        selectedDate,
+      )
       const normalized = dedupeEntries(sourceEntriesForDate, { fallbackDate: selectedDate })
       snapshot.byDate[selectedDate] = {
         entries: normalized,
@@ -2544,30 +2561,36 @@ const applyStructuredItems = (
     if (userData?.todaysFoods) {
       console.log(`🚀 PERFORMANCE: Checking cache for date ${selectedDate}, isViewingToday: ${isViewingToday}`);
       console.log(`📦 Cache contains ${userData.todaysFoods.length} total entries`);
-      // Filter to only entries created on the selected date using the entry timestamp id
-      const onlySelectedDate = userData.todaysFoods.filter((item: any) => {
+      // Filter to only entries that truly belong to the selected calendar date.
+      // If an entry has both localDate and a trustworthy timestamp date and they conflict,
+      // trust the timestamp to prevent prior-day cache drift into a new day.
+      const onlySelectedDate = userData.todaysFoods.flatMap((item: any) => {
         try {
-          // Prefer explicit localDate stamp if present
-          if (typeof item.localDate === 'string' && item.localDate.length >= 8) {
-            const matches = item.localDate === selectedDate;
-            if (matches) {
-              console.log(`✅ Cache match by localDate: ${item.localDate} === ${selectedDate}`);
-            }
-            return matches;
+          const explicitLocalDate =
+            typeof item?.localDate === 'string' && item.localDate.length >= 8 ? item.localDate : ''
+          const derivedDate = deriveDateFromEntryTimestamp(item)
+          const effectiveDate = derivedDate || explicitLocalDate
+
+          if (!effectiveDate || effectiveDate !== selectedDate) return []
+
+          if (derivedDate && explicitLocalDate && derivedDate !== explicitLocalDate) {
+            console.warn('⚠️ Cache localDate mismatch healed', {
+              explicitLocalDate,
+              derivedDate,
+              selectedDate,
+              id: item?.id,
+            })
+            return [{ ...item, localDate: derivedDate }]
           }
-          const d = new Date(typeof item.id === 'number' ? item.id : Number(item.id));
-          const y = d.getFullYear();
-          const m = String(d.getMonth() + 1).padStart(2, '0');
-          const day = String(d.getDate()).padStart(2, '0');
-          const itemDate = `${y}-${m}-${day}`;
-          const matches = itemDate === selectedDate;
-          if (matches) {
-            console.log(`✅ Cache match by timestamp: ${itemDate} === ${selectedDate}`);
+
+          if (!explicitLocalDate && derivedDate) {
+            return [{ ...item, localDate: derivedDate }]
           }
-          return matches;
+
+          return [item]
         } catch (e) {
           console.log(`❌ Error filtering cache entry:`, e);
-          return false;
+          return []
         }
       });
       console.log(`📊 Found ${onlySelectedDate.length} entries in cache for date ${selectedDate}`);
