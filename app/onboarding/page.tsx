@@ -329,6 +329,7 @@ function useUnsavedNavigationAllowance(hasUnsavedChanges: boolean) {
   const allowUnsavedNavigationRef = useRef(allowUnsavedNavigation);
   const hasUnsavedChangesRef = useRef(hasUnsavedChanges);
   const prevHasUnsavedChangesRef = useRef(hasUnsavedChanges);
+  const lastSavedRef = useRef<number>(Date.now());
 
   useEffect(() => {
     allowUnsavedNavigationRef.current = allowUnsavedNavigation;
@@ -347,6 +348,9 @@ function useUnsavedNavigationAllowance(hasUnsavedChanges: boolean) {
       pendingActionRef.current = null;
       console.log('[onboarding.guard] Re-armed due to new edits; navigation will be blocked until Update Insights runs.');
     }
+    if (!hasUnsavedChanges && prev) {
+      lastSavedRef.current = Date.now();
+    }
     prevHasUnsavedChangesRef.current = hasUnsavedChanges;
   }, [hasUnsavedChanges]);
 
@@ -361,6 +365,7 @@ function useUnsavedNavigationAllowance(hasUnsavedChanges: boolean) {
   const acknowledgeUnsavedChanges = useCallback(() => {
     allowUnsavedNavigationRef.current = true;
     setAllowUnsavedNavigation(true);
+    lastSavedRef.current = Date.now();
     const pending = pendingActionRef.current;
     pendingActionRef.current = null;
     if (pending) {
