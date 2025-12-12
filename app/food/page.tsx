@@ -5679,35 +5679,46 @@ Please add nutritional information manually if needed.`);
         showQuickToast('Could not open this entry')
         return
       }
-      setEditingEntry(food);
+      const safeDescription = (food.description ?? '').toString()
+      const safeItems = Array.isArray(food.items) ? food.items : null
+      const safeNutrition = sanitizeNutritionTotals(food.nutrition || food.total || null) || null
+      const safeFood = {
+        ...food,
+        description: safeDescription,
+        items: safeItems,
+        nutrition: safeNutrition,
+        total: safeNutrition || null,
+      }
+
+      setEditingEntry(safeFood);
       setEnergyUnit('kcal')
-      setSelectedAddCategory(normalizeCategory(food?.meal || food?.category || food?.mealType) as any);
+      setSelectedAddCategory(normalizeCategory(safeFood?.meal || safeFood?.category || safeFood?.mealType) as any);
       try {
         // Keep an immutable copy to enable "Cancel changes"
-        setOriginalEditingEntry(JSON.parse(JSON.stringify(food)))
+        setOriginalEditingEntry(JSON.parse(JSON.stringify(safeFood)))
       } catch {
-        setOriginalEditingEntry(food)
+        setOriginalEditingEntry(safeFood)
       }
       // Populate the form with existing data and go directly to editing
-      const useIngredientCards = food.method === 'photo' || isBarcodeEntry(food)
+      const useIngredientCards = safeFood.method === 'photo' || isBarcodeEntry(safeFood)
       if (useIngredientCards) {
         // Clear all state first to ensure clean rebuild
         setAnalyzedItems([]);
         setAnalyzedNutrition(null);
         setAnalyzedTotal(null);
-        setPhotoPreview(food.photo || null);
+        setPhotoPreview(safeFood.photo || null);
         // Set aiDescription AFTER clearing items so useEffect can rebuild
-        setAiDescription(food.description || '');
-        setAnalyzedNutrition(food.nutrition);
+        setAiDescription(safeFood.description || '');
+        setAnalyzedNutrition(safeFood.nutrition);
         
         // Try to restore items immediately (synchronous extraction)
         let itemsRestored = false;
         
         // First priority: use saved items if they exist and are valid
-        if (food.items && Array.isArray(food.items) && food.items.length > 0) {
-          const baseItems = isBarcodeEntry(food)
-            ? normalizeDiscreteServingsWithLabel(food.items)
-            : food.items
+        if (safeFood.items && Array.isArray(safeFood.items) && safeFood.items.length > 0) {
+          const baseItems = isBarcodeEntry(safeFood)
+            ? normalizeDiscreteServingsWithLabel(safeFood.items)
+            : safeFood.items
           const enriched = enrichItemsFromStarter(baseItems)
           setAnalyzedItems(enriched);
           applyRecalculatedNutrition(enriched);
@@ -5715,9 +5726,9 @@ Please add nutritional information manually if needed.`);
         }
         
         // Second priority: extract from description text (try both JSON and prose)
-        if (!itemsRestored && food.description) {
+        if (!itemsRestored && safeFood.description) {
           // Try structured JSON extraction first
-          const extracted = extractStructuredItemsFromAnalysis(food.description);
+          const extracted = extractStructuredItemsFromAnalysis(safeFood.description);
           if (extracted && Array.isArray(extracted.items) && extracted.items.length > 0) {
             const enriched = enrichItemsFromStarter(extracted.items)
             setAnalyzedItems(enriched);
@@ -5725,7 +5736,7 @@ Please add nutritional information manually if needed.`);
             itemsRestored = true;
           } else {
             // Try prose extraction as fallback
-            const proseExtracted = extractItemsFromTextEstimates(food.description);
+            const proseExtracted = extractItemsFromTextEstimates(safeFood.description);
             if (proseExtracted && Array.isArray(proseExtracted.items) && proseExtracted.items.length > 0) {
               const enriched = enrichItemsFromStarter(proseExtracted.items);
               setAnalyzedItems(enriched);
@@ -5744,11 +5755,11 @@ Please add nutritional information manually if needed.`);
         setShowAddFood(true);
         setIsEditingDescription(false);
         // Prefill description editor with a clean summary
-        const cleanDescription = extractBaseMealDescription(food.description);
+        const cleanDescription = extractBaseMealDescription(safeFood.description);
         setEditedDescription(cleanDescription);
       } else {
         // For manual entries, populate the manual form
-        setManualFoodName(food.description);
+        setManualFoodName(safeFood.description);
         setManualFoodType('single');
         setShowAddFood(true);
       }
