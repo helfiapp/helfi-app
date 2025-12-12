@@ -2631,9 +2631,10 @@ const applyStructuredItems = (
     return grouped
   }, [sourceEntries])
 
-  // Reset local delete markers when switching dates so previous-day deletes don't hide other days.
+  // NOTE: Do NOT clear delete tombstones on date switches.
+  // Tombstones already include a stable YYYY-MM-DD date key, so they won't hide other days.
+  // Clearing them causes "ghost" entries to reappear after navigating away and back.
   useEffect(() => {
-    deletedEntryKeysRef.current = new Set()
     setDeletedEntryNonce((n) => n + 1)
   }, [selectedDate])
 
