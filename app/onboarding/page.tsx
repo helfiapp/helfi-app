@@ -871,12 +871,16 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
       setShowValidationError(true);
       return;
     }
-    if (hasUnsavedChanges) {
-      queuedNavigationRef.current = handleNext;
-      triggerPopup();
-      return;
-    }
-    requestNavigation(handleNext, triggerPopup);
+    // Always route through the navigation guard so the Update Insights popup is shown
+    // when there are unsaved changes; when there are none, it will proceed immediately.
+    requestNavigation(() => {
+      if (hasUnsavedChanges) {
+        queuedNavigationRef.current = handleNext;
+        triggerPopup();
+        return;
+      }
+      handleNext();
+    }, triggerPopup);
   };
 
   const handleBackWithGuard = () => {
