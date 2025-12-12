@@ -1350,20 +1350,14 @@ export default function FoodDiary() {
   const SNAPSHOT_MAX_DAYS = 21
   const SNAPSHOT_MAX_ENTRIES = 300
   const limitSnapshotFoods = (entries: any[], fallbackDate: string) => {
-    const todayIsoForWindow = buildTodayIso()
-    const todayUtcMs = utcMsForIso(todayIsoForWindow)
     const compacted = compactTodaysFoodsForSnapshot(entries, fallbackDate)
     const filtered = compacted.filter((entry: any) => {
       const localDate =
         typeof entry?.localDate === 'string' && entry.localDate.length >= 8 ? entry.localDate : ''
       if (!localDate) return false
-      // Always keep the currently viewed date so deletes/saves for that day stick.
-      if (localDate === fallbackDate) return true
-      if (!Number.isFinite(todayUtcMs)) return false
-      const entryUtcMs = utcMsForIso(localDate)
-      if (!Number.isFinite(entryUtcMs)) return false
-      const daysAgo = Math.floor((todayUtcMs - entryUtcMs) / (24 * 60 * 60 * 1000))
-      return daysAgo >= 0 && daysAgo <= SNAPSHOT_MAX_DAYS
+      // Server snapshot is a fast-cache for the currently viewed date only.
+      // Keeping it scoped prevents oversized payloads (413) that resurrect stale entries.
+      return localDate === fallbackDate
     })
     filtered.sort((a: any, b: any) => {
       const aTs = extractEntryTimestampMs(a)
@@ -2733,20 +2727,29 @@ const applyStructuredItems = (
 
               const mappedFromDb = mapLogsToEntries(logs, selectedDate)
 
-              // Always prefer authoritative DB rows for this date to avoid stale categories
+              // Merge authoritative DB rows with local cache so fresh (not-yet-synced) entries
+              // don't disappear when the DB is stale or incomplete.
               if (mappedFromDb.length > 0) {
-                console.log('♻️ Replacing cache with DB rows for date', selectedDate, { dbCount: mappedFromDb.length })
+                const mergedForDate = dedupeEntries(
+                  [...mappedFromDb, ...deduped],
+                  { fallbackDate: selectedDate },
+                )
+                console.log('♻️ Merging cache with DB rows for date', selectedDate, {
+                  dbCount: mappedFromDb.length,
+                  cacheCount: deduped.length,
+                  mergedCount: mergedForDate.length,
+                })
                 if (isViewingToday) {
-                  setTodaysFoods(mappedFromDb)
+                  setTodaysFoods(mergedForDate)
                 } else {
-                  setHistoryFoods(mappedFromDb)
+                  setHistoryFoods(mergedForDate)
                 }
                 try {
                   fetch('/api/user-data', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                      todaysFoods: limitSnapshotFoods(mappedFromDb, selectedDate),
+                      todaysFoods: limitSnapshotFoods(mergedForDate, selectedDate),
                       appendHistory: false,
                     })
                   }).catch(() => {})
