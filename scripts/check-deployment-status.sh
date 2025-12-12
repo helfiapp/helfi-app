@@ -3,9 +3,10 @@
 # Usage: ./scripts/check-deployment-status.sh
 
 VERCEL_TOKEN="${VERCEL_TOKEN:-2MLfXoXXv8hIaHIE7lQcdQ39}"
-# Use the canonical Helfi production project + team IDs from DEPLOYMENT_PROTOCOL.md
-PROJECT_ID="prj_0QdxIeqz4oIUEx7aAdLrsjGsqst7"
-TEAM_ID="team_pPRY3znvYPSvqemdfOEf3vAT"
+# Use the active Helfi team ID (see AGENT_START_HERE.md) and query by project slug.
+# NOTE: Project IDs have changed in the past; querying by slug is more robust.
+PROJECT_SLUG="helfi-app"
+TEAM_ID="team_DLxtczVMOZUXhiInxhTSDrCs"
 MAX_WAIT=300  # Maximum wait time in seconds (5 minutes)
 POLL_INTERVAL=5  # Check every 5 seconds
 
@@ -26,7 +27,7 @@ while true; do
   fi
 
   RESPONSE=$(curl -s -H "Authorization: Bearer $VERCEL_TOKEN" \
-    "https://api.vercel.com/v6/deployments?projectId=$PROJECT_ID&teamId=$TEAM_ID&limit=1")
+    "https://api.vercel.com/v6/deployments?project=$PROJECT_SLUG&teamId=$TEAM_ID&limit=1")
 
   if echo "$RESPONSE" | grep -q '"error"'; then
     echo "❌ Error checking deployment status:"

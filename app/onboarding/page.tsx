@@ -322,6 +322,38 @@ async function triggerTargetedInsightsRefresh(
   }
 }
 
+// Deterministic stringify for form snapshots.
+// The onboarding guard compares baseline vs current form; plain JSON.stringify is sensitive
+// to object key insertion order, which can cause "always dirty" false positives.
+function stableStringify(value: any): string {
+  const seen = new WeakSet<object>();
+  const normalize = (val: any): any => {
+    if (val === null || val === undefined) return val;
+    const t = typeof val;
+    if (t === 'string' || t === 'number' || t === 'boolean') return val;
+    if (t !== 'object') return val;
+    if (val instanceof Date) return val.toISOString();
+    if (Array.isArray(val)) return val.map(normalize);
+    if (seen.has(val)) return '[Circular]';
+    seen.add(val);
+    const out: Record<string, any> = {};
+    for (const key of Object.keys(val).sort()) {
+      out[key] = normalize(val[key]);
+    }
+    return out;
+  };
+  try {
+    return JSON.stringify(normalize(value));
+  } catch {
+    // Last resort: fall back to regular stringify so we don't crash the guard.
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return '';
+    }
+  }
+}
+
 // Track when the user chooses to continue without running Update Insights so navigation isn't blocked
 function useUnsavedNavigationAllowance(hasUnsavedChanges: boolean) {
   const [allowUnsavedNavigation, setAllowUnsavedNavigation] = useState(false);
@@ -6065,7 +6097,7 @@ export default function Onboarding() {
   const formBaselineRef = useRef<string>(''); // canonical snapshot to detect real edits
   const syncFormBaseline = useCallback(() => {
     try {
-      formBaselineRef.current = JSON.stringify(formRef.current || {});
+      formBaselineRef.current = stableStringify(formRef.current || {});
     } catch {
       formBaselineRef.current = '';
     }
@@ -6277,7 +6309,7 @@ export default function Onboarding() {
           debouncedSave(next);
           // Mark dirty only if current form differs from baseline
           try {
-            if (formBaselineRef.current && JSON.stringify(next) !== formBaselineRef.current) {
+            if (formBaselineRef.current && stableStringify(next) !== formBaselineRef.current) {
               setHasGlobalUnsavedChanges(true);
             }
           } catch {
@@ -6340,7 +6372,7 @@ export default function Onboarding() {
       // Keep shared user data context in sync so calorie targets/macros recalc immediately
       updateUserData(updatedForm);
       try {
-        const canonical = JSON.stringify(updatedForm);
+        const canonical = stableStringify(updatedForm);
         if (!formBaselineRef.current || canonical !== formBaselineRef.current) {
           setHasGlobalUnsavedChanges(true);
         }
@@ -6502,7 +6534,7 @@ export default function Onboarding() {
                   const hasRealChanges = (() => {
                     try {
                       if (!formBaselineRef.current) return false;
-                      return JSON.stringify(formRef.current || {}) !== formBaselineRef.current;
+                      return stableStringify(formRef.current || {}) !== formBaselineRef.current;
                     } catch {
                       return hasGlobalUnsavedChanges;
                     }
