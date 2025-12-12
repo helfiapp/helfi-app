@@ -14,6 +14,13 @@ import UsageMeter from '@/components/UsageMeter';
 import InsightsProgressBar from '@/components/InsightsProgressBar';
 import { UserIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 
+const sanitizeUserDataPayload = (payload: any) => {
+  if (!payload || typeof payload !== 'object') return payload;
+  // Strip food diary and favorites fields so health-setup autosaves cannot overwrite them
+  const { todaysFoods, favorites, ...rest } = payload as any;
+  return rest;
+};
+
 // Auth-enabled onboarding flow
 
 // Update Insights Popup Component
@@ -6321,13 +6328,6 @@ export default function Onboarding() {
       }
     } catch {}
   }, [status, form, showFirstTimeModal, dataLoaded, firstTimeModalDismissed]);
-
-  const sanitizeUserDataPayload = (payload: any) => {
-    if (!payload || typeof payload !== 'object') return payload;
-    // Strip food diary and favorites fields so health-setup autosaves cannot overwrite them
-    const { todaysFoods, favorites, ...rest } = payload as any;
-    return rest;
-  };
 
   // Optimized debounced save function
   const debouncedSave = useCallback(async (data: any) => {
