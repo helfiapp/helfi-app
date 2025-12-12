@@ -3265,7 +3265,7 @@ const applyStructuredItems = (
         const tz = new Date().getTimezoneOffset();
         const apiUrl = `/api/food-log?date=${selectedDate}&tz=${tz}`;
         console.log(`📡 Fetching from API: ${apiUrl}`);
-        const res = await fetch(apiUrl);
+        const res = await fetch(`${apiUrl}&t=${Date.now()}`, { cache: 'no-store' });
         console.log(`📡 API response status: ${res.status}, ok: ${res.ok}`);
         if (res.ok) {
           const json = await res.json()
@@ -3339,13 +3339,30 @@ const applyStructuredItems = (
   const refreshEntriesFromServer = async () => {
     try {
       const tz = new Date().getTimezoneOffset();
-      const res = await fetch(`/api/food-log?date=${selectedDate}&tz=${tz}`);
+      const res = await fetch(`/api/food-log?date=${selectedDate}&tz=${tz}&t=${Date.now()}`, {
+        cache: 'no-store',
+      });
       if (!res.ok) return;
 
       const json = await res.json();
       const logs = Array.isArray(json.logs) ? json.logs : [];
       const mapped = mapLogsToEntries(logs, selectedDate);
-      const deduped = dedupeEntries(mapped, { fallbackDate: selectedDate });
+      const serverDbIds = new Set<string>(
+        mapped
+          .map((e: any) => (e?.dbId ? String(e.dbId) : ''))
+          .filter((v: string) => v.length > 0),
+      )
+      const localList = isViewingToday ? todaysFoodsForSelectedDate : Array.isArray(historyFoods) ? historyFoods : []
+      const keptLocal = Array.isArray(localList)
+        ? localList.filter((e: any) => {
+            const dbId = e?.dbId ? String(e.dbId) : ''
+            // If an entry is DB-backed, only keep it if the server still has it.
+            // This is what makes deletes on one device propagate to another.
+            if (dbId) return serverDbIds.has(dbId)
+            return true
+          })
+        : []
+      const deduped = dedupeEntries([...mapped, ...keptLocal], { fallbackDate: selectedDate });
 
       if (isViewingToday) {
         setTodaysFoods(deduped);
@@ -3357,6 +3374,44 @@ const applyStructuredItems = (
       console.error('Error refreshing food diary after save:', error);
     }
   };
+
+  // Cross-device sync:
+  // - Poll the server while /food is open (keeps desktop + mobile aligned)
+  // - Also refresh when the tab/app becomes active again
+  const syncInFlightRef = useRef(false)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (!diaryHydrated) return
+    if (editingEntry) return
+
+    const syncNow = async () => {
+      if (syncInFlightRef.current) return
+      syncInFlightRef.current = true
+      try {
+        await refreshEntriesFromServer()
+      } finally {
+        syncInFlightRef.current = false
+      }
+    }
+
+    const onFocus = () => syncNow()
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') syncNow()
+    }
+
+    // Initial sync shortly after mount/date switch
+    const initial = window.setTimeout(syncNow, 600)
+    const interval = window.setInterval(syncNow, 12000)
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onVisibility)
+
+    return () => {
+      window.clearTimeout(initial)
+      window.clearInterval(interval)
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
+  }, [selectedDate, isViewingToday, diaryHydrated, editingEntry?.id])
 
   // Save food entries to database and update context (OPTIMIZED + RELIABLE HISTORY)
   const saveFoodEntries = async (
