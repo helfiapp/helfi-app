@@ -6,6 +6,7 @@ import { useSession, signOut } from 'next-auth/react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { flushSync } from 'react-dom';
+import { useRouter } from 'next/navigation';
 import CreditPurchaseModal from '@/components/CreditPurchaseModal';
 import { useUserData } from '@/components/providers/UserDataProvider';
 import MobileMoreMenu from '@/components/MobileMoreMenu';
@@ -614,6 +615,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
   const { shouldBlockNavigation, allowUnsavedNavigation, acknowledgeUnsavedChanges, requestNavigation, beforeUnloadHandler } = useUnsavedNavigationAllowance(hasUnsavedChanges);
   const { updateUserData } = useUserData();
   const pendingExternalNavigationRef = useRef<(() => void) | null>(null);
+  const router = useRouter();
 
   const parseNumber = (value: string): number | null => {
     if (!value) return null;
@@ -866,8 +868,9 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
         if (event?.data?.navigateTo === 'dashboard') {
           pendingExternalNavigationRef.current = () => {
             try {
-              window.location.href = '/dashboard';
+              router.push('/dashboard');
             } catch {
+              // Fallback to hard navigation if router isn't available for any reason
               window.location.assign('/dashboard');
             }
           };
@@ -877,7 +880,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     };
     window.addEventListener('message', handler);
     return () => window.removeEventListener('message', handler);
-  }, []);
+  }, [router]);
 
   const birthdateFromParts = React.useMemo(
     () =>
@@ -1525,8 +1528,15 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
           setShowUpdatePopup(false);
         }}
         onAddMore={() => {
-          pendingExternalNavigationRef.current = null;
+          // User explicitly chose to continue without updating insights.
+          // Allow the pending guarded navigation (Next/Back/Dashboard) to proceed.
+          acknowledgeUnsavedChanges();
           setShowUpdatePopup(false);
+          const external = pendingExternalNavigationRef.current;
+          pendingExternalNavigationRef.current = null;
+          if (external) {
+            external();
+          }
         }}
         onUpdateInsights={handleUpdateInsights}
         isGenerating={isGeneratingInsights}
@@ -6094,6 +6104,7 @@ function InteractionAnalysisStep({ onNext, onBack, initial, onAnalysisSettled }:
 export default function Onboarding() {
   const { data: session, status } = useSession();
   const { profileImage: providerProfileImage, updateUserData } = useUserData();
+  const router = useRouter();
   
   // ⚠️ HEALTH SETUP GUARD RAIL
   // This onboarding component is part of a carefully tuned flow:
@@ -6124,6 +6135,13 @@ export default function Onboarding() {
   const [firstTimeModalDismissed, setFirstTimeModalDismissed] = useState(false);
   const [usageMeterRefresh, setUsageMeterRefresh] = useState(0);
   const formBaselineRef = useRef<string>(''); // canonical snapshot to detect real edits
+  const pendingNavigationRef = useRef<(() => void) | null>(null);
+
+  const runPendingNavigation = useCallback(() => {
+    const fn = pendingNavigationRef.current;
+    pendingNavigationRef.current = null;
+    if (fn) fn();
+  }, []);
   const syncFormBaseline = useCallback(() => {
     try {
       formBaselineRef.current = stableStringify(formRef.current || {});
@@ -6576,6 +6594,7 @@ export default function Onboarding() {
                       window.postMessage({ type: 'OPEN_PHYSICAL_UPDATE_POPUP', navigateTo: 'dashboard' }, '*');
                       return;
                     }
+                    pendingNavigationRef.current = () => router.push('/dashboard');
                     setShowGlobalUpdatePopup(true);
                   }
                 } catch {
@@ -6882,21 +6901,18 @@ export default function Onboarding() {
 
         <UpdateInsightsPopup
           isOpen={showGlobalUpdatePopup}
-          onClose={() => setShowGlobalUpdatePopup(false)}
+          onClose={() => {
+            pendingNavigationRef.current = null;
+            setShowGlobalUpdatePopup(false);
+          }}
           onAddMore={() => {
             setShowGlobalUpdatePopup(false);
+            runPendingNavigation();
           }}
           onUpdateInsights={async () => {
             setIsGlobalGenerating(true);
             try {
               const changeTypes = detectChangedInsightTypes(formBaselineRef.current, formRef.current || form);
-              if (!changeTypes.length) {
-                setHasGlobalUnsavedChanges(false);
-                syncFormBaseline();
-                setShowGlobalUpdatePopup(false);
-                return;
-              }
-
               // Step 1: Save data immediately
               const payload = formRef.current || form;
               const saveResponse = await fetch('/api/user-data', {
@@ -6916,13 +6932,16 @@ export default function Onboarding() {
             window.dispatchEvent(new Event('userData:refresh'));
           } catch {}
 
-              // Step 2: Fire regen in background WITHOUT waiting
-              fireAndForgetInsightsRegen(changeTypes);
+              // Step 2: Fire regen in background WITHOUT waiting (only when change types exist)
+              if (changeTypes.length) {
+                fireAndForgetInsightsRegen(changeTypes);
+              }
               
               // Step 3: Close popup immediately - data is saved, regen is in background
               setHasGlobalUnsavedChanges(false);
               syncFormBaseline();
               setShowGlobalUpdatePopup(false);
+              runPendingNavigation();
             } catch (error) {
               console.warn('Error saving data:', error);
               alert('Failed to save your changes. Please try again.');
