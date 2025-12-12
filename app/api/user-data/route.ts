@@ -422,6 +422,16 @@ export async function POST(request: NextRequest) {
     console.time('⏱️ Parse Request Data')
     const data = await request.json()
     console.timeEnd('⏱️ Parse Request Data')
+
+    // #region agent log
+    try {
+      const hasTodaysFoodsKey = !!(data && typeof data === 'object' && 'todaysFoods' in data)
+      const todaysFoodsLen = Array.isArray((data as any)?.todaysFoods) ? (data as any).todaysFoods.length : null
+      const appendHistory = (data as any)?.appendHistory
+      fetch('http://127.0.0.1:7242/ingest/aaafab43-c6ce-48b6-a8ee-51e168d7e762',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'C',location:'app/api/user-data/route.ts:POST',message:'POST /api/user-data payload includes todaysFoods?',data:{hasTodaysFoodsKey,todaysFoodsLen,appendHistory,referer:(request.headers.get('referer')||'').slice(0,200),contentLength:(request.headers.get('content-length')||'')},timestamp:Date.now()})}).catch(()=>{});
+      console.log('AGENT_DEBUG', JSON.stringify({hypothesisId:'C',location:'app/api/user-data/route.ts:POST',message:'POST /api/user-data payload includes todaysFoods?',data:{hasTodaysFoodsKey,todaysFoodsLen,appendHistory,referer:(request.headers.get('referer')||'').slice(0,200),contentLength:(request.headers.get('content-length')||'')},timestamp:Date.now()}));
+    } catch {}
+    // #endregion agent log
     
     console.log('📊 POST /api/user-data - Data received:', {
       hasGender: !!data.gender,

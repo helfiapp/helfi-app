@@ -1388,6 +1388,9 @@ export default function FoodDiary() {
   const syncSnapshotToServer = async (entries: any[], fallbackDate: string) => {
     const snapshotFoods = limitSnapshotFoods(entries, fallbackDate)
     if (!snapshotFoods || snapshotFoods.length === 0) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/aaafab43-c6ce-48b6-a8ee-51e168d7e762',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'C',location:'app/food/page.tsx:syncSnapshotToServer:clear',message:'Clearing server todaysFoods snapshot (empty entries)',data:{fallbackDate,entriesLen:Array.isArray(entries)?entries.length:0},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion agent log
       try {
         await fetch('/api/user-data/clear-todays-foods', { method: 'POST' })
       } catch (err) {
@@ -1396,15 +1399,19 @@ export default function FoodDiary() {
       return
     }
     try {
+      const payloadStr = JSON.stringify({
+        todaysFoods: snapshotFoods,
+        appendHistory: false,
+      })
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/aaafab43-c6ce-48b6-a8ee-51e168d7e762',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'C',location:'app/food/page.tsx:syncSnapshotToServer:post',message:'Posting server todaysFoods snapshot',data:{fallbackDate,snapshotFoodsLen:Array.isArray(snapshotFoods)?snapshotFoods.length:0,payloadChars:payloadStr.length},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion agent log
       const res = await fetch('/api/user-data', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          todaysFoods: snapshotFoods,
-          appendHistory: false,
-        }),
+        body: payloadStr,
       })
       if (res.status === 413) {
         console.warn('Snapshot write hit 413, retrying with minimal payload')
@@ -2954,6 +2961,9 @@ const applyStructuredItems = (
                 // Safety net: if we have local entries but the server has none, backfill them into the history table.
                 backfillAttemptedRef.current[selectedDate] = true
                 try {
+                  // #region agent log
+                  fetch('http://127.0.0.1:7242/ingest/aaafab43-c6ce-48b6-a8ee-51e168d7e762',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'B',location:'app/food/page.tsx:backfill:trigger',message:'Backfill triggered (DB returned 0, local entries exist)',data:{selectedDate,isViewingToday,dedupedLen:deduped.length,sample:deduped.slice(0,3).map((e:any)=>({id:e?.id,dbId:e?.dbId,localDate:e?.localDate,meal:normalizeCategory(e?.meal||e?.category||e?.mealType)}))},timestamp:Date.now()})}).catch(()=>{});
+                  // #endregion agent log
                   await Promise.all(
                     deduped.map(async (entry: any) => {
                       const payload = {
@@ -5751,6 +5761,10 @@ Please add nutritional information manually if needed.`);
           .map(String),
       ),
     )
+
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/aaafab43-c6ce-48b6-a8ee-51e168d7e762',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'E',location:'app/food/page.tsx:deleteFood:start',message:'deleteFood called',data:{selectedDate,todayIso,hasDbId:!!dbId,entryId:entryId??null,entryLocalDate:typeof entry?.localDate==='string'?entry.localDate:'',derivedDate:deriveDateFromEntryTimestamp(entry),entryCategory,deletionKeysCount:deletionKeys.size,autoDates},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion agent log
 
     const updatedFoods = todaysFoods.filter((food: any) => {
       const sameId =
