@@ -576,6 +576,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
   const [showValidationError, setShowValidationError] = useState(false);
   const { shouldBlockNavigation, allowUnsavedNavigation, acknowledgeUnsavedChanges, requestNavigation, beforeUnloadHandler } = useUnsavedNavigationAllowance(hasUnsavedChanges);
   const { updateUserData } = useUserData();
+  const queuedNavigationRef = useRef<(() => void) | null>(null);
 
   const parseNumber = (value: string): number | null => {
     if (!value) return null;
@@ -835,6 +836,12 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
         setHasUnsavedChanges(false);
         if (onInsightsSaved) onInsightsSaved();
         updateUserData(buildPayload());
+        // If navigation was waiting on this save, continue it now
+        if (queuedNavigationRef.current) {
+          const fn = queuedNavigationRef.current;
+          queuedNavigationRef.current = null;
+          fn();
+        }
         
         // Step 2: Fire regen in background WITHOUT waiting
         // This prevents timeouts from blocking the UI
@@ -862,6 +869,11 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
   const handleNextWithGuard = () => {
     if (!isStepComplete) {
       setShowValidationError(true);
+      return;
+    }
+    if (hasUnsavedChanges) {
+      queuedNavigationRef.current = handleNext;
+      triggerPopup();
       return;
     }
     requestNavigation(handleNext, triggerPopup);
@@ -1893,6 +1905,11 @@ function ExerciseStep({ onNext, onBack, initial, onPartialSave, onUnsavedChange,
         }}
         onAddMore={() => {
           acknowledgeUnsavedChanges();
+          if (queuedNavigationRef.current) {
+            const fn = queuedNavigationRef.current;
+            queuedNavigationRef.current = null;
+            fn();
+          }
           setShowUpdatePopup(false);
         }}
         onUpdateInsights={handleUpdateInsights}
