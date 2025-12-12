@@ -1046,22 +1046,45 @@ export async function POST(request: NextRequest) {
         const favoritesArray = (data as any).favorites
         const favoritesCount = Array.isArray(favoritesArray) ? favoritesArray.length : 0
         const referer = (request.headers.get('referer') || '').slice(0, 200)
-        console.log('AGENT_DEBUG favorites write', { favoritesCount, referer })
-        await prisma.healthGoal.deleteMany({
-          where: {
-            userId: user.id,
-            name: '__FOOD_FAVORITES__'
+
+        // Load existing favorites to avoid accidental wipes from empty payloads
+        let existingFavorites: any[] = []
+        try {
+          const existingFavGoal = await prisma.healthGoal.findFirst({
+            where: { userId: user.id, name: '__FOOD_FAVORITES__' },
+          })
+          if (existingFavGoal?.category) {
+            const parsed = JSON.parse(existingFavGoal.category)
+            if (Array.isArray(parsed?.favorites)) existingFavorites = parsed.favorites
+            else if (Array.isArray(parsed)) existingFavorites = parsed
           }
-        })
-        await prisma.healthGoal.create({
-          data: {
-            userId: user.id,
-            name: '__FOOD_FAVORITES__',
-            category: JSON.stringify({ favorites: favoritesArray }),
-            currentRating: 0,
-          }
-        })
-        console.log('Stored favorites data successfully')
+        } catch (favLoadErr) {
+          console.warn('AGENT_DEBUG favorites load failed (non-blocking)', favLoadErr)
+        }
+
+        if (favoritesCount === 0 && existingFavorites.length > 0) {
+          console.log('AGENT_DEBUG favorites write skipped (empty payload would wipe existing)', {
+            existingCount: existingFavorites.length,
+            referer,
+          })
+        } else {
+          console.log('AGENT_DEBUG favorites write', { favoritesCount, referer })
+          await prisma.healthGoal.deleteMany({
+            where: {
+              userId: user.id,
+              name: '__FOOD_FAVORITES__'
+            }
+          })
+          await prisma.healthGoal.create({
+            data: {
+              userId: user.id,
+              name: '__FOOD_FAVORITES__',
+              category: JSON.stringify({ favorites: favoritesArray }),
+              currentRating: 0,
+            }
+          })
+          console.log('Stored favorites data successfully')
+        }
       }
     } catch (error) {
       console.error('Error storing favorites data:', error)
