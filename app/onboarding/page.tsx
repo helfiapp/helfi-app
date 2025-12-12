@@ -958,7 +958,10 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
   );
 
   const handleRemoveAllergy = useCallback((value: string) => {
-    setAllergies((prev) => prev.filter((a) => a.toLowerCase() !== value.toLowerCase()));
+    const normalized = normalizedAllergyValue(value || '');
+    setAllergies((prev) =>
+      prev.filter((a) => normalized && a.toLowerCase().trim() !== normalized.toLowerCase().trim()),
+    );
   }, []);
 
   const filteredAllergySuggestions = React.useMemo(() => {
@@ -1217,30 +1220,25 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
         <h2 className="text-2xl font-bold mb-2">Do you have diabetes?</h2>
         <p className="mb-3 text-gray-600">Helps set safer sugar and carb targets.</p>
         <div className="grid grid-cols-2 gap-2 mb-2">
-          {[
-            { key: 'type1', label: 'Type 1' },
-            { key: 'type2', label: 'Type 2' },
-            { key: 'prediabetes', label: 'Pre-diabetic' },
-          ].map((option) => (
-            <button
-              key={option.key}
-              className={`w-full py-3 rounded border ${
-                diabetesType === option.key ? 'bg-orange-600 text-white border-orange-600' : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-              } transition-colors text-sm font-medium`}
-              onClick={() => setDiabetesType(option.key as any)}
+            {[
+              { key: 'type1', label: 'Type 1' },
+              { key: 'type2', label: 'Type 2' },
+              { key: 'prediabetes', label: 'Pre-diabetic' },
+            ].map((option) => (
+              <button
+                key={option.key}
+                className={`w-full py-3 rounded border ${
+                  diabetesType === option.key ? 'bg-orange-600 text-white border-orange-600' : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                } transition-colors text-sm font-medium`}
+              onClick={() => {
+                setDiabetesType((current) => (current === option.key ? '' : (option.key as any)))
+              }}
               type="button"
             >
               {option.label}
             </button>
           ))}
         </div>
-        <button
-          type="button"
-          onClick={() => setDiabetesType('')}
-          className="text-sm text-gray-600 underline"
-        >
-          I don&apos;t have diabetes
-        </button>
       </div>
       <div className="mb-8">
         <h2 className="text-2xl font-bold mb-2">Add your food allergies</h2>
