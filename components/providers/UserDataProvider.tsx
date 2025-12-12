@@ -91,6 +91,15 @@ export function UserDataProvider({ children }: { children: React.ReactNode }) {
     }
   }, [session, status])
 
+  // Allow other parts of the app to force a refresh (e.g., after insights updates)
+  useEffect(() => {
+    const handler = () => {
+      refreshData()
+    }
+    window.addEventListener('userData:refresh', handler)
+    return () => window.removeEventListener('userData:refresh', handler)
+  }, [])
+
   const value: UserDataContextType = {
     userData,
     profileImage,

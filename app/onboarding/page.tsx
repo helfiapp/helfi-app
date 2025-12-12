@@ -841,6 +841,10 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
         setHasUnsavedChanges(false);
         if (onInsightsSaved) onInsightsSaved();
         updateUserData(buildPayload());
+        acknowledgeUnsavedChanges(); // allow navigation without another prompt
+        try {
+          window.dispatchEvent(new Event('userData:refresh'));
+        } catch {}
         // If navigation was waiting on this save, continue it now
         if (queuedNavigationRef.current) {
           const fn = queuedNavigationRef.current;
