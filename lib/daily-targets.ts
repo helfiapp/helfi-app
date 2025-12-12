@@ -18,6 +18,8 @@ export type DailyTargetInput = {
   goalIntensity?: 'mild' | 'standard' | 'aggressive' | null
   exerciseDurations?: Record<string, number | string | null> | null
   bodyType?: string | null
+  allergies?: string[] | null
+  diabetesType?: 'type1' | 'type2' | 'prediabetes' | null
   healthSituations?: {
     healthIssues?: string
     healthProblems?: string
@@ -174,6 +176,14 @@ function parseConditionsFromGoals(goals?: string[] | null): string[] {
   return conditions
 }
 
+function parseConditionsFromDiabetes(diabetesType?: DailyTargetInput['diabetesType']): string[] {
+  const type = (diabetesType || '').toLowerCase()
+  if (type === 'type1') return ['diabetes_type1']
+  if (type === 'type2') return ['diabetes_type2']
+  if (type === 'prediabetes') return ['prediabetes']
+  return []
+}
+
 function applyConditionAdjustments(
   split: { proteinPct: number; fatPct: number; carbPct: number },
   conditions: string[],
@@ -182,11 +192,26 @@ function applyConditionAdjustments(
   let fiberTarget = 28
   let sugarCap = 35
 
-  if (conditions.includes('diabetes') || conditions.includes('pcos')) {
+  if (conditions.includes('diabetes') || conditions.includes('pcos') || conditions.includes('diabetes_type1') || conditions.includes('diabetes_type2')) {
     carbPct = Math.max(0.25, carbPct - 0.05)
     proteinPct = Math.min(0.4, proteinPct + 0.03)
     sugarCap = 25
     fiberTarget = 32
+  }
+  if (conditions.includes('diabetes_type1')) {
+    carbPct = Math.max(0.23, carbPct - 0.02)
+    sugarCap = Math.min(sugarCap, 22)
+    fiberTarget = Math.max(fiberTarget, 34)
+  }
+  if (conditions.includes('diabetes_type2')) {
+    carbPct = Math.max(0.22, carbPct - 0.03)
+    sugarCap = Math.min(sugarCap, 20)
+    fiberTarget = Math.max(fiberTarget, 34)
+  }
+  if (conditions.includes('prediabetes')) {
+    carbPct = Math.max(0.26, carbPct - 0.03)
+    sugarCap = Math.min(sugarCap, 28)
+    fiberTarget = Math.max(fiberTarget, 30)
   }
   if (conditions.includes('ibs')) {
     fiberTarget = 30
@@ -290,6 +315,7 @@ export function calculateDailyTargets(input: DailyTargetInput): DailyTargets {
     new Set([
       ...parseConditionsText(input.healthSituations),
       ...parseConditionsFromGoals(input.goals),
+      ...parseConditionsFromDiabetes(input.diabetesType),
     ]),
   )
   const { proteinPct: conditionedProtein, fatPct: conditionedFat, carbPct: conditionedCarb, fiberTarget, sugarCap } =

@@ -902,6 +902,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
+    let allergySettings: { allergies: string[]; diabetesType?: string } = { allergies: [], diabetesType: '' };
+    try {
+      const storedAllergies = await prisma.healthGoal.findFirst({
+        where: { userId: user.id, name: '__ALLERGIES_DATA__' },
+      });
+      if (storedAllergies?.category) {
+        const parsed = JSON.parse(storedAllergies.category);
+        allergySettings = {
+          allergies: Array.isArray(parsed?.allergies)
+            ? parsed.allergies.filter((a: any) => typeof a === 'string' && a.trim().length > 0)
+            : [],
+          diabetesType: typeof parsed?.diabetesType === 'string' ? parsed.diabetesType : '',
+        };
+      }
+    } catch (error) {
+      console.warn('⚠️ Could not load allergy settings for analyzer:', error);
+    }
+
     // We'll check free use, premium, or credits below
     let creditManager: CreditManager | null = null;
     
@@ -1866,11 +1884,91 @@ CRITICAL REQUIREMENTS:
     // The AI analysis works better without database interference - it provides accurate
     // estimates based on visual analysis and portion sizes, which databases can't match.
 
-    // HEALTH COMPATIBILITY CHECK: temporarily skipped to keep one OpenAI call per analysis
+    // HEALTH COMPATIBILITY CHECK: advisory-only, uses saved allergies/diabetes settings
     try {
-      resp.healthWarning = null;
+      const warnings: string[] = [];
+      const lowerAnalysis = (analysis || (resp as any)?.analysis || resp.total?.description || '').toString().toLowerCase();
+      const itemNames = Array.isArray(resp.items)
+        ? resp.items
+            .map((it: any) => `${it?.name || ''} ${it?.serving_size || ''}`.toLowerCase())
+            .join(' ')
+        : '';
+      const textBlob = `${lowerAnalysis} ${itemNames}`;
+
+      const normalizeAllergy = (val: string) => {
+        const lower = val.toLowerCase();
+        if (lower.includes('peanut')) return 'peanut';
+        if (lower.includes('tree nut')) return 'tree nuts';
+        if (lower.includes('nut')) return 'tree nuts';
+        if (lower.includes('gluten') || lower.includes('celiac') || lower.includes('coeliac') || lower.includes('wheat'))
+          return 'gluten';
+        if (lower.includes('dairy') || lower.includes('milk') || lower.includes('lactose')) return 'dairy';
+        if (lower.includes('egg')) return 'egg';
+        if (lower.includes('shellfish') || lower.includes('shrimp') || lower.includes('prawn')) return 'shellfish';
+        if (lower.includes('fish')) return 'fish';
+        if (lower.includes('soy')) return 'soy';
+        if (lower.includes('sesame')) return 'sesame';
+        if (lower.includes('corn') || lower.includes('maize')) return 'corn';
+        return lower;
+      };
+
+      const allergyKeywordMap: Record<string, string[]> = {
+        peanut: ['peanut', 'groundnut', 'satay', 'peanut butter'],
+        'tree nuts': ['almond', 'walnut', 'cashew', 'pecan', 'pistachio', 'hazelnut', 'macadamia'],
+        gluten: ['gluten', 'wheat', 'barley', 'rye', 'malt', 'semolina', 'spelt'],
+        dairy: ['milk', 'cream', 'cheese', 'butter', 'yogurt', 'ghee', 'custard'],
+        egg: ['egg', 'eggs', 'mayo', 'mayonnaise'],
+        shellfish: ['shrimp', 'prawn', 'crab', 'lobster', 'clam', 'mussel', 'oyster', 'shellfish', 'scallop'],
+        fish: ['fish', 'salmon', 'tuna', 'cod', 'trout', 'anchovy', 'sardine'],
+        soy: ['soy', 'soya', 'edamame', 'tofu', 'tempeh', 'miso', 'soy sauce'],
+        sesame: ['sesame', 'tahini', 'sesame seed'],
+        corn: ['corn', 'maize', 'tortilla', 'polenta', 'cornmeal'],
+        sulfites: ['sulfite', 'sulphite', 'wine', 'dried fruit', 'cider'],
+      };
+
+      const allergiesSelected = Array.isArray(allergySettings.allergies)
+        ? allergySettings.allergies.filter((a) => typeof a === 'string' && a.trim().length > 0)
+        : [];
+
+      allergiesSelected.forEach((allergyRaw: string) => {
+        const canonical = normalizeAllergy(allergyRaw);
+        const keywords = allergyKeywordMap[canonical] || [canonical];
+        const hit = keywords.some((kw) => textBlob.includes(kw.toLowerCase()));
+        if (hit) {
+          warnings.push(`Contains or may contain ${allergyRaw} based on the analysis.`);
+        }
+      });
+
+      const diabetesType = (allergySettings.diabetesType || '').toLowerCase();
+      if (diabetesType) {
+        const sugarRaw =
+          (resp.total as any)?.sugar_g ?? (resp.total as any)?.sugar ?? (resp.total as any)?.sugars_g;
+        const sugar = Number(sugarRaw);
+        const hasSugar = Number.isFinite(sugar);
+        const carbsRaw = (resp.total as any)?.carbs_g ?? (resp.total as any)?.carbohydrates;
+        const carbs = Number(carbsRaw);
+        const hasCarbs = Number.isFinite(carbs);
+        const hasSugaryKeywords = /dessert|cake|cookie|ice cream|juice|soda|sweet|syrup|candy|chocolate/.test(textBlob);
+
+        const thresholds =
+          diabetesType === 'prediabetes'
+            ? { sugar: 28, carbs: 75, label: 'pre-diabetes' }
+            : diabetesType === 'type1'
+            ? { sugar: 22, carbs: 70, label: 'Type 1 diabetes' }
+            : { sugar: 20, carbs: 65, label: 'Type 2 diabetes' };
+
+        if (hasSugar && sugar > thresholds.sugar) {
+          warnings.push(`High sugar for ${thresholds.label}: about ${Math.round(sugar)}g (target ≤ ${thresholds.sugar}g per meal).`);
+        } else if (!hasSugar && hasSugaryKeywords) {
+          warnings.push(`High-sugar food spotted; use caution for ${thresholds.label}.`);
+        }
+        if (hasCarbs && carbs > thresholds.carbs) {
+          warnings.push(`High carbs for ${thresholds.label}: about ${Math.round(carbs)}g.`);
+        }
+      }
+
+      resp.healthWarning = warnings.length ? `⚠️ Health warning:\n- ${warnings.join('\n- ')}` : null;
       resp.alternatives = null;
-      console.log('ℹ️ Health compatibility check skipped to reduce OpenAI usage.');
     } catch (healthError) {
       console.warn('⚠️ Health compatibility section skipped due to error:', healthError);
     }

@@ -1598,6 +1598,8 @@ export default function FoodDiary() {
       exerciseDurations: (userData as any).exerciseDurations,
       bodyType: (userData as any).bodyType,
       healthSituations: (userData as any).healthSituations,
+      allergies: (userData as any).allergies,
+      diabetesType: (userData as any).diabetesType,
     })
   }, [userData])
   const applyRecalculatedNutrition = (items: any[]) => {

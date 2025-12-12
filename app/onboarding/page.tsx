@@ -164,8 +164,8 @@ function detectChangedInsightTypes(baselineJson: string, currentForm: any): Insi
 
   if (
     hasChanged(
-      pickFields(baseline, ['gender', 'weight', 'height', 'bodyType', 'birthdate', 'unit', 'goalChoice', 'goalIntensity', 'profileInfo']),
-      pickFields(current, ['gender', 'weight', 'height', 'bodyType', 'birthdate', 'unit', 'goalChoice', 'goalIntensity', 'profileInfo']),
+      pickFields(baseline, ['gender', 'weight', 'height', 'bodyType', 'birthdate', 'unit', 'goalChoice', 'goalIntensity', 'profileInfo', 'allergies', 'diabetesType']),
+      pickFields(current, ['gender', 'weight', 'height', 'bodyType', 'birthdate', 'unit', 'goalChoice', 'goalIntensity', 'profileInfo', 'allergies', 'diabetesType']),
     )
   ) {
     changeTypes.push('profile');
@@ -562,6 +562,11 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
   const [goalIntensity, setGoalIntensity] = useState<'mild' | 'standard' | 'aggressive'>(
     (initial?.goalIntensity as any) || 'standard',
   );
+  const [allergies, setAllergies] = useState<string[]>(initial?.allergies || []);
+  const [allergyInput, setAllergyInput] = useState('');
+  const [diabetesType, setDiabetesType] = useState<'type1' | 'type2' | 'prediabetes' | ''>(
+    (initial?.diabetesType as any) || '',
+  );
   const [unit, setUnit] = useState<'metric' | 'imperial'>('metric');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
@@ -630,6 +635,12 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     if (!goalChoice && initial.goalChoice) {
       setGoalChoice(initial.goalChoice);
     }
+    if ((!allergies || allergies.length === 0) && Array.isArray(initial.allergies) && initial.allergies.length > 0) {
+      setAllergies(initial.allergies);
+    }
+    if (!diabetesType && initial.diabetesType) {
+      setDiabetesType(initial.diabetesType);
+    }
     if (initial.goalIntensity && !goalIntensity) {
       setGoalIntensity(initial.goalIntensity);
     }
@@ -642,7 +653,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
         setBirthDay(d);
       }
     }
-  }, [initial, weight, height, feet, inches, bodyType, birthYear, birthMonth, birthDay]);
+  }, [initial, weight, height, feet, inches, bodyType, birthYear, birthMonth, birthDay, allergies, diabetesType]);
 
   const today = new Date();
   const currentYear = today.getFullYear();
@@ -707,7 +718,14 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     const initialGoalChoice = baseline?.goalChoice || '';
     const initialGoalIntensity = baseline?.goalIntensity || 'standard';
     const initialBirthdate = baseline?.birthdate || '';
+    const initialAllergies: string[] = Array.isArray(baseline?.allergies) ? baseline.allergies : [];
+    const initialDiabetesType = baseline?.diabetesType || '';
 
+    const normalizeArray = (list?: string[]) =>
+      Array.isArray(list) ? list.map((v) => (v || '').toString().toLowerCase().trim()).filter(Boolean).sort() : [];
+
+    const allergiesChanged =
+      JSON.stringify(normalizeArray(allergies)) !== JSON.stringify(normalizeArray(initialAllergies));
     const changed =
       (weight || '') !== (initialWeight || '') ||
       (height || '') !== (initialHeight || '') ||
@@ -716,16 +734,18 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
       (bodyType || '') !== (initialBodyType || '') ||
       (goalChoice || '') !== (initialGoalChoice || '') ||
       (goalIntensity || 'standard') !== (initialGoalIntensity || 'standard') ||
-      (birthdate || '') !== (initialBirthdate || '');
+      (birthdate || '') !== (initialBirthdate || '') ||
+      allergiesChanged ||
+      (diabetesType || '') !== (initialDiabetesType || '');
 
     const hasAny =
-      !!(weight || height || feet || inches || bodyType || goalChoice || birthdate);
+      !!(weight || height || feet || inches || bodyType || goalChoice || birthdate || allergies.length || diabetesType);
 
     setHasUnsavedChanges(changed && hasAny);
     if ((changed && hasAny) && onUnsavedChange) {
       onUnsavedChange();
     }
-  }, [weight, height, feet, inches, bodyType, goalChoice, goalIntensity, birthdate, initial]);
+  }, [weight, height, feet, inches, bodyType, goalChoice, goalIntensity, birthdate, allergies, diabetesType, initial]);
 
   // Warn if the user tries to close the tab or browser with unsaved changes
   useEffect(() => {
@@ -783,6 +803,8 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
       goalChoice: goalChoice?.trim(),
       goalIntensity: goalIntensity,
       unit,
+      allergies,
+      diabetesType,
     }
   };
 
@@ -891,6 +913,62 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
   const handleBodyTypeChange = useCallback((type: string) => {
     setBodyType(type);
   }, []);
+
+  const allergyOptions = React.useMemo(
+    () => [
+      'Peanut',
+      'Tree nuts',
+      'Dairy',
+      'Egg',
+      'Shellfish',
+      'Fish',
+      'Gluten',
+      'Wheat',
+      'Soy',
+      'Sesame',
+      'Lactose',
+      'Corn',
+      'Sulfites',
+      'Mustard',
+      'Celery',
+      'Pollen',
+      'Chocolate',
+      'Strawberry',
+      'Tomato',
+    ],
+    [],
+  );
+
+  const normalizedAllergyValue = (value: string) => value.trim().replace(/\s+/g, ' ');
+
+  const handleAddAllergy = useCallback(
+    (value?: string) => {
+      const raw = typeof value === 'string' && value.trim().length > 0 ? value : allergyInput;
+      const normalized = normalizedAllergyValue(raw || '');
+      if (!normalized) return;
+      const already = allergies.some((a) => a.toLowerCase() === normalized.toLowerCase());
+      if (already) {
+        setAllergyInput('');
+        return;
+      }
+      setAllergies((prev) => [...prev, normalized]);
+      setAllergyInput('');
+    },
+    [allergies, allergyInput],
+  );
+
+  const handleRemoveAllergy = useCallback((value: string) => {
+    setAllergies((prev) => prev.filter((a) => a.toLowerCase() !== value.toLowerCase()));
+  }, []);
+
+  const filteredAllergySuggestions = React.useMemo(() => {
+    const term = allergyInput.toLowerCase().trim();
+    const selected = new Set(allergies.map((a) => a.toLowerCase()));
+    return allergyOptions
+      .filter((opt) => !selected.has(opt.toLowerCase()))
+      .filter((opt) => !term || opt.toLowerCase().includes(term))
+      .slice(0, 6);
+  }, [allergyInput, allergies, allergyOptions]);
   // Persist physical info as the user fills it out so moving between steps keeps data
   useEffect(() => {
     if (!onPartialSave) return;
@@ -904,6 +982,8 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
       goalChoice,
       goalIntensity,
       unit,
+      allergies,
+      diabetesType,
     };
     onPartialSave(payload);
   }, [
@@ -916,6 +996,8 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     goalChoice,
     goalIntensity,
     unit,
+    allergies,
+    diabetesType,
     onPartialSave,
   ]);
 
@@ -1130,6 +1212,103 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
         <p className="mt-2 text-xs text-gray-500">
           Mild = smaller change, Standard = balanced, Aggressive = faster change (use only if safe for you).
         </p>
+      </div>
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold mb-2">Do you have diabetes?</h2>
+        <p className="mb-3 text-gray-600">Helps set safer sugar and carb targets.</p>
+        <div className="grid grid-cols-2 gap-2 mb-2">
+          {[
+            { key: 'type1', label: 'Type 1' },
+            { key: 'type2', label: 'Type 2' },
+            { key: 'prediabetes', label: 'Pre-diabetic' },
+          ].map((option) => (
+            <button
+              key={option.key}
+              className={`w-full py-3 rounded border ${
+                diabetesType === option.key ? 'bg-orange-600 text-white border-orange-600' : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+              } transition-colors text-sm font-medium`}
+              onClick={() => setDiabetesType(option.key as any)}
+              type="button"
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={() => setDiabetesType('')}
+          className="text-sm text-gray-600 underline"
+        >
+          I don&apos;t have diabetes
+        </button>
+      </div>
+      <div className="mb-8">
+        <h2 className="text-2xl font-bold mb-2">Add your food allergies</h2>
+        <p className="mb-3 text-gray-600">We&apos;ll warn you during new food analyses. This will never block foods.</p>
+        <div className="flex flex-col sm:flex-row gap-2 mb-3">
+          <div className="flex-1 flex gap-2">
+            <input
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-green-500 focus:ring-1 focus:ring-green-500"
+              type="search"
+              list="allergy-suggestions"
+              placeholder="Search or type an allergy (e.g., peanut, gluten)"
+              value={allergyInput}
+              onChange={(e) => setAllergyInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleAddAllergy();
+                }
+              }}
+            />
+            <datalist id="allergy-suggestions">
+              {allergyOptions.map((opt) => (
+                <option key={opt} value={opt} />
+              ))}
+            </datalist>
+            <button
+              type="button"
+              onClick={() => handleAddAllergy()}
+              className="px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 transition-colors whitespace-nowrap"
+            >
+              Add
+            </button>
+          </div>
+        </div>
+        {filteredAllergySuggestions.length > 0 && (
+          <div className="mb-3 flex flex-wrap gap-2">
+            {filteredAllergySuggestions.map((opt) => (
+              <button
+                key={opt}
+                type="button"
+                className="px-3 py-1 rounded-full border border-gray-200 text-sm text-gray-700 hover:bg-gray-50"
+                onClick={() => handleAddAllergy(opt)}
+              >
+                {opt}
+              </button>
+            ))}
+          </div>
+        )}
+        {allergies.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {allergies.map((allergy) => (
+              <span
+                key={allergy}
+                className="inline-flex items-center bg-orange-50 text-orange-800 border border-orange-200 px-3 py-1 rounded-full text-sm"
+              >
+                {allergy}
+                <button
+                  type="button"
+                  className="ml-2 text-orange-700 hover:text-orange-900"
+                  onClick={() => handleRemoveAllergy(allergy)}
+                  aria-label={`Remove ${allergy}`}
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
       </div>
       <h2 className="text-2xl font-bold mb-4">Choose your body type (optional)</h2>
       <p className="mb-4 text-gray-600">Helps tailor insights to your body composition.</p>

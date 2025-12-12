@@ -113,6 +113,21 @@ export async function GET(request: NextRequest) {
       console.log('No health situations data found in storage');
     }
 
+    // Get allergy + diabetes data
+    let allergyData = { allergies: [] as string[], diabetesType: '' };
+    try {
+      const storedAllergies = user.healthGoals.find((goal: any) => goal.name === '__ALLERGIES_DATA__');
+      if (storedAllergies?.category) {
+        const parsed = JSON.parse(storedAllergies.category);
+        allergyData = {
+          allergies: Array.isArray(parsed?.allergies) ? parsed.allergies.filter((a: any) => typeof a === 'string' && a.trim().length > 0) : [],
+          diabetesType: typeof parsed?.diabetesType === 'string' ? parsed.diabetesType : '',
+        };
+      }
+    } catch (e) {
+      console.log('No allergy data found in storage');
+    }
+
     // Get blood results data
     let bloodResultsData = { uploadMethod: 'documents', documents: [], images: [], notes: '', skipped: false };
     try {
@@ -318,6 +333,8 @@ export async function GET(request: NextRequest) {
       termsAccepted: (user as any).termsAccepted === true,
       goalChoice: primaryGoalData.goalChoice || '',
       goalIntensity: (primaryGoalData.goalIntensity || 'standard').toString().toLowerCase(),
+      allergies: allergyData.allergies,
+      diabetesType: allergyData.diabetesType,
     }
 
     // Fallback: if primary goal still missing, use the first non-hidden health goal as a soft default
@@ -551,7 +568,7 @@ export async function POST(request: NextRequest) {
         const deleteResult = await prisma.healthGoal.deleteMany({
           where: { 
             userId: user.id,
-            name: { notIn: ['__EXERCISE_DATA__', '__HEALTH_SITUATIONS_DATA__', '__SELECTED_ISSUES__', '__PRIMARY_GOAL__'] }
+            name: { notIn: ['__EXERCISE_DATA__', '__HEALTH_SITUATIONS_DATA__', '__SELECTED_ISSUES__', '__PRIMARY_GOAL__', '__ALLERGIES_DATA__'] }
           }
         })
         console.log('🗑️ Deleted', deleteResult.count, 'existing health goals')
@@ -621,6 +638,57 @@ export async function POST(request: NextRequest) {
       }
     } catch (error) {
       console.error('Error storing health situations data:', error)
+      // Continue with other updates
+    }
+
+    // 3.1. Handle allergies + diabetes type (Step 2) - store as special health goal
+    try {
+      const hasIncomingAllergies = Array.isArray(data.allergies)
+      const hasIncomingDiabetes = typeof data.diabetesType === 'string'
+      if (hasIncomingAllergies || hasIncomingDiabetes) {
+        let existingAllergyPayload: { allergies: string[]; diabetesType?: string } = { allergies: [], diabetesType: '' }
+        try {
+          const existingAllergies = await prisma.healthGoal.findFirst({
+            where: { userId: user.id, name: '__ALLERGIES_DATA__' },
+          })
+          if (existingAllergies?.category) {
+            const parsed = JSON.parse(existingAllergies.category)
+            existingAllergyPayload = {
+              allergies: Array.isArray(parsed?.allergies) ? parsed.allergies : [],
+              diabetesType: typeof parsed?.diabetesType === 'string' ? parsed.diabetesType : '',
+            }
+          }
+        } catch (error) {
+          console.warn('⚠️ Failed to load existing allergy data:', error)
+        }
+
+        const normalizedAllergies = hasIncomingAllergies
+          ? (data.allergies as any[])
+              .filter((a) => typeof a === 'string')
+              .map((a) => (a as string).trim())
+              .filter((a) => a.length > 0)
+          : existingAllergyPayload.allergies || []
+
+        const payload = {
+          allergies: normalizedAllergies,
+          diabetesType: hasIncomingDiabetes ? data.diabetesType : existingAllergyPayload.diabetesType || '',
+        }
+
+        await prisma.healthGoal.deleteMany({
+          where: { userId: user.id, name: '__ALLERGIES_DATA__' },
+        })
+        await prisma.healthGoal.create({
+          data: {
+            userId: user.id,
+            name: '__ALLERGIES_DATA__',
+            category: JSON.stringify(payload),
+            currentRating: 0,
+          },
+        })
+        console.log('Stored allergy + diabetes data successfully')
+      }
+    } catch (error) {
+      console.error('Error storing allergy data:', error)
       // Continue with other updates
     }
 
