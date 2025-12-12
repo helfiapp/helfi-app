@@ -1281,6 +1281,62 @@ export default function FoodDiary() {
     if (!Number.isFinite(ts)) return ''
     return formatDateFromMs(ts)
   }
+  const compactItemForSnapshot = (item: any) => {
+    if (!item || typeof item !== 'object') return item
+    return {
+      name: item?.name,
+      brand: item?.brand,
+      calories: item?.calories,
+      protein_g: item?.protein_g,
+      carbs_g: item?.carbs_g,
+      fat_g: item?.fat_g,
+      fiber_g: item?.fiber_g,
+      sugar_g: item?.sugar_g,
+      servings: item?.servings,
+      serving_size: item?.serving_size,
+      pieces: (item as any)?.pieces,
+      piecesPerServing: (item as any)?.piecesPerServing,
+      unit: (item as any)?.unit,
+      weight_g: (item as any)?.weight_g,
+      barcode: (item as any)?.barcode,
+      barcodeSource: (item as any)?.barcodeSource,
+      detectionMethod: (item as any)?.detectionMethod,
+      isGuess: (item as any)?.isGuess,
+    }
+  }
+  const compactEntryForSnapshot = (entry: any, fallbackDate: string) => {
+    if (!entry || typeof entry !== 'object') return entry
+    const explicitLocalDate =
+      typeof entry?.localDate === 'string' && entry.localDate.length >= 8 ? entry.localDate : ''
+    const derivedDate = deriveDateFromEntryTimestamp(entry)
+    const localDate = derivedDate || explicitLocalDate || fallbackDate
+    const description =
+      typeof entry?.description === 'string'
+        ? entry.description.slice(0, 2000)
+        : entry?.description
+    const items =
+      Array.isArray(entry?.items) && entry.items.length > 0
+        ? entry.items.map(compactItemForSnapshot)
+        : entry?.items || null
+    return {
+      id: entry?.id,
+      dbId: (entry as any)?.dbId,
+      localDate,
+      description,
+      time: entry?.time,
+      method: entry?.method,
+      photo: entry?.photo || null,
+      nutrition: entry?.nutrition || null,
+      total: (entry as any)?.total || null,
+      items,
+      meal: entry?.meal,
+      category: entry?.category,
+      persistedCategory: (entry as any)?.persistedCategory,
+      createdAt: entry?.createdAt,
+    }
+  }
+  const compactTodaysFoodsForSnapshot = (entries: any[], fallbackDate: string) =>
+    Array.isArray(entries) ? entries.map((e) => compactEntryForSnapshot(e, fallbackDate)) : []
   const entryMatchesDate = (entry: any, targetDate: string) => {
     if (!entry) return false
     const localDate =
@@ -2651,7 +2707,10 @@ const applyStructuredItems = (
                   fetch('/api/user-data', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ todaysFoods: mappedFromDb, appendHistory: false })
+                    body: JSON.stringify({
+                      todaysFoods: compactTodaysFoodsForSnapshot(mappedFromDb, selectedDate),
+                      appendHistory: false,
+                    })
                   }).catch(() => {})
                 } catch {}
                 return
@@ -2706,7 +2765,10 @@ const applyStructuredItems = (
                   fetch('/api/user-data', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ todaysFoods: merged, appendHistory: false })
+                    body: JSON.stringify({
+                      todaysFoods: compactTodaysFoodsForSnapshot(merged, selectedDate),
+                      appendHistory: false,
+                    })
                   }).catch(() => {})
                 } catch {}
               } else if (mappedFromDb.length === 0 && deduped.length > 0 && !backfillAttemptedRef.current[selectedDate]) {
@@ -2771,7 +2833,10 @@ const applyStructuredItems = (
                   fetch('/api/user-data', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ todaysFoods: mapped, appendHistory: false })
+                    body: JSON.stringify({
+                      todaysFoods: compactTodaysFoodsForSnapshot(mapped, selectedDate),
+                      appendHistory: false,
+                    })
                   }).catch(() => {})
                 } catch {}
               } else {
@@ -2803,7 +2868,10 @@ const applyStructuredItems = (
                       fetch('/api/user-data', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ todaysFoods: byDate, appendHistory: false })
+                        body: JSON.stringify({
+                          todaysFoods: compactTodaysFoodsForSnapshot(byDate, selectedDate),
+                          appendHistory: false,
+                        })
                       }).catch(() => {})
                     } catch {}
                   }
@@ -2844,7 +2912,10 @@ const applyStructuredItems = (
                 fetch('/api/user-data', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ todaysFoods: deduped, appendHistory: false })
+                  body: JSON.stringify({
+                    todaysFoods: compactTodaysFoodsForSnapshot(deduped, selectedDate),
+                    appendHistory: false,
+                  })
                 }).catch(() => {})
               } catch {}
             }
@@ -3178,7 +3249,7 @@ const applyStructuredItems = (
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            todaysFoods: snapshotFoods, // Use deduplicated array
+            todaysFoods: compactTodaysFoodsForSnapshot(snapshotFoods, selectedDate), // Compact to avoid 413
             appendHistory: false, // Always false - we handle FoodLog separately
           }),
         }).then(async (userDataResponse) => {
@@ -5709,7 +5780,10 @@ Please add nutritional information manually if needed.`);
             await fetch('/api/user-data', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ todaysFoods: updatedFoods, appendHistory: false }),
+              body: JSON.stringify({
+                todaysFoods: compactTodaysFoodsForSnapshot(updatedFoods, selectedDate),
+                appendHistory: false,
+              }),
             })
           }
         } catch (syncErr) {
