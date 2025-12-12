@@ -5835,58 +5835,68 @@ Please add nutritional information manually if needed.`);
     }
 
     const ensureRemoteDelete = async () => {
-      let deleted = false
+      // IMPORTANT: Many users have duplicate FoodLog rows for the same visible entry.
+      // We must delete *all* matching rows, not stop after the first successful delete,
+      // otherwise the entry will "resurrect" after refresh.
+      let deletedAny = false
       const sweepDates: string[] = []
-      if (dbId) {
-        deleted = await tryDeleteById(dbId)
-      }
-      if (!deleted && entryId) {
-        deleted = await tryDeleteById(entryId)
-      }
-      if (!deleted) {
-        try {
-          const tz = new Date().getTimezoneOffset()
-          autoDates.forEach((d) => sweepDates.push(d))
-          const base = autoDates[0] ? new Date(autoDates[0]) : new Date()
-          ;[1, -1, 2, -2].forEach((delta) => {
-            const d = new Date(base)
-            d.setDate(d.getDate() + delta)
-            sweepDates.push(d.toISOString().slice(0, 10))
-          })
 
-          for (const day of sweepDates) {
-            if (deleted) break
-            try {
-              const res = await fetch(`/api/food-log?date=${day}&tz=${tz}`)
-              if (res.ok) {
-                const json = await res.json()
-                const logs = Array.isArray(json.logs) ? json.logs : []
-                const matches = logs.filter((l: any) => {
-                  const cat = normalizeCategory(l?.meal || l?.category || l?.mealType)
-                  const descMatch =
-                    normalizedDescription(l?.description || l?.name) ===
-                    normalizedDescription(entry?.description)
-                  return cat === entryCategory && descMatch
-                })
-                for (const m of matches) {
-                  if (await tryDeleteById(m.id)) {
-                    deleted = true
-                  }
-                }
-              }
-            } catch (errAlt) {
-              console.warn('Delete sweep lookup failed', { day, err: errAlt })
-            }
-          }
-        } catch (err) {
-          console.warn('Best-effort server delete fallback failed', err)
-        }
+      // 1) Try direct id deletes first (fast path), but do NOT stop here: duplicates may remain.
+      if (dbId) {
+        deletedAny = (await tryDeleteById(dbId)) || deletedAny
       }
-      if (!deleted) {
-        // Nuclear option: delete by description/category across the sweep dates.
-        try {
+      if (entryId) {
+        deletedAny = (await tryDeleteById(entryId)) || deletedAny
+      }
+
+      // 2) Always sweep dates to remove duplicates matching the visible entry.
+      try {
+        const tz = new Date().getTimezoneOffset()
+        autoDates.forEach((d) => sweepDates.push(d))
+        const base = autoDates[0] ? new Date(autoDates[0]) : new Date()
+        ;[1, -1, 2, -2].forEach((delta) => {
+          const d = new Date(base)
+          d.setDate(d.getDate() + delta)
+          sweepDates.push(d.toISOString().slice(0, 10))
+        })
+
+        for (const day of Array.from(new Set(sweepDates)).slice(0, 12)) {
+          try {
+            const res = await fetch(`/api/food-log?date=${day}&tz=${tz}`)
+            if (!res.ok) continue
+            const json = await res.json()
+            const logs = Array.isArray(json.logs) ? json.logs : []
+            const matches = logs.filter((l: any) => {
+              const cat = normalizeCategory(l?.meal || l?.category || l?.mealType)
+              const descMatch =
+                normalizedDescription(l?.description || l?.name) ===
+                normalizedDescription(entry?.description || entry?.name || '')
+              return cat === entryCategory && descMatch
+            })
+
+            const ids = Array.from(
+              new Set<string>(matches.map((m: any) => String(m?.id || '')).filter((v: string) => v.length > 0)),
+            ).slice(0, 25)
+            for (const id of ids) {
+              deletedAny = (await tryDeleteById(id)) || deletedAny
+            }
+          } catch (errAlt) {
+            console.warn('Delete sweep lookup failed', { day, err: errAlt })
+          }
+        }
+      } catch (err) {
+        console.warn('Best-effort server delete sweep failed', err)
+      }
+
+      // 3) Final fallback: delete by description/category across dates.
+      // Use a raw (non-normalized) prefix so the server `contains` matcher can find rows even if
+      // punctuation/whitespace differs.
+      try {
+        const rawDesc = (entry?.description || entry?.name || '').toString().trim()
+        const descForServer = rawDesc.length > 0 ? rawDesc.slice(0, 220) : ''
+        if (descForServer) {
           const payload = {
-            description: normalizedDescription(entry?.description || entry?.name || ''),
+            description: descForServer,
             category: entryCategory,
             dates: Array.from(new Set(sweepDates)).slice(0, 12),
           }
@@ -5897,15 +5907,16 @@ Please add nutritional information manually if needed.`);
           })
           if (res.ok) {
             const json = await res.json().catch(() => ({} as any))
-            deleted = !!json?.deleted && json.deleted > 0
+            deletedAny = (Boolean(json?.deleted) && Number(json.deleted) > 0) || deletedAny
           } else {
             console.warn('Description delete failed', res.status, res.statusText)
           }
-        } catch (err) {
-          console.warn('Description-based delete failed', err)
         }
+      } catch (err) {
+        console.warn('Description-based delete failed', err)
       }
-      if (!deleted) {
+
+      if (!deletedAny) {
         console.warn('Delete did not confirm; entry may reappear after refresh.')
       }
     }
