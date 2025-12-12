@@ -613,6 +613,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
   const [showValidationError, setShowValidationError] = useState(false);
   const { shouldBlockNavigation, allowUnsavedNavigation, acknowledgeUnsavedChanges, requestNavigation, beforeUnloadHandler } = useUnsavedNavigationAllowance(hasUnsavedChanges);
   const { updateUserData } = useUserData();
+  const pendingExternalNavigationRef = useRef<(() => void) | null>(null);
 
   const parseNumber = (value: string): number | null => {
     if (!value) return null;
@@ -862,6 +863,15 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
   useEffect(() => {
     const handler = (event: MessageEvent) => {
       if (event?.data?.type === 'OPEN_PHYSICAL_UPDATE_POPUP') {
+        if (event?.data?.navigateTo === 'dashboard') {
+          pendingExternalNavigationRef.current = () => {
+            try {
+              window.location.href = '/dashboard';
+            } catch {
+              window.location.assign('/dashboard');
+            }
+          };
+        }
         setShowUpdatePopup(true);
       }
     };
@@ -922,6 +932,9 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
 
         // Data saved successfully - update local state immediately
         setHasUnsavedChanges(false);
+        try {
+          (window as any).__helfiOnboardingPhysicalHasUnsavedChanges = false;
+        } catch {}
         if (onInsightsSaved) onInsightsSaved();
         updateUserData(payload);
         acknowledgeUnsavedChanges(); // flush any pending guarded navigation (Next/Back)
@@ -935,6 +948,13 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
         
         // Step 3: Close popup immediately - user sees instant success
         setShowUpdatePopup(false);
+
+        // If the popup was opened by an external navigation (e.g., "Go To Dashboard"), proceed now.
+        const external = pendingExternalNavigationRef.current;
+        pendingExternalNavigationRef.current = null;
+        if (external) {
+          external();
+        }
       } else {
         alert('Failed to save your changes. Please try again.');
       }
@@ -949,10 +969,6 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
   const triggerPopup = () => {
     if (!showUpdatePopup) {
       setShowUpdatePopup(true);
-      try {
-        // Also fire the global message listener to guarantee the modal opens
-        window.postMessage({ type: 'OPEN_PHYSICAL_UPDATE_POPUP' }, '*');
-      } catch {}
     }
   };
 
@@ -1502,6 +1518,19 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
           </button>
         </div>
       </div>
+      <UpdateInsightsPopup
+        isOpen={showUpdatePopup}
+        onClose={() => {
+          pendingExternalNavigationRef.current = null;
+          setShowUpdatePopup(false);
+        }}
+        onAddMore={() => {
+          pendingExternalNavigationRef.current = null;
+          setShowUpdatePopup(false);
+        }}
+        onUpdateInsights={handleUpdateInsights}
+        isGenerating={isGeneratingInsights}
+      />
       {/* No Update Insights prompt on review; do not block exit here */}
     </div>
   );
@@ -6350,9 +6379,6 @@ export default function Onboarding() {
         setIsNavigating(false);
         setIsLoading(false);
       }
-      if (event?.data?.type === 'OPEN_PHYSICAL_UPDATE_POPUP') {
-        setShowGlobalUpdatePopup(true);
-      }
     };
     window.addEventListener('message', handler);
     return () => window.removeEventListener('message', handler);
@@ -6544,10 +6570,12 @@ export default function Onboarding() {
                     (window as any).__helfiOnboardingPhysicalHasUnsavedChanges;
                   if (hasPhysicalUnsaved || (hasGlobalUnsavedChanges && hasRealChanges)) {
                     e.preventDefault();
-                    window.postMessage(
-                      { type: 'OPEN_PHYSICAL_UPDATE_POPUP' },
-                      '*'
-                    );
+                    // On the Physical step, route through the step-scoped popup so Update Insights
+                    // can acknowledge and resume the correct pending navigation.
+                    if (step === 1) {
+                      window.postMessage({ type: 'OPEN_PHYSICAL_UPDATE_POPUP', navigateTo: 'dashboard' }, '*');
+                      return;
+                    }
                     setShowGlobalUpdatePopup(true);
                   }
                 } catch {
