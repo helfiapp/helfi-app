@@ -150,6 +150,7 @@ const BARCODE_REGION_ID = 'food-barcode-reader'
 // timestamp will be included in the All list so we can start fresh after data corruption.
 // (Dec 12, 2025 09:47:56 UTC)
 const HISTORY_RESET_EPOCH_MS = 1765532876309
+const HISTORY_RESET_UTC_DATE = new Date(HISTORY_RESET_EPOCH_MS).toISOString().slice(0, 10) // 2025-12-12
 const EMPTY_TOTALS = { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0 }
 
 class DiaryErrorBoundary extends Component<{ children: React.ReactNode }, { hasError: boolean }> {
@@ -1659,6 +1660,7 @@ export default function FoodDiary() {
     mode: 'duplicate' | 'copyToToday'
   } | null>(null)
   const duplicateInFlightRef = useRef(false)
+  const favoriteInsertDebounceRef = useRef<Record<string, number>>({})
   const [showFavoritesPicker, setShowFavoritesPicker] = useState(false)
   const [favoriteSwipeOffsets, setFavoriteSwipeOffsets] = useState<Record<string, number>>({})
   const swipeMetaRef = useRef<Record<string, { startX: number; startY: number; swiping: boolean; hasMoved: boolean }>>({})
@@ -4636,6 +4638,7 @@ Please add nutritional information manually if needed.`);
     }
     const meetsFreshnessAndShape = (entry: any) => {
       if (!entry) return false
+      const entryDate = dateKeyForEntry(entry) || deriveDateFromEntryTimestamp(entry)
       const ts =
         typeof entry?.createdAt === 'string'
           ? new Date(entry.createdAt).getTime()
@@ -4645,10 +4648,11 @@ Please add nutritional information manually if needed.`);
           ? entry.id
           : NaN
       const hasFreshTimestamp = Number.isFinite(ts) && ts >= HISTORY_RESET_EPOCH_MS
+      const hasFreshDate = Boolean(entryDate) && entryDate >= HISTORY_RESET_UTC_DATE
       const desc = (entry?.description || entry?.label || '').toString().trim()
       const hasNutrition =
         Boolean(entry?.nutrition) || Boolean(entry?.total) || (Array.isArray(entry?.items) && entry.items.length > 0)
-      return hasFreshTimestamp && desc.length > 0 && hasNutrition
+      return (hasFreshDate || hasFreshTimestamp) && desc.length > 0 && hasNutrition
     }
     return dedupeEntries(pool.filter(meetsFreshnessAndShape), { fallbackDate: selectedDate })
   }
@@ -5336,7 +5340,14 @@ Please add nutritional information manually if needed.`);
   const insertFavoriteIntoDiary = async (favorite: any, targetCategory?: typeof MEAL_CATEGORY_ORDER[number]) => {
     if (!favorite) return
     const category = normalizeCategory(targetCategory || selectedAddCategory)
-    const createdAtIso = alignTimestampToLocalDate(new Date().toISOString(), selectedDate)
+    const now = Date.now()
+    const debounceKey = `${favorite?.id || favorite?.label || 'favorite'}|${selectedDate}|${category}`
+    const last = favoriteInsertDebounceRef.current[debounceKey] || 0
+    // Mobile browsers can fire multiple taps/clicks; guard to avoid triple inserts.
+    if (now - last < 1200) return
+    favoriteInsertDebounceRef.current[debounceKey] = now
+
+    const createdAtIso = alignTimestampToLocalDate(new Date(now).toISOString(), selectedDate)
     const clonedItems =
       favorite.items && Array.isArray(favorite.items) && favorite.items.length > 0
         ? JSON.parse(JSON.stringify(favorite.items))
@@ -5361,35 +5372,12 @@ Please add nutritional information manually if needed.`);
       persistedCategory: category,
       createdAt: createdAtIso,
     }
-    const buildEntryDedupKey = (food: any) =>
-      [
-        food?.localDate || '',
-        normalizeCategory(food?.meal || food?.category || food?.mealType),
-        (food?.description || '').toString().trim().toLowerCase(),
-        food?.photo || '',
-      ].join('|')
-    const entryDedupKey = buildEntryDedupKey(entry)
-    const ensureEntryPresent = () => {
-      const insertIfMissing = (list: any[]) => {
-        const exists = list.some((food: any) => buildEntryDedupKey(food) === entryDedupKey)
-        if (exists) return list
-        return [entry, ...list]
-      }
-      if (isViewingToday) {
-        setTodaysFoods((prev) => insertIfMissing(prev))
-      } else {
-        setHistoryFoods((prev: any[] | null) => {
-          const base = Array.isArray(prev) ? prev : []
-          return insertIfMissing(base)
-        })
-      }
-    }
     setSelectedAddCategory(category as typeof MEAL_CATEGORY_ORDER[number])
     setExpandedCategories((prev) => ({
       ...prev,
       [category]: true,
     }))
-    const updatedFoods = [entry, ...todaysFoods]
+    const updatedFoods = dedupeEntries([entry, ...todaysFoods], { fallbackDate: selectedDate })
     setTodaysFoods(updatedFoods)
     triggerHaptic(10)
     setShowFavoritesPicker(false)
@@ -5399,21 +5387,18 @@ Please add nutritional information manually if needed.`);
     if (!isViewingToday) {
       setHistoryFoods((prev: any[] | null) => {
         const base = Array.isArray(prev) ? prev : []
-        return [{ ...entry, dbId: undefined }, ...base]
+        return dedupeEntries([{ ...entry, dbId: undefined }, ...base], { fallbackDate: selectedDate })
       })
     }
-    ensureEntryPresent()
-    ;(async () => {
-      try {
-        await saveFoodEntries(updatedFoods)
-        await refreshEntriesFromServer()
-        showQuickToast(`Added to ${categoryLabel(category)}`)
-      } catch (err) {
-        console.warn('Favorite add sync failed', err)
-      } finally {
-        setPhotoOptionsAnchor(null)
-      }
-    })()
+    try {
+      await saveFoodEntries(updatedFoods)
+      await refreshEntriesFromServer()
+      showQuickToast(`Added to ${categoryLabel(category)}`)
+    } catch (err) {
+      console.warn('Favorite add sync failed', err)
+    } finally {
+      setPhotoOptionsAnchor(null)
+    }
   }
 
   const handleDeleteFavorite = (id: string) => {
@@ -5704,12 +5689,25 @@ Please add nutritional information manually if needed.`);
         return
       }
       const safeDescription = (food.description ?? '').toString()
-      const safeItems = Array.isArray(food.items) ? food.items : null
+      const safeItems = (() => {
+        if (Array.isArray(food.items)) return food.items
+        if (typeof food.items === 'string') {
+          try {
+            const parsed = JSON.parse(food.items)
+            return Array.isArray(parsed) ? parsed : null
+          } catch {
+            return null
+          }
+        }
+        return null
+      })()
+      const safePhoto = typeof food.photo === 'string' ? food.photo : null
       const safeNutrition = sanitizeNutritionTotals(food.nutrition || food.total || null) || EMPTY_TOTALS
       const safeFood = {
         ...food,
         description: safeDescription,
         items: safeItems,
+        photo: safePhoto,
         nutrition: safeNutrition,
         total: safeNutrition || null,
       }
@@ -5724,7 +5722,7 @@ Please add nutritional information manually if needed.`);
         setOriginalEditingEntry(safeFood)
       }
       // Populate the form with existing data and go directly to editing
-      const useIngredientCards = safeFood.method === 'photo' || isBarcodeEntry(safeFood)
+      const useIngredientCards = safeFood.method === 'photo' || Boolean(safeFood.photo) || isBarcodeEntry(safeFood)
       if (useIngredientCards) {
         // Clear all state first to ensure clean rebuild
         setAnalyzedItems([]);
@@ -7279,20 +7277,7 @@ Please add nutritional information manually if needed.`);
                           servingUnitMeta && Number.isFinite(servingUnitMeta.quantity) && servingUnitMeta.quantity > 0
                             ? Number(servingUnitMeta.quantity)
                             : 1
-                        const portionMode = item?.portionMode === 'weight' ? 'weight' : 'servings'
-                        const weightUnit = item?.weightUnit === 'ml' ? 'ml' : item?.weightUnit === 'oz' ? 'oz' : 'g'
-                        const weightAmount =
-                          portionMode === 'weight' && Number.isFinite(item?.weightAmount)
-                            ? Number(item.weightAmount)
-                            : null
-                        const weightLabel =
-                          portionMode === 'weight' && weightAmount
-                            ? `${weightAmount}${weightUnit}`
-                            : null
-                        const totalsLabel =
-                          portionMode === 'weight' && weightAmount
-                            ? `${formatNumberInputValue(weightAmount)} ${weightUnit}`
-                            : formattedServings
+                        const totalsLabel = formattedServings
 
                         const piecesPerServing =
                           getPiecesPerServing(item) ||
@@ -7416,217 +7401,96 @@ Please add nutritional information manually if needed.`);
                               </div>
                             </div>
                             
-                            {/* Portion controls: toggle between servings and weight modes */}
+                            {/* Portion controls: servings-only (weight editor is intentionally hidden). */}
                             {isExpanded && (
                               <div className="flex flex-col gap-2 mb-3 pb-3 border-b border-gray-100">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-sm text-gray-600">Portion mode:</span>
-                                  <div className="flex gap-1">
+                                <div className="flex items-center gap-3">
+                                  <span className="text-sm text-gray-600">Servings:</span>
+                                  <div className="flex items-center gap-2">
                                     <button
-                                      type="button"
-                                      onClick={() => updateItemField(index, 'portionMode', 'servings')}
-                                      className={`px-3 py-1.5 text-xs rounded-lg border ${
-                                        portionMode === 'servings'
-                                          ? 'bg-emerald-600 text-white border-emerald-600'
-                                          : 'bg-white text-gray-700 border-gray-300'
-                                      }`}
+                                      onClick={() => {
+                                        const current = analyzedItems[index]?.servings || 1
+                                        const step = servingsStep
+                                        const snapToStep = (val: number) => {
+                                          if (!step || step <= 0) return val
+                                          const snapped = Math.round(val / step)
+                                          return Math.max(0, Math.round(snapped * step * 10000) / 10000)
+                                        }
+                                        const next = snapToStep(current - step)
+                                        updateItemField(index, 'servings', next)
+                                      }}
+                                      className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-medium transition-colors"
                                     >
-                                      Servings
+                                      -
                                     </button>
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      step={servingsStep > 0 ? Math.max(servingsStep, 0.01) : 0.25}
+                                      value={formatNumberInputValue(item.servings ?? 1)}
+                                      onChange={(e) => updateItemField(index, 'servings', e.target.value)}
+                                      className="w-20 px-2 py-1 border border-gray-300 rounded-lg text-base font-semibold text-gray-900 text-center focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                    />
                                     <button
-                                      type="button"
-                                      onClick={() => updateItemField(index, 'portionMode', 'weight')}
-                                      className={`px-3 py-1.5 text-xs rounded-lg border ${
-                                        portionMode === 'weight'
-                                          ? 'bg-slate-800 text-white border-slate-800'
-                                          : 'bg-white text-gray-700 border-gray-300'
-                                      }`}
+                                      onClick={() => {
+                                        const current = analyzedItems[index]?.servings || 1
+                                        const step = servingsStep
+                                        const snapToStep = (val: number) => {
+                                          if (!step || step <= 0) return val
+                                          const snapped = Math.round(val / step)
+                                          return Math.max(0, Math.round(snapped * step * 10000) / 10000)
+                                        }
+                                        const next = snapToStep(current + step)
+                                        updateItemField(index, 'servings', next)
+                                      }}
+                                      className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-medium transition-colors"
                                     >
-                                      Weight (g / mL)
+                                      +
                                     </button>
                                   </div>
                                 </div>
-
-                                {portionMode === 'servings' ? (
-                                  <>
-                                    <div className="flex items-center gap-3">
-                                      <span className="text-sm text-gray-600">Servings:</span>
-                                      <div className="flex items-center gap-2">
-                                        <button
-                                          onClick={() => {
-                                            const current = analyzedItems[index]?.servings || 1
-                                            const step = servingsStep
-                                            const snapToStep = (val: number) => {
-                                              if (!step || step <= 0) return val
-                                              const snapped = Math.round(val / step)
-                                              return Math.max(0, Math.round(snapped * step * 10000) / 10000)
-                                            }
-                                            const next = snapToStep(current - step)
-                                            updateItemField(index, 'servings', next)
-                                          }}
-                                          className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-medium transition-colors"
-                                        >
-                                          -
-                                        </button>
-                                        <input
-                                          type="number"
-                                          min={0}
-                                          step={servingsStep > 0 ? Math.max(servingsStep, 0.01) : 0.25}
-                                          value={formatNumberInputValue(item.servings ?? 1)}
-                                          onChange={(e) => updateItemField(index, 'servings', e.target.value)}
-                                          className="w-20 px-2 py-1 border border-gray-300 rounded-lg text-base font-semibold text-gray-900 text-center focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                        />
-                                        <button
-                                          onClick={() => {
-                                            const current = analyzedItems[index]?.servings || 1
-                                            const step = servingsStep
-                                            const snapToStep = (val: number) => {
-                                              if (!step || step <= 0) return val
-                                              const snapped = Math.round(val / step)
-                                              return Math.max(0, Math.round(snapped * step * 10000) / 10000)
-                                            }
-                                            const next = snapToStep(current + step)
-                                            updateItemField(index, 'servings', next)
-                                          }}
-                                          className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-medium transition-colors"
-                                        >
-                                          +
-                                        </button>
-                                      </div>
-                                    </div>
-                                    <div className="text-xs text-gray-500">
-                                      {servingSizeDisplayLabel
-                                        ? `1 serving = ${servingSizeDisplayLabel}`
-                                        : 'Serving size not specified'}
-                                    </div>
-                                    {/* Pieces control for discrete items */}
-                                    {piecesPerServing && piecesPerServing > 0 && (
-                                      <div className="flex items-center gap-3 mt-2">
-                                        <span className="text-sm text-gray-600">Pieces:</span>
-                                        <div className="flex items-center gap-2">
-                                          <button
-                                            onClick={() => {
-                                              const current = analyzedItems[index]?.servings || 1
-                                              const currentPieces = Math.round(current * piecesPerServing)
-                                              const newPieces = Math.max(0, currentPieces - 1)
-                                              const newServings = newPieces / piecesPerServing
-                                              updateItemField(index, 'servings', newServings)
-                                            }}
-                                            className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-medium transition-colors"
-                                          >
-                                            -
-                                          </button>
-                                          <div className="w-20 px-2 py-1 border border-gray-300 rounded-lg text-base font-semibold text-gray-900 text-center bg-gray-50">
-                                            {pieceCount !== null ? Math.round(pieceCount) : Math.round(servingsCount * piecesPerServing)}
-                                          </div>
-                                          <button
-                                            onClick={() => {
-                                              const current = analyzedItems[index]?.servings || 1
-                                              const currentPieces = Math.round(current * piecesPerServing)
-                                              const newPieces = currentPieces + 1
-                                              const newServings = newPieces / piecesPerServing
-                                              updateItemField(index, 'servings', newServings)
-                                            }}
-                                            className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-medium transition-colors"
-                                          >
-                                            +
-                                          </button>
-                                        </div>
-                                      </div>
-                                    )}
-                                    {baseWeightPerServing && (
-                                      <div className="text-xs text-gray-500">
-                                        Total amount ≈ {Math.round(baseWeightPerServing * servingsCount)} g
-                                      </div>
-                                    )}
-                                  </>
-                                ) : (
-                                  <>
-                                    <div className="grid grid-cols-6 gap-2 items-center">
-                                      <span className="text-sm text-gray-600 col-span-2">Weight:</span>
-                                      <input
-                                        type="number"
-                                        inputMode="decimal"
-                                        enterKeyHint="done"
-                                        min={0}
-                                        step={1}
-                                        value={formatNumberInputValue(weightAmount ?? baseWeightPerServing ?? (weightUnit === 'ml' ? mlPerServing || '' : gramsPerServing || ''))}
-                                        onFocus={handleNumericFocus}
-                                        onBlur={handleNumericBlur}
-                                        onKeyDown={handleNumericKeyDown}
-                                        onChange={(e) => updateItemField(index, 'weightAmount', normalizeNumericInput(e))}
-                                        className="col-span-2 px-2 py-1 border border-gray-300 rounded-lg text-base font-semibold text-gray-900 text-center focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                      />
-                                      <select
-                                        value={weightUnit}
-                                        onChange={(e) => updateItemField(index, 'weightUnit', e.target.value)}
-                                        className="col-span-2 px-2 py-1 border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                <div className="text-xs text-gray-500">
+                                  {servingSizeDisplayLabel ? `1 serving = ${servingSizeDisplayLabel}` : 'Serving size not specified'}
+                                </div>
+                                {/* Pieces control for discrete items */}
+                                {piecesPerServing && piecesPerServing > 0 && (
+                                  <div className="flex items-center gap-3 mt-2">
+                                    <span className="text-sm text-gray-600">Pieces:</span>
+                                    <div className="flex items-center gap-2">
+                                      <button
+                                        onClick={() => {
+                                          const current = analyzedItems[index]?.servings || 1
+                                          const currentPieces = Math.round(current * piecesPerServing)
+                                          const newPieces = Math.max(0, currentPieces - 1)
+                                          const newServings = newPieces / piecesPerServing
+                                          updateItemField(index, 'servings', newServings)
+                                        }}
+                                        className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-medium transition-colors"
                                       >
-                                        <option value="g">g</option>
-                                        <option value="ml">mL</option>
-                                        <option value="oz">oz</option>
-                                      </select>
-                                    </div>
-                                    {(gramsPerServing || mlPerServing || item.customGramsPerServing || item.customMlPerServing) && (
-                                      <div className="text-xs text-gray-500">
-                                        {servingSizeDisplayLabel
-                                          ? `1 serving = ${servingSizeDisplayLabel}`
-                                          : baseWeightPerServing
-                                          ? `1 serving ≈ ${Math.round(baseWeightPerServing * 100) / 100} g`
-                                          : mlPerServing
-                                          ? `1 serving ≈ ${Math.round(mlPerServing * 100) / 100} mL`
-                                          : item.customGramsPerServing
-                                          ? `1 serving ≈ ${Math.round(item.customGramsPerServing * 100) / 100} g`
-                                          : item.customMlPerServing
-                                          ? `1 serving ≈ ${Math.round(item.customMlPerServing * 100) / 100} mL`
-                                          : null}
+                                        -
+                                      </button>
+                                      <div className="w-20 px-2 py-1 border border-gray-300 rounded-lg text-base font-semibold text-gray-900 text-center bg-gray-50">
+                                        {pieceCount !== null ? Math.round(pieceCount) : Math.round(servingsCount * piecesPerServing)}
                                       </div>
-                                    )}
-                                    {!gramsPerServing && !mlPerServing && !item.customGramsPerServing && !item.customMlPerServing && (
-                                      <div className="grid grid-cols-6 gap-2 items-center">
-                                        <span className="text-[11px] text-gray-600 col-span-3">Per-serving weight (for scaling):</span>
-                                        <input
-                                          type="number"
-                                          inputMode="decimal"
-                                          enterKeyHint="done"
-                                          min={0}
-                                          step={weightUnit === 'oz' ? 0.1 : 1}
-                                          value={formatNumberInputValue(
-                                            weightUnit === 'ml'
-                                              ? item.customMlPerServing ?? ''
-                                              : weightUnit === 'oz'
-                                              ? item.customGramsPerServing
-                                                ? item.customGramsPerServing / 28.3495
-                                                : ''
-                                              : item.customGramsPerServing ?? '',
-                                          )}
-                                          onFocus={handleNumericFocus}
-                                          onBlur={handleNumericBlur}
-                                          onKeyDown={handleNumericKeyDown}
-                                          onChange={(e) => {
-                                            const val = Number(normalizeNumericInput(e))
-                                            if (!Number.isFinite(val) || val <= 0) {
-                                              updateItemField(index, 'customGramsPerServing', '')
-                                              updateItemField(index, 'customMlPerServing', '')
-                                              return
-                                            }
-                                            if (weightUnit === 'ml') {
-                                              updateItemField(index, 'customMlPerServing', val)
-                                            } else if (weightUnit === 'oz') {
-                                              updateItemField(index, 'customGramsPerServing', val * 28.3495)
-                                            } else {
-                                              updateItemField(index, 'customGramsPerServing', val)
-                                            }
-                                          }}
-                                          className="col-span-3 px-2 py-1 border border-gray-300 rounded-lg text-sm text-gray-900 text-center focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                                          placeholder={weightUnit === 'ml' ? 'mL per serving' : weightUnit === 'oz' ? 'oz per serving' : 'g per serving'}
-                                        />
-                                      </div>
-                                    )}
-                                    <div className="text-xs text-gray-500">
-                                      Macros scale linearly to the weight you enter. Servings controls are hidden in weight mode to avoid conflicts.
+                                      <button
+                                        onClick={() => {
+                                          const current = analyzedItems[index]?.servings || 1
+                                          const currentPieces = Math.round(current * piecesPerServing)
+                                          const newPieces = currentPieces + 1
+                                          const newServings = newPieces / piecesPerServing
+                                          updateItemField(index, 'servings', newServings)
+                                        }}
+                                        className="w-8 h-8 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-medium transition-colors"
+                                      >
+                                        +
+                                      </button>
                                     </div>
-                                  </>
+                                  </div>
+                                )}
+                                {baseWeightPerServing && (
+                                  <div className="text-xs text-gray-500">
+                                    Total amount ≈ {Math.round(baseWeightPerServing * servingsCount)} g
+                                  </div>
                                 )}
                               </div>
                             )}
