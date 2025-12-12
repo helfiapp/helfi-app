@@ -1375,10 +1375,11 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
           )}
         </div>
       )}
-      <div className="flex justify-between">
-        <button className="border border-green-600 text-green-600 px-6 py-3 rounded-lg hover:bg-green-600 hover:text-white transition-colors" onClick={handleBackWithGuard}>Back</button>
+        <div className="flex justify-between">
+        <button type="button" className="border border-green-600 text-green-600 px-6 py-3 rounded-lg hover:bg-green-600 hover:text-white transition-colors" onClick={handleBackWithGuard}>Back</button>
         <div className="flex space-x-3">
         <button 
+          type="button"
           className="text-gray-600 hover:text-gray-900 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
           disabled={!isStepComplete}
           onClick={() => {
@@ -1392,6 +1393,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
           Skip
         </button>
           <button 
+            type="button"
             className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed" 
             disabled={!isStepComplete}
             onClick={handleNextWithGuard}
