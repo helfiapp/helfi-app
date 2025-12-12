@@ -4671,7 +4671,7 @@ Please add nutritional information manually if needed.`);
     const allMeals = Array.from(allByKey.values()).map((entry) => ({
       id: entry?.id || `all-${Math.random()}`,
       label: normalizeMealLabel(entry?.description || entry?.label || 'Meal'),
-      entry: (entry as any)?.items || (entry as any)?.nutrition || (entry as any)?.total ? entry : null,
+      entry,
       favorite: (entry as any)?.sourceTag === 'Favorite' ? entry : null,
       createdAt: entry?.createdAt || entry?.id || Date.now(),
       sourceTag: (entry as any)?.sourceTag === 'Favorite' ? 'Favorite' : buildSourceTag(entry),
