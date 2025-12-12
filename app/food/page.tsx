@@ -146,6 +146,10 @@ const alignTimestampToLocalDate = (rawCreatedAt: any, localDate?: string | null)
 }
 
 const BARCODE_REGION_ID = 'food-barcode-reader'
+// Reset older history items from showing in the "All" tab. Only entries created after this
+// timestamp will be included in the All list so we can start fresh after data corruption.
+// (Dec 12, 2025 09:47:56 UTC)
+const HISTORY_RESET_EPOCH_MS = 1765532876309
 
 type WarmDiaryState = {
   selectedDate?: string
@@ -4606,7 +4610,23 @@ Please add nutritional information manually if needed.`);
         }
       })
     }
-    return dedupeEntries(pool, { fallbackDate: selectedDate })
+    const meetsFreshnessAndShape = (entry: any) => {
+      if (!entry) return false
+      const ts =
+        typeof entry?.createdAt === 'string'
+          ? new Date(entry.createdAt).getTime()
+          : typeof entry?.createdAt === 'number'
+          ? entry.createdAt
+          : typeof entry?.id === 'number'
+          ? entry.id
+          : NaN
+      const hasFreshTimestamp = Number.isFinite(ts) && ts >= HISTORY_RESET_EPOCH_MS
+      const desc = (entry?.description || entry?.label || '').toString().trim()
+      const hasNutrition =
+        Boolean(entry?.nutrition) || Boolean(entry?.total) || (Array.isArray(entry?.items) && entry.items.length > 0)
+      return hasFreshTimestamp && desc.length > 0 && hasNutrition
+    }
+    return dedupeEntries(pool.filter(meetsFreshnessAndShape), { fallbackDate: selectedDate })
   }
 
   const buildFavoritesDatasets = () => {
@@ -5193,6 +5213,8 @@ Please add nutritional information manually if needed.`);
   const insertMealIntoDiary = async (source: any, targetCategory?: typeof MEAL_CATEGORY_ORDER[number]) => {
     if (!source) return
     const category = normalizeCategory(targetCategory || selectedAddCategory)
+    triggerHaptic(10)
+    setQuickToast(`Adding to ${categoryLabel(category)}...`)
     const createdAtIso = alignTimestampToLocalDate(new Date().toISOString(), selectedDate)
     const displayTime = new Date(createdAtIso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     const description = normalizeMealLabel(
