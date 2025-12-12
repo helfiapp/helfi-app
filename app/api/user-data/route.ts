@@ -967,8 +967,13 @@ export async function POST(request: NextRequest) {
         console.log('Stored todays foods data successfully')
 
         // Also append the latest entry into FoodLog for reliable history,
-        // but only when explicitly allowed by the caller.
-        const appendHistory = data.appendHistory !== false
+        // but ONLY when explicitly requested by the caller.
+        //
+        // IMPORTANT (Dec 2025 bug): Many pages POST /api/user-data as part of "Health Setup"
+        // updates while carrying a copy of todaysFoods in memory. If appendHistory defaults
+        // to true, those unrelated saves will create duplicate FoodLog rows (user-visible
+        // duplicates after changing health settings).
+        const appendHistory = data.appendHistory === true
         if (appendHistory && data.todaysFoods.length > 0) {
           const last = data.todaysFoods[0]
           if (last && (last.description || last.nutrition || last.photo)) {
