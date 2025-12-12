@@ -5674,87 +5674,99 @@ Please add nutritional information manually if needed.`);
   }
 
   const editFood = (food: any) => {
-    setEditingEntry(food);
-    setEnergyUnit('kcal')
-    setSelectedAddCategory(normalizeCategory(food?.meal || food?.category || food?.mealType) as any);
     try {
-      // Keep an immutable copy to enable "Cancel changes"
-      setOriginalEditingEntry(JSON.parse(JSON.stringify(food)))
-    } catch {
-      setOriginalEditingEntry(food)
-    }
-    // Populate the form with existing data and go directly to editing
-    const useIngredientCards = food.method === 'photo' || isBarcodeEntry(food)
-    if (useIngredientCards) {
-      // Clear all state first to ensure clean rebuild
-      setAnalyzedItems([]);
-      setAnalyzedNutrition(null);
-      setAnalyzedTotal(null);
-      setPhotoPreview(food.photo || null);
-      // Set aiDescription AFTER clearing items so useEffect can rebuild
-      setAiDescription(food.description || '');
-      setAnalyzedNutrition(food.nutrition);
-      
-      // Try to restore items immediately (synchronous extraction)
-      let itemsRestored = false;
-      
-      // First priority: use saved items if they exist and are valid
-      if (food.items && Array.isArray(food.items) && food.items.length > 0) {
-        const baseItems = isBarcodeEntry(food)
-          ? normalizeDiscreteServingsWithLabel(food.items)
-          : food.items
-        const enriched = enrichItemsFromStarter(baseItems)
-        setAnalyzedItems(enriched);
-        applyRecalculatedNutrition(enriched);
-        itemsRestored = true;
+      if (!food) {
+        showQuickToast('Could not open this entry')
+        return
       }
-      
-      // Second priority: extract from description text (try both JSON and prose)
-      if (!itemsRestored && food.description) {
-        // Try structured JSON extraction first
-        const extracted = extractStructuredItemsFromAnalysis(food.description);
-        if (extracted && Array.isArray(extracted.items) && extracted.items.length > 0) {
-          const enriched = enrichItemsFromStarter(extracted.items)
+      setEditingEntry(food);
+      setEnergyUnit('kcal')
+      setSelectedAddCategory(normalizeCategory(food?.meal || food?.category || food?.mealType) as any);
+      try {
+        // Keep an immutable copy to enable "Cancel changes"
+        setOriginalEditingEntry(JSON.parse(JSON.stringify(food)))
+      } catch {
+        setOriginalEditingEntry(food)
+      }
+      // Populate the form with existing data and go directly to editing
+      const useIngredientCards = food.method === 'photo' || isBarcodeEntry(food)
+      if (useIngredientCards) {
+        // Clear all state first to ensure clean rebuild
+        setAnalyzedItems([]);
+        setAnalyzedNutrition(null);
+        setAnalyzedTotal(null);
+        setPhotoPreview(food.photo || null);
+        // Set aiDescription AFTER clearing items so useEffect can rebuild
+        setAiDescription(food.description || '');
+        setAnalyzedNutrition(food.nutrition);
+        
+        // Try to restore items immediately (synchronous extraction)
+        let itemsRestored = false;
+        
+        // First priority: use saved items if they exist and are valid
+        if (food.items && Array.isArray(food.items) && food.items.length > 0) {
+          const baseItems = isBarcodeEntry(food)
+            ? normalizeDiscreteServingsWithLabel(food.items)
+            : food.items
+          const enriched = enrichItemsFromStarter(baseItems)
           setAnalyzedItems(enriched);
           applyRecalculatedNutrition(enriched);
           itemsRestored = true;
-        } else {
-          // Try prose extraction as fallback
-          const proseExtracted = extractItemsFromTextEstimates(food.description);
-          if (proseExtracted && Array.isArray(proseExtracted.items) && proseExtracted.items.length > 0) {
-            const enriched = enrichItemsFromStarter(proseExtracted.items);
+        }
+        
+        // Second priority: extract from description text (try both JSON and prose)
+        if (!itemsRestored && food.description) {
+          // Try structured JSON extraction first
+          const extracted = extractStructuredItemsFromAnalysis(food.description);
+          if (extracted && Array.isArray(extracted.items) && extracted.items.length > 0) {
+            const enriched = enrichItemsFromStarter(extracted.items)
             setAnalyzedItems(enriched);
             applyRecalculatedNutrition(enriched);
             itemsRestored = true;
+          } else {
+            // Try prose extraction as fallback
+            const proseExtracted = extractItemsFromTextEstimates(food.description);
+            if (proseExtracted && Array.isArray(proseExtracted.items) && proseExtracted.items.length > 0) {
+              const enriched = enrichItemsFromStarter(proseExtracted.items);
+              setAnalyzedItems(enriched);
+              applyRecalculatedNutrition(enriched);
+              itemsRestored = true;
+            }
           }
         }
+        
+        // If nothing worked, set total nutrition at least
+        if (!itemsRestored) {
+          setAnalyzedTotal(food.total || null);
+        }
+        
+        setShowAiResult(true);
+        setShowAddFood(true);
+        setIsEditingDescription(false);
+        // Prefill description editor with a clean summary
+        const cleanDescription = extractBaseMealDescription(food.description);
+        setEditedDescription(cleanDescription);
+      } else {
+        // For manual entries, populate the manual form
+        setManualFoodName(food.description);
+        setManualFoodType('single');
+        setShowAddFood(true);
       }
-      
-      // If nothing worked, set total nutrition at least
-      if (!itemsRestored) {
-        setAnalyzedTotal(food.total || null);
-      }
-      
-      setShowAiResult(true);
-      setShowAddFood(true);
-      setIsEditingDescription(false);
-      // Prefill description editor with a clean summary
-      const cleanDescription = extractBaseMealDescription(food.description);
-      setEditedDescription(cleanDescription);
-    } else {
-      // For manual entries, populate the manual form
-      setManualFoodName(food.description);
-      setManualFoodType('single');
-      setShowAddFood(true);
+      setShowEntryOptions(null);
+      requestAnimationFrame(() => {
+        if (pageTopRef.current) {
+          pageTopRef.current.scrollIntoView({ behavior: 'auto', block: 'start' })
+        } else if (typeof window !== 'undefined') {
+          window.scrollTo({ top: 0, behavior: 'auto' })
+        }
+      })
+    } catch (err) {
+      console.error('Failed to open entry for edit', err, food)
+      showQuickToast('Could not open this entry')
+      setEditingEntry(null)
+      setShowAddFood(false)
+      setShowAiResult(false)
     }
-    setShowEntryOptions(null);
-    requestAnimationFrame(() => {
-      if (pageTopRef.current) {
-        pageTopRef.current.scrollIntoView({ behavior: 'auto', block: 'start' })
-      } else if (typeof window !== 'undefined') {
-        window.scrollTo({ top: 0, behavior: 'auto' })
-      }
-    })
   };
 
 
