@@ -929,6 +929,24 @@ export async function POST(request: NextRequest) {
     // 6. Handle today's foods data - store as special health goal
     try {
       if (data.todaysFoods && Array.isArray(data.todaysFoods)) {
+        // #region agent log
+        try {
+          const appendHistoryFlag = (data as any)?.appendHistory
+          console.log('AGENT_DEBUG', JSON.stringify({
+            hypothesisId: 'A',
+            location: 'app/api/user-data/route.ts:POST:todaysFoods',
+            message: 'Received todaysFoods in /api/user-data',
+            data: {
+              referer: (request.headers.get('referer') || '').slice(0, 200),
+              todaysFoodsLen: data.todaysFoods.length,
+              appendHistory: appendHistoryFlag,
+              hasAppendHistoryKey: data && typeof data === 'object' ? Object.prototype.hasOwnProperty.call(data, 'appendHistory') : false,
+            },
+            timestamp: Date.now(),
+          }))
+        } catch {}
+        // #endregion agent log
+
         // Remove existing food data
         await prisma.healthGoal.deleteMany({
           where: {
@@ -989,6 +1007,23 @@ export async function POST(request: NextRequest) {
                 },
               })
               console.log('Appended latest food entry to FoodLog for history view')
+
+              // #region agent log
+              try {
+                console.log('AGENT_DEBUG', JSON.stringify({
+                  hypothesisId: 'A',
+                  location: 'app/api/user-data/route.ts:POST:appendFoodLog',
+                  message: 'Appended FoodLog row from /api/user-data (potential duplicate source)',
+                  data: {
+                    referer: (request.headers.get('referer') || '').slice(0, 200),
+                    appendHistory,
+                    namePreview: String(name || '').slice(0, 60),
+                    localDate: typeof (last as any)?.localDate === 'string' ? String((last as any).localDate).slice(0, 10) : null,
+                  },
+                  timestamp: Date.now(),
+                }))
+              } catch {}
+              // #endregion agent log
             } catch (foodLogError) {
               console.warn('FoodLog append failed (non-blocking):', foodLogError)
             }
