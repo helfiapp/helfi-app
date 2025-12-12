@@ -1,4 +1,71 @@
-## Emergency follow-up – Agent GPT‑5.1 High (November 19, 2025)
+## Incident Log – Food Analyzer (Dec 10, 2025 – Melbourne)
+
+- **Symptom:** New plate photo (roast chicken, sweet potatoes, broccoli, roasted potatoes, peas, mushrooms) shows identical macros per ingredient (e.g., 153 kcal / 12.3g protein / 14.5g carbs / 4.5g fat) and misses peas/carrots/guesses.
+- **What the model returned:** OpenAI response (ITEMS_JSON) had realistic per-item macros and totals (chicken ~420 kcal, sweet potatoes ~90, broccoli ~25, roasted potatoes ~100, peas ~30, mushrooms ~15; total ~680). The good data exists in the model output.
+- **Root cause found:** Backend was overwriting parsed ITEMS_JSON items/total with a fallback items array (generic 1-serving items, equal-split calories). This is why every card showed identical macros and no guesses.
+- **Changes made (live):**
+  - Disabled image-hash cache in `app/api/analyze-food/route.ts` so every photo calls OpenAI.
+  - Added FOOD_DEBUG logging for raw items/total (server-side only).
+  - Fixed ITEMS_JSON handling so parsed items/total are kept; fallback extractor only runs when no items are parsed.
+- **Current state:** User’s latest runs (around 2:10am Melbourne) still show uniform 153 kcal items in the UI. We need to confirm the live request reaches the correct deploy and that the frontend isn’t replacing items post-response.
+- **Next steps for the next agent:**
+  1) Pull runtime logs for `/api/analyze-food` on the current deployment (`helfi-6ameahgpe-louie-veleskis-projects.vercel.app`) and look for `[FOOD_DEBUG] raw response preview`. If none, add a minimal entry-trace log to ensure the request hits the function.
+  2) If FOOD_DEBUG shows correct items, inspect client mapping in `app/food/page.tsx` (applyStructuredItems, enrichment/normalization) to ensure it does not swap in fallback items.
+  3) Re-test the same plate photo and verify distinct per-item macros and that peas/carrots (and isGuess items) appear.
+  4) Keep all guard rails intact; do not relax serving/pieces sync or delete/snapshot protections.
+
+## Emergency follow-up – Agent GPT‑5.1 High (December 9, 2025)
+
+> **Critical handover for food photo analysis accuracy and servings UX (burgers/patties/slices)**
+> - Current accuracy is poor: burger photos are returning way too few calories (e.g., 2 patties showing ~235 kcal each and totals ~700 kcal; earlier runs even showed 0 kcal on patties).
+> - Do **not** ship further code changes until you have a clear recovery plan. The user asked to stop coding and leave detailed guidance.
+> - Guard rails to respect: see `GUARD_RAILS.md` (Food Diary deletes & snapshot sync; ingredient summary filtering; sticky entry playbook).
+
+### What the user wants fixed
+1) **Improve photo analysis accuracy** for all foods (not just burgers). Burger example: 2 patties should land around 400–600 kcal total for the patties alone; current outputs are far below this.
+2) **Servings increments must reflect per-serving piece counts**:
+   - If the item is “3 patties,” servings step should be exactly 1/3 (0.33, 0.67, 1.0, 1.33, …), not quarters.
+   - If the item is “7 nuggets,” step should be 1/7, etc.
+3) **Add a piece-count control tied to servings/weight**:
+   - Show a “Pieces” +/- control when the serving label is discrete (patties, nuggets, slices, wings, cookies, etc.).
+   - Changing pieces updates servings proportionally (pieces ÷ pieces_per_serving) and weight/macros stay in sync.
+   - Changing servings should also reflect in pieces (bidirectional).
+4) **Do not auto-add questionable items**; avoid false positives. If counts are unclear, prefer user-adjustable suggestions.
+
+### Current (broken) symptoms
+- Burger patties returning unrealistically low calories (sometimes even 0 kcal); totals ~700 kcal for a double-patty burger with cheese and bacon. Accuracy is worse than before the experiments.
+- Serving steps still at 0.25 even when the label says “3 patties.”
+- No piece stepper present; the last attempt to add it was reverted.
+
+### Recent state / rollback
+- We reverted serving/stepper experiments back to commit `fc4f9447` state by commit `162404a02727ce594ebbd9848f08db6dd51f2abe` (live at `helfi-32aa15533-louie-veleskis-projects.vercel.app`). Accuracy remains bad.
+- The piece stepper, discrete scaling tweaks, and prompt additions for universal counting were reverted (commits `aaee9c67`, `9af9b08c`, `79e859ce`, `51f52a63` were rolled back).
+- Guard rails updated in `GUARD_RAILS.md` sections 3.7, 3.7.1, 3.8—respect them.
+
+### Guidance for the next agent (do this carefully, not in a rush)
+1) **Prompt-level fixes (backend `app/api/analyze-food/route.ts`)**
+   - Keep the “count discrete items” instruction, but tighten accuracy: require realistic kcal/protein per counted item (patties, cheese, bacon, nuggets, slices). Consider adding conservative per-item floors in the prompt (e.g., beef patty 180–300 kcal per 4–6 oz; cheese slice ~80–120 kcal) so the model doesn’t undercount.
+   - Add a short follow-up consistency check (second pass) that only reconciles counts/macros; do not add new items silently.
+   - Avoid adding items not mentioned; suggestions only.
+
+2) **Discrete serving steps (frontend `app/food/page.tsx`)**
+   - When serving_size is discrete with quantity N, set serving step to 1/N (not 0.25). Keep this in the servings control and ensure it snaps to step multiples.
+   - Reintroduce a “Pieces” control when discrete: +/- 1 piece updates servings (pieces / N) and weight/macros accordingly; changing servings also updates displayed pieces. Keep both in sync.
+   - Apply to any discrete keywords (existing heuristics include eggs, bacon, patties, cheese slices, cookies, pieces, nuggets, wings, etc.). If missing, extend the keyword list.
+
+3) **Avoid regressions / guard rails**
+   - Do NOT touch delete/snapshot sync (`/api/user-data`, `/api/user-data/clear-todays-foods`, delete sweep) or ingredient summary filtering.
+   - Do NOT reintroduce sticky entries; follow 3.7.1 playbook if you touch deletes.
+
+4) **Testing requests**
+   - Re-run burger photo: expect realistic totals (~900–1100 kcal) for double patties + cheese + bacon + bun + condiments.
+   - Verify serving step equals 1/N for any labeled discrete quantity (e.g., 3 patties → 0.33 increments; 7 nuggets → 0.142857).
+   - Verify pieces +/- keeps servings/weight in sync and macros scale.
+
+### Status to communicate to the user
+- Accuracy is currently poor; patties are undercounted and sometimes 0 kcal.
+- Serving increments are still 0.25; no piece stepper is present.
+- A safe fix requires prompt tweaks plus discrete-step logic; proceed cautiously and respect guard rails.
 
 > **Status after this session (honest summary)**  
 > - Entries for past dates (e.g. **18/11/2025**) still **disappear after a full page refresh**, even though they look correct immediately after saving.  
@@ -131,6 +198,13 @@ From the repo root I ran small Node scripts using Prisma (no schema changes) to 
 ---
 
 ### B. Behaviour observed with the user (what still fails)
+
+### C. Stability hardening (Dec 12, 2025 – live)
+
+- Server dedupe on write: `/api/food-log` now refuses to create a second near-identical row (same description + meal) within a short window and returns the existing id instead. This stops double inserts even if two POSTs fire.
+- Favorites protection: `/api/user-data` will not overwrite favorites with an empty payload and logs `AGENT_DEBUG favorites write` (count + referer) for any favorites write. Health-setup payloads strip `todaysFoods`/`favorites`, and hidden goals are preserved when saving goals.
+- All-tab reset: only shows valid, recent entries (description + nutrition/items) created after Dec 12, 2025 reset. New diary entries automatically populate All; Favorites remains separate.
+- Health check endpoint: `GET /api/food-log/health?date=YYYY-MM-DD` (auth required) returns favorites count, todaysFoods snapshot count, FoodLog count for the date, and 10 recent FoodLog rows to spot mismatches quickly.
 
 From multiple live tests with the user (all on production, Melbourne time):
 
@@ -955,3 +1029,28 @@ The user has started planning the **next major upgrade** to the Food Diary, insp
   - All copying behaviour must respect the fixed `localDate` logic so meals stay pinned to the day the user expects.
 
 The user prefers tackling the **hardest problems first**, so a future agent should start with **daily targets + circles**, then add **copy‑meals** functionality once targets are solid and trusted. Remember to discuss these options with the user in simple, non‑technical language before implementing anything.
+
+---
+
+## Current Status – December 10, 2025 (plan not yet achieved)
+
+I was working from the “Food Analyzer Accuracy & Guard‑Rail‑Safe Plan,” but we have not achieved the goal. New regressions and accuracy issues are present:
+
+### What the user is seeing
+- Photo analysis still misses counts: two fried eggs show serving size 1 but servings input 2 and pieces 1. The model returns a single item with servings>1 and no pieces; the UI clamps servings to 1 but pieces are not recovered.
+- Portion/units inconsistent: kcal vs kJ mix-ups; discrete servings inflating (e.g., 4 chicken pieces + salad reported as 16 pieces).
+- Barcode scans are off: serving sizes and calories misread, suggesting unit/serving parsing drift.
+- Overall accuracy is poor: wrong counts, wrong serving sizes, incorrect macro totals across meals.
+
+### Guard rails (must stay intact)
+- Do not alter ingredient card structure, deletes/snapshot sync, credit/billing, macros progress bars, remaining-calories ring, or portion sync rules without explicit approval (see `GUARD_RAILS.md`). Ingredient cards themselves must remain unaffected.
+
+### Next steps for the next agent
+1) Discrete counts: when the model sends servings>1 for discrete items (eggs, patties, nuggets) but no pieces, set piecesPerServing=servings and clamp servings=1; also parse free text (“two eggs”) to seed pieces. Apply to photo and barcode flows without changing card UX.  
+2) Units audit: ensure kcal/kJ toggles don’t double-convert; fix barcode parsing for serving size and energy units (kcal↔kJ, per‑serving vs per‑100g).  
+3) Regression tests: two-egg photo; 4-piece chicken + salad; chicken/potatoes/peas plate; a barcode scan. Confirm serving label matches servings=1 for discrete items, pieces=detected count, macros scale correctly.  
+4) Deployment: the last deploy attempt failed (build error) after adding pieces-from-text inference; current live behaviour is from the last successful deploy and still exhibits the issues above. Check the failing Vercel build logs, fix, redeploy, and verify before claiming success.
+
+### Summary
+- Ingredient cards remain structurally intact, but analyzer outputs (counts/units) are unreliable.  
+- We have not achieved the planned accuracy improvements; proceed carefully within the guard rails and validate on real photos/barcodes.

@@ -383,6 +383,11 @@ Before modifying food diary loading logic, agents must test:
 - Tapping the toggle must always set `swipeMenuEntry` to `null` (closing) when the same entry is already open, and should reset swipe offsets for previously open entries.
 - Do not remove stopPropagation/preventDefault that keeps the tap from falling through. Do not drop the z-index class; it is required to make the close tap land.
 
+### 4.2.1 Edit entry while add menu is open (must stay guarded)
+- When the green “+” add menu is open, do **not** fire edit actions until the add menu is closed. Current behaviour closes add menus (`closeAddMenus`), then runs `editFood` on the next frame (requestAnimationFrame or setTimeout). Keep this guard intact.
+- Applies to both mobile row taps and the desktop row action menu “Edit Entry”. If add menu is open, ignore the tap until the menu is closed or explicitly close it first.
+- Do not reintroduce broad pointer blocking/overlays; rely on the explicit guard so the green “+” can still toggle closed.
+
 ### 4.3 What agents must not break
 - Do **not** reintroduce clipping/hidden overflow on the desktop menu.
 - Do **not** lower the green toggle behind the sheet (no z-index removal), or the close tap will be blocked.
@@ -411,6 +416,9 @@ The green “+” buttons for each Food Diary category (Breakfast, Lunch, Dinner
   - Keep `/api/user-data/clear-todays-foods` intact; do not remove or bypass it.
   - In `app/food/page.tsx`, after deleting an entry, continue posting the updated (or empty) `todaysFoods` to `/api/user-data` (or call the clear endpoint when empty). Do **not** remove this server-sync step.
   - Do not reintroduce local-only deletes that skip the server snapshot; fixes were for entries resurrecting after refresh.
+- **Backfill safeguard (Jan 2026):** If the client has local entries for a day but `/api/food-log` returns zero rows, the UI now backfills those entries into `FoodLog` so deletes have real IDs and don’t 404. Do **not** remove this backfill step; it is required to keep saves/deletes reliable when the server is temporarily empty.
+- **Favorites and write guards (Dec 2025):** `/api/user-data` must not overwrite favorites with an empty array; it logs `AGENT_DEBUG favorites write` and skips empty wipes. Do not remove this guard or the logging.
+- **Server-side dedupe (Dec 2025):** `/api/food-log` dedupes on write (blocks near-identical duplicates within a short window) and the All tab filters out stale/corrupt entries (only recent valid rows). Do not remove these protections without approval.
 
 #### 3.7.1 Persistent/Sticky Entry Playbook (Dec 2025 incident)
 - Root cause observed: entries saved with mismatched `localDate` vs `createdAt` leak across adjacent days; client warm cache can keep showing the card even after server delete.
