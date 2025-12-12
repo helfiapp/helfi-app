@@ -567,6 +567,8 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
   const [diabetesType, setDiabetesType] = useState<'type1' | 'type2' | 'prediabetes' | ''>(
     (initial?.diabetesType as any) || '',
   );
+  const allergiesHydratedRef = useRef(false);
+  const diabetesHydratedRef = useRef(false);
   const [unit, setUnit] = useState<'metric' | 'imperial'>('metric');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
@@ -635,11 +637,13 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     if (!goalChoice && initial.goalChoice) {
       setGoalChoice(initial.goalChoice);
     }
-    if ((!allergies || allergies.length === 0) && Array.isArray(initial.allergies) && initial.allergies.length > 0) {
+    if (!allergiesHydratedRef.current && Array.isArray(initial.allergies)) {
       setAllergies(initial.allergies);
+      allergiesHydratedRef.current = true;
     }
-    if (!diabetesType && initial.diabetesType) {
+    if (!diabetesHydratedRef.current && initial.diabetesType) {
       setDiabetesType(initial.diabetesType);
+      diabetesHydratedRef.current = true;
     }
     if (initial.goalIntensity && !goalIntensity) {
       setGoalIntensity(initial.goalIntensity);
@@ -653,7 +657,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
         setBirthDay(d);
       }
     }
-  }, [initial, weight, height, feet, inches, bodyType, birthYear, birthMonth, birthDay, allergies, diabetesType]);
+  }, [initial, weight, height, feet, inches, bodyType, birthYear, birthMonth, birthDay]);
 
   const today = new Date();
   const currentYear = today.getFullYear();
@@ -959,9 +963,8 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
 
   const handleRemoveAllergy = useCallback((value: string) => {
     const normalized = normalizedAllergyValue(value || '');
-    setAllergies((prev) =>
-      prev.filter((a) => normalized && a.toLowerCase().trim() !== normalized.toLowerCase().trim()),
-    );
+    if (!normalized) return;
+    setAllergies((prev) => prev.filter((a) => a.toLowerCase().trim() !== normalized.toLowerCase()));
   }, []);
 
   const filteredAllergySuggestions = React.useMemo(() => {
