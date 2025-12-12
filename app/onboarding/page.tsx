@@ -863,6 +863,10 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
   const triggerPopup = () => {
     if (!showUpdatePopup) {
       setShowUpdatePopup(true);
+      try {
+        // Also fire the global message listener to guarantee the modal opens
+        window.postMessage({ type: 'OPEN_PHYSICAL_UPDATE_POPUP' }, '*');
+      } catch {}
     }
   };
 
