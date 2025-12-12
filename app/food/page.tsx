@@ -24,7 +24,7 @@ import { Cog6ToothIcon, UserIcon } from '@heroicons/react/24/outline'
  * Any change requires explicit written approval from the user.
  */
 
-import React, { useState, useEffect, useMemo, useRef } from 'react'
+import React, { useState, useEffect, useMemo, useRef, Component } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -150,6 +150,30 @@ const BARCODE_REGION_ID = 'food-barcode-reader'
 // timestamp will be included in the All list so we can start fresh after data corruption.
 // (Dec 12, 2025 09:47:56 UTC)
 const HISTORY_RESET_EPOCH_MS = 1765532876309
+const EMPTY_TOTALS = { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0 }
+
+class DiaryErrorBoundary extends Component<{ children: React.ReactNode }, { hasError: boolean }> {
+  constructor(props: any) {
+    super(props)
+    this.state = { hasError: false }
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true }
+  }
+  componentDidCatch(error: any, info: any) {
+    console.error('Diary render error', error, info)
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-6 text-center text-sm text-red-700 bg-red-50 border border-red-200">
+          Something went wrong loading this entry. Please reload. If it repeats, copy the console error and share it.
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
 
 type WarmDiaryState = {
   selectedDate?: string
@@ -5681,7 +5705,7 @@ Please add nutritional information manually if needed.`);
       }
       const safeDescription = (food.description ?? '').toString()
       const safeItems = Array.isArray(food.items) ? food.items : null
-      const safeNutrition = sanitizeNutritionTotals(food.nutrition || food.total || null) || null
+      const safeNutrition = sanitizeNutritionTotals(food.nutrition || food.total || null) || EMPTY_TOTALS
       const safeFood = {
         ...food,
         description: safeDescription,
@@ -6183,7 +6207,8 @@ Please add nutritional information manually if needed.`);
   }, [isEditingDescription, editedDescription]);
 
   return (
-    <div ref={pageTopRef} className="flex-1 flex flex-col overflow-hidden bg-gray-50">
+    <DiaryErrorBoundary>
+      <div ref={pageTopRef} className="flex-1 flex flex-col overflow-hidden bg-gray-50">
       {/* Saved Toast (brief confirmation) */}
       {showSavedToast && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[10000]">
@@ -9899,5 +9924,6 @@ Please add nutritional information manually if needed.`);
       </nav>
       </div>
     </div>
+    </DiaryErrorBoundary>
   )
 }
