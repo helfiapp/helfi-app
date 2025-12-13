@@ -614,6 +614,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
   );
   const allergiesHydratedRef = useRef(false);
   const diabetesHydratedRef = useRef(false);
+  const bodyTypeHydratedRef = useRef(false);
   const [unit, setUnit] = useState<'metric' | 'imperial'>('metric');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
@@ -704,8 +705,12 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
     if (!inches && initial.inches) {
       setInches(initial.inches);
     }
-    if (!bodyType && initial.bodyType) {
-      setBodyType(initial.bodyType);
+    // Body type is optional and user-toggleable; only hydrate it once from initial.
+    if (!bodyTypeHydratedRef.current) {
+      if (!bodyType && initial.bodyType) {
+        setBodyType(initial.bodyType);
+      }
+      bodyTypeHydratedRef.current = true;
     }
     if (!goalChoice && initial.goalChoice) {
       setGoalChoice(initial.goalChoice);
