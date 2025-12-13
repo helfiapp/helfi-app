@@ -1717,9 +1717,6 @@ export default function FoodDiary() {
     featureUsageToday: { foodAnalysis: 0, interactionAnalysis: 0 }
   })
   const [usageMeterRefresh, setUsageMeterRefresh] = useState<number>(0) // Trigger for UsageMeter refresh
-  const [foodAnalyzerModel, setFoodAnalyzerModel] = useState<'gpt-4o' | 'gpt-5.2'>('gpt-4o')
-  const [foodAnalyzerModelLoading, setFoodAnalyzerModelLoading] = useState(false)
-  const [foodAnalyzerModelError, setFoodAnalyzerModelError] = useState<string | null>(null)
   const [hasPaidAccess, setHasPaidAccess] = useState<boolean>(false)
   const [energyUnit, setEnergyUnit] = useState<'kcal' | 'kJ'>('kcal')
   const [volumeUnit, setVolumeUnit] = useState<'oz' | 'ml'>('oz')
@@ -1759,51 +1756,6 @@ export default function FoodDiary() {
     window.addEventListener('resize', updateIsMobile)
     return () => window.removeEventListener('resize', updateIsMobile)
   }, [])
-
-  useEffect(() => {
-    let cancelled = false
-    const loadModel = async () => {
-      setFoodAnalyzerModelLoading(true)
-      setFoodAnalyzerModelError(null)
-      try {
-        const res = await fetch('/api/food-analyzer-model', { method: 'GET' })
-        if (!res.ok) return
-        const data = await res.json().catch(() => ({}))
-        const model = data?.model === 'gpt-5.2' ? 'gpt-5.2' : 'gpt-4o'
-        if (!cancelled) setFoodAnalyzerModel(model)
-      } catch (err: any) {
-        if (!cancelled) setFoodAnalyzerModelError(err?.message || 'Failed to load model')
-      } finally {
-        if (!cancelled) setFoodAnalyzerModelLoading(false)
-      }
-    }
-    loadModel()
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  const updateFoodAnalyzerModel = async (model: 'gpt-4o' | 'gpt-5.2') => {
-    setFoodAnalyzerModelLoading(true)
-    setFoodAnalyzerModelError(null)
-    try {
-      const res = await fetch('/api/food-analyzer-model', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model }),
-      })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setFoodAnalyzerModelError(data?.error || 'Failed to save model')
-        return
-      }
-      setFoodAnalyzerModel(model)
-    } catch (err: any) {
-      setFoodAnalyzerModelError(err?.message || 'Failed to save model')
-    } finally {
-      setFoodAnalyzerModelLoading(false)
-    }
-  }
 
   useEffect(() => {
     try {
@@ -2861,6 +2813,31 @@ const applyStructuredItems = (
     })
     return grouped
   }, [sourceEntries])
+
+  // Calendar highlight: keep Today green; show orange background for other days that have entries.
+  // This is best-effort and uses the durable local snapshot (no extra server requests).
+  const entryDatesInVisibleMonth = useMemo(() => {
+    const set = new Set<string>()
+    const monthPrefix = `${monthMeta.year}-${String(monthMeta.month).padStart(2, '0')}-`
+
+    // Always include current selected day if it has entries.
+    if (selectedDate.startsWith(monthPrefix) && Array.isArray(sourceEntries) && sourceEntries.length > 0) {
+      set.add(selectedDate)
+    }
+
+    // Pull from the durable per-date snapshot in localStorage.
+    const snapshot = readPersistentDiarySnapshot()
+    const byDate = snapshot?.byDate || {}
+    Object.keys(byDate).forEach((iso) => {
+      if (!iso || !iso.startsWith(monthPrefix)) return
+      const rawEntries = (byDate as any)?.[iso]?.entries
+      if (!Array.isArray(rawEntries) || rawEntries.length === 0) return
+      const normalized = dedupeEntries(normalizeDiaryList(rawEntries, iso), { fallbackDate: iso })
+      if (normalized.length > 0) set.add(iso)
+    })
+
+    return set
+  }, [monthMeta.year, monthMeta.month, selectedDate, sourceEntries, deletedEntryNonce])
 
   // NOTE: Do NOT clear delete tombstones on date switches.
   // Tombstones already include a stable YYYY-MM-DD date key, so they won't hide other days.
@@ -6900,6 +6877,7 @@ Please add nutritional information manually if needed.`);
                   const iso = `${monthMeta.year}-${String(monthMeta.month).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`
                   const isSelected = iso === selectedDate
                   const isToday = iso === todayIso
+                  const hasEntries = entryDatesInVisibleMonth.has(iso)
                   return (
                     <button
                       key={iso}
@@ -6907,8 +6885,20 @@ Please add nutritional information manually if needed.`);
                       onClick={() => selectCalendarDay(dayNum)}
                       className={[
                         'mx-auto w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold',
-                        isSelected ? 'bg-emerald-600 text-white' : 'bg-white text-gray-900',
-                        !isSelected ? 'active:bg-gray-100' : 'active:bg-emerald-700',
+                        isSelected
+                          ? 'bg-emerald-600 text-white'
+                          : isToday
+                          ? 'bg-white text-gray-900'
+                          : hasEntries
+                          ? 'bg-orange-500 text-white'
+                          : 'bg-white text-gray-900',
+                        !isSelected
+                          ? isToday
+                            ? 'active:bg-gray-100'
+                            : hasEntries
+                            ? 'active:bg-orange-600'
+                            : 'active:bg-gray-100'
+                          : 'active:bg-emerald-700',
                         isToday && !isSelected ? 'ring-2 ring-emerald-300' : '',
                       ].join(' ')}
                       aria-label={`Select ${iso}`}
@@ -7006,37 +6996,6 @@ Please add nutritional information manually if needed.`);
             <UsageMeter inline={true} refreshTrigger={usageMeterRefresh} />
             <FeatureUsageDisplay featureName="foodAnalysis" featureLabel="Food Analysis" refreshTrigger={usageMeterRefresh} />
             <p className="text-xs text-gray-600 mt-1">Cost: 15 credits per food analysis.</p>
-            <div className="mt-2 flex items-center justify-between gap-2 text-xs text-gray-600">
-              <div className="flex items-center gap-2">
-                <span className="font-medium text-gray-700">Model</span>
-                <span className="text-gray-500">({foodAnalyzerModel === 'gpt-5.2' ? 'Higher accuracy' : 'Standard'})</span>
-              </div>
-              <div className="inline-flex rounded-md border border-gray-200 overflow-hidden bg-white">
-                <button
-                  type="button"
-                  disabled={foodAnalyzerModelLoading}
-                  onClick={() => updateFoodAnalyzerModel('gpt-4o')}
-                  className={`px-3 py-1 text-xs font-semibold ${
-                    foodAnalyzerModel === 'gpt-4o' ? 'bg-gray-900 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'
-                  } disabled:opacity-60`}
-                >
-                  4o
-                </button>
-                <button
-                  type="button"
-                  disabled={foodAnalyzerModelLoading}
-                  onClick={() => updateFoodAnalyzerModel('gpt-5.2')}
-                  className={`px-3 py-1 text-xs font-semibold ${
-                    foodAnalyzerModel === 'gpt-5.2' ? 'bg-gray-900 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'
-                  } disabled:opacity-60`}
-                >
-                  5.2
-                </button>
-              </div>
-            </div>
-            {foodAnalyzerModelError && (
-              <div className="mt-2 text-xs text-red-600">{foodAnalyzerModelError}</div>
-            )}
           </div>
 
           {/* Category picker first */}
