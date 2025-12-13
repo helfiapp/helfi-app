@@ -6680,10 +6680,14 @@ Please add nutritional information manually if needed.`);
                   {/* Manual Entry Option */}
                   <button
                     type="button"
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       setShowPhotoOptions(false);
                       setPhotoOptionsAnchor(null);
-                      setShowAddIngredientModal(true);
+                      // Use setTimeout to ensure modal opens after dropdown closes
+                      setTimeout(() => {
+                        setShowAddIngredientModal(true);
+                      }, 0);
                     }}
                     className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
                   >
@@ -9273,10 +9277,14 @@ Please add nutritional information manually if needed.`);
 
                                       <button
                                         type="button"
-                                        onClick={() => {
+                                        onClick={(e) => {
+                                          e.stopPropagation();
                                           setShowPhotoOptions(false);
                                           setPhotoOptionsAnchor(null);
-                                          setShowAddIngredientModal(true);
+                                          // Use setTimeout to ensure modal opens after dropdown closes
+                                          setTimeout(() => {
+                                            setShowAddIngredientModal(true);
+                                          }, 0);
                                         }}
                                         className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
                                       >
@@ -9425,10 +9433,14 @@ Please add nutritional information manually if needed.`);
 
                                       <button
                                         type="button"
-                                        onClick={() => {
+                                        onClick={(e) => {
+                                          e.stopPropagation();
                                           setShowPhotoOptions(false);
                                           setPhotoOptionsAnchor(null);
-                                          setShowAddIngredientModal(true);
+                                          // Use setTimeout to ensure modal opens after dropdown closes
+                                          setTimeout(() => {
+                                            setShowAddIngredientModal(true);
+                                          }, 0);
                                         }}
                                         className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
                                       >
