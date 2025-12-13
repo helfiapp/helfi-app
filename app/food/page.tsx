@@ -1737,11 +1737,15 @@ export default function FoodDiary() {
   const [exerciseTypeError, setExerciseTypeError] = useState<string | null>(null)
   const [exercisePickerCategory, setExercisePickerCategory] = useState<string | null>(null)
   const [selectedExerciseType, setSelectedExerciseType] = useState<any>(null)
-  const [exerciseDurationMinutes, setExerciseDurationMinutes] = useState<string>('30')
+  const [exerciseDurationHours, setExerciseDurationHours] = useState<number>(0)
+  const [exerciseDurationMins, setExerciseDurationMins] = useState<number>(30)
   const [exerciseDistanceKm, setExerciseDistanceKm] = useState<string>('')
   const [exerciseDistanceUnit, setExerciseDistanceUnit] = useState<'km' | 'mi'>('km')
   const [exerciseTimeOfDay, setExerciseTimeOfDay] = useState<string>('')
   const [exerciseSaveError, setExerciseSaveError] = useState<string | null>(null)
+  const [exercisePreviewKcal, setExercisePreviewKcal] = useState<number | null>(null)
+  const [exercisePreviewLoading, setExercisePreviewLoading] = useState<boolean>(false)
+  const [exercisePreviewError, setExercisePreviewError] = useState<string | null>(null)
   const [macroPopup, setMacroPopup] = useState<{
     title: string
     energyLabel?: string
@@ -1894,13 +1898,16 @@ export default function FoodDiary() {
     setExerciseSaveError(null)
     setSelectedExerciseType(null)
     setExercisePickerCategory(null)
-    setExerciseDurationMinutes('30')
+    setExerciseDurationHours(0)
+    setExerciseDurationMins(30)
     setExerciseDistanceKm('')
     setExerciseDistanceUnit('km')
     setExerciseTimeOfDay('')
     setExerciseTypeSearch('')
     setExerciseTypeResults([])
     setExerciseTypeError(null)
+    setExercisePreviewKcal(null)
+    setExercisePreviewError(null)
   }, [showAddExerciseModal])
 
   useEffect(() => {
@@ -1954,28 +1961,87 @@ export default function FoodDiary() {
     }
   }
 
+  const computeExerciseDurationMinutes = () => {
+    const hours = Number(exerciseDurationHours)
+    const mins = Number(exerciseDurationMins)
+    const clampedHours = Number.isFinite(hours) ? Math.max(0, Math.min(23, Math.floor(hours))) : 0
+    const clampedMins = Number.isFinite(mins) ? Math.max(0, Math.min(59, Math.floor(mins))) : 0
+    return clampedHours * 60 + clampedMins
+  }
+
+  const computeDistanceKmForRequest = () => {
+    const distanceValue = exerciseDistanceKm.trim().length > 0 ? Number(exerciseDistanceKm) : null
+    if (distanceValue === null) return null
+    if (!Number.isFinite(distanceValue) || distanceValue <= 0) return NaN
+    return exerciseDistanceUnit === 'mi' ? distanceValue * 1.60934 : distanceValue
+  }
+
+  useEffect(() => {
+    if (!showAddExerciseModal) return
+    if (!selectedExerciseType?.id) {
+      setExercisePreviewKcal(null)
+      setExercisePreviewError(null)
+      return
+    }
+
+    const durationMinutes = computeExerciseDurationMinutes()
+    if (!Number.isFinite(durationMinutes) || durationMinutes <= 0) {
+      setExercisePreviewKcal(null)
+      setExercisePreviewError(null)
+      return
+    }
+
+    const distanceKm = computeDistanceKmForRequest()
+    if (Number.isNaN(distanceKm)) {
+      setExercisePreviewKcal(null)
+      setExercisePreviewError(null)
+      return
+    }
+
+    setExercisePreviewLoading(true)
+    setExercisePreviewError(null)
+    const handle = window.setTimeout(async () => {
+      try {
+        const res = await fetch('/api/exercise-preview', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            exerciseTypeId: selectedExerciseType.id,
+            durationMinutes,
+            distanceKm: distanceKm !== null ? distanceKm : null,
+          }),
+        })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(data?.error || 'Failed to estimate calories')
+        const kcal = Number(data?.calories)
+        setExercisePreviewKcal(Number.isFinite(kcal) ? kcal : null)
+      } catch (err: any) {
+        setExercisePreviewKcal(null)
+        setExercisePreviewError(err?.message || 'Failed to estimate calories')
+      } finally {
+        setExercisePreviewLoading(false)
+      }
+    }, 250)
+
+    return () => window.clearTimeout(handle)
+  }, [showAddExerciseModal, selectedExerciseType?.id, exerciseDistanceKm, exerciseDistanceUnit, exerciseDurationHours, exerciseDurationMins])
+
   const saveManualExercise = async () => {
     setExerciseSaveError(null)
     if (!selectedExerciseType?.id) {
       setExerciseSaveError('Please select an exercise.')
       return
     }
-    const minutes = Number(exerciseDurationMinutes)
+    const minutes = computeExerciseDurationMinutes()
     if (!Number.isFinite(minutes) || minutes <= 0) {
       setExerciseSaveError('Please enter a valid duration.')
       return
     }
-    const distanceValue = exerciseDistanceKm.trim().length > 0 ? Number(exerciseDistanceKm) : null
-    if (distanceValue !== null && (!Number.isFinite(distanceValue) || distanceValue <= 0)) {
+    const distanceKmNum = computeDistanceKmForRequest()
+    if (Number.isNaN(distanceKmNum)) {
       setExerciseSaveError('Please enter a valid distance.')
       return
     }
-    const distanceKmNum =
-      distanceValue !== null
-        ? exerciseDistanceUnit === 'mi'
-          ? distanceValue * 1.60934
-          : distanceValue
-        : null
     let startTime: string | undefined
     if (exerciseTimeOfDay && /^\d{2}:\d{2}$/.test(exerciseTimeOfDay)) {
       try {
@@ -6999,7 +7065,7 @@ Please add nutritional information manually if needed.`);
 	                      const name = String(selectedExerciseType?.name || '').toLowerCase()
 	                      const distanceBased = /walk|run|jog|cycl|bike/.test(name)
 	                      if (!distanceBased) return null
-	                      const mins = Number(exerciseDurationMinutes)
+	                      const mins = computeExerciseDurationMinutes()
 	                      const distRaw = exerciseDistanceKm.trim().length > 0 ? Number(exerciseDistanceKm) : null
 	                      const dist =
 	                        distRaw && Number.isFinite(distRaw) && distRaw > 0
@@ -7089,17 +7155,38 @@ Please add nutritional information manually if needed.`);
 	                        </div>
 	                      )
 	                    })()}
-	                    <div className="space-y-1">
-	                      <label className="block text-sm font-semibold text-gray-900">Duration (minutes)</label>
-	                      <input
-	                        type="text"
-	                        inputMode="numeric"
-	                        pattern="[0-9]*"
-	                        value={exerciseDurationMinutes}
-	                        onChange={(e) => setExerciseDurationMinutes(e.target.value)}
-	                        onFocus={() => setExerciseDurationMinutes('')}
-	                        className="w-full px-4 py-3 border-2 border-emerald-500 rounded-2xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base"
-	                      />
+	                    <div className="space-y-2">
+	                      <label className="block text-sm font-semibold text-gray-900">Duration</label>
+	                      <div className="grid grid-cols-2 gap-3">
+	                        <div className="space-y-1">
+	                          <div className="text-xs font-semibold text-gray-500">Hours</div>
+	                          <select
+	                            value={exerciseDurationHours}
+	                            onChange={(e) => setExerciseDurationHours(Number(e.target.value))}
+	                            className="w-full px-4 py-3 border-2 border-emerald-500 rounded-2xl bg-white text-base font-semibold"
+	                          >
+	                            {Array.from({ length: 24 }).map((_, i) => (
+	                              <option key={i} value={i}>
+	                                {i}
+	                              </option>
+	                            ))}
+	                          </select>
+	                        </div>
+	                        <div className="space-y-1">
+	                          <div className="text-xs font-semibold text-gray-500">Minutes</div>
+	                          <select
+	                            value={exerciseDurationMins}
+	                            onChange={(e) => setExerciseDurationMins(Number(e.target.value))}
+	                            className="w-full px-4 py-3 border-2 border-emerald-500 rounded-2xl bg-white text-base font-semibold"
+	                          >
+	                            {Array.from({ length: 60 }).map((_, i) => (
+	                              <option key={i} value={i}>
+	                                {i}
+	                              </option>
+	                            ))}
+	                          </select>
+	                        </div>
+	                      </div>
 	                    </div>
 
 	                    <div className="space-y-1">
@@ -7111,6 +7198,21 @@ Please add nutritional information manually if needed.`);
 	                        className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base"
 	                      />
 	                    </div>
+
+	                    {(exercisePreviewLoading || exercisePreviewKcal !== null || exercisePreviewError) && (
+	                      <div className="rounded-2xl border border-gray-200 bg-white px-4 py-3">
+	                        <div className="text-xs text-gray-500">Estimated calories</div>
+	                        {exercisePreviewLoading ? (
+	                          <div className="text-sm font-semibold text-gray-700">Calculating…</div>
+	                        ) : exercisePreviewError ? (
+	                          <div className="text-sm font-semibold text-red-600">{exercisePreviewError}</div>
+	                        ) : (
+	                          <div className="text-lg font-semibold text-gray-900">
+	                            {Math.round(convertKcalToUnit(exercisePreviewKcal || 0, energyUnit) || 0)} {energyUnit}
+	                          </div>
+	                        )}
+	                      </div>
+	                    )}
 
 	                    {exerciseSaveError && <div className="text-sm text-red-600">{exerciseSaveError}</div>}
 

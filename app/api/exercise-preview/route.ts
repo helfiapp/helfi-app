@@ -2,37 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { calculateExerciseCalories } from '@/lib/exercise/calories'
 import { getHealthProfileForUser } from '@/lib/exercise/health-profile'
+import { calculateExerciseCalories } from '@/lib/exercise/calories'
 import { inferMetAndLabel } from '@/lib/exercise/met'
-
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
-
-function normalizeLocalDate(input: string) {
-  const trimmed = (input || '').trim()
-  if (!DATE_RE.test(trimmed)) return null
-  return trimmed
-}
-
-export async function GET(request: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  const date = normalizeLocalDate(request.nextUrl.searchParams.get('date') || '')
-  if (!date) {
-    return NextResponse.json({ error: 'Missing or invalid date (YYYY-MM-DD)' }, { status: 400 })
-  }
-
-  const entries = await prisma.exerciseEntry.findMany({
-    where: { userId: session.user.id, localDate: date },
-    orderBy: [{ startTime: 'asc' }, { createdAt: 'asc' }],
-  })
-
-  const exerciseCalories = entries.reduce((sum, e) => sum + (Number(e.calories) || 0), 0)
-  return NextResponse.json({ date, exerciseCalories, entries })
-}
 
 export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions)
@@ -51,8 +23,6 @@ export async function POST(request: NextRequest) {
   const durationMinutes = Number(body?.durationMinutes)
   const distanceKmRaw = body?.distanceKm
   const distanceKm = distanceKmRaw === null || distanceKmRaw === undefined ? null : Number(distanceKmRaw)
-  const date = normalizeLocalDate(body?.date || '')
-  const startTime = body?.startTime ? new Date(String(body.startTime)) : null
 
   if (!Number.isFinite(exerciseTypeId) || exerciseTypeId <= 0) {
     return NextResponse.json({ error: 'Invalid exerciseTypeId' }, { status: 400 })
@@ -62,12 +32,6 @@ export async function POST(request: NextRequest) {
   }
   if (distanceKm !== null && (!Number.isFinite(distanceKm) || distanceKm <= 0 || distanceKm > 500)) {
     return NextResponse.json({ error: 'Invalid distanceKm' }, { status: 400 })
-  }
-  if (!date) {
-    return NextResponse.json({ error: 'Missing or invalid date (YYYY-MM-DD)' }, { status: 400 })
-  }
-  if (startTime && Number.isNaN(startTime.getTime())) {
-    return NextResponse.json({ error: 'Invalid startTime' }, { status: 400 })
   }
 
   const type = await prisma.exerciseType.findUnique({ where: { id: exerciseTypeId } })
@@ -96,26 +60,10 @@ export async function POST(request: NextRequest) {
     durationMinutes: inferred.durationMinutes,
   })
 
-  const entry = await prisma.exerciseEntry.create({
-    data: {
-      userId: session.user.id,
-      localDate: date,
-      startTime,
-      durationMinutes: inferred.durationMinutes,
-      distanceKm: distanceKm !== null ? distanceKm : null,
-      source: 'MANUAL',
-      exerciseTypeId: type.id,
-      label: inferred.label,
-      met: inferred.met,
-      calories,
-    },
+  return NextResponse.json({
+    calories,
+    met: inferred.met,
+    label: inferred.label,
   })
-
-  const entries = await prisma.exerciseEntry.findMany({
-    where: { userId: session.user.id, localDate: date },
-    orderBy: [{ startTime: 'asc' }, { createdAt: 'asc' }],
-  })
-  const exerciseCalories = entries.reduce((sum, e) => sum + (Number(e.calories) || 0), 0)
-
-  return NextResponse.json({ entry, date, exerciseCalories })
 }
+
