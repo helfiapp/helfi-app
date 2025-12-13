@@ -2314,6 +2314,52 @@ const applyStructuredItems = (
         }
       }
     }
+    
+    // Initialize weightAmount from serving size if not set
+    if (!next.weightAmount || next.weightAmount === 0) {
+      const { gramsPerServing, mlPerServing, ozPerServing } = quickParseServingSize(next?.serving_size)
+      const currentUnit = next?.weightUnit === 'ml' ? 'ml' : next?.weightUnit === 'oz' ? 'oz' : 'g'
+      const servings = Number.isFinite(Number(next?.servings)) && Number(next.servings) > 0 ? Number(next.servings) : 1
+      
+      let initialWeight: number | null = null
+      let targetUnit = currentUnit
+      
+      // Determine which unit to use based on what's available in serving size
+      if (ozPerServing && ozPerServing > 0) {
+        targetUnit = 'oz'
+        initialWeight = ozPerServing * servings
+      } else if (mlPerServing && mlPerServing > 0) {
+        targetUnit = 'ml'
+        initialWeight = mlPerServing * servings
+      } else if (gramsPerServing && gramsPerServing > 0) {
+        targetUnit = 'g'
+        initialWeight = gramsPerServing * servings
+      }
+      
+      // Convert to current unit if needed
+      if (initialWeight && initialWeight > 0 && targetUnit !== currentUnit) {
+        if (targetUnit === 'g' && currentUnit === 'oz') {
+          initialWeight = initialWeight / 28.3495
+        } else if (targetUnit === 'oz' && currentUnit === 'g') {
+          initialWeight = initialWeight * 28.3495
+        } else if (targetUnit === 'g' && currentUnit === 'ml') {
+          // assume ~1g/mL
+          initialWeight = initialWeight
+        } else if (targetUnit === 'ml' && currentUnit === 'g') {
+          // assume ~1g/mL
+          initialWeight = initialWeight
+        }
+      }
+      
+      if (initialWeight && initialWeight > 0) {
+        const precision = currentUnit === 'oz' ? 100 : 1000
+        next.weightAmount = Math.round(initialWeight * precision) / precision
+        if (!next.weightUnit) {
+          next.weightUnit = targetUnit
+        }
+      }
+    }
+    
     return next
   })
 
@@ -7328,6 +7374,18 @@ Please add nutritional information manually if needed.`);
                         const totalSugar = Math.round(((item.sugar_g ?? 0) * servingsCount) * 10) / 10
                         const formattedServings = `${formatServingsDisplay(servingsCount)} serving${Math.abs(servingsCount - 1) < 0.001 ? '' : 's'}`
                         const baseWeightPerServing = getBaseWeightPerServing(item)
+                        
+                        // Function to focus weight input (for mobile serving size click)
+                        const focusWeightInput = () => {
+                          const weightInput = document.querySelector(`input[data-weight-input-id="weight-input-${index}"]`) as HTMLInputElement
+                          if (weightInput) {
+                            weightInput.focus()
+                            // On mobile, select all text when focusing to allow easy replacement
+                            if (window.innerWidth < 768) {
+                              weightInput.select()
+                            }
+                          }
+                        }
 
                         const totalsByField: Record<string, number | null> = {
                           calories: totalCalories,
@@ -7430,7 +7488,15 @@ Please add nutritional information manually if needed.`);
                                     {item.brand && (
                                       <div className="text-sm text-gray-600 mt-0.5">Brand: {item.brand}</div>
                                     )}
-                                    <div className="text-sm text-gray-500 mt-1">
+                                    <div 
+                                      className="text-sm text-gray-500 mt-1 md:cursor-default cursor-pointer active:opacity-70"
+                                      onClick={() => {
+                                        // On mobile, clicking serving size focuses weight input
+                                        if (window.innerWidth < 768) {
+                                          focusWeightInput()
+                                        }
+                                      }}
+                                    >
                                       Serving size: {formatServingSizeDisplay(servingSizeDisplayLabel || '', item)}
                                     </div>
                                   </>
@@ -7585,12 +7651,22 @@ Please add nutritional information manually if needed.`);
                                   <div className="flex items-center gap-2">
                                     <input
                                       type="number"
+                                      inputMode="decimal"
                                       min={0}
                                       step={(item?.weightUnit === 'oz' ? 0.1 : 1) as any}
+                                      data-weight-input-id={`weight-input-${index}`}
                                       value={
-                                        Number.isFinite(Number(item?.weightAmount)) ? Number(item.weightAmount) : ''
+                                        Number.isFinite(Number(item?.weightAmount)) && Number(item.weightAmount) > 0
+                                          ? Number(item.weightAmount)
+                                          : ''
                                       }
                                       onChange={(e) => updateItemField(index, 'weightAmount', e.target.value)}
+                                      onFocus={(e) => {
+                                        // On mobile, select all text when focusing to allow easy replacement
+                                        if (window.innerWidth < 768) {
+                                          e.target.select()
+                                        }
+                                      }}
                                       placeholder={
                                         baseWeightPerServing
                                           ? String(
