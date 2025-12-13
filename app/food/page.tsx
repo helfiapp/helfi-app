@@ -6683,7 +6683,7 @@ Please add nutritional information manually if needed.`);
                     onClick={() => {
                       setShowPhotoOptions(false);
                       setPhotoOptionsAnchor(null);
-                      setShowAddFood(true);
+                      setShowAddIngredientModal(true);
                     }}
                     className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
                   >
@@ -9276,7 +9276,7 @@ Please add nutritional information manually if needed.`);
                                         onClick={() => {
                                           setShowPhotoOptions(false);
                                           setPhotoOptionsAnchor(null);
-                                          setShowAddFood(true);
+                                          setShowAddIngredientModal(true);
                                         }}
                                         className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
                                       >
@@ -9428,7 +9428,7 @@ Please add nutritional information manually if needed.`);
                                         onClick={() => {
                                           setShowPhotoOptions(false);
                                           setPhotoOptionsAnchor(null);
-                                          setShowAddFood(true);
+                                          setShowAddIngredientModal(true);
                                         }}
                                         className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
                                       >
