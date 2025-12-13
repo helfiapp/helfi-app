@@ -9737,14 +9737,46 @@ Please add nutritional information manually if needed.`);
                   sugar: (dailyTargets as any).sugarMax ?? null,
                 }
 
+                // If exercise increases calorie "room", also increase macro targets using the user's existing macro split.
+                // Fiber and sugar max remain unchanged.
+                const macroTargetsWithExercise = (() => {
+                  const protein = Number(macroTargets.protein)
+                  const carbs = Number(macroTargets.carbs)
+                  const fat = Number(macroTargets.fat)
+                  if (!Number.isFinite(protein) || !Number.isFinite(carbs) || !Number.isFinite(fat)) return macroTargets
+                  if (protein <= 0 || carbs <= 0 || fat <= 0) return macroTargets
+                  if (!Number.isFinite(exerciseKcal) || exerciseKcal <= 0) return macroTargets
+
+                  const proteinCals = protein * 4
+                  const carbCals = carbs * 4
+                  const fatCals = fat * 9
+                  const totalMacroCals = proteinCals + carbCals + fatCals
+                  if (!Number.isFinite(totalMacroCals) || totalMacroCals <= 0) return macroTargets
+
+                  const pShare = proteinCals / totalMacroCals
+                  const cShare = carbCals / totalMacroCals
+                  const fShare = fatCals / totalMacroCals
+
+                  const extraProteinG = (exerciseKcal * pShare) / 4
+                  const extraCarbsG = (exerciseKcal * cShare) / 4
+                  const extraFatG = (exerciseKcal * fShare) / 9
+
+                  return {
+                    ...macroTargets,
+                    protein: protein + extraProteinG,
+                    carbs: carbs + extraCarbsG,
+                    fat: fat + extraFatG,
+                  }
+                })()
+
                 const macroViewOptions: Array<'targets' | 'consumed'> = ['targets', 'consumed']
 
                 const macroRows = [
-                  { key: 'protein', label: 'Protein', consumed: totals.protein || 0, target: macroTargets.protein || 0, unit: 'g', color: '#ef4444' },
-                  { key: 'carbs', label: 'Carbs', consumed: carbGrams, target: macroTargets.carbs || 0, unit: 'g', color: '#22c55e' },
-                  { key: 'fat', label: 'Fat', consumed: totals.fat || 0, target: macroTargets.fat || 0, unit: 'g', color: '#6366f1' },
-                  { key: 'fibre', label: 'Fibre', consumed: fibreGrams, target: macroTargets.fiber || 0, unit: 'g', color: '#12adc9' },
-                  { key: 'sugar', label: 'Sugar (max)', consumed: sugarGrams, target: macroTargets.sugar || 0, unit: 'g', color: '#f97316' },
+                  { key: 'protein', label: 'Protein', consumed: totals.protein || 0, target: macroTargetsWithExercise.protein || 0, unit: 'g', color: '#ef4444' },
+                  { key: 'carbs', label: 'Carbs', consumed: carbGrams, target: macroTargetsWithExercise.carbs || 0, unit: 'g', color: '#22c55e' },
+                  { key: 'fat', label: 'Fat', consumed: totals.fat || 0, target: macroTargetsWithExercise.fat || 0, unit: 'g', color: '#6366f1' },
+                  { key: 'fibre', label: 'Fibre', consumed: fibreGrams, target: macroTargetsWithExercise.fiber || 0, unit: 'g', color: '#12adc9' },
+                  { key: 'sugar', label: 'Sugar (max)', consumed: sugarGrams, target: macroTargetsWithExercise.sugar || 0, unit: 'g', color: '#f97316' },
                 ].filter((row) => row.target > 0)
 
                 return (
