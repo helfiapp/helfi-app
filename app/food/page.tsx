@@ -1738,6 +1738,7 @@ export default function FoodDiary() {
   const [exercisePickerCategory, setExercisePickerCategory] = useState<string | null>(null)
   const [selectedExerciseType, setSelectedExerciseType] = useState<any>(null)
   const [exerciseDurationMinutes, setExerciseDurationMinutes] = useState<number>(30)
+  const [exerciseDistanceKm, setExerciseDistanceKm] = useState<string>('')
   const [exerciseTimeOfDay, setExerciseTimeOfDay] = useState<string>('')
   const [exerciseSaveError, setExerciseSaveError] = useState<string | null>(null)
   const [macroPopup, setMacroPopup] = useState<{
@@ -1893,6 +1894,7 @@ export default function FoodDiary() {
     setSelectedExerciseType(null)
     setExercisePickerCategory(null)
     setExerciseDurationMinutes(30)
+    setExerciseDistanceKm('')
     setExerciseTimeOfDay('')
     setExerciseTypeSearch('')
     setExerciseTypeResults([])
@@ -1961,6 +1963,11 @@ export default function FoodDiary() {
       setExerciseSaveError('Please enter a valid duration.')
       return
     }
+    const distanceKmNum = exerciseDistanceKm.trim().length > 0 ? Number(exerciseDistanceKm) : null
+    if (distanceKmNum !== null && (!Number.isFinite(distanceKmNum) || distanceKmNum <= 0)) {
+      setExerciseSaveError('Please enter a valid distance.')
+      return
+    }
     let startTime: string | undefined
     if (exerciseTimeOfDay && /^\d{2}:\d{2}$/.test(exerciseTimeOfDay)) {
       try {
@@ -1977,6 +1984,7 @@ export default function FoodDiary() {
         body: JSON.stringify({
           exerciseTypeId: selectedExerciseType.id,
           durationMinutes: Math.floor(minutes),
+          distanceKm: distanceKmNum,
           date: selectedDate,
           startTime,
         }),
@@ -6979,6 +6987,47 @@ Please add nutritional information manually if needed.`);
 	                  </div>
 
 	                  <div className="mt-5 space-y-4">
+	                    {(() => {
+	                      const name = String(selectedExerciseType?.name || '').toLowerCase()
+	                      const distanceBased = /walk|run|jog|cycl|bike/.test(name)
+	                      if (!distanceBased) return null
+	                      const mins = Number(exerciseDurationMinutes)
+	                      const dist = exerciseDistanceKm.trim().length > 0 ? Number(exerciseDistanceKm) : null
+	                      const speed =
+	                        dist && Number.isFinite(dist) && dist > 0 && mins && Number.isFinite(mins) && mins > 0
+	                          ? dist / (mins / 60)
+	                          : null
+	                      const pace =
+	                        dist && Number.isFinite(dist) && dist > 0 && mins && Number.isFinite(mins) && mins > 0
+	                          ? mins / dist
+	                          : null
+	                      const paceLabel =
+	                        pace && Number.isFinite(pace)
+	                          ? `${Math.floor(pace)}:${String(Math.round((pace - Math.floor(pace)) * 60)).padStart(2, '0')} min/km`
+	                          : null
+	                      return (
+	                        <div className="space-y-1">
+	                          <label className="block text-sm font-semibold text-gray-900">Distance (km)</label>
+	                          <input
+	                            type="number"
+	                            inputMode="decimal"
+	                            value={exerciseDistanceKm}
+	                            onChange={(e) => setExerciseDistanceKm(e.target.value)}
+	                            min={0}
+	                            step="0.1"
+	                            placeholder="e.g., 3.2"
+	                            className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base"
+	                          />
+	                          {(speed || paceLabel) && (
+	                            <div className="text-xs text-gray-500 mt-1">
+	                              {speed ? `${Math.round(speed * 10) / 10} km/h` : null}
+	                              {speed && paceLabel ? ' • ' : null}
+	                              {paceLabel}
+	                            </div>
+	                          )}
+	                        </div>
+	                      )
+	                    })()}
 	                    <div className="space-y-1">
 	                      <label className="block text-sm font-semibold text-gray-900">Duration (minutes)</label>
 	                      <input

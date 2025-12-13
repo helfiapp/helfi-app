@@ -219,6 +219,7 @@ model ExerciseEntry {
   localDate       String         // Local calendar date (YYYY-MM-DD) to avoid timezone drift
   startTime       DateTime?
   durationMinutes Int
+  distanceKm      Float?
   source          ExerciseSource
   deviceId        String?
   exerciseTypeId  Int?

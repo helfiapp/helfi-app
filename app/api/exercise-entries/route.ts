@@ -13,6 +13,34 @@ function normalizeLocalDate(input: string) {
   return trimmed
 }
 
+function distanceBasedMet(params: { name: string; speedKmh: number }) {
+  const n = (params.name || '').toLowerCase()
+  const s = params.speedKmh
+  if (!Number.isFinite(s) || s <= 0) return null
+
+  if (n.includes('walk')) {
+    if (s < 4) return 2.8
+    if (s < 5.5) return 3.3
+    if (s < 6.8) return 4.3
+    return 6.5
+  }
+
+  if (n.includes('run') || n.includes('jog')) {
+    if (s < 8.5) return 7.0
+    if (s < 9.5) return 8.3
+    if (s < 11.5) return 9.8
+    return 11.5
+  }
+
+  if (n.includes('cycl') || n.includes('bike')) {
+    if (s < 16) return 4.0
+    if (s < 22) return 8.0
+    return 10.0
+  }
+
+  return null
+}
+
 export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) {
@@ -48,6 +76,8 @@ export async function POST(request: NextRequest) {
 
   const exerciseTypeId = Number(body?.exerciseTypeId)
   const durationMinutes = Number(body?.durationMinutes)
+  const distanceKmRaw = body?.distanceKm
+  const distanceKm = distanceKmRaw === null || distanceKmRaw === undefined ? null : Number(distanceKmRaw)
   const date = normalizeLocalDate(body?.date || '')
   const startTime = body?.startTime ? new Date(String(body.startTime)) : null
 
@@ -56,6 +86,9 @@ export async function POST(request: NextRequest) {
   }
   if (!Number.isFinite(durationMinutes) || durationMinutes <= 0 || durationMinutes > 24 * 60) {
     return NextResponse.json({ error: 'Invalid durationMinutes' }, { status: 400 })
+  }
+  if (distanceKm !== null && (!Number.isFinite(distanceKm) || distanceKm <= 0 || distanceKm > 500)) {
+    return NextResponse.json({ error: 'Invalid distanceKm' }, { status: 400 })
   }
   if (!date) {
     return NextResponse.json({ error: 'Missing or invalid date (YYYY-MM-DD)' }, { status: 400 })
@@ -77,10 +110,30 @@ export async function POST(request: NextRequest) {
     )
   }
 
+  const durationMinsInt = Math.floor(durationMinutes)
+  let met = type.met
+  let label = type.name
+  if (distanceKm !== null && Number.isFinite(distanceKm) && distanceKm > 0) {
+    const speedKmh = distanceKm / (durationMinsInt / 60)
+    const inferredMet = distanceBasedMet({ name: type.name, speedKmh })
+    if (inferredMet) {
+      met = inferredMet
+      const base =
+        type.name.toLowerCase().includes('walk')
+          ? 'Walking'
+          : type.name.toLowerCase().includes('run') || type.name.toLowerCase().includes('jog')
+          ? 'Running'
+          : type.name.toLowerCase().includes('cycl') || type.name.toLowerCase().includes('bike')
+          ? 'Cycling'
+          : type.name
+      label = `${base} (${Math.round(speedKmh * 10) / 10} km/h)`
+    }
+  }
+
   const calories = calculateExerciseCalories({
-    met: type.met,
+    met,
     weightKg: health.weightKg,
-    durationMinutes: Math.floor(durationMinutes),
+    durationMinutes: durationMinsInt,
   })
 
   const entry = await prisma.exerciseEntry.create({
@@ -88,11 +141,12 @@ export async function POST(request: NextRequest) {
       userId: session.user.id,
       localDate: date,
       startTime,
-      durationMinutes: Math.floor(durationMinutes),
+      durationMinutes: durationMinsInt,
+      distanceKm: distanceKm !== null ? distanceKm : null,
       source: 'MANUAL',
       exerciseTypeId: type.id,
-      label: type.name,
-      met: type.met,
+      label,
+      met,
       calories,
     },
   })
