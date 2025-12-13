@@ -716,10 +716,6 @@ export async function POST(request: NextRequest) {
       // This prevents calorie/macros targets from "fluctuating" when different pages POST partially-loaded forms.
       const normalizedIncomingGoalChoice =
         typeof data.goalChoice === 'string' ? data.goalChoice.trim() : ''
-      const incomingGoalChoice =
-        normalizedIncomingGoalChoice.length > 0
-          ? normalizedIncomingGoalChoice
-          : (existingPrimaryGoalData.goalChoice || '')
 
       const normalizedIncomingIntensityRaw =
         typeof data.goalIntensity === 'string' ? data.goalIntensity.trim().toLowerCase() : ''
@@ -727,12 +723,20 @@ export async function POST(request: NextRequest) {
         normalizedIncomingIntensityRaw === 'mild' ||
         normalizedIncomingIntensityRaw === 'standard' ||
         normalizedIncomingIntensityRaw === 'aggressive'
-      const incomingGoalIntensity =
-        isValidIntensity
-          ? normalizedIncomingIntensityRaw
-          : (existingPrimaryGoalData.goalIntensity || 'standard').toLowerCase()
+      
+      // Only update the stored primary goal when the request explicitly includes it.
+      // Otherwise, unrelated saves (food snapshot, profile image, etc.) could overwrite the user's goal unintentionally.
+      const shouldUpdatePrimaryGoal = normalizedIncomingGoalChoice.length > 0 || isValidIntensity
+      if (shouldUpdatePrimaryGoal) {
+        const incomingGoalChoice =
+          normalizedIncomingGoalChoice.length > 0
+            ? normalizedIncomingGoalChoice
+            : (existingPrimaryGoalData.goalChoice || '')
+        const incomingGoalIntensity =
+          isValidIntensity
+            ? normalizedIncomingIntensityRaw
+            : (existingPrimaryGoalData.goalIntensity || 'standard').toLowerCase()
 
-      if (incomingGoalChoice || incomingGoalIntensity) {
         await prisma.healthGoal.deleteMany({
           where: {
             userId: user.id,
