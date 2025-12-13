@@ -35,7 +35,11 @@ export async function chatCompletionWithCost(
   } else {
     // Fallback: estimate from message text and max_tokens
     const promptText = extractPromptText(params.messages);
-    const expectedOutputChars = Math.max(0, Number((params as any).max_tokens || 0) * 4);
+    const maxTokens =
+      Number((params as any).max_tokens) ||
+      Number((params as any).max_completion_tokens) ||
+      0;
+    const expectedOutputChars = Math.max(0, maxTokens * 4);
     costCents = costCentsForTokens(model, {
       promptTokens: estimateTokensFromText(promptText),
       completionTokens: Math.ceil(expectedOutputChars / 4),
@@ -68,7 +72,6 @@ function extractPromptText(messages: any[]): string {
     return '';
   }
 }
-
 
 
 

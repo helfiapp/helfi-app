@@ -62,10 +62,11 @@ export async function POST(req: NextRequest) {
 
     const results: any[] = []
     for (const model of modelList) {
+      const isGpt5Family = model.toLowerCase().includes('gpt-5')
       const out = await chatCompletionWithCost(openai, {
         model,
         messages,
-        max_tokens: 700,
+        ...(isGpt5Family ? { max_completion_tokens: 700 } : { max_tokens: 700 }),
         temperature: 0,
       } as any)
       const text = out.completion.choices?.[0]?.message?.content?.trim?.() || ''
