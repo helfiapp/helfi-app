@@ -712,11 +712,24 @@ export async function POST(request: NextRequest) {
 
     // 3.25. Handle primary goal + intensity (Step 2) - store as special health goal
     try {
+      // IMPORTANT: Do not allow empty strings from autosaves (or partial saves) to wipe an existing goal.
+      // This prevents calorie/macros targets from "fluctuating" when different pages POST partially-loaded forms.
+      const normalizedIncomingGoalChoice =
+        typeof data.goalChoice === 'string' ? data.goalChoice.trim() : ''
       const incomingGoalChoice =
-        typeof data.goalChoice === 'string' ? data.goalChoice.trim() : existingPrimaryGoalData.goalChoice || ''
+        normalizedIncomingGoalChoice.length > 0
+          ? normalizedIncomingGoalChoice
+          : (existingPrimaryGoalData.goalChoice || '')
+
+      const normalizedIncomingIntensityRaw =
+        typeof data.goalIntensity === 'string' ? data.goalIntensity.trim().toLowerCase() : ''
+      const isValidIntensity =
+        normalizedIncomingIntensityRaw === 'mild' ||
+        normalizedIncomingIntensityRaw === 'standard' ||
+        normalizedIncomingIntensityRaw === 'aggressive'
       const incomingGoalIntensity =
-        typeof data.goalIntensity === 'string'
-          ? data.goalIntensity.toLowerCase()
+        isValidIntensity
+          ? normalizedIncomingIntensityRaw
           : (existingPrimaryGoalData.goalIntensity || 'standard').toLowerCase()
 
       if (incomingGoalChoice || incomingGoalIntensity) {
