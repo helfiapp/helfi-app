@@ -7473,7 +7473,7 @@ Please add nutritional information manually if needed.`);
                               </div>
                             </div>
                             
-                            {/* Portion controls: servings-only (weight editor is intentionally hidden). */}
+                            {/* Portion controls: servings + optional weight editor (keeps servings/pieces/weight in sync). */}
                             {isExpanded && (
                               <div className="flex flex-col gap-2 mb-3 pb-3 border-b border-gray-100">
                                 <div className="flex items-center gap-3">
@@ -7559,9 +7559,50 @@ Please add nutritional information manually if needed.`);
                                     </div>
                                   </div>
                                 )}
+                                {/* Weight editor: changing weight back-calculates servings (and pieces) when possible */}
+                                <div className="flex items-center gap-3 mt-2">
+                                  <span className="text-sm text-gray-600">Weight:</span>
+                                  <div className="flex items-center gap-2">
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      step={(item?.weightUnit === 'oz' ? 0.1 : 1) as any}
+                                      value={
+                                        Number.isFinite(Number(item?.weightAmount)) ? Number(item.weightAmount) : ''
+                                      }
+                                      onChange={(e) => updateItemField(index, 'weightAmount', e.target.value)}
+                                      placeholder={
+                                        baseWeightPerServing
+                                          ? String(
+                                              item?.weightUnit === 'oz'
+                                                ? Math.round(baseWeightPerServing * servingsCount * 100) / 100
+                                                : Math.round(baseWeightPerServing * servingsCount),
+                                            )
+                                          : 'e.g., 250'
+                                      }
+                                      className="w-24 px-2 py-1 border border-gray-300 rounded-lg text-base font-semibold text-gray-900 text-center focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                    />
+                                    <select
+                                      value={item?.weightUnit === 'ml' ? 'ml' : item?.weightUnit === 'oz' ? 'oz' : 'g'}
+                                      onChange={(e) => updateItemField(index, 'weightUnit', e.target.value)}
+                                      className="px-2 py-1 border border-gray-300 rounded-lg text-base font-semibold text-gray-900 bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                    >
+                                      <option value="g">g</option>
+                                      <option value="ml">ml</option>
+                                      <option value="oz">oz</option>
+                                    </select>
+                                  </div>
+                                </div>
                                 {baseWeightPerServing && (
                                   <div className="text-xs text-gray-500">
-                                    Total amount ≈ {Math.round(baseWeightPerServing * servingsCount)} g
+                                    Total amount ≈{' '}
+                                    {(() => {
+                                      const unit =
+                                        item?.weightUnit === 'ml' ? 'ml' : item?.weightUnit === 'oz' ? 'oz' : 'g'
+                                      const raw = baseWeightPerServing * servingsCount
+                                      const amount = unit === 'oz' ? Math.round(raw * 100) / 100 : Math.round(raw)
+                                      return `${amount} ${unit}`
+                                    })()}
                                   </div>
                                 )}
                               </div>
