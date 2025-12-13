@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { assertGarminConfigured, parseBearerToken, parseOAuthHeader } from '@/lib/garmin-oauth'
+import { extractGarminWorkouts } from '@/lib/exercise/garmin-workouts'
+import { ingestExerciseEntry } from '@/lib/exercise/ingest'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -61,6 +63,31 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       payload,
     },
   })
+
+  // Best-effort: ingest workout-style records into the Food Diary exercise log.
+  // This is intentionally conservative (requires duration + calories + activity id).
+  if (userId) {
+    try {
+      const workouts = extractGarminWorkouts(payload)
+      for (const w of workouts) {
+        if (!w.startTime) continue
+        const localDate = `${w.startTime.getUTCFullYear()}-${String(w.startTime.getUTCMonth() + 1).padStart(2, '0')}-${String(w.startTime.getUTCDate()).padStart(2, '0')}`
+        await ingestExerciseEntry({
+          userId,
+          source: 'GARMIN',
+          deviceId: `garmin:${w.deviceId}`,
+          localDate,
+          startTime: w.startTime,
+          durationMinutes: w.durationMinutes,
+          calories: w.calories,
+          label: w.label,
+          rawPayload: w.raw,
+        })
+      }
+    } catch (error) {
+      console.warn('⚠️ Garmin webhook exercise ingest failed:', error)
+    }
+  }
 
   return new NextResponse('OK', { status: 200 })
 }

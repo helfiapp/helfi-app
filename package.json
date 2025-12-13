@@ -12,7 +12,8 @@
     "start": "next start",
     "lint": "next lint",
     "postinstall": "prisma generate",
-    "test:food-normalization": "TS_NODE_TRANSPILE_ONLY=1 TS_NODE_COMPILER_OPTIONS='{\"module\":\"commonjs\",\"moduleResolution\":\"node\"}' ts-node scripts/food-normalization-check.ts"
+    "test:food-normalization": "TS_NODE_TRANSPILE_ONLY=1 TS_NODE_COMPILER_OPTIONS='{\"module\":\"commonjs\",\"moduleResolution\":\"node\"}' ts-node scripts/food-normalization-check.ts",
+    "seed:exercise-types": "TS_NODE_TRANSPILE_ONLY=1 TS_NODE_COMPILER_OPTIONS='{\"module\":\"commonjs\",\"moduleResolution\":\"node\"}' ts-node scripts/seed-exercise-types.ts"
   },
   "dependencies": {
     "@aws-sdk/client-kms": "^3.927.0",

@@ -1723,6 +1723,22 @@ export default function FoodDiary() {
   const [hasPaidAccess, setHasPaidAccess] = useState<boolean>(false)
   const [energyUnit, setEnergyUnit] = useState<'kcal' | 'kJ'>('kcal')
   const [volumeUnit, setVolumeUnit] = useState<'oz' | 'ml'>('oz')
+  const [exerciseEntries, setExerciseEntries] = useState<any[]>([])
+  const [exerciseCaloriesKcal, setExerciseCaloriesKcal] = useState<number>(0)
+  const [exerciseLoading, setExerciseLoading] = useState<boolean>(false)
+  const [exerciseError, setExerciseError] = useState<string | null>(null)
+  const [exerciseSyncing, setExerciseSyncing] = useState<boolean>(false)
+  const [fitbitConnected, setFitbitConnected] = useState<boolean>(false)
+  const [garminConnected, setGarminConnected] = useState<boolean>(false)
+  const [showAddExerciseModal, setShowAddExerciseModal] = useState<boolean>(false)
+  const [exerciseTypeSearch, setExerciseTypeSearch] = useState<string>('')
+  const [exerciseTypeResults, setExerciseTypeResults] = useState<any[]>([])
+  const [exerciseTypeLoading, setExerciseTypeLoading] = useState<boolean>(false)
+  const [exerciseTypeError, setExerciseTypeError] = useState<string | null>(null)
+  const [selectedExerciseType, setSelectedExerciseType] = useState<any>(null)
+  const [exerciseDurationMinutes, setExerciseDurationMinutes] = useState<number>(30)
+  const [exerciseTimeOfDay, setExerciseTimeOfDay] = useState<string>('')
+  const [exerciseSaveError, setExerciseSaveError] = useState<string | null>(null)
   const [macroPopup, setMacroPopup] = useState<{
     title: string
     energyLabel?: string
@@ -1759,6 +1775,173 @@ export default function FoodDiary() {
     window.addEventListener('resize', updateIsMobile)
     return () => window.removeEventListener('resize', updateIsMobile)
   }, [])
+
+  const loadExerciseEntriesForDate = async (dateKey: string, options?: { silent?: boolean }) => {
+    if (!dateKey) return
+    if (!options?.silent) {
+      setExerciseLoading(true)
+      setExerciseError(null)
+    }
+    try {
+      const res = await fetch(`/api/exercise-entries?date=${encodeURIComponent(dateKey)}`, {
+        method: 'GET',
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(data?.error || 'Failed to load exercise')
+      }
+      setExerciseEntries(Array.isArray(data?.entries) ? data.entries : [])
+      setExerciseCaloriesKcal(Number(data?.exerciseCalories) || 0)
+    } catch (err: any) {
+      if (!options?.silent) {
+        setExerciseError(err?.message || 'Failed to load exercise')
+      }
+    } finally {
+      if (!options?.silent) setExerciseLoading(false)
+    }
+  }
+
+  const refreshDeviceStatus = async () => {
+    try {
+      const [fitbitRes, garminRes] = await Promise.all([
+        fetch('/api/fitbit/status', { method: 'GET' }).catch(() => null),
+        fetch('/api/garmin/status', { method: 'GET' }).catch(() => null),
+      ])
+      const fitbit = fitbitRes ? await fitbitRes.json().catch(() => ({})) : {}
+      const garmin = garminRes ? await garminRes.json().catch(() => ({})) : {}
+      setFitbitConnected(Boolean(fitbit?.connected))
+      setGarminConnected(Boolean(garmin?.connected))
+    } catch {
+      // best-effort
+    }
+  }
+
+  const syncExerciseFromDevices = async () => {
+    setExerciseSyncing(true)
+    setExerciseError(null)
+    try {
+      const res = await fetch('/api/exercise/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: selectedDate }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(data?.error || 'Failed to sync exercise')
+      }
+      setExerciseEntries(Array.isArray(data?.entries) ? data.entries : [])
+      setExerciseCaloriesKcal(Number(data?.exerciseCalories) || 0)
+    } catch (err: any) {
+      setExerciseError(err?.message || 'Failed to sync exercise')
+    } finally {
+      setExerciseSyncing(false)
+    }
+  }
+
+  const deleteExerciseEntry = async (entryId: string) => {
+    if (!entryId) return
+    try {
+      const res = await fetch(`/api/exercise-entries/${encodeURIComponent(entryId)}`, { method: 'DELETE' })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(data?.error || 'Failed to delete exercise')
+      }
+      await loadExerciseEntriesForDate(selectedDate, { silent: true })
+    } catch (err: any) {
+      setExerciseError(err?.message || 'Failed to delete exercise')
+    }
+  }
+
+  useEffect(() => {
+    refreshDeviceStatus()
+  }, [session?.user?.id])
+
+  useEffect(() => {
+    loadExerciseEntriesForDate(selectedDate)
+    // Keep device pills updated when switching dates (low-cost, cached by browser).
+    refreshDeviceStatus()
+  }, [selectedDate])
+
+  const searchExerciseTypes = async (query: string) => {
+    setExerciseTypeLoading(true)
+    setExerciseTypeError(null)
+    try {
+      const res = await fetch(`/api/exercise-types?search=${encodeURIComponent(query || '')}&limit=30`, {
+        method: 'GET',
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(data?.error || 'Failed to load exercise types')
+      }
+      setExerciseTypeResults(Array.isArray(data?.items) ? data.items : [])
+    } catch (err: any) {
+      setExerciseTypeError(err?.message || 'Failed to load exercise types')
+      setExerciseTypeResults([])
+    } finally {
+      setExerciseTypeLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!showAddExerciseModal) return
+    setExerciseSaveError(null)
+    setSelectedExerciseType(null)
+    setExerciseDurationMinutes(30)
+    setExerciseTimeOfDay('')
+    setExerciseTypeSearch('')
+    setExerciseTypeResults([])
+    setExerciseTypeError(null)
+  }, [showAddExerciseModal])
+
+  useEffect(() => {
+    if (!showAddExerciseModal) return
+    const handle = window.setTimeout(() => {
+      searchExerciseTypes(exerciseTypeSearch.trim())
+    }, 200)
+    return () => window.clearTimeout(handle)
+  }, [exerciseTypeSearch, showAddExerciseModal])
+
+  const saveManualExercise = async () => {
+    setExerciseSaveError(null)
+    if (!selectedExerciseType?.id) {
+      setExerciseSaveError('Please select an exercise.')
+      return
+    }
+    const minutes = Number(exerciseDurationMinutes)
+    if (!Number.isFinite(minutes) || minutes <= 0) {
+      setExerciseSaveError('Please enter a valid duration.')
+      return
+    }
+    let startTime: string | undefined
+    if (exerciseTimeOfDay && /^\d{2}:\d{2}$/.test(exerciseTimeOfDay)) {
+      try {
+        const dt = new Date(`${selectedDate}T${exerciseTimeOfDay}:00`)
+        if (!Number.isNaN(dt.getTime())) startTime = dt.toISOString()
+      } catch {
+        // ignore
+      }
+    }
+    try {
+      const res = await fetch('/api/exercise-entries', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          exerciseTypeId: selectedExerciseType.id,
+          durationMinutes: Math.floor(minutes),
+          date: selectedDate,
+          startTime,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        throw new Error(data?.error || 'Failed to save exercise')
+      }
+      setShowAddExerciseModal(false)
+      await loadExerciseEntriesForDate(selectedDate, { silent: true })
+    } catch (err: any) {
+      setExerciseSaveError(err?.message || 'Failed to save exercise')
+    }
+  }
 
   // User-selectable Food Analyzer model (used for pricing/accuracy comparisons)
   useEffect(() => {
@@ -6554,15 +6737,118 @@ Please add nutritional information manually if needed.`);
       )}
       
       {/* Backdrop to block clicks on entries while dropdown menus are open */}
-      {(showPhotoOptions || showCategoryPicker) && (
-        <div
-          className="fixed inset-0 z-30 bg-transparent pointer-events-none"
-        />
-      )}
+	      {(showPhotoOptions || showCategoryPicker) && (
+	        <div
+	          className="fixed inset-0 z-30 bg-transparent pointer-events-none"
+	        />
+	      )}
 
-      {/* Add Ingredient Modal (available from both Food Analysis and Today’s Meals dropdowns) */}
-      {showAddIngredientModal && (
-        <div className="fixed inset-0 z-50">
+	      {showAddExerciseModal && (
+	        <div className="fixed inset-0 z-50">
+	          <div
+	            className="absolute inset-0 bg-black/30"
+	            onClick={() => setShowAddExerciseModal(false)}
+	          ></div>
+	          <div className="absolute inset-0 flex items-start sm:items-center justify-center mt-10 sm:mt-0">
+	            <div className="w-[92%] max-w-lg bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+	              <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+	                <div className="font-semibold text-gray-900">Add exercise</div>
+	                <button onClick={() => setShowAddExerciseModal(false)} className="p-2 rounded-md hover:bg-gray-100">
+	                  <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+	                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+	                  </svg>
+	                </button>
+	              </div>
+	              <div className="p-4 space-y-4">
+	                <div className="space-y-2">
+	                  <label className="block text-sm font-medium text-gray-900">Search exercise</label>
+	                  <input
+	                    type="text"
+	                    value={exerciseTypeSearch}
+	                    onChange={(e) => setExerciseTypeSearch(e.target.value)}
+	                    placeholder="e.g., walking, running, weights"
+	                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base"
+	                  />
+	                  {exerciseTypeError && <div className="text-xs text-red-600">{exerciseTypeError}</div>}
+	                  {exerciseTypeLoading && <div className="text-xs text-gray-500">Searching…</div>}
+	                  {!exerciseTypeLoading && exerciseTypeResults.length > 0 && (
+	                    <div className="max-h-56 overflow-y-auto space-y-2">
+	                      {exerciseTypeResults.map((t: any) => (
+	                        <button
+	                          key={`${t.id}`}
+	                          type="button"
+	                          onClick={() => setSelectedExerciseType(t)}
+	                          className={`w-full text-left rounded-lg border px-3 py-2 hover:bg-gray-50 ${
+	                            selectedExerciseType?.id === t.id ? 'border-emerald-400 bg-emerald-50' : 'border-gray-200'
+	                          }`}
+	                        >
+	                          <div className="text-sm font-semibold text-gray-900">{t.name}</div>
+	                          <div className="text-xs text-gray-500">
+	                            {t.category} • MET {Number(t.met).toFixed(1)}
+	                            {t.intensity ? ` • ${t.intensity}` : ''}
+	                          </div>
+	                        </button>
+	                      ))}
+	                    </div>
+	                  )}
+	                  {selectedExerciseType && (
+	                    <div className="text-xs text-gray-600">
+	                      Selected: <span className="font-semibold">{selectedExerciseType.name}</span>
+	                    </div>
+	                  )}
+	                </div>
+
+	                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+	                  <div className="space-y-1">
+	                    <label className="block text-sm font-medium text-gray-900">Duration (minutes)</label>
+	                    <input
+	                      type="number"
+	                      value={exerciseDurationMinutes}
+	                      onChange={(e) => setExerciseDurationMinutes(Number(e.target.value))}
+	                      min={1}
+	                      max={1440}
+	                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base"
+	                    />
+	                  </div>
+	                  <div className="space-y-1">
+	                    <label className="block text-sm font-medium text-gray-900">Time (optional)</label>
+	                    <input
+	                      type="time"
+	                      value={exerciseTimeOfDay}
+	                      onChange={(e) => setExerciseTimeOfDay(e.target.value)}
+	                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base"
+	                    />
+	                  </div>
+	                </div>
+
+	                {exerciseSaveError && <div className="text-sm text-red-600">{exerciseSaveError}</div>}
+
+	                <div className="flex gap-3">
+	                  <button
+	                    type="button"
+	                    onClick={() => setShowAddExerciseModal(false)}
+	                    className="flex-1 py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-colors duration-200"
+	                  >
+	                    Cancel
+	                  </button>
+	                  <button
+	                    type="button"
+	                    onClick={saveManualExercise}
+	                    className="flex-1 py-3 px-4 bg-emerald-500 hover:bg-emerald-600 text-white font-medium rounded-xl transition-colors duration-200 disabled:bg-gray-300 disabled:cursor-not-allowed"
+	                    disabled={!selectedExerciseType}
+	                  >
+	                    Save
+	                  </button>
+	                </div>
+	              </div>
+	            </div>
+	          </div>
+	        </div>
+	      )}
+
+	      {/* Add Ingredient Modal (available from both Food Analysis and Today’s Meals dropdowns) */}
+	      {showAddIngredientModal && (
+	        <div className="fixed inset-0 z-50">
           <div
             className="absolute inset-0 bg-black/30"
             onClick={() => {
@@ -8860,16 +9146,23 @@ Please add nutritional information manually if needed.`);
                   (macroCalories && Number.isFinite(macroCalories) ? macroCalories : 0) ||
                   totals.calories ||
                   0
-                const targetCalories = dailyTargets.calories
+                const baseTargetCalories = dailyTargets.calories
+                const exerciseKcal =
+                  Number.isFinite(Number(exerciseCaloriesKcal)) && Number(exerciseCaloriesKcal) > 0
+                    ? Number(exerciseCaloriesKcal)
+                    : 0
+                const allowanceCalories =
+                  baseTargetCalories && baseTargetCalories > 0 ? baseTargetCalories + exerciseKcal : null
                 const remainingKcal =
-                  targetCalories && targetCalories > 0
-                    ? Math.max(0, targetCalories - consumedKcal)
+                  allowanceCalories && allowanceCalories > 0
+                    ? Math.max(0, allowanceCalories - consumedKcal)
                     : 0
                 const consumedInUnit = convertKcalToUnit(consumedKcal, energyUnit)
-                const targetInUnit = convertKcalToUnit(targetCalories, energyUnit)
+                const allowanceInUnit = convertKcalToUnit(allowanceCalories, energyUnit)
+                const exerciseInUnit = convertKcalToUnit(exerciseKcal, energyUnit)
                 const remainingInUnit =
-                  targetInUnit !== null && consumedInUnit !== null
-                    ? Math.max(0, targetInUnit - consumedInUnit)
+                  allowanceInUnit !== null && consumedInUnit !== null
+                    ? Math.max(0, allowanceInUnit - consumedInUnit)
                     : null
 
                 const sugarGrams = totals.sugar || 0
@@ -8963,12 +9256,17 @@ Please add nutritional information manually if needed.`);
                                   color="#ef4444"
                                 />
                               </div>
-                              {targetInUnit !== null && (
+                              {allowanceInUnit !== null && (
                                 <div className="mt-3 text-[11px] text-gray-500 text-center col-span-2">
                                   Daily allowance:{' '}
                                   <span className="font-semibold">
-                                    {Math.round(targetInUnit)} {energyUnit}
+                                    {Math.round(allowanceInUnit)} {energyUnit}
                                   </span>
+                                  {exerciseInUnit !== null && exerciseInUnit > 0 && (
+                                    <span className="ml-2 text-emerald-600 font-semibold">
+                                      +{Math.round(exerciseInUnit)} {energyUnit} exercise
+                                    </span>
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -9060,15 +9358,123 @@ Please add nutritional information manually if needed.`);
             </div>
           )}
 
-          {/* Hide energy summary + meals while editing an entry to keep the user focused on editing */}
-          {!editingEntry && (
-            <>
-              <h3 className="text-lg font-semibold mb-4">{isViewingToday ? "Today's Meals" : 'Meals'}</h3>
+	          {/* Hide energy summary + meals while editing an entry to keep the user focused on editing */}
+	          {!editingEntry && (
+	            <>
+	              <div className="flex items-center justify-between mb-4">
+	                <h3 className="text-lg font-semibold">{isViewingToday ? "Today's Meals" : 'Meals'}</h3>
+	                <button
+	                  type="button"
+	                  onClick={() => setShowAddExerciseModal(true)}
+	                  className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100 transition-colors flex items-center justify-center"
+	                  title="Add exercise"
+	                  aria-label="Add exercise"
+	                >
+	                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+	                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+	                  </svg>
+	                </button>
+	              </div>
 
-              <div
-                className="space-y-3 -mx-4 sm:-mx-6 overflow-visible"
-                style={isMobile ? { marginLeft: 'calc(50% - 50vw)', marginRight: 'calc(50% - 50vw)' } : undefined}
-              >
+	              <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 mb-4">
+	                <div className="flex items-start justify-between gap-3">
+	                  <div>
+	                    <div className="text-sm font-semibold text-gray-800">Exercise &amp; Activity</div>
+	                    <div className="text-xs text-gray-500 mt-0.5">
+	                      Exercise calories:{' '}
+	                      <span className="font-semibold text-emerald-600">
+	                        +{Math.round(convertKcalToUnit(exerciseCaloriesKcal, energyUnit) || 0)} {energyUnit}
+	                      </span>
+	                    </div>
+	                  </div>
+	                  <div className="flex items-center gap-2 flex-wrap justify-end">
+	                    {fitbitConnected && (
+	                      <span className="text-[11px] sm:text-xs bg-gray-100 rounded-full px-2 py-1 border border-gray-200">
+	                        Connected: Fitbit
+	                      </span>
+	                    )}
+	                    {garminConnected && (
+	                      <span className="text-[11px] sm:text-xs bg-gray-100 rounded-full px-2 py-1 border border-gray-200">
+	                        Connected: Garmin
+	                      </span>
+	                    )}
+	                    {(fitbitConnected || garminConnected) && (
+	                      <button
+	                        type="button"
+	                        onClick={syncExerciseFromDevices}
+	                        disabled={exerciseSyncing}
+	                        className="text-xs font-semibold px-3 py-1.5 rounded-full border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-60"
+	                      >
+	                        {exerciseSyncing ? 'Refreshing...' : 'Refresh'}
+	                      </button>
+	                    )}
+	                    <button
+	                      type="button"
+	                      onClick={() => setShowAddExerciseModal(true)}
+	                      className="text-xs font-semibold px-3 py-1.5 rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+	                    >
+	                      + Add Exercise
+	                    </button>
+	                  </div>
+	                </div>
+
+	                {exerciseError && (
+	                  <div className="mt-3 text-sm text-red-600">{exerciseError}</div>
+	                )}
+	                {exerciseLoading ? (
+	                  <div className="mt-3 text-sm text-gray-500">Loading exercise...</div>
+	                ) : (
+	                  <div className="mt-3 space-y-2">
+	                    {exerciseEntries.length === 0 ? (
+	                      <div className="text-sm text-gray-500">No exercise logged for this date.</div>
+	                    ) : (
+	                      exerciseEntries.map((entry: any) => {
+	                        const calories = convertKcalToUnit(Number(entry?.calories) || 0, energyUnit)
+	                        const duration = Number(entry?.durationMinutes) || 0
+	                        const sourceLabel = entry?.source === 'FITBIT' ? 'Fitbit' : entry?.source === 'GARMIN' ? 'Garmin' : 'Manual'
+	                        return (
+	                          <div
+	                            key={entry.id}
+	                            className="flex items-center justify-between gap-3 border border-gray-200 rounded-lg px-3 py-2"
+	                          >
+	                            <div className="min-w-0">
+	                              <div className="text-sm font-semibold text-gray-900 truncate">
+	                                {entry?.label || 'Exercise'}
+	                              </div>
+	                              <div className="text-xs text-gray-500">
+	                                {Math.round(duration)} min • {sourceLabel}
+	                              </div>
+	                            </div>
+	                            <div className="flex items-center gap-2">
+	                              <div className="text-sm font-semibold text-gray-900">
+	                                {Math.round(calories || 0)} {energyUnit}
+	                              </div>
+	                              {entry?.source === 'MANUAL' && (
+	                                <button
+	                                  type="button"
+	                                  onClick={() => deleteExerciseEntry(entry.id)}
+	                                  className="p-2 rounded-lg hover:bg-gray-100 text-gray-500"
+	                                  title="Delete"
+	                                  aria-label="Delete exercise"
+	                                >
+	                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+	                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22m-5-3H6a1 1 0 00-1 1v2h14V5a1 1 0 00-1-1z" />
+	                                  </svg>
+	                                </button>
+	                              )}
+	                            </div>
+	                          </div>
+	                        )
+	                      })
+	                    )}
+	                  </div>
+	                )}
+	              </div>
+
+	              <div
+	                className="space-y-3 -mx-4 sm:-mx-6 overflow-visible"
+	                style={isMobile ? { marginLeft: 'calc(50% - 50vw)', marginRight: 'calc(50% - 50vw)' } : undefined}
+	              >
                 {sourceEntries.length === 0 && (
                   <div className="text-sm text-gray-500 px-4 sm:px-6 pb-2">
                     No food entries yet {isViewingToday ? 'today' : 'for this date'}. Add a meal to get started.

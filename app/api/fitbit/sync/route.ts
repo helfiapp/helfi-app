@@ -3,6 +3,8 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { fitbitApiRequest, getFitbitUserId } from '@/lib/fitbit-api'
+import { ingestExerciseEntry } from '@/lib/exercise/ingest'
+import { parseFitbitActivitiesToIngest } from '@/lib/exercise/fitbit-workouts'
 
 /**
  * Sync Fitbit data for the authenticated user
@@ -161,6 +163,53 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Sync activity/workouts (and ingest into Food Diary exercise log)
+    if (dataTypes.includes('activity')) {
+      const activityResponse = await fitbitApiRequest(
+        session.user.id,
+        `/1/user/${fitbitUserId}/activities/list.json?afterDate=${date}&sort=asc&offset=0&limit=100`
+      )
+
+      if (activityResponse?.ok) {
+        const activityData = await activityResponse.json()
+        await prisma.fitbitData.upsert({
+          where: {
+            userId_date_dataType: {
+              userId: session.user.id,
+              date: new Date(date),
+              dataType: 'activity',
+            },
+          },
+          update: {
+            value: activityData,
+            syncedAt: new Date(),
+          },
+          create: {
+            userId: session.user.id,
+            date: new Date(date),
+            dataType: 'activity',
+            value: activityData,
+          },
+        })
+        syncedData.activity = activityData
+
+        const workouts = parseFitbitActivitiesToIngest({ date, payload: activityData })
+        for (const w of workouts as any[]) {
+          await ingestExerciseEntry({
+            userId: session.user.id,
+            source: 'FITBIT',
+            deviceId: `fitbit:${w.deviceId}`,
+            localDate: date,
+            startTime: w.startTime,
+            durationMinutes: w.durationMinutes,
+            calories: w.calories,
+            label: w.label,
+            rawPayload: w.raw,
+          })
+        }
+      }
+    }
+
     return NextResponse.json({
       success: true,
       synced: syncedData,
@@ -223,4 +272,3 @@ export async function GET(request: NextRequest) {
     )
   }
 }
-

@@ -61,6 +61,7 @@ model User {
   healthLogs          HealthLog[]
   foodLogs            FoodLog[]
   exerciseLogs        ExerciseLog[]
+  exerciseEntries     ExerciseEntry[]
   subscription        Subscription?
   supportTickets      SupportTicket[]
   interactionAnalyses InteractionAnalysis[]
@@ -192,6 +193,53 @@ model ExerciseLog {
   notes     String?
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Food Diary Exercise - MET catalog
+model ExerciseType {
+  id        Int      @id @default(autoincrement())
+  name      String
+  category  String
+  met       Float
+  intensity String?
+  isCustom  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  entries ExerciseEntry[]
+
+  @@unique([name, category])
+  @@index([name])
+}
+
+// Food Diary Exercise - per-user daily entries (manual or synced)
+model ExerciseEntry {
+  id              String         @id @default(cuid())
+  userId          String
+  localDate       String         // Local calendar date (YYYY-MM-DD) to avoid timezone drift
+  startTime       DateTime?
+  durationMinutes Int
+  source          ExerciseSource
+  deviceId        String?
+  exerciseTypeId  Int?
+  label           String
+  met             Float
+  calories        Float
+  rawPayload      Json?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exerciseType ExerciseType? @relation(fields: [exerciseTypeId], references: [id])
+
+  @@index([userId, localDate])
+  @@unique([userId, source, deviceId])
+}
+
+enum ExerciseSource {
+  MANUAL
+  FITBIT
+  GARMIN
 }
 
 model AIUsageEvent {
