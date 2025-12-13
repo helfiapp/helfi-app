@@ -12,7 +12,7 @@ export type BillingWindow = {
   totalUsageCents: number | null
   costUsd: number | null
   tokenTotals?: UsageTokenTotals | null
-  source: 'usage' | 'billing_fallback' | 'missing_key' | 'error'
+  source: 'usage' | 'costs' | 'billing_fallback' | 'missing_key' | 'error'
   usingFallback: boolean
   fetchedAt: string
   error?: string | null
@@ -24,6 +24,30 @@ const toNumber = (value: any): number => {
 }
 
 const hasValue = (value: any) => value !== undefined && value !== null
+
+const parseUsdAmount = (value: any): number | null => {
+  if (value === undefined || value === null) return null
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (!trimmed) return null
+    // OpenAI cost export sometimes uses stringified numerics like "0E-6176".
+    const n = Number(trimmed)
+    return Number.isFinite(n) ? n : null
+  }
+  return null
+}
+
+const dateToUnixStartUtc = (yyyyMmDd: string): number => {
+  const d = new Date(`${yyyyMmDd}T00:00:00Z`)
+  return Math.floor(d.getTime() / 1000)
+}
+
+const addDaysIso = (yyyyMmDd: string, days: number): string => {
+  const d = new Date(`${yyyyMmDd}T00:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString().slice(0, 10)
+}
 
 function summarizeUsageList(body: any): { usageCents: number | null; tokens?: UsageTokenTotals | null } {
   if (!body) return { usageCents: null, tokens: null }
@@ -143,6 +167,71 @@ export async function fetchOpenAIUsageTotals(args: { startDate: string; endDate:
     }
     return null
   }
+
+  // Prefer the newer org costs endpoint (matches OpenAI dashboard "Export → Cost data").
+  // Use an inclusive end by querying until endDate+1 at 00:00Z.
+  const tryFetchOrgCosts = async (): Promise<BillingWindow | null> => {
+    const startTime = dateToUnixStartUtc(startDate)
+    const endTime = dateToUnixStartUtc(addDaysIso(endDate, 1))
+    const urls = [
+      `https://api.openai.com/v1/organization/costs?start_time=${startTime}&end_time=${endTime}&bucket_width=1d`,
+      `https://api.openai.com/v1/organization/costs?start_time=${startTime}&end_time=${endTime}&bucket_width=1d&group_by=project_id`,
+      `https://api.openai.com/v1/organization/costs?start_time=${startTime}&end_time=${endTime}&bucket_width=1d&group_by[]=project_id`,
+    ]
+
+    for (const url of urls) {
+      for (const hv of headerVariants) {
+        try {
+          const resp = await fetch(url, { headers: hv, method: 'GET' })
+          const body = await resp.json().catch(() => ({}))
+          if (!resp.ok) {
+            const msg = body?.error?.message || resp.statusText || `org_costs failed`
+            errors.push(`org_costs: ${msg} (status ${resp.status})`)
+            continue
+          }
+
+          const buckets = Array.isArray(body?.data) ? body.data : []
+          let sumUsd = 0
+          let sawAny = false
+
+          for (const bucket of buckets) {
+            const results = Array.isArray(bucket?.results) ? bucket.results : []
+            for (const r of results) {
+              if (projectId && typeof r?.project_id === 'string' && r.project_id !== projectId) continue
+              const usd = parseUsdAmount(r?.amount?.value)
+              if (usd === null) continue
+              sumUsd += usd
+              sawAny = true
+            }
+          }
+
+          if (!sawAny) {
+            errors.push('org_costs returned no usable cost buckets')
+            continue
+          }
+
+          const totalUsageCents = Math.round(sumUsd * 100)
+          return {
+            startDate,
+            endDate,
+            totalUsageCents,
+            costUsd: totalUsageCents / 100,
+            tokenTotals: null,
+            source: 'costs',
+            usingFallback: false,
+            fetchedAt,
+            error: errors.length ? errors[errors.length - 1] : null,
+          }
+        } catch (err: any) {
+          errors.push(`org_costs exception: ${err?.message || 'unknown'}`)
+        }
+      }
+    }
+    return null
+  }
+
+  const costs = await tryFetchOrgCosts()
+  if (costs) return costs
 
   // OpenAI's vendor billing endpoints under /dashboard/* now require a browser session
   // and will 401 for API keys. Also, many usage endpoints reject start/end and only
