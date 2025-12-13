@@ -4584,6 +4584,21 @@ Please add nutritional information manually if needed.`);
     setShowAddFood(false)
   }
 
+  const openAddIngredientModalFromMenu = (e?: any) => {
+    try {
+      e?.stopPropagation?.()
+    } catch {}
+    // Close any add menus/dropdowns first, then open the modal.
+    setShowPhotoOptions(false)
+    setShowCategoryPicker(false)
+    setPhotoOptionsAnchor(null)
+    setPhotoOptionsPosition(null)
+    setPendingPhotoPicker(false)
+    setTimeout(() => {
+      setShowAddIngredientModal(true)
+    }, 0)
+  }
+
   const computeDesktopAddMenuPosition = (key: typeof MEAL_CATEGORY_ORDER[number]) => {
     const row = categoryRowRefs.current[key]
     if (!row || typeof window === 'undefined') {
@@ -6353,6 +6368,156 @@ Please add nutritional information manually if needed.`);
         />
       )}
 
+      {/* Add Ingredient Modal (available from both Food Analysis and Today’s Meals dropdowns) */}
+      {showAddIngredientModal && (
+        <div className="fixed inset-0 z-50">
+          <div
+            className="absolute inset-0 bg-black/30"
+            onClick={() => {
+              setShowAddIngredientModal(false)
+              setOfficialSearchQuery('')
+              setOfficialResults([])
+              setOfficialError(null)
+            }}
+          ></div>
+          <div className="absolute inset-0 flex items-start sm:items-center justify-center mt-10 sm:mt-0">
+            <div className="w-[92%] max-w-lg bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+              <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+                <div className="font-semibold text-gray-900">Add ingredient</div>
+                <button onClick={() => setShowAddIngredientModal(false)} className="p-2 rounded-md hover:bg-gray-100">
+                  <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <div className="p-4">
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-900">
+                    Search foods (USDA first, FatSecret fallback)
+                  </label>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input
+                      type="text"
+                      value={officialSearchQuery}
+                      onChange={(e) => setOfficialSearchQuery(e.target.value)}
+                      placeholder={'e.g., Carman\'s toasted muesli or \"oatmeal\"'}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        disabled={officialLoading}
+                        onClick={() => handleOfficialSearch('packaged')}
+                        className={`px-3 py-2 text-xs font-medium rounded-lg border ${
+                          officialSource === 'packaged'
+                            ? 'bg-emerald-600 text-white border-emerald-600'
+                            : 'bg-white text-gray-700 border-gray-300'
+                        } disabled:opacity-60`}
+                      >
+                        Packaged
+                      </button>
+                      <button
+                        type="button"
+                        disabled={officialLoading}
+                        onClick={() => handleOfficialSearch('single')}
+                        className={`px-3 py-2 text-xs font-medium rounded-lg border ${
+                          officialSource === 'single'
+                            ? 'bg-slate-800 text-white border-slate-800'
+                            : 'bg-white text-gray-700 border-gray-300'
+                        } disabled:opacity-60`}
+                      >
+                        Single food
+                      </button>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    We search USDA FoodData Central first, then fall back to FatSecret if USDA is unavailable or rate limited. Use the toggles to focus on packaged products or generic single foods.
+                  </p>
+                </div>
+                {officialError && <div className="mt-3 text-xs text-red-600">{officialError}</div>}
+                {officialLoading && (
+                  <div className="mt-3 text-xs text-gray-500">Searching USDA → FatSecret…</div>
+                )}
+                {!officialLoading && !officialError && officialResults.length > 0 && (
+                  <div className="mt-3 max-h-80 overflow-y-auto space-y-2">
+                    {officialResults.map((r, idx) => (
+                      <div
+                        key={`${r.source}-${r.id}-${idx}`}
+                        className="flex items-start justify-between rounded-lg border border-gray-200 px-3 py-2"
+                      >
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold text-gray-900 truncate">
+                            {r.name}
+                            {r.brand ? ` – ${r.brand}` : ''}
+                          </div>
+                          <div className="mt-0.5 text-xs text-gray-600">
+                            {r.serving_size ? `Serving: ${r.serving_size} • ` : ''}
+                            {r.calories != null && !Number.isNaN(Number(r.calories)) && (
+                              <span>{Math.round(Number(r.calories))} kcal</span>
+                            )}
+                            {r.protein_g != null && (
+                              <span className="ml-2">{`${r.protein_g} g protein`}</span>
+                            )}
+                            {r.carbs_g != null && (
+                              <span className="ml-2">{`${r.carbs_g} g carbs`}</span>
+                            )}
+                            {r.fat_g != null && <span className="ml-2">{`${r.fat_g} g fat`}</span>}
+                          </div>
+                          <div className="mt-1 text-[11px] text-gray-400">
+                            Source:{' '}
+                            {r.source === 'usda'
+                              ? 'USDA FoodData Central'
+                              : r.source === 'fatsecret'
+                              ? 'FatSecret'
+                              : r.source === 'openfoodfacts'
+                              ? 'OpenFoodFacts'
+                              : officialResultsSource || 'Unknown'}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => addIngredientFromOfficial(r)}
+                          className="ml-3 px-3 py-1.5 rounded-md bg-emerald-600 text-white text-xs hover:bg-emerald-700"
+                        >
+                          Add
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {!officialLoading && !officialError && officialResults.length === 0 && officialSearchQuery.trim() && (
+                  <div className="mt-4 text-xs text-gray-500">
+                    Can't find your food? You can use AI photo analysis instead.
+                  </div>
+                )}
+                <div className="mt-4 pt-3 border-t border-gray-100 space-y-2">
+                  <div className="text-sm font-medium text-gray-900">
+                    Or use AI photo analysis
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    Take a clear photo of the food or package and let Helfi estimate the nutrition using AI.
+                  </p>
+                  <label className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium cursor-pointer hover:bg-emerald-700">
+                    Add Image
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        handlePhotoUpload(e)
+                        setShowAddIngredientModal(false)
+                        setShowAddFood(true)
+                        setShowPhotoOptions(false)
+                      }}
+                    />
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Insights Update Notification - Subtle and non-intrusive */}
       {insightsNotification && (
         <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[10000] transition-opacity duration-300">
@@ -6680,15 +6845,7 @@ Please add nutritional information manually if needed.`);
                   {/* Manual Entry Option */}
                   <button
                     type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowPhotoOptions(false);
-                      setPhotoOptionsAnchor(null);
-                      // Use setTimeout to ensure modal opens after dropdown closes
-                      setTimeout(() => {
-                        setShowAddIngredientModal(true);
-                      }, 0);
-                    }}
+                    onClick={(e) => openAddIngredientModalFromMenu(e)}
                     className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
                   >
                     <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center mr-3 text-green-600">
@@ -7361,7 +7518,7 @@ Please add nutritional information manually if needed.`);
                       <div className="mb-2 flex items-center justify-between">
                         <div className="text-sm font-medium text-gray-600">Detected Foods:</div>
                         <button
-                          onClick={() => setShowAddIngredientModal(true)}
+                          onClick={(e) => openAddIngredientModalFromMenu(e)}
                           className="text-sm px-3 py-1.5 rounded-md bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
                           title="Add a missing ingredient"
                         >
@@ -7834,155 +7991,7 @@ Please add nutritional information manually if needed.`);
                     )}
                 </div>
                   
-                {/* Add Ingredient Modal */}
-                {showAddIngredientModal && (
-                  <div className="fixed inset-0 z-50">
-                    <div
-                      className="absolute inset-0 bg-black/30"
-                      onClick={() => {
-                        setShowAddIngredientModal(false)
-                        setOfficialSearchQuery('')
-                        setOfficialResults([])
-                        setOfficialError(null)
-                      }}
-                    ></div>
-                    <div className="absolute inset-0 flex items-start sm:items-center justify-center mt-10 sm:mt-0">
-                      <div className="w-[92%] max-w-lg bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
-                        <div className="p-4 border-b border-gray-100 flex items-center justify-between">
-                          <div className="font-semibold text-gray-900">Add ingredient</div>
-                          <button onClick={() => setShowAddIngredientModal(false)} className="p-2 rounded-md hover:bg-gray-100">
-                            <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                          </button>
-                        </div>
-                        <div className="p-4">
-                          <div className="space-y-2">
-                            <label className="block text-sm font-medium text-gray-900">
-                              Search foods (USDA first, FatSecret fallback)
-                            </label>
-                            <div className="flex flex-col sm:flex-row gap-2">
-                              <input
-                                type="text"
-                                value={officialSearchQuery}
-                                onChange={(e) => setOfficialSearchQuery(e.target.value)}
-                                placeholder={'e.g., Carman\'s toasted muesli or \"oatmeal\"'}
-                                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base"
-                              />
-                              <div className="flex gap-2">
-                                <button
-                                  type="button"
-                                  disabled={officialLoading}
-                                  onClick={() => handleOfficialSearch('packaged')}
-                                  className={`px-3 py-2 text-xs font-medium rounded-lg border ${
-                                    officialSource === 'packaged'
-                                      ? 'bg-emerald-600 text-white border-emerald-600'
-                                      : 'bg-white text-gray-700 border-gray-300'
-                                  } disabled:opacity-60`}
-                                >
-                                  Packaged
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={officialLoading}
-                                  onClick={() => handleOfficialSearch('single')}
-                                  className={`px-3 py-2 text-xs font-medium rounded-lg border ${
-                                    officialSource === 'single'
-                                      ? 'bg-slate-800 text-white border-slate-800'
-                                      : 'bg-white text-gray-700 border-gray-300'
-                                  } disabled:opacity-60`}
-                                >
-                                  Single food
-                                </button>
-                              </div>
-                            </div>
-                            <p className="text-xs text-gray-500">
-                              We search USDA FoodData Central first, then fall back to FatSecret if USDA is unavailable or rate limited. Use the toggles to focus on packaged products or generic single foods.
-                            </p>
-                          </div>
-                          {officialError && <div className="mt-3 text-xs text-red-600">{officialError}</div>}
-                          {officialLoading && (
-                            <div className="mt-3 text-xs text-gray-500">Searching USDA → FatSecret…</div>
-                          )}
-                          {!officialLoading && !officialError && officialResults.length > 0 && (
-                            <div className="mt-3 max-h-80 overflow-y-auto space-y-2">
-                              {officialResults.map((r, idx) => (
-                                <div
-                                  key={`${r.source}-${r.id}-${idx}`}
-                                  className="flex items-start justify-between rounded-lg border border-gray-200 px-3 py-2"
-                                >
-                                  <div className="min-w-0">
-                                    <div className="text-sm font-semibold text-gray-900 truncate">
-                                      {r.name}
-                                      {r.brand ? ` – ${r.brand}` : ''}
-                                    </div>
-                                    <div className="mt-0.5 text-xs text-gray-600">
-                                      {r.serving_size ? `Serving: ${r.serving_size} • ` : ''}
-                                      {r.calories != null && !Number.isNaN(Number(r.calories)) && (
-                                        <span>{Math.round(Number(r.calories))} kcal</span>
-                                      )}
-                                      {r.protein_g != null && (
-                                        <span className="ml-2">{`${r.protein_g} g protein`}</span>
-                                      )}
-                                      {r.carbs_g != null && (
-                                        <span className="ml-2">{`${r.carbs_g} g carbs`}</span>
-                                      )}
-                                      {r.fat_g != null && <span className="ml-2">{`${r.fat_g} g fat`}</span>}
-                                    </div>
-                                    <div className="mt-1 text-[11px] text-gray-400">
-                                      Source:{' '}
-                                      {r.source === 'usda'
-                                        ? 'USDA FoodData Central'
-                                        : r.source === 'fatsecret'
-                                        ? 'FatSecret'
-                                        : r.source === 'openfoodfacts'
-                                        ? 'OpenFoodFacts'
-                                        : officialResultsSource || 'Unknown'}
-                                    </div>
-                                  </div>
-                                  <button
-                                    type="button"
-                                    onClick={() => addIngredientFromOfficial(r)}
-                                    className="ml-3 px-3 py-1.5 rounded-md bg-emerald-600 text-white text-xs hover:bg-emerald-700"
-                                  >
-                                    Add
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                          {!officialLoading && !officialError && officialResults.length === 0 && officialSearchQuery.trim() && (
-                            <div className="mt-4 text-xs text-gray-500">
-                              Can't find your food? You can use AI photo analysis instead.
-                            </div>
-                          )}
-                          <div className="mt-4 pt-3 border-t border-gray-100 space-y-2">
-                            <div className="text-sm font-medium text-gray-900">
-                              Or use AI photo analysis
-                            </div>
-                            <p className="text-xs text-gray-500">
-                              Take a clear photo of the food or package and let Helfi estimate the nutrition using AI.
-                            </p>
-                            <label className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium cursor-pointer hover:bg-emerald-700">
-                              Add Image
-                              <input
-                                type="file"
-                                accept="image/*"
-                                className="hidden"
-                                onChange={(e) => {
-                                  handlePhotoUpload(e)
-                                  setShowAddIngredientModal(false)
-                                  setShowAddFood(true)
-                                  setShowPhotoOptions(false)
-                                }}
-                              />
-                            </label>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
+                {/* Add Ingredient Modal is rendered near the top of the page so it can open from anywhere */}
                 {/* Action Buttons */}
                 <div className="space-y-3 px-1 pb-6">
                   <div className="mb-6 mx-auto max-w-[95%]">
@@ -9277,15 +9286,7 @@ Please add nutritional information manually if needed.`);
 
                                       <button
                                         type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setShowPhotoOptions(false);
-                                          setPhotoOptionsAnchor(null);
-                                          // Use setTimeout to ensure modal opens after dropdown closes
-                                          setTimeout(() => {
-                                            setShowAddIngredientModal(true);
-                                          }, 0);
-                                        }}
+                                        onClick={(e) => openAddIngredientModalFromMenu(e)}
                                         className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
                                       >
                                         <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center mr-3 text-green-600">
@@ -9433,15 +9434,7 @@ Please add nutritional information manually if needed.`);
 
                                       <button
                                         type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setShowPhotoOptions(false);
-                                          setPhotoOptionsAnchor(null);
-                                          // Use setTimeout to ensure modal opens after dropdown closes
-                                          setTimeout(() => {
-                                            setShowAddIngredientModal(true);
-                                          }, 0);
-                                        }}
+                                        onClick={(e) => openAddIngredientModalFromMenu(e)}
                                         className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
                                       >
                                         <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center mr-3 text-green-600">
