@@ -1463,9 +1463,26 @@ CRITICAL REQUIREMENTS:
       );
     }
 
-    // Use the higher-accuracy model for both first pass and re-analysis.
+    // Main food model selection.
+    // Default is env-controlled; admin can set a per-user override via __FOOD_ANALYZER_MODEL__.
     // Temperature is set to 0 for maximum consistency between runs on the same meal.
-    const model = 'gpt-4o';
+    let model = (process.env.OPENAI_FOOD_MODEL || 'gpt-4o').trim() || 'gpt-4o'
+    try {
+      const goal = await prisma.healthGoal.findFirst({
+        where: { userId: currentUser.id, name: '__FOOD_ANALYZER_MODEL__' },
+        select: { category: true },
+      })
+      if (goal?.category) {
+        const parsed = JSON.parse(goal.category)
+        const override = typeof parsed?.model === 'string' ? parsed.model.trim() : ''
+        if (override === 'gpt-4o' || override === 'gpt-5.2') {
+          model = override
+        }
+      }
+    } catch (e) {
+      console.warn('Food analyzer model override lookup failed (non-fatal):', e)
+    }
+
     const maxTokens = 600;
 
     // Wallet pre-check (skip if allowed via free use OR billing checks are disabled)
@@ -1523,7 +1540,9 @@ CRITICAL REQUIREMENTS:
     const primary = await chatCompletionWithCost(openai, {
       model,
       messages,
-      max_tokens: maxTokens,
+      ...(model.toLowerCase().includes('gpt-5')
+        ? { max_completion_tokens: maxTokens }
+        : { max_tokens: maxTokens }),
       temperature: 0,
     } as any);
 

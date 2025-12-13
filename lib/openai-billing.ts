@@ -144,65 +144,13 @@ export async function fetchOpenAIUsageTotals(args: { startDate: string; endDate:
     return null
   }
 
-  // 1) Try usage with start/end
-  const usageRange = await tryCall('usage_range', `https://api.openai.com/v1/usage?start_date=${startDate}&end_date=${endDate}`, 'usage', false)
-  if (usageRange) return usageRange
-
-  // 2) Try usage with single date (endDate)
+  // OpenAI's vendor billing endpoints under /dashboard/* now require a browser session
+  // and will 401 for API keys. Also, many usage endpoints reject start/end and only
+  // accept a single `date` param. Avoid noisy multi-request fallbacks (rate limits).
   const usageSingle = await tryCall('usage_single', `https://api.openai.com/v1/usage?date=${endDate}`, 'usage', false)
   if (usageSingle) return usageSingle
 
-  // 3) Try billing endpoints (may be blocked on some accounts)
-  const billingRange = await tryCall(
-    'billing_range',
-    `https://api.openai.com/dashboard/billing/usage?start_date=${startDate}&end_date=${endDate}`,
-    'billing_fallback',
-    true,
-  )
-  if (billingRange) return billingRange
-
-  const billingSingle = await tryCall('billing_single', `https://api.openai.com/dashboard/billing/usage?date=${endDate}`, 'billing_fallback', true)
-  if (billingSingle) return billingSingle
-
-  // 4) As a last resort, aggregate per-day usage calls (usage?date=YYYY-MM-DD) to satisfy endpoints that demand a single date
-  try {
-    let cur = new Date(startDate + 'T00:00:00Z')
-    const end = new Date(endDate + 'T00:00:00Z')
-    let sumCents = 0
-    let promptTokens = 0
-    let completionTokens = 0
-
-    while (cur <= end) {
-      const dayStr = cur.toISOString().slice(0, 10)
-      const perDay = await tryCall(`usage_day_${dayStr}`, `https://api.openai.com/v1/usage?date=${dayStr}`, 'usage', false)
-      if (perDay?.totalUsageCents) {
-        sumCents += perDay.totalUsageCents
-        promptTokens += perDay.tokenTotals?.promptTokens || 0
-        completionTokens += perDay.tokenTotals?.completionTokens || 0
-      }
-      cur = new Date(cur.getTime() + 24 * 60 * 60 * 1000)
-    }
-
-    if (sumCents > 0) {
-      return {
-        startDate,
-        endDate,
-        totalUsageCents: sumCents,
-        costUsd: sumCents / 100,
-        tokenTotals: {
-          promptTokens,
-          completionTokens,
-          totalTokens: promptTokens + completionTokens,
-        },
-        source: 'usage',
-        usingFallback: false,
-        fetchedAt,
-        error: errors.length ? errors[errors.length - 1] : null,
-      }
-    }
-  } catch (err: any) {
-    errors.push(`per-day usage aggregation failed: ${err?.message || 'unknown'}`)
-  }
+  errors.push('OpenAI usage totals unavailable for this account; falling back to Helfi logs + rate card estimates.')
 
   // If everything failed, return error
   return {
