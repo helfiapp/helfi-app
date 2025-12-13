@@ -541,13 +541,15 @@ const harmonizeDiscretePortionItems = (items: any[]): { items: any[]; total: any
   const BACON_KEYWORDS = ['bacon', 'rasher', 'rashers', 'bacon strip', 'bacon strips'];
   const PATTY_KEYWORDS = ['patty', 'pattie', 'patties', 'burger patty', 'beef patty'];
   const CHEESE_KEYWORDS = ['cheese', 'cheddar', 'mozzarella', 'slice of cheese', 'cheese slice'];
+  const DRUMSTICK_KEYWORDS = ['drumstick', 'drumsticks', 'chicken drumstick', 'chicken leg', 'chicken legs'];
   const DISCRETE_DEFAULTS: Array<{
-    key: 'patty' | 'bacon' | 'cheese' | 'egg';
+    key: string;
     keywords: string[];
     gramsPerPiece: number;
     caloriesPerPiece: number;
     proteinPerPiece?: number;
     fatPerPiece?: number;
+    label?: (piecesPerServing: number) => string;
   }> = [
     {
       key: 'patty',
@@ -556,6 +558,7 @@ const harmonizeDiscretePortionItems = (items: any[]): { items: any[]; total: any
       caloriesPerPiece: 250,
       proteinPerPiece: 22,
       fatPerPiece: 18,
+      label: (n) => `${n} patty${n > 1 ? 'ies' : 'y'} (4–6 oz)`,
     },
     {
       key: 'bacon',
@@ -564,6 +567,7 @@ const harmonizeDiscretePortionItems = (items: any[]): { items: any[]; total: any
       caloriesPerPiece: 45,
       proteinPerPiece: 3,
       fatPerPiece: 3.5,
+      label: (n) => `${n} slice${n > 1 ? 's' : ''} bacon`,
     },
     {
       key: 'cheese',
@@ -572,6 +576,7 @@ const harmonizeDiscretePortionItems = (items: any[]): { items: any[]; total: any
       caloriesPerPiece: 100,
       proteinPerPiece: 6,
       fatPerPiece: 9,
+      label: (n) => `${n} cheese slice${n > 1 ? 's' : ''}`,
     },
     {
       key: 'egg',
@@ -580,6 +585,16 @@ const harmonizeDiscretePortionItems = (items: any[]): { items: any[]; total: any
       caloriesPerPiece: 70,
       proteinPerPiece: 6,
       fatPerPiece: 5,
+      label: (n) => `${n} piece${n > 1 ? 's' : ''}`,
+    },
+    {
+      key: 'drumstick',
+      keywords: DRUMSTICK_KEYWORDS,
+      gramsPerPiece: 90,
+      caloriesPerPiece: 180,
+      proteinPerPiece: 13,
+      fatPerPiece: 12,
+      label: (n) => `${n} drumstick${n > 1 ? 's' : ''}`,
     },
   ];
 
@@ -619,41 +634,50 @@ const harmonizeDiscretePortionItems = (items: any[]): { items: any[]; total: any
       // Seed serving_size with a discrete hint when missing so the UI picks up pieces.
       if (!item.serving_size || String(item.serving_size).trim().length === 0) {
         const label =
-          defaults.key === 'patty'
-            ? `${piecesPerServing} patty${piecesPerServing > 1 ? 'ies' : 'y'} (4–6 oz)`
-            : defaults.key === 'bacon'
-            ? `${piecesPerServing} slice${piecesPerServing > 1 ? 's' : ''} bacon`
-            : defaults.key === 'cheese'
-            ? `${piecesPerServing} cheese slice${piecesPerServing > 1 ? 's' : ''}`
-            : `${piecesPerServing} piece${piecesPerServing > 1 ? 's' : ''}`;
+          defaults.label?.(piecesPerServing) || `${piecesPerServing} piece${piecesPerServing > 1 ? 's' : ''}`;
         item.serving_size = label;
       }
 
       const totalPiecesForMacros = Math.max(totalPieces, piecesPerServing * item.servings);
-      const calories = Number(item?.calories ?? 0);
-      const protein = Number(item?.protein_g ?? 0);
-      const fat = Number(item?.fat_g ?? 0);
+      const calories = Number(item?.calories ?? NaN);
+      const protein = Number(item?.protein_g ?? NaN);
+      const fat = Number(item?.fat_g ?? NaN);
 
       const perPieceCalories =
-        totalPiecesForMacros > 0 && Number.isFinite(calories) ? calories / totalPiecesForMacros : 0;
+        totalPiecesForMacros > 0 && Number.isFinite(calories) ? calories / totalPiecesForMacros : NaN;
       const perPieceProtein =
-        totalPiecesForMacros > 0 && Number.isFinite(protein) ? protein / totalPiecesForMacros : 0;
-      const perPieceFat = totalPiecesForMacros > 0 && Number.isFinite(fat) ? fat / totalPiecesForMacros : 0;
+        totalPiecesForMacros > 0 && Number.isFinite(protein) ? protein / totalPiecesForMacros : NaN;
+      const perPieceFat = totalPiecesForMacros > 0 && Number.isFinite(fat) ? fat / totalPiecesForMacros : NaN;
 
-      if (!Number.isFinite(calories) || perPieceCalories < defaults.caloriesPerPiece * 0.9) {
-        item.calories = Math.round(defaults.caloriesPerPiece * totalPiecesForMacros);
-      }
-      if (
-        defaults.proteinPerPiece !== undefined &&
-        (!Number.isFinite(protein) || perPieceProtein < defaults.proteinPerPiece * 0.9)
-      ) {
-        item.protein_g = Math.round(defaults.proteinPerPiece * totalPiecesForMacros * 10) / 10;
-      }
-      if (
-        defaults.fatPerPiece !== undefined &&
-        (!Number.isFinite(fat) || perPieceFat < defaults.fatPerPiece * 0.9)
-      ) {
-        item.fat_g = Math.round(defaults.fatPerPiece * totalPiecesForMacros * 10) / 10;
+      const caloriesLow = !Number.isFinite(perPieceCalories) || perPieceCalories < defaults.caloriesPerPiece * 0.9;
+      const proteinLow =
+        defaults.proteinPerPiece === undefined ||
+        !Number.isFinite(perPieceProtein) ||
+        perPieceProtein < defaults.proteinPerPiece * 0.9;
+      const fatLow =
+        defaults.fatPerPiece === undefined || !Number.isFinite(perPieceFat) || perPieceFat < defaults.fatPerPiece * 0.9;
+
+      // If the "total" looks like it's only for a single piece, prefer scaling the model's numbers
+      // (this keeps photo-specific portion sizes), otherwise fall back to conservative defaults.
+      if (caloriesLow && (proteinLow || fatLow)) {
+        const looksLikePerPieceCalories = Number.isFinite(calories) && calories >= defaults.caloriesPerPiece * 0.6;
+        if (looksLikePerPieceCalories) {
+          const mult = totalPiecesForMacros;
+          if (Number.isFinite(calories)) item.calories = Math.round(calories * mult);
+          const macroFields: Array<keyof typeof item> = ['protein_g', 'carbs_g', 'fat_g', 'fiber_g', 'sugar_g'];
+          for (const field of macroFields) {
+            const v = Number((item as any)?.[field]);
+            if (Number.isFinite(v)) (item as any)[field] = Math.round(v * mult * 10) / 10;
+          }
+        } else {
+          item.calories = Math.round(defaults.caloriesPerPiece * totalPiecesForMacros);
+          if (defaults.proteinPerPiece !== undefined) {
+            item.protein_g = Math.round(defaults.proteinPerPiece * totalPiecesForMacros * 10) / 10;
+          }
+          if (defaults.fatPerPiece !== undefined) {
+            item.fat_g = Math.round(defaults.fatPerPiece * totalPiecesForMacros * 10) / 10;
+          }
+        }
       }
 
       if (
