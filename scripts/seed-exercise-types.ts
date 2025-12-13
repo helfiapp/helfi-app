@@ -13,46 +13,79 @@ const EXERCISE_TYPES: SeedExerciseType[] = [
   // Cardio
   { category: 'Cardio', name: 'Walking, 5 km/h', met: 3.3, intensity: 'light' },
   { category: 'Cardio', name: 'Walking, brisk, 6.5 km/h', met: 4.3, intensity: 'moderate' },
+  { category: 'Cardio', name: 'Walking, uphill', met: 6.5, intensity: 'vigorous' },
+  { category: 'Cardio', name: 'Walking, stairs / step-ups', met: 8.0, intensity: 'vigorous' },
+  { category: 'Cardio', name: 'Jogging, easy', met: 7.0, intensity: 'vigorous' },
   { category: 'Cardio', name: 'Jogging, 8 km/h', met: 8.3, intensity: 'vigorous' },
   { category: 'Cardio', name: 'Running, 10 km/h', met: 9.8, intensity: 'vigorous' },
+  { category: 'Cardio', name: 'Running, 12 km/h', met: 11.5, intensity: 'vigorous' },
+  { category: 'Cardio', name: 'Running, intervals', met: 12.0, intensity: 'vigorous' },
   { category: 'Cardio', name: 'Stair climbing', met: 8.8, intensity: 'vigorous' },
   { category: 'Cardio', name: 'Rowing machine, moderate', met: 7.0, intensity: 'vigorous' },
+  { category: 'Cardio', name: 'Rowing machine, vigorous', met: 8.5, intensity: 'vigorous' },
   { category: 'Cardio', name: 'Elliptical trainer, moderate', met: 5.0, intensity: 'moderate' },
+  { category: 'Cardio', name: 'Elliptical trainer, vigorous', met: 7.0, intensity: 'vigorous' },
+  { category: 'Cardio', name: 'Jump rope', met: 12.3, intensity: 'vigorous' },
+  { category: 'Cardio', name: 'Aerobics, general', met: 6.5, intensity: 'vigorous' },
 
   // Outdoor Activity
   { category: 'Outdoor Activity', name: 'Hiking', met: 6.0, intensity: 'vigorous' },
+  { category: 'Outdoor Activity', name: 'Trail running', met: 9.5, intensity: 'vigorous' },
   { category: 'Outdoor Activity', name: 'Gardening', met: 4.0, intensity: 'moderate' },
+  { category: 'Outdoor Activity', name: 'Snow shoveling', met: 6.0, intensity: 'vigorous' },
+  { category: 'Outdoor Activity', name: 'Raking leaves', met: 4.3, intensity: 'moderate' },
 
   // Transportation
   { category: 'Transportation', name: 'Cycling, leisure, 19–22 km/h', met: 8.0, intensity: 'vigorous' },
   { category: 'Transportation', name: 'Cycling, easy', met: 4.0, intensity: 'moderate' },
+  { category: 'Transportation', name: 'Cycling, vigorous', met: 10.0, intensity: 'vigorous' },
+  { category: 'Transportation', name: 'Walking commute', met: 3.5, intensity: 'light' },
 
   // Gym
   { category: 'Gym', name: 'Stationary bike, moderate', met: 7.0, intensity: 'vigorous' },
+  { category: 'Gym', name: 'Stationary bike, vigorous', met: 10.5, intensity: 'vigorous' },
   { category: 'Gym', name: 'Spin class', met: 8.5, intensity: 'vigorous' },
+  { category: 'Gym', name: 'Treadmill, walking', met: 4.0, intensity: 'moderate' },
+  { category: 'Gym', name: 'Treadmill, running', met: 9.8, intensity: 'vigorous' },
 
   // Strength And Mobility
   { category: 'Strength And Mobility', name: 'Weight training, general', met: 3.5, intensity: 'moderate' },
+  { category: 'Strength And Mobility', name: 'Weight training, vigorous', met: 6.0, intensity: 'vigorous' },
+  { category: 'Strength And Mobility', name: 'Bodyweight training', met: 4.0, intensity: 'moderate' },
   { category: 'Strength And Mobility', name: 'Circuit training', met: 8.0, intensity: 'vigorous' },
   { category: 'Strength And Mobility', name: 'HIIT', met: 8.5, intensity: 'vigorous' },
   { category: 'Strength And Mobility', name: 'Yoga', met: 2.5, intensity: 'light' },
   { category: 'Strength And Mobility', name: 'Pilates', met: 3.0, intensity: 'moderate' },
   { category: 'Strength And Mobility', name: 'Stretching / mobility', met: 2.3, intensity: 'light' },
+  { category: 'Strength And Mobility', name: 'Calisthenics', met: 5.0, intensity: 'moderate' },
 
   // Individual Sport
   { category: 'Individual Sport', name: 'Swimming, moderate', met: 6.0, intensity: 'vigorous' },
+  { category: 'Individual Sport', name: 'Swimming, vigorous', met: 9.8, intensity: 'vigorous' },
+  { category: 'Individual Sport', name: 'Boxing, training', met: 7.8, intensity: 'vigorous' },
+  { category: 'Individual Sport', name: 'Martial arts', met: 10.3, intensity: 'vigorous' },
   { category: 'Individual Sport', name: 'Tennis, singles', met: 8.0, intensity: 'vigorous' },
+  { category: 'Individual Sport', name: 'Golf, walking, carrying clubs', met: 4.3, intensity: 'moderate' },
+  { category: 'Individual Sport', name: 'Skiing, downhill', met: 6.8, intensity: 'vigorous' },
 
   // Team Sport
   { category: 'Team Sport', name: 'Soccer', met: 7.0, intensity: 'vigorous' },
   { category: 'Team Sport', name: 'Basketball', met: 6.5, intensity: 'vigorous' },
+  { category: 'Team Sport', name: 'AFL / football', met: 8.0, intensity: 'vigorous' },
+  { category: 'Team Sport', name: 'Netball', met: 6.0, intensity: 'vigorous' },
+  { category: 'Team Sport', name: 'Volleyball', met: 4.0, intensity: 'moderate' },
 
   // Household Activity
   { category: 'Household Activity', name: 'House cleaning', met: 3.0, intensity: 'light' },
   { category: 'Household Activity', name: 'Carrying groceries', met: 3.5, intensity: 'moderate' },
+  { category: 'Household Activity', name: 'Mopping / vacuuming', met: 3.5, intensity: 'moderate' },
+  { category: 'Household Activity', name: 'Laundry, folding', met: 2.0, intensity: 'light' },
+  { category: 'Household Activity', name: 'Cooking / food prep', met: 2.5, intensity: 'light' },
 
   // Occupational Activity
   { category: 'Occupational Activity', name: 'Standing, light work', met: 2.3, intensity: 'light' },
+  { category: 'Occupational Activity', name: 'Walking, light work', met: 3.0, intensity: 'light' },
+  { category: 'Occupational Activity', name: 'Carrying loads', met: 6.0, intensity: 'vigorous' },
 ]
 
 async function main() {
@@ -82,4 +115,3 @@ main()
     await prisma.$disconnect()
     process.exit(1)
   })
-
