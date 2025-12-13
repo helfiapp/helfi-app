@@ -1948,7 +1948,7 @@ export default function FoodDiary() {
       const distanceKm = editingExerciseEntry?.distanceKm
       if (typeof distanceKm === 'number' && Number.isFinite(distanceKm) && distanceKm > 0) {
         setExerciseDistanceUnit('km')
-        setExerciseDistanceKm(String(Math.round(distanceKm * 10) / 10))
+        setExerciseDistanceKm(formatDistanceForInput(distanceKm))
       } else {
         setExerciseDistanceKm('')
         setExerciseDistanceUnit('km')
@@ -2052,6 +2052,18 @@ export default function FoodDiary() {
     const clampedHours = Number.isFinite(hours) ? Math.max(0, Math.min(23, Math.floor(hours))) : 0
     const clampedMins = Number.isFinite(mins) ? Math.max(0, Math.min(59, Math.floor(mins))) : 0
     return clampedHours * 60 + clampedMins
+  }
+
+  const roundTo = (value: number, decimals: number) => {
+    const factor = Math.pow(10, decimals)
+    return Math.round(value * factor) / factor
+  }
+
+  const formatDistanceForInput = (distanceKm: number) => {
+    const rounded = roundTo(distanceKm, 2)
+    if (!Number.isFinite(rounded)) return ''
+    const asString = String(rounded)
+    return asString.replace(/\.0+$/, '')
   }
 
   const computeDistanceKmForRequest = () => {
@@ -7250,7 +7262,8 @@ Please add nutritional information manually if needed.`);
 	                                  if (exerciseDistanceUnit === 'km') return
 	                                  const current = exerciseDistanceKm.trim().length > 0 ? Number(exerciseDistanceKm) : null
 	                                  if (current && Number.isFinite(current)) {
-	                                    setExerciseDistanceKm(String(Math.round(current * 1.60934 * 10) / 10))
+	                                    const next = roundTo(current * 1.60934, 2)
+	                                    setExerciseDistanceKm(String(next).replace(/\.0+$/, ''))
 	                                  }
 	                                  setExerciseDistanceUnit('km')
 	                                }}
@@ -7268,7 +7281,8 @@ Please add nutritional information manually if needed.`);
 	                                  if (exerciseDistanceUnit === 'mi') return
 	                                  const current = exerciseDistanceKm.trim().length > 0 ? Number(exerciseDistanceKm) : null
 	                                  if (current && Number.isFinite(current)) {
-	                                    setExerciseDistanceKm(String(Math.round((current / 1.60934) * 10) / 10))
+	                                    const next = roundTo(current / 1.60934, 2)
+	                                    setExerciseDistanceKm(String(next).replace(/\.0+$/, ''))
 	                                  }
 	                                  setExerciseDistanceUnit('mi')
 	                                }}
@@ -9986,8 +10000,25 @@ Please add nutritional information manually if needed.`);
 		                          const calories = convertKcalToUnit(Number(entry?.calories) || 0, energyUnit)
 		                          const duration = Number(entry?.durationMinutes) || 0
 		                          const isManual = String(entry?.source || '').toUpperCase() === 'MANUAL'
+		                          const distanceKm =
+		                            typeof entry?.distanceKm === 'number' && Number.isFinite(entry.distanceKm) && entry.distanceKm > 0
+		                              ? Number(entry.distanceKm)
+		                              : null
 		                          const sourceLabel =
 		                            entry?.source === 'FITBIT' ? 'Fitbit' : entry?.source === 'GARMIN' ? 'Garmin' : 'Manual'
+		                          const title = (() => {
+		                            const typeName = String(entry?.exerciseType?.name || '').trim()
+		                            const label = String(entry?.label || '').trim()
+		                            if (distanceKm) {
+		                              if (typeName) return typeName.split(',')[0].trim() || typeName
+		                              return (label || 'Exercise').replace(/\s*\([^)]*km\/h[^)]*\)\s*$/i, '').trim() || 'Exercise'
+		                            }
+		                            return label || typeName || 'Exercise'
+		                          })()
+		                          const subtitleParts: string[] = []
+		                          if (distanceKm) subtitleParts.push(`${formatDistanceForInput(distanceKm)} km`)
+		                          subtitleParts.push(`${Math.round(duration)} min`)
+		                          subtitleParts.push(sourceLabel)
 		                          return (
 		                            <div
 		                              key={entry.id}
@@ -10008,10 +10039,10 @@ Please add nutritional information manually if needed.`);
 		                            >
 		                              <div className="min-w-0">
 		                                <div className="text-sm font-semibold text-gray-900 truncate">
-		                                  {entry?.label || 'Exercise'}
+		                                  {title}
 		                                </div>
 		                                <div className="text-xs text-gray-500">
-		                                  {Math.round(duration)} min • {sourceLabel}
+		                                  {subtitleParts.join(' • ')}
 		                                </div>
 		                              </div>
 		                              <div className="flex items-center gap-2">
