@@ -25,6 +25,24 @@ const envNumber = (key: string, fallback: number): number => {
 };
 
 const DEFAULT_PRICES: Record<string, ModelPrices> = {
+  // GPT-5.2 (per OpenAI pricing page screenshot provided by user)
+  // Input: $1.75 / 1M tokens; Output: $14.00 / 1M tokens
+  'gpt-5.2': {
+    inputCentsPer1k: envNumber('HELFI_PRICE_GPT52_INPUT_CENTS_PER_1K', 0.175),
+    outputCentsPer1k: envNumber('HELFI_PRICE_GPT52_OUTPUT_CENTS_PER_1K', 1.4),
+  },
+  // GPT-5.2 pro
+  // Input: $21.00 / 1M tokens; Output: $168.00 / 1M tokens
+  'gpt-5.2-pro': {
+    inputCentsPer1k: envNumber('HELFI_PRICE_GPT52_PRO_INPUT_CENTS_PER_1K', 2.1),
+    outputCentsPer1k: envNumber('HELFI_PRICE_GPT52_PRO_OUTPUT_CENTS_PER_1K', 16.8),
+  },
+  // GPT-5 mini
+  // Input: $0.25 / 1M tokens; Output: $2.00 / 1M tokens
+  'gpt-5-mini': {
+    inputCentsPer1k: envNumber('HELFI_PRICE_GPT5_MINI_INPUT_CENTS_PER_1K', 0.025),
+    outputCentsPer1k: envNumber('HELFI_PRICE_GPT5_MINI_OUTPUT_CENTS_PER_1K', 0.2),
+  },
   // 4o: ~$0.005 / 1k input, $0.015 / 1k output
   'gpt-4o': {
     inputCentsPer1k: envNumber('HELFI_PRICE_GPT4O_INPUT_CENTS_PER_1K', 0.5),
@@ -55,6 +73,9 @@ export type TokenUsage = {
 
 function normalizeModelKey(model: string): string {
   const m = (model || '').toLowerCase();
+  if (m.includes('gpt-5.2') && m.includes('pro')) return 'gpt-5.2-pro';
+  if (m.includes('gpt-5.2')) return 'gpt-5.2';
+  if (m.includes('gpt-5-mini') || m.includes('gpt-5 mini')) return 'gpt-5-mini';
   if (m.includes('gpt-4o-mini')) return 'gpt-4o-mini';
   if (m.includes('gpt-4o')) return 'gpt-4o';
   if (m.includes('gpt-4')) return 'gpt-4';
@@ -109,7 +130,6 @@ export function costCentsEstimateFromText(
   const completionTokens = Math.ceil(expectedOutputChars / 4);
   return costCentsForTokens(model, { promptTokens, completionTokens });
 }
-
 
 
 

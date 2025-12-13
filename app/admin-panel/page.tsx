@@ -24,6 +24,22 @@ export default function AdminPanel() {
   const [visionUsageUserFilter, setVisionUsageUserFilter] = useState('')
   const [visionUsageLoading, setVisionUsageLoading] = useState(false)
   const [visionUsageError, setVisionUsageError] = useState('')
+
+  // Food analysis cost testing (admin)
+  const [foodCostSimRange, setFoodCostSimRange] = useState(7)
+  const [foodCostSim, setFoodCostSim] = useState<any>(null)
+  const [foodCostSimLoading, setFoodCostSimLoading] = useState(false)
+  const [foodCostSimError, setFoodCostSimError] = useState('')
+  const [foodBenchmarkImageUrl, setFoodBenchmarkImageUrl] = useState('')
+  const [foodBenchmarkModels, setFoodBenchmarkModels] = useState<Record<string, boolean>>({
+    'gpt-4o': true,
+    'gpt-5.2': true,
+    'gpt-5-mini': false,
+    'gpt-5.2-pro': false,
+  })
+  const [foodBenchmarkResult, setFoodBenchmarkResult] = useState<any>(null)
+  const [foodBenchmarkLoading, setFoodBenchmarkLoading] = useState(false)
+  const [foodBenchmarkError, setFoodBenchmarkError] = useState('')
   
   // Additional admin data states
   const [waitlistData, setWaitlistData] = useState<any[]>([])
@@ -266,6 +282,63 @@ export default function AdminPanel() {
       setVisionUsageError(err?.message || 'Failed to load vision usage')
     } finally {
       setVisionUsageLoading(false)
+    }
+  }
+
+  const loadFoodCostSim = async (range?: number) => {
+    const days = range ?? foodCostSimRange
+    setFoodCostSimRange(days)
+    setFoodCostSimLoading(true)
+    setFoodCostSimError('')
+    try {
+      const authToken = sessionStorage.getItem('adminToken') || adminToken
+      const params = new URLSearchParams()
+      params.set('rangeDays', String(days))
+      const res = await fetch(`/api/admin/food-cost-sim?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${authToken}` },
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setFoodCostSimError(data?.error || 'Failed to load food cost simulation')
+        setFoodCostSimLoading(false)
+        return
+      }
+      setFoodCostSim(data)
+    } catch (err: any) {
+      setFoodCostSimError(err?.message || 'Failed to load food cost simulation')
+    } finally {
+      setFoodCostSimLoading(false)
+    }
+  }
+
+  const runFoodBenchmark = async () => {
+    setFoodBenchmarkLoading(true)
+    setFoodBenchmarkError('')
+    setFoodBenchmarkResult(null)
+    try {
+      const authToken = sessionStorage.getItem('adminToken') || adminToken
+      const models = Object.entries(foodBenchmarkModels)
+        .filter(([, enabled]) => enabled)
+        .map(([m]) => m)
+      const res = await fetch('/api/admin/food-benchmark', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ imageUrl: foodBenchmarkImageUrl.trim(), models }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setFoodBenchmarkError(data?.error || 'Benchmark failed')
+        setFoodBenchmarkLoading(false)
+        return
+      }
+      setFoodBenchmarkResult(data)
+    } catch (err: any) {
+      setFoodBenchmarkError(err?.message || 'Benchmark failed')
+    } finally {
+      setFoodBenchmarkLoading(false)
     }
   }
 
@@ -1626,6 +1699,9 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                   if (item.id === 'usage' && !visionUsage) {
                     loadVisionUsage(visionUsageRange)
                   }
+                  if (item.id === 'usage' && !foodCostSim) {
+                    loadFoodCostSim(foodCostSimRange)
+                  }
                   if (item.id === 'settings') {
                     checkPushNotificationStatus()
                   }
@@ -1666,6 +1742,9 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                   }
                   if (tab.id === 'usage' && !visionUsage) {
                     loadVisionUsage(visionUsageRange)
+                  }
+                  if (tab.id === 'usage' && !foodCostSim) {
+                    loadFoodCostSim(foodCostSimRange)
                   }
                   if (tab.id === 'management') {
                     loadUserManagement(userSearch, userFilter, currentPage)
@@ -2133,6 +2212,211 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                 </div>
               </>
             )}
+
+            <div className="bg-white rounded-lg shadow p-6 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Food Analysis Cost Simulator</h3>
+                  <p className="text-sm text-gray-600">
+                    Uses recent Helfi usage logs to estimate what switching models (e.g. GPT‑5.2) would cost per food image analysis.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <label className="text-sm text-gray-600">Range</label>
+                  <select
+                    value={foodCostSimRange}
+                    onChange={(e) => loadFoodCostSim(Number(e.target.value))}
+                    className="border-gray-300 rounded-lg text-sm"
+                  >
+                    <option value={1}>Last 24h</option>
+                    <option value={7}>Last 7d</option>
+                    <option value={30}>Last 30d</option>
+                    <option value={90}>Last 90d</option>
+                  </select>
+                  <button
+                    onClick={() => loadFoodCostSim(foodCostSimRange)}
+                    className="px-3 py-2 bg-emerald-600 text-white rounded-md text-sm hover:bg-emerald-700"
+                  >
+                    Refresh
+                  </button>
+                </div>
+              </div>
+
+              {foodCostSimError && (
+                <div className="bg-red-50 text-red-700 border border-red-200 rounded-lg p-3 text-sm">
+                  {foodCostSimError}
+                </div>
+              )}
+
+              {foodCostSimLoading && (
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-sm text-gray-700">
+                  Loading food cost simulation…
+                </div>
+              )}
+
+              {!foodCostSimLoading && foodCostSim && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                      <div className="text-xs text-gray-500">Samples</div>
+                      <div className="text-xl font-semibold text-gray-900">{foodCostSim.samples || 0}</div>
+                    </div>
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                      <div className="text-xs text-gray-500">Avg Prompt Tokens</div>
+                      <div className="text-xl font-semibold text-gray-900">{foodCostSim.averages?.promptTokens || 0}</div>
+                    </div>
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                      <div className="text-xs text-gray-500">Avg Completion Tokens</div>
+                      <div className="text-xl font-semibold text-gray-900">{foodCostSim.averages?.completionTokens || 0}</div>
+                    </div>
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                      <div className="text-xs text-gray-500">Avg Total Tokens</div>
+                      <div className="text-xl font-semibold text-gray-900">{foodCostSim.averages?.totalTokens || 0}</div>
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Model</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Vendor $ (est)</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Billed Credits</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Analyses / $20 Plan</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200 text-sm">
+                        {(foodCostSim.simulations || []).map((s: any) => (
+                          <tr key={s.model} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 font-medium text-gray-900">{s.model}</td>
+                            <td className="px-4 py-3 text-gray-700">
+                              ${((Number(s.vendorCostCents || 0) || 0) / 100).toFixed(4)}
+                            </td>
+                            <td className="px-4 py-3 text-gray-700">{Number(s.billedCostCents || 0)}</td>
+                            <td className="px-4 py-3 text-gray-700">{Number(s.analysesPer1400Credits || 0)}</td>
+                          </tr>
+                        ))}
+                        {(foodCostSim.simulations || []).length === 0 && (
+                          <tr>
+                            <td colSpan={4} className="px-4 py-6 text-center text-gray-500">
+                              Not enough data yet.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="text-xs text-gray-500">
+                    Credits are cents. “Billed credits” includes Helfi markup; “Vendor $” is raw estimated OpenAI cost for the same tokens.
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="bg-white rounded-lg shadow p-6 space-y-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Food Model Benchmark (Image URL)</h3>
+                <p className="text-sm text-gray-600">
+                  Runs a simplified image-analysis prompt on selected models and returns token usage + a short output preview.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div className="lg:col-span-2">
+                  <label className="block text-sm text-gray-600 mb-1">Public Image URL</label>
+                  <input
+                    value={foodBenchmarkImageUrl}
+                    onChange={(e) => setFoodBenchmarkImageUrl(e.target.value)}
+                    placeholder="https://…"
+                    className="w-full border-gray-300 rounded-lg text-sm px-3 py-2"
+                  />
+                  <div className="text-xs text-gray-500 mt-1">Must be publicly accessible (https://).</div>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">Models</label>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    {Object.keys(foodBenchmarkModels).map((m) => (
+                      <label key={m} className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={foodBenchmarkModels[m]}
+                          onChange={(e) => setFoodBenchmarkModels((prev) => ({ ...prev, [m]: e.target.checked }))}
+                          className="h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded"
+                        />
+                        <span className="text-gray-700">{m}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={runFoodBenchmark}
+                  disabled={foodBenchmarkLoading || !foodBenchmarkImageUrl.trim()}
+                  className="px-3 py-2 bg-emerald-600 text-white rounded-md text-sm hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {foodBenchmarkLoading ? 'Running…' : 'Run Benchmark'}
+                </button>
+                <button
+                  onClick={() => {
+                    setFoodBenchmarkResult(null)
+                    setFoodBenchmarkError('')
+                  }}
+                  className="px-3 py-2 bg-gray-100 text-gray-800 rounded-md text-sm hover:bg-gray-200"
+                >
+                  Clear
+                </button>
+              </div>
+
+              {foodBenchmarkError && (
+                <div className="bg-red-50 text-red-700 border border-red-200 rounded-lg p-3 text-sm">
+                  {foodBenchmarkError}
+                </div>
+              )}
+
+              {foodBenchmarkResult && (
+                <div className="space-y-3">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Model</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Prompt</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Completion</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Vendor $</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Billed Credits</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200 text-sm">
+                        {(foodBenchmarkResult.results || []).map((r: any) => (
+                          <tr key={r.model} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 font-medium text-gray-900">{r.model}</td>
+                            <td className="px-4 py-3 text-gray-700">{Number(r.promptTokens || 0)}</td>
+                            <td className="px-4 py-3 text-gray-700">{Number(r.completionTokens || 0)}</td>
+                            <td className="px-4 py-3 text-gray-700">
+                              ${((Number(r.vendorCostCents || 0) || 0) / 100).toFixed(4)}
+                            </td>
+                            <td className="px-4 py-3 text-gray-700">{Number(r.billedCostCents || 0)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {(foodBenchmarkResult.results || []).map((r: any) => (
+                    <div key={`${r.model}-preview`} className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                      <div className="text-xs font-semibold text-gray-700 mb-2">{r.model} output preview</div>
+                      <pre className="whitespace-pre-wrap text-xs text-gray-800">{r.outputPreview}</pre>
+                    </div>
+                  ))}
+
+                  <div className="text-xs text-gray-500">{foodBenchmarkResult.note}</div>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
