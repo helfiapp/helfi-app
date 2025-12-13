@@ -237,6 +237,93 @@ const normalizeGuessFlags = (items: any[]): any[] =>
       }))
     : [];
 
+const isSlicedProduceLabel = (text: string): boolean => {
+  const lower = (text || '').toLowerCase()
+  if (!lower.includes('slice')) return false
+  return (
+    lower.includes('avocado') ||
+    lower.includes('cucumber') ||
+    lower.includes('tomato') ||
+    lower.includes('zucchini') ||
+    lower.includes('courgette')
+  )
+}
+
+const inferSliceCount = (text: string): number | null => {
+  const lower = (text || '').toLowerCase()
+  const match = lower.match(/(\d+)\s*(?:thin\s*)?slice/i)
+  if (!match) return null
+  const n = Number(match[1])
+  return Number.isFinite(n) && n > 0 ? n : null
+}
+
+const applySlicedProduceSanity = (items: any[]): { items: any[]; changed: boolean } => {
+  if (!Array.isArray(items) || items.length === 0) return { items, changed: false }
+  let changed = false
+  const next = items.map((item) => {
+    if (!item || typeof item !== 'object') return item
+    const name = String(item?.name || '')
+    const serving = String(item?.serving_size || '')
+    const label = `${name} ${serving}`.trim()
+    if (!isSlicedProduceLabel(label)) return item
+
+    // If the model already provided grams/oz/ml, keep it (user can still adjust).
+    const hasExplicitWeight = /\b(\d+(?:\.\d+)?)\s*(g|gram|grams|ml|oz|ounce|ounces)\b/i.test(label)
+    const calories = Number(item?.calories)
+    const fat = Number(item?.fat_g)
+
+    // If this is a guess and the calories/macros are clearly "whole-food" sized, clamp to a conservative slice portion.
+    const isGuess = item?.isGuess === true
+    const isEgregious =
+      (!Number.isFinite(calories) || calories <= 0) ? false : calories >= 250 ||
+      (!Number.isFinite(fat) || fat <= 0) ? false : fat >= 25
+
+    if (!isGuess || hasExplicitWeight || !isEgregious) {
+      // Still ensure sliced produce doesn't get treated as discrete pieces.
+      if ((item as any)?.piecesPerServing || (item as any)?.pieces) {
+        const cleaned = { ...item }
+        delete (cleaned as any).piecesPerServing
+        delete (cleaned as any).pieces
+        return cleaned
+      }
+      return item
+    }
+
+    // Conservative estimate: thin slices are ~8g each (very rough).
+    const inferredSlices = inferSliceCount(label)
+    const grams = Math.min(90, Math.max(15, (inferredSlices ? inferredSlices * 8 : 25)))
+
+    // Avocado: ~160 kcal / 100g, fat ~14.7g/100g, carbs ~8.5g/100g, protein ~2g/100g, fiber ~6.7g/100g.
+    // For other sliced produce, the model is rarely egregious; keep only avocado clamp for now.
+    const lowerName = name.toLowerCase()
+    if (!lowerName.includes('avocado')) return item
+
+    const scale = grams / 100
+    const clamped = {
+      ...item,
+      name: 'avocado slices',
+      serving_size: inferredSlices ? `${inferredSlices} thin slices (~${Math.round(grams)}g)` : `thin slices (~${Math.round(grams)}g)`,
+      servings: 1,
+      calories: Math.round(160 * scale),
+      fat_g: Math.round(14.7 * scale * 10) / 10,
+      carbs_g: Math.round(8.5 * scale * 10) / 10,
+      protein_g: Math.round(2.0 * scale * 10) / 10,
+      fiber_g: Math.round(6.7 * scale * 10) / 10,
+      sugar_g: Math.round(0.7 * scale * 10) / 10,
+      isGuess: true,
+      // Ensure the UI defaults the weight editor to a sane value.
+      customGramsPerServing: Math.round(grams * 100) / 100,
+      weightUnit: 'g',
+      weightAmount: Math.round(grams * 100) / 100,
+    }
+    delete (clamped as any).piecesPerServing
+    delete (clamped as any).pieces
+    changed = true
+    return clamped
+  })
+  return { items: next, changed }
+}
+
 const replaceWordNumbers = (text: string) => {
   if (!text) return text;
   const map: Record<string, string> = {
@@ -1808,6 +1895,15 @@ CRITICAL REQUIREMENTS:
       resp.items = normalizeDiscreteCounts(resp.items);
       if (!resp.total || Object.keys(resp.total || {}).length === 0) {
         resp.total = computeTotalsFromItems(resp.items);
+      }
+    }
+
+    // Sliced produce sanity: avoid egregious "whole avocado" guesses when the item is clearly just slices.
+    if (resp.items && Array.isArray(resp.items) && resp.items.length > 0) {
+      const sanitized = applySlicedProduceSanity(resp.items)
+      resp.items = sanitized.items
+      if (sanitized.changed) {
+        resp.total = computeTotalsFromItems(resp.items) || resp.total
       }
     }
 
