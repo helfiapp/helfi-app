@@ -667,6 +667,11 @@ const isDiscreteUnitLabel = (label: string) => {
     'cup','cups','tbsp','tablespoon','tsp','teaspoon','oz','ounce','lb','pound'
   ]
   if (nonDiscreteUnits.some(u => l === u || l.endsWith(' ' + u))) return false
+  // Sliced produce should be treated as a portion (weight/servings), not a discrete "piece count".
+  // e.g. "avocado slices" should not behave like "6 pieces".
+  if (l.includes('slice') && (l.includes('avocado') || l.includes('cucumber') || l.includes('tomato') || l.includes('zucchini') || l.includes('courgette'))) {
+    return false
+  }
   const discreteKeywords = [
   'egg','slice','cookie','piece','patty','pattie','wing','nugget','meatball','stick','bar','biscuit','pancake','scoop',
   'cracker','crackers','chip','chips',
@@ -7374,7 +7379,12 @@ Please add nutritional information manually if needed.`);
                             /^\s*(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s+/i,
                             '',
                           )
-                          const trimmed = strippedWord.trim()
+                          const withoutGenericPrefixes = strippedWord
+                            // Drop noisy summary prefixes that shouldn't appear as ingredient names
+                            .replace(/^\s*(several components|multiple components)\s*:\s*/i, '')
+                            .replace(/^\s*(components?)\s*:\s*/i, '')
+                            .replace(/^\s*(a\s+)?(bowl|plate|meal)\s+with\s+several\s+components\s*:?\s*/i, '')
+                          const trimmed = withoutGenericPrefixes.trim()
                           return trimmed || 'Unknown Food'
                         })()
                         const displayName =
@@ -7527,7 +7537,17 @@ Please add nutritional information manually if needed.`);
                                 {/* Pieces control for discrete items */}
                                 {piecesPerServing && piecesPerServing > 0 && (
                                   <div className="flex items-center gap-3 mt-2">
-                                    <span className="text-sm text-gray-600">Pieces:</span>
+                                    <span className="text-sm text-gray-600">
+                                      {(() => {
+                                        const labelSource = String(servingSizeDisplayLabel || item?.serving_size || item?.name || '')
+                                        const meta = parseServingUnitMetadata(labelSource)
+                                        const unit = (meta?.unitLabelSingular || '').toLowerCase()
+                                        if (unit.includes('egg')) return 'Eggs:'
+                                        if (unit.includes('slice')) return 'Slices:'
+                                        if (unit.includes('patty')) return 'Patties:'
+                                        return 'Pieces:'
+                                      })()}
+                                    </span>
                                     <div className="flex items-center gap-2">
                                       <button
                                         onClick={() => {

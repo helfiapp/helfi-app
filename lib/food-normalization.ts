@@ -82,9 +82,23 @@ export const parseCountFromText = (text: string | null | undefined): number | nu
   return Number.isFinite(n) && n > 0 ? n : null
 }
 
+const isProduceSliceLabel = (text: string): boolean => {
+  const lower = (text || '').toLowerCase()
+  if (!lower.includes('slice')) return false
+  return (
+    lower.includes('avocado') ||
+    lower.includes('cucumber') ||
+    lower.includes('tomato') ||
+    lower.includes('zucchini') ||
+    lower.includes('courgette')
+  )
+}
+
 const isDiscreteLabel = (text: string | null | undefined): boolean => {
   if (!text) return false
   const lower = text.toLowerCase()
+  // Sliced produce behaves like a portion (weight/servings), not a discrete piece count.
+  if (isProduceSliceLabel(lower)) return false
   return DISCRETE_KEYWORDS.some((kw) => lower.includes(kw))
 }
 

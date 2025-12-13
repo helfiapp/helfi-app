@@ -1042,7 +1042,10 @@ IMPORTANT: Different sizes have different nutrition values:
 CRITICAL STRUCTURED OUTPUT RULES:
 - ALWAYS return the ITEMS_JSON block and include fiber_g and sugar_g for each item (do not leave as 0 unless truly 0).
 - Use household measures and add ounce equivalents in parentheses where appropriate (e.g., "1 cup (8 oz)").
-- For discrete items like bacon or bread slices, count visible slices and use that count for servings.
+- Item "name" must be the plain ingredient name only (e.g., "grilled salmon", "white rice"). Do NOT prefix names with "several components:", "components:", "meal:", etc.
+- For discrete items like bacon or bread/pizza slices, count visible slices and use that count for servings.
+- For sliced produce (e.g., avocado slices, tomato slices, cucumber slices): treat it as a PORTION (weight/servings), not a discrete piece count. Prefer a grams estimate or a fraction of the whole food (e.g., "1/4 avocado") and set isGuess: true if uncertain.
+- If uncertain about a count, choose a conservative (lower) number and mark isGuess: true.
 
 Examples:
 "Medium banana (1 whole)
@@ -1065,6 +1068,7 @@ CRITICAL REQUIREMENTS:
 - **Set "isGuess": true for any item you're including but aren't completely confident about.**
 - **Set "isGuess": false only for items you can clearly identify with high confidence.**
 - **For discrete items like patties, count them in serving_size (e.g., "2 patties" or "3 patties") and set servings to match the count.**
+- Do not use "pieces" semantics for sliced produce; use portion/grams as described above.
 - Nutrition values should be PER SERVING (not total) for each item.
 - The "total" object should sum all items multiplied by their servings.
 ` : ''}`
@@ -1167,7 +1171,10 @@ ${packagedEmphasisBlock}
 CRITICAL STRUCTURED OUTPUT RULES:
 - ALWAYS return the ITEMS_JSON block and include fiber_g and sugar_g for each item (do not leave as 0 unless truly 0).
 - Use household measures and add ounce equivalents in parentheses where appropriate (e.g., "1 cup (8 oz)").
-- For discrete items like bacon or bread slices, count visible slices and use that count for servings.
+- Item "name" must be the plain ingredient name only (e.g., "grilled salmon", "white rice"). Do NOT prefix names with "several components:", "components:", "meal:", etc.
+- For discrete items like bacon or bread/pizza slices, count visible slices and use that count for servings.
+- For sliced produce (e.g., avocado slices, tomato slices, cucumber slices): treat it as a PORTION (weight/servings), not a discrete piece count. Prefer a grams estimate or a fraction of the whole food (e.g., "1/4 avocado") and set isGuess: true if uncertain.
+- If uncertain about a count, choose a conservative (lower) number and mark isGuess: true.
 - **CRITICAL: Use REALISTIC nutrition values based on standard food databases (USDA, nutrition labels, etc.). Do NOT underestimate calories or macros.**
 - **Self-check before finalizing:** Sum all item macros and ensure they roughly match the headline Calories/Protein/Carbs/Fat line. If they don’t, adjust per-item macros (not the total) so the sum is realistic. Burgers with bun + 2 patties + cheese + bacon should land roughly 900–1100 kcal; a single patty ~200–300 kcal, cheese slice ~80–120 kcal, bacon slice ~40–50 kcal.
 
@@ -1286,6 +1293,7 @@ CRITICAL REQUIREMENTS:
 - **Set "isGuess": true for any item you're including but aren't completely confident about (e.g., condiments that might be hidden, salad that might be present).**
 - **Set "isGuess": false only for items you can clearly see and identify with high confidence.**
 - **For discrete items like patties, count them in serving_size (e.g., "2 patties" or "3 patties") and set servings to match the count.**
+- Do not use "pieces" semantics for sliced produce; use portion/grams as described above.
 - Nutrition values should be PER SERVING (not total) for each item.
 - The "total" object should sum all items multiplied by their servings.
 ` : ''}`
