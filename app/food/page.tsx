@@ -9554,7 +9554,7 @@ Please add nutritional information manually if needed.`);
 
       {showFavoritesPicker && (
         /* GUARD RAIL: Favorites picker UI is locked per user request. Do not change without approval. */
-        <div className="fixed inset-0 z-50 bg-white flex flex-col">
+        <div className="fixed inset-0 z-50 bg-white flex flex-col overflow-x-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
             <div>
               <div className="text-lg font-semibold text-gray-900">Add from favorites</div>
@@ -9628,7 +9628,7 @@ Please add nutritional information manually if needed.`);
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto mt-3 pb-6">
+          <div className="flex-1 overflow-y-auto overflow-x-hidden mt-3 pb-6">
             {(() => {
               const { allMeals, favoriteMeals, customMeals } = buildFavoritesDatasets()
               const search = favoritesSearch.trim().toLowerCase()
@@ -9680,15 +9680,15 @@ Please add nutritional information manually if needed.`);
                     return (
                       <div
                         key={item.id}
-                        className="w-full bg-white flex items-stretch"
+                        className="w-full bg-white flex items-stretch min-w-0 overflow-hidden"
                         style={{ borderRadius: 0 }}
                       >
                         <button
                           onClick={handleSelect}
-                          className="flex-1 text-left px-4 py-3 hover:bg-gray-50"
+                          className="flex-1 min-w-0 w-full overflow-hidden text-left px-4 py-3 hover:bg-gray-50"
                           style={{ borderRadius: 0 }}
                         >
-                          <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center justify-between gap-3 min-w-0">
                             <div className="min-w-0">
                               <div className="text-sm font-semibold text-gray-900 truncate">{item.label}</div>
                               <div className="text-xs text-gray-600 truncate">{serving}</div>
