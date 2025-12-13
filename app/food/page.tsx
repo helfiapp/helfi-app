@@ -1737,8 +1737,9 @@ export default function FoodDiary() {
   const [exerciseTypeError, setExerciseTypeError] = useState<string | null>(null)
   const [exercisePickerCategory, setExercisePickerCategory] = useState<string | null>(null)
   const [selectedExerciseType, setSelectedExerciseType] = useState<any>(null)
-  const [exerciseDurationMinutes, setExerciseDurationMinutes] = useState<number>(30)
+  const [exerciseDurationMinutes, setExerciseDurationMinutes] = useState<string>('30')
   const [exerciseDistanceKm, setExerciseDistanceKm] = useState<string>('')
+  const [exerciseDistanceUnit, setExerciseDistanceUnit] = useState<'km' | 'mi'>('km')
   const [exerciseTimeOfDay, setExerciseTimeOfDay] = useState<string>('')
   const [exerciseSaveError, setExerciseSaveError] = useState<string | null>(null)
   const [macroPopup, setMacroPopup] = useState<{
@@ -1893,8 +1894,9 @@ export default function FoodDiary() {
     setExerciseSaveError(null)
     setSelectedExerciseType(null)
     setExercisePickerCategory(null)
-    setExerciseDurationMinutes(30)
+    setExerciseDurationMinutes('30')
     setExerciseDistanceKm('')
+    setExerciseDistanceUnit('km')
     setExerciseTimeOfDay('')
     setExerciseTypeSearch('')
     setExerciseTypeResults([])
@@ -1963,11 +1965,17 @@ export default function FoodDiary() {
       setExerciseSaveError('Please enter a valid duration.')
       return
     }
-    const distanceKmNum = exerciseDistanceKm.trim().length > 0 ? Number(exerciseDistanceKm) : null
-    if (distanceKmNum !== null && (!Number.isFinite(distanceKmNum) || distanceKmNum <= 0)) {
+    const distanceValue = exerciseDistanceKm.trim().length > 0 ? Number(exerciseDistanceKm) : null
+    if (distanceValue !== null && (!Number.isFinite(distanceValue) || distanceValue <= 0)) {
       setExerciseSaveError('Please enter a valid distance.')
       return
     }
+    const distanceKmNum =
+      distanceValue !== null
+        ? exerciseDistanceUnit === 'mi'
+          ? distanceValue * 1.60934
+          : distanceValue
+        : null
     let startTime: string | undefined
     if (exerciseTimeOfDay && /^\d{2}:\d{2}$/.test(exerciseTimeOfDay)) {
       try {
@@ -6992,7 +7000,13 @@ Please add nutritional information manually if needed.`);
 	                      const distanceBased = /walk|run|jog|cycl|bike/.test(name)
 	                      if (!distanceBased) return null
 	                      const mins = Number(exerciseDurationMinutes)
-	                      const dist = exerciseDistanceKm.trim().length > 0 ? Number(exerciseDistanceKm) : null
+	                      const distRaw = exerciseDistanceKm.trim().length > 0 ? Number(exerciseDistanceKm) : null
+	                      const dist =
+	                        distRaw && Number.isFinite(distRaw) && distRaw > 0
+	                          ? exerciseDistanceUnit === 'mi'
+	                            ? distRaw
+	                            : distRaw
+	                          : null
 	                      const speed =
 	                        dist && Number.isFinite(dist) && dist > 0 && mins && Number.isFinite(mins) && mins > 0
 	                          ? dist / (mins / 60)
@@ -7003,24 +7017,71 @@ Please add nutritional information manually if needed.`);
 	                          : null
 	                      const paceLabel =
 	                        pace && Number.isFinite(pace)
-	                          ? `${Math.floor(pace)}:${String(Math.round((pace - Math.floor(pace)) * 60)).padStart(2, '0')} min/km`
+	                          ? `${Math.floor(pace)}:${String(Math.round((pace - Math.floor(pace)) * 60)).padStart(2, '0')} min/${exerciseDistanceUnit === 'mi' ? 'mi' : 'km'}`
 	                          : null
 	                      return (
 	                        <div className="space-y-1">
-	                          <label className="block text-sm font-semibold text-gray-900">Distance (km)</label>
-	                          <input
-	                            type="number"
-	                            inputMode="decimal"
-	                            value={exerciseDistanceKm}
-	                            onChange={(e) => setExerciseDistanceKm(e.target.value)}
-	                            min={0}
-	                            step="0.1"
-	                            placeholder="e.g., 3.2"
-	                            className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base"
-	                          />
+	                          <div className="flex items-center justify-between">
+	                            <label className="block text-sm font-semibold text-gray-900">
+	                              Distance ({exerciseDistanceUnit})
+	                            </label>
+	                            <div className="inline-flex items-center text-xs bg-gray-100 rounded-full p-0.5 border border-gray-200">
+	                              <button
+	                                type="button"
+	                                onClick={() => {
+	                                  if (exerciseDistanceUnit === 'km') return
+	                                  const current = exerciseDistanceKm.trim().length > 0 ? Number(exerciseDistanceKm) : null
+	                                  if (current && Number.isFinite(current)) {
+	                                    setExerciseDistanceKm(String(Math.round(current * 1.60934 * 10) / 10))
+	                                  }
+	                                  setExerciseDistanceUnit('km')
+	                                }}
+	                                className={`px-2 py-0.5 rounded-full ${
+	                                  exerciseDistanceUnit === 'km'
+	                                    ? 'bg-white text-gray-900 shadow-sm'
+	                                    : 'text-gray-500'
+	                                }`}
+	                              >
+	                                km
+	                              </button>
+	                              <button
+	                                type="button"
+	                                onClick={() => {
+	                                  if (exerciseDistanceUnit === 'mi') return
+	                                  const current = exerciseDistanceKm.trim().length > 0 ? Number(exerciseDistanceKm) : null
+	                                  if (current && Number.isFinite(current)) {
+	                                    setExerciseDistanceKm(String(Math.round((current / 1.60934) * 10) / 10))
+	                                  }
+	                                  setExerciseDistanceUnit('mi')
+	                                }}
+	                                className={`px-2 py-0.5 rounded-full ${
+	                                  exerciseDistanceUnit === 'mi'
+	                                    ? 'bg-white text-gray-900 shadow-sm'
+	                                    : 'text-gray-500'
+	                                }`}
+	                              >
+	                                miles
+	                              </button>
+	                            </div>
+	                          </div>
+	                          <div className="relative">
+	                            <input
+	                              type="text"
+	                              inputMode="decimal"
+	                              pattern="[0-9]*"
+	                              value={exerciseDistanceKm}
+	                              onChange={(e) => setExerciseDistanceKm(e.target.value)}
+	                              onFocus={() => setExerciseDistanceKm('')}
+	                              placeholder="e.g., 3.2"
+	                              className="w-full pr-14 px-4 py-3 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base"
+	                            />
+	                            <div className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 text-sm font-semibold">
+	                              {exerciseDistanceUnit === 'mi' ? 'miles' : 'km'}
+	                            </div>
+	                          </div>
 	                          {(speed || paceLabel) && (
 	                            <div className="text-xs text-gray-500 mt-1">
-	                              {speed ? `${Math.round(speed * 10) / 10} km/h` : null}
+	                              {speed ? `${Math.round(speed * 10) / 10} ${exerciseDistanceUnit === 'mi' ? 'mph' : 'km/h'}` : null}
 	                              {speed && paceLabel ? ' • ' : null}
 	                              {paceLabel}
 	                            </div>
@@ -7031,11 +7092,12 @@ Please add nutritional information manually if needed.`);
 	                    <div className="space-y-1">
 	                      <label className="block text-sm font-semibold text-gray-900">Duration (minutes)</label>
 	                      <input
-	                        type="number"
+	                        type="text"
+	                        inputMode="numeric"
+	                        pattern="[0-9]*"
 	                        value={exerciseDurationMinutes}
-	                        onChange={(e) => setExerciseDurationMinutes(Number(e.target.value))}
-	                        min={1}
-	                        max={1440}
+	                        onChange={(e) => setExerciseDurationMinutes(e.target.value)}
+	                        onFocus={() => setExerciseDurationMinutes('')}
 	                        className="w-full px-4 py-3 border-2 border-emerald-500 rounded-2xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base"
 	                      />
 	                    </div>
@@ -9589,22 +9651,11 @@ Please add nutritional information manually if needed.`);
           )}
 
 	          {/* Hide energy summary + meals while editing an entry to keep the user focused on editing */}
-	          {!editingEntry && (
-	            <>
-	              <div className="flex items-center justify-between mb-4">
-	                <h3 className="text-lg font-semibold">{isViewingToday ? "Today's Meals" : 'Meals'}</h3>
-	                <button
-	                  type="button"
-	                  onClick={() => setShowAddExerciseModal(true)}
-	                  className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100 transition-colors flex items-center justify-center"
-	                  title="Add exercise"
-	                  aria-label="Add exercise"
-	                >
-	                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-	                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-	                  </svg>
-	                </button>
-	              </div>
+		          {!editingEntry && (
+		            <>
+		              <div className="flex items-center justify-between mb-4">
+		                <h3 className="text-lg font-semibold">{isViewingToday ? "Today's Meals" : 'Meals'}</h3>
+		              </div>
 
 		              <div className="bg-white border border-gray-200 rounded-3xl shadow-sm overflow-hidden mb-4">
 		                <div className="px-4 py-4 flex items-start justify-between gap-3">
