@@ -2116,6 +2116,41 @@ export default function FoodDiary() {
       fiber_g: item.fiber_g ?? null,
       sugar_g: item.sugar_g ?? null,
     }
+
+    // If the modal was opened from the Today’s Meals (+) dropdown, add this as a new diary entry
+    // in that meal category instead of adding to the analysis ingredient cards.
+    if (addIngredientContextRef.current?.mode === 'diary') {
+      const targetCategory =
+        addIngredientContextRef.current?.targetCategory || selectedAddCategory || 'uncategorized'
+      const label = `${newItem.name}${newItem.brand ? ` – ${newItem.brand}` : ''}`.trim()
+      const totals = sanitizeNutritionTotals({
+        calories: newItem.calories ?? null,
+        protein: newItem.protein_g ?? null,
+        carbs: newItem.carbs_g ?? null,
+        fat: newItem.fat_g ?? null,
+        fiber: newItem.fiber_g ?? null,
+        sugar: newItem.sugar_g ?? null,
+      } as any)
+
+      setShowAddIngredientModal(false)
+      setOfficialSearchQuery('')
+      setOfficialResults([])
+      setOfficialError(null)
+
+      // Insert a new entry into the selected meal section
+      insertMealIntoDiary(
+        {
+          description: label,
+          nutrition: totals,
+          total: totals,
+          items: [newItem],
+          method: 'official',
+        },
+        targetCategory,
+      ).catch(() => {})
+      return
+    }
+
     const next = [...analyzedItems, newItem]
     setAnalyzedItems(next)
     applyRecalculatedNutrition(next)
@@ -4584,10 +4619,22 @@ Please add nutritional information manually if needed.`);
     setShowAddFood(false)
   }
 
-  const openAddIngredientModalFromMenu = (e?: any) => {
+  const addIngredientContextRef = useRef<{
+    mode: 'analysis' | 'diary'
+    targetCategory?: typeof MEAL_CATEGORY_ORDER[number]
+  }>({ mode: 'analysis' })
+
+  const openAddIngredientModalFromMenu = (
+    e?: any,
+    context?: { mode?: 'analysis' | 'diary'; targetCategory?: typeof MEAL_CATEGORY_ORDER[number] },
+  ) => {
     try {
       e?.stopPropagation?.()
     } catch {}
+    addIngredientContextRef.current = {
+      mode: context?.mode || 'analysis',
+      targetCategory: context?.targetCategory,
+    }
     // Close any add menus/dropdowns first, then open the modal.
     setShowPhotoOptions(false)
     setShowCategoryPicker(false)
@@ -6845,7 +6892,12 @@ Please add nutritional information manually if needed.`);
                   {/* Manual Entry Option */}
                   <button
                     type="button"
-                    onClick={(e) => openAddIngredientModalFromMenu(e)}
+                    onClick={(e) =>
+                      openAddIngredientModalFromMenu(e, {
+                        mode: 'diary',
+                        targetCategory: selectedAddCategory,
+                      })
+                    }
                     className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
                   >
                     <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center mr-3 text-green-600">
@@ -7518,7 +7570,11 @@ Please add nutritional information manually if needed.`);
                       <div className="mb-2 flex items-center justify-between">
                         <div className="text-sm font-medium text-gray-600">Detected Foods:</div>
                         <button
-                          onClick={(e) => openAddIngredientModalFromMenu(e)}
+                          onClick={(e) =>
+                            openAddIngredientModalFromMenu(e, {
+                              mode: 'analysis',
+                            })
+                          }
                           className="text-sm px-3 py-1.5 rounded-md bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
                           title="Add a missing ingredient"
                         >
@@ -9286,7 +9342,12 @@ Please add nutritional information manually if needed.`);
 
                                       <button
                                         type="button"
-                                        onClick={(e) => openAddIngredientModalFromMenu(e)}
+                                        onClick={(e) =>
+                                          openAddIngredientModalFromMenu(e, {
+                                            mode: 'diary',
+                                            targetCategory: cat.key,
+                                          })
+                                        }
                                         className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
                                       >
                                         <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center mr-3 text-green-600">
@@ -9434,7 +9495,12 @@ Please add nutritional information manually if needed.`);
 
                                       <button
                                         type="button"
-                                        onClick={(e) => openAddIngredientModalFromMenu(e)}
+                                        onClick={(e) =>
+                                          openAddIngredientModalFromMenu(e, {
+                                            mode: 'diary',
+                                            targetCategory: cat.key,
+                                          })
+                                        }
                                         className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
                                       >
                                         <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center mr-3 text-green-600">
