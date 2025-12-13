@@ -5451,6 +5451,10 @@ Please add nutritional information manually if needed.`);
       persistedCategory: category,
       createdAt: createdAtIso,
     }
+    // If the user previously deleted this same item (same day + category + description),
+    // we keep a tombstone to prevent server "resurrections". But if the user is *intentionally*
+    // re-adding it now, we must clear that tombstone so it can appear again.
+    removeDeletedTombstonesForEntries([newEntry])
     const updated = dedupeEntries([newEntry, ...todaysFoods], { fallbackDate: selectedDate })
     setTodaysFoods(updated)
     if (!isViewingToday) {
