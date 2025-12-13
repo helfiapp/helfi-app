@@ -5907,7 +5907,11 @@ Please add nutritional information manually if needed.`);
         setOriginalEditingEntry(safeFood)
       }
       // Populate the form with existing data and go directly to editing
-      const useIngredientCards = safeFood.method === 'photo' || Boolean(safeFood.photo) || isBarcodeEntry(safeFood)
+      const useIngredientCards =
+        safeFood.method === 'photo' ||
+        Boolean(safeFood.photo) ||
+        isBarcodeEntry(safeFood) ||
+        (Array.isArray(safeFood.items) && safeFood.items.length > 0)
       if (useIngredientCards) {
         // Clear all state first to ensure clean rebuild
         setAnalyzedItems([]);
