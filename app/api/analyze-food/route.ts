@@ -22,7 +22,7 @@ import { consumeRateLimit } from '@/lib/rate-limit';
 import { normalizeDiscreteItems, summarizeDiscreteItemsForLog } from '@/lib/food-normalization';
 
 // Bump this when changing curated nutrition to invalidate old cached images.
-const CACHE_VERSION = 'v3';
+const CACHE_VERSION = 'v4';
 const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute
 const RATE_LIMIT_MAX_REQUESTS = 3;   // stop runaway loops quickly
 
@@ -873,6 +873,41 @@ const splitAnalysisIntoComponents = (analysis: string | null | undefined): strin
   return unique;
 };
 
+const looksLikeNonFoodArtifact = (nameRaw: any): boolean => {
+  const name = String(nameRaw || '').trim();
+  if (!name) return true;
+  if (name.length > 140) return true;
+
+  const lower = name.toLowerCase();
+  // JSON/metadata artifacts accidentally parsed into items
+  if (lower.includes('<items_json') || lower.includes('</items_json')) return true;
+  if (name.includes('{') || name.includes('}') || name.includes('"')) return true;
+  if (/^\s*[\[\]\{\}]+\s*$/.test(name)) return true;
+  if (/^\s*[a-z_]+\s*:\s*.+$/i.test(name)) return true;
+  if (/^\s*"(?:brand|serving_size|servings|calories|protein_g|carbs_g|fat_g|fiber_g|sugar_g)"\s*:/i.test(name)) return true;
+  if (/^\s*(?:brand|serving_size|servings|calories|protein_g|carbs_g|fat_g|fiber_g|sugar_g)\s*:/i.test(name)) return true;
+  if (/^\s*\d+\s*"(?:calories|protein|carbs|fat|fiber|sugar)/i.test(name)) return true;
+
+  // Reject lines that are basically just numbers/symbols
+  if (!/[a-z]/i.test(name)) return true;
+
+  return false;
+};
+
+const sanitizeStructuredItems = (items: any[]): any[] => {
+  if (!Array.isArray(items)) return [];
+  const cleaned = items
+    .filter((it) => it && typeof it === 'object')
+    .map((it) => ({
+      ...it,
+      name: typeof it.name === 'string' ? it.name.trim() : '',
+    }))
+    .filter((it) => it.name && !looksLikeNonFoodArtifact(it.name));
+
+  // Prevent runaway lists from exploding the UI
+  return cleaned.length > 10 ? cleaned.slice(0, 10) : cleaned;
+};
+
 const buildMultiComponentFallback = (
   analysis: string | null | undefined,
   total: any | null | undefined,
@@ -1151,8 +1186,8 @@ CRITICAL REQUIREMENTS:
 - For packaged foods: ALWAYS extract the serving size from the label (e.g., "1 slice", "2 cookies", "100g", "1 cup"). This is the DEFAULT serving size per package.
 - Set "servings" to 1 as the default (user can adjust this in the UI).
 - For multi-item meals: Create separate items for each distinct food component.
-- **BE COMPREHENSIVE: Include ALL likely components even if you're not 100% certain.**
-- **Set "isGuess": true for any item you're including but aren't completely confident about.**
+- Include ONLY components explicitly mentioned in the description. Do NOT invent typical sides/toppings.
+- Set "isGuess": true only when the description implies an item but is ambiguous.
 - **Set "isGuess": false only for items you can clearly identify with high confidence.**
 - **For discrete items like patties, count them in serving_size (e.g., "2 patties" or "3 patties") and set servings to match the count.**
 - Do not use "pieces" semantics for sliced produce; use portion/grams as described above.
@@ -1221,24 +1256,12 @@ CRITICAL FOR MEALS WITH MULTIPLE COMPONENTS:
   4. Sum all components to provide TOTAL nutrition values
   5. List components briefly in your description
 
-- For complex meals, be thorough: don't miss side dishes, condiments, dressings, or toppings
-- Estimate portions realistically based on what's visible in the image
-- **BE DARING: If you think you see something (even with low confidence), include it as a separate item with isGuess: true**
-- **Scan edges/corners and include any plausible side items even if only partially visible; mark low-confidence ones as isGuess: true rather than skipping.**
-- **Include breads/rolls/bagels/plate-side carbs when any part is visible; use isGuess: true if uncertain.**
-- **For burgers specifically: ALWAYS include bun, patties (count them!), cheese, bacon (if visible), lettuce, tomato, and sauces/condiments as separate items**
-- If unsure about a component, estimate conservatively but include it in your totals - the user can easily delete guessed items
-- **Never omit a plausible ingredient just because macros are uncertain — include the card and flag it with isGuess: true.**
+- Only include foods you can actually SEE in the photo. Do NOT assume common sides (e.g., fries) unless they are clearly visible.
+- Estimate portions realistically based on what's visible in the image (count pieces when possible).
+- If something is unclear, prefer leaving it out OR include a generic label (e.g., "dipping sauce") and set isGuess: true.
 - For mixed dishes (salads, soups, stews), break down the main ingredients and sum them
 
-COMMON MEAL PATTERNS TO RECOGNIZE (DO NOT MISS - BE COMPREHENSIVE):
-- **Burgers: ALWAYS include bun + patties (count each patty separately) + cheese + bacon (if visible) + lettuce + tomato + sauces/condiments (ketchup, mayo, mustard, etc.)**
-- Wraps/sandwiches/tacos: wrap/bread + protein + cheese + sauces + salad/veg
-- Bowls/salads: base (rice/greens) + protein + toppings + dressing/sauce
-- Plates: protein + starch (rice/pasta/potato/bread) + vegetables + sauces
-- Pizzas/flatbreads: base + cheese + toppings (count visible slices as portion)
-- Breakfasts: eggs + toast + spreads + bacon/sausage + sides (tomatoes, mushrooms)
-- Soups/stews/curries: liquid base + visible solids (meat/veg) + rice/bread
+Do NOT infer meal patterns. Only list components supported by visible evidence in the photo.
 
 PORTION CUES:
 - Use plate size, utensil size, and hand-size cues to estimate grams or household measures
@@ -1338,7 +1361,7 @@ COMMON MEAL COMPONENTS:
   - Beef patty (4oz cooked): 200-300 calories per patty
   - Cheese slice: 80-120 calories per slice
   - Bacon slice (cooked): 40-50 calories per slice
-  - If you are unsure, keep the item and mark isGuess: true rather than omitting it.
+  - If you are unsure and it is not clearly visible, omit it (do not invent it).
 
 OUTPUT REQUIREMENTS:
 - Keep explanation to 2-3 sentences
@@ -1376,8 +1399,8 @@ CRITICAL REQUIREMENTS:
 - For packaged foods: ALWAYS extract the serving size from the label (e.g., "1 slice", "2 cookies", "100g", "1 cup"). This is the DEFAULT serving size per package.
 - Set "servings" to 1 as the default (user can adjust this in the UI).
 - For multi-item meals: Create separate items for each distinct food component.
-- **BE COMPREHENSIVE: Include ALL visible components (bun, patties, cheese, bacon, lettuce, tomato, sauces, condiments, etc.) even if you're not 100% certain.**
-- **Set "isGuess": true for any item you're including but aren't completely confident about (e.g., condiments that might be hidden, salad that might be present).**
+- Include ONLY foods/components you can see in the photo. Do NOT add "typical" sides.
+- Set "isGuess": true only for ambiguous items that are still visible (e.g., an unknown dipping sauce).
 - **Set "isGuess": false only for items you can clearly see and identify with high confidence.**
 - **For discrete items like patties, count them in serving_size (e.g., "2 patties" or "3 patties") and set servings to match the count.**
 - Do not use "pieces" semantics for sliced produce; use portion/grams as described above.
@@ -1675,10 +1698,10 @@ CRITICAL REQUIREMENTS:
             const parsedTotal = typeof parsed.total === 'object' ? parsed.total : null;
             if (parsedItems.length > 0) {
               // Use the parsed items/total directly; do not overwrite them with fallback/default items
-              resp.items = parsedItems;
-              resp.total = parsedTotal || computeTotalsFromItems(parsedItems) || null;
+              resp.items = sanitizeStructuredItems(parsedItems);
+              resp.total = parsedTotal || computeTotalsFromItems(resp.items) || null;
               itemsSource = 'items_json';
-              itemsQuality = validateStructuredItems(parsedItems) ? 'valid' : 'weak';
+              itemsQuality = validateStructuredItems(resp.items) ? 'valid' : 'weak';
             }
           }
           // Always strip the ITEMS_JSON block to avoid UI artifacts, even if parsing failed
@@ -1738,10 +1761,10 @@ CRITICAL REQUIREMENTS:
             const items = Array.isArray(parsed.items) ? parsed.items : [];
             const total = typeof parsed.total === 'object' ? parsed.total : null;
             if (items.length > 0) {
-              resp.items = items;
-              resp.total = total || computeTotalsFromItems(items) || resp.total || null;
+              resp.items = sanitizeStructuredItems(items);
+              resp.total = total || computeTotalsFromItems(resp.items) || resp.total || null;
                 itemsSource = itemsSource === 'none' ? 'text_extractor' : `${itemsSource}+text_extractor`;
-                itemsQuality = validateStructuredItems(items) ? 'valid' : 'weak';
+                itemsQuality = validateStructuredItems(resp.items) ? 'valid' : 'weak';
               console.log('✅ Structured items extracted via follow-up call:', {
                 itemCount: items.length,
               });
@@ -1842,10 +1865,10 @@ CRITICAL REQUIREMENTS:
           const items = Array.isArray(parsed.items) ? parsed.items : [];
           const total = typeof parsed.total === 'object' ? parsed.total : null;
           if (items.length > 1 || (items.length === 1 && !looksLikeSingleGenericItem(items))) {
-            resp.items = items;
-            resp.total = total || computeTotalsFromItems(items) || resp.total || null;
+            resp.items = sanitizeStructuredItems(items);
+            resp.total = total || computeTotalsFromItems(resp.items) || resp.total || null;
             itemsSource = itemsSource === 'none' ? 'multi_followup' : `${itemsSource}+multi_followup`;
-            itemsQuality = validateStructuredItems(items) ? 'valid' : 'weak';
+            itemsQuality = validateStructuredItems(resp.items) ? 'valid' : 'weak';
             console.log('✅ Multi-item follow-up produced structured items:', items.length);
           }
         }
@@ -1863,42 +1886,8 @@ CRITICAL REQUIREMENTS:
     resp.items = burgerEnriched.items;
     resp.total = burgerEnriched.total || resp.total;
 
-    // If the analysis text lists components we didn't get items for, add guessed items (macros blank).
-    if (preferMultiDetect && analysis) {
-      const inferred = inferComponentsFromAnalysis(analysis);
-      if (inferred.length > 0) {
-        const existingNames = new Set(
-          Array.isArray(resp.items)
-            ? resp.items.map((it: any) => String(it?.name || '').trim().toLowerCase()).filter(Boolean)
-            : [],
-        );
-        const additions: any[] = [];
-        for (const name of inferred) {
-          const key = name.toLowerCase();
-          if (existingNames.has(key)) continue;
-          const guess = estimatedGuessMacrosForName(name);
-          additions.push({
-            name,
-            brand: null,
-            serving_size: '1 serving',
-            servings: 1,
-            calories: guess.calories,
-            protein_g: guess.protein_g,
-            carbs_g: guess.carbs_g,
-            fat_g: guess.fat_g,
-            fiber_g: null,
-            sugar_g: null,
-            isGuess: true,
-          });
-          existingNames.add(key);
-        }
-        if (additions.length > 0) {
-          resp.items = Array.isArray(resp.items) ? [...resp.items, ...additions] : additions;
-          itemsSource = `${itemsSource}+description_inferred`;
-          itemsQuality = validateStructuredItems(resp.items) ? 'valid' : 'weak';
-        }
-      }
-    }
+    // Intentionally do NOT add inferred “plausible” components from the prose.
+    // This was a major source of hallucinations (e.g., fries or sauces not actually visible).
 
     // Normalize guess flags, discrete counts (pieces/servings), and convert word numbers to numerals.
     if (resp.items && Array.isArray(resp.items)) {
