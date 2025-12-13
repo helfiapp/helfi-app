@@ -144,6 +144,7 @@ export async function POST(request: NextRequest) {
   const entries = await prisma.exerciseEntry.findMany({
     where: { userId: session.user.id, localDate: date },
     orderBy: [{ startTime: 'asc' }, { createdAt: 'asc' }],
+    include: { exerciseType: true },
   })
   const exerciseCalories = entries.reduce((sum, e) => sum + (Number(e.calories) || 0), 0)
 

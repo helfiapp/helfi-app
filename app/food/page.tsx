@@ -28,7 +28,7 @@ import React, { useState, useEffect, useMemo, useRef, Component } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useUserData } from '@/components/providers/UserDataProvider'
 import MobileMoreMenu from '@/components/MobileMoreMenu'
 import UsageMeter from '@/components/UsageMeter'
@@ -1284,6 +1284,7 @@ const removeItemsByIndex = (
 export default function FoodDiary() {
   const { data: session } = useSession()
   const pathname = usePathname()
+  const router = useRouter()
   const { userData, profileImage, updateUserData } = useUserData()
   const warmDiaryState = useMemo(() => readWarmDiaryState(), [])
   const persistentDiarySnapshot = useMemo(() => readPersistentDiarySnapshot(), [])
@@ -1309,6 +1310,10 @@ export default function FoodDiary() {
     // Guard against small non-timestamp numbers producing bogus 1970 dates.
     if (ts < 946684800000) return NaN
     return ts
+  }
+
+  const goToDevices = () => {
+    router.push('/devices')
   }
   const deriveDateFromEntryTimestamp = (entry: any) => {
     const ts = extractEntryTimestampMs(entry)
@@ -1746,6 +1751,8 @@ export default function FoodDiary() {
   const [exercisePreviewKcal, setExercisePreviewKcal] = useState<number | null>(null)
   const [exercisePreviewLoading, setExercisePreviewLoading] = useState<boolean>(false)
   const [exercisePreviewError, setExercisePreviewError] = useState<string | null>(null)
+  const [editingExerciseEntry, setEditingExerciseEntry] = useState<any>(null)
+  const autoExerciseSyncRef = useRef<Record<string, boolean>>({})
   const [macroPopup, setMacroPopup] = useState<{
     title: string
     energyLabel?: string
@@ -1823,9 +1830,11 @@ export default function FoodDiary() {
     }
   }
 
-  const syncExerciseFromDevices = async () => {
-    setExerciseSyncing(true)
-    setExerciseError(null)
+  const syncExerciseFromDevices = async (options?: { silent?: boolean }) => {
+    if (!options?.silent) {
+      setExerciseSyncing(true)
+      setExerciseError(null)
+    }
     try {
       const res = await fetch('/api/exercise/sync', {
         method: 'POST',
@@ -1839,9 +1848,11 @@ export default function FoodDiary() {
       setExerciseEntries(Array.isArray(data?.entries) ? data.entries : [])
       setExerciseCaloriesKcal(Number(data?.exerciseCalories) || 0)
     } catch (err: any) {
-      setExerciseError(err?.message || 'Failed to sync exercise')
+      if (!options?.silent) {
+        setExerciseError(err?.message || 'Failed to sync exercise')
+      }
     } finally {
-      setExerciseSyncing(false)
+      if (!options?.silent) setExerciseSyncing(false)
     }
   }
 
@@ -1859,6 +1870,21 @@ export default function FoodDiary() {
     }
   }
 
+  const openCreateExercise = () => {
+    setEditingExerciseEntry(null)
+    setShowAddExerciseModal(true)
+  }
+
+  const openEditExercise = (entry: any) => {
+    if (!entry?.id) return
+    if (String(entry?.source || '').toUpperCase() !== 'MANUAL') {
+      showQuickToast("Synced exercise entries can't be edited here.")
+      return
+    }
+    setEditingExerciseEntry(entry)
+    setShowAddExerciseModal(true)
+  }
+
   useEffect(() => {
     refreshDeviceStatus()
   }, [session?.user?.id])
@@ -1868,6 +1894,15 @@ export default function FoodDiary() {
     // Keep device pills updated when switching dates (low-cost, cached by browser).
     refreshDeviceStatus()
   }, [selectedDate])
+
+  useEffect(() => {
+    const today = buildTodayIso()
+    if (selectedDate !== today) return
+    if (!fitbitConnected && !garminConnected) return
+    if (autoExerciseSyncRef.current[selectedDate]) return
+    autoExerciseSyncRef.current[selectedDate] = true
+    syncExerciseFromDevices({ silent: true })
+  }, [selectedDate, fitbitConnected, garminConnected])
 
   const loadExerciseTypes = async (params: { search?: string; category?: string | null }) => {
     setExerciseTypeLoading(true)
@@ -1895,7 +1930,62 @@ export default function FoodDiary() {
 
   useEffect(() => {
     if (!showAddExerciseModal) return
+
     setExerciseSaveError(null)
+    setExerciseTypeSearch('')
+    setExerciseTypeResults([])
+    setExerciseTypeError(null)
+    setExercisePreviewKcal(null)
+    setExercisePreviewError(null)
+
+    if (editingExerciseEntry?.id) {
+      const mins = Number(editingExerciseEntry?.durationMinutes) || 0
+      const hours = Math.max(0, Math.min(23, Math.floor(mins / 60)))
+      const minutes = Math.max(0, Math.min(59, mins % 60))
+      setExerciseDurationHours(hours)
+      setExerciseDurationMins(minutes)
+
+      const distanceKm = editingExerciseEntry?.distanceKm
+      if (typeof distanceKm === 'number' && Number.isFinite(distanceKm) && distanceKm > 0) {
+        setExerciseDistanceUnit('km')
+        setExerciseDistanceKm(String(Math.round(distanceKm * 10) / 10))
+      } else {
+        setExerciseDistanceKm('')
+        setExerciseDistanceUnit('km')
+      }
+
+      const startTimeRaw = editingExerciseEntry?.startTime
+      if (startTimeRaw) {
+        const dt = new Date(startTimeRaw)
+        if (!Number.isNaN(dt.getTime())) {
+          const hh = String(dt.getHours()).padStart(2, '0')
+          const mm = String(dt.getMinutes()).padStart(2, '0')
+          setExerciseTimeOfDay(`${hh}:${mm}`)
+        } else {
+          setExerciseTimeOfDay('')
+        }
+      } else {
+        setExerciseTimeOfDay('')
+      }
+
+      const type = editingExerciseEntry?.exerciseType
+      if (type?.id) {
+        setSelectedExerciseType(type)
+      } else if (editingExerciseEntry?.exerciseTypeId) {
+        setSelectedExerciseType({
+          id: editingExerciseEntry.exerciseTypeId,
+          name: editingExerciseEntry?.label || 'Exercise',
+          category: 'Cardio',
+          met: Number(editingExerciseEntry?.met) || 0,
+        })
+      } else {
+        setSelectedExerciseType(null)
+      }
+
+      setExercisePickerCategory(null)
+      return
+    }
+
     setSelectedExerciseType(null)
     setExercisePickerCategory(null)
     setExerciseDurationHours(0)
@@ -1903,12 +1993,7 @@ export default function FoodDiary() {
     setExerciseDistanceKm('')
     setExerciseDistanceUnit('km')
     setExerciseTimeOfDay('')
-    setExerciseTypeSearch('')
-    setExerciseTypeResults([])
-    setExerciseTypeError(null)
-    setExercisePreviewKcal(null)
-    setExercisePreviewError(null)
-  }, [showAddExerciseModal])
+  }, [showAddExerciseModal, editingExerciseEntry?.id])
 
   useEffect(() => {
     if (!showAddExerciseModal) return
@@ -2052,22 +2137,27 @@ export default function FoodDiary() {
       }
     }
     try {
-      const res = await fetch('/api/exercise-entries', {
-        method: 'POST',
+      const isEditing = Boolean(editingExerciseEntry?.id)
+      const endpoint = isEditing ? `/api/exercise-entries/${encodeURIComponent(editingExerciseEntry.id)}` : '/api/exercise-entries'
+      const payload: any = {
+        exerciseTypeId: selectedExerciseType.id,
+        durationMinutes: Math.floor(minutes),
+        distanceKm: distanceKmNum,
+        startTime: startTime || null,
+      }
+      if (!isEditing) payload.date = selectedDate
+
+      const res = await fetch(endpoint, {
+        method: isEditing ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          exerciseTypeId: selectedExerciseType.id,
-          durationMinutes: Math.floor(minutes),
-          distanceKm: distanceKmNum,
-          date: selectedDate,
-          startTime,
-        }),
+        body: JSON.stringify(payload),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
         throw new Error(data?.error || 'Failed to save exercise')
       }
       setShowAddExerciseModal(false)
+      setEditingExerciseEntry(null)
       await loadExerciseEntriesForDate(selectedDate, { silent: true })
     } catch (err: any) {
       setExerciseSaveError(err?.message || 'Failed to save exercise')
@@ -6901,9 +6991,18 @@ Please add nutritional information manually if needed.`);
 	                    </svg>
 	                  </button>
 	                )}
-	                <div className="font-semibold text-gray-900 text-lg">Add exercise</div>
+	                <div className="font-semibold text-gray-900 text-lg">
+	                  {editingExerciseEntry?.id ? 'Edit exercise' : 'Add exercise'}
+	                </div>
 	              </div>
-	              <button onClick={() => setShowAddExerciseModal(false)} className="p-2 rounded-xl hover:bg-gray-100" aria-label="Close">
+	              <button
+	                onClick={() => {
+	                  setShowAddExerciseModal(false)
+	                  setEditingExerciseEntry(null)
+	                }}
+	                className="p-2 rounded-xl hover:bg-gray-100"
+	                aria-label="Close"
+	              >
 	                <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 	                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
 	                </svg>
@@ -6913,6 +7012,59 @@ Please add nutritional information manually if needed.`);
 	            <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-5 pb-10">
 	              {!selectedExerciseType ? (
 	                <>
+	                  <div className="mb-4">
+	                    {!fitbitConnected && !garminConnected ? (
+	                      <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4 flex items-center justify-between gap-3">
+	                        <div className="min-w-0">
+	                          <div className="text-sm font-semibold text-gray-900">Connect a device</div>
+	                          <div className="text-xs text-gray-500 mt-0.5">
+	                            Connect Fitbit or Garmin to automatically log workouts here.
+	                          </div>
+	                        </div>
+	                        <button
+	                          type="button"
+	                          onClick={() => {
+	                            setShowAddExerciseModal(false)
+	                            setEditingExerciseEntry(null)
+	                            goToDevices()
+	                          }}
+	                          className="px-3 py-2 rounded-xl bg-white border border-gray-200 hover:bg-gray-50 text-xs font-semibold text-gray-700 flex-shrink-0"
+	                        >
+	                          Connect
+	                        </button>
+	                      </div>
+	                    ) : (
+	                      <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 flex items-center justify-between gap-3">
+	                        <div className="min-w-0">
+	                          <div className="text-sm font-semibold text-gray-900">Device connected</div>
+	                          <div className="text-xs text-gray-600 mt-0.5">
+	                            {fitbitConnected && garminConnected ? 'Fitbit and Garmin' : fitbitConnected ? 'Fitbit' : 'Garmin'} connected. Workouts can be imported.
+	                          </div>
+	                        </div>
+	                        <div className="flex items-center gap-2 flex-shrink-0">
+	                          <button
+	                            type="button"
+	                            onClick={() => syncExerciseFromDevices()}
+	                            disabled={exerciseSyncing}
+	                            className="px-3 py-2 rounded-xl bg-white border border-gray-200 hover:bg-gray-50 text-xs font-semibold text-gray-700 disabled:opacity-60"
+	                          >
+	                            Sync now
+	                          </button>
+	                          <button
+	                            type="button"
+	                            onClick={() => {
+	                              setShowAddExerciseModal(false)
+	                              setEditingExerciseEntry(null)
+	                              goToDevices()
+	                            }}
+	                            className="px-3 py-2 rounded-xl bg-white border border-gray-200 hover:bg-gray-50 text-xs font-semibold text-gray-700"
+	                          >
+	                            Devices
+	                          </button>
+	                        </div>
+	                      </div>
+	                    )}
+	                  </div>
 	                  <div className="space-y-3">
 	                    <div className="relative">
 	                      <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
@@ -7219,7 +7371,10 @@ Please add nutritional information manually if needed.`);
 	                    <div className="grid grid-cols-2 gap-3 pt-1">
 	                      <button
 	                        type="button"
-	                        onClick={() => setShowAddExerciseModal(false)}
+	                        onClick={() => {
+	                          setShowAddExerciseModal(false)
+	                          setEditingExerciseEntry(null)
+	                        }}
 	                        className="py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-900 font-semibold rounded-2xl transition-colors duration-200"
 	                      >
 	                        Cancel
@@ -7229,7 +7384,7 @@ Please add nutritional information manually if needed.`);
 	                        onClick={saveManualExercise}
 	                        className="py-3 px-4 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold rounded-2xl transition-colors duration-200 disabled:bg-gray-300 disabled:cursor-not-allowed"
 	                      >
-	                        Save
+	                        {editingExerciseEntry?.id ? 'Save changes' : 'Save'}
 	                      </button>
 	                    </div>
 	                  </div>
@@ -9788,10 +9943,19 @@ Please add nutritional information manually if needed.`);
 		                        Garmin
 		                      </span>
 		                    )}
+		                    {!fitbitConnected && !garminConnected && (
+		                      <button
+		                        type="button"
+		                        onClick={goToDevices}
+		                        className="px-3 py-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 text-xs font-semibold text-gray-700"
+		                      >
+		                        Connect device
+		                      </button>
+		                    )}
 		                    {(fitbitConnected || garminConnected) && (
 		                      <button
 		                        type="button"
-		                        onClick={syncExerciseFromDevices}
+		                        onClick={() => syncExerciseFromDevices()}
 		                        disabled={exerciseSyncing}
 		                        className="p-2 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 disabled:opacity-60"
 		                        title="Refresh from device"
@@ -9804,7 +9968,7 @@ Please add nutritional information manually if needed.`);
 		                    )}
 		                    <button
 		                      type="button"
-		                      onClick={() => setShowAddExerciseModal(true)}
+		                      onClick={openCreateExercise}
 		                      className="p-2 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
 		                      title="Add exercise"
 		                      aria-label="Add exercise"
@@ -9830,10 +9994,27 @@ Please add nutritional information manually if needed.`);
 		                        exerciseEntries.map((entry: any) => {
 		                          const calories = convertKcalToUnit(Number(entry?.calories) || 0, energyUnit)
 		                          const duration = Number(entry?.durationMinutes) || 0
+		                          const isManual = String(entry?.source || '').toUpperCase() === 'MANUAL'
 		                          const sourceLabel =
 		                            entry?.source === 'FITBIT' ? 'Fitbit' : entry?.source === 'GARMIN' ? 'Garmin' : 'Manual'
 		                          return (
-		                            <div key={entry.id} className="px-4 py-3 flex items-center justify-between gap-3">
+		                            <div
+		                              key={entry.id}
+		                              className={`px-4 py-3 flex items-center justify-between gap-3 ${isManual ? 'cursor-pointer hover:bg-gray-50' : ''}`}
+		                              role={isManual ? 'button' : undefined}
+		                              tabIndex={isManual ? 0 : undefined}
+		                              onClick={isManual ? () => openEditExercise(entry) : undefined}
+		                              onKeyDown={
+		                                isManual
+		                                  ? (e) => {
+		                                      if (e.key === 'Enter' || e.key === ' ') {
+		                                        e.preventDefault()
+		                                        openEditExercise(entry)
+		                                      }
+		                                    }
+		                                  : undefined
+		                              }
+		                            >
 		                              <div className="min-w-0">
 		                                <div className="text-sm font-semibold text-gray-900 truncate">
 		                                  {entry?.label || 'Exercise'}
@@ -9846,10 +10027,13 @@ Please add nutritional information manually if needed.`);
 		                                <div className="text-sm font-semibold text-gray-900">
 		                                  {Math.round(calories || 0)} {energyUnit}
 		                                </div>
-		                                {entry?.source === 'MANUAL' && (
+		                                {isManual && (
 		                                  <button
 		                                    type="button"
-		                                    onClick={() => deleteExerciseEntry(entry.id)}
+		                                    onClick={(e) => {
+		                                      e.stopPropagation()
+		                                      deleteExerciseEntry(entry.id)
+		                                    }}
 		                                    className="p-2 rounded-xl hover:bg-gray-100 text-gray-500"
 		                                    title="Delete"
 		                                    aria-label="Delete exercise"
