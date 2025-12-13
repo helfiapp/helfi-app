@@ -53,6 +53,11 @@ export async function GET(req: NextRequest) {
         { userLabel: { contains: userFilter, mode: 'insensitive' } },
       ]
     }
+    // Avoid double-counting Food Analyzer usage:
+    // `/api/analyze-food` logs a per-request `food:image-*` or `food:text-*` event AND an
+    // aggregate `food:analysis` event with the same tokens, which inflates totals.
+    // The per-request events are the canonical ones for usage reporting.
+    where.NOT = [{ feature: 'food:analysis' }]
 
     const [
       rangeAggregates,
