@@ -36,6 +36,30 @@ export async function GET(request: NextRequest) {
     skip: offset,
   })
 
-  return NextResponse.json({ items, limit, offset })
-}
+  const normalizedSearch = search.toLowerCase()
+  const normalizedCategory = category.toLowerCase()
+  let ordered = items
 
+  // UX: prioritize the most common activities near the top (especially within Cardio).
+  // Prisma ordering is alphabetical, so "Walking" otherwise lands near the bottom.
+  if (!normalizedSearch && normalizedCategory === 'cardio') {
+    const rank = (name: string) => {
+      const v = (name || '').toLowerCase()
+      if (v.includes('walking')) return 0
+      if (v.includes('jog')) return 1
+      if (v.includes('run')) return 2
+      if (v.includes('elliptical')) return 3
+      if (v.includes('rowing')) return 4
+      if (v.includes('aerobics')) return 5
+      return 10
+    }
+    ordered = [...items].sort((a: any, b: any) => {
+      const ra = rank(a?.name)
+      const rb = rank(b?.name)
+      if (ra !== rb) return ra - rb
+      return String(a?.name || '').localeCompare(String(b?.name || ''))
+    })
+  }
+
+  return NextResponse.json({ items: ordered, limit, offset })
+}

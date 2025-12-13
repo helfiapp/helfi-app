@@ -1901,6 +1901,19 @@ export default function FoodDiary() {
 
   useEffect(() => {
     if (!showAddExerciseModal) return
+    try {
+      const prevOverflow = document.body.style.overflow
+      document.body.style.overflow = 'hidden'
+      return () => {
+        document.body.style.overflow = prevOverflow
+      }
+    } catch {
+      // ignore
+    }
+  }, [showAddExerciseModal])
+
+  useEffect(() => {
+    if (!showAddExerciseModal) return
     const handle = window.setTimeout(() => {
       const search = exerciseTypeSearch.trim()
       if (search.length > 0) {
@@ -1915,6 +1928,27 @@ export default function FoodDiary() {
     }, 200)
     return () => window.clearTimeout(handle)
   }, [exerciseTypeSearch, showAddExerciseModal, exercisePickerCategory])
+
+  const pickQuickExercise = async (query: string) => {
+    setExerciseTypeError(null)
+    setExerciseSaveError(null)
+    try {
+      const qs = new URLSearchParams()
+      qs.set('search', query)
+      qs.set('limit', '1')
+      const res = await fetch(`/api/exercise-types?${qs.toString()}`, { method: 'GET' })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || 'Failed to load exercise')
+      const first = Array.isArray(data?.items) ? data.items[0] : null
+      if (first) {
+        setSelectedExerciseType(first)
+        return
+      }
+      setExerciseTypeError('No matches. Try searching.')
+    } catch (err: any) {
+      setExerciseTypeError(err?.message || 'Failed to load exercise')
+    }
+  }
 
   const saveManualExercise = async () => {
     setExerciseSaveError(null)
@@ -6759,224 +6793,235 @@ Please add nutritional information manually if needed.`);
 	      )}
 
 	      {showAddExerciseModal && (
-	        <div className="fixed inset-0 z-50">
-	          <div
-	            className="absolute inset-0 bg-black/30"
-	            onClick={() => setShowAddExerciseModal(false)}
-	          ></div>
-	          <div className="absolute inset-0 flex items-start sm:items-center justify-center mt-10 sm:mt-0 px-3">
-	            <div
-	              className="w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-gray-200 overflow-hidden"
-	              onClick={(e) => e.stopPropagation()}
-	            >
-	              <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-	                <div className="flex items-center gap-2">
-	                  {(exercisePickerCategory || selectedExerciseType) && (
-	                    <button
-	                      type="button"
-	                      onClick={() => {
-	                        if (selectedExerciseType) {
-	                          setSelectedExerciseType(null)
-	                          setExerciseSaveError(null)
-	                          return
-	                        }
-	                        setExercisePickerCategory(null)
-	                        setExerciseTypeResults([])
-	                        setExerciseTypeError(null)
-	                      }}
-	                      className="p-2 -ml-2 rounded-xl hover:bg-gray-100 text-gray-700"
-	                      aria-label="Back"
-	                      title="Back"
-	                    >
-	                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-	                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-	                      </svg>
-	                    </button>
-	                  )}
-	                  <div className="font-semibold text-gray-900 text-lg">Add exercise</div>
-	                </div>
-	                <button onClick={() => setShowAddExerciseModal(false)} className="p-2 rounded-xl hover:bg-gray-100">
-	                  <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-	                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-	                  </svg>
-	                </button>
+	        <div className="fixed inset-0 z-50 bg-white">
+	          <div className="h-[100dvh] flex flex-col">
+	            <div className="sticky top-0 z-10 bg-white border-b border-gray-100 px-5 py-4 flex items-center justify-between">
+	              <div className="flex items-center gap-2">
+	                {(exercisePickerCategory || selectedExerciseType) && (
+	                  <button
+	                    type="button"
+	                    onClick={() => {
+	                      if (selectedExerciseType) {
+	                        setSelectedExerciseType(null)
+	                        setExerciseSaveError(null)
+	                        return
+	                      }
+	                      setExercisePickerCategory(null)
+	                      setExerciseTypeResults([])
+	                      setExerciseTypeError(null)
+	                    }}
+	                    className="p-2 -ml-2 rounded-xl hover:bg-gray-100 text-gray-700"
+	                    aria-label="Back"
+	                    title="Back"
+	                  >
+	                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+	                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+	                    </svg>
+	                  </button>
+	                )}
+	                <div className="font-semibold text-gray-900 text-lg">Add exercise</div>
 	              </div>
+	              <button onClick={() => setShowAddExerciseModal(false)} className="p-2 rounded-xl hover:bg-gray-100" aria-label="Close">
+	                <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+	                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+	                </svg>
+	              </button>
+	            </div>
 
-	              <div className="p-5 space-y-4">
-	                {!selectedExerciseType ? (
-	                  <>
-	                    <div className="space-y-2">
-	                      <div className="relative">
-	                        <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-	                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-	                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 110-15 7.5 7.5 0 010 15z" />
-	                          </svg>
-	                        </div>
-	                        <input
-	                          type="text"
-	                          value={exerciseTypeSearch}
-	                          onChange={(e) => {
-	                            setExercisePickerCategory(null)
-	                            setExerciseTypeSearch(e.target.value)
-	                          }}
-	                          placeholder="Search exercise (e.g., walking)"
-	                          className="w-full pl-10 pr-3 py-3 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base"
-	                        />
+	            <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-5 pb-10">
+	              {!selectedExerciseType ? (
+	                <>
+	                  <div className="space-y-3">
+	                    <div className="relative">
+	                      <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+	                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+	                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 110-15 7.5 7.5 0 010 15z" />
+	                        </svg>
 	                      </div>
-	                      {exerciseTypeError && <div className="text-sm text-red-600">{exerciseTypeError}</div>}
-	                      {exerciseTypeLoading && <div className="text-sm text-gray-500">Loading…</div>}
+	                      <input
+	                        type="text"
+	                        value={exerciseTypeSearch}
+	                        onChange={(e) => {
+	                          setExercisePickerCategory(null)
+	                          setExerciseTypeSearch(e.target.value)
+	                        }}
+	                        placeholder="Search exercise (e.g., walking)"
+	                        className="w-full pl-10 pr-3 py-3 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base"
+	                      />
 	                    </div>
 
-	                    {exerciseTypeSearch.trim().length === 0 && !exercisePickerCategory ? (
-	                      <div>
-	                        <div className="text-sm font-semibold text-gray-900 mb-3">All categories</div>
-	                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-	                          {[
-	                            { key: 'Cardio', icon: 'M3 12h4l3 8 4-16 3 8h4' },
-	                            { key: 'Gym', icon: 'M7 7h10M7 17h10M9 5v14M15 5v14' },
-	                            { key: 'Household Activity', icon: 'M3 10l9-7 9 7v10a2 2 0 01-2 2H5a2 2 0 01-2-2V10z' },
-	                            { key: 'Individual Sport', icon: 'M16 14a4 4 0 10-8 0' },
-	                            { key: 'Occupational Activity', icon: 'M9 6h6a2 2 0 012 2v1H7V8a2 2 0 012-2z' },
-	                            { key: 'Outdoor Activity', icon: 'M12 2l2 7h7l-5.5 4 2.5 7-6-4.5L6 20l2.5-7L3 9h7l2-7z' },
-	                            { key: 'Strength And Mobility', icon: 'M6 8h12M6 16h12M4 10h2v4H4zM18 10h2v4h-2z' },
-	                            { key: 'Team Sport', icon: 'M12 12a4 4 0 100-8 4 4 0 000 8z' },
-	                            { key: 'Transportation', icon: 'M5 16l1-5a2 2 0 012-2h8a2 2 0 012 2l1 5M7 16a2 2 0 104 0M13 16a2 2 0 104 0' },
-	                          ].map((c) => (
+	                    <div className="flex items-center gap-2 flex-wrap">
+	                      {[
+	                        { label: 'Walking', query: 'walking' },
+	                        { label: 'Run', query: 'running' },
+	                        { label: 'Cycling', query: 'cycling' },
+	                        { label: 'Weights', query: 'weight training' },
+	                        { label: 'Yoga', query: 'yoga' },
+	                      ].map((chip) => (
+	                        <button
+	                          key={chip.label}
+	                          type="button"
+	                          onClick={() => pickQuickExercise(chip.query)}
+	                          className="px-3 py-2 rounded-full border border-gray-200 bg-white hover:bg-gray-50 text-sm font-semibold text-gray-900"
+	                        >
+	                          {chip.label}
+	                        </button>
+	                      ))}
+	                    </div>
+
+	                    {exerciseTypeError && <div className="text-sm text-red-600">{exerciseTypeError}</div>}
+	                    {exerciseTypeLoading && <div className="text-sm text-gray-500">Loading…</div>}
+	                  </div>
+
+	                  {exerciseTypeSearch.trim().length === 0 && !exercisePickerCategory ? (
+	                    <div className="mt-5">
+	                      <div className="text-sm font-semibold text-gray-900 mb-3">All categories</div>
+	                      <div className="grid grid-cols-2 gap-3">
+	                        {[
+	                          { key: 'Cardio', icon: 'M3 12h4l3 8 4-16 3 8h4' },
+	                          { key: 'Gym', icon: 'M7 7h10M7 17h10M9 5v14M15 5v14' },
+	                          { key: 'Household Activity', icon: 'M3 10l9-7 9 7v10a2 2 0 01-2 2H5a2 2 0 01-2-2V10z' },
+	                          { key: 'Individual Sport', icon: 'M16 14a4 4 0 10-8 0' },
+	                          { key: 'Occupational Activity', icon: 'M9 6h6a2 2 0 012 2v1H7V8a2 2 0 012-2z' },
+	                          { key: 'Outdoor Activity', icon: 'M12 2l2 7h7l-5.5 4 2.5 7-6-4.5L6 20l2.5-7L3 9h7l2-7z' },
+	                          { key: 'Strength And Mobility', icon: 'M6 8h12M6 16h12M4 10h2v4H4zM18 10h2v4h-2z' },
+	                          { key: 'Team Sport', icon: 'M12 12a4 4 0 100-8 4 4 0 000 8z' },
+	                          { key: 'Transportation', icon: 'M5 16l1-5a2 2 0 012-2h8a2 2 0 012 2l1 5M7 16a2 2 0 104 0M13 16a2 2 0 104 0' },
+	                        ].map((c) => (
+	                          <button
+	                            key={c.key}
+	                            type="button"
+	                            onClick={() => {
+	                              setExercisePickerCategory(c.key)
+	                              setExerciseTypeSearch('')
+	                              setExerciseSaveError(null)
+	                              loadExerciseTypes({ category: c.key })
+	                            }}
+	                            className="rounded-2xl border border-gray-200 bg-white hover:bg-gray-50 shadow-sm px-4 py-4 flex flex-col items-center gap-3"
+	                          >
+	                            <div className="w-10 h-10 rounded-2xl bg-gray-100 flex items-center justify-center text-gray-500">
+	                              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+	                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={c.icon} />
+	                              </svg>
+	                            </div>
+	                            <div className="text-sm font-semibold text-gray-900 text-center leading-tight">{c.key}</div>
+	                          </button>
+	                        ))}
+	                      </div>
+	                    </div>
+	                  ) : (
+	                    <div className="mt-5 space-y-2">
+	                      {exercisePickerCategory && (
+	                        <div className="flex items-center justify-between">
+	                          <div className="text-sm font-semibold text-gray-900">{exercisePickerCategory}</div>
+	                          <button
+	                            type="button"
+	                            onClick={() => {
+	                              setExercisePickerCategory(null)
+	                              setExerciseTypeResults([])
+	                              setExerciseTypeError(null)
+	                            }}
+	                            className="text-sm text-gray-500 hover:text-gray-700"
+	                          >
+	                            Clear
+	                          </button>
+	                        </div>
+	                      )}
+
+	                      {!exerciseTypeLoading && exerciseTypeResults.length > 0 && (
+	                        <div className="space-y-2">
+	                          {exerciseTypeResults.map((t: any) => (
 	                            <button
-	                              key={c.key}
+	                              key={`${t.id}`}
 	                              type="button"
-	                              onClick={() => {
-	                                setExercisePickerCategory(c.key)
-	                                setExerciseTypeSearch('')
-	                                setExerciseSaveError(null)
-	                                loadExerciseTypes({ category: c.key })
-	                              }}
-	                              className="rounded-2xl border border-gray-200 bg-white hover:bg-gray-50 shadow-sm px-4 py-4 flex flex-col items-center gap-3"
+	                              onClick={() => setSelectedExerciseType(t)}
+	                              className="w-full text-left rounded-2xl border border-gray-200 px-4 py-3 hover:bg-gray-50 flex items-center justify-between gap-3"
 	                            >
-	                              <div className="w-10 h-10 rounded-2xl bg-gray-100 flex items-center justify-center text-gray-500">
-	                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-	                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={c.icon} />
+	                              <div className="min-w-0">
+	                                <div className="text-sm font-semibold text-gray-900 truncate">{t.name}</div>
+	                                <div className="text-xs text-gray-500">
+	                                  {t.category}
+	                                  {t.intensity ? ` • ${t.intensity}` : ''}
+	                                </div>
+	                              </div>
+	                              <div className="text-xs text-gray-400 flex items-center gap-2 flex-shrink-0">
+	                                <span>MET {Number(t.met).toFixed(1)}</span>
+	                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+	                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
 	                                </svg>
 	                              </div>
-	                              <div className="text-sm font-semibold text-gray-900 text-center leading-tight">{c.key}</div>
 	                            </button>
 	                          ))}
 	                        </div>
-	                      </div>
-	                    ) : (
-	                      <div className="space-y-2">
-	                        {exercisePickerCategory && (
-	                          <div className="flex items-center justify-between">
-	                            <div className="text-sm font-semibold text-gray-900">{exercisePickerCategory}</div>
-	                            <button
-	                              type="button"
-	                              onClick={() => {
-	                                setExercisePickerCategory(null)
-	                                setExerciseTypeResults([])
-	                                setExerciseTypeError(null)
-	                              }}
-	                              className="text-sm text-gray-500 hover:text-gray-700"
-	                            >
-	                              Clear
-	                            </button>
-	                          </div>
-	                        )}
+	                      )}
 
-	                        {!exerciseTypeLoading && exerciseTypeResults.length > 0 && (
-	                          <div className="max-h-72 overflow-y-auto space-y-2">
-	                            {exerciseTypeResults.map((t: any) => (
-	                              <button
-	                                key={`${t.id}`}
-	                                type="button"
-	                                onClick={() => setSelectedExerciseType(t)}
-	                                className="w-full text-left rounded-2xl border border-gray-200 px-4 py-3 hover:bg-gray-50 flex items-center justify-between gap-3"
-	                              >
-	                                <div className="min-w-0">
-	                                  <div className="text-sm font-semibold text-gray-900 truncate">{t.name}</div>
-	                                  <div className="text-xs text-gray-500">
-	                                    {t.category}
-	                                    {t.intensity ? ` • ${t.intensity}` : ''}
-	                                  </div>
-	                                </div>
-	                                <div className="text-xs text-gray-400 flex items-center gap-2 flex-shrink-0">
-	                                  <span>MET {Number(t.met).toFixed(1)}</span>
-	                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-	                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-	                                  </svg>
-	                                </div>
-	                              </button>
-	                            ))}
-	                          </div>
-	                        )}
+	                      {!exerciseTypeLoading && exerciseTypeResults.length === 0 && exerciseTypeSearch.trim().length > 0 && !exerciseTypeError && (
+	                        <div className="text-sm text-gray-500">No matches. Try a different search.</div>
+	                      )}
+	                    </div>
+	                  )}
+	                </>
+	              ) : (
+	                <>
+	                  <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
+	                    <div className="text-xs text-gray-500">Selected exercise</div>
+	                    <div className="text-base font-semibold text-gray-900">{selectedExerciseType.name}</div>
+	                    <div className="text-xs text-gray-500">
+	                      {selectedExerciseType.category} • MET {Number(selectedExerciseType.met).toFixed(1)}
+	                    </div>
+	                    <button
+	                      type="button"
+	                      onClick={() => setSelectedExerciseType(null)}
+	                      className="mt-2 text-sm font-semibold text-emerald-700 hover:text-emerald-800"
+	                    >
+	                      Change exercise
+	                    </button>
+	                  </div>
 
-	                        {!exerciseTypeLoading && exerciseTypeResults.length === 0 && exerciseTypeSearch.trim().length > 0 && !exerciseTypeError && (
-	                          <div className="text-sm text-gray-500">No matches. Try a different search.</div>
-	                        )}
-	                      </div>
-	                    )}
-	                  </>
-	                ) : (
-	                  <>
-	                    <div className="rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3">
-	                      <div className="text-xs text-gray-500">Selected exercise</div>
-	                      <div className="text-base font-semibold text-gray-900">{selectedExerciseType.name}</div>
-	                      <div className="text-xs text-gray-500">
-	                        {selectedExerciseType.category} • MET {Number(selectedExerciseType.met).toFixed(1)}
-	                      </div>
-	                      <button
-	                        type="button"
-	                        onClick={() => setSelectedExerciseType(null)}
-	                        className="mt-2 text-sm font-semibold text-emerald-700 hover:text-emerald-800"
-	                      >
-	                        Change exercise
-	                      </button>
+	                  <div className="mt-5 space-y-4">
+	                    <div className="space-y-1">
+	                      <label className="block text-sm font-semibold text-gray-900">Duration (minutes)</label>
+	                      <input
+	                        type="number"
+	                        value={exerciseDurationMinutes}
+	                        onChange={(e) => setExerciseDurationMinutes(Number(e.target.value))}
+	                        min={1}
+	                        max={1440}
+	                        className="w-full px-4 py-3 border-2 border-emerald-500 rounded-2xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base"
+	                      />
 	                    </div>
 
-	                    <div className="space-y-3">
-	                      <div className="space-y-1">
-	                        <label className="block text-sm font-semibold text-gray-900">Duration (minutes)</label>
-	                        <input
-	                          type="number"
-	                          value={exerciseDurationMinutes}
-	                          onChange={(e) => setExerciseDurationMinutes(Number(e.target.value))}
-	                          min={1}
-	                          max={1440}
-	                          className="w-full px-4 py-3 border-2 border-emerald-500 rounded-2xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base"
-	                        />
-	                      </div>
-
-	                      <div className="space-y-1">
-	                        <label className="block text-sm font-semibold text-gray-900">Time (optional)</label>
-	                        <input
-	                          type="time"
-	                          value={exerciseTimeOfDay}
-	                          onChange={(e) => setExerciseTimeOfDay(e.target.value)}
-	                          className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base"
-	                        />
-	                      </div>
+	                    <div className="space-y-1">
+	                      <label className="block text-sm font-semibold text-gray-900">Time (optional)</label>
+	                      <input
+	                        type="time"
+	                        value={exerciseTimeOfDay}
+	                        onChange={(e) => setExerciseTimeOfDay(e.target.value)}
+	                        className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base"
+	                      />
 	                    </div>
 
 	                    {exerciseSaveError && <div className="text-sm text-red-600">{exerciseSaveError}</div>}
 
-	                    <div className="flex gap-3 pt-1">
+	                    <div className="grid grid-cols-2 gap-3 pt-1">
 	                      <button
 	                        type="button"
 	                        onClick={() => setShowAddExerciseModal(false)}
-	                        className="flex-1 py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-900 font-semibold rounded-2xl transition-colors duration-200"
+	                        className="py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-900 font-semibold rounded-2xl transition-colors duration-200"
 	                      >
 	                        Cancel
 	                      </button>
 	                      <button
 	                        type="button"
 	                        onClick={saveManualExercise}
-	                        className="flex-1 py-3 px-4 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold rounded-2xl transition-colors duration-200 disabled:bg-gray-300 disabled:cursor-not-allowed"
+	                        className="py-3 px-4 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold rounded-2xl transition-colors duration-200 disabled:bg-gray-300 disabled:cursor-not-allowed"
 	                      >
 	                        Save
 	                      </button>
 	                    </div>
-	                  </>
-	                )}
-	              </div>
+	                  </div>
+	                </>
+	              )}
 	            </div>
 	          </div>
 	        </div>
