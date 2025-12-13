@@ -1299,22 +1299,25 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
       </div>
       <h2 className="text-2xl font-bold mb-2">What is your primary goal?</h2>
       <p className="mb-4 text-gray-600">We’ll tailor your calories and macros to this goal.</p>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
         {[
           { key: 'lose weight', label: 'Lose weight' },
           { key: 'tone up', label: 'Tone up' },
           { key: 'get shredded', label: 'Get shredded' },
+          { key: 'maintain weight', label: 'Maintain weight' },
           { key: 'gain weight', label: 'Gain weight' },
         ].map((option) => (
           <button
             key={option.key}
-            className={`w-full p-3 rounded border ${
-              goalChoice === option.key ? 'bg-green-600 text-white' : 'border-green-600 text-green-600 hover:bg-green-50'
+            className={`w-full px-3 py-2.5 rounded-xl border text-sm font-semibold ${
+              goalChoice === option.key
+                ? 'bg-green-600 text-white border-green-600'
+                : 'border-green-600 text-green-700 hover:bg-green-50'
             } transition-colors`}
             onClick={() => setGoalChoice(option.key)}
             type="button"
           >
-            <span className="font-semibold">{option.label}</span>
+            <span>{option.label}</span>
           </button>
         ))}
       </div>
@@ -1331,9 +1334,11 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
           ].map((option) => (
             <button
               key={option.key}
-              className={`w-full py-2 rounded border ${
-                goalIntensity === option.key ? 'bg-gray-900 text-white' : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-              } transition-colors text-sm font-medium`}
+              className={`w-full py-2 rounded-xl border ${
+                goalIntensity === option.key
+                  ? 'bg-gray-900 text-white border-gray-900'
+                  : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+              } transition-colors text-sm font-semibold`}
               onClick={() => setGoalIntensity(option.key as any)}
               type="button"
             >
@@ -1356,9 +1361,11 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
             ].map((option) => (
               <button
                 key={option.key}
-                className={`w-full py-3 rounded border ${
-                  diabetesType === option.key ? 'bg-orange-600 text-white border-orange-600' : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-                } transition-colors text-sm font-medium`}
+                className={`w-full py-2.5 rounded-xl border ${
+                  diabetesType === option.key
+                    ? 'bg-orange-600 text-white border-orange-600'
+                    : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                } transition-colors text-sm font-semibold`}
               onClick={() => {
                 setDiabetesType((current) => (current === option.key ? '' : (option.key as any)))
               }}
@@ -1440,15 +1447,19 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
       <h2 className="text-2xl font-bold mb-4">Choose your body type (optional)</h2>
       <p className="mb-4 text-gray-600">Helps tailor insights to your body composition.</p>
       <div className="space-y-3 mb-6">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
           {['ectomorph', 'mesomorph', 'endomorph'].map(type => (
             <button
               key={type}
-              className={`w-full p-3 rounded border ${bodyType === type ? 'bg-green-600 text-white' : 'border-green-600 text-green-600 hover:bg-green-50'} relative group transition-colors`}
+              className={`w-full px-3 py-2.5 rounded-xl border ${
+                bodyType === type
+                  ? 'bg-green-600 text-white border-green-600'
+                  : 'border-green-600 text-green-700 hover:bg-green-50'
+              } relative group transition-colors`}
               onClick={() => handleBodyTypeChange(type)}
             >
               <div className="flex items-center justify-center gap-2">
-                <span className="text-sm font-medium">
+                <span className="text-sm font-semibold">
                   {type.charAt(0).toUpperCase() + type.slice(1)}
                 </span>
                 <span className="inline-flex items-center justify-center">
@@ -1469,7 +1480,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
         </div>
         <div className="flex justify-start">
           <button 
-            className="px-8 py-2 rounded border border-gray-400 text-gray-600 hover:bg-gray-50 transition-colors" 
+            className="px-6 py-2 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors text-sm font-semibold" 
             onClick={() => handleBodyTypeChange('')}
           >
             Skip
