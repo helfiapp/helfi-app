@@ -2705,6 +2705,69 @@ const applyStructuredItems = (
     });
   })();
 
+  const formatShortDayLabel = (iso: string) => {
+    try {
+      const [y, m, d] = iso.split('-').map((v) => parseInt(v, 10))
+      const local = new Date(y, (m || 1) - 1, d || 1)
+      return local.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+    } catch {
+      return iso
+    }
+  }
+
+  // Mobile date header label: "Today" when on today's date; otherwise "Fri, Dec 12"
+  const mobileDateLabel = isViewingToday ? 'Today' : formatShortDayLabel(selectedDate)
+
+  const shiftSelectedDateByDays = (deltaDays: number) => {
+    try {
+      const [y, m, d] = selectedDate.split('-').map((v) => parseInt(v, 10))
+      const base = new Date(y, (m || 1) - 1, d || 1, 12, 0, 0, 0) // midday to avoid DST edge weirdness
+      base.setDate(base.getDate() + deltaDays)
+      const yy = base.getFullYear()
+      const mm = String(base.getMonth() + 1).padStart(2, '0')
+      const dd = String(base.getDate()).padStart(2, '0')
+      setSelectedDate(`${yy}-${mm}-${dd}`)
+    } catch {
+      // fallback: do nothing
+    }
+  }
+
+  const [showDateSheet, setShowDateSheet] = useState(false)
+  const [dateSheetMonth, setDateSheetMonth] = useState<string>(() => (selectedDate || todayIso).slice(0, 7))
+  useEffect(() => {
+    if (showDateSheet) {
+      setDateSheetMonth((selectedDate || todayIso).slice(0, 7))
+    }
+  }, [showDateSheet, selectedDate, todayIso])
+
+  const monthMeta = useMemo(() => {
+    const [yy, mm] = (dateSheetMonth || '').split('-').map((v) => parseInt(v, 10))
+    const safeY = Number.isFinite(yy) ? yy : new Date().getFullYear()
+    const safeM = Number.isFinite(mm) ? mm : new Date().getMonth() + 1
+    const first = new Date(safeY, Math.max(0, safeM - 1), 1)
+    const daysInMonth = new Date(safeY, Math.max(0, safeM - 1) + 1, 0).getDate()
+    const startDow = first.getDay() // 0 = Sun
+    const label = first.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+    return { year: safeY, month: safeM, daysInMonth, startDow, label }
+  }, [dateSheetMonth])
+
+  const shiftDateSheetMonth = (delta: number) => {
+    const y = monthMeta.year
+    const m = monthMeta.month
+    const next = new Date(y, (m - 1) + delta, 1)
+    const yy = next.getFullYear()
+    const mm = String(next.getMonth() + 1).padStart(2, '0')
+    setDateSheetMonth(`${yy}-${mm}`)
+  }
+
+  const selectCalendarDay = (dayNum: number) => {
+    const yy = monthMeta.year
+    const mm = String(monthMeta.month).padStart(2, '0')
+    const dd = String(dayNum).padStart(2, '0')
+    setSelectedDate(`${yy}-${mm}-${dd}`)
+    setShowDateSheet(false)
+  }
+
   const normalizeDiaryEntry = (entry: any, fallbackDate: string) => {
     if (!entry) return entry
     const rawCat = entry.meal ?? entry.category ?? (entry as any)?.mealType ?? (entry as any)?.persistedCategory
@@ -6668,18 +6731,55 @@ Please add nutritional information manually if needed.`);
       </nav>
       
       {/* Date selector */}
-      <div className="bg-white border-b border-gray-200 px-4 py-4">
+      <div className="bg-white border-b border-gray-200 px-4 py-3">
         <div className="max-w-7xl mx-auto">
-          <div className="flex items-center justify-center gap-3">
+          {/* Mobile: modern Huawei-style header */}
+          <div className="md:hidden flex items-center justify-center">
+            <div className="w-full max-w-md flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => shiftSelectedDateByDays(-1)}
+                className="w-11 h-11 rounded-full bg-gray-100 active:bg-gray-200 flex items-center justify-center text-gray-800"
+                aria-label="Previous day"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowDateSheet(true)}
+                className="flex-1 mx-3 h-11 rounded-2xl bg-white border border-gray-200 shadow-sm px-4 flex items-center justify-center gap-2 active:bg-gray-50"
+                aria-label="Open calendar"
+              >
+                <span className="text-base font-semibold text-gray-900">{mobileDateLabel}</span>
+                {!isViewingToday && (
+                  <span className="text-xs text-gray-500">{selectedDate.slice(0, 4)}</span>
+                )}
+                <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => shiftSelectedDateByDays(1)}
+                className="w-11 h-11 rounded-full bg-gray-100 active:bg-gray-200 flex items-center justify-center text-gray-800"
+                aria-label="Next day"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          {/* Desktop: keep simple date input */}
+          <div className="hidden md:flex items-center justify-center gap-3">
             <button
-              onClick={() => {
-                const d = new Date(selectedDate);
-                d.setDate(d.getDate() - 1);
-                const y = d.getFullYear();
-                const m = String(d.getMonth() + 1).padStart(2, '0');
-                const day = String(d.getDate()).padStart(2, '0');
-                setSelectedDate(`${y}-${m}-${day}`);
-              }}
+              type="button"
+              onClick={() => shiftSelectedDateByDays(-1)}
               className="px-3 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm"
             >
               ◀︎ Previous
@@ -6691,22 +6791,108 @@ Please add nutritional information manually if needed.`);
               className="text-sm border border-gray-200 rounded-lg px-3 py-1"
             />
             <button
-              onClick={() => {
-                const d = new Date(selectedDate);
-                d.setDate(d.getDate() + 1);
-                const y = d.getFullYear();
-                const m = String(d.getMonth() + 1).padStart(2, '0');
-                const day = String(d.getDate()).padStart(2, '0');
-                setSelectedDate(`${y}-${m}-${day}`);
-              }}
+              type="button"
+              onClick={() => shiftSelectedDateByDays(1)}
               className="px-3 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm"
             >
               Next ▶︎
             </button>
-            {/* Removed Today button to avoid mixed date cues */}
           </div>
         </div>
       </div>
+
+      {/* Mobile calendar sheet */}
+      {showDateSheet && (
+        <div className="fixed inset-0 z-50 md:hidden">
+          <div
+            className="absolute inset-0 bg-black/30"
+            onClick={() => setShowDateSheet(false)}
+          />
+          <div className="absolute left-0 right-0 bottom-0 bg-white rounded-t-3xl shadow-2xl border-t border-gray-200 overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <button
+                type="button"
+                onClick={() => shiftDateSheetMonth(-1)}
+                className="w-10 h-10 rounded-full bg-gray-100 active:bg-gray-200 flex items-center justify-center"
+                aria-label="Previous month"
+              >
+                <svg className="w-5 h-5 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+
+              <div className="flex-1 text-center">
+                <div className="text-lg font-semibold text-gray-900">{monthMeta.label}</div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => shiftDateSheetMonth(1)}
+                className="w-10 h-10 rounded-full bg-gray-100 active:bg-gray-200 flex items-center justify-center"
+                aria-label="Next month"
+              >
+                <svg className="w-5 h-5 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="px-5 pt-4 pb-6">
+              <div className="grid grid-cols-7 text-center text-xs font-semibold text-gray-400 mb-2">
+                {['SUN','MON','TUE','WED','THU','FRI','SAT'].map((d) => (
+                  <div key={d} className="py-1">{d}</div>
+                ))}
+              </div>
+              <div className="grid grid-cols-7 gap-y-2 text-center">
+                {Array.from({ length: monthMeta.startDow }).map((_, idx) => (
+                  <div key={`pad-${idx}`} />
+                ))}
+                {Array.from({ length: monthMeta.daysInMonth }).map((_, idx) => {
+                  const dayNum = idx + 1
+                  const iso = `${monthMeta.year}-${String(monthMeta.month).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`
+                  const isSelected = iso === selectedDate
+                  const isToday = iso === todayIso
+                  return (
+                    <button
+                      key={iso}
+                      type="button"
+                      onClick={() => selectCalendarDay(dayNum)}
+                      className={[
+                        'mx-auto w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold',
+                        isSelected ? 'bg-emerald-600 text-white' : 'bg-white text-gray-900',
+                        !isSelected ? 'active:bg-gray-100' : 'active:bg-emerald-700',
+                        isToday && !isSelected ? 'ring-2 ring-emerald-300' : '',
+                      ].join(' ')}
+                      aria-label={`Select ${iso}`}
+                    >
+                      {dayNum}
+                    </button>
+                  )
+                })}
+              </div>
+              <div className="mt-5 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedDate(todayIso)
+                    setShowDateSheet(false)
+                  }}
+                  className="px-4 py-2 rounded-xl bg-gray-100 text-gray-900 font-semibold active:bg-gray-200"
+                >
+                  Today
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowDateSheet(false)}
+                  className="px-4 py-2 rounded-xl bg-emerald-600 text-white font-semibold active:bg-emerald-700"
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main Content */}
       <div className="flex-1">
