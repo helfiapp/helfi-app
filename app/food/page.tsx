@@ -9700,15 +9700,11 @@ Please add nutritional information manually if needed.`);
                   Number.isFinite(Number(exerciseCaloriesKcal)) && Number(exerciseCaloriesKcal) > 0
                     ? Number(exerciseCaloriesKcal)
                     : 0
-                const allowanceCalories =
-                  baseTargetCalories && baseTargetCalories > 0 ? baseTargetCalories + exerciseKcal : null
-                const remainingKcal =
-                  allowanceCalories && allowanceCalories > 0
-                    ? Math.max(0, allowanceCalories - consumedKcal)
-                    : 0
-                const consumedInUnit = convertKcalToUnit(consumedKcal, energyUnit)
+                const allowanceCalories = baseTargetCalories && baseTargetCalories > 0 ? baseTargetCalories : null
+                const netUsedKcal = Math.max(0, consumedKcal - exerciseKcal)
+
+                const consumedInUnit = convertKcalToUnit(netUsedKcal, energyUnit)
                 const allowanceInUnit = convertKcalToUnit(allowanceCalories, energyUnit)
-                const exerciseInUnit = convertKcalToUnit(exerciseKcal, energyUnit)
                 const remainingInUnit =
                   allowanceInUnit !== null && consumedInUnit !== null
                     ? Math.max(0, allowanceInUnit - consumedInUnit)
@@ -9811,11 +9807,6 @@ Please add nutritional information manually if needed.`);
                                   <span className="font-semibold">
                                     {Math.round(allowanceInUnit)} {energyUnit}
                                   </span>
-                                  {exerciseInUnit !== null && exerciseInUnit > 0 && (
-                                    <span className="ml-2 text-emerald-600 font-semibold">
-                                      +{Math.round(exerciseInUnit)} {energyUnit} exercise
-                                    </span>
-                                  )}
                                 </div>
                               )}
                             </div>
