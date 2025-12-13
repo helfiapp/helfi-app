@@ -7585,7 +7585,7 @@ Please add nutritional information manually if needed.`);
                                     <select
                                       value={item?.weightUnit === 'ml' ? 'ml' : item?.weightUnit === 'oz' ? 'oz' : 'g'}
                                       onChange={(e) => updateItemField(index, 'weightUnit', e.target.value)}
-                                      className="px-2 py-1 border border-gray-300 rounded-lg text-base font-semibold text-gray-900 bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                      className="pl-2 pr-8 py-1 border border-gray-300 rounded-lg text-base font-semibold text-gray-900 bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                                     >
                                       <option value="g">g</option>
                                       <option value="ml">ml</option>
