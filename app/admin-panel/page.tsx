@@ -1998,58 +1998,70 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
 
             {!visionUsageLoading && visionUsage && (
               <>
-                <div className="space-y-3">
-                  {visionUsage?.billing && (
-                    <div className="bg-emerald-50 border border-emerald-100 text-emerald-800 rounded-lg p-4">
-                      <div className="font-semibold">Real OpenAI billing</div>
-                      <div className="text-sm">
-                        Totals pulled directly from OpenAI billing/usage API
-                        {visionUsage?.billing?.range?.usingFallback ? ' (fallback endpoint in use)' : ''}. No in-app estimates shown here.
-                      </div>
-                      <div className="text-xs text-emerald-700 mt-1">
-                        Range: {visionUsage?.billing?.range?.startDate || '—'} → {visionUsage?.billing?.range?.endDate || '—'} · MTD starts{' '}
-                        {visionUsage?.billing?.monthToDate?.startDate || '—'}
-                      </div>
-                      <div className="text-xs text-emerald-700">
-                        Key present: {visionUsage?.keyStatus?.hasKey ? 'yes' : 'no'} · Endpoint: {visionUsage?.keyStatus?.baseUrl || 'api.openai.com'}
-                        {visionUsage?.keyStatus?.altKeys?.length
-                          ? ` · Other key vars: ${visionUsage.keyStatus.altKeys.join(', ')}`
-                          : ''}
+                <div className="bg-white rounded-lg shadow p-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <div>
+                      <div className="font-semibold text-gray-900">Vendor totals (OpenAI)</div>
+                      <div className="text-xs text-gray-500">
+                        This is the “invoice truth” if OpenAI exposes totals for your account via API. If not, we fall back to Helfi logs below.
                       </div>
                     </div>
-                  )}
+                    <div className="text-xs text-gray-500">
+                      Range: {visionUsage?.billing?.range?.startDate || '—'} → {visionUsage?.billing?.range?.endDate || '—'}
+                    </div>
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                      <div className="text-[11px] text-gray-500 uppercase">Vendor Cost (Range)</div>
+                      <div className="text-lg font-semibold text-gray-900">
+                        {typeof visionUsage?.billing?.range?.costUsd === 'number'
+                          ? `$${Number(visionUsage.billing.range.costUsd).toFixed(2)}`
+                          : visionUsage?.billing?.range?.totalUsageCents
+                          ? `$${(Number(visionUsage.billing.range.totalUsageCents) / 100).toFixed(2)}`
+                          : 'Unavailable'}
+                      </div>
+                    </div>
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                      <div className="text-[11px] text-gray-500 uppercase">Vendor Cost (MTD)</div>
+                      <div className="text-lg font-semibold text-gray-900">
+                        {typeof visionUsage?.billing?.monthToDate?.costUsd === 'number'
+                          ? `$${Number(visionUsage.billing.monthToDate.costUsd).toFixed(2)}`
+                          : visionUsage?.billing?.monthToDate?.totalUsageCents
+                          ? `$${(Number(visionUsage.billing.monthToDate.totalUsageCents) / 100).toFixed(2)}`
+                          : 'Unavailable'}
+                      </div>
+                    </div>
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                      <div className="text-[11px] text-gray-500 uppercase">Status</div>
+                      <div className="text-sm font-medium text-gray-900">
+                        {visionUsage?.billing?.range?.totalUsageCents != null || typeof visionUsage?.billing?.range?.costUsd === 'number'
+                          ? 'OK'
+                          : 'Not supported'}
+                      </div>
+                      <div className="text-[11px] text-gray-500">
+                        Endpoint: {visionUsage?.keyStatus?.baseUrl || 'api.openai.com'}
+                      </div>
+                    </div>
+                  </div>
+
                   {visionUsage?.billing?.range?.error && (
-                    <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-3 text-sm">
-                      Vendor totals unavailable (showing Helfi logs + rate card estimates). Details: {String(visionUsage.billing.range.error).slice(0, 240)}
-                      {String(visionUsage.billing.range.error).length > 240 ? '…' : ''}
-                    </div>
+                    <details className="mt-3 bg-amber-50 border border-amber-200 text-amber-900 rounded-lg p-3 text-sm">
+                      <summary className="cursor-pointer font-medium">Why vendor totals are unavailable</summary>
+                      <div className="mt-2 text-xs text-amber-900 whitespace-pre-wrap">
+                        {String(visionUsage.billing.range.error)}
+                      </div>
+                    </details>
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div className="bg-white rounded-lg shadow p-4">
-                    <div className="text-xs text-gray-500 uppercase">Real Cost (Range)</div>
+                    <div className="text-xs text-gray-500 uppercase">Estimated Cost (Range)</div>
                     <div className="text-2xl font-bold text-blue-600">
-                      {typeof visionUsage?.billing?.range?.costUsd === 'number'
-                        ? `$${Number(visionUsage.billing.range.costUsd).toFixed(2)}`
-                        : visionUsage?.billing?.range?.totalUsageCents
-                        ? `$${(Number(visionUsage.billing.range.totalUsageCents) / 100).toFixed(2)}`
-                        : '—'}
+                      ${((Number(visionUsage?.totals?.rangeCostCentsFromLogs || 0) || 0) / 100).toFixed(2)}
                     </div>
-                    <div className="text-[11px] text-gray-500">
-                      {visionUsage?.billing?.range?.usingFallback ? 'OpenAI billing (fallback)' : 'OpenAI usage API'}
-                    </div>
-                  </div>
-                  <div className="bg-white rounded-lg shadow p-4">
-                    <div className="text-xs text-gray-500 uppercase">Real Cost (MTD)</div>
-                    <div className="text-2xl font-bold text-amber-600">
-                      {typeof visionUsage?.billing?.monthToDate?.costUsd === 'number'
-                        ? `$${Number(visionUsage.billing.monthToDate.costUsd).toFixed(2)}`
-                        : visionUsage?.billing?.monthToDate?.totalUsageCents
-                        ? `$${(Number(visionUsage.billing.monthToDate.totalUsageCents) / 100).toFixed(2)}`
-                        : '—'}
-                    </div>
-                    <div className="text-[11px] text-gray-500">OpenAI month-to-date</div>
+                    <div className="text-[11px] text-gray-500">From Helfi logs + OpenAI rate card</div>
                   </div>
                   <div className="bg-white rounded-lg shadow p-4">
                     <div className="text-xs text-gray-500 uppercase">Tokens (P/C)</div>
@@ -2074,9 +2086,9 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                     <div className="text-[11px] text-gray-500">In selected range</div>
                   </div>
                   <div className="bg-white rounded-lg shadow p-4">
-                    <div className="text-xs text-gray-500 uppercase">Feature Mapping</div>
+                    <div className="text-xs text-gray-500 uppercase">Features</div>
                     <div className="text-2xl font-bold text-gray-800">{visionUsage.features || 0}</div>
-                    <div className="text-[11px] text-gray-500">Per-feature cost uses OpenAI rate card (no markup)</div>
+                    <div className="text-[11px] text-gray-500">Tracked in Helfi logs</div>
                   </div>
                 </div>
 
@@ -2090,137 +2102,153 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                   </div>
                 )}
 
-                <div className="bg-blue-50 border border-blue-200 text-blue-800 rounded-lg p-4">
-                  <div className="font-semibold">Per-feature split (best-effort)</div>
-                  <div className="text-sm">
-                    Costs below use Helfi request logs + OpenAI rate card (no markup). If a feature can't be mapped cleanly you'll see "Not available yet" instead of an estimate.
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <div className="bg-white rounded-lg shadow overflow-hidden">
-                    <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-                      <h3 className="font-semibold text-gray-900">Breakdown by Feature</h3>
-                      <span className="text-xs text-gray-500">Requests · Tokens · Cost</span>
+                <details className="bg-white rounded-lg shadow overflow-hidden">
+                  <summary className="cursor-pointer select-none p-4 border-b border-gray-200 flex items-center justify-between">
+                    <span className="font-semibold text-gray-900">Breakdowns (Feature + User)</span>
+                    <span className="text-xs text-gray-500">Expand to view tables</span>
+                  </summary>
+                  <div className="p-4 space-y-4">
+                    <div className="bg-blue-50 border border-blue-200 text-blue-800 rounded-lg p-3 text-sm">
+                      Costs use Helfi request logs + OpenAI rate card (no markup). If a feature can't be mapped cleanly you'll see “Not available yet”.
                     </div>
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Feature</th>
-                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Requests</th>
-                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Tokens</th>
-                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Cost</th>
-                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Model · Max Res</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200 text-sm">
-                          {Object.entries<any>(visionUsage.featureSummary || {})
-                            .sort((a, b) => Number((b[1] as any).costCents || 0) - Number((a[1] as any).costCents || 0))
-                            .map(([feature, stats]) => {
-                              const models = (Object.entries((stats as any).models || {}) as Array<[string, any]>)
-                                .map(([k, v]) => [k, Number(v || 0)] as [string, number])
-                                .sort((a, b) => b[1] - a[1])
-                              const topModel = models[0]?.[0] || 'n/a'
-                              const costValue = Number((stats as any).costCents)
-                              const res =
-                                (stats as any).maxWidth && (stats as any).maxHeight
-                                  ? `${(stats as any).maxWidth}x${(stats as any).maxHeight}`
-                                  : 'n/a'
-                              return (
-                                <tr key={feature} className="hover:bg-gray-50">
-                                  <td className="px-4 py-3 font-medium text-gray-900">{feature}</td>
-                                  <td className="px-4 py-3 text-gray-700">{(stats as any).count}</td>
-                                  <td className="px-4 py-3 text-gray-700">
-                                    {(stats as any).promptTokens?.toLocaleString?.() || (stats as any).promptTokens} /
-                                    {(stats as any).completionTokens?.toLocaleString?.() || (stats as any).completionTokens}
-                                  </td>
-                                  <td className="px-4 py-3 text-gray-700">
-                                    {Number.isFinite(costValue) ? `$${(costValue / 100).toFixed(2)}` : 'Not available yet'}
-                                  </td>
-                                  <td className="px-4 py-3 text-gray-700">
-                                    {topModel} • {res}
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                        <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+                          <h3 className="font-semibold text-gray-900">Breakdown by Feature</h3>
+                          <span className="text-xs text-gray-500">Requests · Tokens · Cost</span>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full divide-y divide-gray-200">
+                            <thead className="bg-gray-50">
+                              <tr>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Feature</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Requests</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Tokens</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Cost</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Model · Max Res</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-200 text-sm">
+                              {Object.entries<any>(visionUsage.featureSummary || {})
+                                .sort((a, b) => Number((b[1] as any).costCents || 0) - Number((a[1] as any).costCents || 0))
+                                .slice(0, 12)
+                                .map(([feature, stats]) => {
+                                  const models = (Object.entries((stats as any).models || {}) as Array<[string, any]>)
+                                    .map(([k, v]) => [k, Number(v || 0)] as [string, number])
+                                    .sort((a, b) => b[1] - a[1])
+                                  const topModel = models[0]?.[0] || 'n/a'
+                                  const costValue = Number((stats as any).costCents)
+                                  const res =
+                                    (stats as any).maxWidth && (stats as any).maxHeight
+                                      ? `${(stats as any).maxWidth}x${(stats as any).maxHeight}`
+                                      : 'n/a'
+                                  return (
+                                    <tr key={feature} className="hover:bg-gray-50">
+                                      <td className="px-4 py-3 font-medium text-gray-900">{feature}</td>
+                                      <td className="px-4 py-3 text-gray-700">{(stats as any).count}</td>
+                                      <td className="px-4 py-3 text-gray-700">
+                                        {(stats as any).promptTokens?.toLocaleString?.() || (stats as any).promptTokens} /
+                                        {(stats as any).completionTokens?.toLocaleString?.() || (stats as any).completionTokens}
+                                      </td>
+                                      <td className="px-4 py-3 text-gray-700">
+                                        {Number.isFinite(costValue) ? `$${(costValue / 100).toFixed(2)}` : 'Not available yet'}
+                                      </td>
+                                      <td className="px-4 py-3 text-gray-700">
+                                        {topModel} • {res}
+                                      </td>
+                                    </tr>
+                                  )
+                                })}
+                              {Object.keys(visionUsage.featureSummary || {}).length === 0 && (
+                                <tr>
+                                  <td colSpan={5} className="px-4 py-6 text-center text-gray-500">
+                                    No usage recorded for this range yet.
                                   </td>
                                 </tr>
-                              )
-                            })}
-                          {Object.keys(visionUsage.featureSummary || {}).length === 0 && (
-                            <tr>
-                              <td colSpan={5} className="px-4 py-6 text-center text-gray-500">
-                                No usage recorded for this range yet.
-                              </td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                        {Object.keys(visionUsage.featureSummary || {}).length > 12 && (
+                          <div className="p-3 text-xs text-gray-500 border-t border-gray-200">
+                            Showing top 12. Use the user/email filter above to narrow results.
+                          </div>
+                        )}
+                      </div>
 
-                  <div className="bg-white rounded-lg shadow overflow-hidden">
-                    <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-                      <h3 className="font-semibold text-gray-900">Breakdown by User</h3>
-                      <span className="text-xs text-gray-500">Spot heavy or abusive users</span>
-                    </div>
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">User</th>
-                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Requests</th>
-                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Cost</th>
-                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Top Features</th>
-                            <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Status</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200 text-sm">
-                          {Object.entries<any>(visionUsage.userSummary || {})
-                            .sort((a, b) => Number((b[1] as any).costCents || 0) - Number((a[1] as any).costCents || 0))
-                            .slice(0, 20)
-                            .map(([userKey, stats]) => {
-                              const featureList = (Object.entries((stats as any).features || {}) as Array<[string, any]>)
-                                .map(([f, c]) => [f, Number(c || 0)] as [string, number])
-                                .sort((a, b) => b[1] - a[1])
-                                .slice(0, 2)
-                                .map(([f, c]) => `${f} (${c})`)
-                                .join(', ')
-                              const rawCostCents = Number((stats as any).costCents)
-                              const costUsd = Number.isFinite(rawCostCents) ? rawCostCents / 100 : null
-                              const status =
-                                (stats as any).count > 50 || (costUsd ?? 0) > 5
-                                  ? '🚩 FLAG'
-                                  : (stats as any).count > 20
-                                  ? '⚠️ Watch'
-                                  : '✅ OK'
-                              return (
-                                <tr key={userKey} className="hover:bg-gray-50">
-                                  <td className="px-4 py-3 font-medium text-gray-900">{(stats as any).label || userKey}</td>
-                                  <td className="px-4 py-3 text-gray-700">{(stats as any).count}</td>
-                                  <td className="px-4 py-3 text-gray-700">
-                                    {costUsd !== null ? `$${costUsd.toFixed(2)}` : 'Not available yet'}
+                      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                        <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+                          <h3 className="font-semibold text-gray-900">Breakdown by User</h3>
+                          <span className="text-xs text-gray-500">Top spenders</span>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full divide-y divide-gray-200">
+                            <thead className="bg-gray-50">
+                              <tr>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">User</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Requests</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Cost</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Top Features</th>
+                                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Status</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-200 text-sm">
+                              {Object.entries<any>(visionUsage.userSummary || {})
+                                .sort((a, b) => Number((b[1] as any).costCents || 0) - Number((a[1] as any).costCents || 0))
+                                .slice(0, 12)
+                                .map(([userKey, stats]) => {
+                                  const featureList = (Object.entries((stats as any).features || {}) as Array<[string, any]>)
+                                    .map(([f, c]) => [f, Number(c || 0)] as [string, number])
+                                    .sort((a, b) => b[1] - a[1])
+                                    .slice(0, 2)
+                                    .map(([f, c]) => `${f} (${c})`)
+                                    .join(', ')
+                                  const rawCostCents = Number((stats as any).costCents)
+                                  const costUsd = Number.isFinite(rawCostCents) ? rawCostCents / 100 : null
+                                  const status =
+                                    (stats as any).count > 50 || (costUsd ?? 0) > 5
+                                      ? '🚩 FLAG'
+                                      : (stats as any).count > 20
+                                      ? '⚠️ Watch'
+                                      : '✅ OK'
+                                  return (
+                                    <tr key={userKey} className="hover:bg-gray-50">
+                                      <td className="px-4 py-3 font-medium text-gray-900">{(stats as any).label || userKey}</td>
+                                      <td className="px-4 py-3 text-gray-700">{(stats as any).count}</td>
+                                      <td className="px-4 py-3 text-gray-700">
+                                        {costUsd !== null ? `$${costUsd.toFixed(2)}` : 'Not available yet'}
+                                      </td>
+                                      <td className="px-4 py-3 text-gray-700">{featureList || 'n/a'}</td>
+                                      <td className="px-4 py-3 text-gray-700">{status}</td>
+                                    </tr>
+                                  )
+                                })}
+                              {Object.keys(visionUsage.userSummary || {}).length === 0 && (
+                                <tr>
+                                  <td colSpan={5} className="px-4 py-6 text-center text-gray-500">
+                                    No user usage yet.
                                   </td>
-                                  <td className="px-4 py-3 text-gray-700">{featureList || 'n/a'}</td>
-                                  <td className="px-4 py-3 text-gray-700">{status}</td>
                                 </tr>
-                              )
-                            })}
-                          {Object.keys(visionUsage.userSummary || {}).length === 0 && (
-                            <tr>
-                              <td colSpan={5} className="px-4 py-6 text-center text-gray-500">
-                                No user usage yet.
-                              </td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                        {Object.keys(visionUsage.userSummary || {}).length > 12 && (
+                          <div className="p-3 text-xs text-gray-500 border-t border-gray-200">
+                            Showing top 12. Use the user/email filter above to narrow results.
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
+                </details>
 
-                <div className="bg-white rounded-lg shadow overflow-hidden">
-                  <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-                    <h3 className="font-semibold text-gray-900">Trend (Cost per Day)</h3>
-                    <span className="text-xs text-gray-500">Rise fast? clamp usage.</span>
-                  </div>
+                <details className="bg-white rounded-lg shadow overflow-hidden">
+                  <summary className="cursor-pointer select-none p-4 border-b border-gray-200 flex items-center justify-between">
+                    <span className="font-semibold text-gray-900">Trend (Cost per Day)</span>
+                    <span className="text-xs text-gray-500">Expand to view chart</span>
+                  </summary>
                   <div className="p-4 space-y-2">
                     {(!visionUsage.trend || visionUsage.trend.length === 0) && (
                       <div className="text-sm text-gray-600">No data for this range.</div>
@@ -2246,13 +2274,13 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                         )
                       })}
                   </div>
-                </div>
+                </details>
 
-                <div className="bg-white rounded-lg shadow">
-                  <div className="p-4 border-b border-gray-200">
-                    <h3 className="font-semibold text-gray-900">Recent Scans (per-image cost)</h3>
-                    <p className="text-xs text-gray-500">Shows tokens, cost, model, resolution to spot overpriced scans.</p>
-                  </div>
+                <details className="bg-white rounded-lg shadow overflow-hidden">
+                  <summary className="cursor-pointer select-none p-4 border-b border-gray-200 flex items-center justify-between">
+                    <span className="font-semibold text-gray-900">Recent Scans (per-image)</span>
+                    <span className="text-xs text-gray-500">Expand to view list</span>
+                  </summary>
                   <div className="divide-y divide-gray-200">
                     {visionRecent.length === 0 && (
                       <div className="p-4 text-sm text-gray-600">No recent entries.</div>
@@ -2277,7 +2305,7 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                       </div>
                     ))}
                   </div>
-                </div>
+                </details>
               </>
             )}
 
