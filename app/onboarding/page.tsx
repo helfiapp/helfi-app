@@ -1040,7 +1040,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
 
   // Body type is optional: tapping the same option again should deselect (match diabetes toggle UX).
   const handleBodyTypeChange = useCallback((type: string) => {
-    setBodyType((current) => (current === type ? '' : type));
+    setBodyType((current: string) => (current === type ? '' : type));
   }, []);
 
   const allergyOptions = React.useMemo(
