@@ -3629,6 +3629,10 @@ const applyStructuredItems = (
   //
   // Load today's foods from context data (no API calls needed!)
   useEffect(() => {
+    // IMPORTANT: `userData.todaysFoods` is a fast-cache snapshot for the currently viewed date.
+    // When it changes (e.g., after copying/pasting to today), letting it drive `historyFoods`
+    // can wipe entries on past dates. Past dates are loaded via the dedicated history loader.
+    if (!isViewingToday) return
     // Try to load from cache first (works for both today and past dates)
     if (userData?.todaysFoods) {
       console.log(`🚀 PERFORMANCE: Checking cache for date ${selectedDate}, isViewingToday: ${isViewingToday}`);
@@ -4198,11 +4202,11 @@ const applyStructuredItems = (
   }, [selectedDate, isViewingToday, diaryHydrated, editingEntry?.id])
 
   // Save food entries to database and update context (OPTIMIZED + RELIABLE HISTORY)
-  const saveFoodEntries = async (
-    updatedFoods: any[],
-    options?: { appendHistory?: boolean; suppressToast?: boolean; snapshotDateOverride?: string },
-  ) => {
-    try {
+	  const saveFoodEntries = async (
+	    updatedFoods: any[],
+	    options?: { appendHistory?: boolean; suppressToast?: boolean; snapshotDateOverride?: string },
+	  ) => {
+	    try {
       // When the user intentionally saves, clear any tombstones for matching entries so
       // re-adding the same meal on purpose is allowed.
       removeDeletedTombstonesForEntries(updatedFoods)
@@ -4223,26 +4227,62 @@ const applyStructuredItems = (
         (initialLatest?.localDate && typeof initialLatest.localDate === 'string' && initialLatest.localDate.length >= 8
           ? initialLatest.localDate
           : selectedDate) || ''
-      const dedupedFoods = dedupeEntries(uniqueById, { fallbackDate: dedupeTargetDate })
-      
-      // 2) Update context immediately for instant UI updates (with deduplicated array)
-      updateUserData({ todaysFoods: dedupedFoods })
-      console.log('🚀 PERFORMANCE: Food updated in cache instantly - UI responsive!', {
-        originalCount: updatedFoods.length,
-        dedupedCount: dedupedFoods.length
-      })
+	      const dedupedFoods = dedupeEntries(uniqueById, { fallbackDate: dedupeTargetDate })
+	      
+	      // IMPORTANT: `todaysFoods` is used as a cross-day cache (filtered by `localDate`).
+	      // Never replace it with only the entries from the current operation, or other days can
+	      // "disappear" (especially if they haven't been persisted to FoodLog yet).
+	      const existingSnapshotFoods = Array.isArray((userData as any)?.todaysFoods)
+	        ? ((userData as any).todaysFoods as any[])
+	        : []
+	      const mergedSnapshotFoods = dedupeEntries(
+	        [...dedupedFoods, ...existingSnapshotFoods],
+	        { fallbackDate: dedupeTargetDate },
+	      )
+	      
+	      // 2) Update context immediately for instant UI updates (with merged cache)
+	      updateUserData({ todaysFoods: mergedSnapshotFoods })
+	      console.log('🚀 PERFORMANCE: Food updated in cache instantly - UI responsive!', {
+	        originalCount: updatedFoods.length,
+	        dedupedCount: dedupedFoods.length
+	      })
 
       // We only want to create a new history row when this save represents
       // a *new* entry (not edits or deletes). Callers pass appendHistory: false
       // for edits/deletes.
       const appendHistory = options?.appendHistory !== false
 
-      // Determine the localDate for logging and saving
-      const latest = Array.isArray(dedupedFoods) && dedupedFoods.length > 0 ? dedupedFoods[0] : initialLatest
-      const targetLocalDate =
-        latest && typeof latest?.localDate === 'string' && latest.localDate.length >= 8
-          ? latest.localDate
-          : selectedDate
+	      // Determine which entry is "new" for FoodLog writes (avoid saving an older entry when the list order changes).
+	      const previousIds = new Set<number>(
+	        existingSnapshotFoods
+	          .map((food: any) => (typeof food?.id === 'number' ? food.id : Number(food?.id)))
+	          .filter((id: number) => Number.isFinite(id)),
+	      )
+	      const addedCandidates = dedupedFoods.filter((food: any) => {
+	        const id = typeof food?.id === 'number' ? food.id : Number(food?.id)
+	        return Number.isFinite(id) && !previousIds.has(id)
+	      })
+	      const pickMostRecent = (list: any[]) => {
+	        let best: any = null
+	        let bestTs = -Infinity
+	        for (const item of list) {
+	          const ts = extractEntryTimestampMs(item)
+	          if (Number.isFinite(ts) && ts > bestTs) {
+	            bestTs = ts
+	            best = item
+	          }
+	        }
+	        return best
+	      }
+	      // Prefer a newly-added entry for the currently selected calendar day; fall back to most-recent add.
+	      const latestAddedForSelectedDate = pickMostRecent(
+	        addedCandidates.filter((it: any) => entryMatchesDate(it, selectedDate)),
+	      )
+	      const latest = latestAddedForSelectedDate || pickMostRecent(addedCandidates) || (dedupedFoods[0] ?? initialLatest)
+	      const targetLocalDate =
+	        latest && typeof latest?.localDate === 'string' && latest.localDate.length >= 8
+	          ? latest.localDate
+	          : selectedDate
       // Anchor createdAt to the selected/target local date to avoid drift across adjacent days.
       const anchoredCreatedAt = alignTimestampToLocalDate(
         latest?.createdAt || new Date().toISOString(),
@@ -4261,10 +4301,10 @@ const applyStructuredItems = (
         hasItems: Array.isArray(latest?.items) && latest.items.length > 0,
       })
 
-      const snapshotFoods = dedupedFoods
+	      const snapshotFoods = mergedSnapshotFoods
 
-      // 2) Persist today's foods snapshot (fast "today" view) via /api/user-data.
-      await syncSnapshotToServer(snapshotFoods, options?.snapshotDateOverride ?? selectedDate)
+	      // 2) Persist today's foods snapshot (fast "today" view) via /api/user-data.
+	      await syncSnapshotToServer(snapshotFoods, options?.snapshotDateOverride ?? selectedDate)
 
       // 3) For brand new entries, write directly into the permanent FoodLog history table.
       //    If the write fails, enqueue the payload locally and surface a retry button.
