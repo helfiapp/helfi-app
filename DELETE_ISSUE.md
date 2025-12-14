@@ -95,14 +95,14 @@ Earlier deployments (subset of changes):
 
 ## 4) Immediate issues to fix next (based on latest user message)
 
-1) **Search ranking (exact match should be first)**  
+1) ❌ **Search ranking (exact match should be first)**  
    - Add scoring on API response (or client) to push:
      - exact match of `name` to top
      - prefix match next
      - substring match next
    - Example: query “lamb chop” should prioritize “Lamb, chop”.
 
-2) **Search latency (30–60 seconds)**  
+2) ❌ **Search latency (30–60 seconds)**  
    Likely causes:
    - External APIs are slow (FatSecret token + search, USDA search, OpenFoodFacts search)
    - No request cancellation; “Reset” doesn’t cancel in-flight requests → race conditions
@@ -111,12 +111,12 @@ Earlier deployments (subset of changes):
    - Add per-source timeout server-side (return partial results quickly)
    - Cache FatSecret access token server-side (short TTL) to avoid fetching it every search
 
-3) **Build a meal not adding ingredients**  
+3) ❌ **Build a meal not adding ingredients**  
    - Verify `addIngredientFromOfficial` runs in “analysis” mode during build mode.  
    - Ensure it appends to `analyzedItems` and that the ingredient cards UI is visible in builder state.
    - Add minimal logging (or temporary toast) confirming “ingredient added” and current ingredient count.
 
-4) **Food Diary flashing/disappearing**  
+4) ❌ **Food Diary flashing/disappearing**  
    - Needs a reliable reproduction with exact steps and date/meal context.
    - Do not claim fixed without user confirmation.
 
