@@ -4684,6 +4684,18 @@ function sanitizeNutritionTotals(raw: any): NutritionTotals | null {
     setShowAnalysisModeModal(false);
     setIsAnalyzing(true);
     setAnalysisPhase('preparing');
+
+    // Desktop UX: auto-scroll to the top so the user can see the analysis UI/progress immediately.
+    try {
+      if (typeof window !== 'undefined') {
+        const isDesktop = window.matchMedia ? window.matchMedia('(min-width: 768px)').matches : true
+        if (isDesktop) {
+          window.requestAnimationFrame(() => {
+            window.scrollTo({ top: 0, behavior: 'smooth' })
+          })
+        }
+      }
+    } catch {}
     
     try {
       console.log('🔍 AGENT #6 DEBUG: Starting photo analysis...');
@@ -4831,6 +4843,18 @@ Meanwhile, you can describe your food manually:
     
     setIsAnalyzing(true);
     setAnalysisPhase('analyzing');
+
+    // Desktop UX: keep the analysis results/progress in view.
+    try {
+      if (typeof window !== 'undefined') {
+        const isDesktop = window.matchMedia ? window.matchMedia('(min-width: 768px)').matches : true
+        if (isDesktop) {
+          window.requestAnimationFrame(() => {
+            window.scrollTo({ top: 0, behavior: 'smooth' })
+          })
+        }
+      }
+    } catch {}
     
     try {
       console.log('🚀 PERFORMANCE: Starting fast text-based food analysis...');
