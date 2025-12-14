@@ -1765,10 +1765,90 @@ export default function FoodDiary() {
     macros: MacroSegment[]
   } | null>(null)
   const [quickToast, setQuickToast] = useState<string | null>(null)
+  const MULTI_COPY_CLIPBOARD_KEY = 'foodDiary:multiCopyClipboard'
+  const [multiCopyClipboardCount, setMultiCopyClipboardCount] = useState<number>(0)
+  const [showMultiCopyModal, setShowMultiCopyModal] = useState(false)
+  const [multiCopyCategory, setMultiCopyCategory] = useState<typeof MEAL_CATEGORY_ORDER[number] | null>(null)
+  const [multiCopySelectedKeys, setMultiCopySelectedKeys] = useState<Record<string, boolean>>({})
   const deletedEntryKeysRef = useRef<Set<string>>(new Set())
   const [deletedEntryNonce, setDeletedEntryNonce] = useState(0) // bump to force dedupe refresh after deletes
   const [favorites, setFavorites] = useState<any[]>([])
   const isAddMenuOpen = showCategoryPicker || showPhotoOptions
+
+  type MultiCopyClipboardItem = {
+    description: string
+    nutrition?: any
+    total?: any
+    items?: any[] | null
+    photo?: string | null
+    time?: string | null
+    createdAt?: string | null
+    method?: string | null
+  }
+  type MultiCopyClipboard = {
+    v: 1
+    createdAt: number
+    items: MultiCopyClipboardItem[]
+  }
+
+  const readMultiCopyClipboard = (): MultiCopyClipboard | null => {
+    if (typeof window === 'undefined') return null
+    try {
+      const raw = localStorage.getItem(MULTI_COPY_CLIPBOARD_KEY)
+      const parsed = raw ? JSON.parse(raw) : null
+      if (!parsed || typeof parsed !== 'object') return null
+      if (parsed.v !== 1) return null
+      const items = Array.isArray(parsed.items) ? parsed.items : []
+      return {
+        v: 1,
+        createdAt: Number(parsed.createdAt) || Date.now(),
+        items: items
+          .map((it: any) => ({
+            description: (it?.description || '').toString(),
+            nutrition: it?.nutrition ?? null,
+            total: it?.total ?? null,
+            items: Array.isArray(it?.items) ? it.items : null,
+            photo: typeof it?.photo === 'string' ? it.photo : null,
+            time: typeof it?.time === 'string' ? it.time : null,
+            createdAt: typeof it?.createdAt === 'string' ? it.createdAt : null,
+            method: typeof it?.method === 'string' ? it.method : null,
+          }))
+          .filter((it: MultiCopyClipboardItem) => Boolean(it.description)),
+      }
+    } catch {
+      return null
+    }
+  }
+
+  const writeMultiCopyClipboard = (items: MultiCopyClipboardItem[]) => {
+    if (typeof window === 'undefined') return
+    try {
+      const payload: MultiCopyClipboard = { v: 1, createdAt: Date.now(), items }
+      localStorage.setItem(MULTI_COPY_CLIPBOARD_KEY, JSON.stringify(payload))
+      setMultiCopyClipboardCount(items.length)
+    } catch {}
+  }
+
+  const clearMultiCopyClipboard = () => {
+    if (typeof window === 'undefined') return
+    try {
+      localStorage.removeItem(MULTI_COPY_CLIPBOARD_KEY)
+    } catch {}
+    setMultiCopyClipboardCount(0)
+  }
+
+  useEffect(() => {
+    const initial = readMultiCopyClipboard()
+    setMultiCopyClipboardCount(initial?.items?.length || 0)
+    if (typeof window === 'undefined') return
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== MULTI_COPY_CLIPBOARD_KEY) return
+      const next = readMultiCopyClipboard()
+      setMultiCopyClipboardCount(next?.items?.length || 0)
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [])
 
   // Always scope "today" entries to the currently selected calendar date so cached prior-day rows
   // (e.g., from warm session storage) can't leak into the visible day.
@@ -3316,6 +3396,16 @@ const applyStructuredItems = (
     })
     return grouped
   }, [sourceEntries])
+
+  const multiCopyEntries = useMemo(() => {
+    if (!multiCopyCategory) return []
+    const list = entriesByCategory[multiCopyCategory] || []
+    return Array.isArray(list) ? list.slice().sort((a: any, b: any) => (b?.id || 0) - (a?.id || 0)) : []
+  }, [entriesByCategory, multiCopyCategory])
+
+  const multiCopySelectedCount = useMemo(() => {
+    return Object.values(multiCopySelectedKeys || {}).filter(Boolean).length
+  }, [multiCopySelectedKeys])
 
   // Calendar highlight: keep Today green; show orange background for other days that have entries.
   // This is best-effort and uses the durable local snapshot (no extra server requests).
@@ -6928,6 +7018,159 @@ Please add nutritional information manually if needed.`);
       setShowEntryOptions(null);
     }
   };
+
+  const entrySelectionKey = (entry: any) => {
+    if (!entry) return ''
+    if ((entry as any)?.dbId) return `db:${(entry as any).dbId}`
+    if (entry?.id !== null && entry?.id !== undefined) return `id:${entry.id}`
+    const built = buildDeleteKey(entry)
+    return built || ''
+  }
+
+  const openMultiCopyPicker = (categoryKey: typeof MEAL_CATEGORY_ORDER[number]) => {
+    setMultiCopyCategory(categoryKey)
+    setMultiCopySelectedKeys({})
+    setShowMultiCopyModal(true)
+  }
+
+  const closeMultiCopyPicker = () => {
+    setShowMultiCopyModal(false)
+    setMultiCopyCategory(null)
+    setMultiCopySelectedKeys({})
+  }
+
+  const pasteMultipleFromClipboard = async (
+    targetCategoryKey: typeof MEAL_CATEGORY_ORDER[number],
+    targetDate: string,
+  ) => {
+    const clipboard = readMultiCopyClipboard()
+    const items = clipboard?.items || []
+    if (!items.length) {
+      showQuickToast('No copied items to paste')
+      return
+    }
+    const category = normalizeCategory(targetCategoryKey)
+    const clones = items.map((item, idx) => {
+      const createdSource = item?.createdAt || new Date().toISOString()
+      const baseTs = new Date(createdSource).getTime()
+      const adjusted = Number.isFinite(baseTs) ? new Date(baseTs + idx * 60000).toISOString() : new Date().toISOString()
+      const anchored = alignTimestampToLocalDate(adjusted, targetDate)
+      const time =
+        item?.time ||
+        new Date(anchored).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      const description = (item?.description || '').toString() || 'Copied meal'
+      return {
+        id: new Date(anchored).getTime() + idx,
+        dbId: undefined,
+        localDate: targetDate,
+        createdAt: anchored,
+        time,
+        meal: category,
+        category,
+        persistedCategory: category,
+        description,
+        nutrition: item?.nutrition ?? null,
+        total: item?.total ?? null,
+        items: Array.isArray(item?.items) && item.items.length > 0 ? item.items : null,
+        photo: item?.photo ?? null,
+        method: item?.method ?? 'copied',
+      }
+    })
+
+    const dedupeTargetDate = targetDate || selectedDate
+    const dedupeList = (entries: any[]) => dedupeEntries(entries, { fallbackDate: dedupeTargetDate })
+
+    const isTargetToday = targetDate === todayIso
+    const isTargetSelected = targetDate === selectedDate
+    let foodsForSave: any[] = []
+
+    if (isTargetToday || (isTargetSelected && isViewingToday)) {
+      const updated = dedupeList([...clones, ...todaysFoods])
+      setTodaysFoods(updated)
+      foodsForSave = updated
+    } else if (isTargetSelected && !isViewingToday) {
+      const updated = dedupeList([...clones, ...(historyFoods || [])])
+      setHistoryFoods(updated)
+      foodsForSave = updated
+    } else {
+      const updated = dedupeList([...clones, ...todaysFoods])
+      setTodaysFoods(updated)
+      foodsForSave = updated
+    }
+
+    setExpandedCategories((prev) => ({ ...prev, [targetCategoryKey]: true }))
+    showQuickToast(`Pasted ${clones.length} item${clones.length === 1 ? '' : 's'} into ${categoryLabel(targetCategoryKey)}`)
+
+    try {
+      await saveFoodEntries(foodsForSave, { appendHistory: false, snapshotDateOverride: targetDate })
+
+      // Persist to FoodLog so refresh won't drop pasted entries (especially for non-today dates).
+      for (const clone of clones) {
+        const idKey = clone?.id !== null && clone?.id !== undefined ? `id:${clone.id}` : ''
+        const stableKeys = stableDeleteKeysForEntry(clone)
+        const shouldSkip =
+          (idKey && deletedEntryKeysRef.current.has(idKey)) ||
+          stableKeys.some((k) => deletedEntryKeysRef.current.has(k)) ||
+          isEntryDeleted(clone)
+        if (shouldSkip) continue
+
+        try {
+          const res = await fetch('/api/food-log', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              description: clone.description || '',
+              nutrition: clone.nutrition || null,
+              imageUrl: clone.photo || null,
+              items: Array.isArray(clone.items) && clone.items.length > 0 ? clone.items : null,
+              meal: clone.meal || clone.category,
+              category: clone.category || clone.meal,
+              localDate: clone.localDate,
+              createdAt: clone.createdAt,
+            }),
+          })
+          if (!res.ok) continue
+          const json = await res.json().catch(() => ({} as any))
+          const createdId = typeof json?.id === 'string' && json.id ? json.id : null
+          if (!createdId) continue
+
+          setTodaysFoods((prev) =>
+            dedupeEntries(
+              (prev || []).map((e: any) => {
+                if (String(e?.id ?? '') !== String(clone?.id ?? '')) return e
+                return { ...e, dbId: createdId }
+              }),
+              { fallbackDate: dedupeTargetDate },
+            ),
+          )
+          setHistoryFoods((prev) =>
+            dedupeEntries(
+              (prev || []).map((e: any) => {
+                if (String(e?.id ?? '') !== String(clone?.id ?? '')) return e
+                return { ...e, dbId: createdId }
+              }),
+              { fallbackDate: dedupeTargetDate },
+            ),
+          )
+
+          const deletedNow =
+            (idKey && deletedEntryKeysRef.current.has(idKey)) ||
+            stableKeys.some((k) => deletedEntryKeysRef.current.has(k))
+          if (deletedNow) {
+            await fetch('/api/food-log/delete', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id: createdId }),
+            }).catch(() => {})
+          }
+        } catch {}
+      }
+
+      await refreshEntriesFromServer()
+    } catch (err) {
+      console.warn('Paste multiple items failed', err)
+    }
+  }
 
   const addIngredient = () => {
     setManualIngredients([...manualIngredients, { name: '', weight: '', unit: 'g' }]);
@@ -10791,6 +11034,82 @@ Please add nutritional information manually if needed.`);
                                         ) : null
                                       })()}
 
+                                      {(() => {
+                                        const entriesForCopy = entriesByCategory[cat.key] || []
+                                        return entriesForCopy.length > 0 ? (
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setShowPhotoOptions(false)
+                                              setPhotoOptionsAnchor(null)
+                                              openMultiCopyPicker(cat.key)
+                                            }}
+                                            className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
+                                          >
+                                            <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-teal-50 flex items-center justify-center mr-3 text-teal-700">
+                                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 8h3m-3 4h3m-7-8h.01m-.01 4h.01" />
+                                              </svg>
+                                            </div>
+                                            <div className="flex-1">
+                                              <div className="text-base font-semibold text-gray-900">Copy multiple items</div>
+                                              <div className="text-xs text-gray-500">Choose which {categoryLabel(cat.key)} items to copy</div>
+                                            </div>
+                                            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                            </svg>
+                                          </button>
+                                        ) : null
+                                      })()}
+
+                                      {multiCopyClipboardCount > 0 && (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setShowPhotoOptions(false)
+                                            setPhotoOptionsAnchor(null)
+                                            pasteMultipleFromClipboard(cat.key, selectedDate)
+                                          }}
+                                          className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
+                                        >
+                                          <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center mr-3 text-purple-700">
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 4v4a2 2 0 002 2h4a2 2 0 002-2V4m-2 12h2a2 2 0 002-2V8a2 2 0 00-2-2h-2M8 20h8a2 2 0 002-2v-4a2 2 0 00-2-2H8a2 2 0 00-2 2v4a2 2 0 002 2z" />
+                                            </svg>
+                                          </div>
+                                          <div className="flex-1">
+                                            <div className="text-base font-semibold text-gray-900">Paste multiple items</div>
+                                            <div className="text-xs text-gray-500">Paste {multiCopyClipboardCount} copied item{multiCopyClipboardCount === 1 ? '' : 's'} into {categoryLabel(cat.key)}</div>
+                                          </div>
+                                          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                          </svg>
+                                        </button>
+                                      )}
+
+                                      {multiCopyClipboardCount > 0 && (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setShowPhotoOptions(false)
+                                            setPhotoOptionsAnchor(null)
+                                            clearMultiCopyClipboard()
+                                            showQuickToast('Cleared copied items')
+                                          }}
+                                          className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
+                                        >
+                                          <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center mr-3 text-gray-700">
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 12H6" />
+                                            </svg>
+                                          </div>
+                                          <div className="flex-1">
+                                            <div className="text-base font-semibold text-gray-900">Clear copied items</div>
+                                            <div className="text-xs text-gray-500">Remove items from the clipboard</div>
+                                          </div>
+                                        </button>
+                                      )}
+
                                       <button
                                         type="button"
                                         onClick={() => {
@@ -10943,6 +11262,82 @@ Please add nutritional information manually if needed.`);
                                           </button>
                                         ) : null
                                       })()}
+
+                                      {(() => {
+                                        const entriesForCopy = entriesByCategory[cat.key] || []
+                                        return entriesForCopy.length > 0 ? (
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setShowPhotoOptions(false)
+                                              setPhotoOptionsAnchor(null)
+                                              openMultiCopyPicker(cat.key)
+                                            }}
+                                            className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
+                                          >
+                                            <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-teal-50 flex items-center justify-center mr-3 text-teal-700">
+                                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 8h3m-3 4h3m-7-8h.01m-.01 4h.01" />
+                                              </svg>
+                                            </div>
+                                            <div className="flex-1">
+                                              <div className="text-base font-semibold text-gray-900">Copy multiple items</div>
+                                              <div className="text-xs text-gray-500">Choose which {categoryLabel(cat.key)} items to copy</div>
+                                            </div>
+                                            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                            </svg>
+                                          </button>
+                                        ) : null
+                                      })()}
+
+                                      {multiCopyClipboardCount > 0 && (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setShowPhotoOptions(false)
+                                            setPhotoOptionsAnchor(null)
+                                            pasteMultipleFromClipboard(cat.key, selectedDate)
+                                          }}
+                                          className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
+                                        >
+                                          <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center mr-3 text-purple-700">
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 4v4a2 2 0 002 2h4a2 2 0 002-2V4m-2 12h2a2 2 0 002-2V8a2 2 0 00-2-2h-2M8 20h8a2 2 0 002-2v-4a2 2 0 00-2-2H8a2 2 0 00-2 2v4a2 2 0 002 2z" />
+                                            </svg>
+                                          </div>
+                                          <div className="flex-1">
+                                            <div className="text-base font-semibold text-gray-900">Paste multiple items</div>
+                                            <div className="text-xs text-gray-500">Paste {multiCopyClipboardCount} copied item{multiCopyClipboardCount === 1 ? '' : 's'} into {categoryLabel(cat.key)}</div>
+                                          </div>
+                                          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                          </svg>
+                                        </button>
+                                      )}
+
+                                      {multiCopyClipboardCount > 0 && (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setShowPhotoOptions(false)
+                                            setPhotoOptionsAnchor(null)
+                                            clearMultiCopyClipboard()
+                                            showQuickToast('Cleared copied items')
+                                          }}
+                                          className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
+                                        >
+                                          <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center mr-3 text-gray-700">
+                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 12H6" />
+                                            </svg>
+                                          </div>
+                                          <div className="flex-1">
+                                            <div className="text-base font-semibold text-gray-900">Clear copied items</div>
+                                            <div className="text-xs text-gray-500">Remove items from the clipboard</div>
+                                          </div>
+                                        </button>
+                                      )}
 
                                       <button
                                         type="button"
@@ -11194,6 +11589,125 @@ Please add nutritional information manually if needed.`);
                 </div>
               )
             })()}
+          </div>
+        </div>
+      )}
+
+      {showMultiCopyModal && (
+        <div className="fixed inset-0 z-50 bg-white flex flex-col overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+            <button
+              type="button"
+              onClick={closeMultiCopyPicker}
+              className="p-2 rounded-full hover:bg-gray-100"
+              aria-label="Back"
+            >
+              <span aria-hidden>←</span>
+            </button>
+            <div className="flex-1 text-center">
+              <div className="text-lg font-semibold text-gray-900">Copy multiple items</div>
+              <div className="text-xs text-gray-500">
+                {multiCopyCategory ? categoryLabel(multiCopyCategory) : 'Meals'}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={closeMultiCopyPicker}
+              className="p-2 rounded-full hover:bg-gray-100"
+              aria-label="Close"
+            >
+              <span aria-hidden>✕</span>
+            </button>
+          </div>
+
+          <div className="px-4 py-3 text-sm text-gray-600">
+            Select the items you want to copy, then tap Copy.
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-4 pb-24">
+            {multiCopyEntries.length === 0 ? (
+              <div className="text-sm text-gray-500 py-6 text-center">No items to copy.</div>
+            ) : (
+              <div className="divide-y divide-gray-100 border border-gray-200 rounded-xl overflow-hidden">
+                {multiCopyEntries.map((entry: any, idx: number) => {
+                  const key = entrySelectionKey(entry)
+                  const checked = Boolean(multiCopySelectedKeys[key])
+                  const totals = getEntryTotals(entry)
+                  const calories =
+                    typeof totals?.calories === 'number' && Number.isFinite(totals.calories)
+                      ? Math.round(totals.calories)
+                      : null
+                  const label = sanitizeMealDescription(
+                    (entry?.description || '').toString().split('\n')[0].split('Calories:')[0],
+                  )
+                  return (
+                    <button
+                      key={key || String(entry?.id ?? '') || `multi-copy-${idx}`}
+                      type="button"
+                      onClick={() => {
+                        if (!key) return
+                        setMultiCopySelectedKeys((prev) => ({
+                          ...(prev || {}),
+                          [key]: !Boolean(prev?.[key]),
+                        }))
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => {}}
+                        className="h-5 w-5 accent-emerald-600"
+                        aria-label={`Select ${label}`}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-gray-900 truncate">{label || 'Food item'}</div>
+                        <div className="text-xs text-gray-500 truncate">
+                          {formatTimeWithAMPM(entry?.time || '')}
+                        </div>
+                      </div>
+                      {calories !== null && (
+                        <div className="text-sm font-semibold text-gray-900">{calories} kcal</div>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          <div className="fixed inset-x-0 bottom-0 z-10 border-t border-gray-200 bg-white p-4 pb-[calc(env(safe-area-inset-bottom)+16px)]">
+            <button
+              type="button"
+              disabled={multiCopySelectedCount === 0}
+              onClick={() => {
+                if (!multiCopyCategory) return
+                const selected = multiCopyEntries.filter((entry: any) => {
+                  const key = entrySelectionKey(entry)
+                  return key && Boolean(multiCopySelectedKeys[key])
+                })
+                const items: MultiCopyClipboardItem[] = selected.map((entry: any) => ({
+                  description: (entry?.description || '').toString(),
+                  nutrition: entry?.nutrition ?? null,
+                  total: (entry as any)?.total ?? null,
+                  items: Array.isArray(entry?.items) && entry.items.length > 0 ? entry.items : null,
+                  photo: typeof entry?.photo === 'string' ? entry.photo : null,
+                  time: typeof entry?.time === 'string' ? entry.time : null,
+                  createdAt: typeof entry?.createdAt === 'string' ? entry.createdAt : null,
+                  method: typeof entry?.method === 'string' ? entry.method : null,
+                }))
+                writeMultiCopyClipboard(items)
+                closeMultiCopyPicker()
+                showQuickToast(`Copied ${items.length} item${items.length === 1 ? '' : 's'}`)
+              }}
+              className={`w-full py-3 rounded-xl font-semibold transition-colors ${
+                multiCopySelectedCount === 0
+                  ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                  : 'bg-helfi-green text-white hover:bg-green-600'
+              }`}
+            >
+              Copy{multiCopySelectedCount > 0 ? ` (${multiCopySelectedCount})` : ''}
+            </button>
           </div>
         </div>
       )}
