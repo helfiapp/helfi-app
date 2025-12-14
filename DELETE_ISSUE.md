@@ -1,191 +1,133 @@
-# DELETE_ISSUE.md — Food Diary “Ghost Entries” + Delete Resurrection
+# DELETE_ISSUE.md — Handover (Food Diary: Copy/Paste, Deletes, Ingredient Picker, Meal Builder)
 
-**Audience:** next agent.  
-**Goal:** give full context so you do not repeat prior attempts.  
-**Status:** still broken after multiple deploys on 12 Dec 2025.  
-
----
-
-## 1. User‑visible symptom
-
-- On a new day, “ghost” meals appear in Today’s Meals that the user did not enter that day (examples shown repeatedly: burger under Dinner, peanuts under Snacks).
-- User deletes these ghosts from Today’s Meals.
-- Immediately after delete they disappear in UI, but after refresh they **come back**.
-- This has happened many times historically; user reports multiple agents previously “fixed it,” then it returned at the next day rollover.
-
-Screenshots from this session show:
-- Ghosts visible on today.
-- Network panel often showing many `user-data` requests, several returning **413** (payload too large).
-- Even after later deploys, ghosts still resurrect after delete + refresh.
+**Audience:** next agent  
+**Goal:** give a clear handover of what was shipped in this session, what is confirmed working vs still broken, and what to fix next **without breaking guard rails**.
 
 ---
 
-## 2. Guard rails / historical context (from `GUARD_RAILS.md`)
+## Read First (non‑negotiable)
 
-Relevant protected section: **GUARD_RAILS.md §3 Food Diary Entry Loading & Date Filtering**.
+Before touching anything in the Food Diary, read:
+- `GUARD_RAILS.md` (especially Food Diary section)
+- `FOOD-DIARY.md`
 
-Key guard‑rail requirements:
-- Never rely on `localDate` alone to filter.
-- Always merge DB rows into cache via `mapLogsToEntries(...)` + `dedupeEntries(...)`.
-- Backfill safeguard (Jan 2026): if client has local entries for a day but `/api/food-log` returns 0, UI backfills those entries into `FoodLog` so deletes have real IDs.
-- Delete sweep: try delete by ID, then by description+category across multiple dates.
-- Do not remove multi‑date delete sweep or cache clear + reload.
-
-Guard rails explicitly mention:
-- Root cause previously observed: entries with mismatched `localDate` vs `createdAt` leak across days; warm cache can keep showing cards even after server delete.
-- Delete failures can cause entries to reappear; there are console scripts for manual cleanup.
-
-Prior agent handovers also noted:
-- `todaysFoods` is stored in hidden goal `__TODAYS_FOODS_DATA__` for “fast today view”.
-- History view uses real `FoodLog` rows.
-- If snapshots don’t sync, deletes can 404 or resurrect.
+The Food Diary has protected behaviors (snapshot sync, DB verification, fallback loads, delete safety). Do not remove or “simplify” them.
 
 ---
 
-## 3. Repo architecture relevant to this issue
+## Status Icons
 
-**Frontend**
-- Main diary page: `app/food/page.tsx`.
-- Local “today cache”: `todaysFoods` state + warm snapshot (`sessionStorage foodDiary:warmState`) + persistent snapshot (`localStorage foodDiary:persistentSnapshot`).
-- Server “today snapshot”: stored in hidden health goal `__TODAYS_FOODS_DATA__` via `POST /api/user-data` with `{todaysFoods, appendHistory:false}`.
+Use these exact markers in this doc:
 
-**Backend**
-- History table: Prisma `FoodLog`.
-- Load history: `GET /api/food-log?date=YYYY-MM-DD&tz=...`.
-  - Has broad OR query and post-filtering to handle wrong/missing `localDate`.
-  - Includes JWT fallback because `getServerSession` is unreliable on some clients.
-- Save history: `POST /api/food-log` (called directly by diary for new entries).
-- Delete by id: `POST /api/food-log/delete`.
-- Delete by description: `POST /api/food-log/delete-by-description`.
-
-**Provider**
-- `components/providers/UserDataProvider.tsx` only caches GET `/api/user-data` and provides `updateUserData` (local state merge). It does NOT POST.
+- <span style="background:#16a34a;color:#fff;padding:2px 8px;border-radius:6px;font-weight:700;">✓</span> = working (user can do it successfully right now)
+- <span style="background:#dc2626;color:#fff;padding:2px 8px;border-radius:6px;font-weight:700;">✕</span> = still broken / needs work
 
 ---
 
-## 4. What I (current agent) tried and deployed
+## 1) What was implemented in THIS session (numbered list)
 
-### 4.1 Date‑drift / cross‑day leak fixes in `app/food/page.tsx`
+1) <span style="background:#16a34a;color:#fff;padding:2px 8px;border-radius:6px;font-weight:700;">✓</span> **Manual ingredient search now queries multiple sources**  
+   - Endpoint: `GET /api/food-data?source=auto&q=...&kind=...`  
+   - Now aggregates **USDA + FatSecret + OpenFoodFacts** and dedupes by `(name + brand)`.  
+   - User screenshot confirms it returns results from multiple sources (e.g., OpenFoodFacts + USDA).
 
-Deploys:
-1. **Commit `c56844a3` — “Fix Food Diary date drift ghosts”**
-   - Added timestamp‑sanity derivation (`extractEntryTimestampMs`, `deriveDateFromEntryTimestamp`).
-   - `entryMatchesDate` now trusts timestamp date over conflicting `localDate`.
-   - `normalizeDiaryEntry` no longer defaults missing dates to today; uses selected date fallback.
-   - Cache filter healed mismatched localDate vs timestamp.
-   - **Result:** ghosts still resurrect after delete.
+2) <span style="background:#dc2626;color:#fff;padding:2px 8px;border-radius:6px;font-weight:700;">✕</span> **Search result ranking is poor (exact match not first)**  
+   - Example complaint: searching “lamb chop” requires scrolling; “Lamb, chop” should be top.
+   - Needs better ranking for exact/prefix match on `name`.
 
-### 4.2 Payload‑size / 413 fixes for `/api/user-data`
+3) <span style="background:#dc2626;color:#fff;padding:2px 8px;border-radius:6px;font-weight:700;">✕</span> **Ingredient search performance is unacceptable (30–60s)**  
+   - User report: tapping “Packaged” or “Single food” can take 30–60 seconds to show results.  
+   - User report: tapping “Reset” can cause results to appear (likely a UI state/race issue + slow external calls).
 
-Deploys:
-2. **Commit `5e98e47b` — “Compact todaysFoods snapshot”**
-   - Before POST `/api/user-data`, strip heavy fields and truncate description.
-   - Applied to save and delete snapshot writes.
-   - **Result:** still saw `user-data 413` in user screenshots; delete resurrection persisted.
+4) <span style="background:#16a34a;color:#fff;padding:2px 8px;border-radius:6px;font-weight:700;">✓</span> **Ingredient picker now has a Reset button**  
+   - Reset clears query/results/errors and resets toggles.
+   - Also resets state on open/close to reduce “stuck loading” cases.
 
-3. **Commit `1e7fa7fb` — “Limit todaysFoods snapshot to recent window”**
-   - Limit server snapshot to last ~21 days and max 300 entries.
-   - Intended to guarantee no 413.
-   - **Result:** still saw 413 on user side; also caused a regression where DB verification replaced cache and temporarily hid real breakfast entry.
+5) <span style="background:#dc2626;color:#fff;padding:2px 8px;border-radius:6px;font-weight:700;">✕</span> **“Build a meal” (multi‑ingredient meal builder) shipped, but user reports it does not work**  
+   - Intended behavior: multiple ingredients added as cards → saved as 1 diary entry → editable later as one entry with its ingredient cards.  
+   - User report: “Build a meal is no different to add ingredient” and “when I add something nothing is actually added.”
 
-4. **Commit `fa32e8cf` — “Merge DB+cache for today and scope snapshot to selected date”**
-   - Server snapshot now only the currently viewed date.
-   - DB verification merges DB rows with local cache instead of hard replace.
-   - **Result:** 413 stopped in one screenshot, but ghosts still resurrect after delete + refresh.
+6) <span style="background:#16a34a;color:#fff;padding:2px 8px;border-radius:6px;font-weight:700;">✓</span> **Increased manual ingredient search result count**  
+   - `/api/food-data` supports `limit` up to 50; client requests 20.
 
-### 4.3 Server delete auth reliability
+7) <span style="background:#16a34a;color:#fff;padding:2px 8px;border-radius:6px;font-weight:700;">✓</span> **FatSecret serving selection improved (attempt)**  
+   - `lib/food-data.ts` now prefers realistic package servings over “100 g” when possible.  
+   - Not yet confirmed by user on Biscoff specifically, but change is shipped.
 
-Deploy:
-5. **Commit `bfe594cc` — “Add JWT auth fallback to delete routes”**
-   - Added JWT fallback to `/api/food-log/delete` and `/delete-by-description` matching `/api/food-log` GET.
-   - Hypothesis: deletes were failing auth silently on Safari/PWA so rows survived.
-   - **Result:** user still sees resurrection.
+8) <span style="background:#dc2626;color:#fff;padding:2px 8px;border-radius:6px;font-weight:700;">✕</span> **Food Diary still feels “glitchy” (flashing/disappearing entries)**  
+   - User continues to report items flashing, disappearing, and coming back (especially around add/delete/copy flows).  
+   - This is NOT reliably reproduced in this session; needs a fresh, systematic reproduction + logs.
 
----
+9) <span style="background:#16a34a;color:#fff;padding:2px 8px;border-radius:6px;font-weight:700;">✓</span> **Food Diary save logic changed to reduce cross‑day wipe risk**  
+   - `saveFoodEntries()` now merges the updated day’s entries into the existing `userData.todaysFoods` cache instead of overwriting it with only the current list.  
+   - Also tries to pick the newest “added entry” for history writes to avoid saving the wrong entry.  
+   - This was shipped to address “items from yesterday disappear after copying”.
 
-## 5. What remains true after all deploys
-
-- Ghost entries **continue to reappear after delete + refresh**.
-- In latest user screenshot, `delete` requests return 200 and no 413 is obvious, yet ghosts come back.
-- Therefore this is not *only* local cache resurrection or auth failure.
+10) <span style="background:#16a34a;color:#fff;padding:2px 8px;border-radius:6px;font-weight:700;">✓</span> **New diary entries now use collision‑resistant local IDs**  
+   - `addFoodEntry()` now uses `makeUniqueLocalEntryId(...)` instead of `id = createdAtMs`.
 
 ---
 
-## 6. Working hypotheses for next agent (DO NOT repeat prior attempts)
+## 2) Files changed in this session
 
-### Hypothesis A: Delete sweep is missing the real rows
-Possibility:
-- UI deletes a *mapped* entry (id timestamp) that corresponds to multiple FoodLog rows on the same day.
-- `/api/food-log/delete` deletes one row, but another near‑duplicate row remains and is returned on refresh.
-
-Evidence:
-- Resurrection even when delete endpoint returns 200.
-- Dedupe keys might collapse duplicates in UI, hiding multiple server rows.
-
-### Hypothesis B: Backfill safeguard is re‑creating ghosts
-Possibility:
-- After delete, DB returns 0 or partial results for today, and the backfill path re‑posts local cache entries into FoodLog.
-- If local cache still contains the ghosts (e.g., from warm/persistent snapshots), backfill recreates them.
-
-Guard rail says backfill MUST stay, so fix must ensure only valid entries are backfilled.
-
-### Hypothesis C: “todaysFoods” stored goal still contains ghosts
-Possibility:
-- Even with snapshot scoped to selected date, some other path is writing stale ghosts into `__TODAYS_FOODS_DATA__`.
-- On load, diary reads provider `userData.todaysFoods` first, so stale goal entries can seed UI + backfill.
-
-Need to audit ALL writers to `todaysFoods` and ensure they don’t include cross‑day ghosts.
-
-### Hypothesis D: Server `FoodLog` GET post-filtering is rewriting localDate and moving rows
-Possibility:
-- GET auto‑heals localDate based on createdAt window; a ghost row might be getting re‑attributed to today even after delete of the expected id.
-- Another row with wrong localDate/createdAt in boundary window keeps sliding into today.
-
-### Hypothesis E: Client is deleting the wrong key
-Possibility:
-- `deleteFood` tries dbId then entryId timestamp. If entryId differs from actual FoodLog id and dbId is missing/incorrect, the wrong row is deleted.
-- The “nuclear” delete‑by‑description uses normalized description; if server row description differs slightly (e.g., hidden meta line, whitespace, different category), it won’t match.
+- `app/food/page.tsx`
+  - `saveFoodEntries(...)` merge behavior (avoid cross‑day cache wipe)
+  - add “Reset” behavior for ingredient picker
+  - add “Build a meal” mode
+  - `addFoodEntry(...)` uses `makeUniqueLocalEntryId(...)`
+- `app/api/food-data/route.ts`
+  - Auto mode now aggregates sources in parallel and supports `limit`
+- `lib/food-data.ts`
+  - Better FatSecret serving selection (avoid defaulting to 100g when better serving exists)
 
 ---
 
-## 7. What the next agent should do
+## 3) Deployments created in this session (for testing)
 
-**Important:** Do NOT redo any patch above. Assume they are already live.
+Latest deployment (contains everything from this session):  
+- `https://helfi-o17gjd02a-louie-veleskis-projects.vercel.app`
 
-Recommended next steps:
-1. **Inspect live DB for this user and today’s date.**
-   - Query all FoodLog rows for `localDate = today` OR createdAt window for today.
-   - Look for multiple similar rows (burger/peanuts) with different ids or slight description/category differences.
-2. **Instrument delete endpoints temporarily (server logs).**
-   - Log which IDs are deleted and how many rows match delete‑by‑description.
-3. **Verify backfill triggers after delete.**
-   - Confirm whether backfill runs when DB is empty/partial and whether it re‑creates deleted items.
-4. **Audit all writers to `__TODAYS_FOODS_DATA__` and any other hidden goal storing foods.**
-   - Ensure no cross‑day merge is happening elsewhere.
-5. **If duplicates exist, adjust delete‑by‑description matching.**
-   - Consider more robust normalization or deleting all matches for selectedDate regardless of minor diffs.
+Earlier deployments (subset of changes):
+- Cross‑day cache wipe prevention: `https://helfi-2nyc2q58e-louie-veleskis-projects.vercel.app`
+- Multi‑source search + serving attempts: `https://helfi-gq35e9jni-louie-veleskis-projects.vercel.app`
 
 ---
 
-## 8. Deployment notes for next agent
+## 4) Immediate issues to fix next (based on latest user message)
 
-- Preferred deploy path: commit + push to `master` (auto Vercel).  
-- Always verify deploy status with `./scripts/check-deployment-status.sh`.
-- Current relevant commits on master in order:
-  1. `c56844a3` date drift fixes
-  2. `5e98e47b` compact snapshot
-  3. `1e7fa7fb` recent-window snapshot
-  4. `fa32e8cf` merge DB+cache and snapshot-per-day
-  5. `bfe594cc` delete JWT fallback
-  6. `fa32e8cf` already includes latest snapshot scoping
+1) **Search ranking (exact match should be first)**  
+   - Add scoring on API response (or client) to push:
+     - exact match of `name` to top
+     - prefix match next
+     - substring match next
+   - Example: query “lamb chop” should prioritize “Lamb, chop”.
+
+2) **Search latency (30–60 seconds)**  
+   Likely causes:
+   - External APIs are slow (FatSecret token + search, USDA search, OpenFoodFacts search)
+   - No request cancellation; “Reset” doesn’t cancel in-flight requests → race conditions
+   Fix direction:
+   - Add AbortController in `handleOfficialSearch` and cancel previous in-flight calls
+   - Add per-source timeout server-side (return partial results quickly)
+   - Cache FatSecret access token server-side (short TTL) to avoid fetching it every search
+
+3) **Build a meal not adding ingredients**  
+   - Verify `addIngredientFromOfficial` runs in “analysis” mode during build mode.  
+   - Ensure it appends to `analyzedItems` and that the ingredient cards UI is visible in builder state.
+   - Add minimal logging (or temporary toast) confirming “ingredient added” and current ingredient count.
+
+4) **Food Diary flashing/disappearing**  
+   - Needs a reliable reproduction with exact steps and date/meal context.
+   - Do not claim fixed without user confirmation.
 
 ---
 
-## 9. User expectation
+## 5) Notes to the next agent (avoid breaking things)
 
-- User is exhausted and angry; they explicitly do **not** want any repeat of prior experiments.
-- They want a **root-cause fix** that stops:
-  - ghosts appearing on new days
-  - ghosts being undeletable
-  - deletes resurrecting after refresh
+- Do NOT remove any “DB verification + merge” guard rail logic in `app/food/page.tsx`.
+- Do NOT remove:
+  - fallback load from `/api/food-log`
+  - cross-device polling refresh behavior
+  - delete tombstone logic
+- Prefer additive fixes (timeouts, cancelation, ranking) rather than rewriting Food Diary loading.
 
