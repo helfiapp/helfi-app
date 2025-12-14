@@ -28,6 +28,25 @@ function unwrapPayload(payload: any) {
   return payload
 }
 
+function payloadHasUserId(payload: any, expectedUserId: string) {
+  const stack: any[] = [payload]
+  while (stack.length) {
+    const node = stack.pop()
+    if (!node) continue
+    if (Array.isArray(node)) {
+      for (const item of node) stack.push(item)
+      continue
+    }
+    if (typeof node !== 'object') continue
+
+    const possible = (node.userId ?? node.userid ?? node.user_id) as unknown
+    if (typeof possible === 'string' && possible === expectedUserId) return true
+
+    for (const v of Object.values(node)) stack.push(v)
+  }
+  return false
+}
+
 function toNumber(value: unknown): number | null {
   if (value == null) return null
   const n = typeof value === 'number' ? value : Number(value)
@@ -165,6 +184,11 @@ export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const account = await prisma.account.findFirst({
+    where: { userId: session.user.id, provider: 'garmin' },
+    select: { providerAccountId: true },
+  })
+
   const searchParams = request.nextUrl.searchParams
   const dataTypesParam = (searchParams.get('dataTypes') || '').trim()
   const requestedTypes = dataTypesParam
@@ -204,12 +228,34 @@ export async function GET(request: NextRequest) {
   }
 
   // Pull recent logs and derive daily metrics.
-  const logs = await prisma.garminWebhookLog.findMany({
-    where: { userId: session.user.id },
+  const rawLogs = await prisma.garminWebhookLog.findMany({
+    where: account?.providerAccountId
+      ? {
+          OR: [{ userId: session.user.id }, { userId: null }],
+        }
+      : { userId: session.user.id },
     orderBy: { receivedAt: 'desc' },
-    take: 1000,
-    select: { dataType: true, payload: true, receivedAt: true },
+    take: 1500,
+    select: { id: true, userId: true, dataType: true, payload: true, receivedAt: true },
   })
+
+  // If we have a Garmin user id, attach any recent unassigned logs that obviously belong to this user.
+  const extraIdsToAttach: string[] = []
+  const logs = rawLogs.filter((l) => {
+    if (l.userId === session.user.id) return true
+    if (!account?.providerAccountId) return false
+    if (l.userId != null) return false
+    const ok = payloadHasUserId(l.payload, account.providerAccountId)
+    if (ok) extraIdsToAttach.push(l.id)
+    return ok
+  })
+
+  if (extraIdsToAttach.length) {
+    await prisma.garminWebhookLog.updateMany({
+      where: { id: { in: extraIdsToAttach.slice(0, 100) } },
+      data: { userId: session.user.id },
+    })
+  }
 
   const byDate = new Map<string, ReturnType<typeof extractMetricsFromRecord>>()
 
@@ -279,4 +325,3 @@ export async function GET(request: NextRequest) {
     series,
   })
 }
-
