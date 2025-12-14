@@ -11442,7 +11442,7 @@ Please add nutritional information manually if needed.`);
 	                                      onClick={() => {
 	                                        setShowPhotoOptions(false)
 	                                        setPhotoOptionsAnchor(null)
-	                                        startManualMealBuilder(cat.key)
+	                                        router.push(`/food/build-meal?date=${encodeURIComponent(selectedDate)}&category=${encodeURIComponent(cat.key)}`)
 	                                      }}
 	                                      className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
 	                                    >
@@ -11694,7 +11694,7 @@ Please add nutritional information manually if needed.`);
 	                                        onClick={() => {
 	                                          setShowPhotoOptions(false)
 	                                          setPhotoOptionsAnchor(null)
-	                                          startManualMealBuilder(cat.key)
+	                                          router.push(`/food/build-meal?date=${encodeURIComponent(selectedDate)}&category=${encodeURIComponent(cat.key)}`)
 	                                        }}
 	                                        className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
 	                                      >
