@@ -7175,6 +7175,8 @@ Please add nutritional information manually if needed.`);
 
     setExpandedCategories((prev) => ({ ...prev, [targetCategoryKey]: true }))
     showQuickToast(`Pasted ${clones.length} item${clones.length === 1 ? '' : 's'} into ${categoryLabel(targetCategoryKey)}`)
+    // UX: clipboard is single-use by default. After a paste, hide "Paste items" until the user copies again.
+    clearMultiCopyClipboard()
 
     try {
       await saveFoodEntries(foodsForSave, { appendHistory: false, snapshotDateOverride: targetDate })
@@ -11153,7 +11155,7 @@ Please add nutritional information manually if needed.`);
                                             </svg>
                                           </div>
                                           <div className="flex-1">
-                                            <div className="text-base font-semibold text-gray-900">Paste multiple items</div>
+                                            <div className="text-base font-semibold text-gray-900">Paste items</div>
                                             <div className="text-xs text-gray-500">Paste {multiCopyClipboardCount} copied item{multiCopyClipboardCount === 1 ? '' : 's'} into {categoryLabel(cat.key)}</div>
                                           </div>
                                           <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -11382,7 +11384,7 @@ Please add nutritional information manually if needed.`);
                                             </svg>
                                           </div>
                                           <div className="flex-1">
-                                            <div className="text-base font-semibold text-gray-900">Paste multiple items</div>
+                                            <div className="text-base font-semibold text-gray-900">Paste items</div>
                                             <div className="text-xs text-gray-500">Paste {multiCopyClipboardCount} copied item{multiCopyClipboardCount === 1 ? '' : 's'} into {categoryLabel(cat.key)}</div>
                                           </div>
                                           <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
