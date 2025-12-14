@@ -901,6 +901,12 @@ const DISCRETE_SERVING_RULES = [
     caloriesPerUnitFloor: 35,
     proteinPerUnitFloor: 2,
   },
+  {
+    key: 'drumstick',
+    keywords: ['drumstick', 'drumsticks', 'chicken drumstick', 'chicken leg', 'chicken legs'],
+    caloriesPerUnitFloor: 120,
+    proteinPerUnitFloor: 8,
+  },
 ]
 
 const normalizeDiscreteServingsWithLabel = (items: any[]) => {
