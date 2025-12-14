@@ -2326,7 +2326,17 @@ export default function FoodDiary() {
     const raw = (desc || '').toString()
     // UI shows only the first line; treat hidden meta lines as non-semantic.
     const firstLine = raw.split('\n')[0] || raw
-    return firstLine
+    let cleaned = firstLine
+    try {
+      cleaned = cleaned.normalize('NFKC')
+    } catch {}
+    return cleaned
+      // Normalize common unicode variants so delete/de-dupe matching stays stable.
+      .replace(/[\u00A0\u2007\u202F]/g, ' ') // NBSP-ish spaces
+      .replace(/[×✕✖]/g, 'x')
+      .replace(/[’‘]/g, "'")
+      .replace(/[“”]/g, '"')
+      .replace(/[‐‑‒–—]/g, '-')
       .replace(/\(favorite-copy-\d+\)/gi, '')
       .replace(/\(duplicate-[^)]+\)/gi, '')
       .replace(/\(copy-category-to-today-[^)]+\)/gi, '')
@@ -2335,14 +2345,33 @@ export default function FoodDiary() {
       .toLowerCase()
   }
 
+  // Stable delete keys so resurrected entries (or entries missing a category) can still be suppressed.
+  // We always include a category-specific key, and also an "uncategorized" variant because server rows
+  // can intermittently miss the meal/category field.
+  const stableDeleteKeysForEntry = (entry: any) => {
+    if (!entry) return [] as string[]
+    const cat = normalizeCategory(entry?.meal || entry?.category || entry?.mealType)
+    const descCanonical = normalizedDescription(entry?.description || entry?.name || '')
+    const date = dateKeyForEntry(entry)
+    if (!descCanonical || !date) return [] as string[]
+
+    // Back-compat: older tombstones may have used the multiplication sign `×` instead of `x`.
+    // Include both variants for numeric multipliers (e.g., "0.55× avocado").
+    const descVariants = new Set<string>([descCanonical])
+    const multiplierVariant = descCanonical.replace(/(\d(?:[\d.,]*))x(?=\s)/g, '$1×')
+    if (multiplierVariant && multiplierVariant !== descCanonical) descVariants.add(multiplierVariant)
+
+    const keys: string[] = []
+    for (const desc of Array.from(descVariants)) {
+      keys.push(`stable:${cat}|${desc}|${date}`)
+      if (cat !== 'uncategorized') keys.push(`stable:uncategorized|${desc}|${date}`)
+    }
+    return keys
+  }
+
   // Stable delete key so resurrected entries with new db ids can still be suppressed.
   const stableDeleteKeyForEntry = (entry: any) => {
-    if (!entry) return ''
-    const cat = normalizeCategory(entry?.meal || entry?.category || entry?.mealType)
-    const desc = normalizedDescription(entry?.description || entry?.name || '')
-    const date = dateKeyForEntry(entry)
-    if (!desc || !date) return ''
-    return `stable:${cat}|${desc}|${date}`
+    return stableDeleteKeysForEntry(entry)[0] || ''
   }
 
   const tombstonesHydratedRef = useRef(false)
@@ -2395,8 +2424,9 @@ export default function FoodDiary() {
     if (!Array.isArray(entries) || entries.length === 0) return
     const keysToRemove = new Set<string>()
     entries.forEach((entry) => {
-      const stable = stableDeleteKeyForEntry(entry)
-      if (stable) keysToRemove.add(stable)
+      stableDeleteKeysForEntry(entry).forEach((k) => {
+        if (k) keysToRemove.add(k)
+      })
       const dbKey = (entry as any)?.dbId ? `db:${(entry as any).dbId}` : ''
       if (dbKey) keysToRemove.add(dbKey)
       const idKey =
@@ -4061,7 +4091,7 @@ const applyStructuredItems = (
   // Save food entries to database and update context (OPTIMIZED + RELIABLE HISTORY)
   const saveFoodEntries = async (
     updatedFoods: any[],
-    options?: { appendHistory?: boolean; suppressToast?: boolean },
+    options?: { appendHistory?: boolean; suppressToast?: boolean; snapshotDateOverride?: string },
   ) => {
     try {
       // When the user intentionally saves, clear any tombstones for matching entries so
@@ -4125,7 +4155,7 @@ const applyStructuredItems = (
       const snapshotFoods = dedupedFoods
 
       // 2) Persist today's foods snapshot (fast "today" view) via /api/user-data.
-      await syncSnapshotToServer(snapshotFoods, selectedDate)
+      await syncSnapshotToServer(snapshotFoods, options?.snapshotDateOverride ?? selectedDate)
 
       // 3) For brand new entries, write directly into the permanent FoodLog history table.
       //    If the write fails, enqueue the payload locally and surface a retry button.
@@ -6310,31 +6340,68 @@ Please add nutritional information manually if needed.`);
     showQuickToast(`Copied ${categoryLabel(categoryKey)} to today`)
     try {
       // Persist to user-data snapshot (without history append to avoid single-entry overwrite)
-      await saveFoodEntries(deduped, { appendHistory: false })
+      await saveFoodEntries(deduped, { appendHistory: false, snapshotDateOverride: targetDate })
 
-      // Persist each cloned entry to FoodLog so refresh won't drop them
-      await Promise.all(
-        clones.map(async (clone) => {
-          try {
-            await fetch('/api/food-log', {
+      // Persist each cloned entry to FoodLog so refresh won't drop them.
+      // IMPORTANT: This must respect deletes that occur while copies are still being posted,
+      // otherwise an entry can reappear ("ghost") after refresh.
+      for (const clone of clones) {
+        const idKey = clone?.id !== null && clone?.id !== undefined ? `id:${clone.id}` : ''
+        const stableKeys = stableDeleteKeysForEntry(clone)
+        const shouldSkip =
+          (idKey && deletedEntryKeysRef.current.has(idKey)) ||
+          stableKeys.some((k) => deletedEntryKeysRef.current.has(k)) ||
+          isEntryDeleted(clone)
+        if (shouldSkip) continue
+
+        try {
+          const res = await fetch('/api/food-log', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              description: clone.description || '',
+              nutrition: clone.nutrition || null,
+              imageUrl: clone.photo || null,
+              items: Array.isArray(clone.items) && clone.items.length > 0 ? clone.items : null,
+              meal: clone.meal || clone.category,
+              category: clone.category || clone.meal,
+              localDate: clone.localDate,
+              createdAt: clone.createdAt,
+            }),
+          })
+
+          if (!res.ok) continue
+          const json = await res.json().catch(() => ({} as any))
+          const createdId = typeof json?.id === 'string' && json.id ? json.id : null
+          if (!createdId) continue
+
+          // Attach db id to the in-memory clone so future deletes are stable and immediate.
+          setTodaysFoods((prev) =>
+            dedupeEntries(
+              (prev || []).map((e: any) => {
+                if (String(e?.id ?? '') !== String(clone?.id ?? '')) return e
+                return { ...e, dbId: createdId }
+              }),
+              { fallbackDate: targetDate },
+            ),
+          )
+
+          // If the user deleted this entry while the POST was in-flight, delete it server-side now
+          // using the real DB id so it cannot resurrect on the next refresh tick.
+          const deletedNow =
+            (idKey && deletedEntryKeysRef.current.has(idKey)) ||
+            stableKeys.some((k) => deletedEntryKeysRef.current.has(k))
+          if (deletedNow) {
+            await fetch('/api/food-log/delete', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                description: clone.description || '',
-                nutrition: clone.nutrition || null,
-                imageUrl: clone.photo || null,
-                items: Array.isArray(clone.items) && clone.items.length > 0 ? clone.items : null,
-                meal: clone.meal || clone.category,
-                category: clone.category || clone.meal,
-                localDate: clone.localDate,
-                createdAt: clone.createdAt,
-              }),
-            })
-          } catch (err) {
-            console.warn('Copy-to-today FoodLog save failed', err)
+              body: JSON.stringify({ id: createdId }),
+            }).catch(() => {})
           }
-        }),
-      )
+        } catch (err) {
+          console.warn('Copy-to-today FoodLog save failed', err)
+        }
+      }
 
       await refreshEntriesFromServer()
     } catch (err) {
@@ -6588,11 +6655,12 @@ Please add nutritional information manually if needed.`);
     const entryCategory = normalizeCategory(entry?.meal || entry?.category || entry?.mealType)
     const entryId = entry.id
     const entryKey = entryId !== null && entryId !== undefined ? entryId.toString() : ''
-    const stableKey = stableDeleteKeyForEntry(entry)
     const deletionKeys = new Set<string>()
     const builtKey = buildDeleteKey(entry)
     if (builtKey) deletionKeys.add(builtKey)
-    if (stableKey) deletionKeys.add(stableKey)
+    stableDeleteKeysForEntry(entry).forEach((k) => {
+      if (k) deletionKeys.add(k)
+    })
     if (dbId) deletionKeys.add(`db:${dbId}`)
     if (entryId !== null && entryId !== undefined) deletionKeys.add(`id:${entryId}`)
     const autoDates = Array.from(
@@ -6762,21 +6830,25 @@ Please add nutritional information manually if needed.`);
         const rawDesc = (entry?.description || entry?.name || '').toString().trim()
         const descForServer = rawDesc.length > 0 ? rawDesc.slice(0, 220) : ''
         if (descForServer) {
-          const payload = {
-            description: descForServer,
-            category: entryCategory,
-            dates: Array.from(new Set(sweepDates)).slice(0, 12),
-          }
-          const res = await fetch('/api/food-log/delete-by-description', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-          })
-          if (res.ok) {
-            const json = await res.json().catch(() => ({} as any))
-            deletedAny = (Boolean(json?.deleted) && Number(json.deleted) > 0) || deletedAny
-          } else {
-            console.warn('Description delete failed', res.status, res.statusText)
+          const categories = [entryCategory]
+          if (entryCategory !== 'uncategorized') categories.push('uncategorized')
+          for (const cat of categories) {
+            const payload = {
+              description: descForServer,
+              category: cat,
+              dates: Array.from(new Set(sweepDates)).slice(0, 12),
+            }
+            const res = await fetch('/api/food-log/delete-by-description', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+            })
+            if (res.ok) {
+              const json = await res.json().catch(() => ({} as any))
+              deletedAny = (Boolean(json?.deleted) && Number(json.deleted) > 0) || deletedAny
+            } else {
+              console.warn('Description delete failed', res.status, res.statusText)
+            }
           }
         }
       } catch (err) {
@@ -6819,10 +6891,8 @@ Please add nutritional information manually if needed.`);
         }
         return next
       });
-      const stable = stableDeleteKeyForEntry(
-        (historyFoods || []).find((f: any) => f.dbId === dbId),
-      )
-      persistDeletedKeys([`db:${dbId}`, stable].filter(Boolean))
+      const entry = (historyFoods || []).find((f: any) => f.dbId === dbId)
+      persistDeletedKeys([`db:${dbId}`, ...stableDeleteKeysForEntry(entry)].filter(Boolean))
       setDeletedEntryNonce((n) => n + 1)
       // Call API to delete from DB
       triggerHaptic(10)
