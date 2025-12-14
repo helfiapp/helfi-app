@@ -1641,6 +1641,7 @@ export default function FoodDiary() {
   const [officialSource, setOfficialSource] = useState<'packaged' | 'single'>('packaged')
   const [officialLoading, setOfficialLoading] = useState<boolean>(false)
   const [officialError, setOfficialError] = useState<string | null>(null)
+  const [manualMealBuildMode, setManualMealBuildMode] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const [summarySlideIndex, setSummarySlideIndex] = useState(0)
   
@@ -2787,6 +2788,7 @@ export default function FoodDiary() {
           source: 'auto',
           q: officialSearchQuery.trim(),
           kind: mode,
+          limit: '20',
         })
         const res = await fetch(`/api/food-data?${params.toString()}`, {
           method: 'GET',
@@ -5144,7 +5146,10 @@ Please add nutritional information manually if needed.`);
     const createdAtIso = alignTimestampToLocalDate(new Date().toISOString(), selectedDate)
     const displayTime = new Date(createdAtIso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     const newEntry = {
-      id: new Date(createdAtIso).getTime(),
+      id: makeUniqueLocalEntryId(
+        new Date(createdAtIso).getTime(),
+        `entry:${Date.now()}|${selectedDate}|${category}|${normalizedDescription(finalDescription)}`,
+      ),
       localDate: selectedDate, // pin to the date the user is viewing when saving
       description: finalDescription,
       time: displayTime,
@@ -5372,6 +5377,7 @@ Please add nutritional information manually if needed.`);
     setShowPhotoOptions(false)
     setPhotoOptionsAnchor(null)
     setEntryTime('')
+    setManualMealBuildMode(false)
   }
 
   const closeAddMenus = () => {
@@ -5405,9 +5411,57 @@ Please add nutritional information manually if needed.`);
     setPhotoOptionsAnchor(null)
     setPhotoOptionsPosition(null)
     setPendingPhotoPicker(false)
+    // Reset search state every time this modal is opened so it can't get stuck in "loading".
+    setOfficialLoading(false)
+    setOfficialError(null)
+    setOfficialResults([])
+    setOfficialSearchQuery('')
     setTimeout(() => {
       setShowAddIngredientModal(true)
     }, 0)
+  }
+
+  const resetOfficialSearchState = () => {
+    setOfficialLoading(false)
+    setOfficialError(null)
+    setOfficialResults([])
+    setOfficialSearchQuery('')
+    setOfficialResultsSource('usda')
+    setOfficialSource('packaged')
+  }
+
+  const startManualMealBuilder = (targetCategory: typeof MEAL_CATEGORY_ORDER[number]) => {
+    try {
+      setShowPhotoOptions(false)
+      setShowCategoryPicker(false)
+      setPhotoOptionsAnchor(null)
+      setPhotoOptionsPosition(null)
+      setPendingPhotoPicker(false)
+    } catch {}
+
+    // Build a multi-ingredient meal using the same ingredient cards UI as photo analysis,
+    // but without requiring a photo.
+    setSelectedAddCategory(targetCategory)
+    setManualMealBuildMode(true)
+    setIsEditingDescription(true)
+    setEditedDescription('')
+    setPhotoFile(null)
+    setPhotoPreview(null)
+    setAiDescription('')
+    setAnalyzedItems([])
+    setAnalyzedNutrition(null)
+    setAnalyzedTotal(null)
+    setHealthWarning(null)
+    setHealthAlternatives(null)
+    setShowAiResult(true)
+    setShowAddFood(true)
+    setShowFavoritesPicker(false)
+    setEntryTime('')
+
+    // Prompt the official search modal immediately so the user can start adding ingredients.
+    addIngredientContextRef.current = { mode: 'analysis' }
+    resetOfficialSearchState()
+    setTimeout(() => setShowAddIngredientModal(true), 0)
   }
 
   const computeDesktopAddMenuPosition = (key: typeof MEAL_CATEGORY_ORDER[number]) => {
@@ -7892,33 +7946,47 @@ Please add nutritional information manually if needed.`);
 	        </div>
 	      )}
 
-	      {/* Add Ingredient Modal (available from both Food Analysis and Today’s Meals dropdowns) */}
-	      {showAddIngredientModal && (
-	        <div className="fixed inset-0 z-50">
-          <div
-            className="absolute inset-0 bg-black/30"
-            onClick={() => {
-              setShowAddIngredientModal(false)
-              setOfficialSearchQuery('')
-              setOfficialResults([])
-              setOfficialError(null)
-            }}
-          ></div>
-          <div className="absolute inset-0 flex items-start sm:items-center justify-center mt-10 sm:mt-0">
-            <div className="w-[92%] max-w-lg bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
-              <div className="p-4 border-b border-gray-100 flex items-center justify-between">
-                <div className="font-semibold text-gray-900">Add ingredient</div>
-                <button onClick={() => setShowAddIngredientModal(false)} className="p-2 rounded-md hover:bg-gray-100">
-                  <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-              <div className="p-4">
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-900">
-                    Search foods (USDA first, FatSecret fallback)
-                  </label>
+		      {/* Add Ingredient Modal (available from both Food Analysis and Today’s Meals dropdowns) */}
+		      {showAddIngredientModal && (
+		        <div className="fixed inset-0 z-50">
+	          <div
+	            className="absolute inset-0 bg-black/30"
+	            onClick={() => {
+	              setShowAddIngredientModal(false)
+	              resetOfficialSearchState()
+	            }}
+	          ></div>
+	          <div className="absolute inset-0 flex items-start sm:items-center justify-center mt-10 sm:mt-0">
+	            <div className="w-[92%] max-w-lg bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
+	              <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+	                <div className="font-semibold text-gray-900">Add ingredient</div>
+	                <div className="flex items-center gap-2">
+	                  <button
+	                    type="button"
+	                    onClick={() => resetOfficialSearchState()}
+	                    className="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-xs font-medium text-gray-700 hover:bg-gray-50"
+	                  >
+	                    Reset
+	                  </button>
+	                  <button
+	                    type="button"
+	                    onClick={() => {
+	                      setShowAddIngredientModal(false)
+	                      resetOfficialSearchState()
+	                    }}
+	                    className="p-2 rounded-md hover:bg-gray-100"
+	                  >
+	                  <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+	                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+	                  </svg>
+	                  </button>
+	                </div>
+	              </div>
+	              <div className="p-4">
+	                <div className="space-y-2">
+	                  <label className="block text-sm font-medium text-gray-900">
+	                    Search foods (USDA + FatSecret + OpenFoodFacts)
+	                  </label>
                   <div className="flex flex-col sm:flex-row gap-2">
                     <input
                       type="text"
@@ -7954,14 +8022,12 @@ Please add nutritional information manually if needed.`);
                       </button>
                     </div>
                   </div>
-                  <p className="text-xs text-gray-500">
-                    We search USDA FoodData Central first, then fall back to FatSecret if USDA is unavailable or rate limited. Use the toggles to focus on packaged products or generic single foods.
-                  </p>
-                </div>
+	                  <p className="text-xs text-gray-500">
+	                    We search multiple databases and show the best matches. Use the toggles to focus on packaged products or generic single foods.
+	                  </p>
+	                </div>
                 {officialError && <div className="mt-3 text-xs text-red-600">{officialError}</div>}
-                {officialLoading && (
-                  <div className="mt-3 text-xs text-gray-500">Searching USDA → FatSecret…</div>
-                )}
+	                {officialLoading && <div className="mt-3 text-xs text-gray-500">Searching…</div>}
                 {!officialLoading && !officialError && officialResults.length > 0 && (
                   <div className="mt-3 max-h-80 overflow-y-auto space-y-2">
                     {officialResults.map((r, idx) => (
@@ -9705,13 +9771,13 @@ Please add nutritional information manually if needed.`);
                       className="w-full px-3 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base"
                     />
                   </div>
-                  <button
-                    onClick={() =>
-                      editingEntry ? updateFoodEntry() : addFoodEntry(aiDescription, 'photo')
-                    }
-                    disabled={isAnalyzing || isSavingEntry}
-                    className="w-full py-3 px-4 mx-auto max-w-[95%] bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-300 text-white font-medium rounded-xl transition-colors duration-200 flex items-center justify-center shadow-lg"
-                  >
+	                  <button
+	                    onClick={() =>
+	                      editingEntry ? updateFoodEntry() : addFoodEntry(aiDescription, manualMealBuildMode ? 'text' : 'photo')
+	                    }
+	                    disabled={isAnalyzing || isSavingEntry}
+	                    className="w-full py-3 px-4 mx-auto max-w-[95%] bg-emerald-500 hover:bg-emerald-600 disabled:bg-emerald-300 text-white font-medium rounded-xl transition-colors duration-200 flex items-center justify-center shadow-lg"
+	                  >
                     {isAnalyzing || isSavingEntry ? (
                       <>
                         <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -9733,11 +9799,11 @@ Please add nutritional information manually if needed.`);
                       </>
                     )}
                   </button>
-                  {!editingEntry && (
-                    <button
-                      onClick={handleDeletePhoto}
-                      className="w-full py-3 px-4 mx-auto max-w-[95%] bg-gray-500 hover:bg-gray-600 text-white font-medium rounded-xl transition-colors duration-200 flex items-center justify-center"
-                    >
+	                  {!editingEntry && !manualMealBuildMode && (
+	                    <button
+	                      onClick={handleDeletePhoto}
+	                      className="w-full py-3 px-4 mx-auto max-w-[95%] bg-gray-500 hover:bg-gray-600 text-white font-medium rounded-xl transition-colors duration-200 flex items-center justify-center"
+	                    >
                       <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                       </svg>
@@ -11253,29 +11319,52 @@ Please add nutritional information manually if needed.`);
                                         </svg>
                                       </button>
 
-                                      <button
-                                        type="button"
-                                        onClick={(e) =>
-                                          openAddIngredientModalFromMenu(e, {
-                                            mode: 'diary',
-                                            targetCategory: cat.key,
-                                          })
-                                        }
-                                        className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
-                                      >
-                                        <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center mr-3 text-green-600">
-                                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                          </svg>
-                                        </div>
-                                      <div className="flex-1">
-                                        <div className="text-base font-semibold text-gray-900">Manual Entry</div>
-                                        <div className="text-xs text-gray-500">Type your food description</div>
-                                      </div>
-                                      <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                      </svg>
-                                    </button>
+	                                      <button
+	                                        type="button"
+	                                        onClick={(e) =>
+	                                          openAddIngredientModalFromMenu(e, {
+	                                            mode: 'diary',
+	                                            targetCategory: cat.key,
+	                                          })
+	                                        }
+	                                        className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
+	                                      >
+	                                        <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center mr-3 text-green-600">
+	                                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+	                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v12m6-6H6" />
+	                                          </svg>
+	                                        </div>
+	                                      <div className="flex-1">
+	                                        <div className="text-base font-semibold text-gray-900">Add ingredient</div>
+	                                        <div className="text-xs text-gray-500">Search a database and add one item</div>
+	                                      </div>
+	                                      <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+	                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+	                                      </svg>
+	                                    </button>
+
+	                                    <button
+	                                      type="button"
+	                                      onClick={() => {
+	                                        setShowPhotoOptions(false)
+	                                        setPhotoOptionsAnchor(null)
+	                                        startManualMealBuilder(cat.key)
+	                                      }}
+	                                      className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
+	                                    >
+	                                      <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center mr-3 text-emerald-700">
+	                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+	                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+	                                        </svg>
+	                                      </div>
+	                                      <div className="flex-1">
+	                                        <div className="text-base font-semibold text-gray-900">Build a meal</div>
+	                                        <div className="text-xs text-gray-500">Combine multiple ingredients into one entry</div>
+	                                      </div>
+	                                      <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+	                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+	                                      </svg>
+	                                    </button>
 
                                     <button
                                       type="button"
@@ -11482,29 +11571,52 @@ Please add nutritional information manually if needed.`);
                                         </svg>
                                       </button>
 
-                                      <button
-                                        type="button"
-                                        onClick={(e) =>
-                                          openAddIngredientModalFromMenu(e, {
-                                            mode: 'diary',
-                                            targetCategory: cat.key,
-                                          })
-                                        }
-                                        className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
-                                      >
-                                        <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center mr-3 text-green-600">
-                                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                          </svg>
-                                        </div>
-                                        <div className="flex-1">
-                                          <div className="text-base font-semibold text-gray-900">Manual Entry</div>
-                                          <div className="text-xs text-gray-500">Type your food description</div>
-                                        </div>
-                                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                        </svg>
-                                      </button>
+	                                      <button
+	                                        type="button"
+	                                        onClick={(e) =>
+	                                          openAddIngredientModalFromMenu(e, {
+	                                            mode: 'diary',
+	                                            targetCategory: cat.key,
+	                                          })
+	                                        }
+	                                        className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
+	                                      >
+	                                        <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center mr-3 text-green-600">
+	                                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+	                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v12m6-6H6" />
+	                                          </svg>
+	                                        </div>
+	                                        <div className="flex-1">
+	                                          <div className="text-base font-semibold text-gray-900">Add ingredient</div>
+	                                          <div className="text-xs text-gray-500">Search a database and add one item</div>
+	                                        </div>
+	                                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+	                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+	                                        </svg>
+	                                      </button>
+
+	                                      <button
+	                                        type="button"
+	                                        onClick={() => {
+	                                          setShowPhotoOptions(false)
+	                                          setPhotoOptionsAnchor(null)
+	                                          startManualMealBuilder(cat.key)
+	                                        }}
+	                                        className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
+	                                      >
+	                                        <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center mr-3 text-emerald-700">
+	                                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+	                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+	                                          </svg>
+	                                        </div>
+	                                        <div className="flex-1">
+	                                          <div className="text-base font-semibold text-gray-900">Build a meal</div>
+	                                          <div className="text-xs text-gray-500">Combine multiple ingredients into one entry</div>
+	                                        </div>
+	                                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+	                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+	                                        </svg>
+	                                      </button>
                                     </div>
                                   </div>
                                 </div>
