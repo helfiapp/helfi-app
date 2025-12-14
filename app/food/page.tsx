@@ -6612,13 +6612,30 @@ Please add nutritional information manually if needed.`);
     fetch('http://127.0.0.1:7242/ingest/aaafab43-c6ce-48b6-a8ee-51e168d7e762',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'E',location:'app/food/page.tsx:deleteFood:start',message:'deleteFood called',data:{selectedDate,todayIso,hasDbId:!!dbId,entryId:entryId??null,entryLocalDate:typeof entry?.localDate==='string'?entry.localDate:'',derivedDate:deriveDateFromEntryTimestamp(entry),entryCategory,deletionKeysCount:deletionKeys.size,autoDates},timestamp:Date.now()})}).catch(()=>{});
     // #endregion agent log
 
+    const targetDescKey = normalizedDescription(entry?.description || entry?.name || '')
+    const targetDateKey = dateKeyForEntry(entry) || selectedDate
     const updatedFoods = todaysFoods.filter((food: any) => {
       const sameId =
         entryId !== null &&
         entryId !== undefined &&
-        String(food.id ?? '') === String(entryId)
-      const sameDb = dbId && String((food as any).dbId ?? '') === String(dbId)
-      return !sameId && !sameDb
+        String(food?.id ?? '') === String(entryId)
+      const sameDb = dbId && String((food as any)?.dbId ?? '') === String(dbId)
+      if (sameId || sameDb) return false
+
+      // Also remove any duplicate rows representing the same visible entry.
+      // This prevents "delete -> comes back" when there are multiple copies
+      // (e.g., copy-to-today creates a local row and a DB-backed row).
+      const foodDescKey = normalizedDescription(food?.description || food?.name || '')
+      const foodDateKey = dateKeyForEntry(food) || selectedDate
+      if (!foodDescKey || !foodDateKey) return true
+      if (foodDescKey !== targetDescKey) return true
+      if (foodDateKey !== targetDateKey) return true
+
+      const foodCat = normalizeCategory(food?.meal || food?.category || food?.mealType)
+      // If either side is uncategorized, treat it as a duplicate anyway (server rows sometimes miss meal).
+      const catMatches =
+        foodCat === entryCategory || foodCat === 'uncategorized' || entryCategory === 'uncategorized'
+      return !catMatches
     })
     setTodaysFoods(updatedFoods)
     triggerHaptic(10)
@@ -6717,7 +6734,11 @@ Please add nutritional information manually if needed.`);
               const descMatch =
                 normalizedDescription(l?.description || l?.name) ===
                 normalizedDescription(entry?.description || entry?.name || '')
-              return cat === entryCategory && descMatch
+              // If the server row is missing a category, still treat it as a match for deletes
+              // so it doesn't resurrect later.
+              const catMatch =
+                cat === entryCategory || cat === 'uncategorized' || entryCategory === 'uncategorized'
+              return catMatch && descMatch
             })
 
             const ids = Array.from(
