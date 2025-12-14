@@ -365,6 +365,54 @@ const normalizeDiscreteCounts = (items: any[]): any[] =>
       }))
     : [];
 
+// Sometimes the model misreads a weight like "8 oz cooked (227g)" as a *count* of 8 pieces,
+// and may even prefix the name with the number. This causes the UI to show nonsense like
+// "8 roasted chicken" with Pieces=8. If the serving is clearly weight-based and there are
+// no discrete-unit keywords, we clear pieces metadata and strip accidental leading counts.
+const fixWeightUnitsMisreadAsPieces = (items: any[]): { items: any[]; changed: boolean } => {
+  if (!Array.isArray(items) || items.length === 0) return { items, changed: false }
+  let changed = false
+
+  const hasWeightUnit = (text: string) => /\b\d+(?:\.\d+)?\s*(g|gram|grams|kg|ml|oz|ounce|ounces)\b/i.test(text || '')
+  const hasDiscreteKeyword = (text: string) =>
+    /\b(egg|eggs|patty|pattie|patties|nugget|nuggets|wing|wings|drumstick|drumsticks|leg|legs|slice|slices|strip|strips|tender|tenders|piece|pieces|cookie|cookies|cracker|crackers|biscuit|biscuits)\b/i.test(
+      text || '',
+    )
+
+  const fixed = items.map((item) => {
+    if (!item || typeof item !== 'object') return item
+    const next: any = { ...item }
+    const name = String(next?.name || '')
+    const serving = String(next?.serving_size || next?.servingSize || '')
+    const label = `${name} ${serving}`.trim()
+
+    const piecesPerServing =
+      Number.isFinite(Number(next?.piecesPerServing)) && Number(next.piecesPerServing) > 0 ? Number(next.piecesPerServing) : null
+    const pieces =
+      Number.isFinite(Number(next?.pieces)) && Number(next.pieces) > 0 ? Number(next.pieces) : null
+
+    if (!hasWeightUnit(serving)) return next
+    if (hasDiscreteKeyword(label)) return next
+
+    // If the model prefixed the name with a number (often from oz), strip it.
+    if (/^\s*\d+\s+/.test(name)) {
+      next.name = name.replace(/^\s*\d+\s+/, '').trim()
+      changed = true
+    }
+
+    // If pieces metadata exists in a weight-based serving, remove it.
+    if (piecesPerServing || pieces) {
+      delete next.piecesPerServing
+      delete next.pieces
+      changed = true
+    }
+
+    return next
+  })
+
+  return { items: fixed, changed }
+}
+
 // When in packaged mode, try to fill missing/zero macros from FatSecret without overwriting existing values.
 const enrichPackagedItemsWithFatSecret = async (items: any[]): Promise<{ items: any[]; total: any | null }> => {
   const enriched: any[] = [];
@@ -1189,6 +1237,7 @@ CRITICAL STRUCTURED OUTPUT RULES:
 - ALWAYS return the ITEMS_JSON block and include fiber_g and sugar_g for each item (do not leave as 0 unless truly 0).
 - Use household measures and add ounce equivalents in parentheses where appropriate (e.g., "1 cup (8 oz)").
 - Item "name" must be the plain ingredient name only (e.g., "grilled salmon", "white rice"). Do NOT prefix names with "several components:", "components:", "meal:", etc.
+- Do NOT treat weights as counts: "8 oz" means weight, NOT "8 pieces". Never prefix an item name with a weight number.
 - For discrete items like bacon or bread/pizza slices, count visible slices and use that count for servings.
 - For sliced produce (e.g., avocado slices, tomato slices, cucumber slices): treat it as a PORTION (weight/servings), not a discrete piece count. Prefer a grams estimate or a fraction of the whole food (e.g., "1/4 avocado") and set isGuess: true if uncertain.
 - If uncertain about a count, choose a conservative (lower) number and mark isGuess: true.
@@ -1989,6 +2038,11 @@ CRITICAL REQUIREMENTS:
         console.log('[FOOD_DEBUG] discrete normalization preview', discreteNormalized.debug.slice(0, 4));
       }
       resp.items = normalizeDiscreteCounts(resp.items);
+      const weightFix = fixWeightUnitsMisreadAsPieces(resp.items)
+      if (weightFix.changed) {
+        resp.items = weightFix.items
+        resp.total = computeTotalsFromItems(resp.items) || resp.total
+      }
       if (!resp.total || Object.keys(resp.total || {}).length === 0) {
         resp.total = computeTotalsFromItems(resp.items);
       }
