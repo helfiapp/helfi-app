@@ -6923,16 +6923,27 @@ Please add nutritional information manually if needed.`);
             if (!res.ok) continue
             const json = await res.json()
             const logs = Array.isArray(json.logs) ? json.logs : []
+            const entryTs = extractEntryTimestampMs(entry)
             const matches = logs.filter((l: any) => {
               const cat = normalizeCategory(l?.meal || l?.category || l?.mealType)
               const descMatch =
                 normalizedDescription(l?.description || l?.name) ===
                 normalizedDescription(entry?.description || entry?.name || '')
-              // If the server row is missing a category, still treat it as a match for deletes
-              // so it doesn't resurrect later.
-              const catMatch =
-                cat === entryCategory || cat === 'uncategorized' || entryCategory === 'uncategorized'
-              return catMatch && descMatch
+              if (!descMatch) return false
+
+              // SAFETY: never let `uncategorized` match *any* category across days, otherwise
+              // deleting a pasted item can wipe an older entry that was saved without a meal.
+              if (cat === entryCategory) return true
+              if (entryCategory === 'uncategorized') return cat === 'uncategorized'
+
+              // Only treat missing-category rows as the same entry when timestamps are very close
+              // (same save/copy operation), not a different day’s breakfast/lunch copy.
+              if (cat === 'uncategorized') {
+                const logTs = l?.createdAt ? new Date(l.createdAt).getTime() : NaN
+                if (!Number.isFinite(entryTs) || !Number.isFinite(logTs)) return false
+                return Math.abs(logTs - entryTs) <= 2 * 60 * 60 * 1000 // 2 hours
+              }
+              return false
             })
 
             const ids = Array.from(
@@ -6957,12 +6968,35 @@ Please add nutritional information manually if needed.`);
         const descForServer = rawDesc.length > 0 ? rawDesc.slice(0, 220) : ''
         if (descForServer) {
           const categories = [entryCategory]
-          if (entryCategory !== 'uncategorized') categories.push('uncategorized')
-          for (const cat of categories) {
+          // SAFETY: only attempt category-agnostic deletes on the exact target day.
+          // Otherwise a missing-category row can cause deletes to wipe other days’ items.
+          const dates = Array.from(new Set(sweepDates)).slice(0, 12)
+          if (entryCategory !== 'uncategorized') {
+            const targetDay = targetDateKey || selectedDate
+            categories.push('uncategorized')
+            for (const cat of categories) {
+              const payload = {
+                description: descForServer,
+                category: cat,
+                dates: cat === 'uncategorized' ? [targetDay] : dates,
+              }
+              const res = await fetch('/api/food-log/delete-by-description', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+              })
+              if (res.ok) {
+                const json = await res.json().catch(() => ({} as any))
+                deletedAny = (Boolean(json?.deleted) && Number(json.deleted) > 0) || deletedAny
+              } else {
+                console.warn('Description delete failed', res.status, res.statusText)
+              }
+            }
+          } else {
             const payload = {
               description: descForServer,
-              category: cat,
-              dates: Array.from(new Set(sweepDates)).slice(0, 12),
+              category: 'uncategorized',
+              dates,
             }
             const res = await fetch('/api/food-log/delete-by-description', {
               method: 'POST',
