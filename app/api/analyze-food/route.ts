@@ -1584,16 +1584,35 @@ CRITICAL REQUIREMENTS:
     });
 
     // Call OpenAI API (metered)
-    const primary = await chatCompletionWithCost(openai, {
-      model,
-      messages,
-      ...(model.toLowerCase().includes('gpt-5')
-        ? { max_completion_tokens: maxTokens }
-        : { max_tokens: maxTokens }),
-      temperature: 0,
-    } as any);
+    const runCompletion = async (runModel: string) =>
+      chatCompletionWithCost(openai, {
+        model: runModel,
+        messages,
+        ...(runModel.toLowerCase().includes('gpt-5')
+          ? { max_completion_tokens: maxTokens }
+          : { max_tokens: maxTokens }),
+        temperature: 0,
+      } as any);
 
-    const response = primary.completion;
+    const extractAnalysisText = (completion: any): string | null => {
+      const c = completion?.choices?.[0]?.message?.content;
+      if (typeof c === 'string') {
+        const trimmed = c.trim();
+        return trimmed.length ? trimmed : null;
+      }
+      // Defensive: some SDK variants may return segmented content; join text parts.
+      if (Array.isArray(c)) {
+        const joined = c
+          .map((part: any) => (typeof part?.text === 'string' ? part.text : ''))
+          .join('')
+          .trim();
+        return joined.length ? joined : null;
+      }
+      return null;
+    };
+
+    const primary = await runCompletion(model);
+    let response = primary.completion;
 
     if (imageDataUrl) {
       logAiUsageEvent({
@@ -1636,8 +1655,53 @@ CRITICAL REQUIREMENTS:
       hasContent: !!response.choices?.[0]?.message?.content
     });
 
-    let analysis = response.choices[0]?.message?.content;
+    let analysis = extractAnalysisText(response);
     let totalCostCents = primary.costCents;
+
+    // Rare but real: OpenAI sometimes returns a completion object with no content.
+    // To avoid showing the user a blank "failed" screen, retry once and then fall
+    // back to gpt-4o for image analysis if needed.
+    if (!analysis) {
+      try {
+        console.warn('⚠️ OpenAI returned empty content; retrying once...');
+        const retry = await runCompletion(model);
+        totalCostCents += retry.costCents;
+        response = retry.completion;
+        analysis = extractAnalysisText(response);
+      } catch (retryErr) {
+        console.warn('Retry attempt failed (non-fatal):', retryErr);
+      }
+    }
+
+    if (!analysis && imageDataUrl && model !== 'gpt-4o') {
+      try {
+        console.warn('⚠️ Empty content after retry; falling back to gpt-4o for image analysis...');
+        const fallback = await runCompletion('gpt-4o');
+        totalCostCents += fallback.costCents;
+        response = fallback.completion;
+        analysis = extractAnalysisText(response);
+        logAiUsageEvent({
+          feature: 'food:image-analysis-fallback',
+          userId: currentUser.id || null,
+          userLabel: currentUser.email || null,
+          scanId: imageHash ? `food-${imageHash.slice(0, 8)}` : `food-${Date.now()}`,
+          model: 'gpt-4o',
+          promptTokens: fallback.promptTokens,
+          completionTokens: fallback.completionTokens,
+          costCents: fallback.costCents,
+          image: {
+            width: imageMeta?.width ?? null,
+            height: imageMeta?.height ?? null,
+            bytes: imageBytes,
+            mime: imageMime,
+          },
+          endpoint: '/api/analyze-food',
+          success: true,
+        }).catch(() => {});
+      } catch (fallbackErr) {
+        console.warn('gpt-4o fallback attempt failed (non-fatal):', fallbackErr);
+      }
+    }
 
     if (!analysis) {
       console.log('❌ No analysis received from OpenAI');
