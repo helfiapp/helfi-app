@@ -1641,6 +1641,8 @@ export default function FoodDiary() {
   const [officialSource, setOfficialSource] = useState<'packaged' | 'single'>('packaged')
   const [officialLoading, setOfficialLoading] = useState<boolean>(false)
   const [officialError, setOfficialError] = useState<string | null>(null)
+  const officialSearchAbortRef = useRef<AbortController | null>(null)
+  const officialSearchSeqRef = useRef(0)
   const [manualMealBuildMode, setManualMealBuildMode] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const [summarySlideIndex, setSummarySlideIndex] = useState(0)
@@ -2703,7 +2705,7 @@ export default function FoodDiary() {
     }
   }
 
-  const addIngredientFromOfficial = (item: any) => {
+  const addIngredientFromOfficial = async (item: any) => {
     if (!item) return
     const newItem = {
       name: item.name || 'Unknown food',
@@ -2739,16 +2741,21 @@ export default function FoodDiary() {
       setOfficialError(null)
 
       // Insert a new entry into the selected meal section
-      insertMealIntoDiary(
-        {
-          description: label,
-          nutrition: totals,
-          total: totals,
-          items: [newItem],
-          method: 'official',
-        },
-        targetCategory,
-      ).catch(() => {})
+      try {
+        await insertMealIntoDiary(
+          {
+            description: label,
+            nutrition: totals,
+            total: totals,
+            items: [newItem],
+            method: 'official',
+          },
+          targetCategory,
+        )
+      } catch (err) {
+        console.warn('Add ingredient insert failed', err)
+        showQuickToast('Could not add that ingredient. Please try again.')
+      }
       return
     }
 
@@ -2768,45 +2775,73 @@ export default function FoodDiary() {
         setTodaysFoods(prev => prev.map(food => (food.id === editingEntry.id ? updatedEntry : food)))
       } catch {}
     }
-    setShowAddIngredientModal(false)
-    setOfficialSearchQuery('')
-    setOfficialResults([])
-    setOfficialError(null)
+    // When building a meal, keep the search modal open so the user can add multiple ingredients.
+    const shouldKeepModalOpen = Boolean(manualMealBuildMode)
+    if (!shouldKeepModalOpen) {
+      setShowAddIngredientModal(false)
+      setOfficialSearchQuery('')
+      setOfficialResults([])
+      setOfficialError(null)
+    } else {
+      setOfficialError(null)
+      showQuickToast(`Added ${newItem.name}`)
+    }
   }
 
   const handleOfficialSearch = async (mode: 'packaged' | 'single') => {
-    if (!officialSearchQuery.trim()) {
+    const query = officialSearchQuery.trim()
+    if (!query) {
       setOfficialError('Please enter a product name or barcode to search.')
       return
     }
+
+    // Cancel any in-flight request so stale results can't appear after Reset.
+    try {
+      officialSearchAbortRef.current?.abort()
+    } catch {}
+    const controller = new AbortController()
+    officialSearchAbortRef.current = controller
+    const seq = ++officialSearchSeqRef.current
+
     setOfficialError(null)
     setOfficialLoading(true)
-      setOfficialResults([])
-      setOfficialSource(mode)
-      try {
-        const params = new URLSearchParams({
-          source: 'auto',
-          q: officialSearchQuery.trim(),
-          kind: mode,
-          limit: '20',
-        })
-        const res = await fetch(`/api/food-data?${params.toString()}`, {
-          method: 'GET',
+    setOfficialResults([])
+    setOfficialSource(mode)
+
+    try {
+      const params = new URLSearchParams({
+        source: 'auto',
+        q: query,
+        kind: mode,
+        limit: '20',
       })
+
+      const res = await fetch(`/api/food-data?${params.toString()}`, {
+        method: 'GET',
+        signal: controller.signal,
+      })
+
       if (!res.ok) {
         const text = await res.text()
         console.error('Food data search failed:', text)
         setOfficialError('Unable to fetch official data right now. Please try again.')
         return
-          }
-          const data = await res.json()
-          setOfficialResults(Array.isArray(data.items) ? data.items : [])
-          setOfficialResultsSource(data?.source || 'auto')
-        } catch (err) {
-          console.error('Food data search error:', err)
-          setOfficialError('Something went wrong while searching. Please try again.')
-        } finally {
-          setOfficialLoading(false)
+      }
+
+      const data = await res.json()
+      // Ignore late responses from older searches.
+      if (officialSearchSeqRef.current !== seq) return
+
+      setOfficialResults(Array.isArray(data.items) ? data.items : [])
+      setOfficialResultsSource(data?.source || 'auto')
+    } catch (err: any) {
+      if (err?.name === 'AbortError') return
+      console.error('Food data search error:', err)
+      setOfficialError('Something went wrong while searching. Please try again.')
+    } finally {
+      if (officialSearchSeqRef.current === seq) {
+        setOfficialLoading(false)
+      }
     }
   }
 
@@ -4140,6 +4175,35 @@ const applyStructuredItems = (
       const logs = Array.isArray(json.logs) ? json.logs : [];
       const mapped = mapLogsToEntries(logs, selectedDate);
       const localList = isViewingToday ? todaysFoodsForSelectedDate : Array.isArray(historyFoods) ? historyFoods : []
+      // Reduce flicker: when the server copy replaces a local optimistic copy, keep the local `id`
+      // so React keys stay stable (prevents flash/unmount/remount).
+      const descKey = (desc: any) => normalizedDescription(desc)
+      const timeBucketKey = (entry: any) => {
+        const ts = extractEntryTimestampMs(entry)
+        if (Number.isFinite(ts)) return String(Math.floor(ts / 60000))
+        const raw = entry?.time
+        if (raw === null || raw === undefined) return ''
+        return raw.toString().trim().toLowerCase()
+      }
+      const buildMergeKey = (entry: any) => {
+        const cat = normalizeCategory(entry?.meal || entry?.category || entry?.mealType)
+        return [dateKeyForEntry(entry) || selectedDate, cat, descKey(entry?.description), timeBucketKey(entry)].join('|')
+      }
+      const localByKey = new Map<string, any>()
+      if (Array.isArray(localList)) {
+        for (const e of localList) {
+          if (!e) continue
+          if (isEntryDeleted(e)) continue
+          localByKey.set(buildMergeKey(e), e)
+        }
+      }
+      const mappedWithStableIds = mapped.map((e: any) => {
+        const existing = localByKey.get(buildMergeKey(e))
+        if (existing && typeof existing?.id === 'number' && Number.isFinite(existing.id)) {
+          return existing.id === e.id ? e : { ...e, id: existing.id }
+        }
+        return e
+      })
       // IMPORTANT:
       // Treat the server as authoritative for DB-backed rows. Only keep local entries that
       // are NOT DB-backed (optimistic/pending), otherwise polling/focus-refresh can
@@ -4152,7 +4216,7 @@ const applyStructuredItems = (
             return entryMatchesDate(e, selectedDate)
           })
         : []
-      const deduped = dedupeEntries([...mapped, ...keptLocal], { fallbackDate: selectedDate });
+      const deduped = dedupeEntries([...mappedWithStableIds, ...keptLocal], { fallbackDate: selectedDate });
 
       if (isViewingToday) {
         setTodaysFoods(deduped);
@@ -4169,6 +4233,10 @@ const applyStructuredItems = (
   // - Poll the server while /food is open (keeps desktop + mobile aligned)
   // - Also refresh when the tab/app becomes active again
   const syncInFlightRef = useRef(false)
+  const syncPausedRef = useRef(false)
+  useEffect(() => {
+    syncPausedRef.current = Boolean(isSavingEntry || isAnalyzing)
+  }, [isSavingEntry, isAnalyzing])
   useEffect(() => {
     if (typeof window === 'undefined') return
     if (!diaryHydrated) return
@@ -4176,6 +4244,7 @@ const applyStructuredItems = (
 
     const syncNow = async () => {
       if (syncInFlightRef.current) return
+      if (syncPausedRef.current) return
       syncInFlightRef.current = true
       try {
         await refreshEntriesFromServer()
@@ -4213,16 +4282,17 @@ const applyStructuredItems = (
       // re-adding the same meal on purpose is allowed.
       removeDeletedTombstonesForEntries(updatedFoods)
       // 1) Deduplicate before updating context to prevent duplicates
-      const seenIds = new Set<number>();
+      const seenIds = new Set<string>()
       const uniqueById = updatedFoods.filter((food: any) => {
-        const id = typeof food.id === 'number' ? food.id : Number(food.id);
-        if (seenIds.has(id)) {
-          console.log('⚠️ Duplicate entry detected in saveFoodEntries, removing:', id);
-          return false;
+        const idKey = String(food?.id ?? '')
+        if (!idKey) return true
+        if (seenIds.has(idKey)) {
+          console.log('⚠️ Duplicate entry detected in saveFoodEntries, removing:', idKey)
+          return false
         }
-        seenIds.add(id);
-        return true;
-      });
+        seenIds.add(idKey)
+        return true
+      })
       const initialLatest =
         Array.isArray(uniqueById) && uniqueById.length > 0 ? uniqueById[0] : null
       const dedupeTargetDate =
@@ -4255,14 +4325,12 @@ const applyStructuredItems = (
       const appendHistory = options?.appendHistory !== false
 
 	      // Determine which entry is "new" for FoodLog writes (avoid saving an older entry when the list order changes).
-	      const previousIds = new Set<number>(
-	        existingSnapshotFoods
-	          .map((food: any) => (typeof food?.id === 'number' ? food.id : Number(food?.id)))
-	          .filter((id: number) => Number.isFinite(id)),
+	      const previousIds = new Set<string>(
+	        existingSnapshotFoods.map((food: any) => String(food?.id ?? '')).filter((v: string) => Boolean(v)),
 	      )
 	      const addedCandidates = dedupedFoods.filter((food: any) => {
-	        const id = typeof food?.id === 'number' ? food.id : Number(food?.id)
-	        return Number.isFinite(id) && !previousIds.has(id)
+	        const idKey = String(food?.id ?? '')
+	        return Boolean(idKey) && !previousIds.has(idKey)
 	      })
 	      const pickMostRecent = (list: any[]) => {
 	        let best: any = null
@@ -5412,6 +5480,11 @@ Please add nutritional information manually if needed.`);
     setPhotoOptionsPosition(null)
     setPendingPhotoPicker(false)
     // Reset search state every time this modal is opened so it can't get stuck in "loading".
+    try {
+      officialSearchAbortRef.current?.abort()
+    } catch {}
+    officialSearchAbortRef.current = null
+    officialSearchSeqRef.current += 1
     setOfficialLoading(false)
     setOfficialError(null)
     setOfficialResults([])
@@ -5422,6 +5495,11 @@ Please add nutritional information manually if needed.`);
   }
 
   const resetOfficialSearchState = () => {
+    try {
+      officialSearchAbortRef.current?.abort()
+    } catch {}
+    officialSearchAbortRef.current = null
+    officialSearchSeqRef.current += 1
     setOfficialLoading(false)
     setOfficialError(null)
     setOfficialResults([])
@@ -9771,6 +9849,22 @@ Please add nutritional information manually if needed.`);
                       className="w-full px-3 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base"
                     />
                   </div>
+                  {manualMealBuildMode && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        openAddIngredientModalFromMenu(undefined, {
+                          mode: 'analysis',
+                        })
+                      }
+                      className="w-full py-3 px-4 mx-auto max-w-[95%] bg-white border border-emerald-300 hover:bg-emerald-50 text-emerald-800 font-medium rounded-xl transition-colors duration-200 flex items-center justify-center"
+                    >
+                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v12m6-6H6" />
+                      </svg>
+                      Add another ingredient
+                    </button>
+                  )}
 	                  <button
 	                    onClick={() =>
 	                      editingEntry ? updateFoodEntry() : addFoodEntry(aiDescription, manualMealBuildMode ? 'text' : 'photo')
@@ -9795,7 +9889,7 @@ Please add nutritional information manually if needed.`);
                         <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                         </svg>
-                        {editingEntry ? 'Update Entry' : 'Save to Food Diary'}
+                        {editingEntry ? 'Update Entry' : manualMealBuildMode ? 'Save meal to Food Diary' : 'Save to Food Diary'}
                       </>
                     )}
                   </button>

@@ -30,6 +30,31 @@ export async function GET(request: NextRequest) {
     let items: any[] = []
     let actualSource = source
 
+    const normalizeForMatch = (value: any) =>
+      String(value || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim()
+        .replace(/\s+/g, ' ')
+
+    const queryNorm = normalizeForMatch(query)
+    const queryTokens = queryNorm ? queryNorm.split(' ').filter(Boolean) : []
+
+    const scoreNameMatch = (name: any) => {
+      if (!queryNorm) return 0
+      const n = normalizeForMatch(name)
+      if (!n) return 0
+      if (n === queryNorm) return 1000
+      if (n.startsWith(queryNorm)) return 800
+      if (n.includes(queryNorm)) return 500
+      if (queryTokens.length > 0) {
+        const hitCount = queryTokens.filter((t) => n.includes(t)).length
+        if (hitCount === queryTokens.length) return 350
+        return hitCount * 40
+      }
+      return 0
+    }
+
     if (source === 'auto' || !source) {
       const usdaDataType =
         kind === 'packaged' ? 'branded' : kind === 'single' ? 'generic' : 'all'
@@ -48,6 +73,7 @@ export async function GET(request: NextRequest) {
 
       const scoreItem = (it: any) => {
         let score = 0
+        score += scoreNameMatch(it?.name)
         if (it?.source === 'fatsecret') score += 3
         if (it?.source === 'openfoodfacts') score += 2
         if (it?.source === 'usda') score += 1
@@ -96,6 +122,11 @@ export async function GET(request: NextRequest) {
         { success: false, error: 'Invalid source. Expected "openfoodfacts", "usda", "fatsecret", or "auto".' },
         { status: 400 },
       )
+    }
+
+    // For non-auto sources, apply the same name-match ranking so exact matches come first.
+    if (actualSource !== 'auto' && Array.isArray(items) && items.length > 1) {
+      items = [...items].sort((a, b) => scoreNameMatch(b?.name) - scoreNameMatch(a?.name))
     }
 
     return NextResponse.json({ success: true, source: actualSource, items })

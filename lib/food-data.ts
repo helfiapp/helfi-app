@@ -27,6 +27,51 @@ const FATSECRET_CLIENT_ID =
 const FATSECRET_CLIENT_SECRET =
   process.env.FATSECRET_CLIENT_SECRET || 'd544f96d19494c9ca8a3dec1bcaf1da3'
 
+type TimeoutFetchInit = RequestInit & { timeoutMs?: number }
+
+function nowMs(): number {
+  return Date.now()
+}
+
+async function fetchWithTimeout(url: string, init: TimeoutFetchInit = {}): Promise<Response> {
+  const timeoutMs = typeof init.timeoutMs === 'number' && Number.isFinite(init.timeoutMs) ? init.timeoutMs : 3500
+  const controller = new AbortController()
+  const signal = init.signal
+
+  const onAbort = () => {
+    try {
+      controller.abort()
+    } catch {}
+  }
+  if (signal) {
+    if (signal.aborted) {
+      onAbort()
+    } else {
+      try {
+        signal.addEventListener('abort', onAbort, { once: true })
+      } catch {}
+    }
+  }
+
+  const t = setTimeout(() => {
+    try {
+      controller.abort()
+    } catch {}
+  }, timeoutMs)
+
+  try {
+    const { timeoutMs: _timeoutMs, signal: _signal, ...rest } = init
+    return await fetch(url, { ...rest, signal: controller.signal })
+  } finally {
+    clearTimeout(t)
+    if (signal) {
+      try {
+        signal.removeEventListener('abort', onAbort)
+      } catch {}
+    }
+  }
+}
+
 function parseNumber(value: any): number | null {
   const n = typeof value === 'number' ? value : Number(value)
   if (!Number.isFinite(n)) return null
@@ -120,13 +165,14 @@ export async function searchOpenFoodFactsByQuery(
   const url = `${openFoodFactsBaseUrl()}/cgi/search.pl?${params.toString()}`
 
   try {
-    const res = await fetch(url, {
+    const res = await fetchWithTimeout(url, {
       headers: {
         'User-Agent': OPENFOODFACTS_USER_AGENT,
       },
       // keep timeouts modest to avoid blocking the analyzer too long
       cache: 'no-store',
       next: { revalidate: 0 },
+      timeoutMs: 3000,
     })
 
     if (!res.ok) {
@@ -234,13 +280,14 @@ export async function searchUsdaFoods(
   const url = `https://api.nal.usda.gov/fdc/v1/foods/search?${params.toString()}`
 
   try {
-    const res = await fetch(url, {
+    const res = await fetchWithTimeout(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
       },
       cache: 'no-store',
       next: { revalidate: 0 },
+      timeoutMs: 3500,
     })
 
     if (!res.ok) {
@@ -388,10 +435,16 @@ function normalizeFatSecretFood(food: FatSecretFood): NormalizedFoodItem | null 
   }
 }
 
+let fatSecretTokenCache: { token: string; expiresAtMs: number } | null = null
+
 async function getFatSecretAccessToken(): Promise<string | null> {
   if (!FATSECRET_CLIENT_ID || !FATSECRET_CLIENT_SECRET) {
     console.warn('FatSecret credentials not configured')
     return null
+  }
+
+  if (fatSecretTokenCache && fatSecretTokenCache.token && nowMs() < fatSecretTokenCache.expiresAtMs - 10_000) {
+    return fatSecretTokenCache.token
   }
 
   try {
@@ -403,7 +456,7 @@ async function getFatSecretAccessToken(): Promise<string | null> {
 
     const auth = Buffer.from(`${FATSECRET_CLIENT_ID}:${FATSECRET_CLIENT_SECRET}`).toString('base64')
 
-    const res = await fetch('https://oauth.fatsecret.com/connect/token', {
+    const res = await fetchWithTimeout('https://oauth.fatsecret.com/connect/token', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -411,6 +464,7 @@ async function getFatSecretAccessToken(): Promise<string | null> {
       },
       body: params.toString(),
       cache: 'no-store',
+      timeoutMs: 2500,
     })
 
     if (!res.ok) {
@@ -420,7 +474,24 @@ async function getFatSecretAccessToken(): Promise<string | null> {
     }
 
     const data = await res.json()
-    return data.access_token || null
+    const token = data.access_token || null
+    const expiresInSecRaw = data.expires_in
+    const expiresInSec =
+      typeof expiresInSecRaw === 'number'
+        ? expiresInSecRaw
+        : typeof expiresInSecRaw === 'string'
+        ? parseInt(expiresInSecRaw, 10)
+        : NaN
+
+    if (token) {
+      // Default to 5 minutes if FatSecret doesn't return expires_in for some reason.
+      const ttlMs = Number.isFinite(expiresInSec) && expiresInSec > 0 ? expiresInSec * 1000 : 5 * 60 * 1000
+      // Keep a little safety margin so we don't reuse an expired token.
+      fatSecretTokenCache = { token, expiresAtMs: nowMs() + Math.max(30_000, ttlMs) }
+    } else {
+      fatSecretTokenCache = null
+    }
+    return token
   } catch (err) {
     console.warn('FatSecret token error', err)
     return null
@@ -455,7 +526,7 @@ export async function searchFatSecretFoods(
 
     const url = `https://platform.fatsecret.com/rest/server.api?${params.toString()}`
 
-    const res = await fetch(url, {
+    const res = await fetchWithTimeout(url, {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -463,6 +534,7 @@ export async function searchFatSecretFoods(
       },
       cache: 'no-store',
       next: { revalidate: 0 },
+      timeoutMs: 3500,
     })
 
     if (!res.ok) {
