@@ -16,6 +16,9 @@ export async function GET(request: NextRequest) {
     const source = (searchParams.get('source') || '').toLowerCase()
     const query = (searchParams.get('q') || '').trim()
     const kind = (searchParams.get('kind') || '').toLowerCase()
+    const limitRaw = searchParams.get('limit')
+    const limitParsed = limitRaw ? Number.parseInt(limitRaw, 10) : NaN
+    const limit = Number.isFinite(limitParsed) ? Math.min(Math.max(limitParsed, 1), 50) : 20
 
     if (!query) {
       return NextResponse.json(
@@ -30,21 +33,64 @@ export async function GET(request: NextRequest) {
     if (source === 'auto' || !source) {
       const usdaDataType =
         kind === 'packaged' ? 'branded' : kind === 'single' ? 'generic' : 'all'
-      // Auto mode: try all sources with fallback
-      items = await lookupFoodNutrition(query, {
-        preferSource: 'usda',
-        maxResults: 5,
-        usdaDataType,
-      })
-      actualSource = items.length > 0 ? items[0].source : 'none'
+
+      const perSource = Math.min(Math.max(Math.ceil(limit / 2), 10), 25)
+
+      const scoredServing = (serving: string | null | undefined) => {
+        const s = (serving || '').toLowerCase()
+        if (!s) return 0
+        // Prefer real package servings over "100 g" defaults.
+        if (s.includes('100 g') || s.includes('100g')) return -5
+        if (s.includes('serving')) return 2
+        if (s.includes('piece') || s.includes('biscuit') || s.includes('cookie') || s.includes('slice')) return 3
+        return 1
+      }
+
+      const scoreItem = (it: any) => {
+        let score = 0
+        if (it?.source === 'fatsecret') score += 3
+        if (it?.source === 'openfoodfacts') score += 2
+        if (it?.source === 'usda') score += 1
+        if (it?.brand) score += 2
+        if (Number.isFinite(Number(it?.calories)) && Number(it.calories) > 0) score += 1
+        score += scoredServing(it?.serving_size)
+        return score
+      }
+
+      const [usdaRes, fatRes, offRes] = await Promise.allSettled([
+        searchUsdaFoods(query, { pageSize: perSource, dataType: usdaDataType }),
+        searchFatSecretFoods(query, { pageSize: perSource }),
+        searchOpenFoodFactsByQuery(query, { pageSize: perSource }),
+      ])
+
+      const pooled: any[] = []
+      for (const res of [usdaRes, fatRes, offRes]) {
+        if (res.status === 'fulfilled' && Array.isArray(res.value)) {
+          pooled.push(...res.value)
+        }
+      }
+
+      // De-dupe by (name + brand) to avoid showing the same item multiple times across sources.
+      const normalized = (value: any) => String(value || '').trim().toLowerCase()
+      const byNameBrand = new Map<string, any>()
+      pooled
+        .sort((a, b) => scoreItem(b) - scoreItem(a))
+        .forEach((it) => {
+          const key = `${normalized(it?.name)}|${normalized(it?.brand)}`
+          if (!key || key === '|') return
+          if (!byNameBrand.has(key)) byNameBrand.set(key, it)
+        })
+
+      items = Array.from(byNameBrand.values()).slice(0, limit)
+      actualSource = 'auto'
     } else if (source === 'openfoodfacts') {
-      items = await searchOpenFoodFactsByQuery(query, { pageSize: 5 })
+      items = await searchOpenFoodFactsByQuery(query, { pageSize: limit })
     } else if (source === 'usda') {
       const dataType =
         kind === 'packaged' ? 'branded' : kind === 'single' ? 'generic' : 'all'
-      items = await searchUsdaFoods(query, { pageSize: 5, dataType })
+      items = await searchUsdaFoods(query, { pageSize: limit, dataType })
     } else if (source === 'fatsecret') {
-      items = await searchFatSecretFoods(query, { pageSize: 5 })
+      items = await searchFatSecretFoods(query, { pageSize: limit })
     } else {
       return NextResponse.json(
         { success: false, error: 'Invalid source. Expected "openfoodfacts", "usda", "fatsecret", or "auto".' },

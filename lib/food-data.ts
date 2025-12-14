@@ -311,25 +311,74 @@ function normalizeFatSecretFood(food: FatSecretFood): NormalizedFoodItem | null 
   const servings = food.servings?.serving || []
   if (servings.length === 0) return null
 
-  // Prefer "100 g" or "1 serving" if available, otherwise use first serving
-  const preferredServing = servings.find(
-    (s) =>
-      s.measurement_description?.toLowerCase().includes('100 g') ||
-      s.measurement_description?.toLowerCase().includes('serving')
-  ) || servings[0]
-
+  const lower = (v: any) => String(v || '').toLowerCase()
   const parseValue = (val: string | undefined): number | null => {
     if (!val) return null
     const num = parseFloat(val)
     return Number.isFinite(num) ? num : null
   }
+  const parseAmount = (val: string | undefined): number | null => parseValue(val)
+
+  // Prefer real package servings over generic "100 g".
+  const scoreServing = (s: any) => {
+    let score = 0
+    const measurement = lower(s?.measurement_description || s?.serving_description)
+    const metricUnit = lower(s?.metric_serving_unit)
+    const metricAmount = parseAmount(s?.metric_serving_amount)
+
+    if (measurement.includes('100 g') || measurement.includes('100g')) score -= 10
+    if (measurement.includes('serving')) score += 2
+
+    // Common packaged units (biscuits, slices, pieces, bars, etc.)
+    if (
+      measurement.includes('biscuit') ||
+      measurement.includes('cookie') ||
+      measurement.includes('slice') ||
+      measurement.includes('piece') ||
+      measurement.includes('bar') ||
+      measurement.includes('packet') ||
+      measurement.includes('pack')
+    ) {
+      score += 6
+    }
+
+    // Prefer metric amounts that look like real servings (roughly 5g–150g).
+    if (metricUnit === 'g' && metricAmount != null) {
+      if (metricAmount >= 5 && metricAmount <= 150) score += 5
+      if (metricAmount === 100) score -= 4
+    }
+
+    // Prefer explicit "1" unit servings when available.
+    const numberOfUnits = parseAmount(s?.number_of_units)
+    if (numberOfUnits != null) {
+      if (numberOfUnits === 1) score += 2
+      if (numberOfUnits > 1) score += 1
+    }
+
+    return score
+  }
+
+  const preferredServing = [...servings].sort((a, b) => scoreServing(b) - scoreServing(a))[0] || servings[0]
+
+  const servingSizeBase =
+    preferredServing.measurement_description || preferredServing.serving_description || '1 serving'
+  const metricAmount = parseAmount(preferredServing.metric_serving_amount)
+  const metricUnit = preferredServing.metric_serving_unit
+  const servingSizeLabel =
+    metricAmount != null &&
+    metricAmount > 0 &&
+    metricUnit &&
+    typeof servingSizeBase === 'string' &&
+    !/\b\d+(\.\d+)?\s*(g|ml)\b/i.test(servingSizeBase)
+      ? `${servingSizeBase} (${metricAmount} ${metricUnit})`
+      : servingSizeBase
 
   return {
     source: 'fatsecret',
     id: food.food_id,
     name: food.food_name,
     brand: food.brand_name || null,
-    serving_size: preferredServing.measurement_description || preferredServing.serving_description || '1 serving',
+    serving_size: servingSizeLabel,
     calories: parseValue(preferredServing.calories),
     protein_g: parseValue(preferredServing.protein),
     carbs_g: parseValue(preferredServing.carbohydrate),
