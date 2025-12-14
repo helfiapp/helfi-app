@@ -19,52 +19,52 @@ The Food Diary has protected behaviors (snapshot sync, DB verification, fallback
 
 Use these exact markers in this doc:
 
-- <span style="background:#16a34a;color:#fff;padding:2px 8px;border-radius:6px;font-weight:700;">✓</span> = working (user can do it successfully right now)
-- <span style="background:#dc2626;color:#fff;padding:2px 8px;border-radius:6px;font-weight:700;">✕</span> = still broken / needs work
+- ✅ = working (user can do it successfully right now)
+- ❌ = still broken / needs work
 
 ---
 
 ## 1) What was implemented in THIS session (numbered list)
 
-1) <span style="background:#16a34a;color:#fff;padding:2px 8px;border-radius:6px;font-weight:700;">✓</span> **Manual ingredient search now queries multiple sources**  
+1) ✅ **Manual ingredient search now queries multiple sources**  
    - Endpoint: `GET /api/food-data?source=auto&q=...&kind=...`  
    - Now aggregates **USDA + FatSecret + OpenFoodFacts** and dedupes by `(name + brand)`.  
    - User screenshot confirms it returns results from multiple sources (e.g., OpenFoodFacts + USDA).
 
-2) <span style="background:#dc2626;color:#fff;padding:2px 8px;border-radius:6px;font-weight:700;">✕</span> **Search result ranking is poor (exact match not first)**  
+2) ❌ **Search result ranking is poor (exact match not first)**  
    - Example complaint: searching “lamb chop” requires scrolling; “Lamb, chop” should be top.
    - Needs better ranking for exact/prefix match on `name`.
 
-3) <span style="background:#dc2626;color:#fff;padding:2px 8px;border-radius:6px;font-weight:700;">✕</span> **Ingredient search performance is unacceptable (30–60s)**  
+3) ❌ **Ingredient search performance is unacceptable (30–60s)**  
    - User report: tapping “Packaged” or “Single food” can take 30–60 seconds to show results.  
    - User report: tapping “Reset” can cause results to appear (likely a UI state/race issue + slow external calls).
 
-4) <span style="background:#16a34a;color:#fff;padding:2px 8px;border-radius:6px;font-weight:700;">✓</span> **Ingredient picker now has a Reset button**  
+4) ✅ **Ingredient picker now has a Reset button**  
    - Reset clears query/results/errors and resets toggles.
    - Also resets state on open/close to reduce “stuck loading” cases.
 
-5) <span style="background:#dc2626;color:#fff;padding:2px 8px;border-radius:6px;font-weight:700;">✕</span> **“Build a meal” (multi‑ingredient meal builder) shipped, but user reports it does not work**  
+5) ❌ **“Build a meal” (multi‑ingredient meal builder) shipped, but user reports it does not work**  
    - Intended behavior: multiple ingredients added as cards → saved as 1 diary entry → editable later as one entry with its ingredient cards.  
    - User report: “Build a meal is no different to add ingredient” and “when I add something nothing is actually added.”
 
-6) <span style="background:#16a34a;color:#fff;padding:2px 8px;border-radius:6px;font-weight:700;">✓</span> **Increased manual ingredient search result count**  
+6) ✅ **Increased manual ingredient search result count**  
    - `/api/food-data` supports `limit` up to 50; client requests 20.
 
-7) <span style="background:#16a34a;color:#fff;padding:2px 8px;border-radius:6px;font-weight:700;">✓</span> **FatSecret serving selection improved (attempt)**  
+7) ✅ **FatSecret serving selection improved (attempt)**  
    - `lib/food-data.ts` now prefers realistic package servings over “100 g” when possible.  
    - Not yet confirmed by user on Biscoff specifically, but change is shipped.
 
-8) <span style="background:#dc2626;color:#fff;padding:2px 8px;border-radius:6px;font-weight:700;">✕</span> **Food Diary still feels “glitchy” (flashing/disappearing entries)**  
+8) ❌ **Food Diary still feels “glitchy” (flashing/disappearing entries)**  
    - User continues to report items flashing, disappearing, and coming back (especially around add/delete/copy flows).  
    - This is NOT reliably reproduced in this session; needs a fresh, systematic reproduction + logs.
 
-9) <span style="background:#16a34a;color:#fff;padding:2px 8px;border-radius:6px;font-weight:700;">✓</span> **Food Diary save logic changed to reduce cross‑day wipe risk**  
+9) ✅ **Food Diary save logic changed to reduce cross‑day wipe risk**  
    - `saveFoodEntries()` now merges the updated day’s entries into the existing `userData.todaysFoods` cache instead of overwriting it with only the current list.  
    - Also tries to pick the newest “added entry” for history writes to avoid saving the wrong entry.  
    - This was shipped to address “items from yesterday disappear after copying”.
 
-10) <span style="background:#16a34a;color:#fff;padding:2px 8px;border-radius:6px;font-weight:700;">✓</span> **New diary entries now use collision‑resistant local IDs**  
-   - `addFoodEntry()` now uses `makeUniqueLocalEntryId(...)` instead of `id = createdAtMs`.
+10) ✅ **New diary entries now use collision‑resistant local IDs**  
+    - `addFoodEntry()` now uses `makeUniqueLocalEntryId(...)` instead of `id = createdAtMs`.
 
 ---
 
@@ -130,4 +130,3 @@ Earlier deployments (subset of changes):
   - cross-device polling refresh behavior
   - delete tombstone logic
 - Prefer additive fixes (timeouts, cancelation, ranking) rather than rewriting Food Diary loading.
-
