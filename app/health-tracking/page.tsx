@@ -19,6 +19,12 @@ export default function HealthTracking() {
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [profileImage, setProfileImage] = useState<string>('')
   const [fitbitConnected, setFitbitConnected] = useState(false)
+  const [garminStatus, setGarminStatus] = useState<{
+    connected: boolean
+    webhookCount: number
+    lastWebhookAt: string | null
+    lastDataType: string | null
+  } | null>(null)
 
   // Profile data - prefer real photos; fall back to professional icon
   const hasProfileImage = !!(providerProfileImage || profileImage || session?.user?.image)
@@ -72,6 +78,24 @@ export default function HealthTracking() {
       } catch {}
     }
     checkFitbit()
+  }, [])
+
+  useEffect(() => {
+    const checkGarmin = async () => {
+      try {
+        const res = await fetch('/api/garmin/status')
+        if (res.ok) {
+          const j = await res.json()
+          setGarminStatus({
+            connected: !!j.connected,
+            webhookCount: Number(j.webhookCount || 0),
+            lastWebhookAt: j.lastWebhookAt || null,
+            lastDataType: j.lastDataType || null,
+          })
+        }
+      } catch {}
+    }
+    checkGarmin()
   }, [])
 
   return (
@@ -251,6 +275,32 @@ export default function HealthTracking() {
           <div className="mb-6">
             <h1 className="text-2xl md:text-3xl font-bold text-helfi-black">Health Tracking</h1>
             <p className="text-gray-600">Monitor your steps, heart rate, sleep, and more — alongside your check-ins.</p>
+          </div>
+
+          <div className="mb-6 p-6 rounded-xl border bg-gray-50">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+              <div>
+                <div className="text-lg font-semibold text-gray-900">Garmin</div>
+                {garminStatus?.connected ? (
+                  <div className="text-sm text-gray-700">
+                    Connected{garminStatus.webhookCount ? ` • ${garminStatus.webhookCount} data deliveries received` : ''}.
+                    <div className="text-xs text-gray-500 mt-1">
+                      {garminStatus.lastWebhookAt
+                        ? `Last delivery: ${new Date(garminStatus.lastWebhookAt).toLocaleString()}${garminStatus.lastDataType ? ` (${garminStatus.lastDataType})` : ''}`
+                        : 'No data has arrived yet. Open the Garmin Connect app and sync the watch, then check again in a minute.'}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-sm text-gray-600">Connect Garmin to start receiving wellness data.</div>
+                )}
+              </div>
+              <Link
+                href="/devices"
+                className="px-4 py-2 bg-helfi-green text-white rounded-lg hover:bg-green-600 transition-colors text-sm text-center"
+              >
+                {garminStatus?.connected ? 'Manage Garmin' : 'Connect Garmin'}
+              </Link>
+            </div>
           </div>
 
           {fitbitConnected ? (
