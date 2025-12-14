@@ -2716,9 +2716,11 @@ const applyStructuredItems = (
   const curatedEnriched =
     finalItems.length > 0 ? enrichItemsFromCuratedUsda(finalItems) : []
   const enrichedItems = curatedEnriched.length > 0 ? enrichItemsFromStarter(curatedEnriched) : []
-  // The backend now returns correct discrete counts (piecesPerServing, servings=1).
-  // Do NOT re-normalize discrete servings here, or we risk doubling pieces.
-  const normalizedItems = enrichedItems
+  // The backend *tries* to return correct discrete counts and totals, but we still apply a
+  // conservative client-side safety pass for discrete items where the label clearly says
+  // multiple pieces (e.g., "6 drumsticks") but the macros look like a single piece.
+  // This does not change pieces/weight syncing; it only scales obviously-too-low macros.
+  const normalizedItems = normalizeDiscreteServingsWithLabel(enrichedItems)
 
   const addEstimatedServingWeights = (items: any[]) =>
     items.map((it) => {
