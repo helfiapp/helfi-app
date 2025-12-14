@@ -1333,6 +1333,25 @@ export default function FoodDiary() {
     if (/^https?:\/\//i.test(trimmed)) return trimmed.slice(0, 500)
     return null
   }
+
+  // Client-side entries use a numeric `id` that is used as a React key and for delete operations.
+  // IMPORTANT: Copies/pastes can legitimately share the same `createdAt` timestamp (same time-of-day),
+  // so `id = createdAtMs` can collide across categories. Collisions cause deletes to remove the wrong items.
+  const hashToOffset = (input: string) => {
+    // Simple FNV-1a 32-bit hash -> small positive offset.
+    let hash = 2166136261
+    for (let i = 0; i < input.length; i++) {
+      hash ^= input.charCodeAt(i)
+      hash = Math.imul(hash, 16777619)
+    }
+    // 1..997 (small enough to not meaningfully change sort order, but breaks collisions)
+    return (Math.abs(hash) % 997) + 1
+  }
+
+  const makeUniqueLocalEntryId = (baseMs: number, salt: string) => {
+    const safeBase = Number.isFinite(baseMs) ? baseMs : Date.now()
+    return safeBase + hashToOffset(salt || String(safeBase))
+  }
   const compactItemForSnapshot = (item: any) => {
     if (!item || typeof item !== 'object') return item
     return {
@@ -5750,7 +5769,10 @@ Please add nutritional information manually if needed.`);
       [food?.name, food?.brand].filter(Boolean).join(' – ') ||
       'Scanned food'
     const entry = {
-      id: new Date(createdAtIso).getTime(),
+      id: makeUniqueLocalEntryId(
+        new Date(createdAtIso).getTime(),
+        `barcode:${Date.now()}|${selectedDate}|${category}|${normalizedDescription(description)}`,
+      ),
       localDate: selectedDate,
       description,
       time: displayTime,
@@ -6142,7 +6164,10 @@ Please add nutritional information manually if needed.`);
       return null
     })()
     const newEntry = {
-      id: new Date(createdAtIso).getTime(),
+      id: makeUniqueLocalEntryId(
+        new Date(createdAtIso).getTime(),
+        `insert:${Date.now()}|${selectedDate}|${category}|${normalizedDescription(description)}`,
+      ),
       localDate: selectedDate,
       description,
       time: displayTime,
@@ -6244,7 +6269,10 @@ Please add nutritional information manually if needed.`);
         : null
     const baseDescription = favorite.description || favorite.label || 'Favorite meal'
     const entry = {
-      id: new Date(createdAtIso).getTime(),
+      id: makeUniqueLocalEntryId(
+        new Date(createdAtIso).getTime(),
+        `favorite:${now}|${selectedDate}|${category}|${normalizedDescription(baseDescription)}`,
+      ),
       localDate: selectedDate,
       description: baseDescription,
       time: new Date(createdAtIso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -6321,6 +6349,7 @@ Please add nutritional information manually if needed.`);
     setShowEntryOptions(null)
     const category = normalizeCategory(targetCategory)
     const baseDescription = source.description || source.label || 'Duplicated meal'
+    const opStamp = Date.now()
     const createdAtIso = alignTimestampToLocalDate(new Date().toISOString(), targetDate)
     const displayTime = new Date(createdAtIso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     const clonedItems =
@@ -6329,7 +6358,10 @@ Please add nutritional information manually if needed.`);
         : null
     const copiedEntry = {
       ...source,
-      id: new Date(createdAtIso).getTime(),
+      id: makeUniqueLocalEntryId(
+        new Date(createdAtIso).getTime(),
+        `duplicate:${opStamp}|${targetDate}|${category}|${normalizedDescription(baseDescription)}`,
+      ),
       dbId: undefined,
       localDate: targetDate,
       time: displayTime,
@@ -6405,13 +6437,17 @@ Please add nutritional information manually if needed.`);
       const anchored = alignTimestampToLocalDate(adjusted, targetDate)
       const time = new Date(anchored).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       const baseDescription = entry.description || entry.label || 'Duplicated meal'
+      const baseMs = new Date(anchored).getTime()
       const clonedItems =
         entry.items && Array.isArray(entry.items) && entry.items.length > 0
           ? JSON.parse(JSON.stringify(entry.items))
           : null
       return {
         ...entry,
-        id: new Date(anchored).getTime() + idx,
+        id: makeUniqueLocalEntryId(
+          baseMs,
+          `copycat:${metaStamp}|${targetDate}|${category}|${normalizedDescription(baseDescription)}|${idx}`,
+        ),
         dbId: undefined,
         localDate: targetDate,
         createdAt: anchored,
@@ -7050,17 +7086,22 @@ Please add nutritional information manually if needed.`);
       return
     }
     const category = normalizeCategory(targetCategoryKey)
+    const pasteStamp = Date.now()
     const clones = items.map((item, idx) => {
       const createdSource = item?.createdAt || new Date().toISOString()
       const baseTs = new Date(createdSource).getTime()
       const adjusted = Number.isFinite(baseTs) ? new Date(baseTs + idx * 60000).toISOString() : new Date().toISOString()
       const anchored = alignTimestampToLocalDate(adjusted, targetDate)
+      const baseMs = new Date(anchored).getTime()
       const time =
         item?.time ||
         new Date(anchored).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       const description = (item?.description || '').toString() || 'Copied meal'
       return {
-        id: new Date(anchored).getTime() + idx,
+        id: makeUniqueLocalEntryId(
+          baseMs,
+          `paste:${pasteStamp}|${targetDate}|${category}|${normalizedDescription(description)}|${idx}`,
+        ),
         dbId: undefined,
         localDate: targetDate,
         createdAt: anchored,
