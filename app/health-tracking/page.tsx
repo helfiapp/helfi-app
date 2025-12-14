@@ -11,6 +11,8 @@ import MobileMoreMenu from '@/components/MobileMoreMenu'
 import FitbitSummary from '@/components/devices/FitbitSummary'
 import FitbitCharts from '@/components/devices/FitbitCharts'
 import FitbitCorrelations from '@/components/devices/FitbitCorrelations'
+import GarminSummary from '@/components/devices/GarminSummary'
+import GarminCharts from '@/components/devices/GarminCharts'
 
 export default function HealthTracking() {
   const { data: session } = useSession()
@@ -303,28 +305,41 @@ export default function HealthTracking() {
             </div>
           </div>
 
-          {fitbitConnected ? (
-            <div className="space-y-6">
-              <FitbitSummary rangeDays={7} />
-              <FitbitCharts rangeDays={30} />
-              <FitbitCorrelations rangeDays={30} />
+          {garminStatus?.connected && (
+            <div className="space-y-6 mb-10">
+              <GarminSummary rangeDays={7} />
+              <GarminCharts rangeDays={30} />
               <p className="text-xs text-gray-500">
-                Tip: For best results, sync your Fitbit daily so Helfi can align your activity and sleep with your check-ins.
+                Tip: Garmin sends new data after the watch syncs to the Garmin Connect phone app.
               </p>
             </div>
-          ) : (
-            <div className="p-6 rounded-xl border bg-gray-50">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                <div>
-                  <div className="text-lg font-semibold text-gray-900">Connect your Fitbit</div>
-                  <div className="text-sm text-gray-600">See your steps, heart rate, sleep, and weight here once connected.</div>
-                </div>
-                <Link href="/devices" className="px-4 py-2 bg-helfi-green text-white rounded-lg hover:bg-green-600 transition-colors text-sm text-center">
-                  Connect Fitbit
-                </Link>
-              </div>
-            </div>
           )}
+
+          <div className="pt-2 border-t border-gray-100">
+            <div className="text-lg font-semibold text-gray-900 mb-3">Fitbit</div>
+            {fitbitConnected ? (
+              <div className="space-y-6">
+                <FitbitSummary rangeDays={7} />
+                <FitbitCharts rangeDays={30} />
+                <FitbitCorrelations rangeDays={30} />
+                <p className="text-xs text-gray-500">
+                  Tip: For best results, sync your Fitbit daily so Helfi can align your activity and sleep with your check-ins.
+                </p>
+              </div>
+            ) : (
+              <div className="p-6 rounded-xl border bg-gray-50">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                  <div>
+                    <div className="text-lg font-semibold text-gray-900">Connect your Fitbit</div>
+                    <div className="text-sm text-gray-600">See your steps, heart rate, sleep, and weight here once connected.</div>
+                  </div>
+                  <Link href="/devices" className="px-4 py-2 bg-helfi-green text-white rounded-lg hover:bg-green-600 transition-colors text-sm text-center">
+                    Connect Fitbit
+                  </Link>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
