@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { useUserData } from '@/components/providers/UserDataProvider'
 
 type MealCategory = 'breakfast' | 'lunch' | 'dinner' | 'snacks' | 'uncategorized'
 
@@ -155,6 +156,7 @@ const buildDefaultMealName = (items: BuilderItem[]) => {
 export default function MealBuilderClient() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { userData } = useUserData()
 
   const initialDate = searchParams.get('date') || buildTodayIso()
   const initialCategory = normalizeCategory(searchParams.get('category'))
@@ -185,6 +187,9 @@ export default function MealBuilderClient() {
   const [barcodeStatusHint, setBarcodeStatusHint] = useState<string>('Ready')
   const [manualBarcode, setManualBarcode] = useState('')
   const barcodeScannerRef = useRef<any>(null)
+
+  const [showFavoritesPicker, setShowFavoritesPicker] = useState(false)
+  const [favoritesSearch, setFavoritesSearch] = useState('')
 
   const busy = searchLoading || savingMeal || photoLoading || barcodeLoading
 
@@ -332,6 +337,46 @@ export default function MealBuilderClient() {
       }
       addBuilderItem(next)
     }
+  }
+
+  const addFromFavorite = (fav: any) => {
+    if (!fav) return
+    // Favorites are saved meals; prefer their ingredient cards when available.
+    let favItems: any[] | null = null
+    const candidate = (fav as any)?.items
+    if (Array.isArray(candidate)) {
+      favItems = candidate
+    } else if (typeof candidate === 'string') {
+      try {
+        const parsed = JSON.parse(candidate)
+        favItems = Array.isArray(parsed) ? parsed : null
+      } catch {
+        favItems = null
+      }
+    }
+
+    if (favItems && favItems.length > 0) {
+      addItemsFromAi(favItems)
+      return
+    }
+
+    // Fallback: add as a single ingredient using the favorite's totals.
+    const total = (fav as any)?.total || (fav as any)?.nutrition || null
+    const label = String((fav as any)?.label || (fav as any)?.description || 'Favorite').trim() || 'Favorite'
+    addItemsFromAi([
+      {
+        name: label,
+        brand: 'Favorite',
+        serving_size: '1 serving',
+        servings: 1,
+        calories: total?.calories ?? null,
+        protein_g: total?.protein ?? total?.protein_g ?? null,
+        carbs_g: total?.carbs ?? total?.carbs_g ?? null,
+        fat_g: total?.fat ?? total?.fat_g ?? null,
+        fiber_g: total?.fiber ?? total?.fiber_g ?? null,
+        sugar_g: total?.sugar ?? total?.sugar_g ?? null,
+      },
+    ])
   }
 
   const analyzePhotoAndAdd = async (file: File) => {
@@ -645,6 +690,94 @@ export default function MealBuilderClient() {
 
       <div className="px-4 py-4">
         <div className="w-full max-w-4xl mx-auto space-y-4">
+          {showFavoritesPicker && (
+            <div className="fixed inset-0 z-50 bg-white flex flex-col">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => setShowFavoritesPicker(false)}
+                  className="p-2 rounded-full hover:bg-gray-100"
+                  aria-label="Back"
+                >
+                  <span aria-hidden>←</span>
+                </button>
+                <div className="flex-1 text-center">
+                  <div className="text-lg font-semibold text-gray-900">Favorites</div>
+                  <div className="text-xs text-gray-500">Add a saved food into this meal</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowFavoritesPicker(false)}
+                  className="p-2 rounded-full hover:bg-gray-100"
+                  aria-label="Close"
+                >
+                  <span aria-hidden>✕</span>
+                </button>
+              </div>
+
+              <div className="px-4 py-3 border-b border-gray-200">
+                <input
+                  value={favoritesSearch}
+                  onChange={(e) => setFavoritesSearch(e.target.value)}
+                  placeholder="Search favorites..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                />
+              </div>
+
+              <div className="flex-1 overflow-y-auto px-4 py-3">
+                {(() => {
+                  const list = Array.isArray((userData as any)?.favorites) ? ((userData as any).favorites as any[]) : []
+                  const search = favoritesSearch.trim().toLowerCase()
+                  const filtered = !search
+                    ? list
+                    : list.filter((f) => {
+                        const label = String((f as any)?.label || (f as any)?.description || '').toLowerCase()
+                        return label.includes(search)
+                      })
+
+                  if (filtered.length === 0) {
+                    return <div className="text-sm text-gray-500 py-8 text-center">No favorites found.</div>
+                  }
+
+                  const sorted = [...filtered].sort((a, b) => (Number((b as any)?.createdAt) || 0) - (Number((a as any)?.createdAt) || 0))
+
+                  return (
+                    <div className="divide-y divide-gray-100 border border-gray-200 rounded-xl overflow-hidden">
+                      {sorted.map((fav, idx) => {
+                        const label = String((fav as any)?.label || (fav as any)?.description || 'Favorite').trim()
+                        const total = (fav as any)?.total || (fav as any)?.nutrition || null
+                        const calories =
+                          total && typeof total?.calories === 'number' && Number.isFinite(total.calories)
+                            ? Math.round(total.calories)
+                            : null
+                        return (
+                          <button
+                            key={String((fav as any)?.id || idx)}
+                            type="button"
+                            onClick={() => {
+                              addFromFavorite(fav)
+                              setShowFavoritesPicker(false)
+                              setFavoritesSearch('')
+                            }}
+                            className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-gray-50"
+                          >
+                            <div className="min-w-0">
+                              <div className="text-sm font-semibold text-gray-900 truncate">{label || 'Favorite'}</div>
+                              <div className="text-xs text-gray-500 truncate">
+                                {Array.isArray((fav as any)?.items) ? `${(fav as any).items.length} ingredients` : 'Saved meal'}
+                              </div>
+                            </div>
+                            {calories !== null && <div className="text-sm font-semibold text-gray-900">{calories} kcal</div>}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )
+                })()}
+              </div>
+            </div>
+          )}
+
           {showBarcodeScanner && (
             <div className="fixed inset-0 z-50 bg-black">
               <div className="absolute inset-0 flex flex-col">
@@ -763,7 +896,7 @@ export default function MealBuilderClient() {
             </button>
           </div>
           <div className="flex flex-col gap-2 pt-1">
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               <button
                 type="button"
                 disabled={busy}
@@ -779,6 +912,14 @@ export default function MealBuilderClient() {
                 className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-60"
               >
                 {barcodeLoading ? 'Looking up…' : 'Scan barcode'}
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => setShowFavoritesPicker(true)}
+                className="col-span-2 sm:col-span-1 px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-60"
+              >
+                Add from favorites
               </button>
             </div>
             <input
