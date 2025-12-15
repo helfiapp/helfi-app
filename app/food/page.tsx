@@ -1643,6 +1643,7 @@ export default function FoodDiary() {
   const [officialError, setOfficialError] = useState<string | null>(null)
   const officialSearchAbortRef = useRef<AbortController | null>(null)
   const officialSearchSeqRef = useRef(0)
+  const officialSearchDebounceRef = useRef<any>(null)
   const [manualMealBuildMode, setManualMealBuildMode] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const [summarySlideIndex, setSummarySlideIndex] = useState(0)
@@ -2793,8 +2794,8 @@ export default function FoodDiary() {
     }
   }
 
-  const handleOfficialSearch = async (mode: 'packaged' | 'single') => {
-    const query = officialSearchQuery.trim()
+  const handleOfficialSearch = async (mode: 'packaged' | 'single', queryOverride?: string) => {
+    const query = (queryOverride ?? officialSearchQuery).trim()
     if (!query) {
       setOfficialError('Please enter a product name or barcode to search.')
       return
@@ -5498,6 +5499,10 @@ Please add nutritional information manually if needed.`);
     try {
       officialSearchAbortRef.current?.abort()
     } catch {}
+    try {
+      if (officialSearchDebounceRef.current) clearTimeout(officialSearchDebounceRef.current)
+    } catch {}
+    officialSearchDebounceRef.current = null
     officialSearchAbortRef.current = null
     officialSearchSeqRef.current += 1
     setOfficialLoading(false)
@@ -5513,6 +5518,10 @@ Please add nutritional information manually if needed.`);
     try {
       officialSearchAbortRef.current?.abort()
     } catch {}
+    try {
+      if (officialSearchDebounceRef.current) clearTimeout(officialSearchDebounceRef.current)
+    } catch {}
+    officialSearchDebounceRef.current = null
     officialSearchAbortRef.current = null
     officialSearchSeqRef.current += 1
     setOfficialLoading(false)
@@ -8202,7 +8211,30 @@ Please add nutritional information manually if needed.`);
                     <input
                       type="text"
                       value={officialSearchQuery}
-                      onChange={(e) => setOfficialSearchQuery(e.target.value)}
+                      onChange={(e) => {
+                        const next = e.target.value
+                        setOfficialSearchQuery(next)
+                        setOfficialError(null)
+                        try {
+                          if (officialSearchDebounceRef.current) clearTimeout(officialSearchDebounceRef.current)
+                        } catch {}
+                        officialSearchDebounceRef.current = null
+                        if (next.trim().length >= 2) {
+                          officialSearchDebounceRef.current = setTimeout(() => {
+                            handleOfficialSearch(officialSource, next)
+                          }, 350)
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          try {
+                            if (officialSearchDebounceRef.current) clearTimeout(officialSearchDebounceRef.current)
+                          } catch {}
+                          officialSearchDebounceRef.current = null
+                          handleOfficialSearch(officialSource, officialSearchQuery)
+                        }
+                      }}
                       placeholder={'e.g., Carman\'s toasted muesli or \"oatmeal\"'}
                       className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base"
                     />
