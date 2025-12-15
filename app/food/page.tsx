@@ -1644,6 +1644,16 @@ export default function FoodDiary() {
   const officialSearchAbortRef = useRef<AbortController | null>(null)
   const officialSearchSeqRef = useRef(0)
   const officialSearchDebounceRef = useRef<any>(null)
+  const [officialLastRequest, setOfficialLastRequest] = useState<{
+    query: string
+    mode: 'packaged' | 'single'
+    url: string
+    status: number | null
+    itemCount: number | null
+    source: string | null
+    errorText: string | null
+    at: number
+  } | null>(null)
   const [manualMealBuildMode, setManualMealBuildMode] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const [summarySlideIndex, setSummarySlideIndex] = useState(0)
@@ -2821,8 +2831,19 @@ export default function FoodDiary() {
         kind: mode,
         limit: '20',
       })
+      const url = `/api/food-data?${params.toString()}`
+      setOfficialLastRequest({
+        query,
+        mode,
+        url,
+        status: null,
+        itemCount: null,
+        source: null,
+        errorText: null,
+        at: Date.now(),
+      })
 
-      const res = await fetch(`/api/food-data?${params.toString()}`, {
+      const res = await fetch(url, {
         method: 'GET',
         signal: controller.signal,
       })
@@ -2831,6 +2852,17 @@ export default function FoodDiary() {
         const text = await res.text()
         console.error('Food data search failed:', text)
         setOfficialError('Unable to fetch official data right now. Please try again.')
+        if (officialSearchSeqRef.current === seq) {
+          setOfficialLastRequest((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  status: res.status,
+                  errorText: String(text || '').slice(0, 400),
+                }
+              : prev,
+          )
+        }
         return
       }
 
@@ -2840,10 +2872,30 @@ export default function FoodDiary() {
 
       setOfficialResults(Array.isArray(data.items) ? data.items : [])
       setOfficialResultsSource(data?.source || 'auto')
+      setOfficialLastRequest((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: res.status,
+              source: data?.source || 'auto',
+              itemCount: Array.isArray(data.items) ? data.items.length : 0,
+            }
+          : prev,
+      )
     } catch (err: any) {
       if (err?.name === 'AbortError') return
       console.error('Food data search error:', err)
       setOfficialError('Something went wrong while searching. Please try again.')
+      if (officialSearchSeqRef.current === seq) {
+        setOfficialLastRequest((prev) =>
+          prev
+            ? {
+                ...prev,
+                errorText: String(err?.message || err?.name || 'Unknown error'),
+              }
+            : prev,
+        )
+      }
     } finally {
       if (officialSearchSeqRef.current === seq) {
         setOfficialLoading(false)
@@ -8207,43 +8259,57 @@ Please add nutritional information manually if needed.`);
 	                  <label className="block text-sm font-medium text-gray-900">
 	                    Search foods (USDA + FatSecret + OpenFoodFacts)
 	                  </label>
-                  <div className="flex flex-col sm:flex-row gap-2">
-                    <input
-                      type="text"
-                      value={officialSearchQuery}
-                      onChange={(e) => {
-                        const next = e.target.value
-                        setOfficialSearchQuery(next)
-                        setOfficialError(null)
-                        try {
-                          if (officialSearchDebounceRef.current) clearTimeout(officialSearchDebounceRef.current)
-                        } catch {}
-                        officialSearchDebounceRef.current = null
-                        if (next.trim().length >= 2) {
-                          officialSearchDebounceRef.current = setTimeout(() => {
-                            handleOfficialSearch(officialSource, next)
-                          }, 350)
-                        }
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault()
+                  <div className="flex flex-col gap-2">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={officialSearchQuery}
+                        onChange={(e) => {
+                          const next = e.target.value
+                          setOfficialSearchQuery(next)
+                          setOfficialError(null)
                           try {
                             if (officialSearchDebounceRef.current) clearTimeout(officialSearchDebounceRef.current)
                           } catch {}
                           officialSearchDebounceRef.current = null
-                          handleOfficialSearch(officialSource, officialSearchQuery)
-                        }
-                      }}
-                      placeholder={'e.g., Carman\'s toasted muesli or \"oatmeal\"'}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base"
-                    />
+                          if (next.trim().length >= 2) {
+                            officialSearchDebounceRef.current = setTimeout(() => {
+                              handleOfficialSearch(officialSource, next)
+                            }, 350)
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            try {
+                              if (officialSearchDebounceRef.current) clearTimeout(officialSearchDebounceRef.current)
+                            } catch {}
+                            officialSearchDebounceRef.current = null
+                            handleOfficialSearch(officialSource, officialSearchQuery)
+                          }
+                        }}
+                        placeholder={'e.g., pizza'}
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base"
+                      />
+                      <button
+                        type="button"
+                        disabled={officialLoading || officialSearchQuery.trim().length === 0}
+                        onClick={() => handleOfficialSearch(officialSource)}
+                        className="px-4 py-2 rounded-lg bg-slate-900 text-white text-sm font-semibold disabled:opacity-60"
+                      >
+                        {officialLoading ? 'Searching…' : 'Search'}
+                      </button>
+                    </div>
+
                     <div className="flex gap-2">
                       <button
                         type="button"
                         disabled={officialLoading}
-                        onClick={() => handleOfficialSearch('packaged')}
-                        className={`px-3 py-2 text-xs font-medium rounded-lg border ${
+                        onClick={() => {
+                          setOfficialSource('packaged')
+                          if (officialSearchQuery.trim().length >= 2) handleOfficialSearch('packaged', officialSearchQuery)
+                        }}
+                        className={`flex-1 px-3 py-2 text-xs font-medium rounded-lg border ${
                           officialSource === 'packaged'
                             ? 'bg-emerald-600 text-white border-emerald-600'
                             : 'bg-white text-gray-700 border-gray-300'
@@ -8254,8 +8320,11 @@ Please add nutritional information manually if needed.`);
                       <button
                         type="button"
                         disabled={officialLoading}
-                        onClick={() => handleOfficialSearch('single')}
-                        className={`px-3 py-2 text-xs font-medium rounded-lg border ${
+                        onClick={() => {
+                          setOfficialSource('single')
+                          if (officialSearchQuery.trim().length >= 2) handleOfficialSearch('single', officialSearchQuery)
+                        }}
+                        className={`flex-1 px-3 py-2 text-xs font-medium rounded-lg border ${
                           officialSource === 'single'
                             ? 'bg-slate-800 text-white border-slate-800'
                             : 'bg-white text-gray-700 border-gray-300'
@@ -8320,7 +8389,24 @@ Please add nutritional information manually if needed.`);
                 )}
                 {!officialLoading && !officialError && officialResults.length === 0 && officialSearchQuery.trim() && (
                   <div className="mt-4 text-xs text-gray-500">
-                    Can't find your food? You can use AI photo analysis instead.
+                    {(() => {
+                      const last = officialLastRequest
+                      const hasLast =
+                        last &&
+                        last.query?.trim().toLowerCase() === officialSearchQuery.trim().toLowerCase() &&
+                        last.mode === officialSource
+                      const hint = hasLast
+                        ? `Last search: ${last.status ?? '—'} • ${last.itemCount ?? 0} results • ${last.source || '—'}`
+                        : null
+                      const err = hasLast && last?.errorText ? ` (${String(last.errorText).slice(0, 140)})` : ''
+                      return (
+                        <div className="space-y-1">
+                          <div>No results yet.</div>
+                          {hint && <div className="text-[11px] text-gray-400">{hint}{err}</div>}
+                          <div>Can't find your food? You can use AI photo analysis instead.</div>
+                        </div>
+                      )
+                    })()}
                   </div>
                 )}
                 <div className="mt-4 pt-3 border-t border-gray-100 space-y-2">
