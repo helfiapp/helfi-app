@@ -1792,6 +1792,11 @@ export default function FoodDiary() {
   const [showMultiCopyModal, setShowMultiCopyModal] = useState(false)
   const [multiCopyCategory, setMultiCopyCategory] = useState<typeof MEAL_CATEGORY_ORDER[number] | null>(null)
   const [multiCopySelectedKeys, setMultiCopySelectedKeys] = useState<Record<string, boolean>>({})
+  const [showCombineModal, setShowCombineModal] = useState(false)
+  const [combineCategory, setCombineCategory] = useState<typeof MEAL_CATEGORY_ORDER[number] | null>(null)
+  const [combineSelectedKeys, setCombineSelectedKeys] = useState<Record<string, boolean>>({})
+  const [combineMealName, setCombineMealName] = useState<string>('')
+  const [combineSaving, setCombineSaving] = useState(false)
   const deletedEntryKeysRef = useRef<Set<string>>(new Set())
   const [deletedEntryNonce, setDeletedEntryNonce] = useState(0) // bump to force dedupe refresh after deletes
   const [favorites, setFavorites] = useState<any[]>([])
@@ -3462,6 +3467,16 @@ const applyStructuredItems = (
   const multiCopySelectedCount = useMemo(() => {
     return Object.values(multiCopySelectedKeys || {}).filter(Boolean).length
   }, [multiCopySelectedKeys])
+
+  const combineEntries = useMemo(() => {
+    if (!combineCategory) return []
+    const list = entriesByCategory[combineCategory] || []
+    return Array.isArray(list) ? list.slice().sort((a: any, b: any) => (b?.id || 0) - (a?.id || 0)) : []
+  }, [entriesByCategory, combineCategory])
+
+  const combineSelectedCount = useMemo(() => {
+    return Object.values(combineSelectedKeys || {}).filter(Boolean).length
+  }, [combineSelectedKeys])
 
   // Calendar highlight: keep Today green; show orange background for other days that have entries.
   // This is best-effort and uses the durable local snapshot (no extra server requests).
@@ -7279,6 +7294,124 @@ Please add nutritional information manually if needed.`);
     setShowMultiCopyModal(false)
     setMultiCopyCategory(null)
     setMultiCopySelectedKeys({})
+  }
+
+  const openCombinePicker = (categoryKey: typeof MEAL_CATEGORY_ORDER[number]) => {
+    setCombineCategory(categoryKey)
+    setCombineSelectedKeys({})
+    setCombineMealName('')
+    setShowCombineModal(true)
+  }
+
+  const closeCombinePicker = () => {
+    setShowCombineModal(false)
+    setCombineCategory(null)
+    setCombineSelectedKeys({})
+    setCombineMealName('')
+    setCombineSaving(false)
+  }
+
+  const combineSelectedEntries = async () => {
+    if (!combineCategory) return
+    const selected = combineEntries.filter((entry: any) => {
+      const key = entrySelectionKey(entry)
+      return key && Boolean(combineSelectedKeys[key])
+    })
+    if (selected.length === 0) return
+
+    const name = (combineMealName || '').trim() || `Combined ${categoryLabel(combineCategory)}`
+
+    // Merge ingredient cards; if an entry has no cards, create a single fallback card from its totals.
+    const mergedItems: any[] = []
+    for (const entry of selected) {
+      if (Array.isArray(entry?.items) && entry.items.length > 0) {
+        try {
+          const cloned = JSON.parse(JSON.stringify(entry.items))
+          if (Array.isArray(cloned)) mergedItems.push(...cloned)
+        } catch {
+          mergedItems.push(...entry.items)
+        }
+        continue
+      }
+
+      const totals = getEntryTotals(entry)
+      const fallbackName =
+        extractBaseMealDescription(entry?.description || '') ||
+        sanitizeMealDescription((entry?.description || '').toString().split('\n')[0]) ||
+        'Food item'
+      mergedItems.push({
+        name: fallbackName,
+        brand: null,
+        serving_size: '1 serving',
+        servings: 1,
+        calories: typeof totals?.calories === 'number' ? totals.calories : null,
+        protein_g: typeof totals?.protein === 'number' ? totals.protein : null,
+        carbs_g: typeof totals?.carbs === 'number' ? totals.carbs : null,
+        fat_g: typeof totals?.fat === 'number' ? totals.fat : null,
+        fiber_g: typeof totals?.fiber === 'number' ? totals.fiber : null,
+        sugar_g: typeof totals?.sugar === 'number' ? totals.sugar : null,
+      })
+    }
+
+    let mergedTotals: any = null
+    try {
+      mergedTotals = sanitizeNutritionTotals(recalculateNutritionFromItems(mergedItems)) || null
+    } catch {
+      mergedTotals = null
+    }
+    if (!mergedTotals) {
+      // Fallback sum
+      mergedTotals = mergedItems.reduce(
+        (acc: any, it: any) => {
+          const servings = Number.isFinite(Number(it?.servings)) ? Number(it.servings) : 1
+          acc.calories += Number(it?.calories || 0) * servings
+          acc.protein += Number(it?.protein_g || 0) * servings
+          acc.carbs += Number(it?.carbs_g || 0) * servings
+          acc.fat += Number(it?.fat_g || 0) * servings
+          acc.fiber += Number(it?.fiber_g || 0) * servings
+          acc.sugar += Number(it?.sugar_g || 0) * servings
+          return acc
+        },
+        { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0 },
+      )
+      mergedTotals = sanitizeNutritionTotals(mergedTotals) || mergedTotals
+    }
+
+    setCombineSaving(true)
+    try {
+      // 1) Add the combined entry
+      await insertMealIntoDiary(
+        {
+          description: name,
+          nutrition: mergedTotals,
+          total: mergedTotals,
+          items: mergedItems,
+          method: 'combined',
+        },
+        combineCategory,
+      )
+
+      // 2) Delete the originals so they don't double count.
+      // If any delete fails, tombstones will still suppress resurrection.
+      for (const entry of selected) {
+        try {
+          if (isViewingToday) {
+            await deleteFood(entry)
+          } else if ((entry as any)?.dbId) {
+            await deleteHistoryFood(String((entry as any).dbId))
+          } else {
+            await deleteFood(entry)
+          }
+        } catch {}
+      }
+
+      showQuickToast('Combined into one meal')
+      closeCombinePicker()
+    } catch (err) {
+      console.warn('Combine ingredients failed', err)
+      showQuickToast('Could not combine these items. Please try again.')
+      setCombineSaving(false)
+    }
   }
 
   const pasteMultipleFromClipboard = async (
@@ -11460,6 +11593,34 @@ Please add nutritional information manually if needed.`);
 	                                      </svg>
 	                                    </button>
 
+                                      {(() => {
+                                        const entriesForCombine = entriesByCategory[cat.key] || []
+                                        return Array.isArray(entriesForCombine) && entriesForCombine.length > 1 ? (
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setShowPhotoOptions(false)
+                                              setPhotoOptionsAnchor(null)
+                                              openCombinePicker(cat.key)
+                                            }}
+                                            className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
+                                          >
+                                            <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center mr-3 text-emerald-700">
+                                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h8M8 12h8M8 17h8" />
+                                              </svg>
+                                            </div>
+                                            <div className="flex-1">
+                                              <div className="text-base font-semibold text-gray-900">Combine ingredients</div>
+                                              <div className="text-xs text-gray-500">Pick existing foods and combine into one meal</div>
+                                            </div>
+                                            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                            </svg>
+                                          </button>
+                                        ) : null
+                                      })()}
+
                                     <button
                                       type="button"
                                       onClick={() => {
@@ -11711,6 +11872,34 @@ Please add nutritional information manually if needed.`);
 	                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
 	                                        </svg>
 	                                      </button>
+
+                                        {(() => {
+                                          const entriesForCombine = entriesByCategory[cat.key] || []
+                                          return Array.isArray(entriesForCombine) && entriesForCombine.length > 1 ? (
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                setShowPhotoOptions(false)
+                                                setPhotoOptionsAnchor(null)
+                                                openCombinePicker(cat.key)
+                                              }}
+                                              className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
+                                            >
+                                              <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center mr-3 text-emerald-700">
+                                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h8M8 12h8M8 17h8" />
+                                                </svg>
+                                              </div>
+                                              <div className="flex-1">
+                                                <div className="text-base font-semibold text-gray-900">Combine ingredients</div>
+                                                <div className="text-xs text-gray-500">Pick existing foods and combine into one meal</div>
+                                              </div>
+                                              <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                              </svg>
+                                            </button>
+                                          ) : null
+                                        })()}
                                     </div>
                                   </div>
                                 </div>
@@ -12031,6 +12220,116 @@ Please add nutritional information manually if needed.`);
             >
               Copy{multiCopySelectedCount > 0 ? ` (${multiCopySelectedCount})` : ''}
             </button>
+          </div>
+        </div>
+      )}
+
+      {showCombineModal && (
+        <div className="fixed inset-0 z-50 bg-white flex flex-col overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+            <button
+              type="button"
+              onClick={closeCombinePicker}
+              className="p-2 rounded-full hover:bg-gray-100"
+              aria-label="Back"
+            >
+              <span aria-hidden>←</span>
+            </button>
+            <div className="flex-1 text-center">
+              <div className="text-lg font-semibold text-gray-900">Combine ingredients</div>
+              <div className="text-xs text-gray-500">
+                {combineCategory ? categoryLabel(combineCategory) : 'Meals'}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={closeCombinePicker}
+              className="p-2 rounded-full hover:bg-gray-100"
+              aria-label="Close"
+            >
+              <span aria-hidden>✕</span>
+            </button>
+          </div>
+
+          <div className="px-4 py-3 border-b border-gray-200 space-y-2">
+            <div className="text-sm text-gray-700">Pick the foods you want to combine.</div>
+            <div className="space-y-1">
+              <label className="block text-xs font-semibold text-gray-700">New meal name</label>
+              <input
+                value={combineMealName}
+                onChange={(e) => setCombineMealName(e.target.value)}
+                placeholder={combineCategory ? `Louie's ${categoryLabel(combineCategory).toLowerCase()}` : "Louie's meal"}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              />
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-4 pb-28">
+            {combineEntries.length === 0 ? (
+              <div className="text-sm text-gray-500 py-6 text-center">No items to combine.</div>
+            ) : (
+              <div className="divide-y divide-gray-100 border border-gray-200 rounded-xl overflow-hidden">
+                {combineEntries.map((entry: any, idx: number) => {
+                  const key = entrySelectionKey(entry)
+                  const checked = Boolean(combineSelectedKeys[key])
+                  const totals = getEntryTotals(entry)
+                  const calories =
+                    typeof totals?.calories === 'number' && Number.isFinite(totals.calories)
+                      ? Math.round(totals.calories)
+                      : null
+                  const label = sanitizeMealDescription(
+                    (entry?.description || '').toString().split('\n')[0].split('Calories:')[0],
+                  )
+                  return (
+                    <button
+                      key={key || String(entry?.id ?? '') || `combine-${idx}`}
+                      type="button"
+                      onClick={() => {
+                        if (!key) return
+                        setCombineSelectedKeys((prev) => ({
+                          ...(prev || {}),
+                          [key]: !Boolean(prev?.[key]),
+                        }))
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50 transition-colors"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => {}}
+                        className="h-5 w-5 accent-emerald-600"
+                        aria-label={`Select ${label}`}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-gray-900 truncate">{label || 'Food item'}</div>
+                        <div className="text-xs text-gray-500 truncate">{formatTimeWithAMPM(entry?.time || '')}</div>
+                      </div>
+                      {calories !== null && (
+                        <div className="text-sm font-semibold text-gray-900">{calories} kcal</div>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          <div className="fixed inset-x-0 bottom-0 z-10 border-t border-gray-200 bg-white p-4 pb-[calc(env(safe-area-inset-bottom)+16px)] space-y-2">
+            <button
+              type="button"
+              disabled={combineSelectedCount === 0 || combineSaving}
+              onClick={combineSelectedEntries}
+              className={`w-full py-3 rounded-xl font-semibold transition-colors ${
+                combineSelectedCount === 0 || combineSaving
+                  ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                  : 'bg-helfi-green text-white hover:bg-green-600'
+              }`}
+            >
+              {combineSaving ? 'Saving…' : `Combine${combineSelectedCount > 0 ? ` (${combineSelectedCount})` : ''}`}
+            </button>
+            <div className="text-xs text-gray-500 text-center">
+              This will save one combined meal and remove the selected items.
+            </div>
           </div>
         </div>
       )}
