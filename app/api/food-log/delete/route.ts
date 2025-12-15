@@ -46,10 +46,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing id' }, { status: 400 })
     }
 
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/aaafab43-c6ce-48b6-a8ee-51e168d7e762',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'E',location:'app/api/food-log/delete/route.ts:POST',message:'Delete-by-id requested',data:{idLen:id.length,idPrefix:id.slice(0,8)},timestamp:Date.now()})}).catch(()=>{});
     console.log('AGENT_DEBUG', JSON.stringify({hypothesisId:'E',location:'app/api/food-log/delete/route.ts:POST',message:'Delete-by-id requested',data:{idLen:id.length,idPrefix:id.slice(0,8)},timestamp:Date.now()}));
-    // #endregion agent log
 
     // Ensure the log belongs to the user
     const existing = await prisma.foodLog.findUnique({ where: { id: id as any } })
@@ -174,4 +171,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to delete log' }, { status: 500 })
   }
 }
-

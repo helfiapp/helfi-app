@@ -1449,34 +1449,32 @@ export default function FoodDiary() {
       })),
       fallbackDate,
     )
-  const syncSnapshotToServer = async (entries: any[], fallbackDate: string) => {
-    const snapshotFoods = limitSnapshotFoods(entries, fallbackDate)
-    if (!snapshotFoods || snapshotFoods.length === 0) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/aaafab43-c6ce-48b6-a8ee-51e168d7e762',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'C',location:'app/food/page.tsx:syncSnapshotToServer:clear',message:'Clearing server todaysFoods snapshot (empty entries)',data:{fallbackDate,entriesLen:Array.isArray(entries)?entries.length:0},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion agent log
-      try {
-        await fetch('/api/user-data/clear-todays-foods', { method: 'POST' })
-      } catch (err) {
-        console.warn('Failed to clear todaysFoods snapshot', err)
+	  const syncSnapshotToServer = async (entries: any[], fallbackDate: string) => {
+	    const snapshotFoods = limitSnapshotFoods(entries, fallbackDate)
+	    if (!snapshotFoods || snapshotFoods.length === 0) {
+	      try {
+	        await fetch('/api/user-data/clear-todays-foods', { method: 'POST' })
+	      } catch (err) {
+	        console.warn('Failed to clear todaysFoods snapshot', err)
       }
       return
-    }
-    try {
-      const payloadStr = JSON.stringify({
-        todaysFoods: snapshotFoods,
-        appendHistory: false,
-      })
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/aaafab43-c6ce-48b6-a8ee-51e168d7e762',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'C',location:'app/food/page.tsx:syncSnapshotToServer:post',message:'Posting server todaysFoods snapshot',data:{fallbackDate,snapshotFoodsLen:Array.isArray(snapshotFoods)?snapshotFoods.length:0,payloadChars:payloadStr.length},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion agent log
-      const res = await fetch('/api/user-data', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: payloadStr,
-      })
+	    }
+	    try {
+	      const payloadStr = JSON.stringify({
+	        todaysFoods: snapshotFoods,
+	        appendHistory: false,
+	      })
+	      // `keepalive` improves reliability on mobile/PWA when the user backgrounds the app,
+	      // but browsers cap keepalive payload size (roughly ~64KB). Only enable it for small bodies.
+	      const keepalive = payloadStr.length < 60_000
+	      const res = await fetch('/api/user-data', {
+	        method: 'POST',
+	        headers: {
+	          'Content-Type': 'application/json',
+	        },
+	        body: payloadStr,
+	        keepalive,
+	      })
       if (res.status === 413) {
         console.warn('Snapshot write hit 413, retrying with minimal payload')
         try {
@@ -1538,6 +1536,7 @@ export default function FoodDiary() {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analysisPhase, setAnalysisPhase] = useState<'idle' | 'preparing' | 'analyzing' | 'building'>('idle')
   const [isSavingEntry, setIsSavingEntry] = useState(false)
+  const [isDiaryMutating, setIsDiaryMutating] = useState(false)
   const [analysisMode, setAnalysisMode] = useState<'auto' | 'packaged' | 'meal'>('auto')
   const [showAnalysisModeModal, setShowAnalysisModeModal] = useState(false)
   const [pendingPhotoPicker, setPendingPhotoPicker] = useState(false)
@@ -3889,14 +3888,11 @@ const applyStructuredItems = (
                 await syncSnapshotToServer(merged, selectedDate)
               } else if (mappedFromDb.length === 0 && deduped.length > 0 && !backfillAttemptedRef.current[selectedDate]) {
                 // Safety net: if we have local entries but the server has none, backfill them into the history table.
-                backfillAttemptedRef.current[selectedDate] = true
-                try {
-                  // #region agent log
-                  fetch('http://127.0.0.1:7242/ingest/aaafab43-c6ce-48b6-a8ee-51e168d7e762',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'B',location:'app/food/page.tsx:backfill:trigger',message:'Backfill triggered (DB returned 0, local entries exist)',data:{selectedDate,isViewingToday,dedupedLen:deduped.length,sample:deduped.slice(0,3).map((e:any)=>({id:e?.id,dbId:e?.dbId,localDate:e?.localDate,meal:normalizeCategory(e?.meal||e?.category||e?.mealType)}))},timestamp:Date.now()})}).catch(()=>{});
-                  // #endregion agent log
-                  await Promise.all(
-                    deduped.map(async (entry: any) => {
-                      const payload = {
+	                backfillAttemptedRef.current[selectedDate] = true
+	                try {
+	                  await Promise.all(
+	                    deduped.map(async (entry: any) => {
+	                      const payload = {
                         description: (entry?.description || '').toString(),
                         nutrition: entry?.nutrition || null,
                         imageUrl: entry?.photo || null,
@@ -4302,9 +4298,20 @@ const applyStructuredItems = (
   // - Also refresh when the tab/app becomes active again
   const syncInFlightRef = useRef(false)
   const syncPausedRef = useRef(false)
+  const diaryMutationCountRef = useRef(0)
+  const beginDiaryMutation = () => {
+    diaryMutationCountRef.current += 1
+    setIsDiaryMutating(true)
+  }
+  const endDiaryMutation = () => {
+    diaryMutationCountRef.current = Math.max(0, diaryMutationCountRef.current - 1)
+    if (diaryMutationCountRef.current === 0) {
+      setIsDiaryMutating(false)
+    }
+  }
   useEffect(() => {
-    syncPausedRef.current = Boolean(isSavingEntry || isAnalyzing)
-  }, [isSavingEntry, isAnalyzing])
+    syncPausedRef.current = Boolean(isSavingEntry || isAnalyzing || isDiaryMutating)
+  }, [isSavingEntry, isAnalyzing, isDiaryMutating])
   useEffect(() => {
     if (typeof window === 'undefined') return
     if (!diaryHydrated) return
@@ -7047,12 +7054,13 @@ Please add nutritional information manually if needed.`);
 
 
 
-  const deleteFood = async (entry: any) => {
-    if (!entry) return
-    const dbId = (entry as any)?.dbId
-    const entryCategory = normalizeCategory(entry?.meal || entry?.category || entry?.mealType)
-    const entryId = entry.id
-    const entryKey = entryId !== null && entryId !== undefined ? entryId.toString() : ''
+	  const deleteFood = async (entry: any) => {
+	    if (!entry) return
+	    beginDiaryMutation()
+	    const dbId = (entry as any)?.dbId
+	    const entryCategory = normalizeCategory(entry?.meal || entry?.category || entry?.mealType)
+	    const entryId = entry.id
+	    const entryKey = entryId !== null && entryId !== undefined ? entryId.toString() : ''
     const deletionKeys = new Set<string>()
     const builtKey = buildDeleteKey(entry)
     if (builtKey) deletionKeys.add(builtKey)
@@ -7072,15 +7080,11 @@ Please add nutritional information manually if needed.`);
           .filter(Boolean)
           .map(String),
       ),
-    )
-
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/aaafab43-c6ce-48b6-a8ee-51e168d7e762',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'E',location:'app/food/page.tsx:deleteFood:start',message:'deleteFood called',data:{selectedDate,todayIso,hasDbId:!!dbId,entryId:entryId??null,entryLocalDate:typeof entry?.localDate==='string'?entry.localDate:'',derivedDate:deriveDateFromEntryTimestamp(entry),entryCategory,deletionKeysCount:deletionKeys.size,autoDates},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion agent log
-
-    const targetDescKey = normalizedDescription(entry?.description || entry?.name || '')
-    const targetDateKey = dateKeyForEntry(entry) || selectedDate
-    const updatedFoods = todaysFoods.filter((food: any) => {
+	    )
+	
+	    const targetDescKey = normalizedDescription(entry?.description || entry?.name || '')
+	    const targetDateKey = dateKeyForEntry(entry) || selectedDate
+	    const updatedFoods = todaysFoods.filter((food: any) => {
       const sameId =
         entryId !== null &&
         entryId !== undefined &&
@@ -7128,18 +7132,19 @@ Please add nutritional information manually if needed.`);
     }
     setShowEntryOptions(null)
 
-    const tryDeleteById = async (id: string | number | null | undefined) => {
-      if (!id) return false
-      try {
-        const body = JSON.stringify({ id })
-        const res = await fetch('/api/food-log/delete', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body,
-        })
-        if (!res.ok) {
-          console.error('Delete API failed', { status: res.status, statusText: res.statusText })
-          // Legacy fallback (DELETE verb) to catch older server paths
+	    const tryDeleteById = async (id: string | number | null | undefined) => {
+	      if (!id) return false
+	      try {
+	        const body = JSON.stringify({ id })
+	        const res = await fetch('/api/food-log/delete', {
+	          method: 'POST',
+	          headers: { 'Content-Type': 'application/json' },
+	          body,
+	          keepalive: true,
+	        })
+	        if (!res.ok) {
+	          console.error('Delete API failed', { status: res.status, statusText: res.statusText })
+	          // Legacy fallback (DELETE verb) to catch older server paths
           try {
             const legacy = await fetch('/api/food-log', {
               method: 'DELETE',
@@ -7292,61 +7297,80 @@ Please add nutritional information manually if needed.`);
       }
     }
 
-    ;(async () => {
-      await ensureRemoteDelete()
-      try {
-        await saveFoodEntries(updatedFoods, { appendHistory: false, suppressToast: true })
-        await refreshEntriesFromServer()
-        // Keep server snapshot in sync so stale cards don't reappear
-        try {
-          await syncSnapshotToServer(updatedFoods, selectedDate)
-        } catch (syncErr) {
-          console.warn('Failed to sync todaysFoods snapshot after delete', syncErr)
-        }
-      } catch (err) {
-        console.warn('Delete sync failed', err)
-      }
-    })()
-  };
+	    try {
+	      await ensureRemoteDelete()
+	      try {
+	        await saveFoodEntries(updatedFoods, { appendHistory: false, suppressToast: true })
+	        await refreshEntriesFromServer()
+	        // Keep server snapshot in sync so stale cards don't reappear
+	        try {
+	          await syncSnapshotToServer(updatedFoods, selectedDate)
+	        } catch (syncErr) {
+	          console.warn('Failed to sync todaysFoods snapshot after delete', syncErr)
+	        }
+	      } catch (err) {
+	        console.warn('Delete sync failed', err)
+	      }
+	    } finally {
+	      endDiaryMutation()
+	    }
+	  };
 
-  const deleteHistoryFood = async (dbId: string) => {
-    try {
-      // Optimistic UI update
-      setHistoryFoods((prev) => {
-        const base = (prev || [])
-        const entry = base.find((f: any) => f.dbId === dbId)
-        const entryCategory = normalizeCategory(entry?.meal || entry?.category || entry?.mealType)
-        const next = base.filter((f: any) => f.dbId !== dbId)
-        const stillHasCategory = next.some((f: any) => normalizeCategory(f.meal || f.category || f.mealType) === entryCategory)
-        if (!stillHasCategory) {
-          setExpandedCategories((prevExp) => ({ ...prevExp, [entryCategory]: false }))
-        }
-        return next
-      });
-      const entry = (historyFoods || []).find((f: any) => f.dbId === dbId)
-      persistDeletedKeys([`db:${dbId}`, ...stableDeleteKeysForEntry(entry)].filter(Boolean))
-      setDeletedEntryNonce((n) => n + 1)
-      // Call API to delete from DB
-      triggerHaptic(10)
-      ;(async () => {
-        try {
-          await fetch('/api/food-log/delete', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: dbId }),
-          }).then(async (r) => {
-            if (!r.ok) {
-              throw new Error('delete_failed')
-            }
-          });
-        } catch (error) {
-          console.error('Failed to delete history entry from database:', error);
-        }
-      })()
-    } catch {
-      // On error, reload history for the selected date
-      try {
-        const tz = new Date().getTimezoneOffset();
+		  const deleteHistoryFood = async (dbId: string) => {
+		    beginDiaryMutation()
+		    try {
+		      let deletedEntry: any = null
+		      let nextList: any[] = []
+		      // Optimistic UI update
+	      setHistoryFoods((prev) => {
+	        const base = (prev || [])
+	        deletedEntry = base.find((f: any) => f.dbId === dbId)
+	        const entry = deletedEntry
+	        const entryCategory = normalizeCategory(entry?.meal || entry?.category || entry?.mealType)
+	        const next = base.filter((f: any) => f.dbId !== dbId)
+	        nextList = next
+	        const stillHasCategory = next.some((f: any) => normalizeCategory(f.meal || f.category || f.mealType) === entryCategory)
+	        if (!stillHasCategory) {
+	          setExpandedCategories((prevExp) => ({ ...prevExp, [entryCategory]: false }))
+	        }
+	        return next
+	      });
+	      persistDeletedKeys([`db:${dbId}`, ...stableDeleteKeysForEntry(deletedEntry)].filter(Boolean))
+	      setDeletedEntryNonce((n) => n + 1)
+	      try {
+	        localStorage?.removeItem('foodDiary:warmState')
+	        sessionStorage?.removeItem('foodDiary:warmState')
+	      } catch {}
+	      // Call API to delete from DB
+	      triggerHaptic(10)
+	      try {
+	        const res = await fetch('/api/food-log/delete', {
+	          method: 'POST',
+	          headers: { 'Content-Type': 'application/json' },
+	          body: JSON.stringify({ id: dbId }),
+	          keepalive: true,
+	        })
+	        if (!res.ok) {
+	          console.error('Failed to delete history entry from database:', { status: res.status, statusText: res.statusText })
+	        }
+	      } catch (error) {
+	        console.error('Failed to delete history entry from database:', error);
+	      }
+	      try {
+	        await saveFoodEntries(nextList, { appendHistory: false, suppressToast: true, snapshotDateOverride: selectedDate })
+	      } catch (err) {
+	        console.warn('Failed to update local snapshot after history delete', err)
+	      }
+	      try {
+	        await syncSnapshotToServer(nextList, selectedDate)
+	      } catch (syncErr) {
+	        console.warn('Failed to sync server snapshot after history delete', syncErr)
+	      }
+	      await refreshEntriesFromServer()
+	    } catch {
+	      // On error, reload history for the selected date
+	      try {
+	        const tz = new Date().getTimezoneOffset();
         const res = await fetch(`/api/food-log?date=${selectedDate}&tz=${tz}`);
         if (res.ok) {
           const json = await res.json();
@@ -7356,10 +7380,11 @@ Please add nutritional information manually if needed.`);
           setHistoryFoods(deduped);
         }
       } catch {}
-    } finally {
-      setShowEntryOptions(null);
-    }
-  };
+		    } finally {
+		      endDiaryMutation()
+		      setShowEntryOptions(null);
+		    }
+		  };
 
   const entrySelectionKey = (entry: any) => {
     if (!entry) return ''

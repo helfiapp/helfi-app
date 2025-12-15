@@ -28,7 +28,6 @@ function getOpenAIClient() {
     return null
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
   const OpenAI = require('openai').default
   _openai = new OpenAI({ apiKey })
   return _openai

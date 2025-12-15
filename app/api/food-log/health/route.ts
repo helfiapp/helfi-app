@@ -4,6 +4,8 @@ import { getToken } from 'next-auth/jwt'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
+export const dynamic = 'force-dynamic'
+
 // Health check endpoint to quickly verify food diary consistency for the
 // authenticated user. Returns counts of FoodLog rows for a date, todaysFoods
 // snapshot length, favorites length, and a short list of recent FoodLog entries.

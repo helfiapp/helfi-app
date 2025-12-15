@@ -14,7 +14,6 @@ function getOpenAI() {
   if (_openai) return _openai
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) return null
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
   const OpenAI = require('openai').default
   _openai = new OpenAI({ apiKey })
   return _openai

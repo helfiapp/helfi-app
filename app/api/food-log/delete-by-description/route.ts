@@ -79,7 +79,6 @@ export async function POST(request: NextRequest) {
 
     // #region agent log
     try {
-      fetch('http://127.0.0.1:7242/ingest/aaafab43-c6ce-48b6-a8ee-51e168d7e762',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'D',location:'app/api/food-log/delete-by-description/route.ts:POST',message:'Delete-by-description match summary',data:{rawDescLen:rawDesc.length,category,datesCount:targetDates.length,matchesCount:matches.length,sample:matches.slice(0,3).map(m=>({idPrefix:String(m.id).slice(0,8),meal:m.meal||null,localDate:m.localDate||null}))},timestamp:Date.now()})}).catch(()=>{});
       console.log('AGENT_DEBUG', JSON.stringify({hypothesisId:'D',location:'app/api/food-log/delete-by-description/route.ts:POST',message:'Delete-by-description match summary',data:{rawDescLen:rawDesc.length,category,datesCount:targetDates.length,matchesCount:matches.length,sample:matches.slice(0,3).map(m=>({idPrefix:String(m.id).slice(0,8),meal:m.meal||null,localDate:m.localDate||null}))},timestamp:Date.now()}));
     } catch {}
     // #endregion agent log
