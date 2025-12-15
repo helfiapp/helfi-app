@@ -9878,10 +9878,13 @@ Please add nutritional information manually if needed.`);
                                     </button>
                                     <input
                                       type="number"
+                                      inputMode="decimal"
                                       min={0}
                                       step={servingsStep > 0 ? Math.max(servingsStep, 0.01) : 0.25}
                                       value={formatNumberInputValue(item.servings ?? 1)}
                                       onChange={(e) => updateItemField(index, 'servings', e.target.value)}
+                                      onFocus={(e) => e.currentTarget.select()}
+                                      onClick={(e) => e.currentTarget.select()}
                                       className="w-20 px-2 py-1 border border-gray-300 rounded-lg text-base font-semibold text-gray-900 text-center focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                                     />
                                     <button
@@ -9966,12 +9969,8 @@ Please add nutritional information manually if needed.`);
                                           : ''
                                       }
                                       onChange={(e) => updateItemField(index, 'weightAmount', e.target.value)}
-                                      onFocus={(e) => {
-                                        // On mobile, select all text when focusing to allow easy replacement
-                                        if (window.innerWidth < 768) {
-                                          e.target.select()
-                                        }
-                                      }}
+                                      onFocus={(e) => e.currentTarget.select()}
+                                      onClick={(e) => e.currentTarget.select()}
                                       placeholder={
                                         baseWeightPerServing
                                           ? String(
@@ -10288,6 +10287,7 @@ Please add nutritional information manually if needed.`);
                         </label>
                         <input
                           type="number"
+                          inputMode="decimal"
                           min={0}
                           step={(() => {
                             const meta = parseServingUnitMetadata(analyzedItems[editingItemIndex]?.serving_size || '')
@@ -10295,6 +10295,8 @@ Please add nutritional information manually if needed.`);
                           })()}
                           value={analyzedItems[editingItemIndex]?.servings ?? 1}
                           onChange={(e) => updateItemField(editingItemIndex, 'servings', e.target.value)}
+                          onFocus={(e) => e.currentTarget.select()}
+                          onClick={(e) => e.currentTarget.select()}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                           placeholder="e.g., 1"
                         />
@@ -10312,10 +10314,13 @@ Please add nutritional information manually if needed.`);
                             <label className="block text-xs text-gray-600 mb-1">Calories</label>
                             <input
                               type="number"
+                              inputMode="decimal"
                               min={0}
                               step={1}
                               value={analyzedItems[editingItemIndex]?.calories ?? ''}
                               onChange={(e) => updateItemField(editingItemIndex, 'calories', e.target.value)}
+                              onFocus={(e) => e.currentTarget.select()}
+                              onClick={(e) => e.currentTarget.select()}
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                               placeholder="kcal"
                             />
@@ -10324,10 +10329,13 @@ Please add nutritional information manually if needed.`);
                             <label className="block text-xs text-gray-600 mb-1">Protein (g)</label>
                             <input
                               type="number"
+                              inputMode="decimal"
                               min={0}
                               step={0.1}
                               value={analyzedItems[editingItemIndex]?.protein_g ?? ''}
                               onChange={(e) => updateItemField(editingItemIndex, 'protein_g', e.target.value)}
+                              onFocus={(e) => e.currentTarget.select()}
+                              onClick={(e) => e.currentTarget.select()}
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                               placeholder="g"
                             />
@@ -10336,10 +10344,13 @@ Please add nutritional information manually if needed.`);
                             <label className="block text-xs text-gray-600 mb-1">Carbs (g)</label>
                             <input
                               type="number"
+                              inputMode="decimal"
                               min={0}
                               step={0.1}
                               value={analyzedItems[editingItemIndex]?.carbs_g ?? ''}
                               onChange={(e) => updateItemField(editingItemIndex, 'carbs_g', e.target.value)}
+                              onFocus={(e) => e.currentTarget.select()}
+                              onClick={(e) => e.currentTarget.select()}
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                               placeholder="g"
                             />
@@ -10348,10 +10359,13 @@ Please add nutritional information manually if needed.`);
                             <label className="block text-xs text-gray-600 mb-1">Fat (g)</label>
                             <input
                               type="number"
+                              inputMode="decimal"
                               min={0}
                               step={0.1}
                               value={analyzedItems[editingItemIndex]?.fat_g ?? ''}
                               onChange={(e) => updateItemField(editingItemIndex, 'fat_g', e.target.value)}
+                              onFocus={(e) => e.currentTarget.select()}
+                              onClick={(e) => e.currentTarget.select()}
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                               placeholder="g"
                             />
@@ -10360,10 +10374,13 @@ Please add nutritional information manually if needed.`);
                             <label className="block text-xs text-gray-600 mb-1">Fiber (g)</label>
                             <input
                               type="number"
+                              inputMode="decimal"
                               min={0}
                               step={0.1}
                               value={analyzedItems[editingItemIndex]?.fiber_g ?? ''}
                               onChange={(e) => updateItemField(editingItemIndex, 'fiber_g', e.target.value)}
+                              onFocus={(e) => e.currentTarget.select()}
+                              onClick={(e) => e.currentTarget.select()}
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                               placeholder="g"
                             />
@@ -10372,10 +10389,13 @@ Please add nutritional information manually if needed.`);
                             <label className="block text-xs text-gray-600 mb-1">Sugar (g)</label>
                             <input
                               type="number"
+                              inputMode="decimal"
                               min={0}
                               step={0.1}
                               value={analyzedItems[editingItemIndex]?.sugar_g ?? ''}
                               onChange={(e) => updateItemField(editingItemIndex, 'sugar_g', e.target.value)}
+                              onFocus={(e) => e.currentTarget.select()}
+                              onClick={(e) => e.currentTarget.select()}
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                               placeholder="g"
                             />

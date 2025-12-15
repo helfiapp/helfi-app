@@ -1170,6 +1170,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
         placeholder={`Weight (${unit === 'metric' ? 'kg' : 'lbs'})`}
         value={weight}
         onChange={e => setWeight(e.target.value)}
+        onFocus={() => setWeight('')}
       />
       <h2 className="text-2xl font-bold mb-2">What is your date of birth?</h2>
       <p className="mb-4 text-gray-600">
@@ -1277,6 +1278,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
             placeholder="Height (cm)"
             value={height}
             onChange={e => setHeight(e.target.value)}
+            onFocus={() => setHeight('')}
           />
         ) : (
           <div className="flex gap-3">
@@ -1288,6 +1290,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
                 placeholder="Feet"
                 value={feet}
                 onChange={e => setFeet(e.target.value)}
+                onFocus={() => setFeet('')}
               />
             </div>
             <div className="flex-1">
@@ -1298,6 +1301,7 @@ const PhysicalStep = memo(function PhysicalStep({ onNext, onBack, initial, onPar
                 placeholder="Inches"
                 value={inches}
                 onChange={e => setInches(e.target.value)}
+                onFocus={() => setInches('')}
               />
             </div>
           </div>
@@ -1749,10 +1753,12 @@ function ExerciseStep({ onNext, onBack, initial, onPartialSave, onUnsavedChange,
               <input
                 type="number"
                 min="0"
+                inputMode="numeric"
                 className="ml-auto w-24 rounded border border-gray-200 px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
                 placeholder="mins"
                 value={exerciseDurations['Walking'] || ''}
                 onChange={(e) => handleDurationChange('Walking', e.target.value)}
+                onFocus={() => handleDurationChange('Walking', '')}
               />
             )}
           </div>
@@ -1770,10 +1776,12 @@ function ExerciseStep({ onNext, onBack, initial, onPartialSave, onUnsavedChange,
               <input
                 type="number"
                 min="0"
+                inputMode="numeric"
                 className="ml-auto w-24 rounded border border-gray-200 px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
                 placeholder="mins"
                 value={exerciseDurations['Running'] || ''}
                 onChange={(e) => handleDurationChange('Running', e.target.value)}
+                onFocus={() => handleDurationChange('Running', '')}
               />
             )}
           </div>
@@ -1791,10 +1799,12 @@ function ExerciseStep({ onNext, onBack, initial, onPartialSave, onUnsavedChange,
               <input
                 type="number"
                 min="0"
+                inputMode="numeric"
                 className="ml-auto w-24 rounded border border-gray-200 px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
                 placeholder="mins"
                 value={exerciseDurations['Swimming'] || ''}
                 onChange={(e) => handleDurationChange('Swimming', e.target.value)}
+                onFocus={() => handleDurationChange('Swimming', '')}
               />
             )}
           </div>
@@ -1812,10 +1822,12 @@ function ExerciseStep({ onNext, onBack, initial, onPartialSave, onUnsavedChange,
               <input
                 type="number"
                 min="0"
+                inputMode="numeric"
                 className="ml-auto w-24 rounded border border-gray-200 px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
                 placeholder="mins"
                 value={exerciseDurations['Bike riding'] || ''}
                 onChange={(e) => handleDurationChange('Bike riding', e.target.value)}
+                onFocus={() => handleDurationChange('Bike riding', '')}
               />
             )}
           </div>
@@ -1833,10 +1845,12 @@ function ExerciseStep({ onNext, onBack, initial, onPartialSave, onUnsavedChange,
               <input
                 type="number"
                 min="0"
+                inputMode="numeric"
                 className="ml-auto w-24 rounded border border-gray-200 px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
                 placeholder="mins"
                 value={exerciseDurations['MMA'] || ''}
                 onChange={(e) => handleDurationChange('MMA', e.target.value)}
+                onFocus={() => handleDurationChange('MMA', '')}
               />
             )}
           </div>
@@ -1854,10 +1868,12 @@ function ExerciseStep({ onNext, onBack, initial, onPartialSave, onUnsavedChange,
               <input
                 type="number"
                 min="0"
+                inputMode="numeric"
                 className="ml-auto w-24 rounded border border-gray-200 px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
                 placeholder="mins"
                 value={exerciseDurations['Boxing'] || ''}
                 onChange={(e) => handleDurationChange('Boxing', e.target.value)}
+                onFocus={() => handleDurationChange('Boxing', '')}
               />
             )}
           </div>
@@ -1875,10 +1891,12 @@ function ExerciseStep({ onNext, onBack, initial, onPartialSave, onUnsavedChange,
               <input
                 type="number"
                 min="0"
+                inputMode="numeric"
                 className="ml-auto w-24 rounded border border-gray-200 px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
                 placeholder="mins"
                 value={exerciseDurations['Jujitsu'] || ''}
                 onChange={(e) => handleDurationChange('Jujitsu', e.target.value)}
+                onFocus={() => handleDurationChange('Jujitsu', '')}
               />
             )}
           </div>
@@ -1896,10 +1914,12 @@ function ExerciseStep({ onNext, onBack, initial, onPartialSave, onUnsavedChange,
               <input
                 type="number"
                 min="0"
+                inputMode="numeric"
                 className="ml-auto w-24 rounded border border-gray-200 px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
                 placeholder="mins"
                 value={exerciseDurations['Karate'] || ''}
                 onChange={(e) => handleDurationChange('Karate', e.target.value)}
+                onFocus={() => handleDurationChange('Karate', '')}
               />
             )}
           </div>
@@ -1917,10 +1937,12 @@ function ExerciseStep({ onNext, onBack, initial, onPartialSave, onUnsavedChange,
               <input
                 type="number"
                 min="0"
+                inputMode="numeric"
                 className="ml-auto w-24 rounded border border-gray-200 px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
                 placeholder="mins"
                 value={exerciseDurations['Body Building'] || ''}
                 onChange={(e) => handleDurationChange('Body Building', e.target.value)}
+                onFocus={() => handleDurationChange('Body Building', '')}
               />
             )}
           </div>
@@ -1938,10 +1960,12 @@ function ExerciseStep({ onNext, onBack, initial, onPartialSave, onUnsavedChange,
               <input
                 type="number"
                 min="0"
+                inputMode="numeric"
                 className="ml-auto w-24 rounded border border-gray-200 px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
                 placeholder="mins"
                 value={exerciseDurations['Yoga'] || ''}
                 onChange={(e) => handleDurationChange('Yoga', e.target.value)}
+                onFocus={() => handleDurationChange('Yoga', '')}
               />
             )}
           </div>
@@ -1959,10 +1983,12 @@ function ExerciseStep({ onNext, onBack, initial, onPartialSave, onUnsavedChange,
               <input
                 type="number"
                 min="0"
+                inputMode="numeric"
                 className="ml-auto w-24 rounded border border-gray-200 px-2 py-1 text-sm focus:border-green-500 focus:ring-1 focus:ring-green-500"
                 placeholder="mins"
                 value={exerciseDurations['Pilates'] || ''}
                 onChange={(e) => handleDurationChange('Pilates', e.target.value)}
+                onFocus={() => handleDurationChange('Pilates', '')}
               />
             )}
           </div>

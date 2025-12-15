@@ -70,18 +70,22 @@ function PhysicalStep({ onNext, onBack, initial }: { onNext: (data: any) => void
       <input
         className="input-primary mb-4"
         type="number"
+        inputMode="numeric"
         placeholder={`Weight (${unit === 'metric' ? 'kg' : 'lbs'})`}
         value={weight}
         onChange={e => setWeight(e.target.value)}
+        onFocus={() => setWeight('')}
       />
       <h2 className="text-2xl font-bold mb-4">How tall are you?</h2>
       <p className="mb-4 text-gray-600">Height helps us calculate key health metrics.</p>
       <input
         className="input-primary mb-4"
         type="number"
+        inputMode="numeric"
         placeholder={`Height (${unit === 'metric' ? 'cm' : 'inches'})`}
         value={height}
         onChange={e => setHeight(e.target.value)}
+        onFocus={() => setHeight('')}
       />
       <h2 className="text-2xl font-bold mb-4">Choose your body type (optional)</h2>
       <p className="mb-4 text-gray-600">Helps tailor insights to your body composition.</p>

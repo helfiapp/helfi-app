@@ -88,9 +88,11 @@ export default function PhysicalMetrics({
         <div className="relative">
           <input
             type="number"
+            inputMode="numeric"
             id="weight"
             value={weight}
             onChange={(e) => setWeight(e.target.value)}
+            onFocus={() => setWeight('')}
             className="input-primary pr-12"
             placeholder={`Enter your weight in ${unit === 'metric' ? 'kg' : 'lbs'}`}
             required
@@ -114,9 +116,11 @@ export default function PhysicalMetrics({
         <div className="relative">
           <input
             type="number"
+            inputMode="numeric"
             id="height"
             value={height}
             onChange={(e) => setHeight(e.target.value)}
+            onFocus={() => setHeight('')}
             className="input-primary pr-12"
             placeholder={`Enter your height in ${unit === 'metric' ? 'cm' : 'inches'}`}
             required
