@@ -177,7 +177,10 @@ export default function MealBuilderClient() {
   const [results, setResults] = useState<NormalizedFoodItem[]>([])
 
   const [items, setItems] = useState<BuilderItem[]>([])
+  const itemsRef = useRef<BuilderItem[]>([])
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [lastRemoved, setLastRemoved] = useState<{ item: BuilderItem; index: number } | null>(null)
+  const undoRemoveTimeoutRef = useRef<any>(null)
 
   const abortRef = useRef<AbortController | null>(null)
   const seqRef = useRef(0)
@@ -195,6 +198,10 @@ export default function MealBuilderClient() {
   const [favoritesToast, setFavoritesToast] = useState<string | null>(null)
 
   const busy = searchLoading || savingMeal || photoLoading || barcodeLoading
+
+  useEffect(() => {
+    itemsRef.current = items
+  }, [items])
 
   useEffect(() => {
     // Keep /food on the same date when the user returns.
@@ -748,8 +755,33 @@ export default function MealBuilderClient() {
   }, [showBarcodeScanner])
 
   const removeItem = (id: string) => {
+    const current = itemsRef.current
+    const idx = current.findIndex((x) => x.id === id)
+    if (idx >= 0) {
+      const removed = current[idx]
+      setLastRemoved({ item: removed, index: idx })
+      try {
+        if (undoRemoveTimeoutRef.current) clearTimeout(undoRemoveTimeoutRef.current)
+      } catch {}
+      undoRemoveTimeoutRef.current = setTimeout(() => setLastRemoved(null), 5000)
+    }
     setItems((prev) => prev.filter((x) => x.id !== id))
     setExpandedId((prev) => (prev === id ? null : prev))
+  }
+
+  const undoRemove = () => {
+    const payload = lastRemoved
+    if (!payload) return
+    try {
+      if (undoRemoveTimeoutRef.current) clearTimeout(undoRemoveTimeoutRef.current)
+    } catch {}
+    setItems((prev) => {
+      const next = [...prev]
+      const insertAt = Math.max(0, Math.min(payload.index, next.length))
+      next.splice(insertAt, 0, payload.item)
+      return next
+    })
+    setLastRemoved(null)
   }
 
   const setAmount = (id: string, raw: string) => {
@@ -883,6 +915,22 @@ export default function MealBuilderClient() {
 
       <div className="px-4 py-4">
         <div className="w-full max-w-4xl mx-auto space-y-4">
+          {lastRemoved && (
+            <div className="fixed left-1/2 -translate-x-1/2 bottom-6 z-50 w-[min(92vw,520px)] px-3 py-3 rounded-2xl bg-slate-900 text-white shadow-lg flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-sm font-semibold truncate">Removed {String(lastRemoved.item?.name || 'item')}</div>
+                <div className="text-xs text-white/80">Tap undo to restore</div>
+              </div>
+              <button
+                type="button"
+                onClick={undoRemove}
+                className="px-3 py-2 rounded-xl bg-white text-slate-900 text-sm font-semibold"
+              >
+                Undo
+              </button>
+            </div>
+          )}
+
           {showFavoritesPicker && (
             <div className="fixed inset-0 z-50 bg-white flex flex-col">
               <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
@@ -1274,17 +1322,6 @@ export default function MealBuilderClient() {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            removeItem(it.id)
-                          }}
-                          className="px-2 py-1 rounded-lg text-xs font-semibold text-red-600 hover:bg-red-50"
-                        >
-                          Remove
-                        </button>
                         <span className="text-gray-400">{expanded ? '▾' : '▸'}</span>
                       </div>
                     </button>
@@ -1345,6 +1382,18 @@ export default function MealBuilderClient() {
                             <span className="font-semibold text-gray-900">{round3(totals.sugar)}</span> g sugar
                           </div>
                         </div>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            removeItem(it.id)
+                          }}
+                          className="w-full mt-2 px-3 py-2 rounded-lg border border-red-200 bg-red-50 text-sm font-semibold text-red-700 hover:bg-red-100"
+                        >
+                          Remove ingredient
+                        </button>
                       </div>
                     )}
                   </div>
