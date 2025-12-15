@@ -166,7 +166,10 @@ export default function MealBuilderClient() {
 
   const [query, setQuery] = useState('')
   const [kind, setKind] = useState<'packaged' | 'single'>('packaged')
-  const [loading, setLoading] = useState(false)
+  const [searchLoading, setSearchLoading] = useState(false)
+  const [savingMeal, setSavingMeal] = useState(false)
+  const [photoLoading, setPhotoLoading] = useState(false)
+  const [barcodeLoading, setBarcodeLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [results, setResults] = useState<NormalizedFoodItem[]>([])
 
@@ -175,6 +178,15 @@ export default function MealBuilderClient() {
 
   const abortRef = useRef<AbortController | null>(null)
   const seqRef = useRef(0)
+  const photoInputRef = useRef<HTMLInputElement | null>(null)
+
+  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false)
+  const [barcodeError, setBarcodeError] = useState<string | null>(null)
+  const [barcodeStatusHint, setBarcodeStatusHint] = useState<string>('Ready')
+  const [manualBarcode, setManualBarcode] = useState('')
+  const barcodeScannerRef = useRef<any>(null)
+
+  const busy = searchLoading || savingMeal || photoLoading || barcodeLoading
 
   useEffect(() => {
     // Keep /food on the same date when the user returns.
@@ -200,6 +212,11 @@ export default function MealBuilderClient() {
     return total
   }, [items])
 
+  const addBuilderItem = (next: BuilderItem) => {
+    setItems((prev) => [...prev, next])
+    setExpandedId(next.id)
+  }
+
   const runSearch = async () => {
     const q = query.trim()
     if (!q) {
@@ -208,7 +225,7 @@ export default function MealBuilderClient() {
     }
 
     setError(null)
-    setLoading(true)
+    setSearchLoading(true)
     setResults([])
 
     try {
@@ -240,7 +257,7 @@ export default function MealBuilderClient() {
       if (e?.name === 'AbortError') return
       setError('Search failed. Please try again.')
     } finally {
-      if (seqRef.current === seq) setLoading(false)
+      if (seqRef.current === seq) setSearchLoading(false)
     }
   }
 
@@ -279,12 +296,219 @@ export default function MealBuilderClient() {
       next.servings = 1
     }
 
-    setItems((prev) => {
-      const updated = [...prev, next]
-      return updated
-    })
-    setExpandedId(id)
+    addBuilderItem(next)
   }
+
+  const addItemsFromAi = (aiItems: any[]) => {
+    if (!Array.isArray(aiItems) || aiItems.length === 0) return
+    // Add each detected ingredient as its own expandable card.
+    for (const ai of aiItems) {
+      const name = String(ai?.name || ai?.food || 'Food').trim() || 'Food'
+      const brand = ai?.brand ?? null
+      const serving_size = ai?.serving_size || ai?.servingSize || ai?.serving || ''
+      const servings = toNumber(ai?.servings) ?? 1
+
+      const base = parseServingBase(serving_size)
+      const baseAmount = base.amount
+      const baseUnit = base.unit
+
+      const id = `ai:${Date.now()}:${Math.random().toString(16).slice(2)}`
+      const next: BuilderItem = {
+        id,
+        name,
+        brand,
+        serving_size: serving_size || null,
+        calories: toNumber(ai?.calories),
+        protein_g: toNumber(ai?.protein_g),
+        carbs_g: toNumber(ai?.carbs_g),
+        fat_g: toNumber(ai?.fat_g),
+        fiber_g: toNumber(ai?.fiber_g),
+        sugar_g: toNumber(ai?.sugar_g),
+        servings: Number.isFinite(servings) && servings > 0 ? servings : 1,
+        __baseAmount: baseAmount,
+        __baseUnit: baseUnit,
+        __amount: baseAmount && baseUnit ? round3(baseAmount * (Number.isFinite(servings) ? servings : 1)) : round3(Number.isFinite(servings) ? servings : 1),
+        __unit: baseUnit,
+      }
+      addBuilderItem(next)
+    }
+  }
+
+  const analyzePhotoAndAdd = async (file: File) => {
+    if (!file) return
+    setError(null)
+    setPhotoLoading(true)
+    try {
+      const fd = new FormData()
+      fd.append('image', file)
+      // Use the existing Food image analyzer. This can return multiple ingredients.
+      fd.append('analysisMode', 'meal')
+      const res = await fetch('/api/analyze-food', { method: 'POST', body: fd })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        const msg =
+          typeof data?.message === 'string'
+            ? data.message
+            : typeof data?.error === 'string'
+            ? data.error
+            : 'Photo analysis failed. Please try again.'
+        setError(msg)
+        return
+      }
+      const detected = Array.isArray(data?.items) ? data.items : []
+      if (detected.length === 0) {
+        setError('No ingredients were detected from that photo. Try a clearer photo or use search/barcode.')
+        return
+      }
+      addItemsFromAi(detected)
+    } catch {
+      setError('Photo analysis failed. Please try again.')
+    } finally {
+      setPhotoLoading(false)
+      try {
+        if (photoInputRef.current) photoInputRef.current.value = ''
+      } catch {}
+    }
+  }
+
+  const stopBarcodeScanner = () => {
+    try {
+      const current = barcodeScannerRef.current
+      if (current?.controls?.stop) current.controls.stop()
+      if (current?.reader?.reset) current.reader.reset()
+    } catch {}
+    barcodeScannerRef.current = null
+  }
+
+  const lookupBarcode = async (codeRaw: string) => {
+    const code = String(codeRaw || '').trim().replace(/[^0-9A-Za-z]/g, '')
+    if (!code) {
+      setBarcodeError('Please enter a barcode.')
+      return
+    }
+    setBarcodeError(null)
+    setBarcodeLoading(true)
+    setBarcodeStatusHint('Looking up barcode…')
+    try {
+      const res = await fetch(`/api/barcode/lookup?code=${encodeURIComponent(code)}`, { method: 'GET' })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        if (res.status === 402) {
+          setBarcodeError('Not enough credits for barcode scanning.')
+        } else if (res.status === 404) {
+          setBarcodeError('No product found for that barcode. Try photo or search.')
+        } else if (res.status === 401) {
+          setBarcodeError('Please sign in again, then retry.')
+        } else {
+          setBarcodeError('Barcode lookup failed. Please try again.')
+        }
+        return
+      }
+      if (!data?.found || !data?.food) {
+        setBarcodeError('No product found for that barcode. Try photo or search.')
+        return
+      }
+      const food = data.food
+      const normalized: NormalizedFoodItem = {
+        source: food.source === 'fatsecret' ? 'fatsecret' : food.source === 'usda' ? 'usda' : 'openfoodfacts',
+        id: String(food.id || code),
+        name: String(food.name || 'Scanned food'),
+        brand: food.brand ?? null,
+        serving_size: String(food.serving_size || '1 serving'),
+        calories: toNumber(food.calories),
+        protein_g: toNumber(food.protein_g),
+        carbs_g: toNumber(food.carbs_g),
+        fat_g: toNumber(food.fat_g),
+        fiber_g: toNumber(food.fiber_g),
+        sugar_g: toNumber(food.sugar_g),
+      }
+      addItem(normalized)
+      setBarcodeStatusHint('Added')
+      setShowBarcodeScanner(false)
+    } catch {
+      setBarcodeError('Barcode lookup failed. Please try again.')
+    } finally {
+      setBarcodeLoading(false)
+    }
+  }
+
+  const startBarcodeScanner = async () => {
+    setBarcodeError(null)
+    setBarcodeStatusHint('Starting camera…')
+    try {
+      stopBarcodeScanner()
+      const region = document.getElementById('meal-builder-barcode-region')
+      if (!region) {
+        setBarcodeError('Camera area missing. Close and reopen the scanner.')
+        setBarcodeStatusHint('Camera error')
+        return
+      }
+      region.innerHTML = ''
+      const videoEl = document.createElement('video')
+      videoEl.setAttribute('playsinline', 'true')
+      videoEl.setAttribute('autoplay', 'true')
+      videoEl.muted = true
+      videoEl.playsInline = true
+      videoEl.autoplay = true
+      videoEl.style.width = '100%'
+      videoEl.style.height = '100%'
+      videoEl.style.objectFit = 'cover'
+      region.appendChild(videoEl)
+
+      const { BrowserMultiFormatReader, BarcodeFormat } = await import('@zxing/browser')
+      const { DecodeHintType } = await import('@zxing/library')
+      const hints = new Map()
+      hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+        BarcodeFormat.EAN_13,
+        BarcodeFormat.EAN_8,
+        BarcodeFormat.UPC_A,
+        BarcodeFormat.UPC_E,
+        BarcodeFormat.CODE_128,
+        BarcodeFormat.CODE_39,
+        BarcodeFormat.CODE_93,
+        BarcodeFormat.ITF,
+      ])
+      hints.set(DecodeHintType.TRY_HARDER, true)
+      const reader = new BrowserMultiFormatReader()
+      reader.setHints(hints)
+
+      const constraints: any = {
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          advanced: [{ focusMode: 'continuous' }],
+        },
+      }
+
+      const controls = await reader.decodeFromConstraints(constraints, videoEl, (result: any) => {
+        const text = result?.getText ? result.getText() : result?.text
+        if (!text) return
+        // Stop quickly so we don't double-trigger.
+        stopBarcodeScanner()
+        lookupBarcode(text)
+      })
+
+      barcodeScannerRef.current = { reader, controls, videoEl }
+      setBarcodeStatusHint('Scanning…')
+    } catch {
+      setBarcodeError('Could not start the camera. Please allow camera access and retry.')
+      setBarcodeStatusHint('Camera error')
+      stopBarcodeScanner()
+    }
+  }
+
+  useEffect(() => {
+    if (!showBarcodeScanner) {
+      stopBarcodeScanner()
+      setBarcodeError(null)
+      setBarcodeStatusHint('Ready')
+      return
+    }
+    startBarcodeScanner()
+    return () => stopBarcodeScanner()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showBarcodeScanner])
 
   const removeItem = (id: string) => {
     setItems((prev) => prev.filter((x) => x.id !== id))
@@ -370,7 +594,7 @@ export default function MealBuilderClient() {
       createdAt: createdAtIso,
     }
 
-    setLoading(true)
+    setSavingMeal(true)
     try {
       const res = await fetch('/api/food-log', {
         method: 'POST',
@@ -386,7 +610,7 @@ export default function MealBuilderClient() {
     } catch {
       setError('Saving failed. Please try again.')
     } finally {
-      setLoading(false)
+      setSavingMeal(false)
     }
   }
 
@@ -411,7 +635,7 @@ export default function MealBuilderClient() {
           <button
             type="button"
             onClick={createMeal}
-            disabled={loading}
+            disabled={busy}
             className="px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold disabled:opacity-60"
           >
             Save meal
@@ -421,6 +645,75 @@ export default function MealBuilderClient() {
 
       <div className="px-4 py-4">
         <div className="w-full max-w-4xl mx-auto space-y-4">
+          {showBarcodeScanner && (
+            <div className="fixed inset-0 z-50 bg-black">
+              <div className="absolute inset-0 flex flex-col">
+                <div className="flex items-center justify-between px-4 py-3 bg-black/70 text-white">
+                  <div className="text-sm font-semibold">Scan barcode</div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowBarcodeScanner(false)
+                      stopBarcodeScanner()
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-white/10"
+                  >
+                    Close
+                  </button>
+                </div>
+
+                <div className="flex-1 relative">
+                  <div id="meal-builder-barcode-region" className="absolute inset-0" />
+                  <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                    <div className="w-64 h-40 border-2 border-white/70 rounded-xl" />
+                  </div>
+                </div>
+
+                <div className="bg-black/85 text-white px-4 py-3 space-y-2">
+                  <div className="text-xs text-white/80">{barcodeStatusHint}</div>
+                  {barcodeError && <div className="text-xs text-red-300">{barcodeError}</div>}
+
+                  <div className="flex gap-2">
+                    <input
+                      value={manualBarcode}
+                      onChange={(e) => setManualBarcode(e.target.value)}
+                      placeholder="Enter barcode"
+                      className="flex-1 px-3 py-2 rounded-lg bg-white text-gray-900 text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => lookupBarcode(manualBarcode)}
+                      disabled={barcodeLoading}
+                      className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold disabled:opacity-60"
+                    >
+                      Lookup
+                    </button>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => startBarcodeScanner()}
+                      className="flex-1 px-3 py-2 rounded-lg bg-white/10 text-white text-sm font-semibold"
+                    >
+                      Restart camera
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowBarcodeScanner(false)
+                        stopBarcodeScanner()
+                      }}
+                      className="flex-1 px-3 py-2 rounded-lg bg-white/10 text-white text-sm font-semibold"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
         <div className="rounded-2xl border border-gray-200 bg-white p-3 sm:p-4 space-y-3">
           <div className="text-sm font-semibold text-gray-900">Meal name (optional)</div>
           <input
@@ -442,7 +735,7 @@ export default function MealBuilderClient() {
             />
             <button
               type="button"
-              disabled={loading}
+              disabled={busy}
               onClick={runSearch}
               className="px-4 py-2 rounded-lg bg-slate-900 text-white text-sm font-semibold disabled:opacity-60"
             >
@@ -469,8 +762,51 @@ export default function MealBuilderClient() {
               Single food
             </button>
           </div>
+          <div className="flex flex-col gap-2 pt-1">
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => photoInputRef.current?.click()}
+                className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-60"
+              >
+                {photoLoading ? 'Adding photo…' : 'Add by photo'}
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => setShowBarcodeScanner(true)}
+                className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-60"
+              >
+                {barcodeLoading ? 'Looking up…' : 'Scan barcode'}
+              </button>
+            </div>
+            <input
+              ref={photoInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0]
+                if (f) analyzePhotoAndAdd(f)
+              }}
+            />
+          </div>
+
           {error && <div className="text-xs text-red-600">{error}</div>}
-          {loading && <div className="text-xs text-gray-500">Working…</div>}
+          {(searchLoading || savingMeal || photoLoading || barcodeLoading) && (
+            <div className="text-xs text-gray-500">
+              {searchLoading
+                ? 'Searching…'
+                : savingMeal
+                ? 'Saving…'
+                : photoLoading
+                ? 'Analyzing photo…'
+                : barcodeLoading
+                ? 'Looking up barcode…'
+                : 'Working…'}
+            </div>
+          )}
 
           {results.length > 0 && (
             <div className="max-h-72 overflow-y-auto space-y-2 pt-1">
@@ -641,7 +977,7 @@ export default function MealBuilderClient() {
         <button
           type="button"
           onClick={createMeal}
-          disabled={loading}
+          disabled={busy}
           className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-semibold rounded-2xl"
         >
           Save meal
