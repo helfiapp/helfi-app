@@ -5537,9 +5537,11 @@ Please add nutritional information manually if needed.`);
     try {
       e?.stopPropagation?.()
     } catch {}
+    const desiredMode = context?.mode || 'analysis'
+    const desiredCategory = context?.targetCategory || selectedAddCategory
     addIngredientContextRef.current = {
-      mode: context?.mode || 'analysis',
-      targetCategory: context?.targetCategory,
+      mode: desiredMode,
+      targetCategory: desiredCategory,
     }
     // Close any add menus/dropdowns first, then open the modal.
     setShowPhotoOptions(false)
@@ -5547,6 +5549,28 @@ Please add nutritional information manually if needed.`);
     setPhotoOptionsAnchor(null)
     setPhotoOptionsPosition(null)
     setPendingPhotoPicker(false)
+
+    // User request: Add Ingredient should be a dedicated page (not a pop-up) when adding to the diary.
+    if (desiredMode === 'diary') {
+      try {
+        officialSearchAbortRef.current?.abort()
+      } catch {}
+      try {
+        if (officialSearchDebounceRef.current) clearTimeout(officialSearchDebounceRef.current)
+      } catch {}
+      officialSearchDebounceRef.current = null
+      officialSearchAbortRef.current = null
+      officialSearchSeqRef.current += 1
+      setOfficialLoading(false)
+      setOfficialError(null)
+      setOfficialResults([])
+      setOfficialSearchQuery('')
+      setShowAddIngredientModal(false)
+      router.push(
+        `/food/add-ingredient?date=${encodeURIComponent(selectedDate)}&category=${encodeURIComponent(desiredCategory)}`,
+      )
+      return
+    }
     // Reset search state every time this modal is opened so it can't get stuck in "loading".
     try {
       officialSearchAbortRef.current?.abort()
