@@ -1551,6 +1551,8 @@ export default function FoodDiary() {
   const [analyzedTotal, setAnalyzedTotal] = useState<any>(null) // Total nutrition from API
   const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null) // Which item is being edited
   const [showItemEditModal, setShowItemEditModal] = useState<boolean>(false) // Show edit modal for item
+  // Numeric input drafts (so tapping clears the box without mutating values until the user types)
+  const [numericInputDrafts, setNumericInputDrafts] = useState<Record<string, string>>({})
   const [healthWarning, setHealthWarning] = useState<string | null>(null)
   const [healthAlternatives, setHealthAlternatives] = useState<string | null>(null)
   const [historySaveError, setHistorySaveError] = useState<string | null>(null)
@@ -9881,10 +9883,32 @@ Please add nutritional information manually if needed.`);
                                       inputMode="decimal"
                                       min={0}
                                       step={servingsStep > 0 ? Math.max(servingsStep, 0.01) : 0.25}
-                                      value={formatNumberInputValue(item.servings ?? 1)}
-                                      onChange={(e) => updateItemField(index, 'servings', e.target.value)}
-                                      onFocus={(e) => e.currentTarget.select()}
-                                      onClick={(e) => e.currentTarget.select()}
+                                      value={(() => {
+                                        const key = `ai:card:${index}:servings`
+                                        return Object.prototype.hasOwnProperty.call(numericInputDrafts, key)
+                                          ? numericInputDrafts[key]
+                                          : formatNumberInputValue(item.servings ?? 1)
+                                      })()}
+                                      onFocus={() => {
+                                        const key = `ai:card:${index}:servings`
+                                        setNumericInputDrafts((prev) => ({ ...prev, [key]: '' }))
+                                      }}
+                                      onChange={(e) => {
+                                        const key = `ai:card:${index}:servings`
+                                        const v = e.target.value
+                                        setNumericInputDrafts((prev) => ({ ...prev, [key]: v }))
+                                        if (String(v).trim() !== '') {
+                                          updateItemField(index, 'servings', v)
+                                        }
+                                      }}
+                                      onBlur={() => {
+                                        const key = `ai:card:${index}:servings`
+                                        setNumericInputDrafts((prev) => {
+                                          const next = { ...prev }
+                                          delete next[key]
+                                          return next
+                                        })
+                                      }}
                                       className="w-20 px-2 py-1 border border-gray-300 rounded-lg text-base font-semibold text-gray-900 text-center focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                                     />
                                     <button
@@ -9963,14 +9987,35 @@ Please add nutritional information manually if needed.`);
                                       min={0}
                                       step={(item?.weightUnit === 'oz' ? 0.1 : 1) as any}
                                       data-weight-input-id={`weight-input-${index}`}
-                                      value={
-                                        Number.isFinite(Number(item?.weightAmount)) && Number(item.weightAmount) > 0
-                                          ? Number(item.weightAmount)
+                                      value={(() => {
+                                        const key = `ai:card:${index}:weightAmount`
+                                        if (Object.prototype.hasOwnProperty.call(numericInputDrafts, key)) {
+                                          return numericInputDrafts[key]
+                                        }
+                                        return Number.isFinite(Number(item?.weightAmount)) && Number(item.weightAmount) > 0
+                                          ? String(Number(item.weightAmount))
                                           : ''
-                                      }
-                                      onChange={(e) => updateItemField(index, 'weightAmount', e.target.value)}
-                                      onFocus={(e) => e.currentTarget.select()}
-                                      onClick={(e) => e.currentTarget.select()}
+                                      })()}
+                                      onFocus={() => {
+                                        const key = `ai:card:${index}:weightAmount`
+                                        setNumericInputDrafts((prev) => ({ ...prev, [key]: '' }))
+                                      }}
+                                      onChange={(e) => {
+                                        const key = `ai:card:${index}:weightAmount`
+                                        const v = e.target.value
+                                        setNumericInputDrafts((prev) => ({ ...prev, [key]: v }))
+                                        if (String(v).trim() !== '') {
+                                          updateItemField(index, 'weightAmount', v)
+                                        }
+                                      }}
+                                      onBlur={() => {
+                                        const key = `ai:card:${index}:weightAmount`
+                                        setNumericInputDrafts((prev) => {
+                                          const next = { ...prev }
+                                          delete next[key]
+                                          return next
+                                        })
+                                      }}
                                       placeholder={
                                         baseWeightPerServing
                                           ? String(
@@ -10293,10 +10338,32 @@ Please add nutritional information manually if needed.`);
                             const meta = parseServingUnitMetadata(analyzedItems[editingItemIndex]?.serving_size || '')
                             return meta && isDiscreteUnitLabel(meta.unitLabel) ? (1 / meta.quantity) : 0.25
                           })()}
-                          value={analyzedItems[editingItemIndex]?.servings ?? 1}
-                          onChange={(e) => updateItemField(editingItemIndex, 'servings', e.target.value)}
-                          onFocus={(e) => e.currentTarget.select()}
-                          onClick={(e) => e.currentTarget.select()}
+                          value={(() => {
+                            const key = `ai:modal:${editingItemIndex}:servings`
+                            return Object.prototype.hasOwnProperty.call(numericInputDrafts, key)
+                              ? numericInputDrafts[key]
+                              : String(analyzedItems[editingItemIndex]?.servings ?? 1)
+                          })()}
+                          onFocus={() => {
+                            const key = `ai:modal:${editingItemIndex}:servings`
+                            setNumericInputDrafts((prev) => ({ ...prev, [key]: '' }))
+                          }}
+                          onChange={(e) => {
+                            const key = `ai:modal:${editingItemIndex}:servings`
+                            const v = e.target.value
+                            setNumericInputDrafts((prev) => ({ ...prev, [key]: v }))
+                            if (String(v).trim() !== '') {
+                              updateItemField(editingItemIndex, 'servings', v)
+                            }
+                          }}
+                          onBlur={() => {
+                            const key = `ai:modal:${editingItemIndex}:servings`
+                            setNumericInputDrafts((prev) => {
+                              const next = { ...prev }
+                              delete next[key]
+                              return next
+                            })
+                          }}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                           placeholder="e.g., 1"
                         />
@@ -10317,10 +10384,30 @@ Please add nutritional information manually if needed.`);
                               inputMode="decimal"
                               min={0}
                               step={1}
-                              value={analyzedItems[editingItemIndex]?.calories ?? ''}
-                              onChange={(e) => updateItemField(editingItemIndex, 'calories', e.target.value)}
-                              onFocus={(e) => e.currentTarget.select()}
-                              onClick={(e) => e.currentTarget.select()}
+                              value={(() => {
+                                const key = `ai:modal:${editingItemIndex}:calories`
+                                return Object.prototype.hasOwnProperty.call(numericInputDrafts, key)
+                                  ? numericInputDrafts[key]
+                                  : String(analyzedItems[editingItemIndex]?.calories ?? '')
+                              })()}
+                              onFocus={() => {
+                                const key = `ai:modal:${editingItemIndex}:calories`
+                                setNumericInputDrafts((prev) => ({ ...prev, [key]: '' }))
+                              }}
+                              onChange={(e) => {
+                                const key = `ai:modal:${editingItemIndex}:calories`
+                                const v = e.target.value
+                                setNumericInputDrafts((prev) => ({ ...prev, [key]: v }))
+                                if (String(v).trim() !== '') updateItemField(editingItemIndex, 'calories', v)
+                              }}
+                              onBlur={() => {
+                                const key = `ai:modal:${editingItemIndex}:calories`
+                                setNumericInputDrafts((prev) => {
+                                  const next = { ...prev }
+                                  delete next[key]
+                                  return next
+                                })
+                              }}
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                               placeholder="kcal"
                             />
@@ -10332,10 +10419,30 @@ Please add nutritional information manually if needed.`);
                               inputMode="decimal"
                               min={0}
                               step={0.1}
-                              value={analyzedItems[editingItemIndex]?.protein_g ?? ''}
-                              onChange={(e) => updateItemField(editingItemIndex, 'protein_g', e.target.value)}
-                              onFocus={(e) => e.currentTarget.select()}
-                              onClick={(e) => e.currentTarget.select()}
+                              value={(() => {
+                                const key = `ai:modal:${editingItemIndex}:protein_g`
+                                return Object.prototype.hasOwnProperty.call(numericInputDrafts, key)
+                                  ? numericInputDrafts[key]
+                                  : String(analyzedItems[editingItemIndex]?.protein_g ?? '')
+                              })()}
+                              onFocus={() => {
+                                const key = `ai:modal:${editingItemIndex}:protein_g`
+                                setNumericInputDrafts((prev) => ({ ...prev, [key]: '' }))
+                              }}
+                              onChange={(e) => {
+                                const key = `ai:modal:${editingItemIndex}:protein_g`
+                                const v = e.target.value
+                                setNumericInputDrafts((prev) => ({ ...prev, [key]: v }))
+                                if (String(v).trim() !== '') updateItemField(editingItemIndex, 'protein_g', v)
+                              }}
+                              onBlur={() => {
+                                const key = `ai:modal:${editingItemIndex}:protein_g`
+                                setNumericInputDrafts((prev) => {
+                                  const next = { ...prev }
+                                  delete next[key]
+                                  return next
+                                })
+                              }}
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                               placeholder="g"
                             />
@@ -10347,10 +10454,30 @@ Please add nutritional information manually if needed.`);
                               inputMode="decimal"
                               min={0}
                               step={0.1}
-                              value={analyzedItems[editingItemIndex]?.carbs_g ?? ''}
-                              onChange={(e) => updateItemField(editingItemIndex, 'carbs_g', e.target.value)}
-                              onFocus={(e) => e.currentTarget.select()}
-                              onClick={(e) => e.currentTarget.select()}
+                              value={(() => {
+                                const key = `ai:modal:${editingItemIndex}:carbs_g`
+                                return Object.prototype.hasOwnProperty.call(numericInputDrafts, key)
+                                  ? numericInputDrafts[key]
+                                  : String(analyzedItems[editingItemIndex]?.carbs_g ?? '')
+                              })()}
+                              onFocus={() => {
+                                const key = `ai:modal:${editingItemIndex}:carbs_g`
+                                setNumericInputDrafts((prev) => ({ ...prev, [key]: '' }))
+                              }}
+                              onChange={(e) => {
+                                const key = `ai:modal:${editingItemIndex}:carbs_g`
+                                const v = e.target.value
+                                setNumericInputDrafts((prev) => ({ ...prev, [key]: v }))
+                                if (String(v).trim() !== '') updateItemField(editingItemIndex, 'carbs_g', v)
+                              }}
+                              onBlur={() => {
+                                const key = `ai:modal:${editingItemIndex}:carbs_g`
+                                setNumericInputDrafts((prev) => {
+                                  const next = { ...prev }
+                                  delete next[key]
+                                  return next
+                                })
+                              }}
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                               placeholder="g"
                             />
@@ -10362,10 +10489,30 @@ Please add nutritional information manually if needed.`);
                               inputMode="decimal"
                               min={0}
                               step={0.1}
-                              value={analyzedItems[editingItemIndex]?.fat_g ?? ''}
-                              onChange={(e) => updateItemField(editingItemIndex, 'fat_g', e.target.value)}
-                              onFocus={(e) => e.currentTarget.select()}
-                              onClick={(e) => e.currentTarget.select()}
+                              value={(() => {
+                                const key = `ai:modal:${editingItemIndex}:fat_g`
+                                return Object.prototype.hasOwnProperty.call(numericInputDrafts, key)
+                                  ? numericInputDrafts[key]
+                                  : String(analyzedItems[editingItemIndex]?.fat_g ?? '')
+                              })()}
+                              onFocus={() => {
+                                const key = `ai:modal:${editingItemIndex}:fat_g`
+                                setNumericInputDrafts((prev) => ({ ...prev, [key]: '' }))
+                              }}
+                              onChange={(e) => {
+                                const key = `ai:modal:${editingItemIndex}:fat_g`
+                                const v = e.target.value
+                                setNumericInputDrafts((prev) => ({ ...prev, [key]: v }))
+                                if (String(v).trim() !== '') updateItemField(editingItemIndex, 'fat_g', v)
+                              }}
+                              onBlur={() => {
+                                const key = `ai:modal:${editingItemIndex}:fat_g`
+                                setNumericInputDrafts((prev) => {
+                                  const next = { ...prev }
+                                  delete next[key]
+                                  return next
+                                })
+                              }}
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                               placeholder="g"
                             />
@@ -10377,10 +10524,30 @@ Please add nutritional information manually if needed.`);
                               inputMode="decimal"
                               min={0}
                               step={0.1}
-                              value={analyzedItems[editingItemIndex]?.fiber_g ?? ''}
-                              onChange={(e) => updateItemField(editingItemIndex, 'fiber_g', e.target.value)}
-                              onFocus={(e) => e.currentTarget.select()}
-                              onClick={(e) => e.currentTarget.select()}
+                              value={(() => {
+                                const key = `ai:modal:${editingItemIndex}:fiber_g`
+                                return Object.prototype.hasOwnProperty.call(numericInputDrafts, key)
+                                  ? numericInputDrafts[key]
+                                  : String(analyzedItems[editingItemIndex]?.fiber_g ?? '')
+                              })()}
+                              onFocus={() => {
+                                const key = `ai:modal:${editingItemIndex}:fiber_g`
+                                setNumericInputDrafts((prev) => ({ ...prev, [key]: '' }))
+                              }}
+                              onChange={(e) => {
+                                const key = `ai:modal:${editingItemIndex}:fiber_g`
+                                const v = e.target.value
+                                setNumericInputDrafts((prev) => ({ ...prev, [key]: v }))
+                                if (String(v).trim() !== '') updateItemField(editingItemIndex, 'fiber_g', v)
+                              }}
+                              onBlur={() => {
+                                const key = `ai:modal:${editingItemIndex}:fiber_g`
+                                setNumericInputDrafts((prev) => {
+                                  const next = { ...prev }
+                                  delete next[key]
+                                  return next
+                                })
+                              }}
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                               placeholder="g"
                             />
@@ -10392,10 +10559,30 @@ Please add nutritional information manually if needed.`);
                               inputMode="decimal"
                               min={0}
                               step={0.1}
-                              value={analyzedItems[editingItemIndex]?.sugar_g ?? ''}
-                              onChange={(e) => updateItemField(editingItemIndex, 'sugar_g', e.target.value)}
-                              onFocus={(e) => e.currentTarget.select()}
-                              onClick={(e) => e.currentTarget.select()}
+                              value={(() => {
+                                const key = `ai:modal:${editingItemIndex}:sugar_g`
+                                return Object.prototype.hasOwnProperty.call(numericInputDrafts, key)
+                                  ? numericInputDrafts[key]
+                                  : String(analyzedItems[editingItemIndex]?.sugar_g ?? '')
+                              })()}
+                              onFocus={() => {
+                                const key = `ai:modal:${editingItemIndex}:sugar_g`
+                                setNumericInputDrafts((prev) => ({ ...prev, [key]: '' }))
+                              }}
+                              onChange={(e) => {
+                                const key = `ai:modal:${editingItemIndex}:sugar_g`
+                                const v = e.target.value
+                                setNumericInputDrafts((prev) => ({ ...prev, [key]: v }))
+                                if (String(v).trim() !== '') updateItemField(editingItemIndex, 'sugar_g', v)
+                              }}
+                              onBlur={() => {
+                                const key = `ai:modal:${editingItemIndex}:sugar_g`
+                                setNumericInputDrafts((prev) => {
+                                  const next = { ...prev }
+                                  delete next[key]
+                                  return next
+                                })
+                              }}
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                               placeholder="g"
                             />
